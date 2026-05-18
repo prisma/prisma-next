@@ -2,11 +2,20 @@
 
 ## Thesis
 
-**Definition of Ready (DoR)** is the team's pre-condition checklist for picking up a unit of work. If DoR is not satisfied, the unit is not pickable — the agile orchestrator either resolves the gap before delegating or surfaces the gap (often as a design discussion). DoR is the structural fix for the failure mode where a unit looks pickable but isn't, and the implementer discovers the gap mid-dispatch (drift) or quietly accommodates around it (silent expansion).
+**Definition of Ready (DoR)** is the team's pre-condition checklist for picking up a unit of work. If DoR is not satisfied, the unit is **not ready to start** — the agile orchestrator either resolves the gap before delegating or surfaces the gap (often as a design discussion). DoR is the structural fix for the failure mode where a unit *looks* ready but isn't, and the implementer discovers the gap mid-dispatch (drift) or quietly accommodates around it (silent expansion).
 
 DoR gates **three scopes**: project, slice, dispatch. The shape is the same at every scope (a checklist with pass/fail items); the content scales with the unit. The protocol carries the shape; calibration carries the content.
 
 DoR is the *pickup* gate. Definition of Done (next principle) is the *handoff* gate. Together they bookend every unit of work.
+
+## Terminology
+
+A few words this principle reuses, defined once:
+
+- **Pickup.** The moment work transitions from "not yet started" to "in flight." For a project: when the first slice initiates under it. For a slice: when its first dispatch is delegated. For a dispatch: when the brief is handed to the implementer (subagent or operator).
+- **Ready to start** (synonym: **pickable**). A unit whose DoR is satisfied. The shorthand "pickable" appears in some places because it's the established Agile vocabulary for this state; treat it as exactly equivalent to "DoR-satisfied — every pickup pre-condition is met."
+- **Pickup pre-condition.** A specific structural fact about the unit that must be true before pickup — e.g. "the slice plan exists and every dispatch in it is sized ≤ M," "the brief's linked spike artefact is at the named path and readable." Each DoR checklist item names one pickup pre-condition.
+- **Gap.** A pickup pre-condition that is *not* met. When DoR check finds a gap, the next action is to resolve the gap (not to delegate the unit and hope).
 
 ## Why DoR matters
 
@@ -206,4 +215,4 @@ Two failure modes:
 - **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the M-cap at dispatch DoR is the size invariant cost optimization depends on.
 - **[`roles-and-personas.md`](roles-and-personas.md)** — the agile orchestrator persona runs DoR at every scope.
 - (Upcoming) **`definition-of-done.md`** — the handoff gate that bookends every unit; together with DoR they form the unit's contract.
-- (Upcoming) **`retro.md`** — when DoR catches a gap, it's the gate working; when it doesn't, the retro updates the calibration's DoR overlay.
+- [`retro.md`](retro.md) — when DoR catches a gap, it's the gate working; when it doesn't, the retro updates the calibration's DoR overlay.

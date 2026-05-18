@@ -6,7 +6,7 @@ A **brief** is the artefact passed to a dispatch at delegation time. It is the d
 
 Brief discipline is the dispatch-scope analogue of Specification by Example / Example Mapping: every brief carries the worked examples that will trip the implementer, with the disposition pre-named. Pre-naming dispositions is the structural fix for the "silent accommodation" failure mode — the implementer cannot interpret an edge case as the brief failed to anticipate, because the brief did anticipate it.
 
-The brief is also the unit the Definition of Ready gates and the Definition of Done verifies. DoR asks "is this brief satisfied as a brief?" — not "does it look pickable." DoD asks "did the dispatch fulfil the contract this brief declares?"
+The brief is also the unit the Definition of Ready gates and the Definition of Done verifies. DoR asks the structural question "are the brief's required sections present, are the inputs it links actually loadable, and are the validation gates runnable?" — not the vibe question "does this look ready to me?". DoD asks "did the dispatch fulfil the contract this brief declares?"
 
 ## What a brief contains
 
@@ -246,5 +246,5 @@ Worth naming: the *first* time an edge case happens, the brief was the wrong pla
 - **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — brief's model-tier section is the per-dispatch routing decision.
 - **[`spikes.md`](spikes.md)** — spike-flavoured brief is a variant with an artefact-spec section in place of validation gates.
 - **[`roles-and-personas.md`](roles-and-personas.md)** — brief is assembled by the agile orchestrator persona; implementer + reviewer assignments live in the brief.
-- (Upcoming) **`definition-of-ready.md`** — DoR gates whether the brief is pickable.
-- (Upcoming) **`definition-of-done.md`** — DoD is the brief's validation-gates section operationalised at handoff.
+- [`definition-of-ready.md`](definition-of-ready.md) — DoR gates whether the brief is ready to start (every brief section present, inputs loadable, gates runnable).
+- [`definition-of-done.md`](definition-of-done.md) — DoD is the brief's validation-gates section operationalised at handoff, plus intent-validation and (for slices touching user-observable surface) manual QA.
