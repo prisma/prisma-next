@@ -1,35 +1,44 @@
 import { NamespaceBase } from '@prisma-next/framework-components/ir';
+import { MongoCollection } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetDatabase, MongoTargetUnboundDatabase } from '../src/core/mongo-target-database';
 
 describe('MongoTargetDatabase', () => {
   it('is a NamespaceBase subclass (target ↦ family ↦ framework lineage)', () => {
-    const db = new MongoTargetDatabase('app_db');
+    const db = new MongoTargetDatabase({ id: 'app_db' });
     expect(db).toBeInstanceOf(NamespaceBase);
     expect(db).toBeInstanceOf(MongoTargetDatabase);
   });
 
   it('carries kind="database" and the database id', () => {
-    const db = new MongoTargetDatabase('app_db');
+    const db = new MongoTargetDatabase({ id: 'app_db' });
     expect(db.kind).toBe('database');
     expect(db.id).toBe('app_db');
   });
 
   it('is frozen after construction (no mutation possible)', () => {
-    const db = new MongoTargetDatabase('app_db');
+    const db = new MongoTargetDatabase({ id: 'app_db' });
     expect(Object.isFrozen(db)).toBe(true);
   });
 
   describe('qualifier emission', () => {
     it('returns the database name as its qualifier', () => {
-      const db = new MongoTargetDatabase('analytics');
+      const db = new MongoTargetDatabase({ id: 'analytics' });
       expect(db.qualifier()).toBe('analytics');
     });
 
     it('qualifies a collection name with the database prefix', () => {
-      const db = new MongoTargetDatabase('analytics');
+      const db = new MongoTargetDatabase({ id: 'analytics' });
       expect(db.qualifyCollection('events')).toBe('analytics.events');
     });
+  });
+
+  it('normalises plain collection inputs into MongoCollection instances', () => {
+    const db = new MongoTargetDatabase({
+      id: 'app',
+      tables: { users: {} },
+    });
+    expect(db.tables['users']).toBeInstanceOf(MongoCollection);
   });
 });
 
@@ -42,6 +51,11 @@ describe('MongoTargetUnboundDatabase', () => {
 
   it('carries id="__unbound__"', () => {
     expect(MongoTargetUnboundDatabase.instance.id).toBe('__unbound__');
+  });
+
+  it('carries an empty frozen tables map', () => {
+    expect(MongoTargetUnboundDatabase.instance.tables).toEqual({});
+    expect(Object.isFrozen(MongoTargetUnboundDatabase.instance.tables)).toBe(true);
   });
 
   it('exposes a stable singleton reference', () => {

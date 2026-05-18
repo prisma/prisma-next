@@ -3,6 +3,12 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { MongoCollection, type MongoCollectionInput } from '@prisma-next/mongo-contract';
+
+export interface MongoTargetDatabaseInput {
+  readonly id: string;
+  readonly tables?: Record<string, MongoCollection | MongoCollectionInput>;
+}
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
@@ -16,23 +22,23 @@ import {
  * the result polymorphically. The unbound singleton overrides these
  * methods to elide the prefix entirely — call sites stay polymorphic and
  * never branch on `id === UNBOUND_NAMESPACE_ID`.
- *
- * **Freeze-trap warning.** The constructor calls `freezeNode(this)` at
- * the end. Direct subclasses MUST NOT add instance fields — the freeze
- * runs in this base constructor and any subclass field assignment will
- * silently fail in non-strict mode or throw in strict mode. The
- * `MongoTargetUnboundDatabase` singleton below is intentionally
- * field-free for this reason; if a future subclass needs to carry
- * additional fields, lift this `freezeNode` to the leaf-class
- * constructors (or to a `seal()` hook each leaf calls explicitly).
  */
 export class MongoTargetDatabase extends NamespaceBase {
   readonly kind = 'database' as const;
   readonly id: string;
+  readonly tables: Readonly<Record<string, MongoCollection>>;
 
-  constructor(id: string) {
+  constructor(input: MongoTargetDatabaseInput) {
     super();
-    this.id = id;
+    this.id = input.id;
+    this.tables = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.tables ?? {}).map(([name, c]) => [
+          name,
+          c instanceof MongoCollection ? c : new MongoCollection(c),
+        ]),
+      ),
+    );
     freezeNode(this);
   }
 
@@ -72,7 +78,7 @@ export class MongoTargetUnboundDatabase extends MongoTargetDatabase {
   static readonly instance: MongoTargetUnboundDatabase = new MongoTargetUnboundDatabase();
 
   private constructor() {
-    super(UNBOUND_NAMESPACE_ID);
+    super({ id: UNBOUND_NAMESPACE_ID });
   }
 
   override qualifier(): string {
