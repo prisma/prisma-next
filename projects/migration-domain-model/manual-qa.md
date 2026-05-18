@@ -40,10 +40,15 @@
 
 ## Pre-flight
 
-1. **Be on the PR branch.** `git status` must show a clean tree, on the branch that contains the TML-2546 changes (the orchestrator branch or the merged-to-main commit).
+1. **Be on the PR branch.** Check out the branch that contains the TML-2546 changes (the orchestrator branch or the merged-to-main commit).
 2. **Refresh bin symlinks and build artifacts.** `pnpm install && pnpm build`. This is mandatory — `pnpm fixtures:check` and the demo's `prisma-next` binary will silently use stale code without it. (The M7 R1 round hit this; the reviewer flagged it for QA.)
-3. **Baseline check.** `git status` clean; `pnpm --version` ≥ 10; `node --version` matches root `package.json` `engines.node`.
-4. **Open the spec.** Have `projects/migration-domain-model/spec.md` open in another tab — Scenario 1 compares the help output against the intended-surface diagram.
+3. **`git status` baseline.** A clean tree is the goal, **except for two known-intentional uncommitted items** the orchestrator typically commits before handoff but may still be live when QA starts:
+   - `M projects/migration-domain-model/plan.md` — the M7 R3 amendment that records this round'\''s task list.
+   - `M wip/unattended-decisions.md` — the orchestrator'\''s ongoing decision record (gitignored content, but `wip/` itself can show in status if any tracked file landed there earlier).
+
+   If `git status` shows **only** those two paths and otherwise nothing else, treat it as clean and proceed. If it shows additional unexpected entries (especially under `packages/`, `docs/`, `test/`, or `examples/`), surface the surprise as a finding before running scenarios — running QA against an unverified tree wastes runner time. If you prefer a strictly-clean tree, stash the two known items (`git stash push -m 'qa-baseline'`) before starting and `git stash pop` when finished.
+4. **Tooling versions.** `pnpm --version` ≥ 10; `node --version` matches root `package.json` `engines.node`.
+5. **Open the spec.** Have `projects/migration-domain-model/spec.md` open in another tab — Scenario 1 compares the help output against the intended-surface diagram.
 
 ## Scenario 1 — Help enumerates the intended surface
 
