@@ -109,6 +109,7 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
+      readonly __unbound__: {
       readonly articles: {
         namespaceId: '__unbound__';
         columns: {
@@ -241,6 +242,7 @@ type ContractBase = ContractType<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+    };
     };
     readonly types: Record<string, never>;
     readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };

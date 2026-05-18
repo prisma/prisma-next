@@ -14,7 +14,7 @@ import type {
   Scope,
   StorageTableToScopeTable,
 } from '../scope';
-import type { TableProxyContract } from './db';
+import type { FlatTablesOf, TableProxyContract } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
@@ -53,16 +53,12 @@ type ResolvedColumnTypes<
   ? Record<string, never>
   : FindModelForTable<C, TableName> extends infer ModelName extends string
     ? ModelName extends keyof FieldTypes
-      ? C extends {
-          readonly storage: { readonly tables: infer Tables extends Record<string, StorageTable> };
-        }
-        ? TableName extends keyof Tables
+      ? C extends TableProxyContract
+        ? TableName extends string & keyof FlatTablesOf<C['storage']['tables']>
           ? {
-              [ColName in keyof Tables[TableName]['columns'] & string]: FindFieldForColumn<
-                C,
-                ModelName,
-                ColName
-              > extends infer FieldName extends string
+              [ColName in keyof FlatTablesOf<C['storage']['tables']>[TableName]['columns'] &
+                string]: FindFieldForColumn<C, ModelName, ColName> extends infer FieldName extends
+                string
                 ? FieldName extends keyof FieldTypes[ModelName]
                   ? FieldTypes[ModelName][FieldName]
                   : unknown
@@ -120,11 +116,11 @@ type ContractToQC<C extends TableProxyContract, Name extends string = string> = 
 
 export interface TableProxy<
   C extends TableProxyContract,
-  Name extends string & keyof C['storage']['tables'],
+  Name extends string & keyof FlatTablesOf<C['storage']['tables']>,
   Alias extends string = Name,
-  AvailableScope extends Scope = DefaultScope<Name, C['storage']['tables'][Name]>,
+  AvailableScope extends Scope = DefaultScope<Name, FlatTablesOf<C['storage']['tables']>[Name]>,
   QC extends QueryContext = ContractToQC<C, Name>,
-> extends JoinSource<StorageTableToScopeTable<C['storage']['tables'][Name]>, Alias>,
+> extends JoinSource<StorageTableToScopeTable<FlatTablesOf<C['storage']['tables']>[Name]>, Alias>,
     WithSelect<QC, AvailableScope, EmptyRow>,
     WithJoin<QC, AvailableScope, C['capabilities']> {
   as<NewAlias extends string>(
@@ -134,7 +130,7 @@ export interface TableProxy<
   insert(
     values: ResolvedInsertValues<
       C,
-      C['storage']['tables'][Name],
+      FlatTablesOf<C['storage']['tables']>[Name],
       Name,
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
@@ -144,7 +140,7 @@ export interface TableProxy<
   update(
     set: ResolvedUpdateValues<
       C,
-      C['storage']['tables'][Name],
+      FlatTablesOf<C['storage']['tables']>[Name],
       Name,
       QC['codecTypes'],
       ExtractFieldInputTypes<C>

@@ -24,7 +24,7 @@ import type {
   StorageTableToScopeTable,
   Subquery,
 } from '../scope';
-import type { TableProxyContract } from '../types/db';
+import type { FlatTablesOf, TableProxyContract } from '../types/db';
 import type { JoinedTables } from '../types/joined-tables';
 import type { DeleteQuery, InsertQuery, UpdateQuery } from '../types/mutation-query';
 import type { SelectQuery } from '../types/select-query';
@@ -37,7 +37,7 @@ import { SelectQueryImpl } from './query-impl';
 
 export class TableProxyImpl<
     C extends TableProxyContract,
-    Name extends string & keyof C['storage']['tables'],
+    Name extends string & keyof FlatTablesOf<C['storage']['tables']>,
     Alias extends string,
     AvailableScope extends Scope,
     QC extends QueryContext,
@@ -46,7 +46,7 @@ export class TableProxyImpl<
   implements TableProxy<C, Name, Alias, AvailableScope, QC>
 {
   declare readonly [JoinOuterScope]: JoinSource<
-    StorageTableToScopeTable<C['storage']['tables'][Name]>,
+    StorageTableToScopeTable<FlatTablesOf<C['storage']['tables']>[Name]>,
     Alias
   >[typeof JoinOuterScope];
 
