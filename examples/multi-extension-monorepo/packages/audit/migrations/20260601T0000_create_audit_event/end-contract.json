@@ -49,32 +49,41 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:998b6036c01edd2f370b78adb2c2ab2d5130e6b701c680621c2d8a866f7ffca5",
+    "namespaces": {
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "schema"
+      }
+    },
+    "storageHash": "sha256:448864066f63907f65f6ff8e5994844c7976cd0e5da0171e9a7af8f29d84d4ae",
     "tables": {
-      "audit_event": {
-        "columns": {
-          "action": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+      "__unbound__": {
+        "audit_event": {
+          "columns": {
+            "action": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "actor": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
           },
-          "actor": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+          "foreignKeys": [],
+          "indexes": [],
+          "namespaceId": "__unbound__",
+          "primaryKey": {
+            "columns": ["id"]
           },
-          "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": ["id"]
-        },
-        "uniques": []
+          "uniques": []
+        }
       }
     }
   },

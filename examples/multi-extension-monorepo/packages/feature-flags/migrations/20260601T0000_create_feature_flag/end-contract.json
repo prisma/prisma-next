@@ -39,27 +39,36 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:107ce92788984cad3aff9ee860e328048f14e156869ae418ba9ec96f31d6f4df",
+    "namespaces": {
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "schema"
+      }
+    },
+    "storageHash": "sha256:d891931ec5208874f1fde77f524bef081f165ece20ea9bbdef1d0893ed5e2d69",
     "tables": {
-      "feature_flag": {
-        "columns": {
-          "enabled": {
-            "codecId": "pg/bool@1",
-            "nativeType": "bool",
-            "nullable": false
+      "__unbound__": {
+        "feature_flag": {
+          "columns": {
+            "enabled": {
+              "codecId": "pg/bool@1",
+              "nativeType": "bool",
+              "nullable": false
+            },
+            "key": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
           },
-          "key": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": ["key"]
-        },
-        "uniques": []
+          "foreignKeys": [],
+          "indexes": [],
+          "namespaceId": "__unbound__",
+          "primaryKey": {
+            "columns": ["key"]
+          },
+          "uniques": []
+        }
       }
     }
   },
