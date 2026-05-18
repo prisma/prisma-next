@@ -1,14 +1,29 @@
 ---
 name: drive-pr-description
-description: Generates PR descriptions by analyzing git diffs between the current branch and the default branch. Use when the user requests a PR description, pull request summary, or commit message for a squash merge.
+description: >
+  Generates PR descriptions by analyzing git diffs between the current branch and the
+  default branch. Two modes — full mode (slice PRs: overview / changes / why / explicit
+  scope statement) and direct-change mode (~30-second-verifiable diffs: intent / Linear
+  link / scope statement / verification note). Use when the user requests a PR
+  description, pull request summary, or commit message for a squash merge. Direct-change
+  mode fires automatically when drive-start-workflow routes to "direct change."
 metadata:
   author: Tyler Benfield
-  version: "2026.2.3"
+  version: "2026.5.18"
 ---
 
 # PR Description Generator
 
 Analyzes the git diff between the current branch and the default branch to generate a concise, informative PR description suitable for code review and commit history.
+
+## Modes
+
+This skill has **two modes**:
+
+- **Full mode** (default) — for slice-sized PRs. The full overview / changes / why structure below.
+- **Direct-change mode** — for direct-change PRs (~30-second-verifiable diffs routed by `drive-start-workflow`). Different structure: intent statement, Linear ticket link, scope statement, brief verification note. See § Direct-change mode below.
+
+Pick the mode that matches the PR's shape. Direct-change mode is the smaller surface; if you're unsure, use full mode (slice PRs are the more common case).
 
 ## Core Principles
 
@@ -133,4 +148,54 @@ Implements automatic rotation of S3 credentials for pgBackRest backups to comply
 ## Why
 
 S3 credentials expire after 90 days. Rather than manual rotation or backup failures, the worker proactively refreshes credentials well before expiration. The 24-hour interval provides a safety margin while avoiding unnecessary API calls.
+```
+
+## Direct-change mode
+
+For PRs routed by `drive-start-workflow` as **direct change** (~30-second-verifiable diff; no spec; no plan; no dispatch ceremony — per [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Direct change).
+
+### Direct-change structure
+
+```markdown
+[One-paragraph intent statement: what changes; why; what stays the same.]
+
+**Linear:** <issue link>
+
+**Scope:** _<one-line scope statement; named files / behaviours that change; out-of-scope explicitly named if there's any ambiguity>_
+
+**Verification:** _<one-sentence verification note — what the reviewer should look for in the diff; how the reviewer can verify correctness in ~30 sec by reading the diff>_
+```
+
+### Direct-change workflow
+
+1. Read the diff (per § Workflow step 1-2 — resolve remote + diff base; refresh; diff).
+2. **Sanity-check the verdict.** Direct change is a scope claim; the diff is the test. If the diff is more than 1-3 files OR > ~50 LoC OR not obvious-from-reading, the verdict was wrong — escalate back to `drive-triage-work` for re-routing as orphan slice or in-project slice. The direct-change PR description shouldn't be assembled over a diff that isn't direct-change-shaped.
+3. Assemble the four-line PR body per the template above.
+4. Title: a single-line summary, conventional commit style if the team uses one (`fix: ...`, `chore: ...`).
+
+### Direct-change rules
+
+- **Always link Linear.** Direct changes still need observability; the Linear link is the trail.
+- **Scope statement is non-optional.** Without it, the PR's blast radius is unbounded for the reviewer. Even a one-line scope sentence is enough.
+- **Verification note is what makes the PR direct-change-shaped.** The reviewer should be able to verify correctness in ~30 sec; the verification note tells them how. If you can't write a credible verification note, the PR isn't direct-change.
+
+### Direct-change anti-patterns
+
+- **Direct-change PR with a multi-paragraph "Why" section.** If the change needs that much explanation, it's not direct-change. Re-route as orphan slice.
+- **Direct-change PR that adds tests.** Tests are fine; if the test logic needs explaining, the change isn't 30-second-verifiable. Re-route.
+- **Direct-change PR that touches > 3 files.** Almost certainly mis-routed. Verify against triage.
+- **Direct-change PR with feature flags.** Feature flags imply rollout sequencing, which implies a slice (or project). Re-route.
+
+### Example direct-change PR
+
+`fix(docs): typo in install guide`
+
+```markdown
+Fixes a typo in the install guide that misnamed the env var (`DATBASE_URL` → `DATABASE_URL`).
+
+**Linear:** TML-1234
+
+**Scope:** Only `docs/getting-started/install.md`. No code, no tests, no other docs.
+
+**Verification:** Diff shows a single character change in one prose paragraph; no other lines touched.
 ```
