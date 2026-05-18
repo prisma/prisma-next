@@ -49,11 +49,9 @@ function interpret(schema: string) {
 type StorageView = {
   readonly tables: Record<
     string,
-    {
-      readonly columns: Record<string, Record<string, unknown>>;
-    }
+    Record<string, { readonly columns: Record<string, Record<string, unknown>> }>
   >;
-  readonly types?: Record<string, Record<string, unknown>>;
+  readonly types?: Record<string, Record<string, Record<string, unknown>>>;
 };
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
 
@@ -66,7 +64,9 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['metric']?.columns['value']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['metric']?.columns['value'],
+    ).toMatchObject({
       codecId: 'cipherstash/double@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, orderAndRange: true },
@@ -82,7 +82,9 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['metric']?.columns['value']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['metric']?.columns['value'],
+    ).toMatchObject({
       codecId: 'cipherstash/double@1',
       typeParams: { equality: true, orderAndRange: true },
     });
@@ -114,7 +116,7 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const col = asStorage(result.value.storage).tables['metric']?.columns['value'];
+    const col = asStorage(result.value.storage).tables['__unbound__']?.['metric']?.columns['value'];
     // Stripping `nullable` (PSL-specific) the column descriptor mirrors
     // the TS factory's lowered shape byte-for-byte (PSL/TS parity).
     expect(col).toMatchObject({
@@ -134,7 +136,9 @@ describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['ledger']?.columns['amount']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['ledger']?.columns['amount'],
+    ).toMatchObject({
       codecId: 'cipherstash/bigint@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, orderAndRange: true },
@@ -149,7 +153,9 @@ describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['ledger']?.columns['amount']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['ledger']?.columns['amount'],
+    ).toMatchObject({
       codecId: 'cipherstash/bigint@1',
       typeParams: { equality: true, orderAndRange: true },
     });

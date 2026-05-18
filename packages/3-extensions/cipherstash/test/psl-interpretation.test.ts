@@ -66,11 +66,9 @@ function interpret(schema: string) {
 type StorageView = {
   readonly tables: Record<
     string,
-    {
-      readonly columns: Record<string, Record<string, unknown>>;
-    }
+    Record<string, { readonly columns: Record<string, Record<string, unknown>> }>
   >;
-  readonly types?: Record<string, Record<string, unknown>>;
+  readonly types?: Record<string, Record<string, Record<string, unknown>>>;
 };
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
 
@@ -83,7 +81,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['email']).toEqual(
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['email'],
+    ).toEqual(
       expect.objectContaining({
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',
@@ -101,7 +101,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toEqual(
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['notes'],
+    ).toEqual(
       expect.objectContaining({
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',
@@ -119,7 +121,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toEqual(
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['notes'],
+    ).toEqual(
       expect.objectContaining({
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',
@@ -137,7 +141,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toEqual(
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['notes'],
+    ).toEqual(
       expect.objectContaining({
         codecId: 'cipherstash/string@1',
         typeParams: { equality: true, freeTextSearch: true, orderAndRange: false },
@@ -153,7 +159,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['notes'],
+    ).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: false, freeTextSearch: true },
@@ -169,7 +177,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['notes'],
+    ).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: false, freeTextSearch: false },
@@ -185,7 +195,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['username']).toMatchObject({
+    expect(
+      asStorage(result.value.storage).tables['__unbound__']?.['user']?.columns['username'],
+    ).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, freeTextSearch: false },
@@ -242,12 +254,12 @@ model User {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const storage = asStorage(result.value.storage);
-    expect(storage.types?.['SearchableEmail']).toMatchObject({
+    expect(storage.types?.['__unbound__']?.['SearchableEmail']).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, freeTextSearch: false },
     });
-    expect(storage.tables['user']?.columns['email']).toMatchObject({
+    expect(storage.tables['__unbound__']?.['user']?.columns['email']).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       nullable: false,
@@ -274,8 +286,11 @@ model User {
     expect(inlineResult.ok).toBe(true);
     if (!aliasResult.ok || !inlineResult.ok) return;
 
-    const aliasNamedType = asStorage(aliasResult.value.storage).types?.['SearchableEmail'];
-    const inlineCol = asStorage(inlineResult.value.storage).tables['user']?.columns['email'];
+    const aliasNamedType = asStorage(aliasResult.value.storage).types?.['__unbound__']?.[
+      'SearchableEmail'
+    ];
+    const inlineCol = asStorage(inlineResult.value.storage).tables['__unbound__']?.['user']
+      ?.columns['email'];
     expect(inlineCol).toBeDefined();
     if (!inlineCol) return;
 
