@@ -1,10 +1,10 @@
 # drive/plan — project-context for plan authoring
 
-Loaded by `drive-project-plan` and `drive-slice-plan`. Holds prisma-next's dispatch-sizing reference cases, per-dispatch DoR overlays, failure-mode catalogue, and parallelisation heuristics.
+Loaded by `drive-plan-project` and `drive-plan-slice`. Holds prisma-next's dispatch-sizing reference cases, per-dispatch DoR overlays, failure-mode catalogue, and parallelisation heuristics.
 
 ## Dispatch-sizing reference cases (calibration)
 
-The default S/M/L/XL sizes (per `drive-slice-plan`) need calibration against this repo's reality. Reference cases for size estimation:
+The default S/M/L/XL sizes (per `drive-plan-slice`) need calibration against this repo's reality. Reference cases for size estimation:
 
 | Reference change | Files touched | LoC | Time (implementer wallclock) | Size |
 |---|---|---|---|---|

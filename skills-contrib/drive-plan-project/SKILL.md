@@ -1,34 +1,34 @@
 ---
-name: drive-project-plan
+name: drive-plan-project
 description: >
   Compose a project's slices + direct changes into a sequenced project plan with stack
-  (delivery order) and parallel (independent) groupings. Use after drive-project-specify
+  (delivery order) and parallel (independent) groupings. Use after drive-specify-project
   has settled the project spec. Outputs projects/<project>/plan.md listing each slice +
   direct change with its purpose, scope, dependencies, and target Linear issue. Split
-  from drive-create-plan; the slice variant is drive-slice-plan.
+  from drive-create-plan; the slice variant is drive-plan-slice.
 metadata:
   version: "2026.5.18"
   split_from: drive-create-plan
 ---
 
-# Drive: Project Plan
+# Drive: Plan Project
 
 Compose a project into its sequence of slices + direct changes. A project plan answers two questions:
 
 1. **What units of work make up this project?** A list of slices + direct changes, each with a purpose, scope, and Linear issue.
 2. **In what order?** Stack (must-deliver-in-sequence) vs parallel (can-deliver-independently). Plus dependencies between them.
 
-The plan does NOT decompose each slice into dispatches — that's `drive-slice-plan`'s job, fired when the slice is picked up.
+The plan does NOT decompose each slice into dispatches — that's `drive-plan-slice`'s job, fired when the slice is picked up.
 
 ## When to use
 
-- After `drive-project-specify` has produced `projects/<project>/spec.md`.
+- After `drive-specify-project` has produced `projects/<project>/spec.md`.
 - When picking up an existing project whose plan needs re-sequencing (e.g. mid-flight scope shift, slice dependencies discovered late).
 
 **Do not use this skill for:**
 
-- Slice-level dispatch planning — that's `drive-slice-plan`.
-- The project spec — that's `drive-project-specify`.
+- Slice-level dispatch planning — that's `drive-plan-slice`.
+- The project spec — that's `drive-specify-project`.
 - Direct-change planning — direct changes have no plan; intent goes in the PR body.
 
 ## Pre-conditions
@@ -172,7 +172,7 @@ _Plan-level risks (sequencing assumption that might not hold; parallelisation th
 3. **Stack ordering that collapses parallelisation opportunities.** Default to parallel unless there's a real dependency. Sequencing serially when work could parallelise is the most common throughput killer.
 4. **Plan that doesn't cover all Project-DoD conditions.** The coverage map is the gate — if a DoD condition has no delivering unit, the plan is incomplete.
 5. **Linear issues missing.** Slices without Linear issues are invisible to the wider team's observability. Sync issues at planning time, not at slice-pickup time.
-6. **Plan written over an unsettled spec.** Symptom: the purpose statement is fuzzy; scope keeps drifting; DoD conditions feel made up. Route back to `drive-project-specify` (which routes back to `drive-discussion`).
+6. **Plan written over an unsettled spec.** Symptom: the purpose statement is fuzzy; scope keeps drifting; DoD conditions feel made up. Route back to `drive-specify-project` (which routes back to `drive-discussion`).
 
 ## Checklist
 
@@ -188,8 +188,8 @@ _Plan-level risks (sequencing assumption that might not hold; parallelisation th
 
 ## Related skills
 
-- `drive-project-specify` — produces the spec this plan composes; runs before
-- `drive-slice-plan` — decomposes each slice into dispatches; runs when the slice is picked up
+- `drive-specify-project` — produces the spec this plan composes; runs before
+- `drive-plan-slice` — decomposes each slice into dispatches; runs when the slice is picked up
 - `drive-deliver-workflow` — pilots the project plan to delivery
 - `drive-discussion` — fires when sequencing decisions surface load-bearing design questions
 - `drive-start-workflow` — handles mid-flight scope shifts that require re-planning

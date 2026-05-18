@@ -7,8 +7,8 @@ Two places. One you share with everyone else using Drive; one is just for your t
 ```
 your-repo/
 ├── drive/                                ← your team's notes (this repo only)
-│   ├── spec/README.md                    ← read by drive-slice-specify
-│   ├── plan/README.md                    ← read by drive-slice-plan + drive-build-workflow
+│   ├── spec/README.md                    ← read by drive-specify-slice
+│   ├── plan/README.md                    ← read by drive-plan-slice + drive-build-workflow
 │   ├── qa/README.md                      ← read by drive-qa-plan + drive-qa-run
 │   ├── code-review/README.md             ← read by drive-review-code
 │   ├── pr/README.md                      ← read by drive-pr-description + drive-pr-walkthrough
@@ -16,11 +16,11 @@ your-repo/
 │   ├── deployment/README.md              ← read by drive-create-deployment-plan
 │   ├── post-update/README.md             ← read by drive-post-update
 │   ├── triage/README.md                  ← read by drive-triage-work     (added by this project)
-│   ├── retro/README.md                   ← read by drive-retro-run       (added by this project)
-│   └── health/README.md                  ← read by drive-health-check    (added by this project)
+│   ├── retro/README.md                   ← read by drive-run-retro       (added by this project)
+│   └── health/README.md                  ← read by drive-check-health    (added by this project)
 └── .agents/skills/                       ← local copy of the shared playbook
     ├── drive-create-project/SKILL.md
-    ├── drive-slice-specify/SKILL.md
+    ├── drive-specify-slice/SKILL.md
     ├── drive-build-workflow/SKILL.md
     ├── drive-reconcile-skills/SKILL.md   ← the two meta-skills that keep
     ├── drive-update-skills/SKILL.md         the local copy in sync with canonical

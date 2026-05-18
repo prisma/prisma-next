@@ -57,7 +57,7 @@ drive/plan/README.md's failure-mode catalogue.
 § grep library.
 ```
 
-7 minutes. Output: one team-context entry + one grep library pattern in `drive/plan/README.md`. The next time `drive-slice-plan` or `drive-build-workflow` runs on a slice that touches the affected surface, the README loads at workflow step 1 and the failure mode gets threaded into the brief's edge-case table; the failure mode doesn't recur.
+7 minutes. Output: one team-context entry + one grep library pattern in `drive/plan/README.md`. The next time `drive-plan-slice` or `drive-build-workflow` runs on a slice that touches the affected surface, the README loads at workflow step 1 and the failure mode gets threaded into the brief's edge-case table; the failure mode doesn't recur.
 
 That's what a retro looks like when it works. Trigger → write down what happened, why, what should have caught it → land an update somewhere an agent will read it next time → done.
 

@@ -14,7 +14,7 @@ The skill is the *mode of operation*: the operating rules, the response shape, t
 
 Five canonical triggers (per [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 2 — Design discussion):
 
-1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-project-specify` or `drive-slice-specify`.
+1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-specify-project` or `drive-specify-slice`.
 2. **Mid-spec.** A spec authoring session hits a fork-in-the-road that needs collaborative resolution rather than a unilateral pick by the agent.
 3. **Mid-flight on falsified assumption.** A load-bearing assumption (named in the spec or implicit in the plan) is observed to be false during implementation. Per invariant I12 (no silent agent-side amendments), the orchestrator must halt and route to design discussion rather than amending the spec quietly. Surfacing the falsification as a discussion topic is itself one of the skill's uses — *"the contract-versioning assumption from spec § 3.2 is wrong; entering discussion mode to decide what changes."*
 4. **Mid-flight on obstacle.** An obstacle emerges that the plan doesn't account for (a dependency unexpectedly drops, a tool turns out to be insufficient, a design boundary breaks). Same I12-driven discipline: halt and discuss rather than silently route around.
@@ -128,10 +128,10 @@ The summary is the artefact the rest of the team (and future-you) reads when the
 
 Offer to write the summary to a durable artefact, and ask the user which shape they want. Typical shapes (suggest the one that matches the user's framing; offer others as alternatives):
 
-- **Project spec** (`projects/<project>/spec.md`) — when the discussion produced the *what and why* of a new project, before implementation begins. Hand off to `drive-project-specify` for the actual file write.
-- **Project plan** (`projects/<project>/plan.md`) — when the discussion produced the *how and in what order* for an already-shaped project. Hand off to `drive-project-plan`.
-- **Slice spec** (`projects/<project>/slices/<slice>/spec.md` or inline in a PR description) — when the discussion produced the *what* of a slice. Hand off to `drive-slice-specify`.
-- **Slice plan** — when the discussion sharpened the dispatch sequence for a slice. Hand off to `drive-slice-plan`.
+- **Project spec** (`projects/<project>/spec.md`) — when the discussion produced the *what and why* of a new project, before implementation begins. Hand off to `drive-specify-project` for the actual file write.
+- **Project plan** (`projects/<project>/plan.md`) — when the discussion produced the *how and in what order* for an already-shaped project. Hand off to `drive-plan-project`.
+- **Slice spec** (`projects/<project>/slices/<slice>/spec.md` or inline in a PR description) — when the discussion produced the *what* of a slice. Hand off to `drive-specify-slice`.
+- **Slice plan** — when the discussion sharpened the dispatch sequence for a slice. Hand off to `drive-plan-slice`.
 - **Decision record / ADR** — when the discussion produced a single architectural decision deserving a durable record under the repo's ADR directory.
 - **Plan / spec amendment** — when the discussion happened mid-implementation and the outcome is an update to an existing in-flight artefact (a `plan.md` dispatch amendment, a `spec.md § Assumptions` update marking a prior assumption as falsified).
 - **Other shape the user names** — a markdown note under `wip/`, a PR description, a Linear ticket, etc.

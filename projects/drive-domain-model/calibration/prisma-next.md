@@ -6,12 +6,12 @@ Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principl
 
 | Section | Content | Eventual home in `prisma-next/` |
 |---|---|---|
-| § 1 | Reference tasks for t-shirt-size anchoring | `drive/plan/README.md` (read by `drive-slice-plan`, `drive-build-workflow`) |
+| § 1 | Reference tasks for t-shirt-size anchoring | `drive/plan/README.md` (read by `drive-plan-slice`, `drive-build-workflow`) |
 | § 2 | Definition of Ready overlays at three scopes | Split: `drive/project/README.md` (project DoR), `drive/spec/README.md` + `drive/plan/README.md` (slice DoR), `drive/plan/README.md` (dispatch DoR) |
 | § 3 | Definition of Done overlays at three scopes | Split: `drive/project/README.md` + `drive/qa/README.md` (project DoD), `drive/plan/README.md` + `drive/qa/README.md` + `drive/pr/README.md` (slice DoD), `drive/plan/README.md` (dispatch DoD) |
 | § 4 | Failure-mode catalogue | `drive/plan/README.md` (drawn from by brief assembly per [`brief-discipline.md`](../principles/brief-discipline.md)) |
 | § 5 | Grep library of anti-pattern patterns | `drive/plan/README.md` (same — brief assembly threads the relevant patterns) |
-| § 6 | Model-tier routing | `drive/plan/README.md` (`drive-slice-plan` declares model tier per dispatch) |
+| § 6 | Model-tier routing | `drive/plan/README.md` (`drive-plan-slice` declares model tier per dispatch) |
 | § 7 | Linear ceremony | Split: `drive/project/README.md` (project conventions) + `drive/pr/README.md` (PR conventions) + `drive/post-update/README.md` (status updates) |
 | § 8 | Maintenance discipline | Applies to every category; lives in this doc and travels to whichever READMEs the maintenance discipline mentions |
 | § 9 | Manual-QA context | `drive/qa/README.md` (already authored as the source for this file) |
@@ -80,7 +80,7 @@ Estimate new dispatches relative to these references. If a new dispatch feels ha
 | Build a target-extensible something (e.g. target-contributed PSL blocks) | Multiple new framework surfaces + multiple target packs + multiple new tests |
 | Land a project-sized feature in one dispatch (e.g. a whole slice or a whole project) | Definitionally too big |
 
-**Decomposition pattern.** Treat as a project, not a slice or dispatch. Triage routes to `drive-create-project` → `drive-project-specify` → `drive-project-plan`; the plan composes slices; each slice has a slice plan; each slice plan is a dispatch sequence with every dispatch M-or-below.
+**Decomposition pattern.** Treat as a project, not a slice or dispatch. Triage routes to `drive-create-project` → `drive-specify-project` → `drive-plan-project`; the plan composes slices; each slice has a slice plan; each slice plan is a dispatch sequence with every dispatch M-or-below.
 
 ---
 

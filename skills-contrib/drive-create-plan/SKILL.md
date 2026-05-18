@@ -1,8 +1,8 @@
 ---
 name: drive-create-plan
 description: >
-  DEPRECATED — split into drive-project-plan (project-scope plan composing slices +
-  direct changes) and drive-slice-plan (slice-scope plan decomposing into M-sized
+  DEPRECATED — split into drive-plan-project (project-scope plan composing slices +
+  direct changes) and drive-plan-slice (slice-scope plan decomposing into M-sized
   dispatches with per-dispatch DoR). The original "milestone + task" vocabulary is
   retired (per design-decisions D9 / D24). Prefer the scope-specific variants. This body
   remains as shared reference material (test-derivation pattern, Linear-sync notes) the
@@ -12,18 +12,18 @@ metadata:
   version: "2026.5.18"
   status: deprecated
   superseded_by:
-    - drive-project-plan
-    - drive-slice-plan
+    - drive-plan-project
+    - drive-plan-slice
 ---
 
 # Drive: Create Plan — DEPRECATED
 
 **This skill is deprecated.** Use the scope-specific variants instead:
 
-- **Project plans** (compose slices + direct changes; stack / parallel sequencing) → `drive-project-plan`.
-- **Slice plans** (decompose into M-sized dispatches; per-dispatch DoR; L/XL refusal) → `drive-slice-plan`.
+- **Project plans** (compose slices + direct changes; stack / parallel sequencing) → `drive-plan-project`.
+- **Slice plans** (decompose into M-sized dispatches; per-dispatch DoR; L/XL refusal) → `drive-plan-slice`.
 
-The split is per [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17. The pre-existing "milestone + task" vocabulary is also retired (D9 + D24): the two units are now **Slice** (was: milestone) and **Dispatch** (replaces the agent-aggregation sense of "task"). Pre-implementation logical-increment thinking happens inside `drive-slice-plan` as dispatches, not as a separate "step" or "task" layer.
+The split is per [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17. The pre-existing "milestone + task" vocabulary is also retired (D9 + D24): the two units are now **Slice** (was: milestone) and **Dispatch** (replaces the agent-aggregation sense of "task"). Pre-implementation logical-increment thinking happens inside `drive-plan-slice` as dispatches, not as a separate "step" or "task" layer.
 
 The body below remains as shared reference material — the test-derivation pattern (ACs → test cases → dispatches), the Linear-sync notes, the shipping-strategy framing for backward-compat — that both scope-specific variants link back to.
 

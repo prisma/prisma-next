@@ -13,7 +13,7 @@ metadata:
 
 # Drive: Build Workflow
 
-Pilots the slice's implementation loop. Workflow skill — invoked top-down and returns when the slice's DoD is met. Calls atomic skills as steps in its loop (drive-slice-specify, drive-slice-plan, drive-review-code, drive-qa-plan, drive-qa-run, drive-pr-description, drive-pr-walkthrough, drive-retro-run on triggers, drive-discussion on stop-condition).
+Pilots the slice's implementation loop. Workflow skill — invoked top-down and returns when the slice's DoD is met. Calls atomic skills as steps in its loop (drive-specify-slice, drive-plan-slice, drive-review-code, drive-qa-plan, drive-qa-run, drive-pr-description, drive-pr-walkthrough, drive-run-retro on triggers, drive-discussion on stop-condition).
 
 The loop: **pre-flight DoR (per dispatch) → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD (per dispatch) → reviewer verdict → triage verdict → loop / escalate / proceed** until the reviewer reports `SATISFIED` on each milestone of the slice.
 
@@ -60,7 +60,7 @@ Before delegating to the implementer, walk the per-dispatch DoR (per [`projects/
 - [ ] Intent statement clear: what changes; what stays the same.
 - [ ] Files-in-play named (concrete paths, from the slice plan).
 - [ ] "Done when" gates explicit (CI commands; regenerate-fixtures; intent-validation criteria).
-- [ ] Predicted size is S or M. **L/XL refusal: if the dispatch is predicted L or XL, refuse to delegate.** Route back to `drive-slice-plan` for re-decomposition. The two-cap sizing discipline (PR-cap at slice; M-cap at dispatch) is enforced here.
+- [ ] Predicted size is S or M. **L/XL refusal: if the dispatch is predicted L or XL, refuse to delegate.** Route back to `drive-plan-slice` for re-decomposition. The two-cap sizing discipline (PR-cap at slice; M-cap at dispatch) is enforced here.
 - [ ] Failure modes from `drive/plan/README.md` considered.
 - [ ] Edge cases from the slice spec covered by the "done when" or explicitly named as "covered by dispatch X."
 - [ ] No silent design decisions assumed — anything unpinned surfaces as a `drive-discussion` stop-condition (see § Stop conditions) before the dispatch starts.
@@ -126,7 +126,7 @@ What you check (≤ 5 min):
 - Are the early test results passing for the parts that should be passing?
 - Does the running approach match the brief's intent?
 
-If WIP inspection finds drift: surface to the implementer with a brief course-correction (re-delegation with the drift named). If the drift is significant (the implementer is solving a different problem): halt the dispatch and re-plan via `drive-slice-plan`.
+If WIP inspection finds drift: surface to the implementer with a brief course-correction (re-delegation with the drift named). If the drift is significant (the implementer is solving a different problem): halt the dispatch and re-plan via `drive-plan-slice`.
 
 ### 4. Post-flight: per-dispatch DoD (with intent-validation)
 
@@ -138,7 +138,7 @@ After the implementer reports done and before triggering review, walk the per-di
 - [ ] No new findings that should have been pre-named in the slice spec (if there are: route to `drive-discussion` per stop-conditions).
 - [ ] Implementer's heartbeat report aligns with the diff (caught case: implementer claims success but the diff is empty / off-target).
 
-If DoD fails: re-delegate to fix the gap, OR route to `drive-slice-plan` for re-decomposition if the gap is structural. Do not proceed to reviewer until DoD passes.
+If DoD fails: re-delegate to fix the gap, OR route to `drive-plan-slice` for re-decomposition if the gap is structural. Do not proceed to reviewer until DoD passes.
 
 ### 5. Reviewer verdict + triage
 
@@ -154,9 +154,9 @@ The loop halts and surfaces to the operator via `drive-discussion` when:
 
 3. **Out-of-scope surface needs touching to complete the dispatch.** If the implementer reports that completing the dispatch requires touching a surface marked out-of-scope, halt and route to `drive-discussion`. Either the scope was wrong (re-spec) or the approach was wrong (re-plan).
 
-4. **Dispatch refused at DoR as L/XL.** Not a stop-condition exactly — re-plan via `drive-slice-plan`. If the slice can't decompose into Ms cleanly, escalate via `drive-discussion`: the slice itself may need re-triaging (promote to project).
+4. **Dispatch refused at DoR as L/XL.** Not a stop-condition exactly — re-plan via `drive-plan-slice`. If the slice can't decompose into Ms cleanly, escalate via `drive-discussion`: the slice itself may need re-triaging (promote to project).
 
-5. **Health check / drift signal that suggests scope shift.** Surfaced by `drive-health-check` between dispatches. Halt and route to `drive-start-workflow` for mid-flight re-triage (likely outcome: promote or demote).
+5. **Health check / drift signal that suggests scope shift.** Surfaced by `drive-check-health` between dispatches. Halt and route to `drive-start-workflow` for mid-flight re-triage (likely outcome: promote or demote).
 
 6. **Operator-set custom stop.** The operator can declare additional stop conditions in `drive/plan/README.md` (e.g. *"any dispatch that touches `packages/3-...-extensions/migration/*` halts for review before merge"*).
 

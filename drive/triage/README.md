@@ -40,7 +40,7 @@ _(Add patterns as they emerge from operator experience.)_
   - Create a new Linear Project.
   - Move the original ticket into the Project; mark it Done; rename it `Plan: <project-slug>` (or comment-and-leave-name if rename is disruptive).
   - Scaffold `projects/<project>/` via `drive-create-project`.
-  - Migrate the in-flight slice spec / draft to `projects/<project>/spec.md` as the starting point for `drive-project-specify`.
+  - Migrate the in-flight slice spec / draft to `projects/<project>/spec.md` as the starting point for `drive-specify-project`.
 - **Demote**: when an in-flight project's remaining scope fits one PR.
   - Identify the surviving issue.
   - Close other open issues in the Linear Project with comments "merged into <surviving>".
@@ -55,4 +55,4 @@ Both ceremonies require operator authorisation per `drive-triage-work`'s authori
 
 _When triage misroutes work, the retro lands here. Each entry: pattern → consequence → mitigation._
 
-_(Empty at seeding; populated by `drive-retro-run`.)_
+_(Empty at seeding; populated by `drive-run-retro`.)_

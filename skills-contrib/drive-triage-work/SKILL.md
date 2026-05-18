@@ -20,10 +20,10 @@ The eight verdicts:
 | Verdict | What it means | Routes to |
 |---|---|---|
 | **Direct change** | One PR; no spec, no plan, no dispatch ceremony. Trivial enough that a reviewer can verify by reading the diff in ~30 seconds. | `gh pr create` via `drive-pr-description` (direct-change framing). |
-| **Orphan slice** | One PR-sized unit, slice spec inline in the PR description; no `projects/<x>/`. | `drive-slice-specify` (orphan mode) → `drive-build-workflow`. |
-| **In-project slice** | One PR-sized unit within an existing project's scope; slice spec under `projects/<project>/slices/<slice>/`. | `drive-slice-specify` (in-project mode) → `drive-build-workflow`. |
-| **New project** | Composition of multiple slices under one purpose; full project ceremony. | `drive-create-project` → `drive-project-specify` → `drive-project-plan` → `drive-deliver-workflow`. |
-| **Promote** | Mid-flight: an in-flight slice has grown beyond one PR; create a Linear Project and migrate. | Promotion ceremony (Linear MCP + `drive-create-project` + `drive-project-specify`). |
+| **Orphan slice** | One PR-sized unit, slice spec inline in the PR description; no `projects/<x>/`. | `drive-specify-slice` (orphan mode) → `drive-build-workflow`. |
+| **In-project slice** | One PR-sized unit within an existing project's scope; slice spec under `projects/<project>/slices/<slice>/`. | `drive-specify-slice` (in-project mode) → `drive-build-workflow`. |
+| **New project** | Composition of multiple slices under one purpose; full project ceremony. | `drive-create-project` → `drive-specify-project` → `drive-plan-project` → `drive-deliver-workflow`. |
+| **Promote** | Mid-flight: an in-flight slice has grown beyond one PR; create a Linear Project and migrate. | Promotion ceremony (Linear MCP + `drive-create-project` + `drive-specify-project`). |
 | **Demote** | Mid-flight: an in-flight project has shrunk to fit one PR; close down the project ceremony. | Demotion ceremony (Linear MCP + on-disk migration + delete `projects/<project>/`). |
 | **Spike first** | The entry-point can't be sized without a probe; need an investigation dispatch. | `drive-build-workflow` with a spike-flavoured brief; re-triage on artefact. |
 | **Defer** | Out-of-scope for current work; don't act, but don't lose. | Record in `projects/<x>/deferred.md` (in-project) or operator scratch (orphan). |
@@ -41,13 +41,13 @@ Use **mid-flight when scope shifts**:
 - An in-flight slice is growing beyond one PR (candidate for **promote**).
 - An in-flight project's remaining scope is now one PR (candidate for **demote**).
 - Operator-initiated scope re-evaluation.
-- `drive-health-check` surfaces a scope-shift signal.
+- `drive-check-health` surfaces a scope-shift signal.
 
 **Do not use this skill for:**
 
 - Re-checking a verdict that hasn't had a scope-shift signal. Triage is for entry + scope-shift, not for double-checking.
 - Picking *which slice to work next* within a project — that's `drive-deliver-workflow`'s pick-next-slice logic, not triage.
-- Sizing dispatches inside a slice plan — that's `drive-slice-plan`.
+- Sizing dispatches inside a slice plan — that's `drive-plan-slice`.
 
 ## Pre-conditions
 

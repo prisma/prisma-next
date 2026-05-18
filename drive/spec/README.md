@@ -1,6 +1,6 @@
 # drive/spec — project-context for spec authoring
 
-Loaded by `drive-project-specify` and `drive-slice-specify`. Holds prisma-next's spec-authoring conventions, required sections, and common-scope-trap catalogue.
+Loaded by `drive-specify-project` and `drive-specify-slice`. Holds prisma-next's spec-authoring conventions, required sections, and common-scope-trap catalogue.
 
 ## Required sections (beyond template)
 

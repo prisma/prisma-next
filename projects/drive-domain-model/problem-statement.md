@@ -79,14 +79,14 @@ Stacks on top of [PR #93](https://github.com/prisma/ignite/pull/93). The restruc
 
 **Atomic-tier splits** (per-scope variants of existing skills):
 
-- `drive-create-spec` → `drive-project-specify` + `drive-slice-specify`.
-- `drive-create-plan` → `drive-project-plan` + `drive-slice-plan`.
+- `drive-create-spec` → `drive-specify-project` + `drive-specify-slice`.
+- `drive-create-plan` → `drive-plan-project` + `drive-plan-slice`.
 
 **Atomic-tier new skills:**
 
 - `drive-triage-work` (entry-point + mid-flight scope re-evaluator).
-- `drive-health-check` (project rollup; session-bookended or trigger-fired).
-- `drive-retro-run` (trigger-based retro template).
+- `drive-check-health` (project rollup; session-bookended or trigger-fired).
+- `drive-run-retro` (trigger-based retro template).
 
 **Atomic-tier augmentations:**
 

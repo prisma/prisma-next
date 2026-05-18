@@ -6,8 +6,8 @@ description: >
   demote / spike first / defer) and runs the immediate downstream setup. Use at every
   fresh entry into Drive (Linear ticket, bug report, customer ask, "I should do X"
   thought) AND mid-flight when scope shifts (promote / demote). Calls drive-triage-work
-  for the verdict; per verdict, calls drive-create-project / drive-project-specify /
-  drive-slice-specify / drive-pr-description (direct-change) / Linear MCP tools.
+  for the verdict; per verdict, calls drive-create-project / drive-specify-project /
+  drive-specify-slice / drive-pr-description (direct-change) / Linear MCP tools.
 metadata:
   version: "2026.5.18"
 ---
@@ -69,7 +69,7 @@ Use **mid-flight when scope shifts**:
 
 - An in-flight slice is growing beyond one PR → triage as candidate for **promote**.
 - An in-flight project's remaining scope is now one PR → triage as candidate for **demote**.
-- Mid-flight scope re-evaluation requested by the operator or surfaced by `drive-health-check`.
+- Mid-flight scope re-evaluation requested by the operator or surfaced by `drive-check-health`.
 
 **Do not use this skill for:**
 
@@ -87,10 +87,10 @@ Use **mid-flight when scope shifts**:
 - One of the eight triage verdicts has been emitted (`drive-triage-work` output).
 - The verdict's setup chain has been executed:
   - **Direct change** → `drive-pr-description` (direct-change framing) drafted; `gh pr create` ready. No on-disk artefact under `projects/`.
-  - **Orphan slice** → slice spec drafted inline in the PR body via `drive-slice-specify` (orphan mode); no `projects/<x>/`.
-  - **In-project slice** → slice spec under `projects/<project>/slices/<slice>/spec.md` via `drive-slice-specify`; ready for `drive-build-workflow`.
-  - **New project** → `projects/<project>/` scaffolded via `drive-create-project`; `projects/<project>/spec.md` drafted via `drive-project-specify`; ready for `drive-project-plan` → `drive-deliver-workflow`.
-  - **Promote** → Linear Project created; original ticket moved in + marked Done + renamed `Plan: <project>`; `projects/<project>/` scaffolded; spec migration started; ready for `drive-project-specify`.
+  - **Orphan slice** → slice spec drafted inline in the PR body via `drive-specify-slice` (orphan mode); no `projects/<x>/`.
+  - **In-project slice** → slice spec under `projects/<project>/slices/<slice>/spec.md` via `drive-specify-slice`; ready for `drive-build-workflow`.
+  - **New project** → `projects/<project>/` scaffolded via `drive-create-project`; `projects/<project>/spec.md` drafted via `drive-specify-project`; ready for `drive-plan-project` → `drive-deliver-workflow`.
+  - **Promote** → Linear Project created; original ticket moved in + marked Done + renamed `Plan: <project>`; `projects/<project>/` scaffolded; spec migration started; ready for `drive-specify-project`.
   - **Demote** → other open Linear issues closed with "merged into <surviving>" comments; surviving ticket moved out of Linear Project; Linear Project Cancelled or Completed; on-disk content migrated to surviving PR body; `projects/<project>/` deleted.
   - **Spike first** → `drive-build-workflow` invoked with a spike-flavoured brief; artefact is the DoD; re-route via `drive-start-workflow` on the artefact.
   - **Defer** → record landed in `projects/<x>/deferred.md` (if in a project) or operator scratch; control returns to the operator.
@@ -127,28 +127,28 @@ Per the post-conditions above. Each branch is a sequence of atomic-skill calls +
 
 #### Orphan slice
 
-1. `drive-slice-specify` (orphan mode): slice spec drafted inline as the PR description's body. No `projects/<x>/`.
+1. `drive-specify-slice` (orphan mode): slice spec drafted inline as the PR description's body. No `projects/<x>/`.
 2. Return — caller invokes `drive-build-workflow` next.
 
 #### In-project slice
 
 1. Identify the parent project (from operator input or by inferring from open Linear Project / `projects/<project>/` matching the ticket).
-2. `drive-slice-specify` (in-project mode): slice spec under `projects/<project>/slices/<slice>/spec.md`.
+2. `drive-specify-slice` (in-project mode): slice spec under `projects/<project>/slices/<slice>/spec.md`.
 3. Return — caller invokes `drive-build-workflow` next.
 
 #### New project
 
 1. `drive-create-project`: scaffold `projects/<project>/`. Project DoR check fires (see `drive-create-project` augmentations).
-2. `drive-project-specify`: project spec (often with design-discussion participation via `drive-discussion`).
-3. Return — caller invokes `drive-project-plan` and then `drive-deliver-workflow`.
+2. `drive-specify-project`: project spec (often with design-discussion participation via `drive-discussion`).
+3. Return — caller invokes `drive-plan-project` and then `drive-deliver-workflow`.
 
 #### Promote (mid-flight: slice → project)
 
 1. Create Linear Project (MCP: `linear.create_project` or equivalent).
 2. Move the original Linear issue into the new Project; mark it Done; rename it `Plan: <project-slug>` (or post a comment explaining the conversion if rename is disruptive).
 3. `drive-create-project` with the new slug; scaffold `projects/<project>/`.
-4. Migrate the in-flight slice spec / draft into `projects/<project>/spec.md` (rough first draft; refine via `drive-project-specify`).
-5. Return — caller invokes `drive-project-plan` and then `drive-deliver-workflow`.
+4. Migrate the in-flight slice spec / draft into `projects/<project>/spec.md` (rough first draft; refine via `drive-specify-project`).
+5. Return — caller invokes `drive-plan-project` and then `drive-deliver-workflow`.
 
 See `model.md` § Linear sync § Promotion pattern for the canonical MCP-tool sequence.
 
@@ -216,7 +216,7 @@ If invoked without an operator session (e.g. via a watchdog hook firing on a Lin
 - `drive-build-workflow` — pilots the slice dispatch loop after this workflow routes to an in-project slice or orphan slice
 - `drive-deliver-workflow` — pilots the project lifecycle after this workflow routes to new project / promote
 - `drive-discussion` — fires on design-discussion triggers during triage
-- `drive-create-project`, `drive-project-specify`, `drive-slice-specify`, `drive-pr-description` — atomic skills called as setup steps
+- `drive-create-project`, `drive-specify-project`, `drive-specify-slice`, `drive-pr-description` — atomic skills called as setup steps
 - `drive-bootstrap-context` ([PR #93](https://github.com/prisma/ignite/pull/93)) — seeds `drive/<category>/README.md` if missing
 
 ## References

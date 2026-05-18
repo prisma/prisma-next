@@ -1,19 +1,19 @@
 ---
-name: drive-slice-plan
+name: drive-plan-slice
 description: >
   Decompose a slice spec into a sequence of dispatches with per-dispatch DoR-ready scope,
   sizing (S/M/L/XL), and "done when" gates. Enforces the two-cap sizing system: PR-cap
   at the slice (one PR per slice) and M-cap at the dispatch (one M-sized chunk per
   dispatch; L/XL dispatches are refused with a re-decomposition request). Use after
-  drive-slice-specify has settled the slice spec. Outputs the slice plan inline in the
+  drive-specify-slice has settled the slice spec. Outputs the slice plan inline in the
   slice spec or as projects/<project>/slices/<slice>/plan.md. Split from drive-create-
-  plan; the project variant is drive-project-plan.
+  plan; the project variant is drive-plan-project.
 metadata:
   version: "2026.5.18"
   split_from: drive-create-plan
 ---
 
-# Drive: Slice Plan
+# Drive: Plan Slice
 
 Decompose a slice into the sequence of dispatches that delivers it. A slice plan answers:
 
@@ -25,13 +25,13 @@ The slice plan is the artefact `drive-build-workflow` reads to pilot the dispatc
 
 ## When to use
 
-- After `drive-slice-specify` has produced `projects/<project>/slices/<slice>/spec.md` (or the inline orphan-mode equivalent).
+- After `drive-specify-slice` has produced `projects/<project>/slices/<slice>/spec.md` (or the inline orphan-mode equivalent).
 - When picking up a slice whose plan needs re-decomposition (e.g. a dispatch came back L/XL and needs splitting).
 
 **Do not use this skill for:**
 
-- Project-level planning (slice composition + stack/parallel) — that's `drive-project-plan`.
-- The slice spec — that's `drive-slice-specify`.
+- Project-level planning (slice composition + stack/parallel) — that's `drive-plan-project`.
+- The slice spec — that's `drive-specify-slice`.
 - The actual delivery loop — that's `drive-build-workflow`.
 
 ## Pre-conditions
@@ -176,8 +176,8 @@ _..._
 
 ## Related skills
 
-- `drive-slice-specify` — produces the slice spec this plan decomposes; runs before
-- `drive-project-plan` — composes slices into project sequencing; the parent layer
+- `drive-specify-slice` — produces the slice spec this plan decomposes; runs before
+- `drive-plan-project` — composes slices into project sequencing; the parent layer
 - `drive-build-workflow` — pilots the dispatch loop this plan defines
 - `drive-discussion` — fires when decomposition surfaces load-bearing design questions
 - `drive-qa-plan` ([PR #93](https://github.com/prisma/ignite/pull/93)) — the manual-QA dispatch's plan, woven into the slice plan when applicable

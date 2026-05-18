@@ -26,7 +26,7 @@ DoR is the *pickup* gate — pass/fail, structural, not negotiable. Three scopes
 | Scope | Gate focus | Run by |
 |---|---|---|
 | **Project** (light) | Purpose + scope boundary + project-DoD exist; triage verdict is "project." | `drive-create-project` at project initiation. |
-| **Slice** (heaviest) | Slice spec + slice plan exist; every dispatch sized ≤ M; outcome fits one PR; calibration entries linked; spike dependencies resolved; design calls settled. | `drive-slice-specify` / `drive-slice-plan` at slice initiation. |
+| **Slice** (heaviest) | Slice spec + slice plan exist; every dispatch sized ≤ M; outcome fits one PR; calibration entries linked; spike dependencies resolved; design calls settled. | `drive-specify-slice` / `drive-plan-slice` at slice initiation. |
 | **Dispatch** (overlay-bound) | Brief assembled per [`brief-discipline.md`](brief-discipline.md); sized ≤ M; model tier declared; inputs loadable; gates runnable; overlay matches in edge-case table. | `drive-build-workflow` at dispatch pre-flight. |
 
 The protocol (canonical skill bodies) carries the *shape*. Your team's `drive/<category>/README.md` carries the *content* — the team-specific items the overlay adds.
@@ -143,8 +143,8 @@ Each `drive/<category>/README.md` adds team-specific DoR items the matching skil
 | Skill | Reads | Adds overlays for |
 |---|---|---|
 | `drive-create-project` | `drive/project/README.md` | Project-DoR items (Linear setup, branch naming, etc.) |
-| `drive-slice-specify` | `drive/spec/README.md` | Slice-DoR items related to spec content |
-| `drive-slice-plan` | `drive/plan/README.md` | Slice-DoR items related to plan structure |
+| `drive-specify-slice` | `drive/spec/README.md` | Slice-DoR items related to spec content |
+| `drive-plan-slice` | `drive/plan/README.md` | Slice-DoR items related to plan structure |
 | `drive-build-workflow` | `drive/plan/README.md` | Dispatch-DoR items (brief assembly conventions, model-tier routing rules) |
 
 Worked example for `prisma-next`:

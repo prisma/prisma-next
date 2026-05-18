@@ -1,5 +1,5 @@
 ---
-name: drive-retro-run
+name: drive-run-retro
 description: >
   Run a retro on a triggering event (dispatch failure / drift event / scope-shift escapee
   / WIP-inspection finding / operator-flagged surprise) OR at mandatory project close.
@@ -11,7 +11,7 @@ metadata:
   version: "2026.5.18"
 ---
 
-# Drive: Retro Run
+# Drive: Run Retro
 
 Run a retro on a triggering event or at mandatory project close. Produces lessons that land in a memory-strong surface.
 
@@ -35,7 +35,7 @@ Per [`projects/drive-domain-model/principles/retro.md`](/projects/drive-domain-m
 
 - Routine "let's reflect" sessions without a trigger — those rarely produce landing-worthy lessons; the team's project-context surfaces stop maturing.
 - Code review on a dispatch — that's the reviewer subagent in `drive-build-workflow`.
-- Health check (rollup of project state) — that's `drive-health-check`.
+- Health check (rollup of project state) — that's `drive-check-health`.
 
 ## Pre-conditions
 
@@ -167,7 +167,7 @@ When invoked as the mandatory final retro at project close:
 - `drive-close-project` — refuses to close without the mandatory final retro
 - `drive-update-skills` ([PR #93](https://github.com/prisma/ignite/pull/93)) — lands lessons in canonical skill bodies
 - `drive-bootstrap-context` ([PR #93](https://github.com/prisma/ignite/pull/93)) — seeds `drive/retro/README.md` if missing
-- `drive-health-check` — different scope: rollup of project state rather than per-event retrospective
+- `drive-check-health` — different scope: rollup of project state rather than per-event retrospective
 
 ## References
 

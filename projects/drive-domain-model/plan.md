@@ -23,7 +23,7 @@ The shaping slice (this PR on `tml-2549-agile-agent-orchestration`) is in flight
 | Build: `drive-triage-work` + `drive-discussion` promotion | 2 | Not started | this repo | AC5 |
 | Build: spec + plan splits (4 atomic skills) | 2 | Not started | this repo | AC7 |
 | Build: `drive-build-workflow` augmentations | 2 | Not started | this repo | AC6 |
-| Build: `drive-retro-run` + `drive-health-check` | 2 | Not started | this repo | AC7 |
+| Build: `drive-run-retro` + `drive-check-health` | 2 | Not started | this repo | AC7 |
 | Build: atomic augmentations (close-project, create-project, pr-description) | 2 | Not started | this repo | AC7 |
 | Build: vocabulary refresh on unchanged skills | 2 | Not started | this repo | AC7, AC8 |
 | Trial: real-work use of the family | 2 | Not started | this repo (exercise) | AC9, AC11-AC15 |
@@ -68,11 +68,11 @@ Sequencing follows [`skill-restructure.md`](skill-restructure.md) § 4. Each sli
 |---|---|---|---|
 | 2 | Workflow tier: draft `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`. Writing the workflows first surfaces the atomic-skill contracts they depend on. | L | AC4 |
 | 3 | `drive-triage-work` (new) + `drive-discussion` promotion to first-class | M | AC5 |
-| 4 | Spec split: `drive-project-specify` + `drive-slice-specify` (with `drive-create-spec` deprecation) | M | AC7 |
-| 5 | Plan split: `drive-project-plan` + `drive-slice-plan` (with `drive-create-plan` deprecation) | M | AC7 |
+| 4 | Spec split: `drive-specify-project` + `drive-specify-slice` (with `drive-create-spec` deprecation) | M | AC7 |
+| 5 | Plan split: `drive-plan-project` + `drive-plan-slice` (with `drive-create-plan` deprecation) | M | AC7 |
 | 6 | `drive-build-workflow` augmentations: per-dispatch DoR, WIP-inspection cadence, per-dispatch DoD with intent-validation, brief template, L/XL refusal + design-discussion stop-condition | M | AC6 |
-| 7 | `drive-retro-run` (new) | S | AC7 |
-| 8 | `drive-health-check` (new) | M | AC7 |
+| 7 | `drive-run-retro` (new) | S | AC7 |
+| 8 | `drive-check-health` (new) | M | AC7 |
 | 9 | Atomic augmentations: `drive-close-project` (mandatory retro), `drive-create-project` (project DoR + bootstrap), `drive-pr-description` (direct-change framing) | M | AC7 |
 | 10 | Vocabulary refresh across the unchanged skills (mechanical; many files) | M | AC7, AC8 |
 
@@ -106,11 +106,11 @@ After the trial, each surviving skill is promoted upstream. The per-PR order ali
 | 12 | Foundation vocabulary refresh across unchanged skills | M |
 | 13 | Workflow tier: `drive-start-workflow`, `drive-build-workflow` (rename + augment from `drive-orchestrate-plan`), `drive-deliver-workflow` | L |
 | 14 | `drive-triage-work` | M |
-| 15 | Spec split: `drive-project-specify` + `drive-slice-specify` + `drive-create-spec` deprecation | M |
-| 16 | Plan split: `drive-project-plan` + `drive-slice-plan` + `drive-create-plan` deprecation | M |
+| 15 | Spec split: `drive-specify-project` + `drive-specify-slice` + `drive-create-spec` deprecation | M |
+| 16 | Plan split: `drive-plan-project` + `drive-plan-slice` + `drive-create-plan` deprecation | M |
 | 17 | `drive-discussion` promotion-to-first-class | S |
-| 18 | `drive-retro-run` | S |
-| 19 | `drive-health-check` | M |
+| 18 | `drive-run-retro` | S |
+| 19 | `drive-check-health` | M |
 | 20 | Atomic augmentations: `drive-close-project`, `drive-create-project`, `drive-pr-description` | M |
 | 21 | `drive-process.md` rewrite | M-L |
 | 22 | Audit synthesis annotation (`projects/drive-context-convention/audit/SYNTHESIS.md`) | XS |
@@ -122,7 +122,7 @@ After the trial, each surviving skill is promoted upstream. The per-PR order ali
 | Slice # | Scope | Sizing |
 |---|---|---|
 | 23 | Calibration migration: move `calibration/prisma-next.md` content into `prisma-next/docs/` (likely `docs/engineering/agile-calibration.md`) once the upstream restructure has stabilised. Update methodology-project references. | S |
-| 24 | Project close-out: run mandatory final retro (`drive-retro-run`); verify all ACs met; migrate any remaining long-lived docs to durable homes; delete `projects/drive-domain-model/`; clean up references. | S |
+| 24 | Project close-out: run mandatory final retro (`drive-run-retro`); verify all ACs met; migrate any remaining long-lived docs to durable homes; delete `projects/drive-domain-model/`; clean up references. | S |
 
 **Trigger for Slice 23:** Stability signal — at least one full cycle of the new path (triage → slice → dispatch → review → close → retro) completed in `prisma-next` without surfacing calibration gaps. If 60 days pass post-promotion with no calibration entries added, that IS the stability signal — migrate.
 
@@ -138,8 +138,8 @@ Phase 2: Slice 2 (workflow tier)
     ├─→ Slice 4 (specify split)        ┐
     ├─→ Slice 5 (plan split)            ├─ can run in parallel after Slice 2
     ├─→ Slice 6 (build-workflow aug)    │
-    ├─→ Slice 7 (drive-retro-run)       │
-    ├─→ Slice 8 (drive-health-check)    │ (depends on build-workflow for trigger interop)
+    ├─→ Slice 7 (drive-run-retro)       │
+    ├─→ Slice 8 (drive-check-health)    │ (depends on build-workflow for trigger interop)
     ├─→ Slice 9 (atomic augmentations)  │
     └─→ Slice 10 (vocabulary refresh)   ┘
                 │
@@ -171,7 +171,7 @@ Close-out: Slice 24 (project close-out)
 | Trial period reveals the workflow tier is wrong-shape | That's exactly what the trial is for. Fixing the design before upstream PRs is cheaper than fixing it after. Adjust + extend trial. |
 | Trial drags on without producing learnings | Build trial-end criteria into the slice 11 success conditions: at least three retros fired + landed updates. If no learnings surface, the design is probably right OR usage is too sparse to validate — escalate as a design discussion. |
 | Local skill drift from canonical PR #93 baseline | Trial period freezes our local skills as a snapshot of PR #93 + the new family. We re-converge during Phase 3 PR-by-PR. |
-| Phase-3 promotion stalls without per-skill follow-through | Plan enumerates each skill PR explicitly; `drive-health-check` surfaces the missing-slice signal. |
+| Phase-3 promotion stalls without per-skill follow-through | Plan enumerates each skill PR explicitly; `drive-check-health` surfaces the missing-slice signal. |
 | Consumer drift: other repos (besides `prisma-next`) adopt unevenly | Per `spec.md` AC10, each PR is independently reviewable. `drive-reconcile-skills` is calibrated for model-incompatible drift to surface as upstream-worthy. Consumer migration is per-consumer and not blocking. |
 | Vocabulary discipline erodes in canonical PRs | The grep for floating vocabulary should return empty across canonical bodies after the rewrite. A pre-merge check (or PR template item) lands in Slice 12. |
 

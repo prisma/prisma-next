@@ -5,8 +5,8 @@ description: >
   drive-start-workflow routes to new-project / promote) → slice-by-slice (each via
   drive-build-workflow) → health checks on cadence → retros on triggers → mandatory final
   retro → project close. Use when a project spec + project plan exist and you want the
-  project driven to its close-out. Calls drive-create-project, drive-project-specify,
-  drive-project-plan, drive-build-workflow, drive-health-check, drive-retro-run,
+  project driven to its close-out. Calls drive-create-project, drive-specify-project,
+  drive-plan-project, drive-build-workflow, drive-check-health, drive-run-retro,
   drive-close-project.
 metadata:
   version: "2026.5.18"
@@ -26,18 +26,18 @@ project spec + plan exist
         │
         ├─→ drive-build-workflow  (pilots the slice's dispatch loop to slice DoD)
         │       │
-        │       └─→ slice merged → drive-health-check (session-end rollup)
+        │       └─→ slice merged → drive-check-health (session-end rollup)
         │
         ├─→ retros fire on triggers from drive-build-workflow
         │       (dispatch failure / drift / scope-shift escapee)
         │
-        └─→ drive-health-check fires on slice merges + drift alarms
+        └─→ drive-check-health fires on slice merges + drift alarms
         │
         ▼
-  all slices delivered → drive-health-check (project rollup)
+  all slices delivered → drive-check-health (project rollup)
         │
         ▼
-  drive-retro-run (mandatory final retro per project DoD invariant I10)
+  drive-run-retro (mandatory final retro per project DoD invariant I10)
         │
         ▼
   drive-close-project (verifies project DoD; refuses to delete projects/<x>/ if unmet)
@@ -54,7 +54,7 @@ Use **when a project has a spec + plan and you want it driven to delivery**:
 
 - The dispatch loop inside a single slice — that's `drive-build-workflow`.
 - Triaging an entry point or mid-flight scope shift — that's `drive-start-workflow`.
-- A project that doesn't have a project plan yet — invoke `drive-project-plan` first (or use `drive-start-workflow` if scoping hasn't happened).
+- A project that doesn't have a project plan yet — invoke `drive-plan-project` first (or use `drive-start-workflow` if scoping hasn't happened).
 
 ## Pre-conditions
 
@@ -83,7 +83,7 @@ Read `drive/project/README.md` + `drive/health/README.md` if they exist.
 
 ### Step 2 — Open the project
 
-- Run `drive-health-check` in opening-rollup mode: surface slice progress, drifted slices, dispatch throughput so far (if resuming), calibration signals, recommended next pick.
+- Run `drive-check-health` in opening-rollup mode: surface slice progress, drifted slices, dispatch throughput so far (if resuming), calibration signals, recommended next pick.
 - Display the rollup to the operator (interactive) or log to status surface (unattended).
 
 ### Step 3 — Pick the next slice
@@ -103,8 +103,8 @@ If `drive-build-workflow` returns with a stop-condition: escalate to operator vi
 
 ### Step 5 — On slice merge: health check + maybe retro
 
-- Run `drive-health-check` in session-bookend mode after each slice merges (updates the project's recommended-next-pick + drift signals).
-- If `drive-build-workflow` surfaced a retro trigger (dispatch failure, drift event, scope-shift escapee), invoke `drive-retro-run`. The retro is not done until its output lands in a memory-strong surface (canonical update / `drive/<category>/README.md` update / ADR).
+- Run `drive-check-health` in session-bookend mode after each slice merges (updates the project's recommended-next-pick + drift signals).
+- If `drive-build-workflow` surfaced a retro trigger (dispatch failure, drift event, scope-shift escapee), invoke `drive-run-retro`. The retro is not done until its output lands in a memory-strong surface (canonical update / `drive/<category>/README.md` update / ADR).
 
 ### Step 6 — Loop to next slice
 
@@ -112,7 +112,7 @@ Return to Step 3. Continue until all slices in the plan have been delivered or e
 
 ### Step 7 — Mid-flight scope shifts
 
-If during the loop the operator (or `drive-health-check`) detects:
+If during the loop the operator (or `drive-check-health`) detects:
 
 - **Project growing past its spec scope** → invoke `drive-start-workflow` in mid-flight mode for re-triage (likely outcome: a new project or a separate orphan slice, depending on the new work's shape).
 - **Project shrinking below its spec scope** (remaining work fits one PR) → invoke `drive-start-workflow` in mid-flight mode (likely outcome: **Demote**).
@@ -122,8 +122,8 @@ If during the loop the operator (or `drive-health-check`) detects:
 
 When all slices in the plan are delivered or deferred:
 
-- Run `drive-health-check` in closing-rollup mode: final project-DoD readiness check.
-- Run `drive-retro-run` in mandatory-final-retro mode: surface project-level learnings; land them in canonical / project-context / ADR. **The retro is not done until the output lands.** Per invariant I10, project DoD requires this retro.
+- Run `drive-check-health` in closing-rollup mode: final project-DoD readiness check.
+- Run `drive-run-retro` in mandatory-final-retro mode: surface project-level learnings; land them in canonical / project-context / ADR. **The retro is not done until the output lands.** Per invariant I10, project DoD requires this retro.
 - Run `drive-close-project`: verifies project DoD (refuses to close if unmet), migrates long-lived docs into `docs/`, strips repo-wide references to `projects/<project>/**`, deletes `projects/<project>/`, marks the Linear Project Completed.
 
 ### Step 9 — Hand off
@@ -145,26 +145,26 @@ If invoked without an operator session:
 3. **Retro deferred to "later" rather than fired on trigger.** The trigger is the signal; deferring means the next slice runs with the lesson unrecorded.
 4. **Mandatory final retro skipped at project close.** Per invariant I10, the retro is part of project DoD. `drive-close-project` refuses to close without it; bypassing the gate breaks the protocol-as-memory loop.
 5. **Project close-out that deletes `projects/<project>/` without migrating long-lived docs.** Migration is mandatory; the `docs/`-landing is part of close-out per `drive-close-project`'s checklist.
-6. **No mid-flight scope-shift detection.** Symptom: the project grows past its spec scope across multiple slices; nobody re-triages; the project becomes shaped wrong for its actual work. `drive-health-check` is the canonical detection vehicle; this workflow runs it on every slice merge.
+6. **No mid-flight scope-shift detection.** Symptom: the project grows past its spec scope across multiple slices; nobody re-triages; the project becomes shaped wrong for its actual work. `drive-check-health` is the canonical detection vehicle; this workflow runs it on every slice merge.
 
 ## Checklist
 
 - [ ] Loaded `drive/project/README.md` + `drive/health/README.md` (if exist)
-- [ ] Opening `drive-health-check` ran; rollup surfaced
+- [ ] Opening `drive-check-health` ran; rollup surfaced
 - [ ] Slice-by-slice loop: each slice's `drive-build-workflow` ran to DoD or stop-condition
-- [ ] `drive-health-check` ran after each slice merge
-- [ ] `drive-retro-run` fired on every retro trigger from `drive-build-workflow`
+- [ ] `drive-check-health` ran after each slice merge
+- [ ] `drive-run-retro` fired on every retro trigger from `drive-build-workflow`
 - [ ] Mid-flight scope shifts handled via `drive-start-workflow` re-triage
-- [ ] Closing `drive-health-check` ran; project DoD ready
-- [ ] Mandatory final `drive-retro-run` ran; output landed in memory-strong surface
+- [ ] Closing `drive-check-health` ran; project DoD ready
+- [ ] Mandatory final `drive-run-retro` ran; output landed in memory-strong surface
 - [ ] `drive-close-project` ran; project closed; Linear Project Completed
 
 ## Related skills
 
 - `drive-start-workflow` — routes the entry point that produced this workflow's project; also handles mid-flight scope shifts during this workflow
 - `drive-build-workflow` — pilots each slice's dispatch loop; this workflow calls it in a loop
-- `drive-health-check` — opening / closing rollups + per-slice-merge cadence + drift detection
-- `drive-retro-run` — fires on triggers from `drive-build-workflow` + mandatory at project close
+- `drive-check-health` — opening / closing rollups + per-slice-merge cadence + drift detection
+- `drive-run-retro` — fires on triggers from `drive-build-workflow` + mandatory at project close
 - `drive-close-project` — final atomic skill at project close; verifies project DoD
 - `drive-create-deployment-plan` — called by this workflow when the project ships a deployable artefact
 - `drive-post-update` — periodic project status updates (Linear / wider team) on operator-set cadence

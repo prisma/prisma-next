@@ -1,17 +1,17 @@
 ---
-name: drive-project-specify
+name: drive-specify-project
 description: >
   Capture a settled project design as an unambiguous project spec. A project spec carries
   the project's purpose statement (immutable after first dispatch starts, per invariant
   I7), scope boundary, and project-DoD. Use after design discussion has settled the
   project's what + why, before scaffolding slices. Split from drive-create-spec; the slice
-  variant is drive-slice-specify.
+  variant is drive-specify-slice.
 metadata:
   version: "2026.5.18"
   split_from: drive-create-spec
 ---
 
-# Drive: Project Specify
+# Drive: Specify Project
 
 Capture a settled project design as `projects/<project>/spec.md`. A project spec carries:
 
@@ -31,9 +31,9 @@ This skill is the **output** of the project design phase, not part of it. If sig
 
 **Do not use this skill for:**
 
-- Slice-level specs — that's `drive-slice-specify` (scope within a project; ≤ 1 PR; Example-Mapping edge cases).
+- Slice-level specs — that's `drive-specify-slice` (scope within a project; ≤ 1 PR; Example-Mapping edge cases).
 - Facilitating design discussion — that's `drive-discussion`.
-- Project plans (slice composition + sequencing) — that's `drive-project-plan`.
+- Project plans (slice composition + sequencing) — that's `drive-plan-project`.
 
 ## Pre-conditions
 
@@ -99,7 +99,7 @@ Walk through Project DoR (per [`projects/drive-domain-model/principles/definitio
 
 ### Step 7 — Hand off
 
-Hand off to `drive-project-plan` for slice composition + sequencing.
+Hand off to `drive-plan-project` for slice composition + sequencing.
 
 ## Project Spec Template
 
@@ -202,8 +202,8 @@ _Residual design-level questions. Each with a working position so the operator c
 
 - `drive-create-project` — scaffolds `projects/<project>/`; runs before this skill
 - `drive-discussion` — fires when the design isn't settled; resolves design questions then hands back here
-- `drive-project-plan` — composes slices + direct changes; runs after this skill
-- `drive-slice-specify` — slice-level variant; different inputs / outputs / templates
+- `drive-plan-project` — composes slices + direct changes; runs after this skill
+- `drive-specify-slice` — slice-level variant; different inputs / outputs / templates
 
 ## References
 

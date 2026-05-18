@@ -1,5 +1,5 @@
 ---
-name: drive-slice-specify
+name: drive-specify-slice
 description: >
   Capture a slice's design as an unambiguous slice spec. A slice spec carries the slice's
   scope (within its parent project's purpose if in-project, or standalone if orphan),
@@ -7,13 +7,13 @@ description: >
   drive-start-workflow routes to "orphan slice" or "in-project slice." Two modes: in-
   project (writes to projects/<project>/slices/<slice>/spec.md) or orphan (drafts the
   slice spec inline as the PR description body). Split from drive-create-spec; the
-  project variant is drive-project-specify.
+  project variant is drive-specify-project.
 metadata:
   version: "2026.5.18"
   split_from: drive-create-spec
 ---
 
-# Drive: Slice Specify
+# Drive: Specify Slice
 
 Capture a slice's design as either `projects/<project>/slices/<slice>/spec.md` (in-project mode) or as inline content for the PR description (orphan mode). A slice spec carries:
 
@@ -32,9 +32,9 @@ Slice specs are authored by the implementer (the person / agent who'll do the wo
 
 **Do not use this skill for:**
 
-- Project-level specs — that's `drive-project-specify` (purpose + scope boundary + project-DoD).
+- Project-level specs — that's `drive-specify-project` (purpose + scope boundary + project-DoD).
 - Facilitating design discussion — that's `drive-discussion`.
-- Decomposing the slice into dispatches with sizing + DoR — that's `drive-slice-plan`.
+- Decomposing the slice into dispatches with sizing + DoR — that's `drive-plan-slice`.
 - Direct changes — they have no spec; intent goes in the PR body via `drive-pr-description`.
 
 ## Pre-conditions
@@ -114,7 +114,7 @@ In-project: write `projects/<project>/slices/<slice>/spec.md`. Orphan: hold the 
 
 ### Step 10 — Hand off
 
-Hand off to `drive-slice-plan` for dispatch decomposition.
+Hand off to `drive-plan-slice` for dispatch decomposition.
 
 ## Slice Spec Template
 
@@ -199,10 +199,10 @@ _Residual questions that need answering during or before slice execution. Each w
 
 - `drive-start-workflow` — routes to this skill via orphan slice / in-project slice verdicts
 - `drive-discussion` — fires when design questions surface during drafting; resolves then hands back
-- `drive-slice-plan` — decomposes the slice spec into dispatches; runs after this skill
+- `drive-plan-slice` — decomposes the slice spec into dispatches; runs after this skill
 - `drive-build-workflow` — pilots the dispatch loop the slice plan defines
 - `drive-pr-description` — for orphan-mode slices, injects the slice spec into the PR body
-- `drive-project-specify` — project-level variant; different inputs / outputs / templates
+- `drive-specify-project` — project-level variant; different inputs / outputs / templates
 - `drive-qa-plan` + `drive-qa-run` ([PR #93](https://github.com/prisma/ignite/pull/93)) — manual-QA discipline referenced in slice-DoD
 
 ## References

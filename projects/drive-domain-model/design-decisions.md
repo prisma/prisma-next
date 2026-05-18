@@ -245,7 +245,7 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 
 **Options considered.**
 - (a) Scope flag (sibling's working position).
-- (b) Split into project-scope and slice-scope variants (`drive-project-specify`, `drive-slice-specify`, `drive-project-plan`, `drive-slice-plan`).
+- (b) Split into project-scope and slice-scope variants (`drive-specify-project`, `drive-specify-slice`, `drive-plan-project`, `drive-plan-slice`).
 
 **Choice.** (b). Four skills total.
 
@@ -265,7 +265,7 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 
 **Why.** The caps capture different concerns: PR-cap is about review / debug / deploy / rollback debugability; M-cap is about agent-session inspectability and orchestrator recoverability. Both are real, both need enforcement, neither subsumes the other.
 
-**Affected.** `model.md` adds I11. `drive-triage-work` enforces PR-cap at admission. `drive-slice-plan` enforces M-cap at planning. `drive-build-workflow` enforces M-cap defensively at dispatch time.
+**Affected.** `model.md` adds I11. `drive-triage-work` enforces PR-cap at admission. `drive-plan-slice` enforces M-cap at planning. `drive-build-workflow` enforces M-cap defensively at dispatch time.
 
 ## 19. No silent agent-side amendments after first dispatch (I12)
 
@@ -401,6 +401,24 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 
 **Choice.** (b). Build locally first, trial, then promote.
 
-**Why.** The trial period is the cheapest way to catch design problems before they hit canonical bodies. The family is mutually-dependent (the workflow skills call the atomic skills; the augmented `drive-build-workflow` depends on the new `drive-retro-run`); trialling pieces in isolation upstream would be partial validation at best. Promoting only what survived the trial keeps canonical churn down. (a) was rejected because the cost of crystallizing a wrong-shape skill in canonical is high (consumer migration) and the cost of trialling locally is low (one repo, one team, no consumer impact).
+**Why.** The trial period is the cheapest way to catch design problems before they hit canonical bodies. The family is mutually-dependent (the workflow skills call the atomic skills; the augmented `drive-build-workflow` depends on the new `drive-run-retro`); trialling pieces in isolation upstream would be partial validation at best. Promoting only what survived the trial keeps canonical churn down. (a) was rejected because the cost of crystallizing a wrong-shape skill in canonical is high (consumer migration) and the cost of trialling locally is low (one repo, one team, no consumer impact).
 
 **Affected.** `plan.md` rewritten into three phases (shape / build + trial / promote). `spec.md` deliverables tables split into "locally-built skill family" and "upstream-promotion deliverables." `skill-restructure.md` § 4 reframed as build-locally sequencing with Phase 3 as upstream promotion. `problem-statement.md` "What we'd like from you" section notes that upstream PRs come after the trial.
+
+## 28. Atomic-skill naming is `drive-<verb>-<noun>` (verb-led, not scope-led)
+
+**Date.** 2026-05-18.
+
+**Context.** During Phase-2 build, six atomic skills were initially drafted with the scope unit leading: `drive-project-specify`, `drive-slice-specify`, `drive-project-plan`, `drive-slice-plan`, `drive-retro-run`, `drive-health-check`. The intent was to mirror the namespaced pattern of `drive-pr-description` / `drive-pr-walkthrough` / `drive-qa-plan` / `drive-qa-run` ([PR #93](https://github.com/prisma/ignite/pull/93)) by treating `project` / `slice` / `retro` / `health` as sub-namespaces. On review, the operator flagged the inconsistency with the existing canonical verb-led convention (`drive-create-spec`, `drive-create-plan`, `drive-create-project`, `drive-orchestrate-plan`) and with the verb-led shape of the workflow tier (`drive-<verb>-workflow`, per D24).
+
+**Options considered.**
+
+- (a) Keep the scope-led names; document the namespaced pattern as the dominant convention.
+- (b) Rename all six to verb-led: `drive-specify-project` / `drive-specify-slice` / `drive-plan-project` / `drive-plan-slice` / `drive-run-retro` / `drive-check-health`. The `pr` and `qa` sub-namespaces become an explicit exception for genuine sub-namespaces (multiple related skills under a domain prefix).
+- (c) Reverse the convention entirely — make scope-led the norm; rename `drive-create-spec` → `drive-spec-create`, etc.
+
+**Choice.** (b). Atomic skills are `drive-<verb>-<noun>`; the sub-namespace deviation is allowed only when there's a genuine sub-namespace (`pr-*`, `qa-*`).
+
+**Why.** The verb-led shape reads as a command (*"drive specify project"*, *"drive run retro"*), which matches how operators invoke skills and how the workflow tier names itself. Scope units (project / slice) are not sub-namespaces in the `pr` / `qa` sense — they're the unit the verb operates on, which is what the noun slot is for. Reusing the noun slot for scope units keeps the convention coherent across atomic + workflow tiers. (a) was rejected because the inconsistency was real and would have proliferated as more scope-led skills were drafted. (c) was rejected because reversing the established canonical convention would break consumers without buying anything the verb-led shape doesn't.
+
+**Affected.** Six skill directories renamed (`git mv`); frontmatter `name:` field + title heading updated in each. Mechanical name replace across 34 files (canonical skill bodies; the seven `drive/<category>/README.md` surfaces; every project doc under `projects/drive-domain-model/`). `skill-restructure.md` § "Atomic tier" rule statement tightened to make the convention explicit and call out the sub-namespace deviation criterion.

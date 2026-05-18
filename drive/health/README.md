@@ -1,6 +1,6 @@
 # drive/health — project-context for project-health rollups
 
-Loaded by `drive-health-check` and (via it) `drive-deliver-workflow`. Holds prisma-next's drift-signal thresholds, pick-next heuristics, throughput baselines.
+Loaded by `drive-check-health` and (via it) `drive-deliver-workflow`. Holds prisma-next's drift-signal thresholds, pick-next heuristics, throughput baselines.
 
 ## Drift-signal thresholds
 

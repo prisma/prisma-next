@@ -438,8 +438,8 @@ Triggered when triage decides a ticket represents work too big for a single slic
      a. Rename to "Plan: <project name>" — clear forward-pointer.
      b. Add a comment "Converted to project: <project url>" —
         preserves original title.
-4. Continue with drive-create-project → drive-project-specify →
-   drive-project-plan. Slices subsequently created as new Linear
+4. Continue with drive-create-project → drive-specify-project →
+   drive-plan-project. Slices subsequently created as new Linear
    issues under the project.
 ```
 
@@ -495,15 +495,15 @@ Workflow skills (three; all new or renamed):
 
 | Canonical skill | Today | Under this model |
 |---|---|---|
-| `drive-create-spec` | Produces "a spec" — scope implicit. | **Splits** into `drive-project-specify` and `drive-slice-specify`. Body differs meaningfully (project: purpose + scope boundary + project-DoD; slice: scope-within-project + slice-DoD + Example-Mapping edge cases). |
-| `drive-create-plan` | Produces "a plan" with a milestone → task two-level decomposition that floats across scopes. | **Splits** into `drive-project-plan` (slice composition; stack/parallel) and `drive-slice-plan` (dispatch sequence; sizing discipline; DoR-per-dispatch). |
+| `drive-create-spec` | Produces "a spec" — scope implicit. | **Splits** into `drive-specify-project` and `drive-specify-slice`. Body differs meaningfully (project: purpose + scope boundary + project-DoD; slice: scope-within-project + slice-DoD + Example-Mapping edge cases). |
+| `drive-create-plan` | Produces "a plan" with a milestone → task two-level decomposition that floats across scopes. | **Splits** into `drive-plan-project` (slice composition; stack/parallel) and `drive-plan-slice` (dispatch sequence; sizing discipline; DoR-per-dispatch). |
 
 ### Atomic skills that stay (some lightly augmented)
 
 | Canonical skill | Scope | Augmentation |
 |---|---|---|
 | `drive-create-project` | Project | Seed placeholders for slice template + calibration links; called by `drive-deliver-workflow` at project init. |
-| `drive-close-project` | Project | Mandatory final retro step (calls `drive-retro-run`); called by `drive-deliver-workflow` at project close. |
+| `drive-close-project` | Project | Mandatory final retro step (calls `drive-run-retro`); called by `drive-deliver-workflow` at project close. |
 | `drive-create-deployment-plan` | Project | None |
 | `drive-pr-description` | Slice / direct change | Extended to handle the direct-change case (only persisted intent artefact for a direct change). |
 | `drive-pr-walkthrough` | Slice | None |
@@ -517,8 +517,8 @@ Workflow skills (three; all new or renamed):
 | Skill | Scope | Purpose |
 |---|---|---|
 | **`drive-triage-work`** | Cross-cutting (entry) | Runs the triage decision tree and outputs one of the eight verdicts. Called by `drive-start-workflow` (which then executes the verdict's setup). Operators can also invoke it directly. |
-| **`drive-health-check`** | Project (rollup) | Produces session-bookended (interactive) or trigger-fired (unattended) project rollups: slice progress, drifted slices, dispatch throughput so far, calibration signals, recommended next pick. Called by `drive-deliver-workflow` on cadence; operators can invoke it directly. |
-| **`drive-retro-run`** | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical vs project-context vs ADR home, name the update, land it in the matching memory home. Mandatory at project closure (enforced by `drive-deliver-workflow`); trigger-fired on dispatch failure / drift / escapee (from `drive-build-workflow`). |
+| **`drive-check-health`** | Project (rollup) | Produces session-bookended (interactive) or trigger-fired (unattended) project rollups: slice progress, drifted slices, dispatch throughput so far, calibration signals, recommended next pick. Called by `drive-deliver-workflow` on cadence; operators can invoke it directly. |
+| **`drive-run-retro`** | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical vs project-context vs ADR home, name the update, land it in the matching memory home. Mandatory at project closure (enforced by `drive-deliver-workflow`); trigger-fired on dispatch failure / drift / escapee (from `drive-build-workflow`). |
 
 ### Direct change has no dedicated skill
 
@@ -530,7 +530,7 @@ Resolved during consolidation, recorded here as closed for the historical trail:
 
 - ~~OQ1. Linear unit for a slice — issue or milestone?~~ **Closed.** Linear issue. (More universal; matches consumer practice; reserves "milestone" for the Linear-side vocabulary that doesn't map to Drive.)
 - ~~OQ5. Exact persistence shape for in-project slices.~~ **Closed.** `projects/<project>/slices/<slice>/spec.md` + `plan.md`.
-- ~~OQ6. Split `drive-create-spec` / `drive-create-plan` or take a scope flag?~~ **Closed.** Split. The two pairs (`drive-project-specify` / `drive-slice-specify`; `drive-project-plan` / `drive-slice-plan`) have genuinely different inputs, outputs, audiences, and shape. A scope flag papers over the difference.
+- ~~OQ6. Split `drive-create-spec` / `drive-create-plan` or take a scope flag?~~ **Closed.** Split. The two pairs (`drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`) have genuinely different inputs, outputs, audiences, and shape. A scope flag papers over the difference.
 - ~~OQ10. What happens to "milestone" as a word?~~ **Closed.** Retired from Drive vocabulary entirely.
 
 Still open (working positions): see [`spec.md`](spec.md) § Open questions for the full list with working positions.

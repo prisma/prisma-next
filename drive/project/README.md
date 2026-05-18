@@ -1,10 +1,10 @@
 # drive/project — project-context for project-level workflows
 
-Loaded by `drive-deliver-workflow` and `drive-project-plan`. Holds prisma-next's project-level conventions, status-update cadence, slice-composition patterns.
+Loaded by `drive-deliver-workflow` and `drive-plan-project`. Holds prisma-next's project-level conventions, status-update cadence, slice-composition patterns.
 
 ## Status-update cadence
 
-- Linear Project status: update at slice-merge (drive-deliver-workflow does this implicitly via `drive-health-check`).
+- Linear Project status: update at slice-merge (drive-deliver-workflow does this implicitly via `drive-check-health`).
 - Wider-team comms: optional, operator-set. Use `drive-post-update` ([PR #93](https://github.com/prisma/ignite/pull/93)) for the cadence the project needs.
 - Cross-team dependencies: surface in the project plan's `Dependencies` section; ping owners explicitly when a dependency is blocking.
 

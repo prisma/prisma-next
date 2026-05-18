@@ -1,5 +1,5 @@
 ---
-name: drive-health-check
+name: drive-check-health
 description: >
   Run a project-health rollup at any of three cadence points: session-bookend (start /
   end), per-slice-merge (after each slice's DoD), or trigger-fired (operator-requested
@@ -11,7 +11,7 @@ metadata:
   version: "2026.5.18"
 ---
 
-# Drive: Health Check
+# Drive: Check Health
 
 Run a project-health rollup. Atomic skill — does one thing: produces a rollup.
 
@@ -33,7 +33,7 @@ Three canonical cadences (per [`projects/drive-domain-model/workflow.md`](/proje
 
 **Do not use this skill for:**
 
-- Per-event retrospectives — that's `drive-retro-run`.
+- Per-event retrospectives — that's `drive-run-retro`.
 - Project close-out verification — that's `drive-close-project` (although the final rollup before close fires here).
 - CI / build / test health — different domain; use the team's CI dashboards.
 - Cadence-based-only rollups without operator value — health checks have a purpose; if no decisions hang on the rollup, skip it.
@@ -49,7 +49,7 @@ Three canonical cadences (per [`projects/drive-domain-model/workflow.md`](/proje
 - A rollup document produced (chat output in interactive mode; `projects/<project>/rollups/<timestamp>.md` in unattended mode).
 - Drift signals surfaced (each with severity: informational / warning / scope-shift-candidate).
 - If a scope-shift candidate fires: a recommendation to invoke `drive-start-workflow` mid-flight for re-triage.
-- If a retro trigger fires: a recommendation to invoke `drive-retro-run`.
+- If a retro trigger fires: a recommendation to invoke `drive-run-retro`.
 - Recommended next pick named (one or more candidate slices / direct changes, with rationale).
 
 ## Project context
@@ -122,8 +122,8 @@ Interactive mode: display in chat. Unattended mode: write to `projects/<project>
 ### Step 5 — Fire downstream skills on triggers
 
 - **Scope-shift candidate** → recommend (or, in unattended mode, halt and surface for) `drive-start-workflow` mid-flight invocation for re-triage.
-- **Retro trigger** (dispatch failure / drift event / scope-shift escapee surfaced in the rollup that wasn't already retroed) → recommend `drive-retro-run`.
-- **Project-DoD coverage gap** (a DoD condition with no slice that will finish it) → recommend `drive-project-plan` to amend the plan.
+- **Retro trigger** (dispatch failure / drift event / scope-shift escapee surfaced in the rollup that wasn't already retroed) → recommend `drive-run-retro`.
+- **Project-DoD coverage gap** (a DoD condition with no slice that will finish it) → recommend `drive-plan-project` to amend the plan.
 - **Recommended next pick** → in interactive mode, present to operator for confirmation; in unattended mode, log and proceed to `drive-build-workflow` on the picked unit if the operator's policy allows.
 
 ## Rollup template
@@ -184,8 +184,8 @@ Interactive mode: display in chat. Unattended mode: write to `projects/<project>
 
 - `drive-deliver-workflow` — fires this skill on session-bookend + per-slice-merge cadences
 - `drive-start-workflow` — invoked on scope-shift-candidate signals for mid-flight re-triage
-- `drive-retro-run` — invoked on retro triggers surfaced in the rollup
-- `drive-project-plan` — invoked on DoD-coverage-gap signals
+- `drive-run-retro` — invoked on retro triggers surfaced in the rollup
+- `drive-plan-project` — invoked on DoD-coverage-gap signals
 - `drive-close-project` — fires the closing-rollup as part of close-out
 - `drive-bootstrap-context` ([PR #93](https://github.com/prisma/ignite/pull/93)) — seeds `drive/health/README.md` if missing
 

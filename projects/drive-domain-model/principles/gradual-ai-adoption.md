@@ -20,9 +20,9 @@ Every team is at some point on this spectrum, today. Every team's point moves ov
 
 Three concrete commitments:
 
-1. **Both skill tiers are first-class.** [Workflow skills](../skill-restructure.md) (`drive-<verb>-workflow`) and atomic skills are both directly invokable by humans. A human at the "zero AI" end calls atomic skills as building blocks (`drive-slice-specify`, then `drive-slice-plan`, then handles the dispatch loop themselves). A human at the "full delegation" end calls a workflow skill (`drive-build-workflow`) and lets it run the loop. The atomic-tier skills aren't internal plumbing; the workflow-tier skills aren't a replacement for humans. Both are intentional interfaces.
+1. **Both skill tiers are first-class.** [Workflow skills](../skill-restructure.md) (`drive-<verb>-workflow`) and atomic skills are both directly invokable by humans. A human at the "zero AI" end calls atomic skills as building blocks (`drive-specify-slice`, then `drive-plan-slice`, then handles the dispatch loop themselves). A human at the "full delegation" end calls a workflow skill (`drive-build-workflow`) and lets it run the loop. The atomic-tier skills aren't internal plumbing; the workflow-tier skills aren't a replacement for humans. Both are intentional interfaces.
 
-2. **The protocol is human-readable and human-runnable.** Every skill body documents the steps it runs. The Definition-of-Ready / Definition-of-Done / brief / WIP-inspection / retro templates work whether a human or an agent runs them. A human who hasn't touched any Drive skill should be able to read `principles/definition-of-ready.md` and run the gate manually; a human who runs only `drive-slice-plan` directly should get the same shape of slice plan as a human who runs `drive-build-workflow` and lets it call `drive-slice-plan` internally.
+2. **The protocol is human-readable and human-runnable.** Every skill body documents the steps it runs. The Definition-of-Ready / Definition-of-Done / brief / WIP-inspection / retro templates work whether a human or an agent runs them. A human who hasn't touched any Drive skill should be able to read `principles/definition-of-ready.md` and run the gate manually; a human who runs only `drive-plan-slice` directly should get the same shape of slice plan as a human who runs `drive-build-workflow` and lets it call `drive-plan-slice` internally.
 
 3. **Project-context memory (`drive/<category>/README.md`) serves both humans and agents.** The READMEs aren't just agent context loaders — they're the team's documented protocol, readable by anyone on the team. When a human runs a slice manually, they consult the same `drive/plan/README.md` an agent would load. When the team adopts more agent delegation, the agent inherits the human's accumulated lessons via the same surface.
 
@@ -47,7 +47,7 @@ This is a fully valid mode of operating. The principle docs are the methodology;
 
 ### Atomic-skill use (humans invoking individual skills)
 
-- Invoke atomic skills as building blocks when they save time: `drive-slice-specify` to scaffold a slice spec; `drive-slice-plan` to lay out the dispatches; `drive-pr-description` to draft a PR body.
+- Invoke atomic skills as building blocks when they save time: `drive-specify-slice` to scaffold a slice spec; `drive-plan-slice` to lay out the dispatches; `drive-pr-description` to draft a PR body.
 - Run the loop between invocations yourself — you decide when to move from spec to plan to implementation to PR.
 - Use the skills à la carte; skip the ones whose work you'd rather do by hand.
 

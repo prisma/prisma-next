@@ -38,7 +38,7 @@ The trajectory above is a spectrum, not a step function — see [`gradual-ai-ado
 | Point | What the operator does | Drive skills they invoke |
 |---|---|---|
 | **Manual** | Reads `principles/` + `drive/<category>/README.md` directly; runs the rituals by hand. No drive-* skills involved. | None — git, GitHub, Linear directly. |
-| **Atomic invocation** | Invokes individual atomic skills as building blocks (`drive-slice-specify` to scaffold a spec; `drive-slice-plan` to lay out dispatches; `drive-pr-description` to draft a PR body). Operator stays in the loop between invocations. | Atomic skills only; no workflow skills. |
+| **Atomic invocation** | Invokes individual atomic skills as building blocks (`drive-specify-slice` to scaffold a spec; `drive-plan-slice` to lay out dispatches; `drive-pr-description` to draft a PR body). Operator stays in the loop between invocations. | Atomic skills only; no workflow skills. |
 | **Workflow invocation** | Invokes a workflow skill (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) and lets it pilot the loop top-to-bottom. Operator handles design discussions + assumption-falsification escalations that fire to them. | Workflow skills + (transparently) the atomic skills they call. |
 
 Each point is a fully valid mode of operation. Moving from one to the next is a deliberate choice, not an inevitability — a team that stays at "atomic invocation" indefinitely is operating Drive correctly; they're just not delegating more.

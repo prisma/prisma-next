@@ -1,6 +1,6 @@
 # drive/retro — project-context for retros
 
-Loaded by `drive-retro-run`. Holds prisma-next's retro conventions, recurring-pattern catalogue, and landing-surface preferences.
+Loaded by `drive-run-retro`. Holds prisma-next's retro conventions, recurring-pattern catalogue, and landing-surface preferences.
 
 ## Landing-surface preferences
 
@@ -21,7 +21,7 @@ _(Empty at seeding; populated by retros over time.)_
 
 ## Mandatory-final-retro template
 
-Per `drive-retro-run` § Step 8, the project-close retro covers the project as a whole. Template prompts:
+Per `drive-run-retro` § Step 8, the project-close retro covers the project as a whole. Template prompts:
 
 1. **What went well?** Patterns worth keeping; calibrations that proved out; protocol points that earned their cost.
 2. **What surprised us?** Things the protocol didn't predict; assumptions that turned out to be wrong; sizing that drifted.

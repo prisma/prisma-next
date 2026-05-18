@@ -101,18 +101,18 @@ A Linear ticket says "implement the new TypeScript backend's contract emitter." 
 
 1. **Triage** walks its decision tree: not trivial; no existing open project covers this; sizable but estimable. Question 4: does it fit in one PR? No — surface area spans contract IR + emitter target + fixtures. Verdict: **New project**.
 2. Triage runs the **promotion ceremony**: creates a Linear Project, moves the original ticket into it, marks the ticket Done, renames it `Plan: TypeScript backend emitter` (forward-pointer to the project), then routes to **Project initiation**.
-3. **Project initiation** runs `drive-create-project` → scaffolds `projects/typescript-emitter/` → `drive-project-specify` → writes `spec.md` with purpose, scope boundary, project-DoD (often via **Design discussion** with the operator) → `drive-project-plan` → writes `plan.md` composing the project from known + anticipated slices (stack and parallelism declared).
-4. The first slice runs **Slice initiation** → `drive-slice-specify` writes the slice spec under `projects/typescript-emitter/slices/<slice>/spec.md` → `drive-slice-plan` decomposes into a sequence of dispatches, each sized ≤ M, each with DoR + DoD declared.
+3. **Project initiation** runs `drive-create-project` → scaffolds `projects/typescript-emitter/` → `drive-specify-project` → writes `spec.md` with purpose, scope boundary, project-DoD (often via **Design discussion** with the operator) → `drive-plan-project` → writes `plan.md` composing the project from known + anticipated slices (stack and parallelism declared).
+4. The first slice runs **Slice initiation** → `drive-specify-slice` writes the slice spec under `projects/typescript-emitter/slices/<slice>/spec.md` → `drive-plan-slice` decomposes into a sequence of dispatches, each sized ≤ M, each with DoR + DoD declared.
 5. **Slice execution** runs `drive-build-workflow`'s dispatch loop: pre-flight DoR → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD → reviewer subagent verdict → loop to next dispatch.
 6. When a dispatch's brief assumes "the existing emitter's column-naming pass is per-target" and the implementer discovers it's per-codec, the orchestrator hits invariant I12: stop, escalate to **Design discussion** with the operator, output a spec/plan edit + a `design-decisions.md` entry, resume.
 7. Slice execution → **Slice review** (`drive-review-code`, `drive-pr-walkthrough`, `drive-qa-plan`, `drive-qa-run`) → **Slice closure** (PR merged, deferred candidates recorded, health rollup) → next slice.
-8. Last slice merges → **Project closure** runs `drive-close-project` → mandatory final retro via `drive-retro-run` → migrate long-lived docs → delete `projects/typescript-emitter/`.
+8. Last slice merges → **Project closure** runs `drive-close-project` → mandatory final retro via `drive-run-retro` → migrate long-lived docs → delete `projects/typescript-emitter/`.
 
 What this satisfies: **FR1** (pinned model exercised end-to-end), **FR3** (triage routes to new project), **FR5** (dispatch discipline), **FR6** (design discussion fires mid-flight on falsified assumption), **FR7** (promotion ceremony), **I7** (purpose immutable), **I11** (two-cap sizing), **I12** (no silent amendments).
 
 ### Walkthrough 3: a project shrinks mid-flight
 
-A six-slice project is two slices in. The remaining four planned slices turn out to be already-done (the underlying refactor obviated them). The orchestrator notices during a session-bookended `drive-health-check`.
+A six-slice project is two slices in. The remaining four planned slices turn out to be already-done (the underlying refactor obviated them). The orchestrator notices during a session-bookended `drive-check-health`.
 
 1. The orchestrator surfaces a **mid-flight triage** as a structured decision to the operator: "remaining scope appears to fit one PR — propose Demote."
 2. Operator authorises.
@@ -140,16 +140,16 @@ What this project ships, framed as outputs of the design above. The skill family
 | Deliverable | What it is | Design it implements |
 |---|---|---|
 | `drive-triage-work` | Runs the triage decision tree; outputs one of eight verdicts. Called by `drive-start-workflow`; also directly invokable. | Layer 2 — Triage. |
-| `drive-project-specify` + `drive-slice-specify` | Split from `drive-create-spec`. Different inputs / outputs / templates per scope. | Layer 1 — Project vs Slice distinction; Walkthrough 2. |
-| `drive-project-plan` + `drive-slice-plan` | Split from `drive-create-plan`. Project-plan composes slices; slice-plan composes dispatches with sizing + DoR. | Layer 1 — Project vs Slice distinction; Layer 3 — I11. |
-| `drive-health-check` | Project rollup; session-bookended (interactive) or trigger-fired (unattended). Called by `drive-deliver-workflow`; directly invokable. | Layer 2 — cross-cutting; Walkthrough 3 (mid-flight detection). |
-| `drive-retro-run` | Trigger-based retro template; lands the learning in canonical / project-context / ADR. Called by both workflow skills on triggers; directly invokable. | protocol-as-memory principle. |
+| `drive-specify-project` + `drive-specify-slice` | Split from `drive-create-spec`. Different inputs / outputs / templates per scope. | Layer 1 — Project vs Slice distinction; Walkthrough 2. |
+| `drive-plan-project` + `drive-plan-slice` | Split from `drive-create-plan`. Project-plan composes slices; slice-plan composes dispatches with sizing + DoR. | Layer 1 — Project vs Slice distinction; Layer 3 — I11. |
+| `drive-check-health` | Project rollup; session-bookended (interactive) or trigger-fired (unattended). Called by `drive-deliver-workflow`; directly invokable. | Layer 2 — cross-cutting; Walkthrough 3 (mid-flight detection). |
+| `drive-run-retro` | Trigger-based retro template; lands the learning in canonical / project-context / ADR. Called by both workflow skills on triggers; directly invokable. | protocol-as-memory principle. |
 
 **Atomic tier — augmentations (four):**
 
 | Deliverable | What it is | Design it implements |
 |---|---|---|
-| `drive-close-project` (augmented) | Mandatory final retro hook (calls `drive-retro-run`); refusal to delete `projects/<x>/` while project DoD is unmet. | Layer 2 — Project closure; protocol-as-memory principle. |
+| `drive-close-project` (augmented) | Mandatory final retro hook (calls `drive-run-retro`); refusal to delete `projects/<x>/` while project DoD is unmet. | Layer 2 — Project closure; protocol-as-memory principle. |
 | `drive-create-project` (augmented) | Project DoR check at entry; seeds `drive/<category>/README.md` entries via `drive-bootstrap-context`. | Layer 2 — Project initiation; project DoR. |
 | `drive-discussion` (promoted) | From generic mode skill to first-class cross-cutting workflow trigger. Stays atomic. | Layer 2 — Design discussion; Layer 3 — I12. |
 | `drive-pr-description` (augmented) | Extended for the direct-change case. | Layer 1 — Direct change. |
@@ -242,7 +242,7 @@ The full alternatives ledger lives in [`design-decisions.md`](design-decisions.m
 | **Design discussion shape** (D13) | Generic mode skill mentioned in passing; lifecycle stage between Triage and Project initiation; cross-cutting workflow with multiple triggers | Cross-cutting workflow (D13c) | It isn't a stage — it fires multiple times across a project's lifetime on different triggers. Pairing with I12 gives structural protection against silent amendments. |
 | **Triage scope** (D14) | Entry-point only; entry + mid-flight in two separate workflows; entry + mid-flight as one workflow with two modes | One workflow with two modes | Promote and demote are scope-shift decisions — exactly what triage does. Modelling them as separate workflows would duplicate the decision tree. |
 | **Linear promotion ceremony** (D15) | Keep ticket as project "top story"; close ticket entirely; hybrid (move ticket into project, mark Done) | Hybrid (D15c) | Preserves the original ticket as the historical marker of the original ask while making the project the durable handle. |
-| **Spec/plan split** (D17) | Scope flag on existing skills; split into per-scope skills | Split into per-scope skills (`drive-project-specify` etc.) | Project-scope and slice-scope have meaningfully different inputs / outputs / audiences / templates; a flag papers over genuinely different shapes. |
+| **Spec/plan split** (D17) | Scope flag on existing skills; split into per-scope skills | Split into per-scope skills (`drive-specify-project` etc.) | Project-scope and slice-scope have meaningfully different inputs / outputs / audiences / templates; a flag papers over genuinely different shapes. |
 | **Two sizing caps vs one** (D18) | One M-cap at the dispatch level; one PR-cap at the slice level; both caps independent | Both, codified as I11 | The caps capture different concerns: review-ability vs agent-session inspect-ability. Neither subsumes the other. |
 | **PR #93 as base** (D21) | Treat PR #93 as orthogonal (consumer migration handles integration later); treat PR #93 as assumed-landed base | PR #93 is the base | The QA pair is non-optional for slice/project DoD; the project-context convention is the only canonical answer to where project-specific QA / spec / plan facts live. Without PR #93 the restructure ships into a vacuum. |
 | **Calibration architecture** (D23) | Generic "calibration" guidance, teams figure out per-overlay home; explicit per-overlay home in `drive/<category>/README.md` per PR #93 convention | Explicit per-overlay home (D23b) | Generic guidance is undisciplined — teams add items where convenient (often inside in-repo skill copies, which then drift). Naming the home turns "where does this go?" into a lookup. |
@@ -258,7 +258,7 @@ Working positions; resolved questions are recorded in [`model.md`](model.md) § 
 5. **Name for the triage skill.** Working position: `drive-triage-work` — aspirationally compliant with the `<scope>-<verb>-<noun>` taxonomy in `skills/README.md`.
 6. **How is the project spec written when full scope isn't knowable yet?** Working position: two passes — purpose statement fixed in the first pass (immutable per I7); scope boundary sharpened in later passes as slices deliver. Design discussion is the mechanism for the second pass.
 7. **Stacked PRs in Linear.** Linear has no first-class stacking metadata. Working position: each PR is its own Linear issue; the stack order is recorded in the project plan and in the PR descriptions; Linear sees a sequence of issues without explicit stacking metadata.
-8. **N for the unattended-mode drift alarm in `drive-health-check`.** Working position: calibrate per-project; default to 3 consecutive dispatches without slice progress.
+8. **N for the unattended-mode drift alarm in `drive-check-health`.** Working position: calibrate per-project; default to 3 consecutive dispatches without slice progress.
 9. **Demotion authorisation.** Working position: agile orchestrator surfaces a demotion candidate as a structured decision; operator authorises before any Linear cleanup runs.
 10. **How does the protocol become machine-readable for an agent orchestrator?** Likely answer: the principles + rituals as a `drive/agile` skill the orchestrator loads automatically; the always-applied invariants (no L/XL dispatch, WIP-inspection cadence, DoR/DoD gates) as a rule that fires when any `drive-*` skill is in play. Pin during skill restructuring.
 11. **Migration path for existing in-flight Drive projects in `prisma/ignite`.** Working position: retroactively reshape only if there's a clear payoff; let existing in-flight artefacts age out under the old model; new projects use the new model.
