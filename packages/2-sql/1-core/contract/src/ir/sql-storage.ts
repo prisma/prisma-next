@@ -121,18 +121,24 @@ function normaliseNamespaceEntry(
  * responsibility (so the family base does not import target-specific
  * subclasses).
  */
+// SQL concretions always store `StorageTable` instances in `tables`.
+// Narrowing the namespace map here lets target/family-level consumers
+// iterate `namespaces[*].tables[*]` and recover the concrete table type
+// without the framework's wider `object` value forcing per-site casts.
+export type SqlNamespace = Namespace & {
+  readonly tables: Readonly<Record<string, StorageTable>>;
+};
+
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   // The `__unbound__` namespace is always present at runtime — every SQL
   // contract has a late-binding slot whose binding the target resolves at
-  // connection time. Encoding it as a required key here (and narrowing
-  // its `tables` slot to `StorageTable` rather than the framework's wider
-  // `object`) lets DSL surfaces (e.g. `TableProxyContract`) statically
-  // address it without an optional narrowing dance at every call site.
-  readonly namespaces: Readonly<Record<string, Namespace>> & {
-    readonly __unbound__: Namespace & {
-      readonly tables: Readonly<Record<string, StorageTable>>;
-    };
+  // connection time. Every namespace's `tables` slot is narrowed to
+  // `StorageTable` (rather than the framework's wider `object`) so DSL
+  // surfaces and runtime walkers can address it without an optional
+  // narrowing dance at every call site.
+  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
+    readonly __unbound__: SqlNamespace;
   };
   declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
 
@@ -149,10 +155,8 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
     if (!normalised[UNBOUND_NAMESPACE_ID]) {
       normalised[UNBOUND_NAMESPACE_ID] = SqlUnboundNamespace.instance;
     }
-    this.namespaces = Object.freeze(normalised) as Readonly<Record<string, Namespace>> & {
-      readonly __unbound__: Namespace & {
-        readonly tables: Readonly<Record<string, StorageTable>>;
-      };
+    this.namespaces = Object.freeze(normalised) as Readonly<Record<string, SqlNamespace>> & {
+      readonly __unbound__: SqlNamespace;
     };
     if (input.types !== undefined) {
       this.types = Object.freeze(
