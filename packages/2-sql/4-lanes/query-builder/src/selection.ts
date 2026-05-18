@@ -3,6 +3,14 @@ import type { ExtractCodecTypes, SqlStorage, StorageColumn } from '@prisma-next/
 import type { DrainOuterGeneric } from './type-atoms';
 
 /**
+ * Resolves the tables in the late-binding (`__unbound__`) namespace of a SQL
+ * contract. Builder surfaces address tables by their unqualified name today;
+ * the unbound namespace is the slot the target resolves at connection time.
+ */
+export type UnboundTables<TContract extends Contract<SqlStorage>> =
+  TContract['storage']['namespaces']['__unbound__']['tables'];
+
+/**
  * A utility type to extract the output type of a referenced column from a contract.
  * Uses the type-only codec channel (ExtractCodecTypes), not runtime mappings.
  *
@@ -12,9 +20,9 @@ import type { DrainOuterGeneric } from './type-atoms';
  */
 export type ExtractOutputType<
   TContract extends Contract<SqlStorage>,
-  TTableName extends keyof TContract['storage']['tables'] & string,
-  TColumnName extends keyof TContract['storage']['tables'][TTableName]['columns'] & string,
-  _TColumn = TContract['storage']['tables'][TTableName]['columns'][TColumnName],
+  TTableName extends keyof UnboundTables<TContract> & string,
+  TColumnName extends keyof UnboundTables<TContract>[TTableName]['columns'] & string,
+  _TColumn = UnboundTables<TContract>[TTableName]['columns'][TColumnName],
 > = _TColumn extends StorageColumn
   ?
       | (_TColumn['nullable'] extends true ? null : never)
@@ -46,11 +54,11 @@ export interface SelectionValue<TOutput, TDatatype extends string | unknown = un
  */
 export type TableToSelection<
   TContract extends Contract<SqlStorage>,
-  TTableName extends keyof TContract['storage']['tables'] & string,
+  TTableName extends keyof UnboundTables<TContract> & string,
 > = DrainOuterGeneric<{
-  readonly [ColumnName in keyof TContract['storage']['tables'][TTableName]['columns'] &
+  readonly [ColumnName in keyof UnboundTables<TContract>[TTableName]['columns'] &
     string]: SelectionValue<
     ExtractOutputType<TContract, TTableName, ColumnName>,
-    TContract['storage']['tables'][TTableName]['columns'][ColumnName]['nativeType']
+    UnboundTables<TContract>[TTableName]['columns'][ColumnName]['nativeType']
   >;
 }>;

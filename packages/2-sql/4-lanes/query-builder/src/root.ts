@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SelectBuilder } from './select-builder';
+import type { UnboundTables } from './selection';
 import type { TableReference, TableReferenceTooWideError } from './table-reference';
 import type { PreviousFunctionReceivedBadInputError } from './type-errors';
 
@@ -32,7 +33,7 @@ export class Root<TContract extends Contract<SqlStorage>> {
       ? TableReferenceTooWideError<'[error] `root.from()` call received a table reference without a specific table name'>
       : TableReference<TName, TContract['storage']['storageHash']>,
   ): TName extends string
-    ? SelectBuilder<TContract, Pick<TContract['storage']['tables'], TName>>
+    ? SelectBuilder<TContract, Pick<UnboundTables<TContract>, TName>>
     : PreviousFunctionReceivedBadInputError<'[error] invalid table reference in previous `root.from()` call will probably cause runtime errors'>;
   from(
     table: TableReferenceTooWideError<'[error] `root.from()` call received a table reference without a specific table name'>,
