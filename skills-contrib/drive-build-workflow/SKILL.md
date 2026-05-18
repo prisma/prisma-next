@@ -7,8 +7,8 @@ description: >
   dispatch / close. Use when a slice spec + slice plan exist and you want the dispatch
   loop driven to slice DoD. Renamed and augmented from `drive-build-workflow`.
 metadata:
-  version: "2026.5.18"
-  renamed_from: drive-build-workflow
+  version: "2026.5.18-s6"
+  renamed_from: drive-orchestrate-plan
 ---
 
 # Drive: Build Workflow
@@ -17,7 +17,7 @@ Pilots the slice's implementation loop. Workflow skill — invoked top-down and 
 
 The loop: **pre-flight DoR (per dispatch) → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD (per dispatch) → reviewer verdict → triage verdict → loop / escalate / proceed** until the reviewer reports `SATISFIED` on each milestone of the slice.
 
-> **Note:** Renamed from `drive-build-workflow` in 2026-05. The body still carries pre-rename phrasing in places — the augmentations (per-dispatch DoR pre-flight, WIP-inspection cadence as a named loop step, per-dispatch DoD post-flight with intent-validation, brief template, L/XL refusal, design-discussion stop-condition) land in a follow-on slice. Consumers calling `drive-build-workflow` should migrate to `drive-build-workflow` via `drive-reconcile-skills`.
+> **Note:** Renamed from `drive-orchestrate-plan` in 2026-05. The new "Per-dispatch protocol" and "Stop conditions" sections capture the augmentations (per-dispatch DoR pre-flight, brief template, WIP-inspection cadence, per-dispatch DoD post-flight with intent-validation, L/XL refusal, design-discussion stop-condition). The legacy "loop algorithm" section describes the delegation mechanics that fit inside one dispatch's iteration; some pre-rename phrasing remains there ("milestone" → read as "dispatch" in the current vocabulary). Consumers calling `drive-orchestrate-plan` should migrate via `drive-reconcile-skills`.
 
 This skill is an **orchestrator**. It delegates:
 
@@ -48,6 +48,119 @@ The implementer and reviewer subagents are *not* the tech-lead persona — they 
 - Producing the spec or plan — defer to `drive-create-project` / `drive-create-spec` / `drive-create-plan`.
 - Addressing PR review comments — defer to your team's PR-comment-handling skill.
 - Driving CI failures to green — that is a separate concern with different signals (CI logs, not spec ACs).
+
+## Per-dispatch protocol (DoR → brief → WIP inspection → DoD)
+
+The loop iterates **per dispatch**, not per milestone in the legacy sense. Each iteration wraps the implement / review delegation pair with four named gates. These are the slice 6 augmentations layered on the prior body; the legacy "loop algorithm" section below describes the delegation mechanics that fit inside one iteration.
+
+### 1. Pre-flight: per-dispatch DoR
+
+Before delegating to the implementer, walk the per-dispatch DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Per-dispatch DoR). Items the dispatch must pass:
+
+- [ ] Intent statement clear: what changes; what stays the same.
+- [ ] Files-in-play named (concrete paths, from the slice plan).
+- [ ] "Done when" gates explicit (CI commands; regenerate-fixtures; intent-validation criteria).
+- [ ] Predicted size is S or M. **L/XL refusal: if the dispatch is predicted L or XL, refuse to delegate.** Route back to `drive-slice-plan` for re-decomposition. The two-cap sizing discipline (PR-cap at slice; M-cap at dispatch) is enforced here.
+- [ ] Failure modes from `drive/plan/README.md` considered.
+- [ ] Edge cases from the slice spec covered by the "done when" or explicitly named as "covered by dispatch X."
+- [ ] No silent design decisions assumed — anything unpinned surfaces as a `drive-discussion` stop-condition (see § Stop conditions) before the dispatch starts.
+
+If any DoR item fails: fix the gap, OR halt and surface to the operator. Do not delegate over a failed DoR.
+
+### 2. Brief assembly
+
+Once DoR passes, assemble the dispatch brief. The brief is what the implementer reads as its full context for the dispatch (per [`projects/drive-domain-model/principles/brief-discipline.md`](/projects/drive-domain-model/principles/brief-discipline.md)).
+
+Brief template (specialise in `drive/plan/README.md`):
+
+```markdown
+# Dispatch brief: <dispatch-name>
+
+## Context (≤ 1 paragraph)
+_What slice this dispatch is in. What previous dispatches have established. The single piece of information the implementer needs to orient._
+
+## Intent (1-3 sentences)
+_What changes. What stays the same. Anti-corruption boundary._
+
+## Files in play
+- `path/to/file.ts` — _what changes._
+- `path/to/test.ts` — _new tests for ..._
+
+## Edge cases (from slice spec, this dispatch's portion)
+- _Edge case 1 — disposition._
+- _Edge case 2 — disposition._
+
+## "Done when" gates
+- [ ] _Test command: `pnpm test:packages -- <pkg>`_
+- [ ] _Intent-validation: diff matches intent (no scope creep)._
+- [ ] _..._
+
+## Failure modes to avoid (from drive/plan/README.md)
+- _Pattern A — how to avoid._
+- _Pattern B — how to avoid._
+
+## Out of scope (this dispatch)
+- _Surface X — adjacent but explicitly untouched._
+
+## References
+- Slice spec: `projects/<project>/slices/<slice>/spec.md`
+- Slice plan: `projects/<project>/slices/<slice>/plan.md` (or inline section)
+```
+
+The brief feeds `./templates/delegate-implement.md` — the template's `<scope>` and `<context>` placeholders take the brief's body.
+
+### 3. WIP inspection (≤ 5 min, mid-dispatch)
+
+During a dispatch's execution, take **one** 5-minute pass on whatever the implementer has produced so far (diff, test output, intermediate notes). This is not review — it's a sanity check that the dispatch hasn't drifted off-brief.
+
+Cadence:
+
+- For short dispatches (S, < 30 min): no WIP inspection — the dispatch completes before drift can compound.
+- For M dispatches: one WIP inspection at roughly the midpoint OR at the implementer's first "I've made progress, here's where I am" heartbeat.
+- For dispatches that get long unexpectedly: WIP inspection fires automatically once the dispatch crosses 90 min wallclock.
+
+What you check (≤ 5 min):
+
+- Is the diff scope still inside files-in-play?
+- Has the implementer's last action started touching files outside scope?
+- Are the early test results passing for the parts that should be passing?
+- Does the running approach match the brief's intent?
+
+If WIP inspection finds drift: surface to the implementer with a brief course-correction (re-delegation with the drift named). If the drift is significant (the implementer is solving a different problem): halt the dispatch and re-plan via `drive-slice-plan`.
+
+### 4. Post-flight: per-dispatch DoD (with intent-validation)
+
+After the implementer reports done and before triggering review, walk the per-dispatch DoD (per [`projects/drive-domain-model/principles/definition-of-done.md`](/projects/drive-domain-model/principles/definition-of-done.md) § Per-dispatch DoD):
+
+- [ ] All "Done when" gates from the brief pass (CI; lint; typecheck; fixtures; etc.).
+- [ ] **Intent-validation**: the diff matches the brief's intent. No scope creep; no out-of-scope surfaces touched.
+- [ ] Edge cases handled per disposition.
+- [ ] No new findings that should have been pre-named in the slice spec (if there are: route to `drive-discussion` per stop-conditions).
+- [ ] Implementer's heartbeat report aligns with the diff (caught case: implementer claims success but the diff is empty / off-target).
+
+If DoD fails: re-delegate to fix the gap, OR route to `drive-slice-plan` for re-decomposition if the gap is structural. Do not proceed to reviewer until DoD passes.
+
+### 5. Reviewer verdict + triage
+
+This is what the existing loop algorithm (§ The loop algorithm below) covers. After reviewer verdict + intent-validation against verdict + triage, loop to the next dispatch OR mark the slice satisfied OR surface escalation.
+
+## Stop conditions
+
+The loop halts and surfaces to the operator via `drive-discussion` when:
+
+1. **Falsified assumption.** A load-bearing assumption named in the slice spec (or implicit in the plan) is observed to be false during dispatch execution. Per invariant I12, the orchestrator does not silently amend the spec — it halts and routes to `drive-discussion`. The discussion's output includes the design-decisions log entry that closes the stop-condition (per `drive-discussion` § Synthesis).
+
+2. **Unpinned design decision encountered.** A dispatch hits a fork in the road that the slice spec didn't pin (and that's not a documented degree-of-freedom). Halt and route to `drive-discussion`; the decision lands in design-decisions.md + amends the slice spec.
+
+3. **Out-of-scope surface needs touching to complete the dispatch.** If the implementer reports that completing the dispatch requires touching a surface marked out-of-scope, halt and route to `drive-discussion`. Either the scope was wrong (re-spec) or the approach was wrong (re-plan).
+
+4. **Dispatch refused at DoR as L/XL.** Not a stop-condition exactly — re-plan via `drive-slice-plan`. If the slice can't decompose into Ms cleanly, escalate via `drive-discussion`: the slice itself may need re-triaging (promote to project).
+
+5. **Health check / drift signal that suggests scope shift.** Surfaced by `drive-health-check` between dispatches. Halt and route to `drive-start-workflow` for mid-flight re-triage (likely outcome: promote or demote).
+
+6. **Operator-set custom stop.** The operator can declare additional stop conditions in `drive/plan/README.md` (e.g. *"any dispatch that touches `packages/3-...-extensions/migration/*` halts for review before merge"*).
+
+In all cases, the stop-condition is **visible** — recorded in `code-review.md`, in `wip/unattended-decisions.md` (if running unattended), or both. Silent stop-and-resume defeats the I12 protocol.
 
 ## Pre-conditions
 
@@ -413,12 +526,14 @@ Surface the inferred gate to the user for confirmation, then write it back into 
 
 ## The loop algorithm
 
-For each milestone in `plan.md` (or the single milestone named in `iterate <milestone-id>`):
+For each dispatch in the slice plan (or the single dispatch named in `iterate <dispatch-id>`):
 
-1. **Pre-flight.** Confirm `code-review.md` exists; if not, scaffold it from `./templates/code-review.template.md` so the AC scoreboard exists from round 1. Read `code-review.md § Subagent IDs` to recover the persistent implementer/reviewer IDs from prior rounds; if absent (project's first round, or a fresh chat session inheriting the project), note that this round will spawn fresh and record the IDs. Confirm the milestone declares a validation gate; if not, infer it per § Validation gates and confirm with the user before delegating.
-2. **Delegate implementation** using `./templates/delegate-implement.md`, pre-filled with the milestone scope, prior-round context (if R2+), and validation gates from the plan. **Resume the persistent implementer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID in `code-review.md` (see § Subagent continuity). **In Multitask Mode**, set `run_in_background: true` and use the wait window for prep work per § Multitasking the loop.
-3. **Receive implementer report.** Expect: diff highlights, validation results, flagged items, deferral requests, anything surprising.
-4. **If implementer returns deferral requests**: surface to the user as a structured decision (see § Escalation surface). Do not re-delegate until the user has decided.
+> **Note:** This section pre-dates the slice 6 per-dispatch-protocol augmentations (§ Per-dispatch protocol above). Read the per-dispatch protocol first; the steps below describe the delegation mechanics that fit inside one iteration's `2. Brief assembly → delegate` and `5. Reviewer verdict + triage` phases. The phrasing here still uses "milestone" in places — read as "dispatch" in the current vocabulary.
+
+1. **Pre-flight.** Per § Per-dispatch protocol § 1 (per-dispatch DoR). Additionally, confirm `code-review.md` exists; if not, scaffold it from `./templates/code-review.template.md` so the AC scoreboard exists from round 1. Read `code-review.md § Subagent IDs` to recover the persistent implementer/reviewer IDs from prior rounds; if absent (project's first round, or a fresh chat session inheriting the project), note that this round will spawn fresh and record the IDs. Confirm the dispatch declares a validation gate; if not, infer it per § Validation gates and confirm with the user before delegating.
+2. **Delegate implementation** using `./templates/delegate-implement.md`, pre-filled with the **dispatch brief** (per § Per-dispatch protocol § 2), prior-round context (if R2+), and validation gates from the plan. **Resume the persistent implementer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID in `code-review.md` (see § Subagent continuity). **In Multitask Mode**, set `run_in_background: true` and use the wait window for prep work per § Multitasking the loop. **Fire WIP inspection** per § Per-dispatch protocol § 3 if the dispatch crosses the cadence threshold.
+3. **Receive implementer report.** Expect: diff highlights, validation results, flagged items, deferral requests, anything surprising. **Walk per-dispatch DoD** per § Per-dispatch protocol § 4 — including intent-validation — before triggering review. If DoD fails: re-delegate or re-plan; do not proceed to reviewer.
+4. **If implementer returns deferral requests OR a stop-condition fires**: surface to the user as a structured decision (see § Escalation surface) OR route to `drive-discussion` (see § Stop conditions). Do not re-delegate until the trigger is resolved with operator authorisation per I12.
 5. **Delegate review** using `./templates/delegate-review.md`, passing pointers to recent commits and the implementer's report. **Resume the persistent reviewer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID (see § Subagent continuity). **In Multitask Mode**, set `run_in_background: true` and use the wait window for prep work per § Multitasking the loop.
 6. **Receive reviewer verdict.** One of `SATISFIED`, `ANOTHER ROUND NEEDED`, `ESCALATING TO USER`.
 7. **Validate the review against intent.** Required step. The reviewer reasons forward from artifacts; you reason forward from intent (see § The three personas → Orchestrator → Epistemic frame). Read the verdict, the AC scoreboard delta, the new findings (and their severities), and the round entry the reviewer appended under `## Round notes` in `code-review.md`. Apply your project-level context to four questions:
