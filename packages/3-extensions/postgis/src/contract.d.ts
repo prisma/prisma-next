@@ -52,11 +52,13 @@ type ContractBase = ContractType<
   {
     readonly tables: {};
     readonly types: {
-      readonly geometry: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/geometry@1';
-        readonly nativeType: 'geometry';
-        readonly typeParams: Record<string, never>;
+      readonly __unbound__: {
+        readonly geometry: {
+          readonly kind: 'codec-instance';
+          readonly codecId: 'pg/geometry@1';
+          readonly nativeType: 'geometry';
+          readonly typeParams: Record<string, never>;
+        };
       };
     };
     readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
