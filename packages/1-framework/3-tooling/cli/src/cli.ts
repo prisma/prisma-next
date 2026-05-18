@@ -13,6 +13,7 @@ import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrateCommand } from './commands/migrate';
+import { createMigrationCheckCommand } from './commands/migration-check';
 import { createMigrationGraphCommand } from './commands/migration-graph';
 import { createMigrationListCommand } from './commands/migration-list';
 import { createMigrationLogCommand } from './commands/migration-log';
@@ -281,6 +282,9 @@ migrationCommand.addCommand(migrationListCommand);
 
 const migrationGraphCommand = createMigrationGraphCommand();
 migrationCommand.addCommand(migrationGraphCommand);
+
+const migrationCheckCommand = createMigrationCheckCommand();
+migrationCommand.addCommand(migrationCheckCommand);
 
 program.addCommand(migrationCommand);
 
