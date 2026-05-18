@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import {
+  APP_SPACE_ID,
   createControlStack,
   type MigrationPlanOperation,
   type OperationPreview,
@@ -265,32 +266,51 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  // Resolve the app-space target *before* building the aggregate. The
-  // aggregate loader enforces a layout-integrity check (PN-MIG-5001) that
-  // gates the entire command when an extension is declared but its
-  // migrations directory hasn't been materialised yet. Since `migration
-  // show` is documented as offline and read-only, a wrong-grammar input or
-  // an unknown migration reference must reach the user's eyes through the
-  // resolver's structured diagnostic, not through the aggregate loader's
-  // layout check. Building the aggregate later keeps that responsibility
-  // ordering aligned with what the user expects from the verb.
-  let appPkg: OnDiskMigrationPackage;
-  try {
-    if (target && looksLikePath(target)) {
-      const resolved = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
-      if (!resolved.ok) return resolved;
-      appPkg = await readMigrationPackage(resolved.value);
-    } else {
-      const allPackages = await readMigrationsDir(appMigrationsDir);
-      if (allPackages.length === 0) {
-        return notOk(
-          errorRuntime('No migrations found', {
-            why: `No migration packages found in ${appMigrationsRelative}`,
-            fix: 'Run `prisma-next migration plan` to create a migration first.',
-          }),
-        );
-      }
-      if (target) {
+  // `migration show` is an offline command; the control client is constructed
+  // purely to dispatch the family-specific `toOperationPreview` capability and
+  // is not connected to a database.
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    ...ifDefined('driver', config.driver),
+    extensionPacks: config.extensionPacks ?? [],
+  });
+
+  // Explicit-target path. Read the app-space migrations directory directly
+  // and resolve `target` against the app graph. We deliberately skip
+  // `buildContractSpaceAggregate` here for two reasons:
+  //
+  // 1. Functional: the user asked about ONE specific migration. They don't
+  //    need extension-space enumeration; resolving + rendering the named
+  //    package is enough.
+  // 2. UX: the aggregate's layout-integrity check (PN-MIG-5001) fires when
+  //    an extension is declared but its migrations directory hasn't been
+  //    materialised. Gating an offline read-only inspect command on that
+  //    check forces users to run `migrate` against a database before they
+  //    can see what a migration contains — which contradicts the verb's
+  //    documented offline-by-design framing in spec FR3.
+  //
+  // Same pattern as `migration list`, `migration graph`, `migration check`:
+  // those verbs read `appMigrationsDir` directly without ever consulting
+  // the aggregate.
+  if (target) {
+    try {
+      let appPkg: OnDiskMigrationPackage;
+      if (looksLikePath(target)) {
+        const resolved = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
+        if (!resolved.ok) return resolved;
+        appPkg = await readMigrationPackage(resolved.value);
+      } else {
+        const allPackages = await readMigrationsDir(appMigrationsDir);
+        if (allPackages.length === 0) {
+          return notOk(
+            errorRuntime('No migrations found', {
+              why: `No migration packages found in ${appMigrationsRelative}`,
+              fix: 'Run `prisma-next migration plan` to create a migration first.',
+            }),
+          );
+        }
         const graph = reconstructGraph(allPackages);
         const refs = await readRefs(refsDir);
         const migResult = parseMigrationRef(target, { graph, refs });
@@ -309,43 +329,28 @@ async function executeMigrationShowCommand(
           );
         }
         appPkg = matchedPkg;
-      } else {
-        const graph = reconstructGraph(allPackages);
-        const latestMigration = findLatestMigration(graph);
-        if (!latestMigration) {
-          return notOk(
-            errorRuntime('Could not resolve latest migration', {
-              why: 'No latest migration found in the migration history',
-              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
-            }),
-          );
-        }
-        const leafPkg = allPackages.find(
-          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
-        );
-        if (!leafPkg) {
-          return notOk(
-            errorRuntime('Could not resolve latest migration', {
-              why: `Latest migration ${latestMigration.dirName} does not match any package`,
-              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
-            }),
-          );
-        }
-        appPkg = leafPkg;
       }
+      return ok({
+        ok: true,
+        spaces: [pkgToSpaceResult(APP_SPACE_ID, appPkg, client)],
+      });
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
+      }
+      return notOk(
+        errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Failed to read app-space migration: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+      );
     }
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read app-space migration: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
   }
 
-  // Load the app contract so the aggregate loader can validate it.
+  // No-target path. Enumerate the latest migration per space (app +
+  // extensions). The aggregate-loader is needed here because we need to
+  // know which extension spaces are declared; its layout-integrity check
+  // is appropriate at this entry point because the user is asking the
+  // system to report on every loaded space.
   let contractJsonContent: string;
   try {
     contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
@@ -377,7 +382,6 @@ async function executeMigrationShowCommand(
     );
   }
 
-  // Build the aggregate against current disk state to enumerate all spaces.
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
   const aggregateResult = await buildContractSpaceAggregate({
@@ -392,19 +396,51 @@ async function executeMigrationShowCommand(
   }
   const aggregate = aggregateResult.value;
 
-  // `migration show` is an offline command; the control client is constructed
-  // purely to dispatch the family-specific `toOperationPreview` capability and
-  // is not connected to a database.
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    ...ifDefined('driver', config.driver),
-    extensionPacks: config.extensionPacks ?? [],
-  });
-
   const spaces: MigrationShowSpaceResult[] = [];
-  spaces.push(pkgToSpaceResult(aggregate.app.spaceId, appPkg, client));
+
+  // App space: latest leaf.
+  try {
+    const allPackages = await readMigrationsDir(appMigrationsDir);
+    if (allPackages.length === 0) {
+      return notOk(
+        errorRuntime('No migrations found', {
+          why: `No migration packages found in ${appMigrationsRelative}`,
+          fix: 'Run `prisma-next migration plan` to create a migration first.',
+        }),
+      );
+    }
+    const graph = reconstructGraph(allPackages);
+    const latestMigration = findLatestMigration(graph);
+    if (!latestMigration) {
+      return notOk(
+        errorRuntime('Could not resolve latest migration', {
+          why: 'No latest migration found in the migration history',
+          fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+        }),
+      );
+    }
+    const leafPkg = allPackages.find(
+      (p) => p.metadata.migrationHash === latestMigration.migrationHash,
+    );
+    if (!leafPkg) {
+      return notOk(
+        errorRuntime('Could not resolve latest migration', {
+          why: `Latest migration ${latestMigration.dirName} does not match any package`,
+          fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+        }),
+      );
+    }
+    spaces.push(pkgToSpaceResult(aggregate.app.spaceId, leafPkg, client));
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read app-space migration: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
 
   // Extension spaces: always emit one entry per loaded extension so the
   // response enumerates every space the aggregate knows about. Spaces
