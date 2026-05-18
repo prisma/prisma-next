@@ -2,14 +2,17 @@
 
 Project-specific calibration for the `prisma-next` codebase. This is the **worked-example calibration** that informs the general protocol — eventually this content lives in `prisma-next`'s own `docs/` rather than in this methodology project.
 
-Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principles/), the calibration covers six things:
+Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principles/), the calibration covers:
 
 1. Reference tasks for t-shirt-size anchoring (§ 1)
 2. Definition of Ready overlays at three scopes (§ 2)
 3. Definition of Done overlays at three scopes (§ 3)
 4. Failure-mode catalogue (§ 4)
 5. Grep library of anti-pattern patterns (§ 5)
-6. Model-tier routing (§ 6) + Linear ceremony (§ 7) + maintenance discipline (§ 8)
+6. Model-tier routing (§ 6)
+7. Linear ceremony (§ 7)
+8. Maintenance discipline (§ 8)
+9. Manual-QA context (§ 9) — the source for `drive/qa/README.md` in this repo, per the [PR #93](https://github.com/prisma/ignite/pull/93) project-context convention
 
 All sections are living documents — updated **trigger-based** when retros surface a learning (per [`principles/retro.md`](../principles/retro.md)), not on a calendar.
 
@@ -148,6 +151,11 @@ Calibration items that overlay the protocol's DoD templates (per [`principles/de
 - [ ] Original promoted ticket (if applicable) reflects project completion
        (comment or status update)
 - [ ] Final status update on Linear Project links the close-out retro
+- [ ] Manual-QA coverage rolled up: every slice that touched
+       user-observable surface has a drive-qa-plan script + ≥1
+       drive-qa-run report; no unresolved 🛑 Blocker findings;
+       drive/qa/README.md updated if the project surfaced new
+       audiences or coverage-gate gaps
 - [ ] projects/<project>/ deleted from the repo
 - [ ] References to projects/<project>/** removed from the codebase
        (per the doc-maintenance rule)
@@ -167,6 +175,12 @@ Calibration items that overlay the protocol's DoD templates (per [`principles/de
        (auto-close on merge works)
 - [ ] No projects/ references in long-lived files added by the slice
        (per the doc-maintenance rule; grep gate in § 5)
+- [ ] Manual QA: drive-qa-plan script exists + ≥1 drive-qa-run
+       report exists; no unresolved 🛑 Blocker findings;
+       script names both prisma-next QA audiences (extension authors
+       via packages/3-extensions/, end users via examples/) where
+       relevant — OR explicit "N/A — no user-observable change" with
+       a one-line rationale (project-specific shape per § 9 / drive/qa/README.md)
 ```
 
 ### 3.3 Dispatch DoD — `prisma-next` overlay
@@ -450,3 +464,54 @@ All sections of this calibration are updated **trigger-based, not periodically**
 - **Linear ceremony (§ 7).** Update when the team's Linear workflow state convention changes or when the GitHub-Linear integration behaviour changes.
 
 This document is intended to live in `prisma-next`'s `docs/` once the methodology stabilises. While we're still iterating, it lives here in the methodology project. When it migrates, the file path changes and references are updated; the maintenance discipline does not.
+
+---
+
+## 9. Manual-QA context (source for `drive/qa/README.md`)
+
+`drive-qa-plan` and `drive-qa-run` (per [PR #93](https://github.com/prisma/ignite/pull/93)) read project-specific context from `drive/qa/README.md`. The content below is the `prisma-next`-side source for that file; when the calibration migrates into `prisma-next/docs/`, this section's contents move to `prisma-next/drive/qa/README.md` and a one-line stub stays here pointing to it.
+
+### 9.1 Consumer audiences to QA against
+
+Manual-QA scripts for `prisma-next` slices that touch user-observable surface should name and exercise both consumer audiences:
+
+- **Extension authors.** Audience that authors `@prisma-next/extension-*` packages and consumes the framework's authoring substrate, IR, and ADR-defined extension points. Substrate location: `packages/3-extensions/` (worked examples of real extensions) + the framework export surface in `packages/0-framework/` and `packages/1-sql/` / `packages/1-document/`. Common probes: "does the upgrade-skills coverage gate fire on a planted regression?", "does the ADR's new extension point work end-to-end for at least one example extension?", "do the extension's tests still pass after a framework substrate change?"
+- **End users.** Audience that uses `prisma-next` via the demo or example apps. Substrate location: `examples/` (the demo + the example apps under `examples/*`). Common probes: "does `pnpm demo` still run cleanly?", "does the example app's `pnpm dev` produce the expected first-run output?", "does a deliberately-malformed schema produce the documented error envelope?"
+
+Scripts that touch only one audience must say so explicitly in the "What this script is testing" block — that's a coverage statement, not a gap.
+
+### 9.2 Substrate locations the QA runner needs
+
+| Surface | Where to find it |
+|---|---|
+| Demo (the end-user-facing happy path) | `pnpm demo` from repo root |
+| Example apps | `examples/<app>/` — each has its own `README.md` describing what it demonstrates |
+| Extension worked-examples | `packages/3-extensions/<extension>/` — each has its own tests describing the extension's contract |
+| Upgrade-skills coverage gate | `pnpm check:upgrade-coverage` (relevant for any framework-breaking change) |
+| Fixture suite | `pnpm fixtures:check` (relevant for any IR / emitter / serialiser change) |
+| The standard test gates | `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e` (these are CI gates, not manual QA — listed here so scripts don't redundantly re-author them) |
+
+### 9.3 Known coverage-gate gaps
+
+Areas where CI is structurally weak and manual QA is the only honest oracle:
+
+- **Error envelope copy.** `pnpm test:packages` asserts shape, not legibility. A script that says "the user pastes their broken schema; does the error message tell them what to fix?" is the only way to catch error-copy regressions.
+- **CLI diagnostic flow.** `pnpm test:e2e` runs end-to-end but doesn't read the output the way a human would. Scripts that re-run a known-broken CLI flow and judge the diagnostic clarity catch what e2e tests cannot.
+- **Generated artefact shape (the `contract.d.ts` consumers actually edit against).** Fixtures check that the emitted shape matches the golden; manual QA should sometimes open the generated `.d.ts` and read it as a downstream type-author would. Hard to encode as a fixture assertion.
+- **Migration applicability across the demo's history.** Migrations apply forward in test fixtures, but a manual run that walks the demo through its migration history and confirms each step produces a usable database is uniquely valuable when a migration-system slice ships.
+
+### 9.4 Script + report locations
+
+- **In-project slices** (project under `projects/<x>/`): `projects/<x>/manual-qa.md` (script) + `projects/<x>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (one per run).
+- **Orphan slices**: inline in the PR description (script under "Manual QA" heading; findings as a review comment thread).
+
+### 9.5 When to mark "N/A"
+
+A slice may legitimately mark "Manual QA: N/A" when:
+
+- The change is internal-refactor with no user-observable surface (no new envelope copy, no new CLI surface, no new error path, no new extension contract).
+- The change is doc-only (a README rewrite, an ADR addition).
+- The change is purely infrastructural (a CI workflow tweak, a build-config change) that has no consumer-visible behaviour.
+
+The slice's DoD records the N/A with a one-line rationale; the project DoD's QA coverage check confirms the rationale is honest (an "internal refactor" that turns out to have changed a user-visible error message is the failure mode this check exists to catch).
+
