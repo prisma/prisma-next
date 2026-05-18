@@ -73,7 +73,7 @@ describe('PostgresContractSerializer', () => {
     const serializer = new PostgresContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID].tables).toEqual({});
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -81,12 +81,12 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const tables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID].tables;
-    const userTable = tables['user'];
+    const tables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables;
+    const userTable = tables['user'] as StorageTable | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
     expect(userTable?.primaryKey).toBeInstanceOf(PrimaryKey);
-    const postTable = tables['post'];
+    const postTable = tables['post'] as StorageTable | undefined;
     expect(postTable).toBeInstanceOf(StorageTable);
     expect(postTable?.foreignKeys[0]).toBeInstanceOf(ForeignKey);
   });

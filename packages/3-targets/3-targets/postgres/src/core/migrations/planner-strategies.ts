@@ -31,6 +31,7 @@ import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlStorage,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -70,6 +71,43 @@ import {
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 const REBUILD_SUFFIX = '__prisma_next_new';
+
+/**
+ * Finds a table by name across all namespaces in the storage.
+ * Returns the namespace ID alongside the table so callers always have
+ * the full coordinate (namespace ID + table name), not just the table.
+ */
+export function locateTable(
+  storage: SqlStorage,
+  tableName: string,
+): { nsId: string; table: StorageTable } | undefined {
+  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+    // Namespace.tables is typed as Record<string, IRNode> at the interface level;
+    // SQL family namespaces always hold StorageTable instances.
+    const table = ns.tables[tableName] as StorageTable | undefined;
+    if (table !== undefined) {
+      return { nsId, table };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Finds a type entry by name across all namespace type registries.
+ * Namespace types (e.g. Postgres enums) live under
+ * `storage.namespaces[nsId].types`, not under `storage.types`.
+ */
+function locateNamespaceType(
+  storage: SqlStorage,
+  typeName: string,
+): PostgresEnumStorageEntry | undefined {
+  for (const ns of Object.values(storage.namespaces)) {
+    if (!('types' in ns) || ns.types == null) continue;
+    const entry = (ns.types as Record<string, PostgresEnumStorageEntry>)[typeName];
+    if (entry !== undefined) return entry;
+  }
+  return undefined;
+}
 
 // ============================================================================
 // Strategy types
@@ -121,14 +159,21 @@ export interface StrategyContext {
  *      migration fixtures byte-identical.
  */
 export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string): string {
-  const table = ctx.toContract.storage.tables[tableName];
-  if (table?.namespaceId !== undefined) {
-    return table.namespaceId;
+  const located = locateTable(ctx.toContract.storage, tableName);
+  const nsId = located?.nsId;
+
+  if (nsId === undefined) {
+    return ctx.schemaName;
   }
+
+  if (nsId !== UNBOUND_NAMESPACE_ID) {
+    return nsId;
+  }
+
   const namespaces = ctx.toContract.storage.namespaces;
   const unbound = namespaces[UNBOUND_NAMESPACE_ID];
   if (!(unbound instanceof PostgresSchema)) {
-    return ctx.schemaName;
+    return UNBOUND_NAMESPACE_ID;
   }
   if (namespaces['public'] !== undefined) {
     return 'public';
@@ -168,7 +213,7 @@ function buildColumnSpec(
   ctx: StrategyContext,
   overrides?: { nullable?: boolean },
 ) {
-  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  const col = locateTable(ctx.toContract.storage, table)?.table.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -189,7 +234,7 @@ function buildAlterTypeOptions(
   ctx: StrategyContext,
   using?: string,
 ) {
-  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  const col = locateTable(ctx.toContract.storage, table)?.table.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -218,7 +263,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true || column.default !== undefined) continue;
 
@@ -261,8 +306,10 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   for (const issue of issues) {
     if (issue.kind !== 'type_mismatch') continue;
     if (!issue.table || !issue.column) continue;
-    const fromColumn = ctx.fromContract?.storage.tables[issue.table]?.columns[issue.column];
-    const toColumn = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const fromColumn = ctx.fromContract
+      ? locateTable(ctx.fromContract.storage, issue.table)?.table.columns[issue.column]
+      : undefined;
+    const toColumn = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
     if (!fromColumn || !toColumn) continue;
     const fromType = fromColumn.nativeType;
     const toType = toColumn.nativeType;
@@ -306,7 +353,7 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
   for (const issue of issues) {
     if (issue.kind !== 'nullability_mismatch' || !issue.table || !issue.column) continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true) continue;
 
@@ -335,7 +382,7 @@ function enumRebuildCallRecipe(
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toType = ctx.toContract.storage.types?.[typeName];
+  const toType = locateNamespaceType(ctx.toContract.storage, typeName);
   if (!toType) return [];
   const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
@@ -345,10 +392,13 @@ function enumRebuildCallRecipe(
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
   const columnRefs: { table: string; column: string }[] = [];
-  for (const [tableName, table] of Object.entries(ctx.toContract.storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      if (column.typeRef === typeName) {
-        columnRefs.push({ table: tableName, column: columnName });
+  for (const ns of Object.values(ctx.toContract.storage.namespaces)) {
+    for (const [tableName, tableNode] of Object.entries(ns.tables)) {
+      const table = tableNode as StorageTable;
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        if (column.typeRef === typeName) {
+          columnRefs.push({ table: tableName, column: columnName });
+        }
       }
     }
   }
@@ -411,7 +461,7 @@ function enumRebuildCallRecipe(
  * `CreateTableCall` that references the new enum.
  */
 export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage.types);
+  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage);
   if (enumTypes.size === 0) return { kind: 'no_match' };
 
   const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
@@ -498,15 +548,15 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   return { kind: 'match', issues: remaining, calls, recipe: emittedRebuildRecipe };
 };
 
-function collectPostgresEnumTypes(
-  storageTypes: SqlStorage['types'],
-): ReadonlyMap<string, PostgresEnumType> {
+function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
-  for (const [name, instance] of Object.entries(storageTypes ?? {}).sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    if (instance instanceof PostgresEnumType) {
-      result.set(name, instance);
+  for (const ns of Object.values(storage.namespaces)) {
+    if (!('types' in ns) || ns.types == null) continue;
+    const nsTypes = ns.types as Record<string, unknown>;
+    for (const [name, instance] of Object.entries(nsTypes).sort(([a], [b]) => a.localeCompare(b))) {
+      if (instance instanceof PostgresEnumType) {
+        result.set(name, instance);
+      }
     }
   }
   return result;
@@ -606,7 +656,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
-    const contractTable = ctx.toContract.storage.tables[issue.table];
+    const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
     const column = contractTable?.columns[issue.column];
     if (!column) continue;
 
@@ -718,7 +768,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 // ============================================================================
 
 function canUseSharedTemporaryDefaultStrategy(options: {
-  readonly table: NonNullable<Contract<SqlStorage>['storage']['tables'][string]>;
+  readonly table: StorageTable;
   readonly schemaTable: SqlSchemaIR['tables'][string];
   readonly schemaLookup: ReturnType<typeof buildSchemaLookupMap> extends ReadonlyMap<
     string,

@@ -22,6 +22,7 @@ import type {
   PostgresEnumStorageEntry,
   SqlStorage,
   StorageColumn,
+  StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -53,11 +54,21 @@ import { buildExpectedFormatType } from './planner-sql-checks';
 import {
   type CallMigrationStrategy,
   effectiveSchemaForTable,
+  locateTable,
   postgresPlannerStrategies,
   type StrategyContext,
 } from './planner-strategies';
 
 export type { CallMigrationStrategy, StrategyContext };
+
+function locateNamespaceTypeInStorage(storage: SqlStorage, typeName: string): unknown {
+  for (const ns of Object.values(storage.namespaces)) {
+    if (!('types' in ns) || ns.types == null) continue;
+    const entry = (ns.types as Record<string, unknown>)[typeName];
+    if (entry !== undefined) return entry;
+  }
+  return undefined;
+}
 
 // ============================================================================
 // Issue kind ordering (dependency order)
@@ -198,7 +209,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
       if (!contractTable) {
         return notOk(
           issueConflict(
@@ -261,7 +272,9 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
         );
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[
+          issue.column
+        ];
         if (!column)
           return notOk(
             issueConflict(
@@ -284,7 +297,9 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Default missing issue has no table/column name'),
         );
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[
+          issue.column
+        ];
         if (!column?.default) {
           return notOk(
             issueConflict(
@@ -372,7 +387,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict('nullabilityConflict', 'Nullability mismatch has no table/column name'),
         );
-      const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+      const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
       if (!column)
         return notOk(
           issueConflict(
@@ -392,7 +407,9 @@ function mapIssueToCall(
       if (!issue.table || !issue.column)
         return notOk(issueConflict('typeMismatch', 'Type mismatch has no table/column name'));
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[
+          issue.column
+        ];
         if (!column)
           return notOk(
             issueConflict(
@@ -422,7 +439,9 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Default mismatch has no table/column name'),
         );
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[
+          issue.column
+        ];
         if (!column?.default) return ok([]);
         const defaultSql = buildColumnDefaultSql(column.default, column);
         if (!defaultSql) return ok([]);
@@ -441,7 +460,7 @@ function mapIssueToCall(
       if (!issue.table)
         return notOk(issueConflict('indexIncompatible', 'Primary key issue has no table name'));
       if (isMissing(issue)) {
-        const pk = ctx.toContract.storage.tables[issue.table]?.primaryKey;
+        const pk = locateTable(ctx.toContract.storage, issue.table)?.table.primaryKey;
         if (!pk)
           return notOk(
             issueConflict('indexIncompatible', `No primary key in contract for "${issue.table}"`),
@@ -484,8 +503,8 @@ function mapIssueToCall(
         return notOk(issueConflict('indexIncompatible', 'Index issue has no table name'));
       if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
-        const contractIndex = ctx.toContract.storage.tables[issue.table]?.indexes.find((idx) =>
-          arraysEqual(idx.columns, columns),
+        const contractIndex = locateTable(ctx.toContract.storage, issue.table)?.table.indexes.find(
+          (idx: StorageTable['indexes'][number]) => arraysEqual(idx.columns, columns),
         );
         const indexName = contractIndex?.name ?? `${issue.table}_${columns.join('_')}_idx`;
         const extras: { type?: string; options?: Record<string, unknown> } = {};
@@ -511,7 +530,7 @@ function mapIssueToCall(
         if (arrowIdx >= 0) {
           const columns = issue.expected.slice(0, arrowIdx).split(', ');
           const fkName = `${issue.table}_${columns.join('_')}_fkey`;
-          const fk = ctx.toContract.storage.tables[issue.table]?.foreignKeys.find(
+          const fk = locateTable(ctx.toContract.storage, issue.table)?.table.foreignKeys.find(
             (k) => k.columns.join(', ') === columns.join(', '),
           );
           if (fk) {
@@ -544,7 +563,11 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
+      // Enum types live in namespace.types; codec aliases live in storage.types.
+      // Check both so the planner handles whichever slot the type is in.
+      const typeInstance: unknown =
+        ctx.toContract.storage.types?.[issue.typeName] ??
+        locateNamespaceTypeInStorage(ctx.toContract.storage, issue.typeName);
       if (!typeInstance) {
         return notOk(
           issueConflict(
@@ -563,10 +586,11 @@ function mapIssueToCall(
           ),
         ]);
       }
+      const codecInstance = typeInstance as StorageTypeInstance;
       return notOk(
         issueConflict(
           'unsupportedOperation',
-          `Type "${issue.typeName}" uses codec "${typeInstance.codecId}" — only enum types are supported`,
+          `Type "${issue.typeName}" uses codec "${codecInstance.codecId}" — only enum types are supported`,
         ),
       );
     }
