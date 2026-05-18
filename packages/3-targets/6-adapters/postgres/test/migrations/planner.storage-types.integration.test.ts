@@ -25,24 +25,28 @@ const contractWithEnum: Contract<SqlStorage> = {
   storage: {
     storageHash: coreHash('sha256:test'),
     tables: {
-      user: {
-        namespaceId: 'public',
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          role: { nativeType: 'role', codecId: 'pg/enum@1', nullable: false, typeRef: 'Role' },
+      public: {
+        user: {
+          namespaceId: 'public',
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            role: { nativeType: 'role', codecId: 'pg/enum@1', nullable: false, typeRef: 'Role' },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
     types: {
-      Role: new PostgresEnumType({
-        name: 'Role',
-        nativeType: 'role',
-        values: ['USER', 'ADMIN'],
-      }),
+      public: {
+        Role: new PostgresEnumType({
+          name: 'Role',
+          nativeType: 'role',
+          values: ['USER', 'ADMIN'],
+        }),
+      },
     },
     namespaces: { public: new PostgresSchema('public') },
   },
