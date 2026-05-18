@@ -9,6 +9,7 @@ import type { GlobalFlags } from '../../utils/global-flags';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
   DEFAULT_AGENT_SKILL_SOURCES,
+  ensureClaudeCodeProjectRoot,
   formatSkillInstallCommand,
   LEGACY_SKILL_FILE,
   runProjectLevelSkillInstall,
@@ -183,7 +184,7 @@ export async function runInit(
   // and missing-on-disk-at-write-time is tolerated.
   const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
 
-  // `init` delegates the skill to `npx skills add prisma/prisma-next#v<version>`,
+  // `init` delegates the skill to `npx skills add prisma/prisma-next/skills`,
   // so a hand-rolled `.agents/skills/prisma-next/SKILL.md` in the project
   // would shadow the published package. Queue it for deletion on every
   // run (not gated on `--reinit`).
@@ -437,11 +438,9 @@ export async function runInit(
 
   // Agent-skill install. Project-level is unconditional modulo
   // `--no-skill`. We deliberately do **not** offer a user-level
-  // (global) install path: the skill's behaviour and surface track
-  // the project's Prisma Next version, and a host-wide install would
-  // have to pick a single version for every project on the machine,
-  // which breaks the version-locking invariant the rest of the
-  // framework relies on. A project-level failure is fatal
+  // (global) install path: the skill should live with the project that
+  // opted into Prisma Next, while a host-wide install would affect every
+  // project on the machine. A project-level failure is fatal
   // (`INIT_EXIT_SKILL_INSTALL_FAILED`).
   //
   // Runs after install + emit because (1) `node_modules` is in place,
@@ -460,6 +459,7 @@ export async function runInit(
       `Skipped Prisma Next agent-skill install (--no-skill). To install the skills later, run: ${manualProjectSkillSummary}`,
     );
   } else if (install.skipped) {
+    await ensureClaudeCodeProjectRoot(baseDir);
     warnings.push(
       `Skipped Prisma Next agent-skill install because --no-install was passed. After you run install manually, install the skills with: ${manualProjectSkillSummary}`,
     );

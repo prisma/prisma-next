@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from './detect-package-manager';
 import { errorInitSkillInstallFailed } from './errors';
 
@@ -9,82 +10,55 @@ const exec = promisify(execFile);
 /**
  * Default base for the GitHub-URL form `<owner>/<repo>` consumed by
  * upstream `skills add`. Each `SkillSource` joins this base with its
- * own subpath (and optional `#ref` for version-pinned clusters).
+ * own subpath.
  */
 export const DEFAULT_AGENT_SKILL_BASE = 'prisma/prisma-next';
 
 /**
  * One discovery scope inside the Prisma Next monorepo. The CLI emits
- * one `skills add <base>/<subpath>[#ref] --all` invocation per source
+ * one `skills add <base>/<subpath> --all` invocation per source
  * during `init`.
- *
- * `ref` semantics:
- * - `cli`: pin to the CLI's own package version (lockstep with the
- *   skills' SPI). Used for the version-locked usage cluster — the
- *   skills under `skills/<X>/SKILL.md`, which describe the public
- *   package API and are pinned to the version of `@prisma-next/*`
- *   currently installed in the consumer's project.
- * - `null`: no ref. The cluster is "always-latest" — the cumulative
- *   instruction set is the source of truth, and the latest revision
- *   on `main` includes bug fixes for every prior transition. Used
- *   for the upgrade and extension-author clusters.
  */
 export interface SkillSource {
   readonly subpath: string;
-  readonly ref: 'cli' | null;
   readonly description: string;
 }
 
 export const DEFAULT_AGENT_SKILL_SOURCES: readonly SkillSource[] = [
   {
     subpath: 'skills',
-    ref: 'cli',
-    description: 'usage skills (version-locked to installed Prisma Next)',
+    description: 'usage skills',
   },
   {
     subpath: 'skills/upgrade',
-    ref: null,
     description: 'upgrade skill (always tracks `main`)',
   },
   {
     subpath: 'skills/extension-author',
-    ref: null,
     description: 'extension-author skill (always tracks `main`)',
   },
 ];
+
+export const CLAUDE_CODE_PROJECT_DIR = '.claude';
 
 /**
  * Test-only escape hatch for pinning the install base to a local
  * checkout. Production runs leave this unset, so installs always use
  * `DEFAULT_AGENT_SKILL_BASE`.
- *
- * When set to an absolute filesystem path (typical for tests), the
- * `#ref` fragment is dropped — local-path mode in upstream's CLI does
- * not accept refs, and the local clone has whatever content the test
- * checked into it anyway. When set to anything else (e.g. a fork name
- * `myuser/prisma-next`), the ref policy is preserved.
  */
 function resolveAgentSkillBase(): string {
   const override = process.env['PRISMA_NEXT_SKILLS_BASE']?.trim();
   return override && override.length > 0 ? override : DEFAULT_AGENT_SKILL_BASE;
 }
 
-function isLocalPath(base: string): boolean {
-  return base.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(base);
-}
-
 /**
- * Build the `<base>/<subpath>[#ref]` URL the `skills` CLI will
+ * Build the `<base>/<subpath>` URL the `skills` CLI will
  * resolve. Exported for unit tests so the per-source format can be
  * asserted without going through the full install loop.
  */
 export function formatSkillSourceUrl(source: SkillSource): string {
   const base = resolveAgentSkillBase();
-  const url = `${base}/${source.subpath}`;
-  if (source.ref === null) return url;
-  if (isLocalPath(base)) return url;
-  if (source.ref === 'cli') return `${url}#v${cliVersion}`;
-  return url;
+  return `${base}/${source.subpath}`;
 }
 
 /**
@@ -104,6 +78,10 @@ export function formatSkillSourceUrl(source: SkillSource): string {
  */
 export function formatSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
   const args = ['skills', 'add', formatSkillSourceUrl(source), '--all'];
+  return formatPackageManagerCommand(pm, args);
+}
+
+function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {
   switch (pm) {
     case 'pnpm':
       return `pnpm dlx ${args.join(' ')}`;
@@ -134,6 +112,17 @@ function commandToExec(command: string): {
 }
 
 /**
+ * The upstream `skills` CLI installs non-universal project agents only when
+ * that agent's root directory already exists. Claude Code is one of those
+ * agents (`.claude/skills`), so create the root before `skills add --all`
+ * and let the official installer create symlinks from `.claude/skills/*`
+ * back to the canonical `.agents/skills/*` copies.
+ */
+export async function ensureClaudeCodeProjectRoot(baseDir: string): Promise<void> {
+  await mkdir(join(baseDir, CLAUDE_CODE_PROJECT_DIR), { recursive: true });
+}
+
+/**
  * Runs the project-level skill install for every source in
  * `DEFAULT_AGENT_SKILL_SOURCES`, in order. Returns
  * `{ ok: true, commands }` on success; throws a structured
@@ -149,8 +138,13 @@ export async function runProjectLevelSkillInstall(ctx: {
   readonly filesWritten: readonly string[];
 }): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
   const commands: string[] = [];
-  for (const source of DEFAULT_AGENT_SKILL_SOURCES) {
-    const command = formatSkillInstallCommand(ctx.pm, source);
+  const installCommands = DEFAULT_AGENT_SKILL_SOURCES.map((source) =>
+    formatSkillInstallCommand(ctx.pm, source),
+  );
+
+  await ensureClaudeCodeProjectRoot(ctx.baseDir);
+
+  for (const command of installCommands) {
     const { file, args } = commandToExec(command);
     try {
       await exec(file, args, { cwd: ctx.baseDir });
