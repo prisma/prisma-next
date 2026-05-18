@@ -12,6 +12,7 @@ import type {
   Index,
   PostgresEnumStorageEntry,
   ReferentialAction,
+  SqlStorage,
   StorageTypeInstance,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -527,8 +528,12 @@ type BuiltStorage<Definition> = {
   // SQL contracts always carry a literal `__unbound__` namespace whose tables
   // slot is narrowed to the actual built table shape, so downstream DSL
   // surfaces (e.g. `TableProxyContract`, `Ref`, `SelectBuilder`) can address
-  // tables statically without an optional-narrowing dance.
-  readonly namespaces: Readonly<Record<string, Namespace>> & {
+  // tables statically without an optional-narrowing dance. Other namespace
+  // entries are typed against the framework's structural `SqlNamespace`
+  // (tables narrowed to `StorageTable`) which matches `SqlStorage.namespaces`
+  // at the implementation type — no per-model resolution at the type level
+  // because the definition shape doesn't track which model lives where yet.
+  readonly namespaces: SqlStorage['namespaces'] & {
     readonly __unbound__: Namespace & {
       readonly tables: BuiltStorageTables<Definition>;
     };
