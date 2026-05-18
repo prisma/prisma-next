@@ -1,10 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
 import { readRefs } from '@prisma-next/migration-tools/refs';
 import { Command } from 'commander';
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   addGlobalOptions,
@@ -37,14 +38,63 @@ export interface MigrationCheckResult {
   readonly summary: string;
 }
 
+/**
+ * Canonical user-facing locator for a check failure: the cwd-relative path
+ * to the migration package directory. Surfacing the same shape across every
+ * PN code means `--json` consumers can branch uniformly on `where`.
+ */
+function migrationPathRelative(dirPath: string): string {
+  return relative(process.cwd(), dirPath);
+}
+
+function migrationFileRelative(dirPath: string, fileName: string): string {
+  return join(migrationPathRelative(dirPath), fileName);
+}
+
 function checkFileExists(dirPath: string, dirName: string, fileName: string): CheckFailure | null {
   if (!existsSync(join(dirPath, fileName))) {
     return {
       pnCode: 'PN-MIG-CHECK-002',
-      where: dirName,
+      where: migrationFileRelative(dirPath, fileName),
       why: `${fileName} is missing from ${dirName}`,
       fix: 'Re-emit the migration package or restore from version control.',
     };
+  }
+  return null;
+}
+
+/**
+ * Within-migration snapshot-consistency check (PN-MIG-CHECK-005).
+ *
+ * Compares the migration's stored `metadata.to` against the `storageHash`
+ * recorded in its on-disk `end-contract.json` snapshot. The two values are
+ * independent on-disk records of the same fact (the migration's destination
+ * contract); drift between them indicates the package is internally
+ * corrupt. Cross-migration consistency (one migration's end-contract.json
+ * agreeing with the next migration's start-contract.json) is a separate
+ * check that requires shadow execution and is deferred to
+ * `migration preflight`.
+ *
+ * Shared between the graph-wide and per-migration code paths so both report
+ * the same failure for the same on-disk state.
+ */
+function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | null {
+  const endContractPath = join(pkg.dirPath, 'end-contract.json');
+  if (!existsSync(endContractPath)) return null;
+  try {
+    const raw = JSON.parse(readFileSync(endContractPath, 'utf-8')) as Record<string, unknown>;
+    const storage = raw['storage'] as Record<string, unknown> | undefined;
+    const snapshotHash = storage?.['storageHash'];
+    if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
+      return {
+        pnCode: 'PN-MIG-CHECK-005',
+        where: migrationPathRelative(pkg.dirPath),
+        why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but end-contract.json has storageHash=${snapshotHash}`,
+        fix: 'Re-emit the migration package so migration.json and end-contract.json agree.',
+      };
+    }
+  } catch {
+    // end-contract.json unparseable — the file existence check covers this
   }
   return null;
 }
@@ -90,12 +140,17 @@ async function executeMigrationCheckCommand(
     if (MigrationToolsError.is(error)) {
       const pnCode =
         error.code === 'MIGRATION.HASH_MISMATCH' ? 'PN-MIG-CHECK-001' : 'PN-MIG-CHECK-002';
+      // Normalise to a cwd-relative path. `error.details.dir` is absolute
+      // (the migration-tools layer doesn't know the caller's cwd); the
+      // `filePath` fallback is also absolute. Surfacing the relative form
+      // matches the rest of the command's `where` shape and keeps `--json`
+      // consumers from having to special-case the bootstrap-failure path.
+      const rawWhere =
+        (error.details?.['dir'] as string) ?? (error.details?.['filePath'] as string) ?? null;
+      const where = rawWhere ? relative(process.cwd(), rawWhere) : 'unknown';
       failures.push({
         pnCode,
-        where:
-          (error.details?.['dir'] as string) ??
-          (error.details?.['filePath'] as string) ??
-          'unknown',
+        where,
         why: error.why,
         fix: error.fix,
       });
@@ -170,11 +225,17 @@ async function executeMigrationCheckCommand(
     if (!verification.ok) {
       failures.push({
         pnCode: 'PN-MIG-CHECK-001',
-        where: matchedPkg.dirName,
+        where: migrationFileRelative(matchedPkg.dirPath, 'migration.json'),
         why: `Stored hash ${verification.storedHash} does not match recomputed hash ${verification.computedHash}`,
         fix: 'Re-emit the migration package or restore from version control.',
       });
     }
+
+    // PN-MIG-CHECK-005 must fire per-migration as well as graph-wide; both
+    // call sites delegate to the shared helper so the same on-disk drift
+    // produces the same failure regardless of how the user invoked check.
+    const snapshotFailure = checkSnapshotConsistency(matchedPkg);
+    if (snapshotFailure) failures.push(snapshotFailure);
   } else {
     for (const pkg of bundles) {
       for (const f of ['migration.json', 'ops.json']) {
@@ -186,7 +247,7 @@ async function executeMigrationCheckCommand(
       if (!verification.ok) {
         failures.push({
           pnCode: 'PN-MIG-CHECK-001',
-          where: pkg.dirName,
+          where: migrationFileRelative(pkg.dirPath, 'migration.json'),
           why: `Stored hash ${verification.storedHash} does not match recomputed hash ${verification.computedHash}`,
           fix: 'Re-emit the migration package or restore from version control.',
         });
@@ -194,24 +255,8 @@ async function executeMigrationCheckCommand(
     }
 
     for (const pkg of bundles) {
-      const endContractPath = join(pkg.dirPath, 'end-contract.json');
-      if (existsSync(endContractPath)) {
-        try {
-          const raw = JSON.parse(readFileSync(endContractPath, 'utf-8')) as Record<string, unknown>;
-          const storage = raw['storage'] as Record<string, unknown> | undefined;
-          const snapshotHash = storage?.['storageHash'];
-          if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
-            failures.push({
-              pnCode: 'PN-MIG-CHECK-005',
-              where: pkg.dirName,
-              why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but end-contract.json has storageHash=${snapshotHash}`,
-              fix: 'Re-emit the migration package so migration.json and end-contract.json agree.',
-            });
-          }
-        } catch {
-          // end-contract.json unparseable — the file check already covers this
-        }
-      }
+      const snapshotFailure = checkSnapshotConsistency(pkg);
+      if (snapshotFailure) failures.push(snapshotFailure);
     }
 
     const allToHashes = new Set(bundles.map((p) => p.metadata.to));
@@ -223,7 +268,7 @@ async function executeMigrationCheckCommand(
       if (!isReachable) {
         failures.push({
           pnCode: 'PN-MIG-CHECK-003',
-          where: pkg.dirName,
+          where: migrationPathRelative(pkg.dirPath),
           why: `Migration "${pkg.dirName}" starts from ${pkg.metadata.from} which no other migration produces`,
           fix: 'This migration is unreachable in the graph. Delete it or re-emit a connecting migration.',
         });
@@ -236,7 +281,7 @@ async function executeMigrationCheckCommand(
         if (!graph.nodes.has(entry.hash)) {
           failures.push({
             pnCode: 'PN-MIG-CHECK-004',
-            where: `ref "${name}"`,
+            where: relative(process.cwd(), join(refsDir, `${name}.json`)),
             why: `Ref "${name}" points at ${entry.hash} which does not exist in the migration graph`,
             fix: `Update the ref with \`prisma-next ref set ${name} <valid-hash>\` or delete it.`,
           });

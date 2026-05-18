@@ -203,6 +203,47 @@ withTempDir(({ createTempDir }) => {
       timeouts.typeScriptCompilation,
     );
 
+    // F-2 regression: the per-migration code path used to only run PN-001
+    // and PN-002 — it skipped the snapshot-consistency check that the
+    // graph-wide path performs. Lift the check into a shared helper and
+    // pin parity here so the asymmetry can't drift back.
+    it(
+      'per-migration check detects PN-MIG-CHECK-005 in the same way graph-wide does',
+      async () => {
+        const ctx: JourneyContext = setupJourney({ createTempDir });
+
+        const emit = await runContractEmit(ctx);
+        expect(emit.exitCode, 'emit').toBe(0);
+        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
+        expect(plan.exitCode, 'plan').toBe(0);
+
+        const migDir = findLatestMigrationDir(ctx);
+        const dirName = migDir.split('/').pop() ?? '';
+        const endContractPath = join(migDir, 'end-contract.json');
+
+        if (existsSync(endContractPath)) {
+          const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
+          contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
+          writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
+        } else {
+          writeFileSync(
+            endContractPath,
+            JSON.stringify({ storage: { storageHash: `sha256:${'d'.repeat(64)}` } }, null, 2),
+          );
+        }
+
+        const check = await runMigrationCheck(ctx, [dirName, '--json']);
+        const json = parseJsonOutput(check);
+        expect(json?.['ok'], 'per-migration check reports failure').toBe(false);
+        const failures = json?.['failures'] as readonly Record<string, string>[];
+        expect(
+          failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-005'),
+          'per-migration check carries PN-MIG-CHECK-005',
+        ).toBe(true);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
     it(
       'non-existent named migration → exit 2, PRECONDITION',
       async () => {
