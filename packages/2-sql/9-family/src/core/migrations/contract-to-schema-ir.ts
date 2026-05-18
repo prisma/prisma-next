@@ -8,7 +8,7 @@ import {
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
   type StorageTypeInstance,
   toStorageTypeInstance,
   type UniqueConstraint,
@@ -219,25 +219,38 @@ export function detectDestructiveChanges(
 
   const conflicts: MigrationPlannerConflict[] = [];
 
-  for (const tableName of Object.keys(from.tables)) {
-    if (!hasOwn(to.tables, tableName)) {
-      conflicts.push({
-        kind: 'tableRemoved',
-        summary: `Table "${tableName}" was removed`,
-      });
-      continue;
-    }
+  const namespaceIds = [
+    ...new Set([...Object.keys(from.namespaces), ...Object.keys(to.namespaces)]),
+  ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-    const toTable = to.tables[tableName] as StorageTable;
-    const fromTable = from.tables[tableName];
-    if (!fromTable) continue;
+  for (const namespaceId of namespaceIds) {
+    const fromNs = from.namespaces[namespaceId];
+    const toNs = to.namespaces[namespaceId];
+    const fromTables = fromNs?.tables;
+    if (!fromTables) continue;
 
-    for (const columnName of Object.keys(fromTable.columns)) {
-      if (!hasOwn(toTable.columns, columnName)) {
+    for (const tableName of Object.keys(fromTables)) {
+      const toTableRaw = toNs?.tables[tableName];
+      if (!(toTableRaw instanceof StorageTable)) {
         conflicts.push({
-          kind: 'columnRemoved',
-          summary: `Column "${tableName}"."${columnName}" was removed`,
+          kind: 'tableRemoved',
+          summary: `Table "${tableName}" was removed`,
         });
+        continue;
+      }
+      const toTable = toTableRaw;
+
+      const fromTableRaw = fromTables[tableName];
+      if (!(fromTableRaw instanceof StorageTable)) continue;
+      const fromTable = fromTableRaw;
+
+      for (const columnName of Object.keys(fromTable.columns)) {
+        if (!hasOwn(toTable.columns, columnName)) {
+          conflicts.push({
+            kind: 'columnRemoved',
+            summary: `Column "${tableName}"."${columnName}" was removed`,
+          });
+        }
       }
     }
   }
@@ -280,14 +293,27 @@ export function contractToSchemaIR(
   const storage = contract.storage;
   const storageTypes = (storage.types ?? {}) as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
-  for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(
-      tableName,
-      tableDef,
-      storageTypes,
-      options.expandNativeType,
-      options.renderDefault,
-    );
+  for (const ns of Object.values(storage.namespaces)) {
+    for (const [tableName, tableDefRaw] of Object.entries(ns.tables)) {
+      if (!(tableDefRaw instanceof StorageTable)) {
+        throw new Error(
+          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.tables.${tableName}`,
+        );
+      }
+      const tableDef = tableDefRaw;
+      if (tables[tableName] !== undefined) {
+        throw new Error(
+          `contractToSchemaIR: duplicate SQL table name "${tableName}" across namespaces (ambiguous for flat SqlSchemaIR.tables).`,
+        );
+      }
+      tables[tableName] = convertTable(
+        tableName,
+        tableDef,
+        storageTypes,
+        options.expandNativeType,
+        options.renderDefault,
+      );
+    }
   }
 
   const annotations = deriveAnnotations(storage, options.annotationNamespace);

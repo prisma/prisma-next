@@ -1,5 +1,5 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -12,6 +12,8 @@ import {
   sqliteScalarTypeDescriptors,
   sqliteTarget,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
+import { unboundTables } from './unbound-tables';
 
 describe('interpretPslDocumentToSqlContract default lowering', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -78,29 +80,33 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       },
     });
     expect(result.value.storage).toMatchObject({
-      tables: {
-        defaults: {
-          columns: {
-            idNanoidDefault: {
-              codecId: 'sql/char@1',
-              nativeType: 'character',
-              typeParams: { length: 21 },
-            },
-            idNanoidSized: {
-              codecId: 'sql/char@1',
-              nativeType: 'character',
-              typeParams: { length: 16 },
-            },
-            dbExpr: {
-              default: {
-                kind: 'function',
-                expression: 'gen_random_uuid()',
-              },
-            },
-            createdAt: {
-              default: {
-                kind: 'function',
-                expression: 'now()',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            defaults: {
+              columns: {
+                idNanoidDefault: {
+                  codecId: 'sql/char@1',
+                  nativeType: 'character',
+                  typeParams: { length: 21 },
+                },
+                idNanoidSized: {
+                  codecId: 'sql/char@1',
+                  nativeType: 'character',
+                  typeParams: { length: 16 },
+                },
+                dbExpr: {
+                  default: {
+                    kind: 'function',
+                    expression: 'gen_random_uuid()',
+                  },
+                },
+                createdAt: {
+                  default: {
+                    kind: 'function',
+                    expression: 'now()',
+                  },
+                },
               },
             },
           },
@@ -204,19 +210,23 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        defaults: {
-          columns: {
-            touchedAt: {
-              default: {
-                kind: 'function',
-                expression: 'clock_timestamp()',
-              },
-            },
-            payload: {
-              default: {
-                kind: 'function',
-                expression: "'{}'::jsonb",
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            defaults: {
+              columns: {
+                touchedAt: {
+                  default: {
+                    kind: 'function',
+                    expression: 'clock_timestamp()',
+                  },
+                },
+                payload: {
+                  default: {
+                    kind: 'function',
+                    expression: "'{}'::jsonb",
+                  },
+                },
               },
             },
           },
@@ -299,8 +309,8 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['timestamped']?.columns['createdAt']?.default).toEqual({
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(unboundTables(storage)['timestamped']?.columns['createdAt']?.default).toEqual({
       kind: 'function',
       expression: 'now()',
     });
@@ -334,8 +344,8 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['timestamped']?.columns['updatedAt']).toMatchObject({
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(unboundTables(storage)['timestamped']?.columns['updatedAt']).toMatchObject({
       codecId: 'sqlite/datetime@1',
       nativeType: 'text',
       nullable: false,
@@ -445,16 +455,20 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        synthetic: {
-          columns: {
-            example: {
-              codecId: 'pg/text@1',
-              nativeType: 'text',
-              nullable: false,
-              default: {
-                kind: 'function',
-                expression: "'synthetic-default'",
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            synthetic: {
+              columns: {
+                example: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                  nullable: false,
+                  default: {
+                    kind: 'function',
+                    expression: "'synthetic-default'",
+                  },
+                },
               },
             },
           },
@@ -509,12 +523,16 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        synthetic: {
-          columns: {
-            example: {
-              codecId: 'pg/text@1',
-              nativeType: 'text',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            synthetic: {
+              columns: {
+                example: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                },
+              },
             },
           },
         },

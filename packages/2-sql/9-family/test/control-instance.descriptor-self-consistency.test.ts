@@ -8,7 +8,7 @@ import type {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
@@ -17,18 +17,22 @@ const TARGET = 'postgres' as const;
 const TARGET_FAMILY = 'sql' as const;
 
 const fixtureStorageBody = {
-  tables: {
-    fixture_box: {
-      columns: {
-        x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
-        y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+  namespaces: {
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables: {
+        fixture_box: {
+          columns: {
+            x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+            y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
       },
-      uniques: [],
-      indexes: [],
-      foreignKeys: [],
     },
   },
-  namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
 };
 
 const FIXTURE_HEAD_HASH = computeStorageHash({

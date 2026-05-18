@@ -1,7 +1,3 @@
-import { type Contract, profileHash, type StorageHashBase } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -43,36 +39,19 @@ describe('verifySqlSchema - basic', () => {
     });
 
     it('treats parameterized native types as matching when expanded', () => {
-      const contract: Contract<SqlStorage> = {
-        target: 'postgres',
-        targetFamily: 'sql',
-        profileHash: profileHash('sha256:test'),
-        storage: {
-          storageHash: 'sha256:test' as StorageHashBase<string>,
-          tables: {
-            user: {
-              columns: {
-                email: {
-                  nativeType: 'character varying',
-                  codecId: 'sql/varchar@1',
-                  nullable: false,
-                  typeParams: { length: 255 },
-                },
-              },
-              primaryKey: { columns: ['email'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+      const contract = createTestContract({
+        user: createContractTable(
+          {
+            email: {
+              nativeType: 'character varying',
+              codecId: 'sql/varchar@1',
+              nullable: false,
+              typeParams: { length: 255 },
             },
           },
-          namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-        },
-        models: {},
-        roots: {},
-        capabilities: {},
-        extensionPacks: {},
-        meta: {},
-      };
+          { primaryKey: { columns: ['email'] } },
+        ),
+      });
 
       const schema = createTestSchemaIR({
         user: createSchemaTable(
@@ -196,36 +175,19 @@ describe('verifySqlSchema - basic', () => {
     });
 
     it('reports type mismatch when schema omits parameters', () => {
-      const contract: Contract<SqlStorage> = {
-        target: 'postgres',
-        targetFamily: 'sql',
-        profileHash: profileHash('sha256:test'),
-        storage: {
-          storageHash: 'sha256:test' as StorageHashBase<string>,
-          tables: {
-            user: {
-              columns: {
-                email: {
-                  nativeType: 'character varying',
-                  codecId: 'sql/varchar@1',
-                  nullable: false,
-                  typeParams: { length: 255 },
-                },
-              },
-              primaryKey: { columns: ['email'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+      const contract = createTestContract({
+        user: createContractTable(
+          {
+            email: {
+              nativeType: 'character varying',
+              codecId: 'sql/varchar@1',
+              nullable: false,
+              typeParams: { length: 255 },
             },
           },
-          namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-        },
-        models: {},
-        roots: {},
-        capabilities: {},
-        extensionPacks: {},
-        meta: {},
-      };
+          { primaryKey: { columns: ['email'] } },
+        ),
+      });
 
       const schema = createTestSchemaIR({
         user: createSchemaTable(

@@ -1,5 +1,11 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  type IRNode,
+  type Namespace,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -30,6 +36,7 @@ const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
+  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
 
   constructor(id: string) {
     super();
@@ -58,7 +65,7 @@ const userModelArgs = {
   },
 } as const;
 
-describe('FR16a per-model `namespace` field (TS builder)', () => {
+describe('per-model `namespace` field (TS builder)', () => {
   it('lowers `model(name, { namespace, fields })` to `StorageTable.namespaceId`', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
@@ -70,9 +77,7 @@ describe('FR16a per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    const table = contract.storage.tables['User'] as { readonly namespaceId?: string } | undefined;
-    expect(table).toBeDefined();
-    expect(table?.namespaceId).toBe('auth');
+    expect(contract.storage.namespaces['auth']?.tables['User']).toBeDefined();
   });
 
   it('omits `namespaceId` for models that do not set `namespace` — the late-bound default stays implicit', () => {
@@ -86,8 +91,7 @@ describe('FR16a per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    const table = contract.storage.tables['User'] as { readonly namespaceId?: string } | undefined;
-    expect(table?.namespaceId).toBeUndefined();
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['User']).toBeDefined();
   });
 
   it('rejects per-model `namespace` that does not appear in the declared list', () => {

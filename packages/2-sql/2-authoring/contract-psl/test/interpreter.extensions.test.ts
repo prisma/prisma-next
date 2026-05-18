@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -8,6 +9,7 @@ import {
   postgresTarget,
   testEnumEntityContributions,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 
 const baseInput = {
   target: postgresTarget,
@@ -184,30 +186,38 @@ model Document {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       types: {
-        Role: {
-          kind: 'postgres-enum',
-          name: 'Role',
-          nativeType: 'Role',
-          values: ['USER', 'ADMIN'],
-        },
         Embedding1536: {
           codecId: 'custom/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },
         },
       },
-      tables: {
-        document: {
-          columns: {
-            role: {
-              codecId: 'test/enum@1',
+      namespaces: {
+        public: {
+          types: {
+            Role: {
+              kind: 'postgres-enum',
+              name: 'Role',
               nativeType: 'Role',
-              typeRef: 'Role',
+              values: ['USER', 'ADMIN'],
             },
-            embedding: {
-              codecId: 'custom/vector@1',
-              nativeType: 'vector',
-              typeRef: 'Embedding1536',
+          },
+        },
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            document: {
+              columns: {
+                role: {
+                  codecId: 'test/enum@1',
+                  nativeType: 'Role',
+                  typeRef: 'Role',
+                },
+                embedding: {
+                  codecId: 'custom/vector@1',
+                  nativeType: 'vector',
+                  typeRef: 'Embedding1536',
+                },
+              },
             },
           },
         },
@@ -331,18 +341,22 @@ model Document {
           typeParams: { length: 1536 },
         },
       },
-      tables: {
-        document: {
-          columns: {
-            shortName: {
-              codecId: 'custom/varchar@1',
-              nativeType: 'character varying',
-              typeRef: 'ShortName',
-            },
-            embedding: {
-              codecId: 'custom/vector@1',
-              nativeType: 'vector',
-              typeRef: 'Embedding1536',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            document: {
+              columns: {
+                shortName: {
+                  codecId: 'custom/varchar@1',
+                  nativeType: 'character varying',
+                  typeRef: 'ShortName',
+                },
+                embedding: {
+                  codecId: 'custom/vector@1',
+                  nativeType: 'vector',
+                  typeRef: 'Embedding1536',
+                },
+              },
             },
           },
         },
@@ -399,23 +413,25 @@ model Document {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const storage = result.value.storage as {
-      readonly types?: Record<string, unknown>;
-    };
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     expect(storage.types).toEqual({});
     expect(result.value.storage).toMatchObject({
-      tables: {
-        document: {
-          columns: {
-            shortName: {
-              codecId: 'custom/varchar@1',
-              nativeType: 'character varying',
-              nullable: false,
-            },
-            embedding: {
-              codecId: 'custom/vector@1',
-              nativeType: 'vector',
-              nullable: true,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            document: {
+              columns: {
+                shortName: {
+                  codecId: 'custom/varchar@1',
+                  nativeType: 'character varying',
+                  nullable: false,
+                },
+                embedding: {
+                  codecId: 'custom/vector@1',
+                  nativeType: 'vector',
+                  nullable: true,
+                },
+              },
             },
           },
         },
@@ -481,13 +497,17 @@ model Document {
           },
         },
       },
-      tables: {
-        document: {
-          columns: {
-            shortName: {
-              codecId: 'custom/varchar@1',
-              nativeType: 'character varying',
-              typeRef: 'ShortName',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            document: {
+              columns: {
+                shortName: {
+                  codecId: 'custom/varchar@1',
+                  nativeType: 'character varying',
+                  typeRef: 'ShortName',
+                },
+              },
             },
           },
         },

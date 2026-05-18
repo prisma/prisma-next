@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 import { testIndexPack } from './helpers/test-index-pack';
+import { unboundTables } from './unbound-tables';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
@@ -90,8 +91,8 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.uniques).toHaveLength(1);
-    expect(contract.storage.tables.user.uniques[0]).toEqual({ columns: ['email'] });
+    expect(unboundTables(contract.storage)['user']!.uniques).toHaveLength(1);
+    expect(unboundTables(contract.storage)['user']!.uniques[0]).toEqual({ columns: ['email'] });
   });
 
   it('emits unique constraints with names in the contract', () => {
@@ -106,8 +107,8 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.uniques).toHaveLength(1);
-    expect(contract.storage.tables.user.uniques[0]).toEqual({
+    expect(unboundTables(contract.storage)['user']!.uniques).toHaveLength(1);
+    expect(unboundTables(contract.storage)['user']!.uniques[0]).toEqual({
       columns: ['email'],
       name: 'user_email_unique',
     });
@@ -128,8 +129,8 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.indexes).toHaveLength(1);
-    expect(contract.storage.tables.user.indexes[0]).toEqual({ columns: ['email'] });
+    expect(unboundTables(contract.storage)['user']!.indexes).toHaveLength(1);
+    expect(unboundTables(contract.storage)['user']!.indexes[0]).toEqual({ columns: ['email'] });
   });
 
   it('emits indexes with names in the contract', () => {
@@ -147,8 +148,8 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.indexes).toHaveLength(1);
-    expect(contract.storage.tables.user.indexes[0]).toEqual({
+    expect(unboundTables(contract.storage)['user']!.indexes).toHaveLength(1);
+    expect(unboundTables(contract.storage)['user']!.indexes[0]).toEqual({
       columns: ['email'],
       name: 'user_email_idx',
     });
@@ -161,8 +162,8 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys).toHaveLength(1);
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(unboundTables(contract.storage)['post']!.foreignKeys).toHaveLength(1);
+    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
       constraint: true,
@@ -177,8 +178,8 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys).toHaveLength(1);
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(unboundTables(contract.storage)['post']!.foreignKeys).toHaveLength(1);
+    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
       constraint: true,
@@ -198,10 +199,10 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.primaryKey).toEqual({
+    expect(unboundTables(contract.storage)['user']!.primaryKey).toEqual({
       columns: ['id'],
     });
-    expect(contract.storage.tables.user.primaryKey).not.toHaveProperty('name');
+    expect(unboundTables(contract.storage)['user']!.primaryKey).not.toHaveProperty('name');
   });
 
   it('emits primary key name in the contract', () => {
@@ -215,7 +216,7 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.primaryKey).toEqual({
+    expect(unboundTables(contract.storage)['user']!.primaryKey).toEqual({
       columns: ['id'],
       name: 'user_pkey',
     });
@@ -313,8 +314,8 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.user.uniques).toHaveLength(2);
-    expect(contract.storage.tables.user.indexes).toHaveLength(2);
+    expect(unboundTables(contract.storage)['user']!.uniques).toHaveLength(2);
+    expect(unboundTables(contract.storage)['user']!.indexes).toHaveLength(2);
   });
 
   it('defaults per-FK constraint=true, index=true', () => {
@@ -324,7 +325,7 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
       constraint: true,
@@ -340,7 +341,7 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
       constraint: false,
@@ -356,7 +357,7 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
       constraint: true,
@@ -386,11 +387,11 @@ describe('contract definition constraint support', () => {
       },
     });
 
-    expect(contract.storage.tables.membership.primaryKey).toEqual({
+    expect(unboundTables(contract.storage)['membership']!.primaryKey).toEqual({
       columns: ['orgId', 'userId'],
       name: 'membership_pkey',
     });
-    expect(contract.storage.tables.membership.uniques).toEqual([
+    expect(unboundTables(contract.storage)['membership']!.uniques).toEqual([
       {
         columns: ['orgId', 'role'],
         name: 'membership_org_role_key',

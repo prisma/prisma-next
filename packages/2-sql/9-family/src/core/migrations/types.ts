@@ -79,7 +79,7 @@ export type FieldEvent = 'added' | 'dropped' | 'altered';
 /**
  * Context passed to {@link CodecControlHooks.onFieldEvent}.
  *
- * `tableName` and `fieldName` are always populated; `priorTable` /
+ * `namespaceId`, `tableName`, and `fieldName` are always populated; `priorTable` /
  * `priorField` carry the prior contract's view of the table and column
  * (present for `'dropped'` and `'altered'`); `newTable` / `newField`
  * carry the new contract's view (present for `'added'` and `'altered'`).
@@ -89,6 +89,7 @@ export type FieldEvent = 'added' | 'dropped' | 'altered';
  * application emitter only.
  */
 export interface FieldEventContext {
+  readonly namespaceId: string;
   readonly tableName: string;
   readonly fieldName: string;
   readonly priorTable?: StorageTable;

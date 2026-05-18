@@ -20,6 +20,7 @@ import {
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
+  StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -335,52 +336,67 @@ function verifySchemaTables(options: {
   } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
-  const contractTables = contract.storage.tables;
   const schemaTables = schema.tables;
+  const namespaceIds = Object.keys(contract.storage.namespaces).sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
 
-  for (const [tableName, contractTable] of Object.entries(contractTables)) {
-    const schemaTable = schemaTables[tableName];
-    const tablePath = `storage.tables.${tableName}`;
+  for (const namespaceId of namespaceIds) {
+    const ns = contract.storage.namespaces[namespaceId];
+    if (!ns) continue;
+    for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
+      if (!(contractTableRaw instanceof StorageTable)) {
+        throw new Error(
+          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.tables.${tableName}`,
+        );
+      }
+      const contractTable = contractTableRaw;
+      const schemaTable = schemaTables[tableName];
+      const tablePath = `storage.namespaces.${namespaceId}.tables.${tableName}`;
 
-    if (!schemaTable) {
-      issues.push({
-        kind: 'missing_table',
-        table: tableName,
-        message: `Table "${tableName}" is missing from database`,
+      if (!schemaTable) {
+        issues.push({
+          kind: 'missing_table',
+          table: tableName,
+          message: `Table "${tableName}" is missing from database`,
+        });
+        rootChildren.push({
+          status: 'fail',
+          kind: 'table',
+          name: `table ${tableName}`,
+          contractPath: tablePath,
+          code: 'missing_table',
+          message: `Table "${tableName}" is missing`,
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        });
+        continue;
+      }
+
+      const tableChildren = verifyTableChildren({
+        contractTable,
+        schemaTable,
+        tableName,
+        tablePath,
+        issues,
+        strict,
+        typeMetadataRegistry,
+        codecHooks,
+        storageTypes,
+        ...ifDefined('normalizeDefault', normalizeDefault),
+        ...ifDefined('normalizeNativeType', normalizeNativeType),
       });
-      rootChildren.push({
-        status: 'fail',
-        kind: 'table',
-        name: `table ${tableName}`,
-        contractPath: tablePath,
-        code: 'missing_table',
-        message: `Table "${tableName}" is missing`,
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
-      continue;
+      rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
     }
-
-    const tableChildren = verifyTableChildren({
-      contractTable,
-      schemaTable,
-      tableName,
-      tablePath,
-      issues,
-      strict,
-      typeMetadataRegistry,
-      codecHooks,
-      storageTypes,
-      ...ifDefined('normalizeDefault', normalizeDefault),
-      ...ifDefined('normalizeNativeType', normalizeNativeType),
-    });
-    rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
   }
 
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
-      if (!contractTables[tableName]) {
+      const claimed = namespaceIds.some(
+        (namespaceId) => contract.storage.namespaces[namespaceId]?.tables[tableName] !== undefined,
+      );
+      if (!claimed) {
         issues.push({
           kind: 'extra_table',
           table: tableName,
@@ -390,7 +406,7 @@ function verifySchemaTables(options: {
           status: 'fail',
           kind: 'table',
           name: `table ${tableName}`,
-          contractPath: `storage.tables.${tableName}`,
+          contractPath: `storage.namespaces.*.tables.${tableName}`,
           code: 'extra_table',
           message: `Extra table "${tableName}" found`,
           expected: undefined,
@@ -405,7 +421,7 @@ function verifySchemaTables(options: {
 }
 
 function verifyTableChildren(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -563,7 +579,7 @@ function verifyTableChildren(options: {
 }
 
 function collectContractColumnNodes(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -637,7 +653,7 @@ function collectContractColumnNodes(options: {
 }
 
 function appendExtraColumnNodes(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -671,7 +687,7 @@ function appendExtraColumnNodes(options: {
 function verifyColumn(options: {
   tableName: string;
   columnName: string;
-  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string];
+  contractColumn: StorageTable['columns'][string];
   schemaColumn: SqlSchemaIR['tables'][string]['columns'][string];
   columnPath: string;
   issues: SchemaIssue[];
@@ -1020,7 +1036,7 @@ function validateFrameworkComponentsForExtensions(
  * target-specific adapters (like Postgres) to provide their own expansion logic.
  */
 function renderExpectedNativeType(
-  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  contractColumn: StorageColumn,
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
   codecHooks: Map<string, CodecControlHooks>,
   context?: {

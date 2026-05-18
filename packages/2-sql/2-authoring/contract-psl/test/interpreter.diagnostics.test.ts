@@ -1,4 +1,9 @@
-import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  type IRNode,
+  type Namespace,
+  NamespaceBase,
+} from '@prisma-next/framework-components/ir';
 import type { ParsePslDocumentResult, PslSpan } from '@prisma-next/psl-parser';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +15,7 @@ import {
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
+  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
 
   constructor(id: string) {
     super();

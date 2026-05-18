@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 
 describe('SqlContractSerializer model validation', () => {
   const baseContract = {
@@ -14,7 +15,7 @@ describe('SqlContractSerializer model validation', () => {
     meta: {},
     roots: {},
     models: {},
-    storage: {
+    storage: storageWithNamespacedTables({
       storageHash: 'sha256:test',
       tables: {
         User: {
@@ -28,7 +29,7 @@ describe('SqlContractSerializer model validation', () => {
           foreignKeys: [],
         },
       },
-    },
+    }),
   };
 
   it('throws when model is missing storage.table', () => {
@@ -66,7 +67,7 @@ describe('SqlContractSerializer model validation', () => {
   it('accepts model table without primary key', () => {
     const valid = {
       ...baseContract,
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -78,7 +79,7 @@ describe('SqlContractSerializer model validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       models: {
         User: {
           storage: { table: 'User', fields: { id: { column: 'id' } } },
@@ -139,7 +140,7 @@ describe('SqlContractSerializer model validation', () => {
   it('accepts N:1 relation without matching FK', () => {
     const valid = {
       ...baseContract,
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -162,7 +163,7 @@ describe('SqlContractSerializer model validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       models: {
         Post: {
           storage: {
@@ -196,7 +197,7 @@ describe('SqlContractSerializer model validation', () => {
   it('accepts 1:N relation without foreign key on parent table', () => {
     const valid = {
       ...baseContract,
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -226,7 +227,7 @@ describe('SqlContractSerializer model validation', () => {
             ],
           },
         },
-      },
+      }),
       models: {
         User: {
           storage: {
@@ -264,7 +265,7 @@ describe('SqlContractSerializer model validation', () => {
   it('accepts N:1 relation with matching foreign key', () => {
     const valid = {
       ...baseContract,
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -294,7 +295,7 @@ describe('SqlContractSerializer model validation', () => {
             ],
           },
         },
-      },
+      }),
       models: {
         Post: {
           storage: {

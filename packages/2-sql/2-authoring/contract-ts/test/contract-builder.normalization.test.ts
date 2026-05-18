@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 import { testIndexPack } from './helpers/test-index-pack';
+import { unboundTables } from './unbound-tables';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
@@ -36,7 +37,7 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
+    expect(unboundTables(contract.storage)['user']!.columns['id']!.nullable).toBe(false);
   });
 
   it('normalizes nullable to provided value', () => {
@@ -53,8 +54,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
-    expect(contract.storage.tables.user.columns.email.nullable).toBe(true);
+    expect(unboundTables(contract.storage)['user']!.columns['id']!.nullable).toBe(false);
+    expect(unboundTables(contract.storage)['user']!.columns['email']!.nullable).toBe(true);
   });
 
   it('normalizes uniques to empty array when not provided', () => {
@@ -70,8 +71,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.uniques).toEqual([]);
-    expect(Array.isArray(contract.storage.tables.user.uniques)).toBe(true);
+    expect(unboundTables(contract.storage)['user']!.uniques).toEqual([]);
+    expect(Array.isArray(unboundTables(contract.storage)['user']!.uniques)).toBe(true);
   });
 
   it('normalizes indexes to empty array when not provided', () => {
@@ -87,8 +88,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.indexes).toEqual([]);
-    expect(Array.isArray(contract.storage.tables.user.indexes)).toBe(true);
+    expect(unboundTables(contract.storage)['user']!.indexes).toEqual([]);
+    expect(Array.isArray(unboundTables(contract.storage)['user']!.indexes)).toBe(true);
   });
 
   it('normalizes foreignKeys to empty array when not provided', () => {
@@ -104,8 +105,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.foreignKeys).toEqual([]);
-    expect(Array.isArray(contract.storage.tables.user.foreignKeys)).toBe(true);
+    expect(unboundTables(contract.storage)['user']!.foreignKeys).toEqual([]);
+    expect(Array.isArray(unboundTables(contract.storage)['user']!.foreignKeys)).toBe(true);
   });
 
   it('normalizes relations to empty object when not provided', () => {
@@ -149,12 +150,12 @@ describe('contract builder normalization', () => {
     });
 
     // Verify all tables have normalized fields
-    expect(contract.storage.tables.user.uniques).toEqual([]);
-    expect(contract.storage.tables.user.indexes).toEqual([]);
-    expect(contract.storage.tables.user.foreignKeys).toEqual([]);
-    expect(contract.storage.tables.post.uniques).toEqual([]);
-    expect(contract.storage.tables.post.indexes).toEqual([]);
-    expect(contract.storage.tables.post.foreignKeys).toEqual([]);
+    expect(unboundTables(contract.storage)['user']!.uniques).toEqual([]);
+    expect(unboundTables(contract.storage)['user']!.indexes).toEqual([]);
+    expect(unboundTables(contract.storage)['user']!.foreignKeys).toEqual([]);
+    expect(unboundTables(contract.storage)['post']!.uniques).toEqual([]);
+    expect(unboundTables(contract.storage)['post']!.indexes).toEqual([]);
+    expect(unboundTables(contract.storage)['post']!.foreignKeys).toEqual([]);
 
     // Verify all models have normalized relations
     const userModel = contract.models.User as { relations?: Record<string, unknown> };
@@ -163,8 +164,8 @@ describe('contract builder normalization', () => {
     expect(postModel.relations).toEqual({});
 
     // Verify nullable is normalized
-    expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
-    expect(contract.storage.tables.user.columns.email.nullable).toBe(false);
+    expect(unboundTables(contract.storage)['user']!.columns['id']!.nullable).toBe(false);
+    expect(unboundTables(contract.storage)['user']!.columns['email']!.nullable).toBe(false);
   });
 
   it('passes type and options on indexes through to storage IR', () => {
@@ -195,7 +196,7 @@ describe('contract builder normalization', () => {
       }),
     );
 
-    const indexes = contract.storage.tables.items.indexes;
+    const indexes = unboundTables(contract.storage)['items']!.indexes;
     expect(indexes).toHaveLength(1);
     expect(indexes[0]).toEqual({
       columns: ['description'],
@@ -222,7 +223,7 @@ describe('contract builder normalization', () => {
       },
     });
 
-    const idx = contract.storage.tables.user.indexes[0]!;
+    const idx = unboundTables(contract.storage)['user']!.indexes[0]!;
     expect(idx.columns).toEqual(['email']);
     expect(idx).not.toHaveProperty('using');
     expect(idx).not.toHaveProperty('config');

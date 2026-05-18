@@ -3,13 +3,19 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  type IRNode,
+  type Namespace,
+  NamespaceBase,
+} from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
+  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
 
   constructor(id: string) {
     super();
@@ -134,7 +140,7 @@ describe('defineContract runtime guards', () => {
   });
 });
 
-describe('defineContract namespace declaration runtime guards (FR16a)', () => {
+describe('defineContract namespace declaration runtime guards', () => {
   const sqliteTargetPack = {
     kind: 'target',
     id: 'sqlite',
@@ -154,13 +160,7 @@ describe('defineContract namespace declaration runtime guards (FR16a)', () => {
     ).not.toThrow();
   });
 
-  it('accepts user-declared Postgres schema names when paired with a `createNamespace` factory', () => {
-    // Multi-namespace contracts require the target to supply a
-    // namespace factory — the SQL family layer is target-agnostic and
-    // cannot materialise non-unbound `Namespace` concretions on its
-    // own. The test uses a trivial pass-through namespace stub so the
-    // entrypoint validates as a unit; the Postgres target's own test
-    // suite exercises the real `postgresCreateNamespace`.
+  it('accepts user-declared Postgres schema names with or without a `createNamespace` factory', () => {
     expect(() =>
       defineContract({
         family: sqlFamilyPack,
@@ -170,9 +170,7 @@ describe('defineContract namespace declaration runtime guards (FR16a)', () => {
         models: {},
       }),
     ).not.toThrow();
-  });
 
-  it('rejects a multi-namespace Postgres contract that omits the `createNamespace` factory', () => {
     expect(() =>
       defineContract({
         family: sqlFamilyPack,
@@ -180,7 +178,7 @@ describe('defineContract namespace declaration runtime guards (FR16a)', () => {
         namespaces: ['public', 'auth'],
         models: {},
       }),
-    ).toThrow(/createNamespace/);
+    ).not.toThrow();
   });
 
   it('rejects the reserved IR sentinel `__unbound__` in the declared namespaces list', () => {

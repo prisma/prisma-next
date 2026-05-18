@@ -1,10 +1,5 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import {
-  freezeNode,
-  type Namespace,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
@@ -16,36 +11,6 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   targetId: 'postgres',
   version: '0.0.1',
 };
-
-class FakePostgresSchema extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-
-  constructor(id: string) {
-    super();
-    this.id = id;
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-/**
- * Test-side stand-in for `postgresCreateNamespace` — the SQL family
- * layer is target-agnostic and cannot depend on `target-postgres`, so
- * the test uses a locally-defined fake `Namespace` concretion that
- * satisfies the same contract. The Postgres target's own test suite
- * verifies the real factory's behaviour against `PostgresSchema`.
- */
-function fakePostgresCreateNamespace(id: string): Namespace {
-  return new FakePostgresSchema(id);
-}
 
 const minimalModelArgs = {
   modelName: 'User',
@@ -66,35 +31,35 @@ const minimalModelArgs = {
   },
 } as const;
 
-describe('SqlStorage.namespaces population (FR15 slice 3)', () => {
-  it('falls back to the SqlUnboundNamespace singleton when no createNamespace factory is supplied (single-namespace default)', () => {
+describe('SqlStorage.namespaces population', () => {
+  it('materialises the unbound namespace with lowered tables when models default to the unbound coordinate', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       models: [minimalModelArgs],
     });
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);
     expect(Object.keys(contract.storage.namespaces)).toEqual([UNBOUND_NAMESPACE_ID]);
+    const slot = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(slot).not.toBe(SqlUnboundNamespace.instance);
+    expect(slot.id).toBe(UNBOUND_NAMESPACE_ID);
+    expect(slot.tables['app_user']).toBeDefined();
   });
 
-  it('routes every declared namespace through the supplied factory and parks the result in the storage map', () => {
+  it('creates declared namespace slots (initially empty tables) alongside the unbound coordinate', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       namespaces: ['public', 'auth'],
-      createNamespace: fakePostgresCreateNamespace,
       models: [minimalModelArgs],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth', 'public']);
-    expect(contract.storage.namespaces['public']).toBeInstanceOf(FakePostgresSchema);
-    expect(contract.storage.namespaces['auth']).toBeInstanceOf(FakePostgresSchema);
-    expect((contract.storage.namespaces['public'] as FakePostgresSchema).id).toBe('public');
-    expect((contract.storage.namespaces['auth'] as FakePostgresSchema).id).toBe('auth');
+    expect(Object.keys(contract.storage.namespaces['public']!.tables)).toHaveLength(0);
+    expect(Object.keys(contract.storage.namespaces['auth']!.tables)).toHaveLength(0);
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['app_user']).toBeDefined();
   });
 
-  it('collects namespaceIds referenced by storage tables and routes them through the factory even when not pre-declared', () => {
+  it('places tables in the namespace referenced by the model coordinate', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
-      createNamespace: fakePostgresCreateNamespace,
       models: [
         { ...minimalModelArgs, namespaceId: 'auth' },
         { ...minimalModelArgs, modelName: 'Post', tableName: 'blog_post' },
@@ -102,39 +67,36 @@ describe('SqlStorage.namespaces population (FR15 slice 3)', () => {
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth']);
-    expect(contract.storage.namespaces['auth']).toBeInstanceOf(FakePostgresSchema);
+    expect(contract.storage.namespaces['auth']!.tables['app_user']).toBeDefined();
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['blog_post']).toBeDefined();
   });
 
-  it('always materialises the unbound slot through the factory when one is supplied (no SqlUnboundNamespace leak in the live storage map)', () => {
+  it('keeps the unbound singleton only when the unbound coordinate has no tables and no namespace types', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
-      createNamespace: fakePostgresCreateNamespace,
-      models: [minimalModelArgs],
+      models: [],
     });
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]).toBeInstanceOf(FakePostgresSchema);
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]).not.toBe(
-      SqlUnboundNamespace.instance,
-    );
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);
   });
 
-  it('rejects multi-namespace contracts when no factory is supplied — the family layer cannot materialise non-unbound concretions on its own', () => {
+  it('accepts declared namespaces without a createNamespace factory', () => {
     expect(() =>
       buildSqlContractFromDefinition({
         target: postgresTargetPack,
         namespaces: ['auth'],
         models: [minimalModelArgs],
       }),
-    ).toThrow(/createNamespace/);
+    ).not.toThrow();
   });
 
   it('deduplicates declared and table-referenced namespace ids — no slot is built twice', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       namespaces: ['auth'],
-      createNamespace: fakePostgresCreateNamespace,
       models: [{ ...minimalModelArgs, namespaceId: 'auth' }],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth']);
+    expect(contract.storage.namespaces['auth']!.tables['app_user']).toBeDefined();
   });
 });

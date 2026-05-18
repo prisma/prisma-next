@@ -2,6 +2,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
+import { unboundTables } from './unbound-tables';
 
 function validContractInput(overrides?: Record<string, unknown>) {
   return {
@@ -14,7 +16,7 @@ function validContractInput(overrides?: Record<string, unknown>) {
     meta: {},
     roots: {},
     models: {},
-    storage: {
+    storage: storageWithNamespacedTables({
       storageHash: 'sha256:test',
       tables: {
         User: {
@@ -27,7 +29,7 @@ function validContractInput(overrides?: Record<string, unknown>) {
           foreignKeys: [],
         },
       },
-    },
+    }),
     ...overrides,
   };
 }
@@ -35,12 +37,12 @@ function validContractInput(overrides?: Record<string, unknown>) {
 describe('SqlContractSerializer structural validation', () => {
   it('accepts a valid contract with explicit nullable', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
-    expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
+    expect(unboundTables(contract.storage)['User']?.columns['id']?.nullable).toBe(false);
   });
 
   it('rejects missing uniques array', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -52,14 +54,14 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('rejects missing indexes array', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -71,14 +73,14 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('rejects missing foreignKeys array', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -90,19 +92,19 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
           },
         },
-      },
+      }),
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('accepts table with columns present', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
-    expect(contract.storage.tables['User']).toBeDefined();
+    expect(unboundTables(contract.storage)['User']).toBeDefined();
   });
 
   it('rejects table without columns property', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -112,7 +114,7 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
@@ -120,7 +122,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('rejects table with null columns', () => {
     const input = {
       ...validContractInput(),
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -131,7 +133,7 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
@@ -139,7 +141,7 @@ describe('SqlContractSerializer structural validation', () => {
 
   it('accepts table with empty columns object', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -149,7 +151,7 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).not.toThrow();
   });
@@ -157,7 +159,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('rejects table missing columns in multi-table contract', () => {
     const input = {
       ...validContractInput(),
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -176,7 +178,7 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
@@ -223,7 +225,7 @@ describe('SqlContractSerializer structural validation', () => {
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -241,7 +243,7 @@ describe('SqlContractSerializer structural validation', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
     });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).not.toThrow();
   });
@@ -278,7 +280,7 @@ describe('SqlContractSerializer structural validation', () => {
           },
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -306,7 +308,7 @@ describe('SqlContractSerializer structural validation', () => {
             ],
           },
         },
-      },
+      }),
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
@@ -343,7 +345,7 @@ describe('SqlContractSerializer structural validation', () => {
           },
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -371,7 +373,7 @@ describe('SqlContractSerializer structural validation', () => {
             ],
           },
         },
-      },
+      }),
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
@@ -385,7 +387,7 @@ describe('SqlContractSerializer structural validation', () => {
 
   it('validates FK entries with explicit constraint/index', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -413,17 +415,17 @@ describe('SqlContractSerializer structural validation', () => {
             ],
           },
         },
-      },
+      }),
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    const fk = contract.storage.tables['post']?.foreignKeys[0];
+    const fk = unboundTables(contract.storage)['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(true);
     expect(fk?.index).toBe(true);
   });
 
   it('preserves explicit per-FK constraint/index fields', () => {
     const input = validContractInput({
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -451,10 +453,10 @@ describe('SqlContractSerializer structural validation', () => {
             ],
           },
         },
-      },
+      }),
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    const fk = contract.storage.tables['post']?.foreignKeys[0];
+    const fk = unboundTables(contract.storage)['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(false);
     expect(fk?.index).toBe(true);
   });
