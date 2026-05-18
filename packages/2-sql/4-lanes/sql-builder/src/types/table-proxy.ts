@@ -14,7 +14,7 @@ import type {
   Scope,
   StorageTableToScopeTable,
 } from '../scope';
-import type { TableProxyContract } from './db';
+import type { TableProxyContract, UnboundTables } from './db';
 import type { DeleteQuery, InsertQuery, InsertValues, UpdateQuery } from './mutation-query';
 import type { WithJoin, WithSelect } from './shared';
 
@@ -53,21 +53,21 @@ type ResolvedColumnTypes<
   ? Record<string, never>
   : FindModelForTable<C, TableName> extends infer ModelName extends string
     ? ModelName extends keyof FieldTypes
-      ? C extends {
-          readonly storage: { readonly tables: infer Tables extends Record<string, StorageTable> };
-        }
-        ? TableName extends keyof Tables
-          ? {
-              [ColName in keyof Tables[TableName]['columns'] & string]: FindFieldForColumn<
-                C,
-                ModelName,
-                ColName
-              > extends infer FieldName extends string
-                ? FieldName extends keyof FieldTypes[ModelName]
-                  ? FieldTypes[ModelName][FieldName]
-                  : unknown
-                : unknown;
-            }
+      ? C extends TableProxyContract
+        ? UnboundTables<C> extends infer Tables extends Record<string, StorageTable>
+          ? TableName extends keyof Tables
+            ? {
+                [ColName in keyof Tables[TableName]['columns'] & string]: FindFieldForColumn<
+                  C,
+                  ModelName,
+                  ColName
+                > extends infer FieldName extends string
+                  ? FieldName extends keyof FieldTypes[ModelName]
+                    ? FieldTypes[ModelName][FieldName]
+                    : unknown
+                  : unknown;
+              }
+            : Record<string, never>
           : Record<string, never>
         : Record<string, never>
       : Record<string, never>
@@ -120,11 +120,11 @@ type ContractToQC<C extends TableProxyContract, Name extends string = string> = 
 
 export interface TableProxy<
   C extends TableProxyContract,
-  Name extends string & keyof C['storage']['tables'],
+  Name extends string & keyof UnboundTables<C>,
   Alias extends string = Name,
-  AvailableScope extends Scope = DefaultScope<Name, C['storage']['tables'][Name]>,
+  AvailableScope extends Scope = DefaultScope<Name, UnboundTables<C>[Name]>,
   QC extends QueryContext = ContractToQC<C, Name>,
-> extends JoinSource<StorageTableToScopeTable<C['storage']['tables'][Name]>, Alias>,
+> extends JoinSource<StorageTableToScopeTable<UnboundTables<C>[Name]>, Alias>,
     WithSelect<QC, AvailableScope, EmptyRow>,
     WithJoin<QC, AvailableScope, C['capabilities']> {
   as<NewAlias extends string>(
@@ -134,7 +134,7 @@ export interface TableProxy<
   insert(
     values: ResolvedInsertValues<
       C,
-      C['storage']['tables'][Name],
+      UnboundTables<C>[Name],
       Name,
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
@@ -144,7 +144,7 @@ export interface TableProxy<
   update(
     set: ResolvedUpdateValues<
       C,
-      C['storage']['tables'][Name],
+      UnboundTables<C>[Name],
       Name,
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
