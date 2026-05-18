@@ -103,7 +103,31 @@ export function formatSkillSourceUrl(source: SkillSource): string {
  * without a live subprocess.
  */
 export function formatSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
-  const args = ['skills', 'add', formatSkillSourceUrl(source), '--all'];
+  const args = ['skills@latest', 'add', formatSkillSourceUrl(source), '--all'];
+  return formatPackageManagerCommand(pm, args);
+}
+
+/**
+ * `skills add --all` should cover Claude Code, but upstream currently skips
+ * project-local Claude symlinks when `.claude/` does not already exist. Run
+ * the explicit Claude Code install as well so fresh projects get
+ * `.claude/skills` without asking users to create that folder first.
+ */
+export function formatClaudeSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
+  const args = [
+    'skills@latest',
+    'add',
+    formatSkillSourceUrl(source),
+    '--agent',
+    'claude-code',
+    '--skill',
+    "'*'",
+    '-y',
+  ];
+  return formatPackageManagerCommand(pm, args);
+}
+
+function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {
   switch (pm) {
     case 'pnpm':
       return `pnpm dlx ${args.join(' ')}`;
@@ -123,13 +147,16 @@ export function formatSkillInstallCommand(pm: PackageManager, source: SkillSourc
  * format-then-parse split keeps the user-facing command string the same
  * as the surface the structured error advertises, so a user who copies
  * the error's `fix` line gets the same invocation that init just
- * attempted.
+ * attempted. Single quotes are preserved in the display form so `*` is
+ * safe to copy into a shell, then stripped before `execFile`.
  */
 function commandToExec(command: string): {
   readonly file: string;
   readonly args: readonly string[];
 } {
-  const tokens = command.split(/\s+/);
+  const tokens = (command.match(/'[^']*'|\S+/g) ?? []).map((token) =>
+    token.startsWith("'") && token.endsWith("'") ? token.slice(1, -1) : token,
+  );
   return { file: tokens[0] ?? 'npx', args: tokens.slice(1) };
 }
 
@@ -149,8 +176,12 @@ export async function runProjectLevelSkillInstall(ctx: {
   readonly filesWritten: readonly string[];
 }): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
   const commands: string[] = [];
-  for (const source of DEFAULT_AGENT_SKILL_SOURCES) {
-    const command = formatSkillInstallCommand(ctx.pm, source);
+  const installCommands = DEFAULT_AGENT_SKILL_SOURCES.flatMap((source) => [
+    formatSkillInstallCommand(ctx.pm, source),
+    formatClaudeSkillInstallCommand(ctx.pm, source),
+  ]);
+
+  for (const command of installCommands) {
     const { file, args } = commandToExec(command);
     try {
       await exec(file, args, { cwd: ctx.baseDir });

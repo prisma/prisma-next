@@ -84,10 +84,21 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       expect(exitCode).toBe(INIT_EXIT_OK);
 
       const loggedCommands = readLoggedCommands(logPath);
-      expect(loggedCommands).toContain(`dlx skills add ${workspaceClone}/skills --all`);
-      expect(loggedCommands).toContain(`dlx skills add ${workspaceClone}/skills/upgrade --all`);
+      expect(loggedCommands).toContain(`dlx skills@latest add ${workspaceClone}/skills --all`);
       expect(loggedCommands).toContain(
-        `dlx skills add ${workspaceClone}/skills/extension-author --all`,
+        `dlx skills@latest add ${workspaceClone}/skills --agent claude-code --skill * -y`,
+      );
+      expect(loggedCommands).toContain(
+        `dlx skills@latest add ${workspaceClone}/skills/upgrade --all`,
+      );
+      expect(loggedCommands).toContain(
+        `dlx skills@latest add ${workspaceClone}/skills/upgrade --agent claude-code --skill * -y`,
+      );
+      expect(loggedCommands).toContain(
+        `dlx skills@latest add ${workspaceClone}/skills/extension-author --all`,
+      );
+      expect(loggedCommands).toContain(
+        `dlx skills@latest add ${workspaceClone}/skills/extension-author --agent claude-code --skill * -y`,
       );
 
       const installed = readInstalledSkillDirs(testDir);
@@ -99,6 +110,7 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       const expectedSorted = Array.from(new Set(expected)).sort();
       expect(installed).toEqual(expectedSorted);
       expect(installed.length).toBeGreaterThan(0);
+      expect(readClaudeSkillDirs(testDir)).toEqual(expectedSorted);
 
       const contributorNames = new Set(readContributorSkillNames());
       const leaks = installed.filter((name) => contributorNames.has(name));
@@ -139,15 +151,15 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       });
 
       const loggedCommands = readLoggedCommands(logPath);
-      const skillsAddCommands = loggedCommands.filter((c) => c.startsWith('dlx skills add'));
-      // Three subpath sources: usage, upgrade, extension-author.
-      expect(skillsAddCommands).toHaveLength(3);
+      const skillsAddCommands = loggedCommands.filter((c) => c.startsWith('dlx skills@latest add'));
+      // Three subpath sources, each installed for universal agents and Claude Code.
+      expect(skillsAddCommands).toHaveLength(6);
       for (const command of skillsAddCommands) {
         // Each call's source ends at one of the three known subpaths
-        // (with optional `#ref`). A bare repo URL (no `/skills`) would
-        // leak contributor skills via priority discovery of
-        // `.agents/skills/`; assert the subpath form here.
-        expect(command).toMatch(/\/(skills|skills\/upgrade|skills\/extension-author)(?:#|\s|$)/);
+        // before any flags. A bare repo URL (no `/skills`) would leak
+        // contributor skills via priority discovery of `.agents/skills/`;
+        // assert the subpath form here.
+        expect(command).toMatch(/\/(skills|skills\/upgrade|skills\/extension-author)(?:\s|$)/);
       }
     } finally {
       restoreEnvVar('PATH', previousPath);
@@ -181,13 +193,13 @@ function integrationTempRoot(): string {
 }
 
 /**
- * Stand-in for `pnpm dlx`. We can't run real `pnpm dlx skills` from
+ * Stand-in for `pnpm dlx`. We can't run real `pnpm dlx skills@latest` from
  * an offline test (it would fetch from the npm registry on first run
  * in a fresh pnpm store), and we want to invoke the *real* `skills`
  * binary, not a re-implementation. So the harness replaces `pnpm` on
  * `PATH` with a Node script that:
  *   - logs every invocation (for assertions on the install URL form)
- *   - forwards `pnpm dlx skills add <args>` to the workspace's
+ *   - forwards `pnpm dlx skills@latest add <args>` to the workspace's
  *     `node_modules/.bin/skills` invoked from the consumer's cwd.
  */
 function createFakeDlxHarness(testDir: string): {
@@ -214,7 +226,7 @@ if (args[0] === 'add' || args[0] === 'install' || args[0] === 'prisma-next') {
   process.exit(0);
 }
 
-if (args[0] === 'dlx' && args[1] === 'skills' && args[2] === 'add') {
+if (args[0] === 'dlx' && (args[1] === 'skills' || args[1] === 'skills@latest') && args[2] === 'add') {
   // Forward to the real CLI, scoped to the consumer cwd.
   const skillsArgs = args.slice(2);
   const result = spawnSync(${JSON.stringify(SKILLS_BIN)}, skillsArgs, {
@@ -273,9 +285,18 @@ function readLoggedCommands(logPath: string): readonly string[] {
 
 function readInstalledSkillDirs(testDir: string): readonly string[] {
   const root = join(testDir, '.agents', 'skills');
+  return readSkillDirNames(root);
+}
+
+function readClaudeSkillDirs(testDir: string): readonly string[] {
+  const root = join(testDir, '.claude', 'skills');
+  return readSkillDirNames(root);
+}
+
+function readSkillDirNames(root: string): readonly string[] {
   if (!existsSync(root)) return [];
   return readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
     .map((entry) => entry.name)
     .sort();
 }

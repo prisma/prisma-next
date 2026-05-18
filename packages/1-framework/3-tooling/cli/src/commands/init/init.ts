@@ -9,6 +9,7 @@ import type { GlobalFlags } from '../../utils/global-flags';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
   DEFAULT_AGENT_SKILL_SOURCES,
+  formatClaudeSkillInstallCommand,
   formatSkillInstallCommand,
   LEGACY_SKILL_FILE,
   runProjectLevelSkillInstall,
@@ -450,9 +451,10 @@ export async function runInit(
   // potentially fails. We skip the install when the user passed
   // `--no-install` for the same reason — no `node_modules` means the
   // workspace isn't ready to consume the skill yet anyway.
-  const manualProjectSkillCommands = DEFAULT_AGENT_SKILL_SOURCES.map((source) =>
+  const manualProjectSkillCommands = DEFAULT_AGENT_SKILL_SOURCES.flatMap((source) => [
     formatSkillInstallCommand(install.effectivePm, source),
-  );
+    formatClaudeSkillInstallCommand(install.effectivePm, source),
+  ]);
   const manualProjectSkillSummary = manualProjectSkillCommands.map((c) => `\`${c}\``).join(' && ');
   let skillRegistered = false;
   if (!inputs.installProjectSkill) {

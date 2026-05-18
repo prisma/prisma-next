@@ -3,6 +3,7 @@ import { version as cliVersion } from '../../../package.json' with { type: 'json
 import {
   DEFAULT_AGENT_SKILL_BASE,
   DEFAULT_AGENT_SKILL_SOURCES,
+  formatClaudeSkillInstallCommand,
   formatSkillInstallCommand,
   formatSkillSourceUrl,
 } from '../../../src/commands/init/agent-skill-install';
@@ -83,11 +84,14 @@ describe('formatSkillSourceUrl', () => {
 
 describe('formatSkillInstallCommand', () => {
   it.each([
-    ['npm', `npx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['pnpm', `pnpm dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['yarn', `yarn dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['bun', `bunx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['deno', `deno run -A npm:skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['npm', `npx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['pnpm', `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['yarn', `yarn dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['bun', `bunx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    [
+      'deno',
+      `deno run -A npm:skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`,
+    ],
   ] satisfies ReadonlyArray<
     readonly [PackageManager, string]
   >)('formats %s command with the version-pinned usage source', (pm, expected) => {
@@ -99,7 +103,7 @@ describe('formatSkillInstallCommand', () => {
   it('pnpm command for the upgrade source omits the #ref fragment', () => {
     withCleanEnv(() => {
       expect(formatSkillInstallCommand('pnpm', upgradeSource)).toBe(
-        `pnpm dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills/upgrade --all`,
+        `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills/upgrade --all`,
       );
     });
   });
@@ -107,8 +111,39 @@ describe('formatSkillInstallCommand', () => {
   it('pnpm command for the extension-author source omits the #ref fragment', () => {
     withCleanEnv(() => {
       expect(formatSkillInstallCommand('pnpm', extAuthorSource)).toBe(
-        `pnpm dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills/extension-author --all`,
+        `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills/extension-author --all`,
       );
+    });
+  });
+});
+
+describe('formatClaudeSkillInstallCommand', () => {
+  it.each([
+    [
+      'npm',
+      `npx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+    ],
+    [
+      'pnpm',
+      `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+    ],
+    [
+      'yarn',
+      `yarn dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+    ],
+    [
+      'bun',
+      `bunx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+    ],
+    [
+      'deno',
+      `deno run -A npm:skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+    ],
+  ] satisfies ReadonlyArray<
+    readonly [PackageManager, string]
+  >)('formats %s command with the usage source', (pm, expected) => {
+    withCleanEnv(() => {
+      expect(formatClaudeSkillInstallCommand(pm, usageSource)).toBe(expected);
     });
   });
 });
