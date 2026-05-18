@@ -12,6 +12,7 @@ import {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlStorage,
   type SqlStorageInput,
@@ -30,6 +31,10 @@ const expandParameterizedNativeType: NativeTypeExpander = (input) => {
   const hooks = adapterCodecHooks.get(input.codecId);
   return hooks?.expandNativeType?.(input) ?? input.nativeType;
 };
+
+function ns(tables: Record<string, StorageTable>): Pick<SqlStorageInput, 'namespaces'> {
+  return { namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } } };
+}
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -103,7 +108,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
   it('produces no ops when contract and schemaIR represent the same state', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: {
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -115,7 +120,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
           indexes: [{ columns: ['name'] }],
           foreignKeys: [],
         },
-      },
+      }),
     };
 
     const contract = createTestContract(storage);
@@ -143,7 +148,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
   it('detects additive changes from empty state', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: {
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -154,7 +159,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
           indexes: [],
           foreignKeys: [],
         },
-      },
+      }),
     };
 
     const contract = createTestContract(storage);
@@ -184,7 +189,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
   it('detects incremental table addition', () => {
     const fromStorage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: {
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -194,12 +199,12 @@ describe('contractToSchemaIR → planner round-trip', () => {
           indexes: [],
           foreignKeys: [],
         },
-      },
+      }),
     };
 
     const toStorage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: {
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -219,7 +224,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
           indexes: [],
           foreignKeys: [],
         },
-      },
+      }),
     };
 
     const contract = createTestContract(toStorage);
@@ -252,7 +257,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
   it('handles default values in round-trip', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         item: {
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -274,7 +279,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
           indexes: [],
           foreignKeys: [],
         },
-      },
+      }),
     };
 
     const contract = createTestContract(storage);
@@ -304,7 +309,7 @@ describe('planner — additive scenarios', () => {
   it('detects added column on existing table', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -312,12 +317,12 @@ describe('planner — additive scenarios', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -326,7 +331,7 @@ describe('planner — additive scenarios', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const result = planFromStorages(from, to);
@@ -342,19 +347,19 @@ describe('planner — additive scenarios', () => {
   it('detects added table', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -368,7 +373,7 @@ describe('planner — additive scenarios', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const result = planFromStorages(from, to);
@@ -383,19 +388,19 @@ describe('planner — additive scenarios', () => {
   it('detects multiple changes at once (table + unique + index)', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -412,7 +417,7 @@ describe('planner — additive scenarios', () => {
           uniques: [{ columns: ['slug'] }],
           indexes: [{ columns: ['title'] }],
         }),
-      },
+      }),
     };
 
     const result = planFromStorages(from, to);
@@ -430,7 +435,7 @@ describe('planner — additive scenarios', () => {
   it('returns no ops when storages are identical', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -438,7 +443,7 @@ describe('planner — additive scenarios', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const result = planFromStorages(storage, storage);
@@ -454,7 +459,7 @@ describe('detectDestructiveChanges', () => {
   it('rejects column removal with conflict', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -463,12 +468,12 @@ describe('detectDestructiveChanges', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -476,7 +481,7 @@ describe('detectDestructiveChanges', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const conflicts = detectDestructiveChanges(new SqlStorage(from), new SqlStorage(to));
@@ -489,7 +494,7 @@ describe('detectDestructiveChanges', () => {
   it('rejects table removal with conflict', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
@@ -498,17 +503,17 @@ describe('detectDestructiveChanges', () => {
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const conflicts = detectDestructiveChanges(new SqlStorage(from), new SqlStorage(to));
@@ -521,7 +526,7 @@ describe('detectDestructiveChanges', () => {
   it('rejects multiple destructive changes with all conflicts', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -533,17 +538,17 @@ describe('detectDestructiveChanges', () => {
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const conflicts = detectDestructiveChanges(new SqlStorage(from), new SqlStorage(to));
@@ -559,7 +564,7 @@ describe('planner — type and nullability change behavior', () => {
   it('rejects type change (text → int4) as non-additive conflict', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -567,12 +572,12 @@ describe('planner — type and nullability change behavior', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -580,7 +585,7 @@ describe('planner — type and nullability change behavior', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const result = planFromStorages(from, to);
@@ -598,7 +603,7 @@ describe('planner — type and nullability change behavior', () => {
   it('rejects nullability tightening (nullable → non-nullable) as non-additive conflict', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -606,12 +611,12 @@ describe('planner — type and nullability change behavior', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
-      tables: {
+      ...ns({
         user: table({
           columns: {
             id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
@@ -619,7 +624,7 @@ describe('planner — type and nullability change behavior', () => {
           },
           primaryKey: { columns: ['id'] },
         }),
-      },
+      }),
     };
 
     const result = planFromStorages(from, to);
@@ -696,66 +701,68 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
   };
 }
 
+const DEMO_BASE_TABLES = {
+  user: table({
+    columns: {
+      id: col({
+        nativeType: 'character',
+        codecId: 'sql/char@1',
+        typeParams: { length: 36 },
+      }),
+      email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+      createdAt: col({
+        nativeType: 'timestamptz',
+        codecId: 'pg/timestamptz@1',
+        default: { kind: 'function', expression: 'now()' },
+      }),
+      kind: col({
+        nativeType: 'user_type',
+        codecId: 'pg/enum@1',
+        typeRef: 'user_type',
+      }),
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [{ columns: ['email'] }],
+  }),
+  post: table({
+    columns: {
+      id: col({
+        nativeType: 'character',
+        codecId: 'sql/char@1',
+        typeParams: { length: 36 },
+      }),
+      title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+      userId: col({
+        nativeType: 'character',
+        codecId: 'sql/char@1',
+        typeParams: { length: 36 },
+      }),
+      createdAt: col({
+        nativeType: 'timestamptz',
+        codecId: 'pg/timestamptz@1',
+        default: { kind: 'function', expression: 'now()' },
+      }),
+      embedding: col({
+        nativeType: 'vector',
+        codecId: 'pg/vector@1',
+        nullable: true,
+      }),
+    },
+    primaryKey: { columns: ['id'] },
+    foreignKeys: [
+      {
+        columns: ['userId'],
+        references: { table: 'user', columns: ['id'] },
+        constraint: true,
+        index: true,
+      },
+    ],
+  }),
+};
+
 const DEMO_BASE_STORAGE: SqlStorageInput = {
   storageHash: coreHash('sha256:test'),
-  tables: {
-    user: table({
-      columns: {
-        id: col({
-          nativeType: 'character',
-          codecId: 'sql/char@1',
-          typeParams: { length: 36 },
-        }),
-        email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-        createdAt: col({
-          nativeType: 'timestamptz',
-          codecId: 'pg/timestamptz@1',
-          default: { kind: 'function', expression: 'now()' },
-        }),
-        kind: col({
-          nativeType: 'user_type',
-          codecId: 'pg/enum@1',
-          typeRef: 'user_type',
-        }),
-      },
-      primaryKey: { columns: ['id'] },
-      uniques: [{ columns: ['email'] }],
-    }),
-    post: table({
-      columns: {
-        id: col({
-          nativeType: 'character',
-          codecId: 'sql/char@1',
-          typeParams: { length: 36 },
-        }),
-        title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-        userId: col({
-          nativeType: 'character',
-          codecId: 'sql/char@1',
-          typeParams: { length: 36 },
-        }),
-        createdAt: col({
-          nativeType: 'timestamptz',
-          codecId: 'pg/timestamptz@1',
-          default: { kind: 'function', expression: 'now()' },
-        }),
-        embedding: col({
-          nativeType: 'vector',
-          codecId: 'pg/vector@1',
-          nullable: true,
-        }),
-      },
-      primaryKey: { columns: ['id'] },
-      foreignKeys: [
-        {
-          columns: ['userId'],
-          references: { table: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
-        },
-      ],
-    }),
-  },
+  ...ns(DEMO_BASE_TABLES),
   types: {
     user_type: {
       codecId: 'pg/enum@1',
@@ -790,16 +797,16 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
   it('only emits ops for the actual change when adding a column to an existing table', () => {
     const toStorage: Omit<SqlStorageInput, 'storageHash'> = {
       ...DEMO_BASE_STORAGE,
-      tables: {
-        ...DEMO_BASE_STORAGE.tables,
+      ...ns({
+        ...DEMO_BASE_TABLES,
         user: table({
-          ...DEMO_BASE_STORAGE.tables['user']!,
+          ...DEMO_BASE_TABLES['user']!,
           columns: {
-            ...DEMO_BASE_STORAGE.tables['user']!.columns,
+            ...DEMO_BASE_TABLES['user']!.columns,
             name: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: true }),
           },
         }),
-      },
+      }),
     };
 
     const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {

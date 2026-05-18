@@ -7,6 +7,7 @@ import {
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlStorage,
   type SqlStorageInput,
@@ -136,7 +137,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
 });
 
 describe('NOT NULL column without default uses temporary default', () => {
-  const qualifiedUserTable = '"public"."user"';
+  const qualifiedUserTable = '"user"';
 
   it('emits 2-step execute (add with temp default, drop default) for NOT NULL text column', () => {
     const addCol = planAddColumn('name', {
@@ -526,34 +527,39 @@ function createTestContract(
 ): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:contract');
   const storage = overrides?.storage ?? {
-    tables: {
-      user: {
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['email'] }],
-        foreignKeys: [],
-      },
-      post: {
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [
-          {
-            columns: ['userId'],
-            references: { table: 'user', columns: ['id'] },
-            constraint: true,
-            index: true,
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['email'] }],
+            indexes: [{ columns: ['email'] }],
+            foreignKeys: [],
           },
-        ],
+          post: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['userId'],
+                references: { table: 'user', columns: ['id'] },
+                constraint: true,
+                index: true,
+              },
+            ],
+          },
+        },
       },
     },
   };
@@ -650,16 +656,21 @@ function planUserTableOperations(
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
     extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
-    extraContractTables?: Contract<SqlStorage>['storage']['tables'];
+    extraContractTables?: Record<string, StorageTable>;
     extraSchemaTables?: SqlSchemaIR['tables'];
   },
 ) {
   const planner = createPostgresMigrationPlanner();
   const contract = createTestContract({
     storage: {
-      tables: {
-        ...(options?.extraContractTables ?? {}),
-        user: userTable,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            ...(options?.extraContractTables ?? {}),
+            user: userTable,
+          },
+        },
       },
       ...(options?.extraStorageTypes ? { types: options.extraStorageTypes } : {}),
     },
