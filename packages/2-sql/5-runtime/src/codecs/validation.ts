@@ -1,14 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
-    for (const table of Object.values(ns.tables as Readonly<Record<string, StorageTable>>)) {
+    for (const table of Object.values(ns.tables)) {
       for (const column of Object.values(table.columns)) {
         const codecId = column.codecId;
         codecIds.add(codecId);
@@ -23,10 +22,7 @@ function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string,
   const codecIds = new Map<string, string>();
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
-    for (const [tableName, table] of Object.entries(
-      ns.tables as Readonly<Record<string, StorageTable>>,
-    )) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         const codecId = column.codecId;
         const key = `${tableName}.${columnName}`;
