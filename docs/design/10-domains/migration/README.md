@@ -103,7 +103,7 @@ Both grammars borrow two ideas from Git (prefix-matching on hashes and the `^` o
 | `<ref-name>` | The contract the named ref points at. |
 | `<migration-dir-name>` | The migration's **`to`-contract**. |
 | `<migration-dir-name>^` | The migration's **`from`-contract**. |
-| `<filesystem-path>` | The contract file at that path. |
+| `<filesystem-path>` | The contract file at that path (prefixed with `./` to force the filesystem interpretation; see *Ambiguity and resolution rules* below). |
 
 #### Migration reference (`<migration>`)
 
