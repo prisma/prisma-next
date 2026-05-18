@@ -1,9 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import {
-  SqlContractSerializerBase,
-  type SqlEntityHydrationFactory,
-} from '@prisma-next/family-sql/ir';
-import type { AuthoringEntityContext } from '@prisma-next/framework-components/authoring';
+import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
 import {
   type Namespace,
   NamespaceBase,
@@ -12,42 +8,19 @@ import {
 import {
   type SqlNamespaceTablesInput,
   type SqlStorage,
-  type SqlStorageTypeEntry,
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { postgresAuthoringEntityTypes } from './authoring';
-import { PostgresEnumType } from './postgres-enum-type';
+import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { PostgresSchema } from './postgres-schema';
-
-function buildPostgresEntityTypeRegistry(): ReadonlyMap<string, SqlEntityHydrationFactory> {
-  const ctx: AuthoringEntityContext = { family: 'sql', target: 'postgres' };
-  const registry = new Map<string, SqlEntityHydrationFactory>();
-  for (const descriptor of Object.values(postgresAuthoringEntityTypes)) {
-    if (descriptor.kind !== 'entity') {
-      continue;
-    }
-    if (!('factory' in descriptor.output)) {
-      continue;
-    }
-    const factory = descriptor.output.factory as (
-      input: never,
-      ctx: AuthoringEntityContext,
-    ) => SqlStorageTypeEntry;
-    registry.set(descriptor.discriminator, (entry) => {
-      if (entry instanceof PostgresEnumType) {
-        return entry;
-      }
-      return factory(entry as never, ctx);
-    });
-  }
-  return registry;
-}
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
-    super(buildPostgresEntityTypeRegistry());
+    // Postgres entity types (enums) are namespace-level and hydrated in
+    // hydrateSqlNamespaceEntry; there are no storage-level codec alias entities
+    // specific to Postgres, so the registry is empty.
+    super(new Map());
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -74,19 +47,18 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       typeEntries !== undefined && Object.keys(typeEntries).length > 0
         ? Object.fromEntries(
             Object.entries(typeEntries).map(([typeName, entry]) => {
+              if (entry instanceof PostgresEnumType) {
+                return [typeName, entry];
+              }
               const plain = entry as Record<string, unknown>;
-              const withName = {
-                ...plain,
-                kind: 'postgres-enum' as const,
-                name: typeof plain.name === 'string' ? plain.name : typeName,
-                nativeType:
-                  typeof plain.nativeType === 'string'
-                    ? plain.nativeType
-                    : typeof plain.name === 'string'
-                      ? plain.name
-                      : typeName,
-              };
-              return [typeName, this.hydrateStorageTypeEntry(withName as SqlStorageTypeEntry)];
+              const name = typeof plain['name'] === 'string' ? plain['name'] : typeName;
+              const nativeType =
+                typeof plain['nativeType'] === 'string' ? plain['nativeType'] : name;
+              const values = Array.isArray(plain['values']) ? (plain['values'] as string[]) : [];
+              return [
+                typeName,
+                new PostgresEnumType({ name, nativeType, values } as PostgresEnumTypeInput),
+              ];
             }),
           )
         : undefined;
@@ -115,7 +87,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         );
       }
     }
-    const storageOut: JsonObject = {
+    const storageOut: Record<string, unknown> = {
       storageHash: String(storage.storageHash),
       namespaces: namespacesJson,
     };
@@ -124,12 +96,12 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       for (const [name, entry] of Object.entries(storage.types)) {
         typesOut[name] = this.serializeJsonValue(entry) as JsonObject;
       }
-      storageOut.types = typesOut;
+      storageOut['types'] = typesOut;
     }
     return {
       ...rest,
       storage: storageOut,
-    } as JsonObject;
+    } as unknown as JsonObject;
   }
 
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
