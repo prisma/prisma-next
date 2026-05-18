@@ -207,9 +207,10 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
 
   // 5. Apply mode: hand off to the shared `applyAggregate` primitive.
   // The runner-driving tail is identical for `db init` / `db update` /
-  // `migration apply` — only how each caller produces `perSpacePlans`
+  // `migrate` — only how each caller produces `perSpacePlans`
   // differs (synth + graph-walk via planAggregate here; graph-walk
-  // only for migration apply). See M6 sub-spec § Required changes 1.
+  // only for migrate). Each caller produces perSpacePlans differently;
+  // this helper handles the shared apply tail.
   const applied = await applyAggregate({
     aggregate,
     perSpacePlans: planResult.value.perSpace,

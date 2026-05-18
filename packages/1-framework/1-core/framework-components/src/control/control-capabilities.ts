@@ -83,7 +83,7 @@ export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
  * extension-contract-spaces project spec — TML-2397).
  *
  * The CLI's shared `applyAggregate` primitive uses this guard so that
- * `db init` / `db update` / `migration apply` route uniformly through one
+ * `db init` / `db update` / `migrate` route uniformly through one
  * dispatch path regardless of family.
  */
 export function hasMultiSpaceRunner<TFamilyId extends string, TTargetId extends string>(

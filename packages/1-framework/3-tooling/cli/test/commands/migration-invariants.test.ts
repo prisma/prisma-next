@@ -12,7 +12,7 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
 
 /**
  * Integration coverage for the UNKNOWN_INVARIANT pre-check in
- * `migration apply --ref` and `migration status --ref` — the only
+ * `migrate --to` and `migration status --to` — the only
  * invariant-routing diagnostic reachable without a real DB connection.
  * Marker-subtraction and NO_INVARIANT_PATH live in the journey suite.
  */
@@ -206,7 +206,7 @@ async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number>
   }
 }
 
-describe('migration apply / status — invariant-routing pre-checks', {
+describe('migrate / migration status — invariant-routing pre-checks', {
   timeout: timeouts.typeScriptCompilation,
 }, () => {
   let consoleOutput: string[];
@@ -239,7 +239,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     vi.resetModules();
   });
 
-  it('migration apply --ref fails with UNKNOWN_INVARIANT when ref names an undeclared invariant', async () => {
+  it('migrate --to fails with UNKNOWN_INVARIANT when ref names an undeclared invariant', async () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: ['typo-id'],
@@ -283,7 +283,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(envelope.meta?.code).toBe('MIGRATION.UNKNOWN_INVARIANT');
   });
 
-  it('migration apply --ref does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
+  it('migrate --to does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
     // Ref carries `retired-id`. No on-disk migration declares it any more
     // (history was rewritten). The marker still records it as applied.
     // Apply should treat the requirement as already satisfied — not
@@ -377,7 +377,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(codes).not.toContain('MIGRATION.UP_TO_DATE');
   });
 
-  it('migration apply --ref does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {
+  it('migrate --to does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {
     // A ref with no invariants must not trip the pre-check. The command
     // continues to its next failure mode (driver no-op connect in this
     // mock setup); we just assert the error code is NOT UNKNOWN_INVARIANT.

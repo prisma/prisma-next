@@ -42,12 +42,12 @@ const removedVerbRedirects: Record<string, string> = {
  * Checked during the pre-parse argv scan before commander sees the flags.
  */
 const removedFlagRedirects: Record<string, string> = {
-  'migration:status:--graph': 'Use `prisma-next migration graph` to view the migration graph.',
-  'migration:status:--all':
+  'migration:status:graph': 'Use `prisma-next migration graph` to view the migration graph.',
+  'migration:status:all':
     'Use `prisma-next migration log --db <url>` to view the full execution history.',
-  'migration:status:--limit':
+  'migration:status:limit':
     'Use `prisma-next migration log --db <url>` to view the full execution history.',
-  'migration:status:--ref': 'Use `--to <contract>` instead of `--ref`.',
+  'migration:status:ref': 'Use `--to <contract>` instead of `--ref`.',
 };
 
 /**
@@ -288,7 +288,7 @@ migrationCommand.addCommand(migrationCheckCommand);
 
 program.addCommand(migrationCommand);
 
-// Top-level migrate command (replaces `migration apply`)
+// Top-level migrate command
 const migrateCommand = createMigrateCommand();
 program.addCommand(migrateCommand);
 
@@ -374,10 +374,13 @@ if (args.length > 0) {
         process.exit(2);
       }
       for (let i = 2; i < args.length; i++) {
-        const flagKey = `${commandName}:${subcommandName}:${args[i]}`;
+        const arg = args[i]!;
+        if (!arg.startsWith('--')) continue;
+        const flagName = arg.slice(2);
+        const flagKey = `${commandName}:${subcommandName}:${flagName}`;
         const flagRedirect = removedFlagRedirects[flagKey];
         if (flagRedirect) {
-          process.stderr.write(`Unknown option: ${args[i]}\n${flagRedirect}\n`);
+          process.stderr.write(`Unknown option: ${arg}\n${flagRedirect}\n`);
           process.exit(2);
         }
       }

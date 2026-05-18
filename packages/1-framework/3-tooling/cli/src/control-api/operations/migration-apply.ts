@@ -34,7 +34,7 @@ import type {
 import { applyAggregate, buildPerSpaceBreakdown } from './apply-aggregate';
 
 /**
- * Inputs for the aggregate-walking `migration apply` control-api
+ * Inputs for the aggregate-walking `migrate` control-api
  * operation.
  *
  * The CLI command resolves the descriptor surface (config, refs,
@@ -110,7 +110,8 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
  *    shared with `db init` / `db update`). Marker advancement is
  *    inside the per-space transaction.
  *
- * Sub-spec § `migration apply` semantics + § Required changes 1.
+ * Encodes the replay-only contract: every contract space must have an
+ * authored migration graph on disk before this operation can advance it.
  */
 export async function executeMigrationApply<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteMigrationApplyOptions<TFamilyId, TTargetId>,
@@ -461,7 +462,7 @@ function buildNeverPlannedFailure(spaceId: string, targetHash: string): Migratio
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary: `No on-disk migrations for contract space "${spaceId}"`,
-    why: `migration apply is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}". Run \`prisma-next migration plan\` first to materialise the path.`,
+    why: `migrate is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}". Run \`prisma-next migration plan\` first to materialise the path.`,
     meta: { spaceId, target: targetHash, kind: 'neverPlanned' },
   };
 }

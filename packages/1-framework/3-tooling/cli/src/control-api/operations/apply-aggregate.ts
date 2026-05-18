@@ -49,7 +49,7 @@ export interface ApplyAggregateInputs<TFamilyId extends string, TTargetId extend
    * Per-space plans, keyed by `spaceId`. Produced by either the full
    * {@link planAggregate} pipeline (`db init` / `db update` — synth
    * for the app, graph-walk for extensions) or by direct
-   * {@link graphWalkStrategy} calls (`migration apply` — graph-walk
+   * {@link graphWalkStrategy} calls (`migrate` — graph-walk
    * for every member). Either way, the runner consumes the same shape.
    */
   readonly perSpacePlans: ReadonlyMap<string, AggregatePerSpacePlan>;
@@ -100,7 +100,7 @@ export type ApplyAggregateResult = Result<ApplyAggregateValue, AggregateApplyRun
 
 /**
  * Runner-driving tail shared by every aggregate apply caller — `db init`,
- * `db update`, and `migration apply`. Consumes already-resolved per-space
+ * `db update`, and `migrate`. Consumes already-resolved per-space
  * plans (the planner-vs-replay distinction is owned by the caller) and
  * dispatches them to the multi-space runner in canonical order.
  *
@@ -264,7 +264,7 @@ export function collectOrdered(
 /**
  * Action-appropriate label for the `spanStart` event the apply
  * primitive emits. `applyAggregate` is shared by `db init`, `db update`,
- * and `migration apply`; the span label tracks the user-visible action
+ * and `migrate`; the span label tracks the user-visible action
  * so structured-progress output reads naturally for each surface.
  */
 export function progressLabelForAction(action: AggregateApplyAction): string {
@@ -285,6 +285,6 @@ function labelForAction(action: AggregateApplyAction): string {
     case 'dbUpdate':
       return 'db update';
     case 'migrationApply':
-      return 'migration apply';
+      return 'migrate';
   }
 }

@@ -7,7 +7,7 @@ const execFileAsync = promisify(execFile);
 const CLI_PATH = resolve(__dirname, '../dist/cli.mjs');
 
 describe('removed verb redirects', () => {
-  it('`migration apply` exits 2 and suggests `migrate --to`', async () => {
+  it('removed `apply` subverb under `migration` redirects to `migrate --to`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'apply'], {
         timeout: 5000,
@@ -20,7 +20,7 @@ describe('removed verb redirects', () => {
     }
   });
 
-  it('`migration apply --to production` exits 2 and suggests `migrate --to`', async () => {
+  it('removed `apply` subverb with flags still redirects to `migrate --to`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'apply', '--to', 'production'], {
         timeout: 5000,
@@ -33,7 +33,7 @@ describe('removed verb redirects', () => {
     }
   });
 
-  it('`migration ref set` exits 2 and suggests `ref set|list|delete`', async () => {
+  it('removed `ref set` under `migration` redirects to top-level `ref set`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'ref', 'set', 'prod', 'sha256:abc'], {
         timeout: 5000,
@@ -46,7 +46,7 @@ describe('removed verb redirects', () => {
     }
   });
 
-  it('`migration ref` with no subcommand exits 2 and suggests `ref`', async () => {
+  it('removed `ref` namespace under `migration` redirects to top-level `ref`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'ref'], {
         timeout: 5000,
@@ -59,7 +59,7 @@ describe('removed verb redirects', () => {
     }
   });
 
-  it('`migration status --graph` exits 2 and suggests `migration graph`', async () => {
+  it('removed `--graph` flag on `migration status` redirects to `migration graph`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--graph'], {
         timeout: 5000,
@@ -72,7 +72,7 @@ describe('removed verb redirects', () => {
     }
   });
 
-  it('`migration status --all` exits 2 and suggests `migration log`', async () => {
+  it('removed `--all` flag on `migration status` redirects to `migration log`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--all'], {
         timeout: 5000,
@@ -85,7 +85,7 @@ describe('removed verb redirects', () => {
     }
   });
 
-  it('`migration status --ref X` exits 2 and suggests `--to`', async () => {
+  it('removed `--ref` flag on `migration status` redirects to `--to`', async () => {
     try {
       await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--ref', 'prod'], {
         timeout: 5000,

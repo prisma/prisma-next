@@ -241,7 +241,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   });
 
   it(
-    'migration apply surfaces MIGRATION.HASH_MISMATCH before connecting (T3.1)',
+    'migrate surfaces MIGRATION.HASH_MISMATCH before connecting',
     async () => {
       const { createMigrateCommand } = await import('../../src/commands/migrate');
       const fixture = await setupTamperFixture();

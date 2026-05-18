@@ -26,7 +26,7 @@ export interface GraphWalkStrategyInputs {
   readonly currentMarker: ContractMarkerRecordLike | null;
   /**
    * Optional ref name to decorate the resulting `PathDecision`. Used by
-   * `migration apply` to surface the user-supplied `--ref <name>` in
+   * `migrate` to surface the user-supplied `--to <name>` in
    * structured-progress events and invariant-path error envelopes. The
    * strategy itself does not interpret it.
    */

@@ -72,7 +72,7 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         );
         // The framework `MigrationRunner` interface types `destinationContract`
         // as `unknown`; the Mongo runner narrows to `MongoContract`. Validation
-        // happens upstream — `migration apply` calls
+        // happens upstream — `migrate` calls
         // `familyInstance.validateContract(contract)` on the project-root
         // contract loaded from disk before routing it here, so this cast
         // preserves the framework signature without weakening the runner's

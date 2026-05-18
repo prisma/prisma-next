@@ -65,7 +65,7 @@ async function writeAttestedMigration(
 // then read them back. The shared default timeout is intentionally overridden here
 // because this test does real filesystem work and still needs more headroom.
 // filesystem I/O on slow CI runners.
-describe('migration apply — pending migration resolution', {
+describe('migrate — pending migration resolution', {
   timeout: timeouts.databaseOperation,
 }, () => {
   it('finds pending path from empty marker to leaf', async () => {
