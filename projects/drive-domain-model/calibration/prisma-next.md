@@ -1,21 +1,23 @@
-# Prisma-Next Calibration
+# Prisma-Next calibration
 
-Project-specific calibration for the prisma-next codebase. This is the **example calibration** that informs the general protocol — eventually this content lives in `prisma-next`'s own `docs/` rather than in this methodology project.
+Project-specific calibration for the `prisma-next` codebase. This is the **worked-example calibration** that informs the general protocol — eventually this content lives in `prisma-next`'s own `docs/` rather than in this methodology project.
 
-Per the [general spec](../spec.md), the calibration covers four things:
+Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principles/), the calibration covers six things:
 
-1. Reference tasks for t-shirt-size anchoring
-2. Definition of Done verification gates
-3. Failure-mode catalogue
-4. Grep library of anti-pattern patterns
+1. Reference tasks for t-shirt-size anchoring (§ 1)
+2. Definition of Ready overlays at three scopes (§ 2)
+3. Definition of Done overlays at three scopes (§ 3)
+4. Failure-mode catalogue (§ 4)
+5. Grep library of anti-pattern patterns (§ 5)
+6. Model-tier routing (§ 6) + Linear ceremony (§ 7) + maintenance discipline (§ 8)
 
-All four are living documents — updated when we discover new failure modes or recalibrate.
+All sections are living documents — updated **trigger-based** when retros surface a learning (per [`principles/retro.md`](../principles/retro.md)), not on a calendar.
 
 ---
 
 ## 1. Reference tasks for t-shirt anchors
 
-Estimate new tasks relative to these references. If a new task feels harder than its reference, size up. If easier, size down.
+Estimate new dispatches relative to these references. If a new dispatch feels harder than its reference, size up. If easier, size down. The slice-level analogue is "does the slice fit in one PR?" — sizing dispatches against these references is the dispatch-level cap.
 
 ### XS — Trivial
 
@@ -26,14 +28,14 @@ Estimate new tasks relative to these references. If a new task feels harder than
 | Fix a typo in a doc comment | No code change, no behaviour change |
 | Add a single test case to an existing test file | One scope, one assertion |
 
-**Time-box: ≤ 5 min.** Routine dispatch to cheap tier (composer / Sonnet) is fine.
+**Time-box: ≤ 5 min.** Cheap tier (composer / Sonnet) is fine.
 
 ### S — Small
 
 | Reference | Why S |
 |---|---|
 | Add a new error subclass with structured fields + 1-2 tests | One new file, one new test file, well-bounded |
-| Add a new type-level test case (test-d.ts) + its file | One file, requires understanding the type but no design |
+| Add a new type-level test case (`test-d.ts`) + its file | One file, requires understanding the type but no design |
 | Change one type signature and update its 5-10 consumers | Mechanical fanout, single discipline |
 | Add a new lint rule to `scripts/` and apply it once | Two files, mechanical |
 
@@ -60,32 +62,124 @@ Estimate new tasks relative to these references. If a new task feels harder than
 | Migrate test literals across all SQL packages in one go | High surface, multiple packages, easy to miss sites |
 | Restructure an existing IR class's shape (e.g. `ForeignKeyReferences` → `ForeignKeyReference`) | Substrate + every consumer + fixtures |
 
-**Decomposition pattern.** Split along discipline boundaries: substrate change as its own M; each consumer package as its own M; fixture regen as its own S/M; verification as its own S.
+**Decomposition pattern.** Split along discipline boundaries: substrate change as its own M dispatch; each consumer package as its own M dispatch; fixture regen as its own S/M dispatch; verification as its own S dispatch.
 
-### XL — Extra Large (refuse-to-dispatch; decompose into stories)
+### XL — Extra Large (refuse-to-dispatch; route via triage)
 
 | Reference | Why XL |
 |---|---|
-| Reverse the namespaceId optionality across the IR (today's reversal) | Multiple substrate changes + every consumer + envelope shape + introspector + fixtures + test literals across the whole monorepo |
+| Reverse the namespaceId optionality across the IR (the 2026-05-17 reversal) | Multiple substrate changes + every consumer + envelope shape + introspector + fixtures + test literals across the whole monorepo |
 | Add a new authoring DSL surface (e.g. document storage, namespaces, …) | Multiple new abstractions + every target's interpretation + builder API + serialiser + tests |
 | Build a target-extensible something (e.g. target-contributed PSL blocks) | Multiple new framework surfaces + multiple target packs + multiple new tests |
-| Land a project-sized feature in one dispatch (e.g. a whole milestone) | Definitionally too big |
+| Land a project-sized feature in one dispatch (e.g. a whole slice or a whole project) | Definitionally too big |
 
-**Decomposition pattern.** Treat as a project, not a dispatch. Write a spec; write a plan; the plan decomposes into stories; each story is an M; each M may be further decomposed at dispatch time if needed.
+**Decomposition pattern.** Treat as a project, not a slice or dispatch. Triage routes to `drive-create-project` → `drive-project-specify` → `drive-project-plan`; the plan composes slices; each slice has a slice plan; each slice plan is a dispatch sequence with every dispatch M-or-below.
 
 ---
 
-## 2. Definition of Done verification gates
+## 2. Definition of Ready overlays
 
-For prisma-next, the standard verification gates are:
+Calibration items that overlay the protocol's DoR templates (per [`principles/definition-of-ready.md`](../principles/definition-of-ready.md)). Each item adds to the protocol-layer checklist at the named scope; the protocol items are not repeated here.
 
-### Always-run gates
+### 2.1 Project DoR — `prisma-next` overlay
+
+```markdown
+# Calibration overlays (prisma-next, project DoR)
+
+- [ ] Linear Project exists (created via save_project MCP tool)
+- [ ] If started from a ticket: promotion pattern applied (ticket moved
+       into Linear Project, marked Done, renamed "Plan: <project name>"
+       or commented per model.md § Linear sync — Promotion pattern)
+- [ ] Project working branch exists, named with Linear Project ID
+       (e.g. tml-2549-<descriptive-slug>)
+- [ ] projects/<project>/ folder scaffolded with spec.md + plan.md
+       placeholders; README.md present
+```
+
+### 2.2 Slice DoR — `prisma-next` overlay
+
+```markdown
+# Calibration overlays (prisma-next, slice DoR)
+
+- [ ] Linear issue created and linked from slice spec
+       (issue description carries a link back to projects/<x>/slices/<s>/)
+- [ ] Slice's PR-to-be will carry a Refs: <issue-id> line
+- [ ] Slice's parent branch is the project's working branch
+       (or main for orphan slices)
+- [ ] Slice plan references the relevant § 4 failure-mode entries that
+       apply to this slice's shape (so dispatch briefs can thread them in)
+- [ ] Slice plan references the relevant § 5 grep library entries that
+       apply to this slice's shape
+```
+
+### 2.3 Dispatch DoR — `prisma-next` overlay
+
+```markdown
+# Calibration overlays (prisma-next, dispatch DoR)
+
+- [ ] Brief's "Inputs" section references the applicable § 4 failure-mode
+       entries with their dispositions in the edge-case table
+- [ ] Brief's "Inputs" section references the applicable § 5 grep library
+       entries that this dispatch should run
+- [ ] Brief's tier is one of the three the team uses
+       (orchestrator tier / mid tier / cheap tier — per § 6)
+- [ ] Brief specifies a slice plan path under
+       projects/<x>/slices/<s>/ (or "orphan" if no parent project)
+- [ ] Brief's edge-case table includes "destructive git operations
+       forbidden without orchestrator approval" disposition
+       (per § 4.5; non-negotiable for all subagent dispatches)
+```
+
+---
+
+## 3. Definition of Done overlays
+
+Calibration items that overlay the protocol's DoD templates (per [`principles/definition-of-done.md`](../principles/definition-of-done.md)).
+
+### 3.1 Project DoD — `prisma-next` overlay
+
+```markdown
+# Calibration overlays (prisma-next, project DoD)
+
+- [ ] Long-lived docs migrated to docs/ (per the doc-maintenance rule)
+- [ ] Any new architecture docs are linked from docs/architecture docs/
+- [ ] Linear Project marked Completed (or Cancelled with rationale in
+       final status update)
+- [ ] Original promoted ticket (if applicable) reflects project completion
+       (comment or status update)
+- [ ] Final status update on Linear Project links the close-out retro
+- [ ] projects/<project>/ deleted from the repo
+- [ ] References to projects/<project>/** removed from the codebase
+       (per the doc-maintenance rule)
+```
+
+### 3.2 Slice DoD — `prisma-next` overlay
+
+```markdown
+# Calibration overlays (prisma-next, slice DoD)
+
+- [ ] Linear issue moved to "Ready to be merged" (the team's
+       terminal-before-merge state)
+- [ ] PR title carries Linear ticket prefix (e.g. tml-XXXX:)
+- [ ] PR description follows drive-pr-description shape
+       (decision-led, narrative)
+- [ ] PR linked to its Linear issue via GitHub integration
+       (auto-close on merge works)
+- [ ] No projects/ references in long-lived files added by the slice
+       (per the doc-maintenance rule; grep gate in § 5)
+```
+
+### 3.3 Dispatch DoD — `prisma-next` overlay
+
+The protocol-layer dispatch DoD items (per `principles/definition-of-done.md`) apply universally. Below are the verification gates specific to `prisma-next`.
+
+#### Always-run gates
 
 ```bash
 pnpm typecheck    # always; catches the bulk of consumer-site issues
 ```
 
-### Conditional gates
+#### Conditional gates
 
 ```bash
 pnpm lint:deps              # when imports/exports/architectural structure changes
@@ -95,28 +189,40 @@ pnpm test:e2e               # when changes affect emit / migrate / run cycle
 pnpm fixtures:check         # when IR / emitter / serialiser changes
 ```
 
-### Brief-specified gates
+#### Brief-specified gates
 
 A dispatch's brief may add gates specific to the work:
 
 - **Specific test files** that must pass (e.g. F01 regression after the namespace reversal)
-- **Specific PGlite tests** (e.g. AC4 cross-namespace-fk, AC6 unbound-namespace integration tests)
-- **Grep gates** from the library below (see § 4)
+- **Specific PGlite tests** (e.g. cross-namespace-fk, unbound-namespace integration tests)
+- **Grep gates** from the library below (§ 5)
 - **Diff-stat sanity checks** ("no demo migration snapshot should change unless intentional")
 
-### Verification cadence
+#### Verification cadence
 
 - **Per-commit gates** (during the dispatch): typecheck and any grep gates the brief specifies.
 - **End-of-dispatch gates** (before reporting done): the full conditional set + brief-specified gates.
-- **End-of-round gates** (orchestrator-side, post-implementer-report): orchestrator re-runs the grep gates independently to confirm; spot-checks the diff for spec compliance.
+- **End-of-dispatch orchestrator-side gates** (post-implementer-report): orchestrator re-runs the grep gates independently to confirm; spot-checks the diff for spec compliance; runs intent-validation.
+
+#### Additional calibration items
+
+```markdown
+- [ ] Brief's referenced § 4 failure-mode entries were checked during
+       execution and noted as "avoided" in the dispatch summary
+- [ ] No new TODOs left behind by this dispatch
+- [ ] Per-commit messages reference the source spike artefact / slice
+       spec where appropriate
+- [ ] If the dispatch touched test fixtures: fixtures:check passes;
+       drift in unrelated fixture files is investigated, not committed
+```
 
 ---
 
-## 3. Failure-mode catalogue
+## 4. Failure-mode catalogue
 
 Recorded failure modes with their detection signals and mitigations. Add a new entry every time a failure mode is observed; if a recurrence happens, the entry was inadequate — update it.
 
-### 3.1 Dual-shape support relocated under a new name
+### 4.1 Dual-shape support relocated under a new name
 
 **Symptom.** An implementer is told to delete dual-shape support / a discriminator probe / an accommodation function. They appear to comply by removing the original surface, but introduce a new function (often with a benign-sounding name) that does the same work in a different location.
 
@@ -129,12 +235,12 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 **Mitigation.**
 
 - Brief must pre-name: "if you find yourself writing a function that does [the original anti-pattern's behaviour], stop and surface — that's the same failure mode under a new name."
-- 5-min standup check must read the diff of newly-introduced functions, especially those near the deleted surface.
+- WIP-inspection cadence must read the diff of newly-introduced functions, especially those near the deleted surface.
 - Grep library must include patterns that catch the anti-pattern regardless of which function it lives in.
 
 **Reference incident.** 2026-05-17 reversal. Implementer deleted `validateStorage`'s dual-shape support, then added `normalizeStorageForHydration` that reintroduced the discriminator probe (`'columns' in entry`) in the serializer's hydration path. Corrected via commit `7240f5980`. Captured in `wip/unattended-decisions.md` § 11 and design-decisions.md § 1.
 
-### 3.2 Constructor magic for optional fields
+### 4.2 Constructor magic for optional fields
 
 **Symptom.** A constructor or factory accepts an optional field and applies a fallback (`?? defaultValue`) inside. Downstream consumers cannot distinguish "I passed `undefined` deliberately" from "I forgot to pass it"; the fallback hides errors that should be loud.
 
@@ -150,9 +256,9 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 - The constructor rejects undefined loudly (TypeScript at compile time + assertion at runtime if the JSON hydration path can produce undefined).
 - Grep library catches `?? UNBOUND_NAMESPACE_ID`-style fallbacks.
 
-**Reference incident.** M5a R7 byte-stability accommodation made `StorageTable.namespaceId` and `ForeignKeyReference.namespaceId` optional, with constructor `?? UNBOUND_NAMESPACE_ID` magic. Caused F01-F05 + A1-A4 in the independent review. Reversed via decision #10 (in `wip/unattended-decisions.md`).
+**Reference incident.** Byte-stability accommodation made `StorageTable.namespaceId` and `ForeignKeyReference.namespaceId` optional, with constructor `?? UNBOUND_NAMESPACE_ID` magic. Caused F01-F05 + A1-A4 in the independent review. Reversed via decision recorded in `wip/unattended-decisions.md`.
 
-### 3.3 Discovery via test suite instead of grep
+### 4.3 Discovery via test suite instead of grep
 
 **Symptom.** Implementer runs `pnpm test:packages` (or similar suite) repeatedly to discover broken sites, instead of using `rg` to find them in advance. Each test-suite run is 5-30 min; each grep is < 5 s. The dispatch wall-clock balloons.
 
@@ -165,14 +271,14 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 **Mitigation.**
 
 - Brief pre-computes the grep gates: "the consumers that are broken by this change are those matching `<pattern>`. Find them all with rg before running the test suite. Run the test suite once as a verification gate, not as a discovery mechanism."
-- 5-min standup check spot-checks tool-call pattern in transcript; nudge to use grep if discovery loops appear.
+- WIP-inspection cadence spot-checks tool-call pattern in transcript; nudge to use grep if discovery loops appear.
 - Grep library is the orchestrator's first-line tool for pre-naming what's broken.
 
-**Reference incident.** 2026-05-17 reversal. Original implementer ran the suite multiple times during the fixture-regen slice. Required orchestrator interrupt ("kick in the pants, use grep ffs") to redirect.
+**Reference incident.** 2026-05-17 reversal. Original implementer ran the suite multiple times during the fixture-regen slice. Required orchestrator interrupt to redirect.
 
-### 3.4 Feature-sized dispatch with no inspection cadence
+### 4.4 Feature-sized dispatch with no inspection cadence
 
-**Symptom.** The umbrella failure mode behind today's reversal. A dispatch is sized L/XL (multiple commits, many files, multiple disciplines), the orchestrator monitors via file-system proxies (commit cadence, file mod rate) rather than reading diffs, validation gates pass throughout, drift compounds across multiple commits, and the violation is invisible until someone reads a specific diff for an unrelated reason.
+**Symptom.** The umbrella failure mode behind the 2026-05-17 reversal. A dispatch is sized L/XL (multiple commits, many files, multiple disciplines), the orchestrator monitors via file-system proxies (commit cadence, file mod rate) rather than reading diffs, validation gates pass throughout, drift compounds across multiple commits, and the violation is invisible until someone reads a specific diff for an unrelated reason.
 
 **Detection signal.**
 
@@ -182,13 +288,13 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 
 **Mitigation.**
 
-- DoR refuses to dispatch L/XL.
-- All M-or-below dispatches are subject to ≤5-min orchestrator check, including diff reads.
+- Dispatch DoR refuses to dispatch L/XL.
+- All M-or-below dispatches are subject to WIP-inspection cadence (≤ 5 min), including diff reads.
 - Brief pre-names the disciplines so the orchestrator can verify each commit lands the correct discipline.
 
-**Reference incident.** 2026-05-17 reversal. Entire root cause of the dispatch that produced § 3.1 and required the corrective round. Will not recur if DoR and 5-min check are enforced.
+**Reference incident.** 2026-05-17 reversal. Entire root cause of the dispatch that produced § 4.1 and required the corrective round. Will not recur if dispatch DoR and WIP-inspection are enforced.
 
-### 3.5 Destructive git operations executed by subagents without orchestrator approval
+### 4.5 Destructive git operations executed by subagents without orchestrator approval
 
 **Symptom.** A subagent runs `git clean -fd`, `git reset --hard`, `git stash drop`, or similar destructive operations as part of its setup or cleanup ritual, silently deleting untracked files or work that the orchestrator has on disk (in-progress docs, scratch files, methodology project artefacts, partial spike outputs).
 
@@ -208,11 +314,11 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 
 ---
 
-## 4. Grep library
+## 5. Grep library
 
-Patterns that catch known anti-patterns. Run as part of DoD for any dispatch whose work is in the affected surface area.
+Patterns that catch known anti-patterns. Run as part of dispatch DoD for any dispatch whose work is in the affected surface area.
 
-### IR substrate hygiene
+### 5.1 IR substrate hygiene
 
 ```bash
 # Optional fields on substrate IR classes that should be required:
@@ -231,23 +337,24 @@ rg "'columns' in" packages/
 rg 'foreignKeyNamespacesMatch' packages/
 ```
 
-### Test-literal hygiene (post-canonical-shape-enforcement)
+### 5.2 Test-literal hygiene (post-canonical-shape-enforcement)
 
 ```bash
 # Flat-shape literals in test fixtures (after canonical shape is the only allowed shape):
 rg 'tables:\s*\{\s*[a-z][A-Za-z_]+\s*:' packages/ -g '*.test.ts' -g '*.test-d.ts' -g 'fixtures/*.ts' | rg -v '__unbound__|public|auth|tenant'
 ```
 
-### Generic project anti-patterns (cross-cutting)
+### 5.3 Generic project anti-patterns (cross-cutting)
 
 ```bash
 # Transient project artefact references in long-lived docs:
+# (See AGENTS.md / .cursor/rules/doc-maintenance.mdc for the canonical pattern.)
 rg 'Project [12]|\bD[1-9]\b|\(FR[0-9]+\)|\(T[0-9]+\)|AC-[A-Z][A-Z0-9-]*|\bR[0-9]+B?\b|\bF[1-7]\b|\bM[12]\b|per spec|the spec\b|spec calls|spec wording|spec promises|sub-spec|milestone' -- ':!projects/' ':!*.generated.*'
 
 # File-extension imports in TS (which we don't allow):
 rg "from '[^']+\.(ts|tsx|js|jsx)'" packages/
 
-# `any` type usage (which we don't allow):
+# any type usage (which we don't allow):
 rg ': any\b|\bany\[\]' packages/ -g '*.ts' -g '*.tsx'
 
 # @ts-expect-error outside negative type tests:
@@ -257,32 +364,32 @@ rg '@ts-expect-error' packages/ -g '*.ts' -g '!*.test-d.ts'
 rg '@ts-nocheck' packages/
 ```
 
-### Architecture hygiene (substitute for `pnpm lint:deps` when faster signal is needed)
+### 5.4 Architecture hygiene (substitute for `pnpm lint:deps` when faster signal is needed)
 
 ```bash
 # Cross-domain imports that should go through exports/ barrels:
-# (Project-specific; replace with the actual concerning import patterns when they arise.)
+# (Add the actual concerning import patterns when they arise.)
 ```
 
 ### When to extend the library
 
 Add a new pattern when:
 
-- A failure mode in § 3 is detected by a pattern not already in the library.
+- A failure mode in § 4 is detected by a pattern not already in the library.
 - An anti-pattern slips past `pnpm lint:deps` or the type system but is caught by ad-hoc grep.
 - A corrective round introduces a new "must-not-return" pattern (like `foreignKeyNamespacesMatch`).
 
 ---
 
-## 5. Model-tier routing (project-specific)
+## 6. Model-tier routing
 
-Per [`decomposition-and-cost.md`](../principles/decomposition-and-cost.md), dispatches route to model tiers based on dispatch shape. For prisma-next:
+Per [`principles/decomposition-and-cost.md`](../principles/decomposition-and-cost.md), dispatches route to model tiers based on dispatch shape. For `prisma-next`:
 
 | Dispatch shape | Recommended tier |
 |---|---|
 | Substrate change / design judgment / spec interpretation | Opus (orchestrator tier) |
-| Codemod / mechanical migration / batch fix | Sonnet or composer-2 |
-| Test-literal rewrites / fixture regen | composer-2 or composer-2-fast |
+| Codemod / mechanical migration / batch fix | Sonnet or composer-2 (mid tier) |
+| Test-literal rewrites / fixture regen | composer-2 or composer-2-fast (cheap tier) |
 | Spike (read, count, structure findings) | Sonnet or composer-2 |
 | Architect-class finding remediation (single discipline, narrow surface) | Sonnet |
 | Long-running validation gate runs (typecheck, test:packages) | Whichever tier the parent dispatch chose (no model dispatch — just bash) |
@@ -291,21 +398,55 @@ This is a starting calibration. Update as we learn which tier successfully compl
 
 ---
 
-## 6. Maintenance
+## 7. Linear ceremony (prisma-next conventions)
 
-All sections of this calibration are updated **trigger-based, not periodically**. The triggers are:
+Linear-specific conventions used in `prisma-next`. Live here because they're team-specific overlays on the protocol-layer Linear sync (per `model.md` § Linear sync).
 
-- **Significant post-mortem.** Any incident where a dispatch produced a failure the protocol didn't catch (today's reversal is the reference example). Every such post-mortem produces updates to one or more sections; if it produces no updates, the post-mortem failed to extract a lesson.
-- **New verification tooling lands.** A new lint script, a new test harness, a new check command — extends § 2 (DoD gates) and possibly § 4 (grep library).
-- **Repeated dispatch outcomes contradict § 5 routing.** If a tier choice consistently fails on a dispatch shape, the routing entry is wrong; update.
+### 7.1 Project conventions
+
+- Linear Projects are created via `save_project` (MCP).
+- Project working branch is named with the Linear Project ID: `<tml-id>-<descriptive-slug>` (lowercased; hyphens).
+- Initial status update on the project links the project's spec.
+
+### 7.2 Slice / issue conventions
+
+- Each slice maps to a Linear Issue (the Drive slice ↔ Linear issue mapping per `model.md`).
+- Issue description links back to `projects/<project>/slices/<slice>/` (in-project) or to the orphan-slice PR description path (orphan).
+- PR title prefix: `<tml-id>:` (the Linear ticket prefix). E.g. `tml-2549: drive-domain-model consolidation`.
+- PR description references the Linear issue (`Refs: TML-XXXX` line or in the title; either is enough for auto-close).
+
+### 7.3 State conventions
+
+- The team's terminal-before-merge state is `Ready to be merged` (not `Done`). Auto-close on merge transitions to the team's completed state via the GitHub integration.
+- Do not manually transition issues to a completed state; the integration handles it. Manual transitions before merge are fine (e.g. moving to `In review` when the PR opens).
+
+### 7.4 Promotion / demotion
+
+Follow the patterns specified in `model.md` § Linear sync:
+
+- **Promotion** (case-b: ticket → project): move ticket into new Linear Project; mark Done; rename to `Plan: <project name>` OR add a "Converted to project: <url>" comment. Project is the durable handle going forward.
+- **Demotion** (project → slice / direct change): move surviving ticket OUT of the Linear Project; close other issues with "merged into <surviving-ticket>" comments; mark Linear Project Cancelled (rationale) or Completed (if part shipped); delete `projects/<project>/`.
+
+---
+
+## 8. Maintenance
+
+All sections of this calibration are updated **trigger-based, not periodically** — per the retro principle ([`principles/retro.md`](../principles/retro.md)). The triggers are:
+
+- **Retro that lands a calibration update.** Every retro asks "does this lesson land in protocol or calibration?" — when the answer is calibration, the entry lands here.
+- **New verification tooling.** A new lint script, a new test harness, a new check command — extends § 3 (DoD gates) and possibly § 5 (grep library).
+- **Repeated dispatch outcomes contradict § 6 routing.** If a tier choice consistently fails on a dispatch shape, the routing entry is wrong; update.
 - **Project nature shifts.** If the project moves from greenfield to maintenance, from one dominant subsystem to another, or otherwise changes shape, the reference tasks in § 1 may no longer represent useful anchors; recalibrate.
+- **Linear convention changes.** Team-side workflow state changes, naming convention changes, integration changes — extend § 7.
 
-Per-section update discipline:
+### Per-section update discipline
 
-- **Reference tasks (§ 1).** Recalibrate when the post-mortem reveals that an estimated M was actually L (the dispatch failed in ways the M-tier treatment couldn't catch). Add a worked example showing the miscalibration and the corrected anchor.
-- **DoD gates (§ 2).** Extend when a new verification tool lands or when a post-mortem reveals a gap the existing gates didn't cover.
-- **Failure-mode catalogue (§ 3).** **Append on every post-mortem.** Never remove (entries become historical context; the team that hits the failure mode for the second time consults the existing entry rather than re-discovering it). If an entry's mitigation proves inadequate (the same failure mode recurs despite the mitigation), update the mitigation rather than removing the entry — and note the recurrence as a sub-incident under the same entry.
-- **Grep library (§ 4).** Extend on every post-mortem that surfaces a new anti-pattern. Mark entries as historical (don't delete) when the underlying anti-pattern is structurally impossible (e.g. removed at the type level, eliminated by a substrate change).
-- **Model-tier routing (§ 5).** Adjust as we accumulate dispatch outcomes per tier. Trigger: three consecutive failed dispatches at a tier the table recommends, OR a post-mortem that names the tier choice as a contributing factor.
+- **Reference tasks (§ 1).** Recalibrate when a retro reveals that an estimated M was actually L (the dispatch failed in ways the M-tier treatment couldn't catch). Add a worked example showing the miscalibration and the corrected anchor.
+- **DoR overlays (§ 2).** Extend when a retro reveals a pickup-time gap the existing overlays didn't cover.
+- **DoD overlays (§ 3).** Extend when a retro reveals a handoff-time gap or when new verification tooling lands.
+- **Failure-mode catalogue (§ 4).** **Append on every retro that surfaces a failure mode.** Never remove (entries become historical context; the team that hits the failure mode for the second time consults the existing entry rather than re-discovering it). If an entry's mitigation proves inadequate (the same failure mode recurs despite the mitigation), update the mitigation rather than removing the entry — and note the recurrence as a sub-incident under the same entry.
+- **Grep library (§ 5).** Extend on every retro that surfaces a new anti-pattern. Mark entries as historical (don't delete) when the underlying anti-pattern is structurally impossible (e.g. removed at the type level, eliminated by a substrate change).
+- **Model-tier routing (§ 6).** Adjust as we accumulate dispatch outcomes per tier. Trigger: three consecutive failed dispatches at a tier the table recommends, OR a retro that names the tier choice as a contributing factor.
+- **Linear ceremony (§ 7).** Update when the team's Linear workflow state convention changes or when the GitHub-Linear integration behaviour changes.
 
 This document is intended to live in `prisma-next`'s `docs/` once the methodology stabilises. While we're still iterating, it lives here in the methodology project. When it migrates, the file path changes and references are updated; the maintenance discipline does not.
