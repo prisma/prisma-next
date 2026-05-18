@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import { createMongoContract } from './fixtures/create-mongo-contract';
@@ -26,11 +27,12 @@ describe('mongoEmission.validateStructure', () => {
     );
   });
 
-  it('throws for missing storage.collections', () => {
-    const contract = createMongoContract({ storage: {} });
-    expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'must have storage.collections',
-    );
+  it('throws for missing storage.namespaces', () => {
+    const contract = {
+      ...createMongoContract(),
+      storage: { storageHash: 'sha256:test' },
+    } as Contract;
+    expect(() => mongoEmission.validateStructure(contract)).toThrow('must have storage.namespaces');
   });
 
   it('throws when model references non-existent collection', () => {
@@ -47,7 +49,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: { collections: {} },
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'references collection "users" which is not in storage.collections',
+      'references collection "users" which is not in storage.namespaces[..].tables',
     );
   });
 

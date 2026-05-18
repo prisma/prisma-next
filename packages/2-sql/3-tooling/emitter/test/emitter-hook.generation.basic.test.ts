@@ -8,6 +8,7 @@ import type {
 import { extractCodecTypeImports } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>
@@ -15,9 +16,9 @@ type TestDescriptor =
   | ControlExtensionDescriptor<'sql', string>;
 
 function createContract(overrides: Partial<Contract>): Contract {
-  return {
+  const merged = {
     schemaVersion: '1',
-    targetFamily: 'sql',
+    targetFamily: 'sql' as const,
     target: 'test-db',
     models: {},
     relations: {},
@@ -28,6 +29,8 @@ function createContract(overrides: Partial<Contract>): Contract {
     sources: {},
     ...overrides,
   };
+  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
+  return merged as Contract;
 }
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };

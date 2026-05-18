@@ -1,10 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 function createContract(overrides: Partial<Contract>): Contract {
-  return {
-    targetFamily: 'sql',
+  const merged = {
+    targetFamily: 'sql' as const,
     target: 'test-db',
     models: {},
     roots: {},
@@ -12,9 +14,58 @@ function createContract(overrides: Partial<Contract>): Contract {
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:test',
+    profileHash: 'sha256:test' as const,
     ...overrides,
   };
+  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
+  return merged as Contract;
+}
+
+function installNamespacedTableDeletionRace(ir: Contract, tableName: string): void {
+  const originalStorage = ir.storage as {
+    namespaces: Record<string, { tables: Record<string, unknown> }>;
+  };
+  let tableDeleted = false;
+  const proxiedStorage = new Proxy(originalStorage, {
+    get(target, prop, receiver) {
+      if (prop === 'namespaces') {
+        return new Proxy(target.namespaces, {
+          get(nsTarget, nsKey) {
+            if (nsKey !== UNBOUND_NAMESPACE_ID) {
+              return Reflect.get(nsTarget, nsKey, nsTarget);
+            }
+            const inner = Reflect.get(nsTarget, nsKey) as { tables: Record<string, unknown> };
+            return new Proxy(inner, {
+              get(innerTarget, innerProp) {
+                if (innerProp !== 'tables') {
+                  return Reflect.get(innerTarget, innerProp, innerTarget);
+                }
+                return new Proxy(innerTarget.tables, {
+                  get(tableTarget, tableProp) {
+                    if (tableProp === tableName && tableDeleted) {
+                      return undefined;
+                    }
+                    return Reflect.get(tableTarget, tableProp, tableTarget);
+                  },
+                  has(tableTarget, tableProp) {
+                    return Reflect.has(tableTarget, tableProp);
+                  },
+                  ownKeys(tableTarget) {
+                    return Reflect.ownKeys(tableTarget);
+                  },
+                });
+              },
+            });
+          },
+        });
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  delete originalStorage.namespaces[UNBOUND_NAMESPACE_ID].tables[tableName];
+  tableDeleted = true;
+  (ir as { storage: unknown }).storage = proxiedStorage;
 }
 
 describe('sql-target-family-hook', () => {
@@ -127,7 +178,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('SQL contract must have storage.tables');
+    }).toThrow('SQL contract must have storage.namespaces');
   });
 
   it('validates structure with missing storage.tables', () => {
@@ -137,7 +188,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('SQL contract must have storage.tables');
+    }).toThrow('SQL contract must have storage.namespaces');
   });
 
   it('validates structure with model missing storage.table', () => {
@@ -652,39 +703,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    // Create a proxy to intercept table access and simulate the table being deleted
-    // This tests the path where tableNames.has(tableName) is true but storage.tables[tableName] is undefined
-    const originalStorage = ir.storage as { tables: Record<string, unknown> };
-    let tableDeleted = false;
-    const proxiedStorage = new Proxy(originalStorage, {
-      get(target, prop) {
-        if (prop === 'tables') {
-          const tables = new Proxy(target.tables, {
-            get(tableTarget, tableProp) {
-              if (tableProp === 'user' && tableDeleted) {
-                return undefined;
-              }
-              return tableTarget[tableProp as string];
-            },
-            has(tableTarget, tableProp) {
-              return tableProp in tableTarget;
-            },
-            ownKeys(tableTarget) {
-              return Object.keys(tableTarget);
-            },
-          });
-          return tables;
-        }
-        return target[prop as keyof typeof target];
-      },
-    });
-
-    // Delete the table after creating the proxy
-    delete originalStorage.tables['user'];
-    tableDeleted = true;
-
-    // Replace storage with proxied version
-    (ir as { storage: unknown }).storage = proxiedStorage;
+    installNamespacedTableDeletionRace(ir, 'user');
 
     expect(() => {
       sqlEmission.validateStructure(ir);
@@ -723,39 +742,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    // Create a proxy to intercept table access and simulate the table being deleted
-    // This tests the path where tableNames.has(tableName) is true but storage.tables[tableName] is undefined
-    const originalStorage = ir.storage as { tables: Record<string, unknown> };
-    let tableDeleted = false;
-    const proxiedStorage = new Proxy(originalStorage, {
-      get(target, prop) {
-        if (prop === 'tables') {
-          const tables = new Proxy(target.tables, {
-            get(tableTarget, tableProp) {
-              if (tableProp === 'user' && tableDeleted) {
-                return undefined;
-              }
-              return tableTarget[tableProp as string];
-            },
-            has(tableTarget, tableProp) {
-              return tableProp in tableTarget;
-            },
-            ownKeys(tableTarget) {
-              return Object.keys(tableTarget);
-            },
-          });
-          return tables;
-        }
-        return target[prop as keyof typeof target];
-      },
-    });
-
-    // Delete the table after creating the proxy
-    delete originalStorage.tables['user'];
-    tableDeleted = true;
-
-    // Replace storage with proxied version
-    (ir as { storage: unknown }).storage = proxiedStorage;
+    installNamespacedTableDeletionRace(ir, 'user');
 
     expect(() => {
       sqlEmission.validateStructure(ir);

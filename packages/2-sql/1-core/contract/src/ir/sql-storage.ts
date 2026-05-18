@@ -6,10 +6,7 @@ import {
   type Storage,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  isPostgresEnumStorageEntry,
-  type PostgresEnumStorageEntry,
-} from './postgres-enum-storage-entry';
+import type { PostgresEnumStorageEntry } from './postgres-enum-storage-entry';
 import { SqlNode } from './sql-node';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
@@ -21,19 +18,12 @@ import {
 } from './storage-type-instance';
 
 /**
- * Polymorphic value type for `SqlStorage.types` entries (Decision 18,
- * Option B). The slot's framework alphabet is `StorageType` — codec
- * triples (`StorageTypeInstance` with `kind: 'codec-instance'`) and
- * target-specific IR class instances structurally satisfying
- * `PostgresEnumStorageEntry` (with `kind: 'postgres-enum'`) are the
- * two variants the SQL family ships today. The construction side also
- * accepts {@link StorageTypeInstanceInput} so callers can pass raw
- * codec triples; the constructor stamps the discriminator.
+ * Polymorphic value type for document-scoped `SqlStorage.types` entries
+ * (codec aliases / parameterised native type registrations). Postgres
+ * native enum registrations live under
+ * `storage.namespaces[namespaceId].types` instead.
  */
-export type SqlStorageTypeEntry =
-  | StorageTypeInstance
-  | PostgresEnumStorageEntry
-  | StorageTypeInstanceInput;
+export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput;
 
 const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
   [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
@@ -42,6 +32,7 @@ const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
 export interface SqlNamespaceTablesInput {
   readonly id: string;
   readonly tables?: Record<string, StorageTable | StorageTableInput>;
+  readonly types?: Record<string, PostgresEnumStorageEntry>;
 }
 
 export interface SqlStorageInput<THash extends string = string> {
@@ -52,6 +43,7 @@ export interface SqlStorageInput<THash extends string = string> {
 
 class SqlNamespacePayload extends NamespaceBase {
   declare readonly kind?: string;
+  declare readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 
   readonly id: string;
   readonly tables: Readonly<Record<string, StorageTable>>;
@@ -67,6 +59,14 @@ class SqlNamespacePayload extends NamespaceBase {
         ]),
       ),
     );
+    if (input.types !== undefined && Object.keys(input.types).length > 0) {
+      Object.defineProperty(this, 'types', {
+        value: Object.freeze({ ...input.types }),
+        writable: false,
+        enumerable: true,
+        configurable: false,
+      });
+    }
     Object.defineProperty(this, 'kind', {
       value: 'sql-namespace',
       writable: false,
@@ -85,7 +85,8 @@ function normaliseNamespaceEntry(
     return ns;
   }
   const tableCount = Object.keys(ns.tables ?? {}).length;
-  if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0) {
+  const typeCount = Object.keys(ns.types ?? {}).length;
+  if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0 && typeCount === 0) {
     return SqlUnboundNamespace.instance;
   }
   return new SqlNamespacePayload(ns as SqlNamespaceTablesInput);
@@ -122,14 +123,7 @@ function normaliseNamespaceEntry(
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   readonly namespaces: Readonly<Record<string, Namespace>>;
-  // SQL-family slot view: the two structural variants the family ships
-  // today (codec triples + Postgres-enum structural entries). Each
-  // variant extends the framework `StorageType` alphabet; the SQL
-  // narrowing keeps cross-domain layering clean — SQL-family consumers
-  // dispatch via `isStorageTypeInstance` / `isPostgresEnumStorageEntry`
-  // type guards rather than importing the target's concrete IR class
-  // (cross-domain rule: SQL may not import `target-*`).
-  declare readonly types?: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
@@ -153,21 +147,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   }
 }
 
-function normaliseTypeEntry(
-  entry: SqlStorageTypeEntry,
-): StorageTypeInstance | PostgresEnumStorageEntry {
-  if (isPostgresEnumStorageEntry(entry)) {
-    // Live class instances pass through unchanged; raw JSON envelopes
-    // (e.g. `kind: 'postgres-enum'` without the class identity) are
-    // rejected so the target serializer's hydration path is the only
-    // way IR class instances enter the slot.
-    if (entry instanceof SqlNode) {
-      return entry;
-    }
-    throw new Error(
-      'Encountered raw postgres-enum JSON in document-scoped storage.types; postgres enums belong under storage.namespaces[namespaceId].types and require PostgresContractSerializer.',
-    );
-  }
+function normaliseTypeEntry(entry: SqlStorageTypeEntry): StorageTypeInstance {
   if (isStorageTypeInstance(entry)) {
     return entry;
   }

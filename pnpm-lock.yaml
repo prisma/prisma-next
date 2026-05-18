@@ -2449,6 +2449,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:0.8.0
         version: link:../../../1-framework/3-tooling/emitter
+      '@prisma-next/framework-components':
+        specifier: workspace:0.8.0
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/sql-contract':
         specifier: workspace:0.8.0
         version: link:../../1-core/contract
@@ -2456,9 +2459,6 @@ importers:
         specifier: workspace:0.8.0
         version: link:../../../1-framework/0-foundation/utils
     devDependencies:
-      '@prisma-next/framework-components':
-        specifier: workspace:0.8.0
-        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/test-utils':
         specifier: workspace:0.8.0
         version: link:../../../../test/utils

@@ -61,9 +61,14 @@ export const blogContract: Contract = {
   },
   storage: {
     storageHash: 'sha256:test',
-    collections: {
-      users: {},
-      posts: {},
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__',
+        tables: {
+          users: {},
+          posts: {},
+        },
+      },
     },
   },
   extensionPacks: {},

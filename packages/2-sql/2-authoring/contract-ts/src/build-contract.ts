@@ -17,7 +17,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -28,10 +28,11 @@ import {
   applyFkDefaults,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
+  type SqlNamespaceTablesInput,
   SqlStorage,
-  SqlUnboundNamespace,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
+  type StorageTableInput,
   type StorageTypeInstance,
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -209,66 +210,51 @@ function buildDomainField(
   };
 }
 
-/**
- * Build the contract's `SqlStorage.namespaces` map.
- *
- * Walks both authored sources of namespace coordinates:
- *
- * - `declared` — the contract's `namespaces: readonly string[]` list
- *   (declared up-front, defensively validated by `defineContract`).
- *   Entries appear in the storage map even if no model references them.
- * - `storageTables[*].namespaceId` — coordinates each model resolves
- *   to. Entries collected from this walk make sure every referenced
- *   slot has a concretion (e.g. for the PSL-authored
- *   `namespace unbound { … }` path, where the only signal is on the
- *   model side).
- *
- * Always includes `UNBOUND_NAMESPACE_ID` so the late-bound slot is
- * available regardless of authoring choices. Skips the empty string
- * and `undefined` to keep the map keys well-defined.
- *
- * Each distinct id is resolved through `createNamespace` (target-
- * supplied). When `createNamespace` is omitted the family layer falls
- * back to its placeholder `SqlUnboundNamespace.instance` singleton for
- * the unbound slot and throws on any non-unbound coordinate — the
- * family alone cannot conjure a target concretion for a named schema.
- */
-function buildStorageNamespaces(input: {
-  readonly declared: readonly string[] | undefined;
-  readonly storageTables: Readonly<Record<string, { readonly namespaceId?: string }>>;
-  readonly createNamespace: ((id: string) => Namespace) | undefined;
-}): Record<string, Namespace> {
+function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): Set<string> {
   const ids = new Set<string>();
   ids.add(UNBOUND_NAMESPACE_ID);
-  if (input.declared) {
-    for (const id of input.declared) {
-      if (id.length > 0) {
-        ids.add(id);
-      }
+  for (const id of definition.namespaces ?? []) {
+    if (id.length > 0) {
+      ids.add(id);
     }
   }
-  for (const table of Object.values(input.storageTables)) {
-    if (table.namespaceId !== undefined && table.namespaceId.length > 0) {
-      ids.add(table.namespaceId);
+  for (const model of definition.models) {
+    if (model.namespaceId !== undefined && model.namespaceId.length > 0) {
+      ids.add(model.namespaceId);
     }
   }
+  return ids;
+}
 
-  const factory = input.createNamespace;
-  const result: Record<string, Namespace> = {};
-  for (const id of ids) {
-    if (factory) {
-      result[id] = factory(id);
+const POSTGRES_ENUM_NAMESPACE_ID = 'public';
+
+function partitionStorageTypesForTarget(
+  targetId: string,
+  types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+): {
+  readonly documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
+} {
+  const documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  const namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
+  for (const [name, entry] of Object.entries(types)) {
+    if (isPostgresEnumStorageEntry(entry)) {
+      if (targetId !== 'postgres') {
+        throw new Error(
+          `buildSqlContractFromDefinition: postgres enum "${name}" is only valid when target is "postgres" (got "${targetId}").`,
+        );
+      }
+      let slot = namespaceEnumTypesById[POSTGRES_ENUM_NAMESPACE_ID];
+      if (slot === undefined) {
+        slot = {};
+        namespaceEnumTypesById[POSTGRES_ENUM_NAMESPACE_ID] = slot;
+      }
+      slot[name] = entry;
       continue;
     }
-    if (id === UNBOUND_NAMESPACE_ID) {
-      result[id] = SqlUnboundNamespace.instance;
-      continue;
-    }
-    throw new Error(
-      `buildSqlContractFromDefinition: contract declares namespace "${id}" but no \`createNamespace\` factory was supplied — the SQL family layer is target-agnostic and cannot materialise a non-unbound \`Namespace\` concretion on its own. Pass \`createNamespace\` from the target pack (e.g. \`postgresCreateNamespace\` / \`sqliteCreateNamespace\`) through \`defineContract\` to plumb target concretions in.`,
-    );
+    documentTypes[name] = entry;
   }
-  return result;
+  return { documentTypes, namespaceEnumTypesById };
 }
 
 export function buildSqlContractFromDefinition(
@@ -279,7 +265,8 @@ export function buildSqlContractFromDefinition(
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
-  const storageTables: Record<string, StorageTable> = {};
+  const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
+  const tableNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const models: Record<string, ContractModel> = {};
   const roots: Record<string, string> = {};
@@ -367,8 +354,20 @@ export function buildSqlContractFromDefinition(
       };
     });
 
-    storageTables[tableName] = {
-      ...ifDefined('namespaceId', semanticModel.namespaceId),
+    const namespaceId =
+      semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
+        ? semanticModel.namespaceId
+        : UNBOUND_NAMESPACE_ID;
+
+    const existingNs = tableNameToNamespaceId.get(tableName);
+    if (existingNs !== undefined && existingNs !== namespaceId) {
+      throw new Error(
+        `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
+      );
+    }
+    tableNameToNamespaceId.set(tableName, namespaceId);
+
+    const tableInput: StorageTableInput = {
       columns,
       uniques: (semanticModel.uniques ?? []).map((u) => ({
         columns: u.columns,
@@ -390,6 +389,18 @@ export function buildSqlContractFromDefinition(
           }
         : {}),
     };
+
+    let nsTables = tablesByNamespace[namespaceId];
+    if (nsTables === undefined) {
+      nsTables = {};
+      tablesByNamespace[namespaceId] = nsTables;
+    }
+    if (nsTables[tableName] !== undefined) {
+      throw new Error(
+        `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
+      );
+    }
+    nsTables[tableName] = new StorageTable(tableInput);
 
     // --- Build contract model ---
 
@@ -477,14 +488,29 @@ export function buildSqlContractFromDefinition(
       ];
     }),
   );
-  const namespaces = buildStorageNamespaces({
-    declared: definition.namespaces,
-    storageTables,
-    createNamespace: definition.createNamespace,
-  });
+  const { documentTypes, namespaceEnumTypesById } = partitionStorageTypesForTarget(
+    target,
+    storageTypes,
+  );
+  const namespaceCoordinateIds = collectStorageNamespaceCoordinateIds(definition);
+  for (const id of Object.keys(namespaceEnumTypesById)) {
+    namespaceCoordinateIds.add(id);
+  }
+  const namespaces: Record<string, SqlNamespaceTablesInput> = Object.fromEntries(
+    [...namespaceCoordinateIds].sort().map((id) => {
+      const enumTypes = namespaceEnumTypesById[id];
+      return [
+        id,
+        {
+          id,
+          tables: tablesByNamespace[id] ?? {},
+          ...ifDefined('types', enumTypes),
+        } satisfies SqlNamespaceTablesInput,
+      ];
+    }),
+  );
   const storageWithoutHash = {
-    tables: storageTables,
-    types: storageTypes,
+    types: documentTypes,
     namespaces,
   };
   const storageHash: StorageHashBase<string> = definition.storageHash

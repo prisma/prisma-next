@@ -2,10 +2,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 function createContract(overrides: Partial<Contract>): Contract {
-  return {
-    targetFamily: 'sql',
+  const merged = {
+    targetFamily: 'sql' as const,
     target: 'test-db',
     models: {},
     roots: {},
@@ -13,9 +14,11 @@ function createContract(overrides: Partial<Contract>): Contract {
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:test',
+    profileHash: 'sha256:test' as const,
     ...overrides,
   };
+  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
+  return merged as Contract;
 }
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
@@ -82,7 +85,8 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
 
-      expect(types).toContain('readonly types: Record<string, never>');
+      expect(types).toContain('readonly namespaces:');
+      expect(types).not.toContain('readonly Vector1536');
     });
 
     it('handles undefined storage.types (no types key)', () => {
@@ -104,7 +108,8 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
 
-      expect(types).toContain('readonly types: Record<string, never>');
+      expect(types).toContain('readonly namespaces:');
+      expect(types).not.toContain('readonly Vector1536');
     });
 
     it('emits typeParams with nested objects', () => {
