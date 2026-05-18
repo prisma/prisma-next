@@ -182,13 +182,12 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 - **Storage hash** (`storageHash`) — deterministic hash over the contract's storage-affecting parts (`schemaVersion`, `targetFamily`, `target`, `storage`). The identity of a *contract* in the migration graph. (Formerly `coreHash`.) **User-facing convention:** when the CLI says "hash" without qualification, it means the storage hash. Contract references resolve to one.
 - **Profile hash** (`profileHash`) — deterministic hash over the contract's declared capabilities. The identity of a *capability profile* the database must satisfy. **Not user-facing. Candidate for retirement.** Should not appear in CLI output; if it does, it must be qualified.
 - **Migration hash** (`migrationHash` / `migrationId`) — content-addressed hash over `(strippedManifest, ops)`. The identity of a migration as a *physical effect on storage*, independent of cosmetic contract details. **Always qualified as "migration hash" in user-facing prose.** Used only when a migration must be referred to by unambiguous identity (integrity checks, error messages about hash mismatch). The common path is referring to a migration by its directory name.
-- **Canonical version** — the version of the canonicalization rules used when a hash was computed. Stored on the marker.
 - **Canonicalization** — deterministic JSON ordering that makes hashes reproducible across runs and machines.
 
 ### Database state
 
 - **Database** — the live target instance, identified externally by a connection URL.
-- **Marker** — the database's self-record of which contract(s) it currently claims to satisfy. One row per **contract space**. Stores `storageHash`, `profileHash`, `invariants[]`, `canonicalVersion`, optional contract JSON. The framework's *guarantee record* about the database.
+- **Marker** — the database's self-record of which contract(s) it currently claims to satisfy. One row per **contract space**. Stores `storageHash`, `profileHash`, `invariants[]`, optional contract JSON. The framework's *guarantee record* about the database.
 - **Ledger** — append-only audit log of executed migrations (per-DB). User-owned; framework reads only the marker, never the ledger, for routing decisions.
 - **Schema** — the structural definition of a live database, as observed by introspection. **Always refers to the live database**, never to a contract or an authored artifact. The contract *declares* what the schema must look like; the schema *is* what the database actually has.
 - **Postgres schema** — the Postgres-specific namespace concept (tables grouped under a name like `public`). Always qualified as "Postgres schema" to disambiguate from the general "schema" sense above.
