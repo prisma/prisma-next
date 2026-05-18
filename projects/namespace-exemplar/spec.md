@@ -170,6 +170,23 @@ These are the load-bearing decisions for this PR. Anything not on this list is o
 
 - [ ] **AC6. All in-repo demos + extensions emit cleanly.** `pnpm fixtures:check` exits 0 (no diff after `fixtures:emit`). Every example app's `contract.d.ts` reflects the canonical shape. `examples/multi-extension-monorepo`'s aggregate `build:contract-spaces` succeeds end-to-end and produces a namespace-keyed app contract.
 
+## Dependencies
+
+### [PR #520 — TML-2536 — Route on-disk contract reads through `ContractSerializer` + strict deserializer](https://github.com/prisma/prisma-next/pull/520)
+
+PR #520 ships two things this project depends on:
+
+1. **Strict deserializer.** `SqlStorage`'s `normaliseTypeEntry` no longer silently stamps `kind` on untagged storage-type entries; an untagged entry throws a named diagnostic. The deserializer becomes the canonical format-drift alarm.
+2. **CLI seam discipline.** Every CLI on-disk contract read (`migration-plan`, `migration-new`, `migration-apply`, `migration-show`, `db-verify`) goes through `familyInstance.validateContract` instead of `JSON.parse(raw) as Contract`. A grep-based lint (`pnpm lint:no-contract-cast`) prevents new bypass sites.
+
+These are **complementary** to this project's storage-shape change — neither work back-compat the other's breaking change; both rely on "strict throw + regenerate" rather than upcasters. Together they form one coherent narrative: PR #520 makes the seam strict; this project changes what the seam round-trips. The shared discipline is the **no-backwards-compatibility stance** (`.cursor/rules/no-backward-compatibility.md`) — anyone holding an old-shape `contract.json` gets a loud, named diagnostic on first deserialization attempt.
+
+**Sequencing.** Ideally PR #520 merges first; this project rebases on top. The conflict surface is small (`sql-storage.ts` constructor, `sql-contract-serializer-base.ts`, demo migration snapshots) and mechanical. If PR #520 lands during our execution, plan a rebase point between phases (see [`plan.md` § Risk register](./plan.md#risk-register)).
+
+**Inherited policy.** This project's serializer round-trip (FR7) and emitter (FR8) follow PR #520's strict-throw stance: encountering an old-shape `tables`-at-storage-root envelope throws with a named diagnostic; no upcaster, no transitional reading. The "no transitional dual-shape phase" constraint in § Non-functional constraints below is the same discipline at the IR layer.
+
+**Forward link.** PR #520 names [TML-2515](https://linear.app/prisma-company/issue/TML-2515) (back-compat policy for on-disk contracts) as the eventual home for a real upcaster behind the strict seam. This project creates a second concrete consumer of that policy; TML-2515 should govern both shape changes when it lands.
+
 ## Non-goals (explicit)
 
 - **Namespace-aware DSL surface** ([TML-2550](https://linear.app/prisma-company/issue/TML-2550)). The query DSL today is `db.<tableName>.find(…)` — flat by table name. With namespaces, two tables can share a name across namespaces (`auth.user`, `tenant1.user`). The right answer is `db.auth.user.find(…)` style or some equivalent — but the design space is large (default-namespace policy, collision handling, implicit-unbound shortcut, …) and the in-repo demos don't currently hit any name collisions. Deferred to TML-2550. **This PR's scope:** the DSL surface continues to work with no collisions in the current demos. If a demo ever introduces a name collision, the existing flat DSL produces a clear type error; that's the trigger to land TML-2550.
