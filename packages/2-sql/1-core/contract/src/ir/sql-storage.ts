@@ -123,20 +123,37 @@ function normaliseNamespaceEntry(
  */
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  // The `__unbound__` namespace is always present at runtime — every SQL
+  // contract has a late-binding slot whose binding the target resolves at
+  // connection time. Encoding it as a required key here (and narrowing
+  // its `tables` slot to `StorageTable` rather than the framework's wider
+  // `object`) lets DSL surfaces (e.g. `TableProxyContract`) statically
+  // address it without an optional narrowing dance at every call site.
+  readonly namespaces: Readonly<Record<string, Namespace>> & {
+    readonly __unbound__: Namespace & {
+      readonly tables: Readonly<Record<string, StorageTable>>;
+    };
+  };
   declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.namespaces = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.namespaces ?? DEFAULT_NAMESPACES).map(([nsKey, ns]) => [
-          nsKey,
-          normaliseNamespaceEntry(nsKey, ns),
-        ]),
-      ),
+    const inputNamespaces = input.namespaces ?? DEFAULT_NAMESPACES;
+    const normalised: Record<string, Namespace> = Object.fromEntries(
+      Object.entries(inputNamespaces).map(([nsKey, ns]) => [
+        nsKey,
+        normaliseNamespaceEntry(nsKey, ns),
+      ]),
     );
+    if (!normalised[UNBOUND_NAMESPACE_ID]) {
+      normalised[UNBOUND_NAMESPACE_ID] = SqlUnboundNamespace.instance;
+    }
+    this.namespaces = Object.freeze(normalised) as Readonly<Record<string, Namespace>> & {
+      readonly __unbound__: Namespace & {
+        readonly tables: Readonly<Record<string, StorageTable>>;
+      };
+    };
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(
