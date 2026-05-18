@@ -62,16 +62,11 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    const tenant = storage.tables['tenant'];
-    expect(tenant).toBeDefined();
-
-    // The model lowered to the framework-reserved unbound slot.
-    const resolvedNamespaceId = tenant?.namespaceId ?? UNBOUND_NAMESPACE_ID;
-    expect(resolvedNamespaceId).toBe(UNBOUND_NAMESPACE_ID);
+    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['tenant']).toBeDefined();
 
     // The storage map carries the Postgres target concretion (not the
     // SQL family placeholder) at the unbound slot.
-    const namespace = storage.namespaces[resolvedNamespaceId];
+    const namespace = storage.namespaces[UNBOUND_NAMESPACE_ID];
     expect(namespace).toBe(PostgresSchema.unbound);
     expect(namespace).toBeInstanceOf(PostgresUnboundSchema);
 
@@ -106,8 +101,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    const user = storage.tables['user'];
-    expect(user?.namespaceId).toBe('auth');
+    expect(storage.namespaces['auth']?.tables['user']).toBeDefined();
 
     const namespace = storage.namespaces['auth'];
     expect(namespace).toBeInstanceOf(PostgresSchema);
@@ -138,12 +132,9 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    const post = storage.tables['post'];
-    // Top-level declarations carry no explicit coordinate — single-
-    // namespace contracts stay byte-stable with TS-authored
-    // counterparts, and the planner falls back to its
-    // `ctx.schemaName` (today `"public"`) when no per-table
-    // coordinate is set.
-    expect(post?.namespaceId).toBeUndefined();
+    // Top-level declarations lower to the unbound namespace — the
+    // planner falls back to its `ctx.schemaName` (today `"public"`)
+    // for DDL qualification.
+    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['post']).toBeDefined();
   });
 });
