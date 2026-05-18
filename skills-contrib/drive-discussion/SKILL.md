@@ -12,13 +12,19 @@ The skill is the *mode of operation*: the operating rules, the response shape, t
 
 ## When to use
 
-- **At the start of a task**, where the conversation needs to produce a spec, plan, or design before implementation begins.
-- **Mid-implementation, when a load-bearing assumption has been falsified** and the team needs to decide what to do instead. Surfacing the falsification as a discussion topic is itself one of the skill's uses — *"the contract-versioning assumption from spec § 3.2 is wrong; entering discussion mode to decide what changes."*
-- **Any time a substantive understanding needs to be built collaboratively** rather than asserted by the agent — when the agent's default tendency to converge on an answer would lose information the user has and the agent does not.
+Five canonical triggers (per [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 2 — Design discussion):
+
+1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-project-specify` or `drive-slice-specify`.
+2. **Mid-spec.** A spec authoring session hits a fork-in-the-road that needs collaborative resolution rather than a unilateral pick by the agent.
+3. **Mid-flight on falsified assumption.** A load-bearing assumption (named in the spec or implicit in the plan) is observed to be false during implementation. Per invariant I12 (no silent agent-side amendments), the orchestrator must halt and route to design discussion rather than amending the spec quietly. Surfacing the falsification as a discussion topic is itself one of the skill's uses — *"the contract-versioning assumption from spec § 3.2 is wrong; entering discussion mode to decide what changes."*
+4. **Mid-flight on obstacle.** An obstacle emerges that the plan doesn't account for (a dependency unexpectedly drops, a tool turns out to be insufficient, a design boundary breaks). Same I12-driven discipline: halt and discuss rather than silently route around.
+5. **Explicit operator request.** *"Let's discuss this."* *"Discussion mode."* *"Pressure-test this."*
+
+Triggers 3 and 4 are typically surfaced by workflow skills (`drive-build-workflow` stop-conditions, `drive-deliver-workflow` health-check escalations). The workflow skill halts and routes here.
 
 Do **not** use this skill for:
 
-- Quick clarifying questions (a single `AskUserQuestion` is enough).
+- Quick clarifying questions (a single inline question is enough).
 - Implementation work (this skill is read-only by design).
 - Pressure-testing a *finished* artefact (use a review skill instead).
 
@@ -122,13 +128,17 @@ The summary is the artefact the rest of the team (and future-you) reads when the
 
 Offer to write the summary to a durable artefact, and ask the user which shape they want. Typical shapes (suggest the one that matches the user's framing; offer others as alternatives):
 
-- **Project spec** (`projects/<project>/spec.md`) — when the discussion produced the *what and why* of a new project, before implementation begins. Hand off to `drive-create-spec` for the actual file write.
-- **Project plan** (`projects/<project>/plan.md`) — when the discussion produced the *how and in what order* for an already-shaped project. Hand off to `drive-create-plan`.
+- **Project spec** (`projects/<project>/spec.md`) — when the discussion produced the *what and why* of a new project, before implementation begins. Hand off to `drive-project-specify` for the actual file write.
+- **Project plan** (`projects/<project>/plan.md`) — when the discussion produced the *how and in what order* for an already-shaped project. Hand off to `drive-project-plan`.
+- **Slice spec** (`projects/<project>/slices/<slice>/spec.md` or inline in a PR description) — when the discussion produced the *what* of a slice. Hand off to `drive-slice-specify`.
+- **Slice plan** — when the discussion sharpened the dispatch sequence for a slice. Hand off to `drive-slice-plan`.
 - **Decision record / ADR** — when the discussion produced a single architectural decision deserving a durable record under the repo's ADR directory.
-- **Plan / spec amendment** — when the discussion happened mid-implementation and the outcome is an update to an existing in-flight artefact (a `plan.md` task amendment, a `spec.md § Assumptions` update marking a prior assumption as falsified).
+- **Plan / spec amendment** — when the discussion happened mid-implementation and the outcome is an update to an existing in-flight artefact (a `plan.md` dispatch amendment, a `spec.md § Assumptions` update marking a prior assumption as falsified).
 - **Other shape the user names** — a markdown note under `wip/`, a PR description, a Linear ticket, etc.
 
-If the user declines documentation, push back once explicitly: *"the conclusions and reasoning will not survive context-window pressure — confirm you don't want it persisted?"* Discussions that produce real understanding deserve real artefacts; opt-out is the user's choice, not the default.
+**Mandatory output for triggers 3 and 4 (falsified-assumption / obstacle):** in addition to the chosen shape above, append a numbered entry to `projects/<project>/design-decisions.md` (or a comparable decisions log if the team's convention is different). The entry names the trigger, what was learned, the decision reached, the affected artefacts. This is what closes the I12 stop-condition cleanly — without the log entry, the spec / plan amendment is silent on *why* the change happened.
+
+If the user declines documentation, push back once explicitly: *"the conclusions and reasoning will not survive context-window pressure — confirm you don't want it persisted?"* Discussions that produce real understanding deserve real artefacts; opt-out is the user's choice, not the default. (For triggers 3 and 4, the design-decisions log entry is non-optional — the orchestrator can't resume from the I12 stop without it.)
 
 ### Step 3 — exit cleanly
 
