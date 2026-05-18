@@ -8,7 +8,7 @@ Two places. One you share with everyone else using Drive; one is just for your t
 your-repo/
 ├── drive/                                ← your team's notes (this repo only)
 │   ├── spec/README.md                    ← read by drive-slice-specify
-│   ├── plan/README.md                    ← read by drive-slice-plan + drive-orchestrate-plan
+│   ├── plan/README.md                    ← read by drive-slice-plan + drive-build-workflow
 │   ├── qa/README.md                      ← read by drive-qa-plan + drive-qa-run
 │   ├── code-review/README.md             ← read by drive-review-code
 │   ├── pr/README.md                      ← read by drive-pr-description + drive-pr-walkthrough
@@ -21,7 +21,7 @@ your-repo/
 └── .agents/skills/                       ← local copy of the shared playbook
     ├── drive-create-project/SKILL.md
     ├── drive-slice-specify/SKILL.md
-    ├── drive-orchestrate-plan/SKILL.md
+    ├── drive-build-workflow/SKILL.md
     ├── drive-reconcile-skills/SKILL.md   ← the two meta-skills that keep
     ├── drive-update-skills/SKILL.md         the local copy in sync with canonical
     └── ...

@@ -20,7 +20,7 @@ Any of these — roles or hat — can be a human or an agent or a mix. Today the
 
 | Phase | Project owner | Implementer | Reviewer | Agile orchestrator hat |
 |---|---|---|---|---|
-| **Today (typical)** | Operator | Operator (often delegated to implementer subagent) | Operator (often delegated to reviewer subagent) | Operator at the top; orchestrator agent inside `drive-orchestrate-plan` |
+| **Today (typical)** | Operator | Operator (often delegated to implementer subagent) | Operator (often delegated to reviewer subagent) | Operator at the top; orchestrator agent inside `drive-build-workflow` |
 | **Near-term** | Operator | Implementer subagent (default); operator on judgment-heavy slices | Reviewer subagent (default); operator on high-blast-radius PRs | Orchestrator agent across all dispatch-loop work; operator at triage + design discussions |
 | **Eventual** | Operator at the project-spec layer; agent for stable-input projects | Implementer subagent | Reviewer subagent | Orchestrator agent everywhere (triage, dispatch loop, retro running, protocol maintenance) |
 
@@ -99,7 +99,7 @@ For projects whose purpose is captured by a stable input artefact that doesn't n
 1. **Same actor as implementer and reviewer on the same slice.** Compromises the review stance. The *same actor at a different time* is also compromised — adversarial reading doesn't form cleanly when you just finished implementing.
 2. **Project owner playing implementer continuously.** Zoom-out stance erodes when the actor is always in the weeds. The operator who is project owner *and* writes every line of code eventually loses scope discipline. Symptom: scope creeps in silently because the project owner has stopped reading their own spec.
 3. **Treating the orchestrator hat as "the senior agent."** The hat is about orientation, not seniority or model tier. A cheap-tier agent can wear it during a single triage call. An expensive-tier agent can fail at it if it doesn't actually run the rituals.
-4. **No actor wears the orchestrator hat during a dispatch loop.** Worst case: the loop runs without any actor holding the WIP-inspection cadence + DoR / DoD discipline. The dispatch silently drifts. The orchestrator agent inside `drive-orchestrate-plan` is the canonical wearer; a configuration where the loop runs without one is broken.
+4. **No actor wears the orchestrator hat during a dispatch loop.** Worst case: the loop runs without any actor holding the WIP-inspection cadence + DoR / DoD discipline. The dispatch silently drifts. The orchestrator agent inside `drive-build-workflow` is the canonical wearer; a configuration where the loop runs without one is broken.
 5. **Delegating before your `drive/<category>/README.md` carries the lessons.** Delegating implementer to a subagent in a repo whose overlays are sparse means the agent re-discovers failures the overlays would have warned about. Symptom: dispatches drift the same way they did before any of this work existed. The overlays gate delegation pace.
 6. **Wearing the orchestrator hat in name only — skipping its escalation responsibility.** The hat's job to recognise when design discussion is needed only works if the actor wearing it is actually checking for assumption-falsification and obstacle-emergence. An orchestrator agent that just executes its dispatch loop without those watchpoints isn't actually wearing the hat.
 
