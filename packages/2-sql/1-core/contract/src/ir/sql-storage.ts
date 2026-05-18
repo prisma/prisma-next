@@ -2,6 +2,7 @@ import type { StorageHashBase } from '@prisma-next/contract/types';
 import {
   freezeNode,
   type Namespace,
+  NamespaceBase,
   type Storage,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -38,18 +39,63 @@ const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
   [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
 });
 
+export interface SqlNamespaceTablesInput {
+  readonly id: string;
+  readonly tables?: Record<string, StorageTable | StorageTableInput>;
+}
+
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
-  readonly tables: Record<string, StorageTable | StorageTableInput>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
-  readonly namespaces?: Readonly<Record<string, Namespace>>;
+  readonly namespaces?: Readonly<Record<string, Namespace | SqlNamespaceTablesInput>>;
+}
+
+class SqlNamespacePayload extends NamespaceBase {
+  declare readonly kind?: string;
+
+  readonly id: string;
+  readonly tables: Readonly<Record<string, StorageTable>>;
+
+  constructor(input: SqlNamespaceTablesInput) {
+    super();
+    this.id = input.id;
+    this.tables = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.tables ?? {}).map(([name, t]) => [
+          name,
+          t instanceof StorageTable ? t : new StorageTable(t),
+        ]),
+      ),
+    );
+    Object.defineProperty(this, 'kind', {
+      value: 'sql-namespace',
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    freezeNode(this);
+  }
+}
+
+function normaliseNamespaceEntry(
+  nsKey: string,
+  ns: Namespace | SqlNamespaceTablesInput,
+): Namespace {
+  if (ns instanceof NamespaceBase) {
+    return ns;
+  }
+  const tableCount = Object.keys(ns.tables ?? {}).length;
+  if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0) {
+    return SqlUnboundNamespace.instance;
+  }
+  return new SqlNamespacePayload(ns as SqlNamespaceTablesInput);
 }
 
 /**
  * SQL Contract IR root node for the `storage` field.
  *
  * Single concrete family-shared class — both Postgres and SQLite
- * consume this same class today. Per-target storage subclasses are
+ * consume this class today. Per-target storage subclasses are
  * introduced when each target's namespace shape earns its
  * target-specific concretion (target-specific derived fields,
  * target-specific storage extensions).
@@ -62,8 +108,9 @@ export interface SqlStorageInput<THash extends string = string> {
  * `SqliteUnboundDatabase.instance`) earn their slots when each
  * target's namespace shape lands.
  *
- * The constructor normalises nested IR-class fields (`tables`, optional
- * `types`) into class instances so downstream walks see a uniform AST.
+ * The constructor normalises optional `types` into class instances and
+ * materialises plain namespace envelope objects into `Namespace` class
+ * instances so downstream walks see a uniform AST.
  * `types` is polymorphic per Decision 18 Option B: codec-triple inputs
  * are stamped with `kind: 'codec-instance'`; class-instance kinds
  * (e.g. Postgres-enum entries satisfying `PostgresEnumStorageEntry`)
@@ -74,7 +121,6 @@ export interface SqlStorageInput<THash extends string = string> {
  */
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  readonly tables: Readonly<Record<string, StorageTable>>;
   readonly namespaces: Readonly<Record<string, Namespace>>;
   // SQL-family slot view: the two structural variants the family ships
   // today (codec triples + Postgres-enum structural entries). Each
@@ -88,15 +134,14 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   constructor(input: SqlStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.tables = Object.freeze(
+    this.namespaces = Object.freeze(
       Object.fromEntries(
-        Object.entries(input.tables).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
+        Object.entries(input.namespaces ?? DEFAULT_NAMESPACES).map(([nsKey, ns]) => [
+          nsKey,
+          normaliseNamespaceEntry(nsKey, ns),
         ]),
       ),
     );
-    this.namespaces = input.namespaces ?? DEFAULT_NAMESPACES;
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(

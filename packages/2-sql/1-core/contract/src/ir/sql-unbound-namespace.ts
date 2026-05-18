@@ -3,6 +3,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import type { StorageTable } from './storage-table';
 
 /**
  * Family-layer placeholder for the SQL unbound-namespace singleton —
@@ -38,6 +39,7 @@ export class SqlUnboundNamespace extends NamespaceBase {
   static readonly instance: SqlUnboundNamespace = new SqlUnboundNamespace();
 
   readonly id = UNBOUND_NAMESPACE_ID;
+  readonly tables: Readonly<Record<string, StorageTable>> = Object.freeze({});
   declare readonly kind?: string;
 
   private constructor() {
