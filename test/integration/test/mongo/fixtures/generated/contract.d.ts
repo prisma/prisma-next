@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b09d2fcb1959b566aaa597d86d84e834db396431d5134a983ff3a600908c6786'>;
+  StorageHashBase<'sha256:fa6a5b7536b81b4ccd9c569ef8dd1d58573f52908ebd5d36f1b0066cbd44bbec'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -80,23 +80,28 @@ export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTyp
 
 type ContractBase = ContractType<
   {
-    readonly collections: {
-      readonly tasks: { readonly kind: 'mongo-collection' };
-      readonly users: {
-        readonly kind: 'mongo-collection';
-        readonly indexes: readonly [
-          {
-            readonly kind: 'mongo-index';
-            readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
-            readonly unique: true;
-          },
-        ];
-        readonly options: {
-          readonly kind: 'mongo-collection-options';
-          readonly collation: {
-            readonly kind: 'mongo-collation-options';
-            readonly locale: 'en';
-            readonly strength: 2;
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly tables: {
+          readonly tasks: Record<string, never>;
+          readonly users: {
+            readonly kind: 'mongo-collection';
+            readonly indexes: readonly [
+              {
+                readonly kind: 'mongo-index';
+                readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
+                readonly unique: true;
+              },
+            ];
+            readonly options: {
+              readonly kind: 'mongo-collection-options';
+              readonly collation: {
+                readonly kind: 'mongo-collation-options';
+                readonly locale: 'en';
+                readonly strength: 2;
+              };
+            };
           };
         };
       };
