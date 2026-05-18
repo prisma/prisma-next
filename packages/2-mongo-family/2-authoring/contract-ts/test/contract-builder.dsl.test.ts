@@ -1,4 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, index, model, rel, valueObject } from '../src/contract-builder';
 
@@ -56,7 +57,7 @@ describe('mongo contract builder', () => {
       users: 'User',
       posts: 'Post',
     });
-    expect(contract.storage.collections).toEqual({
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
     });
@@ -140,7 +141,7 @@ describe('mongo contract builder', () => {
     expect(contract.roots).toEqual({
       tasks: 'Task',
     });
-    expect(contract.storage.collections).toEqual({
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({
       tasks: { kind: 'mongo-collection' },
     });
     expect(contract.valueObjects).toEqual({
@@ -165,7 +166,7 @@ describe('mongo contract builder', () => {
     expect(contract.models.Comment.owner).toBe('Task');
   });
 
-  it('lowers Mongo indexes into storage.collections', () => {
+  it('lowers Mongo indexes into namespaced storage tables', () => {
     const User = model('User', {
       collection: 'users',
       fields: {
@@ -187,7 +188,7 @@ describe('mongo contract builder', () => {
       models: { User },
     });
 
-    expect(contract.storage.collections).toEqual({
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({
       users: {
         kind: 'mongo-collection',
         indexes: [
@@ -256,7 +257,7 @@ describe('mongo contract builder', () => {
       models: { TaskBase, TaskDerived },
     });
 
-    expect(contract.storage.collections).toEqual({
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({
       tasks: {
         kind: 'mongo-collection',
         indexes: [
@@ -374,7 +375,7 @@ describe('mongo contract builder', () => {
     expect(message).toMatch(/User/);
   });
 
-  it('lowers collection options into storage.collections', () => {
+  it('lowers collection options into namespaced storage tables', () => {
     const User = model('User', {
       collection: 'users',
       fields: {
@@ -393,7 +394,7 @@ describe('mongo contract builder', () => {
       models: { User },
     });
 
-    expect(contract.storage.collections).toEqual({
+    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({
       users: {
         kind: 'mongo-collection',
         options: {

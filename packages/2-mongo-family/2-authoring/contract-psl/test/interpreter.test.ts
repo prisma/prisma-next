@@ -1,5 +1,6 @@
 import type { ContractField, ContractReferenceRelation } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoCollection, MongoValidator } from '@prisma-next/mongo-contract';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
@@ -43,6 +44,15 @@ const mongoCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
+function mongoTablesFromIr(ir: {
+  readonly storage: unknown;
+}): Record<string, Record<string, unknown>> {
+  const storage = ir.storage as {
+    namespaces: Record<string, { tables: Record<string, Record<string, unknown>> }>;
+  };
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables;
+}
+
 interface MongoModel {
   readonly fields: Record<string, ContractField>;
   readonly relations: Record<string, ContractReferenceRelation>;
@@ -80,12 +90,7 @@ function getIndexes(
   ir: unknown,
   collectionName: string,
 ): ReadonlyArray<Record<string, unknown>> | undefined {
-  const contract = ir as Record<string, unknown>;
-  const storage = contract['storage'] as unknown as Record<
-    string,
-    Record<string, Record<string, unknown>>
-  >;
-  return storage['collections']?.[collectionName]?.['indexes'] as
+  return mongoTablesFromIr(ir as { storage: unknown })[collectionName]?.['indexes'] as
     | ReadonlyArray<Record<string, unknown>>
     | undefined;
 }
@@ -216,7 +221,12 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: { collection: 'userProfile' },
       });
       expect(ir.storage).toMatchObject({
-        collections: { userProfile: {} },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { userProfile: {} },
+          },
+        },
       });
     });
 
@@ -232,7 +242,12 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: { collection: 'users' },
       });
       expect(ir.storage).toMatchObject({
-        collections: { users: {} },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { users: {} },
+          },
+        },
       });
     });
   });
@@ -558,7 +573,7 @@ describe('interpretPslDocumentToMongoContract', () => {
       expect(ir.target).toBe('mongo');
     });
 
-    it('generates storage.collections with empty objects', () => {
+    it('generates namespaced storage table entries with empty objects', () => {
       const ir = interpretOk(`
         model User {
           id ObjectId @id @map("_id")
@@ -570,9 +585,14 @@ describe('interpretPslDocumentToMongoContract', () => {
       `);
 
       expect(ir.storage).toMatchObject({
-        collections: {
-          user: {},
-          post: {},
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {},
+              post: {},
+            },
+          },
         },
       });
       expect(ir.storage.storageHash).toMatch(/^sha256:/);
@@ -781,40 +801,45 @@ describe('interpretPslDocumentToMongoContract', () => {
         },
         storage: {
           storageHash: expect.stringMatching(/^sha256:/),
-          collections: {
-            users: new MongoCollection({
-              validator: new MongoValidator({
-                jsonSchema: {
-                  bsonType: 'object',
-                  required: ['_id', 'email', 'name'],
-                  properties: {
-                    _id: { bsonType: 'objectId' },
-                    name: { bsonType: 'string' },
-                    email: { bsonType: 'string' },
-                    bio: { bsonType: ['null', 'string'] },
-                  },
-                },
-                validationLevel: 'strict',
-                validationAction: 'error',
-              }),
-            }),
-            posts: new MongoCollection({
-              validator: new MongoValidator({
-                jsonSchema: {
-                  bsonType: 'object',
-                  required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
-                  properties: {
-                    _id: { bsonType: 'objectId' },
-                    title: { bsonType: 'string' },
-                    content: { bsonType: 'string' },
-                    authorId: { bsonType: 'objectId' },
-                    createdAt: { bsonType: 'date' },
-                  },
-                },
-                validationLevel: 'strict',
-                validationAction: 'error',
-              }),
-            }),
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                users: new MongoCollection({
+                  validator: new MongoValidator({
+                    jsonSchema: {
+                      bsonType: 'object',
+                      required: ['_id', 'email', 'name'],
+                      properties: {
+                        _id: { bsonType: 'objectId' },
+                        name: { bsonType: 'string' },
+                        email: { bsonType: 'string' },
+                        bio: { bsonType: ['null', 'string'] },
+                      },
+                    },
+                    validationLevel: 'strict',
+                    validationAction: 'error',
+                  }),
+                }),
+                posts: new MongoCollection({
+                  validator: new MongoValidator({
+                    jsonSchema: {
+                      bsonType: 'object',
+                      required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
+                      properties: {
+                        _id: { bsonType: 'objectId' },
+                        title: { bsonType: 'string' },
+                        content: { bsonType: 'string' },
+                        authorId: { bsonType: 'objectId' },
+                        createdAt: { bsonType: 'date' },
+                      },
+                    },
+                    validationLevel: 'strict',
+                    validationAction: 'error',
+                  }),
+                }),
+              },
+            },
           },
         },
         extensionPacks: {},
@@ -833,11 +858,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const indexes = storage['collections']?.['user']?.['indexes'] as
+      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -852,11 +873,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@unique([email])
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const indexes = storage['collections']?.['user']?.['indexes'] as
+      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -872,11 +889,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email, name])
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const indexes = storage['collections']?.['user']?.['indexes'] as
+      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -893,11 +906,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           email String   @unique
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const indexes = storage['collections']?.['user']?.['indexes'] as
+      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -913,11 +922,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([expiresAt], sparse: true, expireAfterSeconds: 3600)
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const indexes = storage['collections']?.['session']?.['indexes'] as
+      const indexes = mongoTablesFromIr(ir)['session']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -933,11 +938,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const indexes = storage['collections']?.['user']?.['indexes'] as
+      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes![0]!['keys']).toEqual([{ field: 'email_address', direction: 1 }]);
@@ -949,11 +950,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           id ObjectId @id @map("_id")
         }
       `);
-      const storage = ir.storage as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const userColl = storage['collections']?.['user'];
+      const userColl = mongoTablesFromIr(ir)['user'];
       expect(userColl?.['indexes']).toBeUndefined();
     });
 
@@ -1519,12 +1516,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
   describe('validator derivation', () => {
     function getValidator(ir: unknown, collectionName: string) {
-      const contract = ir as Record<string, unknown>;
-      const storage = contract['storage'] as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      return storage['collections']?.[collectionName]?.['validator'] as
+      return mongoTablesFromIr(ir as { storage: unknown })[collectionName]?.['validator'] as
         | Record<string, unknown>
         | undefined;
     }
@@ -1613,11 +1605,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const storage = ir['storage'] as unknown as Record<
-        string,
-        Record<string, Record<string, unknown>>
-      >;
-      const userColl = storage['collections']?.['user'];
+      const userColl = mongoTablesFromIr(ir as { storage: unknown })['user'];
       expect(userColl?.['indexes']).toBeDefined();
       expect(userColl?.['validator']).toBeDefined();
     });

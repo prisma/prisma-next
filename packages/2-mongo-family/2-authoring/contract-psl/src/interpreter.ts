@@ -10,6 +10,7 @@ import type {
   ContractValueObject,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
   MongoCollection,
@@ -1118,7 +1119,14 @@ export function interpretPslDocumentToMongoContract(
       input as ConstructorParameters<typeof MongoCollection>[0],
     );
   }
-  const storageWithoutHash = { collections: collectionsAsClasses };
+  const storageWithoutHash = {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: collectionsAsClasses,
+      },
+    },
+  };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
   const capabilities: Record<string, Record<string, boolean>> = {};
 

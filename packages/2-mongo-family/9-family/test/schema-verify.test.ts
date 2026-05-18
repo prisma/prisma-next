@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollection,
   type MongoCollectionOptions,
@@ -45,7 +46,12 @@ function buildContract(
     models: {},
     storage: {
       storageHash: 'sha256:test',
-      collections: builtCollections,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: builtCollections,
+        },
+      },
     },
     capabilities: {},
     extensionPacks: {},
@@ -1350,24 +1356,18 @@ describe('verifyMongoSchema', () => {
   });
 
   describe('synthetic-contract opt-out (F1 regression)', () => {
-    // Locks in the minimum well-formed shape that synthetic-contract test
-    // fixtures must use when they pair with `strictVerification: false` to
-    // opt out of post-apply verification. The reviewer found three fixtures
-    // (in test/integration and examples/) that supplied `{}` as the
-    // contract; `contractToMongoSchemaIR` reads `contract.storage.collections`
-    // unconditionally, so the runner crashed with `TypeError` before the
-    // strict flag was consulted.
     function minimalContract(): MongoContract {
-      // Mirrors the documented minimum shape: synthetic fixtures cannot
-      // construct a fully-typed MongoContract, so they bypass the type
-      // system with a single-purpose `as unknown as` cast and supply only
-      // the `storage` shape `contractToMongoSchemaIR` actually reads.
       return {
-        storage: { storageHash: 'sha256:authoring-test', collections: {} },
+        storage: {
+          storageHash: 'sha256:authoring-test',
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} },
+          },
+        },
       } as unknown as MongoContract;
     }
 
-    it('does not throw when contract has empty storage.collections', () => {
+    it('does not throw when contract has empty namespaced storage tables', () => {
       expect(() =>
         verifyMongoSchema({
           contract: minimalContract(),

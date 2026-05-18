@@ -1,4 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, index, model } from '../src/contract-builder';
 
@@ -60,7 +61,8 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug, Feature },
     });
 
-    const collections = contract.storage.collections as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
+      .tables as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -123,7 +125,8 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { taskModel: Task, bugModel: Bug, featureModel: Feature },
     });
 
-    const collections = contract.storage.collections as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
+      .tables as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -180,7 +183,8 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug, Feature },
     });
 
-    const collections = contract.storage.collections as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
+      .tables as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -228,7 +232,8 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug },
     });
 
-    const collections = contract.storage.collections as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
+      .tables as unknown as Record<
       string,
       {
         indexes?: Array<{
@@ -270,7 +275,8 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       models: { Task, Bug },
     });
 
-    const collections = contract.storage.collections as unknown as Record<
+    const collections = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!
+      .tables as unknown as Record<
       string,
       {
         indexes?: Array<{
