@@ -3,6 +3,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import type { StorageTable } from '@prisma-next/sql-contract/types';
 
 /**
  * SQLite target `Namespace` concretion. SQLite has no schema or
@@ -26,9 +27,11 @@ export class SqliteUnboundDatabase extends NamespaceBase {
 
   readonly kind = 'database' as const;
   readonly id = UNBOUND_NAMESPACE_ID;
+  readonly tables: Readonly<Record<string, StorageTable>>;
 
   private constructor() {
     super();
+    this.tables = Object.freeze({});
     freezeNode(this);
   }
 

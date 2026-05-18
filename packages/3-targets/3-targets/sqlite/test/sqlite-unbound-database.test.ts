@@ -7,6 +7,11 @@ describe('SqliteUnboundDatabase', () => {
     expect(SqliteUnboundDatabase.instance.id).toBe(UNBOUND_NAMESPACE_ID);
   });
 
+  it('carries an empty frozen tables map', () => {
+    expect(SqliteUnboundDatabase.instance.tables).toEqual({});
+    expect(Object.isFrozen(SqliteUnboundDatabase.instance.tables)).toBe(true);
+  });
+
   it('elides every qualifier — SQLite has no schema concept and emits unqualified DDL', () => {
     expect(SqliteUnboundDatabase.instance.qualifier()).toBe('');
     expect(SqliteUnboundDatabase.instance.qualifyTable('users')).toBe('"users"');
