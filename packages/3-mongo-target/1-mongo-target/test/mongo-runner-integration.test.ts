@@ -77,18 +77,29 @@ function makeContract(
   return {
     storage: {
       storageHash,
-      collections: storageCollections,
+      namespaces: {
+        __unbound__: {
+          id: '__unbound__',
+          kind: 'mongo-namespace',
+          tables: storageCollections,
+        },
+      },
     },
   } as unknown as MongoContract;
 }
 
 function bareContract(storageHash: string): MongoContract {
-  // Same rationale as `makeContract` above. The post-apply verify step also
-  // reads `storage.collections` via `contractToMongoSchemaIR`, so the empty
-  // map is required for runner.execute() to reach a passing verify against
+  // The post-apply verify step reads namespace tables via
+  // `contractToMongoSchemaIR`, so an empty unbound namespace is
+  // required for runner.execute() to reach a passing verify against
   // an unconstrained live schema.
   return {
-    storage: { storageHash, collections: {} },
+    storage: {
+      storageHash,
+      namespaces: {
+        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', tables: {} },
+      },
+    },
   } as unknown as MongoContract;
 }
 

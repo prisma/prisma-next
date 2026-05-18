@@ -221,7 +221,17 @@ export const testContractJson = {
   },
   storage: {
     storageHash: 'test-hash',
-    collections: { orders: {}, users: {}, customers: {} },
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        tables: {
+          orders: { kind: 'mongo-collection' },
+          users: { kind: 'mongo-collection' },
+          customers: { kind: 'mongo-collection' },
+        },
+      },
+    },
   },
   capabilities: {},
   extensionPacks: {},

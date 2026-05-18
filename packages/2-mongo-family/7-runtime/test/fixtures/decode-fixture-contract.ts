@@ -97,7 +97,16 @@ export const decodeFixtureContractJson = {
   targetFamily: 'mongo' as const,
   roots: { users: 'User', posts: 'Post' },
   storage: {
-    collections: { users: {}, posts: {} },
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__' as const,
+        kind: 'mongo-namespace' as const,
+        tables: {
+          users: { kind: 'mongo-collection' as const },
+          posts: { kind: 'mongo-collection' as const },
+        },
+      },
+    },
     storageHash: 'decode-integration-test',
   },
   models: {

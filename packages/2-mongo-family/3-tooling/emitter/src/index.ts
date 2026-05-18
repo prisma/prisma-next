@@ -19,6 +19,10 @@ function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
 }
 
 function generateMongoCollectionEntryType(coll: MongoCollection): string {
+  const entries = Object.entries(coll).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) {
+    return 'Record<string, never>';
+  }
   return serializeValue(coll);
 }
 

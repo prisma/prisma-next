@@ -4,7 +4,12 @@ import { createContract, createSqlContract } from '@prisma-next/contract/testing
 import type { Contract, StorageBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
-type MongoStorageLike = StorageBase & { readonly collections: Record<string, unknown> };
+type MongoStorageLike = StorageBase & {
+  readonly namespaces: Record<
+    string,
+    { readonly id: string; readonly kind: string; readonly tables: Record<string, unknown> }
+  >;
+};
 
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -355,12 +360,20 @@ describe('loadContractSpaceAggregate', () => {
       const appContract = createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections: { users: {} } },
+        storage: {
+          namespaces: {
+            __unbound__: { id: '__unbound__', kind: 'mongo-namespace', tables: { users: {} } },
+          },
+        },
       });
       const extContract = createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections: { users: {} } },
+        storage: {
+          namespaces: {
+            __unbound__: { id: '__unbound__', kind: 'mongo-namespace', tables: { users: {} } },
+          },
+        },
       });
 
       const cipherJson = { id: 'cipher-mongo-collides' };
