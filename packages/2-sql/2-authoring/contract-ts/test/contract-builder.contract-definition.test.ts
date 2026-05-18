@@ -128,10 +128,10 @@ describe('shared contract definition lowering', () => {
     });
 
     const storage = contract.storage as {
-      readonly types?: Record<string, unknown>;
+      readonly types?: Record<string, Record<string, unknown>>;
       readonly tables?: Record<
         string,
-        { readonly primaryKey?: unknown; readonly foreignKeys?: unknown }
+        Record<string, { readonly primaryKey?: unknown; readonly foreignKeys?: unknown }>
       >;
     };
     const models = contract.models as Record<
@@ -144,17 +144,17 @@ describe('shared contract definition lowering', () => {
       | undefined
     >;
 
-    expect(storage['types']?.['Role']).toEqual({
+    expect(storage['types']?.['__unbound__']?.['Role']).toEqual({
       kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });
-    expect(storage['tables']?.['app_user']?.primaryKey).toEqual({
+    expect(storage['tables']?.['__unbound__']?.['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
     });
-    expect(storage['tables']?.['blog_post']?.foreignKeys).toMatchObject([
+    expect(storage['tables']?.['__unbound__']?.['blog_post']?.foreignKeys).toMatchObject([
       {
         source: { columns: ['author_id'] },
         target: {

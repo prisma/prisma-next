@@ -146,7 +146,7 @@ describe('contract DSL authoring surface', () => {
         Post,
       },
     });
-    const storageTables = contract.storage.tables as Record<
+    const storageTables = contract.storage.tables['__unbound__'] as Record<
       string,
       {
         readonly primaryKey?: unknown;
@@ -264,7 +264,7 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const tables = contract.storage.tables as Record<
+    const tables = contract.storage.tables['__unbound__'] as Record<
       string,
       {
         primaryKey?: unknown;
@@ -437,7 +437,9 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    expect((contract.storage.tables as Record<string, unknown>)['membership']).toMatchObject({
+    expect(
+      (contract.storage.tables['__unbound__'] as Record<string, unknown>)['membership'],
+    ).toMatchObject({
       primaryKey: {
         columns: ['org_id', 'user_id'],
         name: 'membership_pkey',
@@ -571,7 +573,10 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const tables = contract.storage.tables as Record<string, { columns: Record<string, unknown> }>;
+    const tables = contract.storage.tables['__unbound__'] as Record<
+      string,
+      { columns: Record<string, unknown> }
+    >;
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
