@@ -87,3 +87,32 @@ The demo isn't in CI. No fixture in `packages/1-framework/3-tooling/cli/test/com
 - **`db-verify.ts` boundary read.** Functionally OK today because the family `verify` method re-validates internally. Include in the fix for consistency unless rebasing reveals a reason not to.
 - **Pgvector / other extension-contributed `kind` values.** Need a sweep during execution to enumerate the actual fixture set required for AC-9.
 - **Demo-in-CI harness shape.** `pnpm prisma-next migration plan` is harness-light (no database needed for plan); `migration apply` needs a database. Use whichever test harness `examples/prisma-next-postgis-demo/test/utils/test-database.ts` or similar already provides; if no shared harness exists, scope down to plan-only and file a follow-up for apply coverage.
+
+# Slice DoD
+
+Authored against `projects/drive-domain-model/principles/definition-of-done.md` § Slice DoD template + `projects/drive-domain-model/calibration/prisma-next.md` § 3.2 overlay. The PR is mergeable when:
+
+**Protocol-layer items:**
+
+- [ ] Spec outcome met — every AC above verified against the PR diff
+- [ ] All dispatches in `plans/plan.md` have satisfied their dispatch DoD (each closed by orchestrator post-flight check)
+- [ ] PR is review-clean — reviewer subagent verdict accept; orchestrator-tier intent-validation pass; findings either addressed or explicitly accepted
+- [ ] Intent-validation passes — the orchestrator-tier check confirms the PR delivers spec intent, not just AC-literal compliance (e.g. no codemod that satisfies "stamps `kind`" by re-routing through a new helper that does the same silent-coercion work — the § 4.1 failure mode)
+- [ ] No silent spec/plan amendments (I12) — any mid-flight edit to spec.md or plans/plan.md was operator-authorised or design-discussion output
+- [ ] Manual QA satisfied — `manual-qa.md` script exists; ≥1 run report exists under `manual-qa-reports/`; no unresolved 🛑 Blocker findings; ⚠️ High findings addressed or accepted; script names both prisma-next QA audiences (extension authors via `packages/3-extensions/`, end users via `examples/`) per `projects/drive-domain-model/calibration/prisma-next.md` § 9.1
+- [ ] Scope-deferred candidates recorded (in `deferred.md` if any surface; orchestrator scratch otherwise)
+- [ ] Retro fired — at minimum, log the slice-PR-cap borderline-triage call for future calibration; additional retros if learnings surface
+
+**prisma-next overlay (§ 3.2):**
+
+- [ ] Linear issue TML-2536 moved to "Ready to be merged"
+- [ ] PR title carries `tml-2536:` prefix
+- [ ] PR description follows `drive-pr-description` shape (decision-led, narrative)
+- [ ] PR linked to TML-2536 via GitHub integration (auto-close wired)
+- [ ] No `projects/` references in long-lived files added by the slice (per doc-maintenance rule; grep gate from calibration § 5.3)
+
+**Close-out** (orthogonal to merge — runs after merge):
+
+- [ ] Strip references to `projects/tml-2536-contract-deserializer-seam/**` from `docs/`, READMEs, comments, durable artefacts. The rule rewrite is the durable record; the project folder is disposable.
+- [ ] Delete `projects/tml-2536-contract-deserializer-seam/`.
+- [ ] Close PR #520 with a pointer to this PR.

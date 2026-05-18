@@ -1,105 +1,265 @@
-# Route on-disk contract reads through the serializer seam
+# Slice plan: Route on-disk contract reads through the serializer seam
 
-## Summary
+Authored under `projects/drive-domain-model/` methodology. Decomposes the slice into a dispatch sequence sized at the M-cap, with each dispatch carrying DoR/DoD/edge-cases/inputs at the per-dispatch level.
 
-Replace every `JSON.parse(...) as Contract` cast in the CLI with `validateContract` through `familyInstance`, strip the SQL family's silent shape-coercion in `normaliseTypeEntry`, regenerate the demo's `start-/end-contract.json` files under the strict deserializer, rewrite the misleading normalisation rule + add an `as Contract` smell rule, add a grep-based CI lint to keep the bypass class closed, and close the test gap by per-kind fixtures + adding the demo's CLI workflow to CI. Closes TML-2536.
+**Spec:** [`../spec.md`](../spec.md)
+**Methodology:** [`projects/drive-domain-model/model.md`](../../drive-domain-model/model.md), principles under [`projects/drive-domain-model/principles/`](../../drive-domain-model/principles/)
+**Calibration:** [`projects/drive-domain-model/calibration/prisma-next.md`](../../drive-domain-model/calibration/prisma-next.md)
 
-**Spec:** `projects/tml-2536-contract-deserializer-seam/spec.md`
-**Plan:** `projects/tml-2536-contract-deserializer-seam/plans/plan.md`
+## Slice DoR check (run by orchestrator at slice-initiation time)
+
+- [x] Slice spec exists ([`../spec.md`](../spec.md)); slice-DoD section appended per § Slice DoD
+- [x] Slice plan exists (this file); dispatches decomposed below
+- [x] Every dispatch sized ≤ M (table in § Dispatch sequence)
+- [x] Outcome fits in one PR — borderline (logged for slice-closure retro; user-committed at re-cut triage)
+- [x] Calibration entries linked — § 4.1 (dual-shape relocated), § 4.4 (feature-sized dispatch), § 4.5 (destructive git in subagents), § 5.3 (project-artefact-leak grep) all threaded into the relevant dispatches below
+- [x] Spike dependencies resolved — upstream-overlap investigation captured in `wip/upstream-overlap-investigation.md` (worktree `tml-2536-bug-snapshot-contracts-on-disk-are-read-without`)
+- [x] Design calls settled — validation-by-execution path chosen as **Option A** (in-place stamp of demo via codemod, not regenerate-from-scratch)
+- [N/A] In-project: orphan slice with project-folder persistence (no parent project Linear unit) — slight model deviation; logged for slice-closure retro
 
 ## Collaborators
 
-| Role | Person/Team | Context |
-| --- | --- | --- |
-| Maker | William Madden | Drives execution |
-| Reviewer | Terminal team (PR review) | Contract-seam architecture; demo regen |
-| Related | TML-2512 | Already consolidated snapshot reads into `readPredecessorEndContract`; this PR layers on top |
-| Related | TML-2537 | Owns the family-core layering cleanup; out of scope here |
-| Related | TML-2515 | Owns the back-compat-policy question; this PR explicitly assumes "no back-compat" until then |
+| Role | Person / agent | Context |
+|---|---|---|
+| Project owner | — (orphan slice) | n/a |
+| Implementer (slice + dispatches D1, D2, D4, D7) | Operator (Will) + orchestrator agent | Design-heavy work; not delegable cleanly |
+| Implementer (dispatches D3, D5, D6) | Implementer subagents | Mechanical work with tight briefs |
+| Reviewer | Reviewer subagent + operator at PR | Per [`roles-and-personas.md`](../../drive-domain-model/principles/roles-and-personas.md), reviewer is a different actor from implementer |
+| Related ticket | TML-2537 | Family-core layering cleanup; out of scope here |
+| Related ticket | TML-2515 | Back-compat policy; this slice assumes "no back-compat" |
 
-## Shipping Strategy
+## Shipping strategy
 
-Single PR, single milestone. The change is intertwined enough that splitting it across PRs leaves the demo broken in an intermediate state: stripping `normaliseTypeEntry`'s fallthrough invalidates the old `end-contract.json` files immediately, so demo regeneration has to land together. Commits are sequenced so each individual commit leaves typecheck green; the demo CI job is added last so it doesn't fail until the regeneration commit lands.
+Single PR. The change is intertwined enough that splitting leaves the demo broken in an intermediate state: stripping `normaliseTypeEntry`'s fallthrough invalidates the old `end-contract.json` files immediately, so demo regen (via codemod) has to land together. Commits sequenced so each individual commit leaves typecheck green; the demo CI job is added last so it doesn't fail until the substrate is consistent.
 
-The PR is shippable to `main` after CI passes. No deployment coordination — this is a CLI internal-hygiene change with no consumers outside the monorepo.
+## Acceptance criteria ↔ test cases ↔ dispatch coverage
 
-## Test Design
+AC list is in [`../spec.md`](../spec.md) § Acceptance Criteria. TC ↔ dispatch coverage:
 
-| AC | TC | Test Case | Type | Milestone | Expected Outcome |
-| --- | --- | --- | --- | --- | --- |
-| AC-1 | TC-1 | `readPredecessorEndContract` return type is the hydrated `Contract`; no `as Contract` in its body | Type-level + grep | M1 | TS compiles; grep finds zero matches in the function |
-| AC-2 | TC-2 | `JSON.parse(...) as Contract` absent from `packages/**/src/**` | Grep | M1 | Zero matches |
-| AC-2 | TC-3 | `migration plan`, `migration new`, `migration apply`, `migration show`, `db-verify` each route on-disk contract reads through `familyInstance.validateContract` | Code-level (review + grep for `validateContract` calls at the new sites) | M1 | All five sites converted |
-| AC-3 | TC-4 | `normaliseTypeEntry` rejects an untagged codec triple with a diagnostic naming the offending entry | Unit | M1 | Throws; error message includes the entry name |
-| AC-3 | TC-5 | `normaliseTypeEntry` still accepts a tagged `codec-instance` entry and a `postgres-enum` entry | Unit | M1 | Both round-trip |
-| AC-4 | TC-6 | `pnpm prisma-next migration plan` against `examples/prisma-next-demo` is a no-op (does not crash) | E2E (CI job) | M1 | Exit 0; no diff |
-| AC-5 | TC-7 | Demo `start-/end-contract.json` files validate under the strict serializer | Snapshot (parse each file and call `familyInstance.validateContract`) | M1 | All parse + validate |
-| AC-6 | TC-8 | `contract-normalization-responsibilities.mdc` accurately describes the serializer seam; references to "validator does NOT normalize" are removed | Doc review | M1 | Rule text matches current behaviour |
-| AC-7 | TC-9 | A rule declares `as Contract` a serializer-bypass smell + the review skills reference it | Doc review | M1 | Rule file + cross-references exist |
-| AC-8 | TC-10 | A workspace script greps for `as Contract\b` / `as Contract<` and fails on hits outside the allowlist | Harness | M1 | Script exits non-zero on a planted hit; exit 0 on the cleaned tree |
-| AC-9 | TC-11 | One fixture per polymorphic-slot `kind` exists and exercises the snapshot-read seam | Unit | M1 | Tests pass; fixtures named for their kinds |
-| AC-10 | TC-12 | CI job invokes the demo's `migration plan` against the checked-in history; fails on non-zero | CI config | M1 | Job exists; runs on PR + main |
-| AC-11 | TC-13 | `pnpm typecheck`, `pnpm test:packages`, `pnpm lint:deps`, `pnpm lint:no-contract-cast` (or equivalent) all green | Harness | M1 | All gates pass |
+| AC | TC | Test case | Type | Covered by |
+|---|---|---|---|---|
+| AC-1 | TC-1 | `readPredecessorEndContract` return type is the hydrated `Contract`; no `as Contract` in its body | Type-level + grep | D1 |
+| AC-2 | TC-2 | `JSON.parse(...) as Contract` absent from `packages/**/src/**` | Grep gate | D1 + D5 (lint guard) |
+| AC-2 | TC-3 | All five CLI sites route through `familyInstance.validateContract` | Code review + grep for `validateContract` calls | D1 |
+| AC-3 | TC-4 | `normaliseTypeEntry` rejects untagged codec triple with diagnostic | Unit (already landed in cherry-pick `dd054f651` / commit 2) | ✅ Phase 1 |
+| AC-3 | TC-5 | `normaliseTypeEntry` still accepts tagged `codec-instance` + `postgres-enum` | Unit | ✅ Phase 1 |
+| AC-4 | TC-6 | `pnpm prisma-next migration plan` against demo is a no-op (does not crash) | E2E / CI gate | D2 (substrate change) + D5 (CI gate) |
+| AC-5 | TC-7 | Demo `start-/end-contract.json` validate under the strict serializer | Snapshot validation | D2 (codemod application) |
+| AC-6 | TC-8 | `contract-normalization-responsibilities.mdc` accurately describes the serializer seam | Doc review | ✅ Phase 1 (commits `a918547ae`, `ed21bdcb9`) |
+| AC-7 | TC-9 | A rule declares `as Contract` a serializer-bypass smell + review skills reference it | Doc review | ✅ Phase 1 (commits `a918547ae`, `ed21bdcb9`) |
+| AC-8 | TC-10 | Workspace script greps for `as Contract\b` / `as Contract<` outside allowlist | Harness | D5 (lint guard cherry-pick + path-glob update) |
+| AC-9 | TC-11 | One fixture per polymorphic-slot `kind` exists; exercises the snapshot-read seam | Unit | ✅ Phase 1 (commit `7dbbfe609`) |
+| AC-10 | TC-12 | CI job invokes the demo's `migration plan` against checked-in history; fails on non-zero | CI config | D5 |
+| AC-11 | TC-13 | `pnpm typecheck`, `pnpm test:packages`, `pnpm lint:deps`, `pnpm lint:no-contract-cast` all green | Harness | D7 (validation pass) |
 
-## Milestones
+## Dispatch sequence
 
-### Milestone 1: route all on-disk contract reads through the serializer seam (`m1`)
+7 dispatches. All sized ≤ M. Phase 1 (6 cherry-picks already landed on the v2 branch) is treated as D0 — a spike-flavoured scaffolding dispatch whose artefact is "the v2 branch with clean cherry-picks." That work is recorded for the historical trail but not re-decomposed here.
 
-The entire spec ships in one milestone. The work is intertwined: stripping `normaliseTypeEntry`'s fallthrough invalidates the demo's checked-in snapshots, so demo regeneration has to land in the same PR. Commits are sequenced for individual greenness; full validation gate runs once at end-of-round.
+| # | Dispatch | Size | Tier | Implementer | Reviewer | Sequencing |
+|---|---|---|---|---|---|---|
+| ✅ D0 | Phase 1 — worktree spin + 6 cherry-picks (spec, strict throw, fixtures, rules ×3) | (completed) | (mixed) | shell subagent + orchestrator | orchestrator | DONE |
+| D1 | CLI seam re-implementation against post-restructure file layout | M | Opus | orchestrator | reviewer subagent | First — foundation for D2 + D5 |
+| D2 | Upgrade-instructions entry + codemod (user-skill side, applied to demo) | M | Opus | orchestrator | reviewer subagent | After D1 |
+| D3 | Mirror codemod entry to extension-skill side | S | Sonnet | implementer subagent | reviewer subagent | After D2 |
+| D4 | Manual-QA script revision with upgrade-journey scenarios | S | Sonnet | implementer subagent OR orchestrator | reviewer subagent | After D1; parallel to D2/D3 |
+| D5 | Fixups bundle: lint guard (path-glob update) + demo CI gate + test hygiene | M | Sonnet | implementer subagent | orchestrator | After D2 (substrate must be stable) |
+| D6 | Rationale-comments re-author (the original commit-5 `b4d829858` against post-seam shapes) | S | Sonnet | implementer subagent | orchestrator | After D1 |
+| D7 | Validation + PR open + close PR #520 | S | Opus | orchestrator | n/a | Last |
 
-**Suggested commit sequencing** (implementer can adjust if a different shape reads cleaner):
+**M-cap compliance.** No dispatch is L or XL. Two M dispatches (D1, D2) carry the design judgment and stay at the orchestrator's tier. The four S dispatches are mechanical with tight briefs; cheaper tier is safe because the gates carry the risk per [`decomposition-and-cost.md`](../../drive-domain-model/principles/decomposition-and-cost.md).
 
-1. Route bypass sites through `validateContract` (no behavioural change yet — `normaliseTypeEntry` still papers over untagged shapes).
-2. Strip `normaliseTypeEntry` fallthrough; add unit tests pinning the strict-throw behaviour.
-3. Regenerate demo `start-/end-contract.json` files under the strict deserializer.
-4. Add per-kind fixtures + snapshot-read test seam.
-5. Rewrite `contract-normalization-responsibilities.mdc`; add `as Contract` smell rule; wire into review skills.
-6. Add `lint:no-contract-cast` workspace script + CI job.
-7. Add demo-in-CI workflow job.
+## Per-dispatch DoR/DoD seeds
 
-**Tasks:**
+Each dispatch's full brief is assembled at delegation time per [`brief-discipline.md`](../../drive-domain-model/principles/brief-discipline.md). The seeds below carry the dispatch-specific items the brief expands.
 
-- [ ] **T1.1** Route `readPredecessorEndContract` in `packages/1-framework/3-tooling/cli/src/commands/migration-plan.ts:72-87` through `familyInstance.validateContract`. The function should resolve the right `familyInstance` (the predecessor migration's target family); return type becomes the hydrated `Contract`. (satisfies: TC-1, partial TC-3)
-- [ ] **T1.2** Route the second `migration-plan.ts` cast site (`toContractJson = JSON.parse(contractJsonContent) as Contract`, ~line 186) through `familyInstance.validateContract`. The downstream `familyInstance.validateContract(toContractJson)` call becomes redundant — collapse to the single seam. (satisfies: partial TC-3)
-- [ ] **T1.3** Route `migration-new.ts:92-102` (`toContractJson = JSON.parse(contractJsonContent) as Contract`) through `familyInstance.validateContract`. (satisfies: partial TC-3)
-- [ ] **T1.4** Route `migration-apply.ts:159-178` (`contractRaw = JSON.parse(contractContent) as Contract`) through `familyInstance.validateContract`. (satisfies: partial TC-3)
-- [ ] **T1.5** Route `migration-show.ts:281-289` (`appContract = JSON.parse(contractJsonContent) as Contract`) through `familyInstance.validateContract`. (satisfies: partial TC-3)
-- [ ] **T1.6** Audit `db-verify.ts:265-280` and any other CLI command that reads on-disk JSON contracts; route through the seam if functionally equivalent. If `db-verify`'s family-internal re-validation is the seam crossing, leave it but add a comment naming the seam-of-record. (satisfies: partial TC-3)
-- [ ] **T1.7** Grep `packages/**/src/**` for `JSON.parse(.*\)\s*as\s+Contract` to confirm zero hits remain. Any hit not covered above is in scope; surface unfamiliar sites to the orchestrator before fixing. (satisfies: TC-2)
-- [ ] **T1.8** Strip the fallthrough at `packages/2-sql/1-core/contract/src/ir/sql-storage.ts:129` in `normaliseTypeEntry`. After the change, an entry that fails both `isPostgresEnumStorageEntry` and `isStorageTypeInstance` (i.e. an untagged codec triple) throws a `PrismaNextError`-style diagnostic naming the entry's `name` (if present) and its discriminator (or "missing `kind`"). (satisfies: TC-4)
-- [ ] **T1.9** Add unit tests for `normaliseTypeEntry`: one fixture for each of (a) tagged `codec-instance`, (b) `postgres-enum`, (c) untagged-triple (asserts throw + diagnostic). (satisfies: TC-4, TC-5)
-- [ ] **T1.10** Regenerate `examples/prisma-next-demo/migrations/app/**/start-contract.json` and `end-contract.json` under the strict deserializer. Run `pnpm prisma-next migration plan` against the demo to derive the new shapes; commit the resulting files. (satisfies: TC-6, TC-7)
-- [ ] **T1.11** Add a snapshot-validation test that parses every checked-in `*-contract.json` in `examples/**` and `packages/**/test/**/fixtures/**` and round-trips it through `familyInstance.validateContract`. (satisfies: TC-7)
-- [ ] **T1.12** Add per-polymorphic-slot-`kind` fixtures under a test package (suggested: a new `packages/2-sql/1-core/contract/test/fixtures/snapshot-read-shapes/` directory). One fixture file per kind shipped in tree: `codec-instance.json`, `postgres-enum.json`, and any pgvector-contributed kinds the implementer enumerates during execution. Each fixture round-trips through the snapshot-read seam under test. (satisfies: TC-11)
-- [ ] **T1.13** Rewrite `.cursor/rules/contract-normalization-responsibilities.mdc` to describe current behaviour: the serializer (`familyInstance.validateContract` → `ContractSerializer.deserializeContract` → `hydrateSqlStorage`) is the single normalisation seam for on-disk reads; the builder authors contracts in-memory; the validator both validates structure (arktype) and hydrates into class instances. Remove the "validator does NOT normalize" stance and the example that hand-rolls normalisation outside the serializer. (satisfies: TC-8)
-- [ ] **T1.14** Add an `as-contract-cast-smell.mdc` rule (or add to an existing rule — implementer's call) declaring: any `as Contract` / `as Contract<…>` cast in production code is a serializer-bypass smell. Prescribe the `as unknown` + `validateContract<Contract>(...)` replacement (per existing `typed-contract-in-tests.mdc`). Cross-link from `validate-contract-usage.mdc`. (satisfies: TC-9)
-- [ ] **T1.15** Reference the new rule from the review skills (`.agents/skills/drive-code-review`, `.agents/skills/drive-pr-local-review`) so reviewers flag the smell during PR review. Pick the natural insertion point in each skill's "what to flag" section. (satisfies: TC-9)
-- [ ] **T1.16** Add a workspace script (e.g. `scripts/lint-no-contract-cast.sh` or a Node script under `scripts/`) that greps for `as Contract\b` and `as Contract<` in `packages/**/src/**` and fails on any hit outside the allowlist (`**/*.test.ts`, `**/*.test-d.ts`, the serializer implementation files). Wire into `pnpm lint:no-contract-cast` and into the existing CI lint job (likely under `package.json` scripts + the appropriate GitHub Actions workflow). (satisfies: TC-10)
-- [ ] **T1.17** Add a CI job (extend existing `.github/workflows/*.yml`) that runs `pnpm prisma-next migration plan` against `examples/prisma-next-demo` and asserts exit 0 + no resulting diff. If the harness has Postgres infrastructure, also run `migration apply`; if not, plan-only and file a follow-up. (satisfies: TC-12)
-- [ ] **T1.18** Run the milestone validation gate (full set, once): `pnpm typecheck && pnpm test:packages && pnpm lint:deps && pnpm lint:no-contract-cast` (or whatever the lint script lands as). (satisfies: TC-13)
+### D1 — CLI seam re-implementation
 
-**Validation gate:**
+**Outcome.** Every on-disk contract read in `packages/1-framework/3-tooling/cli/src/commands/**.ts` routes through `familyInstance.validateContract`. Targets: `migrate.ts` (post-rename from `migration-apply.ts`), `migration-plan.ts` (both sites: `readPredecessorEndContract` + `toContractJson`), `migration-show.ts`, `migration-new.ts`, `db-verify.ts`. Folds in the predecessor error envelope from the original commit `92b3c647b`.
 
-- `pnpm typecheck`
-- `pnpm test:packages`
-- `pnpm lint:deps`
-- `pnpm lint:no-contract-cast` (new — name may shift during implementation)
-- Demo CI workflow runs locally via `pnpm prisma-next migration plan` against `examples/prisma-next-demo` (exit 0, no diff)
-- Cross-package check: grep for `as Contract` in `packages/**/src/**` returns zero hits outside the allowlist
+**Scope (out).** `b4d829858`'s rationale comments (deferred to D6); lint guard (D5); CI gate (D5); upgrade-instructions (D2/D3).
 
-### Close-out (required)
+**Edge cases.**
 
-- [ ] Verify all acceptance criteria in `projects/tml-2536-contract-deserializer-seam/spec.md` are met (link to tests / PR diff).
-- [ ] Confirm no `formatRevision` / `canonicalVersion` field was added anywhere (regression-on-no-back-compat).
-- [ ] Confirm `PostgresEnumStorageEntry` / `PostgresEnumTypeSchema` were not moved or renamed (out of scope; TML-2537's territory).
-- [ ] Strip references to `projects/tml-2536-contract-deserializer-seam/**` from `docs/`, READMEs, comments, and other durable artifacts. The rule rewrite is the durable record; the project folder is disposable.
-- [ ] Delete `projects/tml-2536-contract-deserializer-seam/`.
-- [ ] Do **not** manually transition TML-2536; the PR's branch name carries the identifier and GitHub will auto-complete on merge.
+| Edge case | Disposition |
+|---|---|
+| Upstream's `createControlStack` / `familyInstance` plumbing already wraps some reads | Re-route through the existing plumbing rather than introducing a parallel seam — calibration § 4.1 (dual-shape relocated) |
+| A site has been refactored such that `JSON.parse` no longer appears verbatim | Read carefully; the cast pattern may have shifted to `as Contract` on an already-parsed object — same anti-pattern, same fix |
+| `db-verify.ts` family-internal re-validation IS the seam crossing | Document with a comment naming the seam-of-record; no refactor needed |
+| Destructive git operations (subagent dispatches only) | Forbidden without orchestrator approval per calibration § 4.5 — N/A here (orchestrator implements) but propagate to all subagent briefs |
 
-## Open Items
+**Done when.**
 
-- **Demo `migration apply` in CI.** Whether the demo CI job can run `migration apply` depends on whether a shared Postgres test harness is available to it. If not, scope to `migration plan` only and file a follow-up ticket for `apply` coverage (the planner crash that motivated TML-2536 surfaces at plan time, so plan-only still closes the regression vector).
-- **Pgvector and other extension-contributed `kind` values.** AC-9 says "one fixture per polymorphic-slot `kind` shipped in tree." During execution, the implementer enumerates the actual `kind` set under `entityTypeRegistry` (and any target-contributed extensions); the spec list (`codec-instance`, `postgres-enum`) is a minimum.
-- **`db-verify.ts` seam shape.** The function path-of-record may use the family's `verify` method, which internally re-validates. If so, T1.6 may be a no-op + a clarifying comment rather than a refactor. Implementer's call.
-- **Cross-pollination with TML-2537.** If TML-2537 lands before this PR merges, the `normaliseTypeEntry` strip in T1.8 may need to rebase against a moved `PostgresEnumStorageEntry`. No hard sequencing requirement; rebase cost is small.
-- **TML-2515 back-compat policy.** Unanswered. Until it lands, "no back-compat for on-disk shapes" stands as the operating assumption.
+- [ ] `pnpm typecheck` clean
+- [ ] `rg "as Contract\b" packages/1-framework/3-tooling/cli/src/commands/` returns zero hits in non-test files
+- [ ] All five CLI commands' existing unit tests pass: `pnpm --filter cli test`
+- [ ] WIP-inspection diff-read: no new helper introduced that re-stamps the legacy shape (§ 4.1 check)
+- [ ] One commit; commit message references this plan + spec
+
+**Inputs.** Spec; methodology calibration § 4.1 + § 4.4 + § 4.5; upstream-overlap investigation; original commits `594436307` + `92b3c647b` for the intent (not the literal patch — re-implement).
+
+### D2 — Upgrade-instructions entry + codemod (user-skill side, applied to demo)
+
+**Outcome.** New `skills/upgrade/prisma-next-upgrade/upgrades/0.9-to-0.10/instructions.md` with one entry describing the strict-deserializer breaking change for end users. The entry's codemod (file under the same directory) transforms pre-strict on-disk contract snapshots (untagged codec triples) to post-strict shape (tagged `kind: 'codec-instance'`). Apply the codemod to `examples/prisma-next-demo/migrations/app/**/*.json` in-place to produce the demo's PR-branch substrate state. Validation-by-execution: reverting + re-running the codemod reproduces the substrate state.
+
+**Scope (out).** Extension-skill mirror (D3); manual-QA scenarios for the upgrade journey (D4); demo-regen-from-scratch (Option B — explicitly rejected).
+
+**Edge cases.**
+
+| Edge case | Disposition |
+|---|---|
+| Codemod re-introduces silent shape coercion under a new function name | Refuse + surface — calibration § 4.1 dual-shape failure mode |
+| The codemod's `--check` mode diverges from `--apply` output | Refuse + surface — that's a codemod-correctness bug |
+| A demo migration has a snapshot the codemod can't transform | Document the unhandled case in the entry's prose; defer to a per-substrate-shape follow-up if it materialises |
+| Demo migrations under existing strict shape already (regression-style) | Codemod is a no-op for those; entry prose calls this out |
+
+**Done when.**
+
+- [ ] `skills/upgrade/prisma-next-upgrade/upgrades/0.9-to-0.10/` directory exists with `instructions.md` + codemod
+- [ ] Demo migrations under `examples/prisma-next-demo/migrations/app/**/*.json` validate under the strict deserializer
+- [ ] `pnpm check:upgrade-coverage --mode pr` exits 0
+- [ ] Validation-by-execution: from a clean revert of the demo's untagged shape, running the codemod's `--apply` produces a diff identical to the PR-branch state
+- [ ] `pnpm prisma-next migration plan` against the demo is a no-op (TC-6 verified)
+
+**Inputs.** Spec; the `record-upgrade-instructions` skill recipe; the existing `0.8-to-0.9/` entries as reference shape (under `skills/upgrade/prisma-next-upgrade/upgrades/0.8-to-0.9/instructions.md`); calibration § 4.1.
+
+### D3 — Mirror codemod entry to extension-skill side
+
+**Outcome.** New `skills/extension-author/prisma-next-extension-upgrade/upgrades/0.9-to-0.10/instructions.md` mirroring D2's entry with extension-author framing. Codemod transformation is structurally the same; only the prose audience differs (an extension author authoring against `@prisma-next/extension-*` packages, not an end-user with a demo).
+
+**Scope (out).** Substrate application — extension authors have no in-tree demo to stamp.
+
+**Edge cases.**
+
+| Edge case | Disposition |
+|---|---|
+| Extension audience's shape differs from end-user audience's shape | Surface — D2/D3 split assumed structural equivalence |
+| Destructive git operations in dispatch ritual | Forbidden per § 4.5; brief enforces |
+
+**Done when.**
+
+- [ ] Directory + files exist; `pnpm check:upgrade-coverage --mode pr` passes for the extension-skill side
+- [ ] Prose audience-aligned (named extension authors, not end users, in motivation + recipe)
+
+**Inputs.** D2's output; the existing `0.8-to-0.9/` extension-skill entries.
+
+### D4 — Manual-QA script revision
+
+**Outcome.** Revise `projects/tml-2536-contract-deserializer-seam/manual-qa.md` to (a) restructure per the new `drive-qa-plan` skill body, (b) add upgrade-journey scenarios for both audiences (end users via the demo; extension authors via `packages/3-extensions/`). Existing scenarios stay; new ones are added.
+
+**Scope (out).** Running the QA (that's a different skill — `drive-qa-run`); the report (also `drive-qa-run`).
+
+**Edge cases.**
+
+| Edge case | Disposition |
+|---|---|
+| Existing scenarios contradict the new structure | Reshape; preserve substance |
+| Manual-QA reveals the codemod can't recreate demo state in practice | Add as 🛑 Blocker scenario for QA runner to surface |
+
+**Done when.**
+
+- [ ] File exists at `projects/tml-2536-contract-deserializer-seam/manual-qa.md`
+- [ ] Structurally matches `drive-qa-plan` body (TOC-first; "What this script is testing" block; per-scenario severity rubric)
+- [ ] Names both prisma-next audiences (calibration § 9.1)
+
+**Inputs.** Existing untracked `manual-qa.md` draft (in the predecessor worktree); `drive-qa-plan` skill body; calibration § 9.
+
+### D5 — Fixups bundle
+
+**Outcome.** Three cherry-picks landed on v2 with mechanical touch-up:
+
+1. `a6bf08da8` — lint guard. Path-glob update for `migration-apply.ts` → `migrate.ts` rename.
+2. `c57bceb6f` + `560b8fd54` — demo CI gate + `--json` fix.
+3. `827aed650` + `c2ba02755` — test hygiene (transient task-ID strip + pathe in tests).
+
+**Scope (out).** Anything substantive beyond touch-up.
+
+**Edge cases.**
+
+| Edge case | Disposition |
+|---|---|
+| Cherry-pick conflicts beyond mechanical | Stop, surface — likely indicates another upstream restructure |
+| Lint guard's allowlist needs a new entry | Surface — that's a design decision, not a touch-up |
+| Destructive git operations | Forbidden per § 4.5 |
+
+**Done when.**
+
+- [ ] All five cherry-picks landed; commit count expected: ≥ 3 (one per logical group; could be more)
+- [ ] `pnpm lint:no-contract-cast` exits 0
+- [ ] Demo CI job invoked locally passes
+- [ ] Test hygiene unit tests pass
+
+**Inputs.** Spec; the original sha set; current v2 file layout for the lint-guard path-glob.
+
+### D6 — Rationale-comments re-author
+
+**Outcome.** Re-derive the `as unknown as Contract` rationale comments (originally in commit `b4d829858`, deferred due to structural conflict with upstream restructure). Apply against post-D1 file shapes. Drop now-redundant casts (the original commit dropped 2 in `graph-walk.ts` / `synth.ts`).
+
+**Scope (out).** Introducing new casts; broader refactors.
+
+**Edge cases.**
+
+| Edge case | Disposition |
+|---|---|
+| A site has been deleted by D1 (cast removed entirely) | No comment needed; skip |
+| A site has been restructured but the cast still exists | New rationale derived from current code shape |
+| Destructive git operations | Forbidden per § 4.5 |
+
+**Done when.**
+
+- [ ] All 10 sites from `b4d829858` revisited; per-site outcome documented in dispatch summary
+- [ ] `pnpm typecheck` clean
+- [ ] WIP-inspection diff-read confirms no new casts introduced
+
+**Inputs.** Original commit `b4d829858` diff for the *intent* (not the literal patch); current file shapes on v2.
+
+### D7 — Validation + PR open
+
+**Outcome.** Full validation gate pass; PR opened; PR #520 closed with a pointer.
+
+**Scope (out).** Substantive changes.
+
+**Edge cases.**
+
+| Edge case | Disposition |
+|---|---|
+| A gate fails | Stop, surface to operator — gate-of-record failure, not a touch-up moment |
+| Composition drift surfaces (e.g. D2's codemod doesn't satisfy D5's CI gate) | Stop, surface — design discussion trigger |
+
+**Done when.**
+
+- [ ] `pnpm typecheck` clean
+- [ ] `pnpm test:packages` passing
+- [ ] `pnpm test:integration` passing (where applicable)
+- [ ] `pnpm lint:deps` clean
+- [ ] `pnpm lint:no-contract-cast` clean
+- [ ] `pnpm check:upgrade-coverage --mode pr` clean
+- [ ] `pnpm fixtures:check` clean
+- [ ] Grep gate from calibration § 5.3 (project-artefact-leak): zero hits outside `projects/`
+- [ ] Branch pushed; PR opened with `tml-2536:` title prefix
+- [ ] PR #520 closed with pointer comment
+
+**Inputs.** Spec § Acceptance Criteria; calibration § 3.2 + § 5.3; PR template (drive-pr-description).
+
+## Validation gate (full slice)
+
+Run at D7 only — per-dispatch gates run within each dispatch:
+
+```bash
+pnpm typecheck
+pnpm test:packages
+pnpm test:integration            # if changes touch PGlite / PG paths
+pnpm lint:deps
+pnpm lint:no-contract-cast
+pnpm check:upgrade-coverage --mode pr
+pnpm fixtures:check              # if IR / emitter / serialiser changes
+```
+
+Plus the calibration grep gates that apply (§ 5.3 in particular).
+
+## Open items
+
+- **Demo `migration apply` in CI.** Whether the demo CI job (D5) can run `migration apply` depends on whether a shared Postgres harness is available. Scope to `migration plan` only if not.
+- **Pgvector / other extension-contributed `kind` values.** Enumerate during D1; AC-9 says "one fixture per kind shipped in tree."
+- **`db-verify.ts` seam shape.** May be a no-op + clarifying comment rather than a refactor; D1's call.
+- **Slice-PR-cap retro item.** Logged for slice-closure retro: this slice is at the upper end of the PR-cap. If reviewer feedback indicates the PR is hard to review, calibration § 1 needs a recalibration note.
