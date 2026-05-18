@@ -185,21 +185,71 @@ The functions for hash recomputation already exist (used by `migration plan`'s m
 
 ---
 
-### M7 — Close-out (docs + cleanup)
+### M7 — Close-out (docs)
 
-**Goal:** docs match the surface; the project directory is deleted; vocabulary lives in canonical locations.
+**Goal:** docs match the surface; vocabulary lives in canonical locations. The project directory is **retained** through PR review + QA — see § Operating-context note below — so the spec, plan, audit, domain map, and reviews are available to the reviewer + QA runner. A separate close-out task after the PR merges will delete the directory once QA artefacts have been migrated.
 
 **Tasks:**
 
 - [ ] Promote `domain.md`'s settled vocabulary into `docs/glossary.md` (or fold and replace; depends on what's there).
 - [ ] Update `docs/architecture docs/subsystems/7. Migration System.md` for the full new verb taxonomy. Remove references to `migration apply`, `migration ref`, `migration status --ref/--graph/--all`. Add `migration check`. Note `migration preflight` as the next-vocab gap pending a separate project. Update the Git-inspired analogy section to use the resolved vocabulary (contract / migration / ref distinctions).
 - [ ] Update `docs/CLI Style Guide.md` for the new top-level subjects (`migrate`, `ref`).
-- [ ] Grep-sweep `docs/` and `packages/*/README.md` / `DEVELOPING.md` for references to removed verb names. Replace or remove.
+- [ ] **Grep-sweep is wider than the original plan called for.** In addition to `docs/` and `packages/*/README.md` / `DEVELOPING.md`, sweep `**/SKILL.md` files and non-CLI source-file comments (especially `packages/0-shared/skills/skills/prisma-next-debug/SKILL.md`, `packages/1-framework/1-core/framework-components/src/control/control-capabilities.ts`, `packages/3-mongo-target/1-mongo-target/src/core/control-target.ts`, `packages/2-mongo-family/9-family/src/core/schema-verify/canonicalize-introspection.ts`). Rationale recorded in `wip/unattended-decisions.md § 7`. After the sweep, `rg 'migration apply|migration ref |migration status --ref|--graph|--all|--limit' packages/ docs/` should produce zero hits outside the project directory itself (which is retained for review per the operating-context note).
 - [ ] File the follow-up Linear ticket for the `migration preflight` project (carries the design questions: sandbox lifecycle, initial-state strategy, Postgres + Mongo flavors).
 - [ ] File a follow-up Linear ticket for the residual internal renames (`MigrationApplied` event, `control-api/operations/` → `commands/`, etc.) that this project explicitly carries as non-goals.
-- [ ] Delete `projects/migration-domain-model/`.
+- [ ] File a follow-up Linear ticket (or reuse TML-2546) tracking the eventual deletion of `projects/migration-domain-model/` once QA artefacts are migrated. Do NOT delete the directory in this PR.
 
 **Validation.** AC1, AC9. `pnpm fixtures:check` and `pnpm lint:deps` pass. `pnpm test:journeys` and `pnpm test:all` are green.
+
+**Operating-context note (orchestrator amendment, see `wip/unattended-decisions.md § 8`).** The plan originally specified deleting `projects/migration-domain-model/` in M7. The user has directed during execution that the project directory must be retained through PR review + QA so the reviewer and QA runner have access to the spec, plan, audit, domain map, references, and reviews. M7 therefore stops at the docs migration; the directory deletion is deferred to a post-merge cleanup task tracked separately.
+
+#### M7 R2 — Forward-compatible doc-framework alignment (orchestrator amendment)
+
+**Why this exists.** The project produced substantial modeling work (`domain.md`, `established-conventions.md`, vendor research under `references/`) that would otherwise be lost when the project directory is eventually deleted. The user directed mid-execution that this content must be preserved in durable homes, *forward-compatible with the `docs-framework` skill's `docs/design/` layout but without wholesale framework adoption.* Rationale recorded in `wip/unattended-decisions.md § 10`.
+
+**Goal.** Port the modeling work into `docs/design/` paths that match the framework's expected layout exactly, so a future framework-adoption project lays in the missing slots without moving migration content a second time. No other framework slots are created.
+
+**Tasks:**
+
+- [ ] Port `projects/migration-domain-model/domain.md` → `docs/design/10-domains/migration/README.md`. Rename to `README.md` per the framework's per-slot convention. Strip project-artefact references (workspace rule: durable docs do not reference `projects/<x>/...`, milestone IDs, AC IDs, etc.). Align vocabulary with `docs/glossary.md` as updated by M7 R1 — any drift between `domain.md`'s wording and the glossary resolves toward the glossary.
+- [ ] Port `projects/migration-domain-model/established-conventions.md` → `docs/design/04-inspirations/migrations/established-conventions.md`. Strip project-artefact references.
+- [ ] Port `projects/migration-domain-model/references/atlas.md` → `docs/design/04-inspirations/migrations/atlas.md`.
+- [ ] Port `projects/migration-domain-model/references/active-record.md` → `docs/design/04-inspirations/migrations/active-record.md`.
+- [ ] Write `docs/design/README.md` — a slim entry doc that honestly frames the partial state: "this directory uses the `docs-framework` skill's layout. Currently populated: `04-inspirations/migrations/`, `10-domains/migration/`. Other framework slots (`00-purpose/`, `01-principles/`, `03-domain-model/`, `05-infrastructure/`, `06-operations/`, `90-decisions/`, `99-process/`) are not yet created; they will be added when there is content for them. Wholesale framework adoption is a separate, future decision."
+- [ ] Write a brief `docs/design/04-inspirations/migrations/README.md` framing the inspirations (which systems, what we took from each).
+- [ ] Write a brief `docs/design/10-domains/migration/README.md` introduction — actually, **rename** the ported `domain.md` directly into this slot. There is no separate intro file; the ported domain content *is* the README.
+- [ ] Cross-link: `docs/architecture docs/subsystems/7. Migration System.md` gets a header note pointing at `docs/design/10-domains/migration/` for the conceptual domain reference. The domain doc has a complementary pointer at the bottom to the subsystem doc for implementation details.
+- [ ] Update TML-2553 (the project-directory deletion ticket) to reflect that the keeper content has been migrated — the post-merge close-out is now a pure delete, no migration step needed.
+
+**Tasks explicitly NOT in this round:**
+
+- Do NOT create `docs/design/00-purpose/`, `01-principles/`, `03-domain-model/`, `05-infrastructure/`, `06-operations/`, `90-decisions/`, or `99-process/`. Empty scaffolds imply false completeness.
+- Do NOT move `docs/glossary.md` into `docs/design/03-domain-model/glossary.md`. M7 R1 just landed clean content there; it stays canonical. The glossary location inversion is a separate, future decision.
+- Do NOT migrate ADRs from `docs/architecture docs/adrs/`. The framework explicitly says "keep existing ADR system."
+- Do NOT trim the subsystem doc's "Mental model" section even though it now duplicates the domain doc. That trim is a separate, deliberate edit; deferring keeps blast radius small.
+- Do NOT delete `projects/migration-domain-model/`. The user-override on retention still applies.
+
+**Validation.** AC9. `pnpm lint:deps` passes. `pnpm test:journeys` and `pnpm test:all` are green (modulo pre-existing Postgres infra-noise per M7 R1's documented baseline). The M7 R1 grep-sweep gate (`rg 'migration apply|migration ref |migration status --(ref|graph|all)|--limit' packages/ docs/ -g '!projects/**'`) must still produce zero hits — the port must NOT reintroduce stale verbs.
+
+#### M7 R3 — QA-driven fix round (orchestrator amendment)
+
+**Why this exists.** The first `drive-qa-run` pass (commit `793ec58a3`) returned ❌ Fail with two ⚠️ High findings and seven 📝 Follow-ups. Per the orchestrator's small-PR policy (decision §11 in `wip/unattended-decisions.md`), every finding is folded into this round rather than ticketed. After this round, the QA pass is re-run; the project is shippable when QA returns ✅ Pass (with or without follow-ups).
+
+**Goal.** Both Highs fixed (AC5 and AC6 promises restored); cheap Follow-ups landed; QA script updated to match. No tickets filed for any finding.
+
+**Tasks:**
+
+- [ ] **F-1 (High) — `migration show` reachability.** In `packages/1-framework/3-tooling/cli/src/commands/migration-show.ts`, defer the aggregate-loader's pgvector-layout check until after `parseMigrationRef` resolves the input. The wrong-grammar diagnostic must reach the user even when the contract space hasn't been materialised yet. Add a journey test that exercises this path (invalid migration ref against a canonical-demo-state contract space without prior `migrate`) and asserts the diagnostic + exit code.
+- [ ] **F-2 (High) — `migration check <m>` PN-005 false negative.** In `packages/1-framework/3-tooling/cli/src/commands/migration-check.ts`, lift the per-migration snapshot-consistency check (currently only invoked on the graph-wide path) into a shared helper called from both the graph-wide and per-migration branches. Add an adversarial fixture test for `migration check <m>` with planted PN-005 corruption (parallels the existing graph-wide test). Asserts exit 4 + `PN-MIG-CHECK-005`.
+- [ ] **F-3 (Follow-up) — help ordering.** Reorder the top-level verb-family listing in `cli.ts`'s root-help formatter to match the spec's intended-surface diagram: `db` family, `migration` family, `migrate`, `ref`, then `init`. Currently `init` is at the bottom and `migrate` lands between `migration` and `ref`.
+- [ ] **F-4 (Follow-up) — `migrate --help` lists 4/5 forms.** The `--to` help text in `commands/migrate.ts` is missing two of the five contract-reference forms (`<dir>^` and `./path`). Reproduce the full grammar in the help text.
+- [ ] **F-5 (Follow-up, script) — wrong corruption recipe.** Update `projects/migration-domain-model/manual-qa.md` Scenario 4's "plant the corruption" recipe: the current recipe mutates `migration.json`'s hash (triggers PN-001), not `end-contract.json`'s `storageHash` (which triggers PN-005). Once F-2 lands, the per-migration recipe also becomes verifiable.
+- [ ] **F-6 (Follow-up) — hash-prefix minimum length drift.** Domain doc at `docs/design/10-domains/migration/README.md` says 8+; glossary + implementation say 6+. Reconcile by updating the domain doc to match the implementation (6+). Search for any other doc that mentions hash-prefix length and align.
+- [ ] **F-7 (Follow-up) — `migration graph --dot` shadowed by auto-JSON.** In `commands/migration-graph.ts`, the output-format resolver currently lets non-TTY auto-JSON detection win over an explicit `--dot` flag. Reverse the precedence: explicit `--dot` always produces DOT. Update the help text if it suggests anything to the contrary.
+- [ ] **F-8 (Follow-up) — `where` field format inconsistent.** In `migration-check.ts`, normalise the `where` field across PN codes. Today PN-001's `where` is a full path (`migrations/<dir>/migration.json`); PN-005's `where` is a short dirname. Pick one (the full relative path is more useful for the user); apply consistently across all 5 PN codes.
+- [ ] **F-9 (Follow-up, script) — pre-flight tree-cleanliness.** Update `projects/migration-domain-model/manual-qa.md` Pre-flight: the tree-cleanliness expectation must acknowledge two known-intentional uncommitted items (the `plan.md` amendment + `wip/unattended-decisions.md` updates). Either instruct the runner to commit them first (orchestrator does, in practice), to stash, or to acknowledge them as expected.
+
+**Validation.** All 9 ACs PASS. `pnpm lint:deps` + `pnpm test:journeys` + `pnpm test:packages` clean modulo documented Postgres baseline. After implementer + reviewer pass, **re-run `drive-qa-run`** (resume the runner agent) against the updated script. QA must return ✅ Pass or ✅ Pass-with-follow-ups (no ⚠️ High or 🛑 Blocker). Once QA passes, push to remote + verify CI.
 
 ## Implementation rules (apply to every milestone)
 
