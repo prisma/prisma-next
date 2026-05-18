@@ -4,38 +4,42 @@ import type { CreateInput } from '../src/types';
 type CreateInputContract = Contract<
   {
     storageHash: StorageHashBase<string>;
-    tables: {
-      user: {
-        columns: {
-          id: {
-            nativeType: 'int4';
-            codecId: 'pg/int4@1';
-            nullable: false;
-            default: {
-              kind: 'function';
-              expression: "nextval('user_id_seq'::regclass)";
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__';
+        tables: {
+          user: {
+            columns: {
+              id: {
+                nativeType: 'int4';
+                codecId: 'pg/int4@1';
+                nullable: false;
+                default: {
+                  kind: 'function';
+                  expression: "nextval('user_id_seq'::regclass)";
+                };
+              };
+              email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
+              slug: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+              created_at: {
+                nativeType: 'timestamptz';
+                codecId: 'pg/text@1';
+                nullable: false;
+                default: {
+                  kind: 'function';
+                  expression: 'now()';
+                };
+              };
             };
-          };
-          email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: true };
-          slug: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          created_at: {
-            nativeType: 'timestamptz';
-            codecId: 'pg/text@1';
-            nullable: false;
-            default: {
-              kind: 'function';
-              expression: 'now()';
-            };
+            primaryKey: { columns: ['id'] };
+            uniques: [];
+            indexes: [];
+            foreignKeys: [];
           };
         };
-        primaryKey: { columns: ['id'] };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
       };
     };
-    namespaces: { __unbound__: { id: '__unbound__' } };
   },
   {
     User: {

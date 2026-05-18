@@ -420,6 +420,7 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
         "tables": {
           "articles": {
             "columns": {
@@ -439,11 +440,14 @@
                 "nullable": false
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "comments": {
             "columns": {
@@ -478,11 +482,13 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "posts": {
             "columns": {
@@ -530,11 +536,13 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "profiles": {
             "columns": {
@@ -569,6 +577,7 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
@@ -598,6 +607,8 @@
                 "nullable": false
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
@@ -654,6 +665,7 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
@@ -670,7 +682,7 @@
         }
       }
     },
-    "storageHash": "sha256:c557abd3e5ad9f09d0e30f39eed25125953687299c4f837d037573183529618b"
+    "storageHash": "sha256:14a8fa05938393edb36bb0400cd3dd59e70d9a8e285b27c1261b0be3112b8eb8"
   },
   "execution": {
     "executionHash": "sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847",
