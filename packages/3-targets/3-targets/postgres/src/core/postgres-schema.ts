@@ -3,7 +3,15 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { StorageTable, type StorageTableInput } from '@prisma-next/sql-contract/types';
+import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
+
+export interface PostgresSchemaInput {
+  readonly id: string;
+  readonly tables?: Record<string, StorageTable | StorageTableInput>;
+  readonly types?: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+}
 
 /**
  * Postgres target `Namespace` concretion — a Postgres schema (`CREATE
@@ -17,15 +25,6 @@ import { escapeLiteral } from './sql-utils';
  * The unbound singleton below overrides these methods to elide the
  * prefix entirely — call sites stay polymorphic and never branch on
  * `id === UNBOUND_NAMESPACE_ID`.
- *
- * **Freeze-trap warning.** The constructor calls `freezeNode(this)` at
- * the end. Direct subclasses MUST NOT add instance fields — the freeze
- * runs in this base constructor and any subclass field assignment will
- * silently fail in non-strict mode or throw in strict mode. The
- * `PostgresUnboundSchema` singleton below is intentionally field-free
- * for this reason; if a future subclass needs to carry additional
- * fields, lift this `freezeNode` to the leaf-class constructors (or to
- * a `seal()` hook each leaf calls explicitly).
  */
 export class PostgresSchema extends NamespaceBase {
   /**
@@ -39,10 +38,28 @@ export class PostgresSchema extends NamespaceBase {
 
   readonly kind = 'schema' as const;
   readonly id: string;
+  readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly types: Readonly<Record<string, PostgresEnumType>>;
 
-  constructor(id: string) {
+  constructor(input: PostgresSchemaInput) {
     super();
-    this.id = id;
+    this.id = input.id;
+    this.tables = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.tables ?? {}).map(([name, t]) => [
+          name,
+          t instanceof StorageTable ? t : new StorageTable(t),
+        ]),
+      ),
+    );
+    this.types = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.types ?? {}).map(([name, ty]) => [
+          name,
+          ty instanceof PostgresEnumType ? ty : new PostgresEnumType(ty),
+        ]),
+      ),
+    );
     freezeNode(this);
   }
 
@@ -106,7 +123,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
   private constructor() {
-    super(UNBOUND_NAMESPACE_ID);
+    super({ id: UNBOUND_NAMESPACE_ID });
   }
 
   override qualifier(): string {
@@ -128,7 +145,7 @@ PostgresSchema.unbound = PostgresUnboundSchema.instance;
  * Target-supplied `Namespace` factory the Postgres target plumbs
  * through `defineContract({ createNamespace })` and the SQL PSL
  * interpreter. Returns the unbound singleton for the framework
- * sentinel and a fresh `PostgresSchema(id)` for any other coordinate.
+ * sentinel and a fresh `PostgresSchema` for any other coordinate.
  *
  * The factory has no per-call state — every named id deterministically
  * maps to a distinct schema instance — so callers can pass it through
@@ -139,5 +156,5 @@ export function postgresCreateNamespace(id: string): PostgresSchema {
   if (id === UNBOUND_NAMESPACE_ID) {
     return PostgresSchema.unbound;
   }
-  return new PostgresSchema(id);
+  return new PostgresSchema({ id });
 }
