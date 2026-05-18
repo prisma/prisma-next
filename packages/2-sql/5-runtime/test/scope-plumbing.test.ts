@@ -6,7 +6,7 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
   SelectAst,
@@ -45,7 +45,7 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: { storageHash: coreHash('sha256:test'), tables: {}, namespaces: {} },
+  storage: new SqlStorage({ storageHash: coreHash('sha256:test') }),
   extensionPacks: {},
   capabilities: {},
   meta: {},

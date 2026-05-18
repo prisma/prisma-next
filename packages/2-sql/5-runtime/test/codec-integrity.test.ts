@@ -3,7 +3,7 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
@@ -116,27 +116,31 @@ describe('createExecutionContext — column codec integrity', () => {
     readonly typeParams?: Record<string, unknown>;
     readonly typeRef?: string;
   }): Contract<SqlStorage> {
-    const storage: SqlStorage = {
+    const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables: {
-        Doc: {
-          columns: {
-            field: {
-              nativeType: column.nativeType,
-              codecId: column.codecId,
-              nullable: false,
-              ...(column.typeParams ? { typeParams: column.typeParams } : {}),
-              ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            Doc: {
+              columns: {
+                field: {
+                  nativeType: column.nativeType,
+                  codecId: column.codecId,
+                  nullable: false,
+                  ...(column.typeParams ? { typeParams: column.typeParams } : {}),
+                  ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+                },
+              },
+              primaryKey: { columns: ['field'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
           },
-          primaryKey: { columns: ['field'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
-      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-    };
+    });
     return {
       targetFamily: 'sql',
       target: 'postgres',
@@ -264,20 +268,25 @@ describe('createExecutionContext — column codec integrity', () => {
   it('accepts a typeRef column whose typed instance carries typeParams', () => {
     const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables: {
-        Doc: {
-          columns: {
-            embedding: {
-              nativeType: 'vector',
-              codecId: 'pgvector/vector@1',
-              nullable: false,
-              typeRef: 'V1536',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            Doc: {
+              columns: {
+                embedding: {
+                  nativeType: 'vector',
+                  codecId: 'pgvector/vector@1',
+                  nullable: false,
+                  typeRef: 'V1536',
+                },
+              },
+              primaryKey: { columns: ['embedding'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
           },
-          primaryKey: { columns: ['embedding'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       types: {
@@ -288,7 +297,6 @@ describe('createExecutionContext — column codec integrity', () => {
           typeParams: { length: 1536 },
         },
       },
-      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     });
     const contract: Contract<SqlStorage> = {
       targetFamily: 'sql',
