@@ -322,3 +322,19 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 **Why.** Each category catches a different failure class. CI catches mechanical contract violations; intent-validation catches "the implementer routed around the gate"; manual QA catches diagnostic clarity, end-to-end developer-journey breaks, original-bug regressions, gate-of-gate sanity, and exploratory unknowns. Lumping any two together makes the gap class invisible. The explicit-N/A discipline forces the slice author to confront the question rather than skip it silently.
 
 **Affected.** `principles/definition-of-done.md` § "CI gates, intent-validation, and manual QA are three different things" introduces the categories; § Slice DoD adds the manual-QA gate item; § Project DoD adds the manual-QA coverage check across slices; templates updated; anti-pattern #2 broadened from "validation-gates only" to "CI-gates only"; calibration overlay example for `prisma-next` adds QA references.
+
+## 23. Canonical drive-* bodies and `drive/<category>/README.md` are the two homes for memory; map every project-context overlay to its category README
+
+**Date.** 2026-05-18.
+
+**Context.** PR #93's project-context convention introduces a structural separation between portable methodology (canonical drive-* skill bodies in `prisma/ignite`) and team-specific protocol (`drive/<category>/README.md` in each consumer repo, read by drive-* skills as workflow step 1). The principle docs talked about the "general protocol vs project calibration" split in the abstract (D10) but didn't reflect that the project-calibration layer now has a concrete on-disk home with strong memory properties: loaded by the skill that needs it, every time, in time to apply the lesson. The `drive-reconcile-skills` + `drive-update-skills` pair makes the loop between the two homes operational rather than aspirational.
+
+**Options considered.**
+- (a) Keep talking about "calibration" generically; let teams figure out where to put each overlay item.
+- (b) Make the canonical-vs-project-context separation the structural commitment, name `drive/<category>/README.md` as the canonical home for each kind of overlay (per the PR #93 eight-category table extended with the three new categories this restructure adds: `triage`, `retro`, `health`), and treat the reconciliation skills as part of the protocol-as-memory loop.
+
+**Choice.** (b). The separation is explicit and load-bearing across the principle docs, the workflow, the calibration worked-example, and the skill restructure plan.
+
+**Why.** Generic "calibration" guidance is undisciplined — teams add items where it's convenient (often inside in-repo skill copies, which then drift from canonical). Naming the per-overlay home turns "where does this go?" into a lookup rather than a judgement call. The PR #93 convention guarantees the file is loaded by the matching skill; the reconciliation skills guarantee drift gets routed back rather than rotting. Together they make protocol-as-memory operational.
+
+**Affected.** `principles/protocol-as-memory.md` rewritten around two homes + a reconciliation loop, with `drive/<category>/README.md` added as a strong memory surface in the tier table. `principles/retro.md` mandatory-output section restructured into canonical update / project-context update / ADR (with explicit home selection heuristic) and the worked example lands in `drive/plan/README.md`. `principles/definition-of-ready.md` and `principles/definition-of-done.md` § "How calibration overlays the protocol" name the per-overlay destination. `principles/brief-discipline.md` names `drive/plan/README.md` as the canonical home for failure-mode catalogue + grep library + reference tasks + model-tier routing. `calibration/prisma-next.md` opens with a section-by-section mapping table to the destination READMEs. Skill-restructure already reflected this (D21); this decision codifies the principle-level commitment.

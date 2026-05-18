@@ -1,18 +1,22 @@
 # Prisma-Next calibration
 
-Project-specific calibration for the `prisma-next` codebase. This is the **worked-example calibration** that informs the general protocol — eventually this content lives in `prisma-next`'s own `docs/` rather than in this methodology project.
+Project-specific calibration for the `prisma-next` codebase. This is the **worked-example calibration** that informs the general protocol — eventually each section migrates to the matching `prisma-next/drive/<category>/README.md` per the [PR #93](https://github.com/prisma/ignite/pull/93) project-context convention.
 
 Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principles/), the calibration covers:
 
-1. Reference tasks for t-shirt-size anchoring (§ 1)
-2. Definition of Ready overlays at three scopes (§ 2)
-3. Definition of Done overlays at three scopes (§ 3)
-4. Failure-mode catalogue (§ 4)
-5. Grep library of anti-pattern patterns (§ 5)
-6. Model-tier routing (§ 6)
-7. Linear ceremony (§ 7)
-8. Maintenance discipline (§ 8)
-9. Manual-QA context (§ 9) — the source for `drive/qa/README.md` in this repo, per the [PR #93](https://github.com/prisma/ignite/pull/93) project-context convention
+| Section | Content | Eventual home in `prisma-next/` |
+|---|---|---|
+| § 1 | Reference tasks for t-shirt-size anchoring | `drive/plan/README.md` (read by `drive-slice-plan`, `drive-orchestrate-plan`) |
+| § 2 | Definition of Ready overlays at three scopes | Split: `drive/project/README.md` (project DoR), `drive/spec/README.md` + `drive/plan/README.md` (slice DoR), `drive/plan/README.md` (dispatch DoR) |
+| § 3 | Definition of Done overlays at three scopes | Split: `drive/project/README.md` + `drive/qa/README.md` (project DoD), `drive/plan/README.md` + `drive/qa/README.md` + `drive/pr/README.md` (slice DoD), `drive/plan/README.md` (dispatch DoD) |
+| § 4 | Failure-mode catalogue | `drive/plan/README.md` (drawn from by brief assembly per [`brief-discipline.md`](../principles/brief-discipline.md)) |
+| § 5 | Grep library of anti-pattern patterns | `drive/plan/README.md` (same — brief assembly threads the relevant patterns) |
+| § 6 | Model-tier routing | `drive/plan/README.md` (`drive-slice-plan` declares model tier per dispatch) |
+| § 7 | Linear ceremony | Split: `drive/project/README.md` (project conventions) + `drive/pr/README.md` (PR conventions) + `drive/post-update/README.md` (status updates) |
+| § 8 | Maintenance discipline | Applies to every category; lives in this doc and travels to whichever READMEs the maintenance discipline mentions |
+| § 9 | Manual-QA context | `drive/qa/README.md` (already authored as the source for this file) |
+
+The mapping is mechanical: every category has at most one consumer skill family per PR #93's table, and the calibration section's content flows to that family's README. Sections that span multiple categories (DoR / DoD overlays) split when they migrate.
 
 All sections are living documents — updated **trigger-based** when retros surface a learning (per [`principles/retro.md`](../principles/retro.md)), not on a calendar.
 
