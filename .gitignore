@@ -55,3 +55,6 @@ test/**/fixtures/generated/
 .claude/
 .devin/
 .windsurf/
+
+# Reference clones inside transient projects (browsing aids, not committed)
+projects/drive-domain-model/reference/
