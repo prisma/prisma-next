@@ -67,9 +67,9 @@ Living record of decisions made during shaping. Format mirrors `wip/unattended-d
 
 **Affected.** Dispatch time-boxes are enforced at the orchestrator level — overrun triggers interrupt + reassess, not extend.
 
-## 5. 5-minute standup-style check during every dispatch
+## 5. WIP-inspection cadence during every dispatch
 
-**Date.** 2026-05-17.
+**Date.** 2026-05-17. (Renamed from "5-minute standup-style check" to "WIP inspection" on 2026-05-17 — "WIP inspection" carries the Kanban lineage rather than the Scrum one and reads better in the Drive context where there are no actual standups.)
 
 **Context.** The drift failure we hit was invisible from file-system proxies (commit cadence, file modification rate). It became visible only when someone read the diff. The fix is to make diff inspection happen periodically, not just at dispatch end.
 
@@ -78,11 +78,11 @@ Living record of decisions made during shaping. Format mirrors `wip/unattended-d
 - (b) Fixed-cadence inspection (e.g. every 5 min). Balances drift detection with orchestrator's ability to multitask.
 - (c) Event-triggered inspection (e.g. orchestrator inspects when N commits queued or when implementer reports a milestone). Misses long quiet drift periods.
 
-**Choice.** (b). 5-minute cadence, standup-style three questions: what's been completed, what's in flight, anything blocking + the burn-down question (can the remainder fit in remaining time-box).
+**Choice.** (b). ≤ 5 min cadence during every dispatch. The inspection answers three questions: what's been completed, what's in flight, anything blocking + the burn-down question (can the remainder fit in the remaining time-box).
 
-**Why.** Maps cleanly to the standup pattern from Scrum, which exists for the same reason: detect drift / blockage early without high-overhead synchronous monitoring. The 5-minute cadence is short enough to catch drift before it compounds (in our failure, the deviation appeared 4 minutes after the prior clean commit — a 5-minute cadence would have caught it within the first inspection after).
+**Why.** Detects drift / blockage early without high-overhead synchronous monitoring. The 5-minute cadence is short enough to catch drift before it compounds (in our failure, the deviation appeared 4 minutes after the prior clean commit — a 5-min cadence would have caught it within the first inspection after).
 
-**Affected.** Every dispatch is monitored at ≤5-minute cadence. The check involves reading actual diffs of spec-critical files, not stat summaries.
+**Affected.** Every dispatch is monitored at ≤ 5-min cadence. The check involves reading actual diffs of spec-critical files, not stat summaries.
 
 ## 6. Agent teams ARE teams; protocol IS the memory
 
@@ -122,17 +122,17 @@ Failure modes that go uncaptured re-happen.
 
 **Affected.** Dispatch routing decisions consider the per-size model tier. M-sized mechanical dispatches default to cheaper models with strong DoD; M-sized judgment-heavy dispatches default to the orchestrator's tier with strong DoR.
 
-## 9. Spike pattern for planning-time unknowns
+## 9. Spike pattern for planning-time unknowns (brief-type, not a separate skill)
 
-**Date.** 2026-05-17.
+**Date.** 2026-05-17. (Refined on 2026-05-18 — spike is a brief-type variant of an ordinary dispatch, not a separate skill.)
 
-**Context.** Sometimes the orchestrator hits a planning question with legitimate unknowns ("how many test sites do we actually need to migrate?", "what's the right shape of this abstraction?"). Guessing leads to bad estimates and bad briefs.
+**Context.** Sometimes the agile orchestrator hits a planning question with legitimate unknowns ("how many test sites do we actually need to migrate?", "what's the right shape of this abstraction?"). Guessing leads to bad estimates and bad briefs.
 
-**Choice.** Adopt the Agile spike pattern. A spike is a time-boxed investigation whose Definition of Done is "you have an actionable understanding of what to do," not working code. Spikes have their own DoR (the question is well-formed) and DoD (an output artefact answers the question).
+**Choice.** Adopt the Agile spike pattern. A spike is a time-boxed investigation whose Definition of Done is "you have an actionable understanding of what to do," not working code. Spikes have their own DoR (the question is well-formed) and DoD (an output artefact answers the question). Mechanically, a spike is a single-dispatch slice plan with a spike-flavoured brief — no dedicated skill required; `drive-orchestrate-plan` runs it. Spike-first is also a triage verdict for the case where the entire entry-point can't be sized yet.
 
-**Why.** Standard Agile pattern, same role for us. Investigation before commitment.
+**Why.** Standard Agile pattern, same role for us. Investigation before commitment. Modelling it as a brief-type variant rather than a separate skill keeps the workflow shape uniform — the orchestrator dispatches a spike the same way it dispatches anything else, just with a different brief DoD.
 
-**Affected.** Briefs that depend on spike outputs are queued behind the spike, not dispatched in parallel.
+**Affected.** Briefs that depend on spike outputs are queued behind the spike, not dispatched in parallel. The triage skill (`drive-triage-work`) can emit "spike first" as a verdict.
 
 ## 10. General protocol vs project-specific calibration — two-layer split
 
@@ -149,3 +149,145 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 **Why.** Avoids the "the protocol works everywhere except where it doesn't" failure mode. Forces explicit thinking about which lessons generalise and which are project-specific.
 
 **Affected.** This project hosts the general protocol; each adopting project hosts its own calibration in its own `docs/`.
+
+## 11. Dispatch is the agent-delegation unit; Step retires to implementer-internal
+
+**Date.** 2026-05-18.
+
+**Context.** Consolidating with the sibling `drive-domain-model` project surfaced a vocabulary collision: the sibling used "step" for what the methodology project called a "dispatch" — the unit of agent-session delegation. The sibling's framing came from a planning lens ("steps within a slice plan"); the methodology project's came from the operational lens ("one delegation to an implementer subagent"). Both senses are valid but compete for the same word.
+
+**Options considered.**
+- (a) Use "step" everywhere (sibling's vocabulary wins).
+- (b) Use "dispatch" everywhere (methodology project's vocabulary wins).
+- (c) Use both — "step" for the planning sense, "dispatch" for the operational sense.
+
+**Choice.** (b) with a renamed (c). "Dispatch" is the real-world unit because that's how we interact with agents; the planning sense uses "dispatch" too (a slice plan is a sequence of dispatches). "Step" is reserved for the implementer-internal logical-increment notion (below the Drive-care line) — an implementer composes steps inside a dispatch while executing.
+
+**Why.** Dispatch captures aggregation: one dispatch may contain multiple logical steps but presents as one orchestrator-to-implementer interaction. The orchestrator's DoR / DoD / WIP-inspection rituals fire per dispatch, not per step. Naming the operational unit aligns the model with the rituals.
+
+**Affected.** Every doc in this project uses "dispatch" for the agent-delegation unit; "step" appears only in implementer-internal context (and in the Execution bounded context in `model.md`).
+
+## 12. Direct change is a sibling unit to Slice (lightweight path)
+
+**Date.** 2026-05-18.
+
+**Context.** Even a slice carries some ceremony — a spec (even inline), a plan (even collapsed), a dispatch loop. For trivial work (copy changes, config flips, one-line bugfixes), the slice ceremony is overkill. The user surfaced this gap explicitly: "our triage and execution workflow needs to handle the case where even a Slice is too much overhead: just get the work done, open a PR."
+
+**Options considered.**
+- (a) Treat trivial work as a "slice with no ceremony" — still goes through `drive-orchestrate-plan` but with relaxed defaults.
+- (b) Bypass Drive entirely for trivial work — operator runs `gh pr create` directly without ever invoking a Drive skill.
+- (c) Add a fourth unit (direct change) as a sibling of slice. Triage decides; the unit has no spec / no plan / no dispatch ceremony; intent lives in the PR body.
+
+**Choice.** (c). Direct change is a sibling of Slice (not below it). Both can compose under a project; both can stand alone (orphan).
+
+**Why.** Triage needs a name for the verdict — option (b) leaves a hole in the decision tree. Modelling the unit explicitly lets the model + the rituals adapt to it (e.g. "design discussion is unlikely to fire on a direct change"; "WIP inspection is not applicable to a direct change"). The naming captures the spectrum: project (most ceremony) → slice (medium) → direct change (least). Triage's decision tree gains a fourth verdict.
+
+**Affected.** `model.md` adds Direct change to ubiquitous language + persistence shape + Linear-sync + aggregates. Invariant I1 changes to "slice OR direct change → one PR." Triage gains a fourth verdict. No Drive skill executes a direct change — triage routes to `gh pr create` directly.
+
+## 13. Design discussion is a cross-cutting workflow; `drive-discussion` is promoted to first-class
+
+**Date.** 2026-05-18.
+
+**Context.** The user surfaced that the predecessor workflow map missed the most valuable human-agent collaboration: the design discussion. `/drive-discussion` fires before / during spec writing, mid-flight when an assumption is falsified, mid-flight when an obstacle emerges, and on explicit request. Without naming it as a workflow, the model couldn't explain when it should fire or who's responsible for recognising the trigger.
+
+**Options considered.**
+- (a) Leave `drive-discussion` as a generic mode skill, mentioned only in passing.
+- (b) Promote `drive-discussion` to first-class but treat it as a lifecycle stage (e.g. between Triage and Project initiation).
+- (c) Promote `drive-discussion` to first-class as a *cross-cutting* workflow with multiple defined trigger points across the lifecycle.
+
+**Choice.** (c). Design discussion is the cross-cutting workflow (eighth in the model's workflows list); the agile orchestrator persona's responsibility includes recognising when to escalate.
+
+**Why.** Design discussion isn't a stage — it fires multiple times across a project's lifetime, on different triggers, with different outcomes. Modelling it as cross-cutting matches the lived experience. Pairing it with invariant I12 (no silent agent-side amendments) gives the protocol structural protection against assumption-falsification being silently accommodated.
+
+**Affected.** `model.md` adds Design discussion to workflows + clarifies the orchestrator's escalation responsibility + adds I12. `workflow.md` adds the row + cadence. Several principle docs (DoR / DoD / brief discipline / retro) will reference design discussion as the resolution mechanism for surfaced questions.
+
+## 14. Triage is the universal entry point AND mid-flight scope re-evaluator (covers promotion + demotion symmetrically)
+
+**Date.** 2026-05-18.
+
+**Context.** The sibling's model originally had triage as an entry-point workflow only. The user surfaced two related cases triage also needs to handle mid-flight: a slice growing beyond one PR (promote to project) and a project shrinking to fit one PR (demote to slice / direct change). Both are scope-shift events; both need the same decision discipline.
+
+**Choice.** Triage is one workflow with two modes (entry-time and mid-flight). Mid-flight triage's output set includes two scope-shift verdicts: Promote and Demote. The decision tree and the persona (agile orchestrator) are the same in both modes.
+
+**Why.** Promoting and demoting are scope-shift decisions, which is exactly what triage does. Modelling them as separate workflows would duplicate triage's decision tree; modelling them as triage outputs keeps the surface uniform.
+
+**Affected.** `model.md` adds the mid-flight variant + the promotion / demotion verdicts. `workflow.md` adds Promotion + Demotion rows with their Linear ceremony. The triage skill (`drive-triage-work`) runs in both modes.
+
+## 15. Linear Pattern 2 for promotion (ticket-becomes-project) with the user's variant
+
+**Date.** 2026-05-18.
+
+**Context.** When triage promotes a ticket to a project, the original Linear ticket needs disposition. Three patterns considered: (1) keep the ticket as the project's "top story"; (2) close the ticket and have the Linear Project take over; (3) hybrid — move the ticket into the new Linear Project but keep it as a Done marker.
+
+**Choice.** Variant of Pattern 2 (the user's call). The original ticket is moved into the new Linear Project, marked Done, and either renamed to "Plan: \<project name\>" or annotated with a comment indicating it was promoted (with a URL to the project). The Linear Project becomes the durable handle going forward; slices subsequently track as new Linear issues under the project.
+
+**Why.** Preserves the original ticket as the historical marker of "the original ask" while making the project the durable handle. The Done state cleans up the operator's "in flight" view; the marker means promotion is discoverable from the original ticket URL.
+
+**Affected.** `model.md` § "Linear sync" specifies the promotion ceremony. `drive-triage-work` orchestrates the Linear MCP calls.
+
+## 16. Demotion workflow (project → slice / direct change) is symmetric to promotion
+
+**Date.** 2026-05-18.
+
+**Context.** The user surfaced the symmetric case: if a project's remaining scope shrinks to fit one PR (or even one direct change), we need to demote rather than continue with project ceremony. This case is heavier than promotion (more Linear state to clean up).
+
+**Choice.** Demotion routes through its own workflow but produces a symmetric result: surviving Linear issue stands alone (moved out of the project); other Linear issues under the project are closed with a "merged into <surviving-ticket>" comment; the Linear Project itself is Cancelled (with rationale) or Completed (if part of the original scope did ship); on-disk artefacts are migrated or retired; `projects/<project>/` is deleted; surviving work continues as orphan slice or direct change.
+
+**Why.** Symmetric to promotion. Required because the alternative — continuing with project ceremony for one PR of remaining scope — is exactly the project-shape gravity failure mode the model is trying to fix.
+
+**Affected.** `model.md` § "Linear sync" specifies the demotion ceremony. `drive-triage-work` orchestrates the Linear cleanup. Operator authorisation is required before mass-closing Linear issues (per open question 9 in `spec.md`).
+
+## 17. Split `drive-create-spec` and `drive-create-plan` into four scope-specific skills (not a scope flag)
+
+**Date.** 2026-05-18.
+
+**Context.** The sibling's working position was a scope flag (fewer skills to maintain). After mapping the workflows and seeing how distinct the project-scope and slice-scope flows are, the user pushed for splitting.
+
+**Options considered.**
+- (a) Scope flag (sibling's working position).
+- (b) Split into project-scope and slice-scope variants (`drive-project-specify`, `drive-slice-specify`, `drive-project-plan`, `drive-slice-plan`).
+
+**Choice.** (b). Four skills total.
+
+**Why.** Project-specify and slice-specify have meaningfully different inputs, outputs, audiences, and templates: project-specify produces purpose + scope-boundary + project-DoD with operator collaboration (often via design discussion); slice-specify produces scope-within-project + slice-DoD + Example-Mapping edge cases, usually authored by the implementer. Project-plan composes slices and direct changes (sequencing, stack/parallel); slice-plan composes dispatches with sizing discipline + DoR-per-dispatch. A scope flag papers over genuinely different shapes; splitting keeps each skill's body tight and its template focused.
+
+**Affected.** Skill restructuring plan adopts the split. `workflow.md`'s lifecycle table names the four new skills. Canonical-side, `drive-create-spec` and `drive-create-plan` are deprecated in favour of the splits.
+
+## 18. Two-cap sizing discipline (PR-cap at slice; M-cap at dispatch)
+
+**Date.** 2026-05-18.
+
+**Context.** The methodology project's M-cap rule needed a scope. Reading carefully: the "nothing above M dispatched" rule applies at the dispatch scope (the unit Drive delegates to agents). At the slice scope, the cap is different — a slice must fit in one PR (the PR's natural size cap, which is reviewability- and rollback-bounded, not complexity-bounded). The two caps act independently.
+
+**Choice.** Codified as invariant I11 in `model.md`. Two caps:
+- **Slice / direct-change cap.** Bounded by PR-cap (the unit must fit in one PR). Triage enforces — refuses to admit a slice that won't fit.
+- **Dispatch cap.** Bounded by M-cap (complexity ≤ M; wall-clock time-box per t-shirt size). Slice planning enforces — refuses to declare a dispatch above M. Slice execution refuses L/XL in defense in depth.
+
+**Why.** The caps capture different concerns: PR-cap is about review / debug / deploy / rollback debugability; M-cap is about agent-session inspectability and orchestrator recoverability. Both are real, both need enforcement, neither subsumes the other.
+
+**Affected.** `model.md` adds I11. `drive-triage-work` enforces PR-cap at admission. `drive-slice-plan` enforces M-cap at planning. `drive-orchestrate-plan` enforces M-cap defensively at dispatch time.
+
+## 19. No silent agent-side amendments after first dispatch (I12)
+
+**Date.** 2026-05-18.
+
+**Context.** When an assumption baked into a spec or plan turns out to be wrong mid-flight, the structurally hazardous response is for the agent to silently accommodate (amend the spec / plan, continue executing, no escalation). This is the dispatch-drift failure mode generalised to the planning layer: the artefact contract gets broken without the operator noticing.
+
+**Choice.** Codified as invariant I12 in `model.md`. Every spec / plan amendment after the first dispatch of a slice starts is either (a) the output of a design discussion with operator participation, or (b) an explicit operator-authorised edit. Silent agent-side amendments are forbidden.
+
+**Why.** The artefact contract is the team's protocol-as-memory; silent amendments break the contract. Forcing escalation surfaces the design call to the operator, where the design discussion ritual resolves it. In unattended mode, this is enforced by a stop-condition in `drive-orchestrate-plan` (orchestrator halts, logs the trigger for the operator's return).
+
+**Affected.** `model.md` adds I12. `drive-orchestrate-plan` augmentation includes a design-discussion stop-condition on assumption-falsification. `drive-discussion` is the resolution mechanism.
+
+## 20. Project consolidation: agile-agent-orchestration + drive-domain-model → drive-domain-model
+
+**Date.** 2026-05-18.
+
+**Context.** Two projects ran in parallel on different branches: the methodology project (this one originally) and the sibling units project (`drive-domain-model`). On reading each other, they were addressing one cluster of failure modes (fuzzy units + unbounded dispatches) and fit one operational shape. Continuing in parallel risked divergent vocabulary and inconsistent rituals.
+
+**Choice.** Merge both projects into one, hosted on this branch (`tml-2549-agile-agent-orchestration`), under the folder name `projects/drive-domain-model/` (the units name carries the substrate; the methodology name describes the discipline but the substrate is the more durable framing). Abandon the sibling's branch. Promote the sibling's `model.md` and `spec.md` to be the consolidated project's substrate; absorb the methodology's spec into a unified `spec.md`; delete the predecessor HANDOVERs (this consolidation supersedes them).
+
+**Why.** One vocabulary + one ritual set + one set of ACs is cheaper to maintain and cleaner to ship. The two halves are naturally complementary: the units pin where the rituals fire; the rituals operationalise where the units transition.
+
+**Affected.** Folder structure, file names, on-disk artefacts. The sibling project's reference branch is abandoned (no PR opened from it).
+
