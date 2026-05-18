@@ -1,90 +1,66 @@
-# Drive domain model + agile orchestration
+# Drive domain model + Agile dispatch discipline
 
-A consolidated effort that pins Drive's domain model, threads dispatch-level Agile discipline into the workflows where agent execution happens, restructures the canonical `drive-*` skill family against the pinned model, and rewrites the Drive process documentation.
+## At a glance
 
-This project absorbs two predecessor projects:
+We are pinning Drive's domain model (three sized units of work + one delegation unit + eight workflows + twelve invariants) and threading Agile-style dispatch discipline (DoR / DoD per dispatch, ≤ 5-minute WIP inspection, M-cap, design-discussion stop-condition) into the canonical drive-* skill family. The work ships as a series of small canonical PRs stacked on top of [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93).
 
-- **`drive-domain-model`** (the units project) — pinned PR / Slice / Project / Dispatch / Direct change as units with explicit invariants and workflows.
-- **`agile-agent-orchestration`** (the methodology project) — adapted Kanban + selected Scrum / XP / SBE rituals (DoR / DoD / WIP-inspection / brief / retro / sizing) for agent teams.
-
-Both turned out to address one cluster of failure modes (fuzzy units + unbounded agent dispatches) and to fit one operational shape, so we consolidated and now deliver them together.
-
-## Motivation
-
-Agent-driven development exhibits the same failure modes as human team development — estimation drift, scope creep, spec drift, context loss between hand-offs, coordination overhead — but faster, and without the organic memory transmission that human teams rely on to learn from mistakes. The protocol adapts well-established Agile practices to a setting where the team is composed of an operator + an orchestrator agent + one or more implementer/reviewer subagents, and where institutional memory must live in written rituals rather than shared experience.
-
-Today's canonical Drive skill family has two compounding failure modes that share a structural fix:
-
-1. **Fuzzy units.** "Project," "milestone," "task," "plan," and "spec" each float across scopes. The Linear sync workflow operates on units that aren't pinned; what gets synced where is unanswerable except by reference to the original author's mental model.
-2. **Unbounded dispatches.** Agent sessions run feature-sized scopes without orchestrator inspection. Drift passes validation gates while violating the spec.
-
-This project pins the units, adds Triage as the universal entry point, threads dispatch-level discipline into the workflows where it matters, and ships the changes back into canonical Drive.
+Two predecessor projects (`drive-domain-model` + `agile-agent-orchestration`) consolidated here when we realised they were addressing one cluster of failure modes — fuzzy units + unbounded agent dispatches — and fit one operational shape.
 
 ## Status
 
-Active. Substantive consolidation in progress. See [`design-decisions.md`](design-decisions.md) for the chronological record of shaping decisions.
+Active. Substantive consolidation in progress. The model and workflow are drafted; the per-skill canonical PRs are pending. See [`spec.md`](spec.md) § Acceptance criteria for the full delivery list.
 
-## Documents
+## Where to start
 
-Read in this order:
-
-1. [`spec.md`](spec.md) — what this project delivers (problem, approach, FRs, ACs, open questions)
-2. [`model.md`](model.md) — the pinned domain model (vocabulary, roles, workflows, invariants, persistence shape, Linear sync)
-3. [`workflow.md`](workflow.md) — the Drive ↔ Agile lifecycle map (operational layer on top of `model.md`)
-4. [`design-decisions.md`](design-decisions.md) — chronological decisions log
-5. [`principles/`](principles/) — per-principle deep-dives:
-   - [`protocol-as-memory.md`](principles/protocol-as-memory.md) — why agent teams must capture lessons in rituals
-   - [`decomposition-and-cost.md`](principles/decomposition-and-cost.md) — why smaller dispatches enable cheaper tiers
-   - [`spikes.md`](principles/spikes.md) — time-boxed investigations with artefact output (now a brief-type variant)
-   - [`roles-and-personas.md`](principles/roles-and-personas.md) — the three-role + one-persona mapping
-   - [`brief-discipline.md`](principles/brief-discipline.md) — Example Mapping in every dispatch brief
-   - [`definition-of-ready.md`](principles/definition-of-ready.md) — gate shape at three scopes
-   - [`definition-of-done.md`](principles/definition-of-done.md) — gate shape at three scopes (includes manual QA per [PR #93](https://github.com/prisma/ignite/pull/93))
-   - [`retro.md`](principles/retro.md) — trigger-based retro template
-6. [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration for the `prisma-next` repo
-7. [`skill-restructure.md`](skill-restructure.md) — workflow → skill map + the proposed restructure (stacks on PR #93)
-8. [`plan.md`](plan.md) — execution plan for landing this work
+| If you are… | Read | Why |
+|---|---|---|
+| A canonical-side maintainer (Ignite contributor) considering whether to engage | [`problem-statement.md`](problem-statement.md) | Self-contained problem framing + the proposed direction + what we're asking for. ~150 lines; nothing else required. |
+| Validating the proposed design | [`spec.md`](spec.md) | At-a-glance summary, the design in three layers, three concrete walkthroughs, the deliverables, alternatives considered, open questions. |
+| Looking up vocabulary, an invariant, or a Linear-sync detail | [`model.md`](model.md) | The pinned domain model, expanded small-scope-first. The source of truth. |
+| Working on the per-skill restructure | [`skill-restructure.md`](skill-restructure.md) | Workflow → skill map, per-skill verdicts, implementation sequencing on top of PR #93. |
+| Adopting the protocol in a new repo | [`calibration/prisma-next.md`](calibration/prisma-next.md) + [`principles/`](principles/) | The worked-example calibration and the principle deep-dives. |
+| Curious why a decision was made | [`design-decisions.md`](design-decisions.md) | 23 decisions, each with options + choice + rationale. The alternatives ledger. |
 
 ## Base assumption
 
 All canonical-side work proposed here stacks on top of [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93), which ships:
 
-- The **project-context convention** (`drive/<category>/README.md` read by drive-* skills as workflow step 1).
-- The **manual-QA pair** (`drive-qa-plan` + `drive-qa-run`) — the judgement layer on top of CI.
-- Three **meta-skills** (`drive-bootstrap-context`, `drive-reconcile-skills`, `drive-update-skills`).
+- The **project-context convention** — `drive/<category>/README.md` files read by drive-* skills as workflow step 1; the on-disk home for team-specific overlays.
+- The **manual-QA pair** — `drive-qa-plan` (author the script) + `drive-qa-run` (execute + report), the judgement layer on top of CI.
+- Three **meta-skills** — `drive-bootstrap-context` (scaffold the project-context directory), `drive-reconcile-skills` (move drift out of in-repo skill copies into the right category README), `drive-update-skills` (sync canonical skill bodies).
 
-Several docs in this project reference that surface as already-existing. See `skill-restructure.md` § "Base assumption" for the integration details.
+Several docs in this project reference that surface as already-existing. See [`skill-restructure.md`](skill-restructure.md) § "Base assumption" for the integration details.
 
-## How this project relates to others
+## Repository layout
 
-This is a **methodology + framework project**. Its output is:
+```
+projects/drive-domain-model/
+├── README.md                  ← you are here
+├── problem-statement.md       ← self-contained framing for Ignite maintainers
+├── spec.md                    ← the project's spec (design, deliverables, ACs)
+├── model.md                   ← the pinned domain model
+├── workflow.md                ← the operational lifecycle map
+├── design-decisions.md        ← chronological decisions log (alternatives ledger)
+├── skill-restructure.md       ← workflow → skill map + per-skill plan
+├── plan.md                    ← execution plan (upcoming)
+├── principles/                ← per-principle deep-dives
+│   ├── protocol-as-memory.md
+│   ├── decomposition-and-cost.md
+│   ├── spikes.md
+│   ├── roles-and-personas.md
+│   ├── brief-discipline.md
+│   ├── definition-of-ready.md
+│   ├── definition-of-done.md
+│   └── retro.md
+├── calibration/
+│   └── prisma-next.md         ← worked-example calibration for this repo
+└── reference/                 ← gitignored local clones (e.g. ignite for cross-ref)
+```
 
-- A pinned domain model that any project can adopt (`model.md`).
-- A general protocol that any team can adopt by writing project-specific calibrations (rubric anchors, DoD checklists, failure-mode catalogues). Calibration is per-repo; the protocol is universal.
-- A restructured canonical `drive-*` skill family (ships in the upstream `prisma/ignite` repo across multiple PRs).
-- A rewritten `drive-process.md` (also upstream in `prisma/ignite`).
+## Out of scope
 
-The protocol is being developed in the context of the `prisma-next` project, which serves as the first calibration example. Prisma-next-specific calibrations eventually live in `prisma-next`'s `docs/`, not here.
+- **Consumer migration.** Each consumer adopts on its own schedule via `drive-reconcile-skills`. The deliverables are canonical-side only. `prisma-next` is the first adopter and contributes its calibration document back as the worked example.
+- **Multi-agent parallel execution semantics.** Addressed when we use it in anger.
+- **Full Linear-sync mechanics beyond unit mapping.** This project pins the units and the promotion / demotion patterns; the full MCP-tool-call shape may be a follow-up.
 
-### Relationship with the existing `drive-*` skills
-
-Today's `drive-*` skill family operates on fuzzy units and skips dispatch-level discipline. This project fixes both. See [`spec.md`](spec.md) § "Restructure the canonical drive-* skill family" and (upcoming) `skill-restructure.md` for the full plan. In summary:
-
-- **Split** `drive-create-spec` → `drive-project-specify` + `drive-slice-specify`.
-- **Split** `drive-create-plan` → `drive-project-plan` + `drive-slice-plan`.
-- **Augment** `drive-orchestrate-plan` (slice-scope only): per-dispatch DoR / DoD; WIP-inspection cadence; brief template; L/XL refusal; design-discussion stop-condition.
-- **Augment** `drive-close-project`: mandatory final retro.
-- **Promote** `drive-discussion` (mode) to first-class cross-cutting workflow.
-- **New** `drive-triage-work` (entry point + mid-flight scope re-evaluator).
-- **New** `drive-health-check` (project rollup; session-bookended or trigger-fired).
-- **New** `drive-retro-run` (trigger-based retro template).
-- **Retire** "milestone" and "task" as Drive vocabulary; "step" demotes to implementer-internal.
-- **Stack on PR #93**: the manual-QA pair + project-context convention are treated as the canonical baseline; slice and project DoD reference them directly.
-
-### Eventual home
-
-When the methodology stabilises, it lives in the centralised `drive/agile` skill namespace (alongside the rest of the `drive-*` family). Project-specific calibrations live in each adopting repo's `docs/`. See [`spec.md`](spec.md) and `model.md` § "Implications for existing canonical Drive."
-
-## Reference clones
-
-`reference/ignite/` is a local clone of the canonical skills repo for browsing. Gitignored; not committed.
+See [`spec.md`](spec.md) § "What this is not" for the full non-goals list.
