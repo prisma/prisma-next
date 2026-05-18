@@ -129,8 +129,8 @@ function createRefSetCommand(): Command {
   const command = new Command('set');
   setCommandDescriptions(
     command,
-    'Set a ref to a contract hash',
-    'Sets a named ref to point to a contract hash in migrations/refs/.',
+    'Set a ref to a contract reference',
+    'Sets a named ref to point to a resolved contract reference (hash, alias, or path) in migrations/refs/.',
   );
   addGlobalOptions(command)
     .argument('<name>', 'Ref name (e.g., staging, production)')

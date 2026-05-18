@@ -110,7 +110,7 @@ The marker write is atomic per storage family. No client-side compare-and-set lo
 
 `invariants: []` on a write is a no-op merge — preserves the existing set, doesn't clobber.
 
-### CLI marker subtraction makes `--ref` idempotent
+### CLI marker subtraction makes `--to` idempotent
 
 Before routing, `migrate --to` and `migration status --to` compute:
 

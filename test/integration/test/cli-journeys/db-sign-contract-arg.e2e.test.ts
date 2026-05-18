@@ -8,7 +8,7 @@
  * - `--contract <ref-name>`
  *
  * Asserts that all four produce the same marker row when the DB
- * satisfies the contract, and the same structured error when it does not.
+ * satisfies the contract.
  */
 
 import { describe, expect, it } from 'vitest';

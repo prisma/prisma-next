@@ -23,4 +23,4 @@ A topic branch with 2 pending migrations relative to a configured `staging` ref.
 
 - [ ] Agent named both pending migrations.
 - [ ] Agent named the `from` and `to` hashes of each.
-- [ ] Agent did NOT run `migration status` without `--ref` (which would compare local-vs-head, not staging).
+- [ ] Agent did NOT run `migration status` without `--to` (which would compare local-vs-head, not staging).
