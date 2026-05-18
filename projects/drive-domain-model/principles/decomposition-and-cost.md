@@ -2,7 +2,7 @@
 
 ## Thesis
 
-Well-decomposed M-sized tasks with clear Definition of Done are safe to dispatch to cheaper / faster models. The verification gates catch drift; the small scope limits blast radius; the explicit brief reduces interpretation latitude. Decomposition therefore unlocks cost optimization in addition to its primary quality benefits.
+Well-decomposed M-sized dispatches with clear Definition of Done are safe to delegate to cheaper / faster models. The verification gates catch drift; the small scope limits blast radius; the explicit brief reduces interpretation latitude. Decomposition therefore unlocks cost optimization in addition to its primary quality benefits.
 
 This is the agent-team analogue of the Agile insight that pulling small stories enables junior developers to pick them up confidently — the cost shift is the same shape (cheaper labour on safer work), just with model tiers instead of seniority levels.
 
@@ -60,11 +60,11 @@ The mechanism is the same:
 
 | Agile concept | Agent-team analogue |
 |---|---|
-| Story sized for sprint | Dispatch sized for M time-box |
-| Acceptance criteria | Definition of Done (gates + verifications) |
+| Story sized for sprint | Slice sized for one PR (PR-cap) AND dispatch sized for time-box (M-cap) |
+| Acceptance criteria | Definition of Done (gates + verifications) at dispatch / slice / project scope |
 | Junior developer | Cheaper / faster model tier |
-| Senior developer review | Orchestrator inspection at 5-min standup |
-| Team retro | Protocol / calibration update |
+| Senior developer review | Agile orchestrator's WIP-inspection cadence (≤ 5 min during every dispatch) |
+| Team retro | Trigger-based retro that produces a protocol / calibration / ADR update |
 | Apprenticeship | (Does not transfer — see [`protocol-as-memory.md`](protocol-as-memory.md)) |
 
 The juniors-pulling-small-stories pattern is regarded as one of Agile's most important leverage points: it changes who can do what work. The agent-team version changes which model tier can safely execute which dispatch, with the same leverage on cost.
@@ -76,7 +76,7 @@ Concrete routing decisions the orchestrator should make per dispatch:
 - **High conceptual difficulty (design judgment, spec interpretation, novel patterns)** → orchestrator's tier (Opus or equivalent). The model needs the capability to navigate ambiguity safely.
 - **High surface volume, low conceptual difficulty (codemods, mechanical migrations, batch fixes)** → cheaper tier. The work is well-bounded and verifiable; capability premium is wasted.
 - **High blast radius regardless of conceptual difficulty** → orchestrator's tier OR smaller dispatch. Risk dominates; either pay for capability or shrink the dispatch until the risk drops.
-- **Spikes** → cheaper tier with shorter time-box. Spike output is an artefact (a plan, an estimate, a list); the agent doesn't need to make design judgment, just gather information.
+- **Spikes (brief-type variant)** → cheaper tier with shorter time-box. Spike output is an artefact (a plan, an estimate, a list); the agent doesn't need to make design judgment, just gather information.
 
 A dispatch that's high on all three dimensions (today's reversal) should never have happened at any tier. Decompose first.
 
