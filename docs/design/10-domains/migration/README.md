@@ -99,7 +99,7 @@ Both grammars borrow two ideas from Git (prefix-matching on hashes and the `^` o
 
 | Form | Meaning |
 |---|---|
-| `<hash>` or `<hash-prefix>` | Bare hex (no `sha256:` prefix). 8+ char prefixes accepted; matched against contract storage hashes. |
+| `<hash>` or `<hash-prefix>` | Bare hex (no `sha256:` prefix). 6+ char prefixes accepted; matched against contract storage hashes. |
 | `<ref-name>` | The contract the named ref points at. |
 | `<migration-dir-name>` | The migration's **`to`-contract**. |
 | `<migration-dir-name>^` | The migration's **`from`-contract**. |
@@ -116,7 +116,7 @@ Both grammars borrow two ideas from Git (prefix-matching on hashes and the `^` o
 
 - **Migration directory names follow a `<timestamp>T<HHMM>_<slug>` convention by default but are user-controlled.** A user could create a directory called `1f3b7c4a` if they wanted.
 - When an input could match more than one form within the active grammar (e.g. a hex-named directory that also looks like a hash prefix), it is an **ambiguity error**. The CLI lists the candidates and asks the user to disambiguate by using a longer / different form (e.g. `./1f3b7c4a` to force the filesystem interpretation; the full migration hash for the migration interpretation).
-- Ambiguity *within* a namespace (two hashes sharing an 8-char prefix; two migrations sharing a 4-char hash prefix) is also an error with candidate listing — same rule Git uses for short SHAs.
+- Ambiguity *within* a namespace (two hashes sharing a 6-char prefix; two migrations sharing a short hash prefix) is also an error with candidate listing — same rule Git uses for short SHAs.
 - The `^` operator is only meaningful on a migration directory name (or a hash-resolved migration) — the only case where a "predecessor contract" is unambiguous (the migration's `from`). Not generalized to refs or contract hashes (a contract can be the destination of multiple migrations).
 
 #### Refs vs the umbrella
