@@ -314,15 +314,17 @@ function collectTypeRefSites(
   storage: SqlStorage,
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
-  for (const [tableName, table] of Object.entries(storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      if (typeof column.typeRef !== 'string') continue;
-      const list = sites.get(column.typeRef);
-      const entry = { table: tableName, column: columnName };
-      if (list) {
-        list.push(entry);
-      } else {
-        sites.set(column.typeRef, [entry]);
+  for (const ns of Object.values(storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        if (typeof column.typeRef !== 'string') continue;
+        const list = sites.get(column.typeRef);
+        const entry = { table: tableName, column: columnName };
+        if (list) {
+          list.push(entry);
+        } else {
+          sites.set(column.typeRef, [entry]);
+        }
       }
     }
   }
@@ -372,12 +374,14 @@ function validateColumnTypeParams(
   storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
-  for (const [tableName, table] of Object.entries(storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      if (column.typeParams) {
-        const descriptor = codecDescriptors.get(column.codecId);
-        if (descriptor) {
-          validateTypeParams(column.typeParams, descriptor, { tableName, columnName });
+  for (const ns of Object.values(storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        if (column.typeParams) {
+          const descriptor = codecDescriptors.get(column.codecId);
+          if (descriptor) {
+            validateTypeParams(column.typeParams, descriptor, { tableName, columnName });
+          }
         }
       }
     }
@@ -399,65 +403,67 @@ function assertColumnCodecIntegrity(
   storage: SqlStorage,
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
-  for (const [tableName, table] of Object.entries(storage.tables)) {
-    for (const columnName of Object.keys(table.columns)) {
-      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
-      if (!ref) continue;
+  for (const ns of Object.values(storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      for (const columnName of Object.keys(table.columns)) {
+        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        if (!ref) continue;
 
-      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
-      if (!descriptor) {
-        throw runtimeError(
-          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
-          `Column '${tableName}.${columnName}' references codec '${ref.codecId}' but no contributor registered a codec descriptor for that codecId. Add the extension pack that owns the codec to the runtime stack.`,
-          { table: tableName, column: columnName, codecId: ref.codecId },
-        );
-      }
-
-      if (descriptor.isParameterized && ref.typeParams === undefined) {
-        // Some parameterized codecs declare every paramsSchema field as optional
-        // (e.g. `pg/timestamptz@1` precision). Defer to the descriptor's own
-        // schema rather than rejecting purely on structural absence: probe the
-        // schema with an empty params object and only fail when the schema
-        // rejects it (i.e. at least one field is required).
-        const probe = descriptor.paramsSchema['~standard'].validate({});
-        if (probe instanceof Promise) {
-          // Swallow the probe Promise's rejection so Node doesn't warn about an
-          // unhandled rejection once we throw synchronously below.
-          probe.catch(() => {});
+        const descriptor = codecDescriptors.descriptorFor(ref.codecId);
+        if (!descriptor) {
           throw runtimeError(
-            'RUNTIME.TYPE_PARAMS_INVALID',
-            `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' whose paramsSchema returned a Promise; paramsSchema must be a synchronous Standard Schema validator. Return a value/issues result directly instead of a Promise.`,
+            'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+            `Column '${tableName}.${columnName}' references codec '${ref.codecId}' but no contributor registered a codec descriptor for that codecId. Add the extension pack that owns the codec to the runtime stack.`,
             { table: tableName, column: columnName, codecId: ref.codecId },
           );
         }
-        const rejects = 'issues' in probe && !!probe.issues;
-        if (rejects) {
+
+        if (descriptor.isParameterized && ref.typeParams === undefined) {
+          // Some parameterized codecs declare every paramsSchema field as optional
+          // (e.g. `pg/timestamptz@1` precision). Defer to the descriptor's own
+          // schema rather than rejecting purely on structural absence: probe the
+          // schema with an empty params object and only fail when the schema
+          // rejects it (i.e. at least one field is required).
+          const probe = descriptor.paramsSchema['~standard'].validate({});
+          if (probe instanceof Promise) {
+            // Swallow the probe Promise's rejection so Node doesn't warn about an
+            // unhandled rejection once we throw synchronously below.
+            probe.catch(() => {});
+            throw runtimeError(
+              'RUNTIME.TYPE_PARAMS_INVALID',
+              `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' whose paramsSchema returned a Promise; paramsSchema must be a synchronous Standard Schema validator. Return a value/issues result directly instead of a Promise.`,
+              { table: tableName, column: columnName, codecId: ref.codecId },
+            );
+          }
+          const rejects = 'issues' in probe && !!probe.issues;
+          if (rejects) {
+            throw runtimeError(
+              'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
+              `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' but no typeParams are supplied. Provide typeParams on the column, or use a typeRef pointing at a storage.types entry that carries them.`,
+              {
+                table: tableName,
+                column: columnName,
+                codecId: ref.codecId,
+                expected: 'parameterized',
+                actual: 'no typeParams',
+              },
+            );
+          }
+        }
+
+        if (!descriptor.isParameterized && ref.typeParams !== undefined) {
           throw runtimeError(
             'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
-            `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' but no typeParams are supplied. Provide typeParams on the column, or use a typeRef pointing at a storage.types entry that carries them.`,
+            `Column '${tableName}.${columnName}' supplies typeParams to non-parameterized codec '${ref.codecId}'. Remove the typeParams or switch to a parameterized codec id.`,
             {
               table: tableName,
               column: columnName,
               codecId: ref.codecId,
-              expected: 'parameterized',
-              actual: 'no typeParams',
+              expected: 'non-parameterized',
+              actual: 'has typeParams',
             },
           );
         }
-      }
-
-      if (!descriptor.isParameterized && ref.typeParams !== undefined) {
-        throw runtimeError(
-          'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
-          `Column '${tableName}.${columnName}' supplies typeParams to non-parameterized codec '${ref.codecId}'. Remove the typeParams or switch to a parameterized codec id.`,
-          {
-            table: tableName,
-            column: columnName,
-            codecId: ref.codecId,
-            expected: 'non-parameterized',
-            actual: 'has typeParams',
-          },
-        );
       }
     }
   }
@@ -512,23 +518,25 @@ function buildContractCodecRegistry(
     }
   }
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      if (column.typeRef !== undefined) continue;
-      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
-      if (!ref) continue;
-      const key = refKeyOf(ref);
-      const site = { table: tableName, column: columnName };
-      const existing = usedAtByKey.get(key);
-      if (existing) {
-        existing.push(site);
-      } else {
-        usedAtByKey.set(key, [site]);
-        const name =
-          ref.typeParams !== undefined
-            ? `<col:${tableName}.${columnName}>`
-            : `<codec:${ref.codecId}>`;
-        nameByKey.set(key, name);
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        if (column.typeRef !== undefined) continue;
+        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        if (!ref) continue;
+        const key = refKeyOf(ref);
+        const site = { table: tableName, column: columnName };
+        const existing = usedAtByKey.get(key);
+        if (existing) {
+          existing.push(site);
+        } else {
+          usedAtByKey.set(key, [site]);
+          const name =
+            ref.typeParams !== undefined
+              ? `<col:${tableName}.${columnName}>`
+              : `<codec:${ref.codecId}>`;
+          nameByKey.set(key, name);
+        }
       }
     }
   }
@@ -542,11 +550,13 @@ function buildContractCodecRegistry(
     };
   });
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
-    for (const columnName of Object.keys(table.columns)) {
-      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
-      if (!ref) continue;
-      resolver.forCodecRef(ref);
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      for (const columnName of Object.keys(table.columns)) {
+        const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+        if (!ref) continue;
+        resolver.forCodecRef(ref);
+      }
     }
   }
 

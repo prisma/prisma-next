@@ -6,10 +6,12 @@ import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/q
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
-  for (const table of Object.values(contract.storage.tables)) {
-    for (const column of Object.values(table.columns)) {
-      const codecId = column.codecId;
-      codecIds.add(codecId);
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    for (const table of Object.values(ns.tables)) {
+      for (const column of Object.values(table.columns)) {
+        const codecId = column.codecId;
+        codecIds.add(codecId);
+      }
     }
   }
 
@@ -19,11 +21,13 @@ export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
 function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string, string> {
   const codecIds = new Map<string, string>();
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      const codecId = column.codecId;
-      const key = `${tableName}.${columnName}`;
-      codecIds.set(key, codecId);
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        const codecId = column.codecId;
+        const key = `${tableName}.${columnName}`;
+        codecIds.set(key, codecId);
+      }
     }
   }
 
