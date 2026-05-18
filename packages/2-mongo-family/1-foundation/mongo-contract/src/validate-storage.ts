@@ -1,12 +1,27 @@
 import type { MongoContract } from './contract-types';
 
+function storageDeclaresCollection(
+  storage: MongoContract['storage'],
+  collectionName: string,
+): boolean {
+  for (const ns of Object.values(storage.namespaces)) {
+    if (collectionName in ns.tables) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function validateMongoStorage(contract: MongoContract): void {
   const errors: string[] = [];
 
   for (const [modelName, model] of Object.entries(contract.models)) {
-    if (model.storage.collection && !(model.storage.collection in contract.storage.collections)) {
+    if (
+      model.storage.collection &&
+      !storageDeclaresCollection(contract.storage, model.storage.collection)
+    ) {
       errors.push(
-        `Model "${modelName}" references collection "${model.storage.collection}" which is not in storage.collections`,
+        `Model "${modelName}" references collection "${model.storage.collection}" which is not declared under any namespace's tables map`,
       );
     }
 
