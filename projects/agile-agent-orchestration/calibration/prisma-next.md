@@ -304,6 +304,27 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 
 **Reference incident.** 2026-05-17, "kill dual-shape storage" dispatch. Recon grep for `tablesByNamespace|nestedTablesView|freezeFlatTablesView` found ~6 consumer files. After the substrate commit, `pnpm typecheck` revealed 50+ errors across `family-sql` source (`contract-to-schema-ir.ts`, `field-event-planner.ts`, `verify-sql-schema.ts`), `family-sql` test fixtures (`contract-to-schema-ir.test.ts`, `schema-verify.basic.test.ts`), and extension/target test files. The substrate change was correct; Phase 1 had not migrated all fixture-construction sites to the nested shape. The dispatch was correctly stopped at PARTIAL and the remaining consumer migration sequenced as follow-up.
 
+### 3.13 Orchestrator scopes a bridge as "contained" when the underlying mismatch is a framework-level type invariant
+
+**Symptom.** A substrate refactor changes the type of a widely-consumed field. The orchestrator surveys the failure surface, sees that one package (the DSL — `sql-builder` in the reference incident) has type-machinery that depends on the old shape, and proposes a "contained bridge in that one package" to keep the substrate shipping while deferring the broader migration. The bridge ships. Typecheck cascade then reveals the same root cause in N other packages that were previously hidden behind the first package's cascading failure — packages the orchestrator never surveyed because the cascade had short-circuited their reporting.
+
+**Why this is structurally different from § 3.7 (per-package gates miss cross-package regressions).** § 3.7 is about DoD gate scoping after a dispatch lands. § 3.13 is about *brief scoping before dispatch* — the orchestrator made a containment claim that wasn't true and structured the dispatch around it. The implementer correctly executed the brief; the brief was wrong.
+
+**Detection signal.**
+
+- Orchestrator's containment claim takes a form like "the bridge in package X handles all the consumers; emitter/substrate/<framework-level shape> stays unchanged." The claim is testable: it requires zero new typecheck failures in any package outside X after the bridge lands.
+- The substrate change touches a type that's parameterised through the framework (`Contract<TStorage>`, `Storage`, `SchemaNode<…>`, etc.) rather than a target-specific or DSL-specific type. Framework-level types propagate through every consumer; "containing" them in one package is structurally impossible.
+- Pre-bridge typecheck shows N packages failing with cascade-truncated errors (only the first failure per dependency chain is reported). The orchestrator surveys the visible failures (1 package) without recognising that the cascade hides siblings.
+
+**Mitigation.**
+
+- **Before claiming containment**, run `pnpm typecheck --filter <each-package-individually>` (or equivalently disable Turbo's failure short-circuit) to see the FULL failure surface, not the cascade-truncated view. Cost: ~30s extra; reveals whether containment is structurally possible.
+- **Cleavage test for the bridge claim:** if the bridged type is *parameterised through the framework* (e.g. `Contract<TStorage>.storage.tables` — the type is reachable from any consumer that imports `Contract`), the bridge cannot contain it. The bridge can only contain types that are *exposed by the DSL only* (e.g. `Db<C>.<tableName>` — only sql-builder's `Db` exposes this surface).
+- **Brief honesty rule:** if the orchestrator cannot demonstrate containment with the pre-dispatch typecheck survey, the brief must NOT make the containment claim. Either the dispatch scope expands to cover the full propagation surface, or the substrate change is deferred until the propagation can be planned.
+- **Recovery when caught post-bridge:** acknowledge the scoping mistake explicitly to the human, present the corrected scope (typically: extend the dispatch to cover the propagation surface — emitter, all generated fixtures, framework type updates), and document the calibration debt. Do NOT push through with hand-edited per-package fixtures (brittle, self-reverting under `fixtures:check`) or with type-level dual-shape support (the exact anti-pattern that was just deleted).
+
+**Reference incident.** 2026-05-18, TML-2520 M5c Phase 3 — orchestrator (this calibration's author) proposed a `FlatTablesOf<C>` bridge inside `sql-builder` to defer the emitter migration to TML-2550, claiming the bridge would contain the substrate change. Composer-2's bridge dispatch (`c2903c314`) executed the brief correctly and cleared `@prisma-next/sqlite` typecheck (the original visible failure). The cascade then unmasked 7 sibling packages failing with the same root cause — `@prisma-next/postgres`, `@prisma-next/sql-orm-client`, plus 4 demo apps and `paradedb-demo` — each one a consumer passing a generated flat-shape `Contract` to a function expecting `Contract<SqlStorage>` (nested). The bridge couldn't shield those consumers because `Contract<TStorage>.storage.tables` is a framework-parameterised type, not a DSL-local one. Correction: emitter migration brought into PR2 scope as Phase 3; bridge in `sql-builder` retained for DSL ergonomics only; full DSL redesign deferred to TML-2550 (which is the genuinely separable part — the bridge's `Db<C>` flatten could have been scoped to "contained" honestly because `Db<C>` is exposed by sql-builder only).
+
 ---
 
 ## 4. Grep library

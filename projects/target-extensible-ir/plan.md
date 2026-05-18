@@ -9,7 +9,7 @@ The user-facing capabilities this project delivers are: multi-schema Postgres co
 **PR2 forward concerns (out of project scope; flagged for follow-up projects):**
 - **Target-contributed top-level PSL blocks** ([TML-2537 — PR3](https://linear.app/prisma-company/issue/TML-2537)). The framework PSL parser stays hardcoded for the small set of top-level keywords (`model`, `enum`, `type`, `types`, `namespace`). Downstream work (RLS, roles, custom types) will hit this gap. PR3 adds a target-contributed top-level PSL block registry and migrates `enum` from framework-parser to Postgres-pack contribution as the proof-of-concept. `namespace { … }` stays framework-parsed because it's a framework concern. Blocked by PR2 merging; does not block PR2. Full spec + plan at `projects/target-contributed-psl-blocks/`.
 - **`@hint(was: 'oldSlot')` mechanism for rebind intent.** When a contract changes a model's namespace declaration (or a table's name), the planner cannot distinguish a deliberate rebind from a delete-and-recreate. PR2 ships drop+create on any slot mismatch with no informational diagnostic (every slot mismatch looks identical to the planner; a diagnostic would either fire spuriously or require the same impossible inference it's trying to flag). The `@hint` mechanism referenced in ADR 001 is the durable solution; it solves table renames and namespace rebinds with one syntax. Future project.
-- **Namespace-aware query API surface** ([TML-2550 — PR4 follow-up](https://linear.app/prisma-company/issue/TML-2550)). PR2 makes `SqlStorage.tables` canonically nested by namespace in the runtime IR (M5c), but keeps the emitted `contract.d.ts` `tables` literal flat and bridges the gap inside `sql-builder` via a single time-bounded `FlatTablesOf<C>` type helper marked `TODO(TML-2550)`. The follow-up PR designs the namespace-aware query DSL surface (unbound-at-root + qualified `db.<namespaceId>.<table>` for named namespaces), decides cross-namespace name-collision behaviour (union row types vs qualified keys vs error), migrates the emitter to emit nested `contract.d.ts`, regenerates all generated fixtures, and removes the bridge helper. Deferred deliberately to avoid bundling an unscoped API-surface design decision into PR2's substrate close-out. Full rationale in M5c § "Deferred follow-up". Blocked by PR2 merging; does not block PR2.
+- **Namespace-aware query DSL surface** ([TML-2550 — PR4 follow-up](https://linear.app/prisma-company/issue/TML-2550)). PR2 makes `SqlStorage.tables` canonically nested by namespace in the runtime IR AND in the emitted `contract.d.ts` (M5c — emitter migrated in-scope as it's a framework-level invariant, not a DSL design choice). The bridge inside `sql-builder` (a single time-bounded `FlatTablesOf<C>` type helper marked `TODO(TML-2550)`) preserves today's `db.users.select(...)` ergonomics for unbound contracts. The follow-up PR designs the **namespace-aware DSL surface** itself (unbound-at-root + qualified `db.<namespaceId>.<table>` for named namespaces; `OrmRoot<C>` and other DSL surfaces aligned identically), decides cross-namespace name-collision behaviour (union row types vs qualified keys vs error), and removes the bridge helper once the DSL natively handles namespaces. Deferred deliberately to avoid bundling an unscoped API-surface design decision into PR2's substrate close-out. Full rationale in M5c § "Deferred follow-up". Blocked by PR2 merging; does not block PR2.
 
 **Spec:** [`projects/target-extensible-ir/spec.md`](spec.md)
 **Linear (project):** [Target-Extensible IR + Namespaces](https://linear.app/prisma-company/issue/TML-2459) (originating ticket TML-2459, completed; per-milestone tickets TML-2468 through TML-2474)
@@ -319,11 +319,11 @@ pnpm test:e2e
 
 ### M5c — Dual-shape substrate elimination (`SqlStorage.tables` canonical nested form)
 
-**Status: COMPLETE on local branch** (Phase 1 + Phase 2 below). Closing out PR2's substrate work with one deferred follow-up (TML-2550) for the namespace-aware query DSL surface, scoped per § "Deferred follow-up" below.
+**Status: IN PROGRESS on local branch** (Phase 1 + Phase 2 below complete; Phase 3 emitter migration in flight). Closing out PR2's substrate work with one deferred follow-up (TML-2550) for the namespace-aware DSL surface, scoped per § "Deferred follow-up" below.
 
 **Goal:** eliminate the dual-shape `SqlStorage.tables` representation introduced under M5a R7 — where instances of `SqlStorage` carried `tables` as a flat-by-name `Record<string, StorageTable>` view plus a non-enumerable `tablesByNamespace` back-pointer holding the truth, while JSON-deserialised POJOs carried `tables` directly as the nested-by-namespace shape. The bridge between the two lived in `nestedTablesView` / `nestedTypesView` via `as unknown as` casts. The dual-shape was a serialization-vs-runtime asymmetry that masked verifier bugs (F01 fed into the reversal of `namespaceId` optionality) and made every consumer's `storage.tables[name]` access ambiguous: it worked for the JSON shape and silently misrouted for the runtime shape, or vice versa, depending on which `SqlStorage` source the contract came from.
 
-The end-state is one canonical shape — nested `Readonly<Record<NamespaceId, Readonly<Record<TableName, StorageTable>>>>` — at both the runtime class layer and the JSON envelope layer. The user-facing emitted `contract.d.ts` `tables` literal stays flat for this PR (bridged inside `sql-builder`); migrating that surface is the deferred follow-up.
+The end-state is one canonical shape — nested `Readonly<Record<NamespaceId, Readonly<Record<TableName, StorageTable>>>>` — at the runtime class layer, the JSON envelope layer, **and the emitted `contract.d.ts` type**. The emitter migration lands in this PR because the runtime-vs-declared shape gap is a **framework-level type invariant**, not a DSL design choice: every consumer that passes a generated `Contract` to a function expecting `Contract<SqlStorage>` would otherwise fail typecheck (which is exactly what surfaced when M5c Phase 2 landed — see "Phase 3 — Emitter migration" below). What defers to TML-2550 is the **DSL surface redesign** itself (unbound-at-root vs qualified `db.<ns>.<table>`; collision handling; `OrmRoot<C>` shape) — a separable API-surface design decision.
 
 **Sequencing rationale (Phase 1 before Phase 2).** Phase 1 had to land first because the substrate refactor would have broken every flat-shaped test fixture before they could be migrated, leaving the test suite uninspectable. The user's framing was definitive: "MODIFY THE FUCKING TEST FIXTURES AND HELPERS FIRST SO THEY GENERATE THE CORRECT FUCKING STRUCTURE" — recorded in [`projects/agile-agent-orchestration/calibration/prisma-next.md`](../agile-agent-orchestration/calibration/prisma-next.md) § 3.1 (dual-shape support relocated under polite names) and § 3.9 (`as unknown as` casts ARE dual-shape support).
 
@@ -345,6 +345,18 @@ Phase 1 reduced deterministic test failures from **246 → 0**; remaining 3-4 PG
 - [x] `packages/3-extensions/extension-pgvector/test/` — fixture migration uncovered during the substrate cascade (`dd5ff9b80`).
 - [x] `packages/3-targets/6-adapters/postgres/test/migrations/` — 4 remaining planner test fixtures migrated (`7e9c2d842`).
 
+**Phase 3 — Emitter migration + `sql-builder` bridge (in-scope correction; commits in flight):**
+
+After Phase 2 landed, `pnpm typecheck` cascade-failed from `@prisma-next/sqlite` (root cause: `Db<C>`'s `keyof C['storage']['tables']` form is a flat-shape assumption). An initial scoping mistake by the orchestrator (recorded as a calibration debt — see § 3.13 below) assumed the gap could be bridged inside `sql-builder` alone, with the emitter's `contract.d.ts` shape kept flat in PR2. Composer-2's bridge dispatch (`c2903c314`) tightened `TableProxyContract.storage.tables` to nested + introduced the `FlatTablesOf<C>` helper + hand-nested the sql-builder playground fixture. That cleared `@prisma-next/sqlite`'s typecheck, but unmasked 7 sibling failures across `@prisma-next/postgres`, `@prisma-next/sql-orm-client`, `react-router-demo`, `prisma-next-demo-sqlite`, `prisma-next-cloudflare-worker`, `prisma-next-demo`, and `paradedb-demo` — each one a consumer passing a generated `Contract` (flat-shape per today's emitter) to a function expecting `Contract<SqlStorage>` (nested-shape per the new runtime IR). The bridge cannot shield those consumers because the runtime-IR-vs-emitted-`.d.ts` shape gap is a framework-level type invariant, not a sql-builder-specific concern.
+
+The corrected scope brings the emitter migration into PR2:
+
+- [x] `packages/2-sql/4-lanes/sql-builder/src/types/db.ts` — `FlatTablesOf<C>` bridge for `Db<C>`'s key mapping; `TableProxyContract.storage.tables` declared nested-only; consumers (`table-proxy.ts`, `table-proxy-impl.ts`) import `FlatTablesOf` for flat-by-name table lookups while the contract shape stays nested-only. Marked `TODO(TML-2550)` (the marker survives the emitter migration — it tracks the DSL redesign, not the emitter shape). +28 lines net (`c2903c314`).
+- [ ] **Emitter migration:** update `packages/2-sql/3-tooling/emitter/src/index.ts` `generateTablesType` and the corresponding types generator to emit `tables: { [namespaceId]: { [tableName]: ... } }` instead of flat `tables: { [tableName]: ... }`. The emitted `Contract.storage.tables` shape now matches the runtime IR `SqlStorage.tables` shape exactly. JSON envelope shape already nested (Phase 1 + 2).
+- [ ] **Fixture regeneration:** `pnpm fixtures:check` regenerates every generated `contract.d.ts` fixture across the repo (~50-100 files; pure mechanical diff). Replaces the hand-nested playground fixture from Phase 3 with the canonical emitted form.
+- [ ] **Downstream consumer typechecks:** the 7 packages that surfaced after composer-2's bridge typecheck-cleanly once their generated `Contract` declares nested `storage.tables` — same shape as `Contract<SqlStorage>`. No test rewrites required for the existing test bodies (only fixture diffs).
+- [ ] **CHANGELOG entry** describing the breaking change to `contract.d.ts` `storage.tables` shape — cold-read JSON consumers must update from `tables.<name>` to `tables.<namespaceId>.<name>`. Pre-1.0; flagged explicitly because the change is mechanical for callers.
+
 **Grep gates (mandatory before declaring M5c done):**
 
 ```bash
@@ -365,11 +377,11 @@ Both gates verified zero hits at HEAD.
 - § 3.10 — Sonnet-low under-reasons through strict anti-pattern guards (informed model-tier routing § 5).
 - § 3.11 — Recon grep undercounts consumer surface for IR type changes (the query-builder's `keyof C['storage']['tables']` form is a structural flat-shape assumption that survives without naming any deleted helper).
 
-**Deferred follow-up — TML-2550: Namespace-aware query API surface**
+**Deferred follow-up — TML-2550: Namespace-aware DSL surface**
 
-PR2 stops short of the user-facing query DSL surface because cross-namespace name collisions are a genuine API-design decision that surfaced during Phase 2 and was not in PR2's spec. The user's framing:
+PR2 ships the substrate (nested runtime IR + nested emitted `contract.d.ts` — both framework-level invariants) but stops short of redesigning the user-facing DSL surface. The DSL redesign is a genuine API-design decision that surfaced during Phase 2 and was not in PR2's spec. The user's framing:
 
-> "We never considered this, or I never considered it. I think the right approach is that we need to represent namespaces in the resulting query surface. Anything that's in the unbound namespace can live at the top level, with no explicit namespace in the query API surface. Everything that's in a named namespace needs to be represented the same way in the query surface."
+> "We need to represent namespaces in the resulting query surface. Anything that's in the unbound namespace can live at the top level, with no explicit namespace in the query API surface. Everything that's in a named namespace needs to be represented the same way in the query surface."
 
 **Bridge shipped in PR2 (`sql-builder/src/types/db.ts`):**
 
@@ -377,29 +389,38 @@ PR2 stops short of the user-facing query DSL surface because cross-namespace nam
 // TODO(TML-2550): replace with namespace-aware Db<C> shape (unbound-at-root
 // + qualified db.<namespaceId>.<table> for named namespaces; collision
 // handling per the follow-up's design decision).
-type FlatTablesOf<C> = UnionToIntersection<
-  C['storage']['tables'][keyof C['storage']['tables']]
->;
+type FlatTablesOf<T> = …; // union-to-intersection across namespace buckets
 
-type TableProxyContract = {
-  readonly storage: { readonly tables: FlatTablesOf<…> };
+export type TableProxyContract = {
+  readonly storage: {
+    readonly tables: Readonly<Record<string, Readonly<Record<string, StorageTable>>>>;
+  };
   readonly capabilities: CapabilitiesBase;
+};
+
+export type Db<C extends TableProxyContract> = {
+  [Name in string & keyof FlatTablesOf<C['storage']['tables']>]: TableProxy<C, Name>;
 };
 ```
 
-The bridge is naïve (no collision handling) because **every existing test fixture and demo only uses `__unbound__`** — collisions are structurally impossible in PR2's surface, so a naïve flatten is provably safe. The `TODO(TML-2550)` comment is the contract; `rg 'TODO\(TML-2550\)'` is the gate that catches us if we forget to remove it when the follow-up lands.
+`TableProxyContract` declares the nested shape (matching the emitter output and runtime IR). `Db<C>`'s key mapping derives a flat view via `FlatTablesOf<C>` so today's `db.users.select(...)` ergonomics keep working unchanged for unbound contracts. The flatten is naïve (no collision handling) because **every existing test fixture and demo only uses `__unbound__`** — collisions are structurally impossible in PR2's surface. The `TODO(TML-2550)` comment is the contract; `rg 'TODO\(TML-2550\)'` is the gate that catches us if we forget to remove it.
 
-**What TML-2550 delivers:**
+**What TML-2550 delivers (DSL surface only — emitter/fixtures shipped in PR2):**
 
-1. **Query API surface design:** unbound-at-root + qualified `db.<namespaceId>.<table>` for named namespaces. Today's `db.users.select(...)` for unbound models keeps working unchanged. Named namespaces become `db.auth.users.select(...)`. (Only the new namespace-exemplar tests in PR2 need to write qualified paths; the existing 600+ test files use unbound implicitly and continue to work.)
-2. **Cross-namespace name-collision behaviour decision:** union row types at colliding keys (preserves `db.users.select(...)` ergonomics + narrowable at use site), vs qualified-on-collision-only (clean but two key shapes), vs error-on-collision. Recommend union (defer the conversation to the follow-up spec).
-3. **Emitter migration:** update `packages/2-sql/3-tooling/emitter/src/index.ts` `generateTablesType` and `generateStorageTypesType` to emit nested `{ [namespaceId]: { [tableName]: ... } }` in `contract.d.ts`. Regenerate every generated `contract.d.ts` fixture across the repo via `pnpm fixtures:check` (large mechanical diff — ~50-100 files).
-4. **DSL type-machinery rework:** `Db<C>`, `OrmRoot<C>`, `ResolvedColumnTypes<C, T>`, `ResolvedInsertValues<C, T>`, `FindModelForTable<C, Name>`, plus any `expectTypeOf` / test-d expectations of the flat shape. Each takes either an `(namespaceId, tableName)` coordinate or walks all namespaces to find by name (with the collision decision applied).
-5. **Bridge removal:** delete `FlatTablesOf<C>` and the `TODO(TML-2550)` markers from `sql-builder`. Grep gate: `rg 'TODO\(TML-2550\)' packages/` returns zero hits.
-6. **Test rewrites for the new API surface** — only the namespace-exemplar tests that exercise named namespaces; the unbound-implicit majority is unchanged.
-7. **CHANGELOG entry** for the breaking change to `contract.d.ts` `storage.tables` shape (cold-read JSON consumers must update from `tables.<name>` to `tables.<namespaceId>.<name>`).
+1. **DSL surface design:** unbound-at-root + qualified `db.<namespaceId>.<table>` for named namespaces, applied uniformly across `Db<C>` (sql-builder), `OrmRoot<C>` (sql-orm-client), and any other DSL surface that maps over `keyof storage.tables`. Today's `db.users.select(...)` for unbound models keeps working unchanged. Named namespaces become `db.auth.users.select(...)`. (Only the new namespace-exemplar tests in PR2 need to write qualified paths; the existing 600+ test files use unbound implicitly and continue to work.)
+2. **Cross-namespace name-collision behaviour decision:** union row types at colliding keys (preserves `db.users.select(...)` ergonomics + narrowable at use site), vs qualified-on-collision-only (clean but two key shapes), vs error-on-collision. Recommend union (validate during the follow-up's spec phase).
+3. **DSL type-machinery rework:** `Db<C>`, `OrmRoot<C>`, `ResolvedColumnTypes<C, T>`, `ResolvedInsertValues<C, T>`, `FindModelForTable<C, Name>`, plus any `expectTypeOf` / test-d expectations that compose over the flat key mapping. Each takes either an `(namespaceId, tableName)` coordinate or walks all namespaces to find by name (with the collision decision applied).
+4. **Bridge removal:** delete `FlatTablesOf<C>` and the `TODO(TML-2550)` markers from `sql-builder`. Grep gate: `rg 'TODO\(TML-2550\)' packages/` returns zero hits.
+5. **Test rewrites for the new API surface** — only the namespace-exemplar tests that exercise named namespaces; the unbound-implicit majority is unchanged.
 
-**Why deferring is the right call:**
+**Scope split rationale (what's in PR2 vs TML-2550):**
+
+The cleavage isn't arbitrary — it follows the structural-invariant boundary:
+
+- **Framework-level type invariant (in PR2):** runtime IR, JSON envelope, and emitted `contract.d.ts` must all declare the same shape. Violating that masks runtime-vs-declared bugs (the `as TestContract` cast that hid this for two phases was masking a real bug — users writing `contract.storage.tables.users` would have returned `undefined` at runtime because the nested data didn't match the flat declared type).
+- **DSL API surface (deferred to TML-2550):** how the user-facing query API maps over the substrate is an ergonomics decision with degrees of freedom (collision handling, qualified vs unqualified, OrmRoot shape symmetry). Deserves its own spec.
+
+**Why deferring TML-2550 is the right call:**
 
 - PR2's acceptance criteria (M5a + M5b) don't touch the user-facing query DSL — cross-namespace FKs are an IR + planner + verifier feature exercised through migration, not through `Db<C>`. Deferral does not reduce PR2's user-facing capability surface.
 - The collision-handling decision is an API surface decision that deserves its own spec, its own design conversation, and its own PR — bundling it into PR2's substrate close-out under time pressure is the exact anti-pattern that produces rough product edges.
@@ -407,19 +428,20 @@ The bridge is naïve (no collision handling) because **every existing test fixtu
 
 **Anti-pattern this is NOT** (the framing matters for honesty):
 
-The `FlatTablesOf<C>` bridge could be characterised as "Path B" from the Phase 2 architectural alternatives discussion — preserve dual-shape between emitter output and runtime IR. The framing that distinguishes it is **time-boundedness**:
+The `FlatTablesOf<C>` bridge could be characterised as preserving dual-shape between user-facing key-mapping and runtime IR. The framing that distinguishes it is **time-boundedness** + **substrate alignment**:
 
-- Permanent dual-shape (rejected): emitter emits flat, runtime IR is nested, bridge helper derives flat from nested with no scheduled removal. Calibration § 3.1 / § 3.9 pattern recurs.
-- **Time-bounded bridge (shipped here):** identical mechanism, explicitly scoped to one helper in one package with a `TODO(TML-2550)` comment and an open Linear ticket. The follow-up PR's first DoD gate is the `rg 'TODO\(TML-2550\)'` zero-hits check. If TML-2550 doesn't land, the gate fails the follow-up PR; if TML-2550 is forgotten, the grep still fires whenever someone touches the file.
+- Permanent dual-shape (rejected): substrate, emitter, and DSL all disagree, with bridge helpers hiding the gap indefinitely. Calibration § 3.1 / § 3.9 pattern recurs.
+- **Time-bounded bridge with substrate alignment (shipped here):** substrate IR + emitted `.d.ts` + JSON envelope all agree (one canonical nested shape). The bridge is one helper in one package that flattens the key mapping for DSL ergonomics only — explicitly scoped, `TODO(TML-2550)` marked, with an open Linear ticket. The follow-up PR's first DoD gate is the `rg 'TODO\(TML-2550\)'` zero-hits check. If TML-2550 doesn't land, the gate fails the follow-up PR; if TML-2550 is forgotten, the grep still fires whenever someone touches the file.
 
 **Validation:**
 
-- `pnpm typecheck` clean.
+- `pnpm typecheck` clean across the monorepo (the Phase 3 emitter migration is what makes this true — Phase 2 + bridge alone leaves 7 consumer packages failing).
 - `pnpm lint:deps` green.
-- `pnpm fixtures:check` green (no regenerated `.d.ts` diffs — the bridge keeps `contract.d.ts` flat-shape stable for PR2).
+- `pnpm fixtures:check` green after Phase 3 lands (the regeneration is part of the Phase 3 commit; subsequent runs return no diffs).
 - `pnpm test:packages` deterministic failures = 0 (PGlite flakiness acceptable; queued as follow-up item).
 - Grep gates above return zero hits.
-- `rg 'TODO\(TML-2550\)' packages/` returns the expected bridge marker (one location).
+- `rg 'TODO\(TML-2550\)' packages/` returns the expected bridge marker (one location, in `db.ts`).
+- Emitted `contract.d.ts` shape across all fixtures is canonical-nested `tables: { [namespaceId]: { [tableName]: ... } }`.
 
 **Open items (deferred / non-blocking for PR2 merge):**
 
