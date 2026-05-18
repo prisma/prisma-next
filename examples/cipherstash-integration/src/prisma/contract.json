@@ -114,10 +114,11 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__"
+        "id": "__unbound__",
+        "kind": "schema"
       }
     },
-    "storageHash": "sha256:9ad615313b35345088904a2f9d2ce786d72b38abfcfc4c0ce70a71a1a3ce0772",
+    "storageHash": "sha256:1128b21392a1dc3c20f9bc0f8ffebfc725a82f729652ec55577d3ca76a5676cc",
     "tables": {
       "__unbound__": {
         "users": {

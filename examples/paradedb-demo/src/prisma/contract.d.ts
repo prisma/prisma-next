@@ -67,41 +67,43 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly item: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
+      readonly __unbound__: {
+        readonly item: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly description: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly category: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly rating: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
           };
-          readonly description: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly category: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly rating: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [
+            {
+              readonly columns: readonly ['id', 'description', 'category', 'rating'];
+              readonly name: 'item_bm25_idx';
+              readonly type: 'bm25';
+              readonly options: { readonly key_field: 'id' };
+            },
+          ];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [
-          {
-            readonly columns: readonly ['id', 'description', 'category', 'rating'];
-            readonly name: 'item_bm25_idx';
-            readonly type: 'bm25';
-            readonly options: { readonly key_field: 'id' };
-          },
-        ];
-        foreignKeys: readonly [];
       };
     };
     readonly types: Record<string, never>;

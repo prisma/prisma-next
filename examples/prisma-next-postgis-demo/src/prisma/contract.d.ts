@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:f952b9f73ba7ae1ba3da6dc516427a055f4df7872662c5e0e434a4575e952272'>;
+  StorageHashBase<'sha256:43680f0f7614ed93ab129578b24e7b98c6d12fbbd61d7e2797ca5ffe2f02747f'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:815d2a9f2f35488d3bb0aeba687849e2475b621c331c1d27ad79e37b6e56182f'>;
 export type ProfileHash =
@@ -88,91 +88,95 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly cafe: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
+      readonly __unbound__: {
+        readonly cafe: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'character';
+              readonly codecId: 'sql/char@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 36 };
+            };
+            readonly name: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly location: {
+              readonly nativeType: 'geometry';
+              readonly codecId: 'pg/geometry@1';
+              readonly nullable: false;
+              readonly typeRef: 'WgsGeometry';
+            };
           };
-          readonly name: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly location: {
-            readonly nativeType: 'geometry';
-            readonly codecId: 'pg/geometry@1';
-            readonly nullable: false;
-            readonly typeRef: 'WgsGeometry';
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
-      readonly neighborhood: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
+        readonly neighborhood: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'character';
+              readonly codecId: 'sql/char@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 36 };
+            };
+            readonly name: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly boundary: {
+              readonly nativeType: 'geometry';
+              readonly codecId: 'pg/geometry@1';
+              readonly nullable: false;
+              readonly typeRef: 'WgsGeometry';
+            };
           };
-          readonly name: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly boundary: {
-            readonly nativeType: 'geometry';
-            readonly codecId: 'pg/geometry@1';
-            readonly nullable: false;
-            readonly typeRef: 'WgsGeometry';
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
-      readonly route: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
+        readonly route: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'character';
+              readonly codecId: 'sql/char@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 36 };
+            };
+            readonly name: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly path: {
+              readonly nativeType: 'geometry';
+              readonly codecId: 'pg/geometry@1';
+              readonly nullable: false;
+              readonly typeRef: 'WgsGeometry';
+            };
           };
-          readonly name: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly path: {
-            readonly nativeType: 'geometry';
-            readonly codecId: 'pg/geometry@1';
-            readonly nullable: false;
-            readonly typeRef: 'WgsGeometry';
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
     readonly types: {
-      readonly WgsGeometry: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/geometry@1';
-        readonly nativeType: 'geometry';
-        readonly typeParams: { readonly srid: 4326 };
+      readonly __unbound__: {
+        readonly WgsGeometry: {
+          readonly kind: 'codec-instance';
+          readonly codecId: 'pg/geometry@1';
+          readonly nativeType: 'geometry';
+          readonly typeParams: { readonly srid: 4326 };
+        };
       };
     };
     readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };

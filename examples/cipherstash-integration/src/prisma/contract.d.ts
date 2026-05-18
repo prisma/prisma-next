@@ -35,7 +35,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9ad615313b35345088904a2f9d2ce786d72b38abfcfc4c0ce70a71a1a3ce0772'>;
+  StorageHashBase<'sha256:1128b21392a1dc3c20f9bc0f8ffebfc725a82f729652ec55577d3ca76a5676cc'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -80,59 +80,61 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly users: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly email: {
-            readonly nativeType: 'eql_v2_encrypted';
-            readonly codecId: 'cipherstash/string@1';
-            readonly nullable: false;
-            readonly typeParams: {
-              readonly equality: true;
-              readonly freeTextSearch: true;
-              readonly orderAndRange: true;
+      readonly __unbound__: {
+        readonly users: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly email: {
+              readonly nativeType: 'eql_v2_encrypted';
+              readonly codecId: 'cipherstash/string@1';
+              readonly nullable: false;
+              readonly typeParams: {
+                readonly equality: true;
+                readonly freeTextSearch: true;
+                readonly orderAndRange: true;
+              };
+            };
+            readonly salary: {
+              readonly nativeType: 'eql_v2_encrypted';
+              readonly codecId: 'cipherstash/double@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+            };
+            readonly accountid: {
+              readonly nativeType: 'eql_v2_encrypted';
+              readonly codecId: 'cipherstash/bigint@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+            };
+            readonly birthday: {
+              readonly nativeType: 'eql_v2_encrypted';
+              readonly codecId: 'cipherstash/date@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+            };
+            readonly emailverified: {
+              readonly nativeType: 'eql_v2_encrypted';
+              readonly codecId: 'cipherstash/boolean@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly equality: true };
+            };
+            readonly preferences: {
+              readonly nativeType: 'eql_v2_encrypted';
+              readonly codecId: 'cipherstash/json@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly searchableJson: true };
             };
           };
-          readonly salary: {
-            readonly nativeType: 'eql_v2_encrypted';
-            readonly codecId: 'cipherstash/double@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-          };
-          readonly accountid: {
-            readonly nativeType: 'eql_v2_encrypted';
-            readonly codecId: 'cipherstash/bigint@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-          };
-          readonly birthday: {
-            readonly nativeType: 'eql_v2_encrypted';
-            readonly codecId: 'cipherstash/date@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-          };
-          readonly emailverified: {
-            readonly nativeType: 'eql_v2_encrypted';
-            readonly codecId: 'cipherstash/boolean@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly equality: true };
-          };
-          readonly preferences: {
-            readonly nativeType: 'eql_v2_encrypted';
-            readonly codecId: 'cipherstash/json@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly searchableJson: true };
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
     readonly types: Record<string, never>;

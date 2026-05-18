@@ -1,6 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
@@ -142,8 +142,8 @@ namespace auth {
     // the `__unbound__` sentinel and stamp it explicitly on every
     // table, so the on-disk envelope addresses each table with an
     // unambiguous `(namespaceId, name)` pair regardless of surface.
-    expect(pslStorage.tables['tenant']?.namespaceId).toBe('__unbound__');
-    expect(tsStorage.tables['tenant']?.namespaceId).toBe('__unbound__');
+    expect(findTableByName(pslStorage, 'tenant')?.namespaceId).toBe('__unbound__');
+    expect(findTableByName(tsStorage, 'tenant')?.namespaceId).toBe('__unbound__');
 
     expect(Object.keys(pslStorage.namespaces)).toEqual(Object.keys(tsStorage.namespaces));
   });

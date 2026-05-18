@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:107ce92788984cad3aff9ee860e328048f14e156869ae418ba9ec96f31d6f4df'>;
+  StorageHashBase<'sha256:d891931ec5208874f1fde77f524bef081f165ece20ea9bbdef1d0893ed5e2d69'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -61,26 +61,30 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly feature_flag: {
-        columns: {
-          readonly key: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
+      readonly __unbound__: {
+        readonly feature_flag: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly key: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly enabled: {
+              readonly nativeType: 'bool';
+              readonly codecId: 'pg/bool@1';
+              readonly nullable: false;
+            };
           };
-          readonly enabled: {
-            readonly nativeType: 'bool';
-            readonly codecId: 'pg/bool@1';
-            readonly nullable: false;
-          };
+          primaryKey: { readonly columns: readonly ['key'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['key'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
     readonly types: Record<string, never>;
+    readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
     readonly storageHash: StorageHash;
   },
   {

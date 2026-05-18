@@ -142,10 +142,11 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__"
+        "id": "__unbound__",
+        "kind": "schema"
       }
     },
-    "storageHash": "sha256:f952b9f73ba7ae1ba3da6dc516427a055f4df7872662c5e0e434a4575e952272",
+    "storageHash": "sha256:43680f0f7614ed93ab129578b24e7b98c6d12fbbd61d7e2797ca5ffe2f02747f",
     "tables": {
       "__unbound__": {
         "cafe": {

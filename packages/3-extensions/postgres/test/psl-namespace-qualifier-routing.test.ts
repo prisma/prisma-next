@@ -1,7 +1,7 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import {
   PostgresSchema,
@@ -62,7 +62,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    const tenant = storage.tables['tenant'];
+    const tenant = findTableByName(storage, 'tenant');
     expect(tenant).toBeDefined();
 
     // The model lowered to the framework-reserved unbound slot.
@@ -106,7 +106,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    const user = storage.tables['user'];
+    const user = findTableByName(storage, 'user');
     expect(user?.namespaceId).toBe('auth');
 
     const namespace = storage.namespaces['auth'];
@@ -138,7 +138,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       return;
     }
     const storage = result.value.storage as SqlStorage;
-    const post = storage.tables['post'];
+    const post = findTableByName(storage, 'post');
     // Top-level declarations resolve to the late-bound `__unbound__`
     // sentinel — single-namespace contracts carry the sentinel
     // explicitly so the on-disk envelope addresses every table with an

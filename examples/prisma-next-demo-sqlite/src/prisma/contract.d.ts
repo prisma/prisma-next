@@ -66,80 +66,82 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly post: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/text@1';
-            readonly nullable: false;
-          };
-          readonly userId: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
-          };
-          readonly createdAt: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/datetime@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [
-          {
-            readonly source: { readonly columns: readonly ['userId'] };
-            readonly target: {
-              readonly namespaceId: '__unbound__';
-              readonly table: 'user';
-              readonly columns: readonly ['id'];
+      readonly __unbound__: {
+        readonly post: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'character';
+              readonly codecId: 'sql/char@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 36 };
             };
-            readonly name: 'post_userId_fkey';
-            readonly constraint: true;
-            readonly index: true;
-          },
-        ];
-      };
-      readonly user: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
+            readonly title: {
+              readonly nativeType: 'text';
+              readonly codecId: 'sqlite/text@1';
+              readonly nullable: false;
+            };
+            readonly userId: {
+              readonly nativeType: 'character';
+              readonly codecId: 'sql/char@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 36 };
+            };
+            readonly createdAt: {
+              readonly nativeType: 'text';
+              readonly codecId: 'sqlite/datetime@1';
+              readonly nullable: false;
+              readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+            };
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/text@1';
-            readonly nullable: false;
-          };
-          readonly displayName: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/text@1';
-            readonly nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/datetime@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [
+            {
+              readonly source: { readonly columns: readonly ['userId'] };
+              readonly target: {
+                readonly namespaceId: '__unbound__';
+                readonly table: 'user';
+                readonly columns: readonly ['id'];
+              };
+              readonly name: 'post_userId_fkey';
+              readonly constraint: true;
+              readonly index: true;
+            },
+          ];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
+        readonly user: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'character';
+              readonly codecId: 'sql/char@1';
+              readonly nullable: false;
+              readonly typeParams: { readonly length: 36 };
+            };
+            readonly email: {
+              readonly nativeType: 'text';
+              readonly codecId: 'sqlite/text@1';
+              readonly nullable: false;
+            };
+            readonly displayName: {
+              readonly nativeType: 'text';
+              readonly codecId: 'sqlite/text@1';
+              readonly nullable: false;
+            };
+            readonly createdAt: {
+              readonly nativeType: 'text';
+              readonly codecId: 'sqlite/datetime@1';
+              readonly nullable: false;
+              readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+            };
+          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
+        };
       };
     };
     readonly types: Record<string, never>;
