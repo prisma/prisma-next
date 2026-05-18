@@ -78,7 +78,7 @@ describe('MongoTargetContractSerializer', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
 
-    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID].tables['items'];
+    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
   });
@@ -97,11 +97,11 @@ describe('MongoTargetContractSerializer', () => {
     };
     expect(json.storage).toHaveProperty('namespaces');
     expect(json.storage).not.toHaveProperty('collections');
-    const namespaces = json.storage.namespaces as Record<
+    const namespaces = json.storage['namespaces'] as Record<
       string,
       { tables: Record<string, unknown> }
     >;
-    expect(namespaces[UNBOUND_NAMESPACE_ID].tables.items).toMatchObject({
+    expect(namespaces[UNBOUND_NAMESPACE_ID]?.tables['items']).toMatchObject({
       kind: 'mongo-collection',
     });
   });
@@ -157,7 +157,7 @@ describe('MongoTargetContractSerializer', () => {
       const serializer = new MongoTargetContractSerializer();
       const contract = serializer.deserializeContract(makeFullyPopulatedJson());
 
-      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID].tables['items'];
+      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
       expect(items?.validator).toBeInstanceOf(MongoValidator);
@@ -180,7 +180,7 @@ describe('MongoTargetContractSerializer', () => {
       expect(items.options.collation.kind).toBe('mongo-collation-options');
 
       const roundtripped = serializer.deserializeContract(reparsed);
-      expect(roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID].tables['items']).toBeInstanceOf(
+      expect(roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['items']).toBeInstanceOf(
         MongoCollection,
       );
     });

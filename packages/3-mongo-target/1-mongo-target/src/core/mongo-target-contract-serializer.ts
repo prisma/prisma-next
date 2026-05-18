@@ -51,6 +51,13 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
         storageHash: String(storage.storageHash),
         namespaces: namespacesJson,
       },
-    } as JsonObject;
+      // `rest` carries Contract fields typed against framework interfaces
+      // (e.g. `ContractExecutionSection`) that TypeScript can't structurally
+      // prove are JSON-compatible without a per-field re-validation pass.
+      // The runtime invariant is that an emitted MongoTargetContract has
+      // already been through validation and contains only JSON-safe values,
+      // so the two-step cast is intentional. Mirrors the pattern in
+      // PostgresContractSerializer.serializeContract.
+    } as unknown as JsonObject;
   }
 }
