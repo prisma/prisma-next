@@ -21,9 +21,9 @@ The CLI verb taxonomy ([namespacing rule](./README.md#namespacing-rule-subject-n
 ### Bootstrap a new project
 
 **Persona:** application developer starting fresh.
-**Question:** "How do I get from `npm init` to a project that can talk to a database?"
+**Question:** "How do I get from `pnpm init` to a project that can talk to a database?"
 
-```
+```bash
 prisma-next init        # scaffold project (schema.psl, config, etc.)
 contract emit           # produce contract.json + contract.d.ts
 db init                 # lay down marker + ledger tables in an empty DB
@@ -38,7 +38,7 @@ After `db init` the database is signed against the initial contract and ready fo
 **Persona:** application developer iterating on the schema.
 **Question:** "I'm changing the contract often; how do I keep my local DB in sync without producing migration files I'd throw away?"
 
-```
+```bash
 # edit schema.psl or the TS contract
 contract emit
 db update               # off-graph reconciliation; rebuild from desired state
@@ -55,7 +55,7 @@ A rewind during iteration is also `db update --to <contract>` — same verb, par
 **Persona:** application developer ready to commit a schema change to a PR.
 **Question:** "I'm done iterating; how do I turn this dev state into a migration the team can review, and declare 'this PR advances production to the new state'?"
 
-```
+```bash
 # contract.json reflects the new desired state
 migration plan --advance <ref>  # diff the ref's contract against current,
                                 # scaffold the migration package,
@@ -81,7 +81,7 @@ This is the "freeze + promise" verb: producing the migration package and writing
 **Persona:** operator running CD, or application developer pointing a fresh DB at a known state.
 **Question:** "Where should this database be, and how do I get it there?"
 
-```
+```bash
 migrate --to <ref>      # walk the graph from marker to the ref's contract,
                         # execute each migration on the path
 ```
@@ -99,7 +99,7 @@ This is the dominant CD operation. The verb is dead-simple by design: the *only*
 
 The CD signal is a two-part flow:
 
-```
+```bash
 migration check         # graph integrity: every migration self-consistent,
                         # every edge's from/to lines up, no orphans,
                         # no dangling refs. Read-only, no DB.
@@ -119,7 +119,7 @@ The preview is required to be **rock solid** — it is the go/no-go signal. `mig
 **Persona:** anyone wondering what's going on.
 **Question:** "Where is this database right now, and what's pending?"
 
-```
+```bash
 migration status                   # the single landing pad
 migration status --to <ref>        # path & pending against a target
 migration status --from <contract> # offline mode; ignore the live DB
@@ -134,7 +134,7 @@ This is the load-bearing CI/CD question and the most-likely "I just got dropped 
 **Persona:** db admin (or reviewer in PR review).
 **Question:** "What's about to run against the database, and what does each step do?"
 
-```
+```bash
 migration log                # applied history from the ledger; live
 migration list               # flat enumeration of migration packages; offline
 migration graph              # relational view of the graph; offline
@@ -172,7 +172,7 @@ The three are deliberately separately named — sharing `verify` across all thre
 **Persona:** application developer adopting Prisma Next on a database that already has schema and data.
 **Question:** "I have a real database with real tables. How do I start managing it with migrations without nuking it?"
 
-```
+```bash
 # point the CLI at the existing DB
 contract infer            # introspect -> derive a contract that matches the DB
 # review/edit the inferred contract.json
@@ -191,7 +191,7 @@ Step-count ergonomics for this path are a tracked concern — the underlying ste
 **Persona:** operator enabling the migration workflow on a database that's been running without it.
 **Question:** "We've been using `db update` (or no Prisma Next at all) on production; how do we switch to managing it with migrations from now on?"
 
-```
+```bash
 # on the running DB
 contract infer            # capture current production state as a contract
 # commit the contract; review it
@@ -213,7 +213,7 @@ The trick is that the production DB and the inferred contract must already match
 **Persona:** application developer or operator whose live DB needs to go back to an earlier state.
 **Question:** "We need to undo a migration that's already been applied. How?"
 
-```
+```bash
 # in the schema
 # rewrite contract back to the earlier shape (e.g. via git revert of schema)
 contract emit

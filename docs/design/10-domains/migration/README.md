@@ -46,8 +46,8 @@ The CLI is namespaced by the *subject* of the command, not by whether it touches
 |---|---|---|
 | **`migrate`** (the verb itself) | The act of migrating a DB. | `migrate --to <ref>` |
 | **`db <verb>`** | A live database. | `db update`, `db verify`, `db sign`, `db init` |
-| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration check`, `migration preflight`, `migration status`, `migration log` |
-| **`contract <verb>`** | Contracts. | `contract emit`, `contract show`, `contract diff` |
+| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration show`, `migration list`, `migration graph`, `migration check`, `migration status`, `migration log` |
+| **`contract <verb>`** | Contracts. | `contract emit` |
 | **`ref <verb>`** | Refs. | `ref set`, `ref list`, `ref delete` |
 
 ### Read-only vs mutating, not offline vs live
@@ -58,9 +58,8 @@ The earlier "offline vs live" axis is replaced by a finer-grained safety axis: *
 |---|---|---|
 | **Mutating live** | Changes the database | `migrate --to <ref>`, `db init`, `db update`, `db sign` |
 | **Read-only live** | Reads the database; answers questions about it | `db verify`, `migration status`, `migration log` |
-| **Mutating sandbox** | Mutates only an ephemeral shadow database; the production DB is untouched | `migration preflight` |
-| **Mutating offline** | Writes to the filesystem only | `migration plan`, `migration new`, `migration compile`, `contract emit`, `ref set` |
-| **Read-only offline** | Reads filesystem only | `migration list`, `migration graph`, `migration show`, `contract show`, `contract diff` |
+| **Mutating offline** | Writes to the filesystem only | `migration plan`, `migration new`, `contract emit`, `ref set` |
+| **Read-only offline** | Reads filesystem only | `migration list`, `migration graph`, `migration show`, `migration check` |
 
 **The load-bearing safety property:** users (and agents) must be able to tell from the verb whether it mutates state, and whether it touches a real DB. The verb's namespace alone is not sufficient — `migration status` (live, read-only) and `migration plan` (offline, mutating) share the `migration` namespace but differ on both axes. Help text and `--dry-run` discipline must surface this distinction.
 
@@ -394,13 +393,13 @@ The choices below are the load-bearing ones — the ones that, if reversed, woul
 
   Contract authoring is **one-step**:
 
-  ```
+  ```text
   source (PSL/TS)  ──emit──►  contract.json + contract.d.ts
   ```
 
   Migration authoring is **two-step**, with an intermediate user-editable artifact:
 
-  ```
+  ```text
   contract diff  ──plan──►  migration.ts (emitted by framework)  ──compile──►  ops.json
   ```
 
