@@ -254,7 +254,7 @@ function renderDistinctPrefix(
   return '';
 }
 
-function renderQualifiedTable(source: { name: string; schema?: string }): string {
+function renderQualifiedTable(source: { name: string; schema?: string | undefined }): string {
   if (source.schema) {
     return `${quoteIdentifier(source.schema)}.${quoteIdentifier(source.name)}`;
   }
