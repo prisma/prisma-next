@@ -9,7 +9,6 @@ import {
   findTypeByName,
   isPostgresEnumStorageEntry,
   iterateTablesWithCoords,
-  iterateTypesWithCoords,
   type PostgresEnumStorageEntry,
   type SqlModelStorage,
   type SqlStorage,
@@ -383,24 +382,27 @@ function emitTableType(table: StorageTable): string {
   return `{ ${tableParts.join('; ')} }`;
 }
 
-/**
- * Tables are emitted as a flat `{ [tableName]: ... }` map keyed by table
- * name. Each table entry carries `namespaceId` as a first-class field;
- * the namespace coordinate is preserved in the type without nesting
- * the map shape. Cross-namespace name collisions are forbidden by
- * the same rule that disallows duplicate table names in any single
- * SQL family contract.
- */
 function generateTablesType(storage: SqlStorage): string {
-  const tableEntries: string[] = [];
-  for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
-    tableEntries.push(`readonly ${tableName}: ${emitTableType(table)}`);
+  const buckets = new Map<string, string[]>();
+  for (const { namespaceId, name: tableName, table } of iterateTablesWithCoords(storage)) {
+    let entries = buckets.get(namespaceId);
+    if (!entries) {
+      entries = [];
+      buckets.set(namespaceId, entries);
+    }
+    entries.push(`readonly ${tableName}: ${emitTableType(table)}`);
   }
-  tableEntries.sort();
-  if (tableEntries.length === 0) {
+
+  if (buckets.size === 0) {
     return '{}';
   }
-  return `{ ${tableEntries.join('; ')} }`;
+
+  const nsParts: string[] = [];
+  for (const [nsId, entries] of [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    entries.sort();
+    nsParts.push(`readonly ${serializeObjectKey(nsId)}: { ${entries.join('; ')} }`);
+  }
+  return `{ ${nsParts.join('; ')} }`;
 }
 
 function generateStorageTypesType(storage: SqlStorage): string {
@@ -460,11 +462,23 @@ function generateStorageTypesType(storage: SqlStorage): string {
     return `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`;
   }
 
-  const typeEntries: string[] = [];
-  for (const { name: typeName, entry: typeInstance } of iterateTypesWithCoords(storage)) {
-    typeEntries.push(emitTypeEntry(typeName, typeInstance));
+  const nsParts: string[] = [];
+  for (const [nsId, bucket] of Object.entries(nestedTypes).sort(([a], [b]) => a.localeCompare(b))) {
+    const entries: string[] = [];
+    for (const [typeName, typeInstance] of Object.entries(bucket).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
+      entries.push(emitTypeEntry(typeName, typeInstance));
+    }
+    if (entries.length > 0) {
+      nsParts.push(`readonly ${serializeObjectKey(nsId)}: { ${entries.join('; ')} }`);
+    }
   }
-  return `{ ${typeEntries.join('; ')} }`;
+
+  if (nsParts.length === 0) {
+    return 'Record<string, never>';
+  }
+  return `{ ${nsParts.join('; ')} }`;
 }
 
 function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): string {
