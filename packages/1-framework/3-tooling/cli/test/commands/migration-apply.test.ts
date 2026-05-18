@@ -15,6 +15,7 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {
@@ -80,13 +81,11 @@ describe('migration apply — pending migration resolution', {
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {
@@ -119,25 +118,21 @@ describe('migration apply — pending migration resolution', {
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+        post: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {
@@ -182,25 +177,21 @@ describe('migration apply — pending migration resolution', {
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+        post: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {
@@ -329,25 +320,21 @@ describe('migration apply — pending migration resolution', {
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
         },
-      },
+        post: {
+          columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {

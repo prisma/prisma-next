@@ -1,8 +1,23 @@
 import { canonicalizeContract as canonicalizeContractRaw } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import { createTestContract } from './utils';
+
+function unboundNamespaceTables(tables: Record<string, unknown>) {
+  return {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
+  };
+}
+
+function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<string, unknown> {
+  const namespaces = storage['namespaces'] as Record<string, unknown>;
+  const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+  return unbound['tables'] as Record<string, unknown>;
+}
 
 const canonicalizeContract = (c: Contract): string =>
   canonicalizeContractRaw(c, {
@@ -38,22 +53,20 @@ describe('canonicalization', () => {
 
   it('preserves nullable false on columns', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
-            },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
           },
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const columns = user['columns'] as Record<string, unknown>;
     const id = columns['id'] as Record<string, unknown>;
@@ -64,31 +77,29 @@ describe('canonicalization', () => {
 
   it('preserves nullable:false for columns with defaults', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              created_at: {
-                codecId: 'pg/timestamptz@1',
-                nativeType: 'timestamptz',
-                nullable: false,
-                default: { kind: 'function', expression: 'now()' },
-              },
-              updated_at: {
-                codecId: 'pg/timestamptz@1',
-                nativeType: 'timestamptz',
-                nullable: true,
-              },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            created_at: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'timestamptz',
+              nullable: false,
+              default: { kind: 'function', expression: 'now()' },
+            },
+            updated_at: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'timestamptz',
+              nullable: true,
             },
           },
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const columns = user['columns'] as Record<string, unknown>;
     const createdAt = columns['created_at'] as Record<string, unknown>;
@@ -99,26 +110,24 @@ describe('canonicalization', () => {
 
   it('preserves nullable:true for columns with defaults', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              bio: {
-                codecId: 'pg/text@1',
-                nativeType: 'text',
-                nullable: true,
-                default: { kind: 'literal', value: '' },
-              },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            bio: {
+              codecId: 'pg/text@1',
+              nativeType: 'text',
+              nullable: true,
+              default: { kind: 'literal', value: '' },
             },
           },
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const columns = user['columns'] as Record<string, unknown>;
     const bio = columns['bio'] as Record<string, unknown>;
@@ -134,7 +143,12 @@ describe('canonicalization', () => {
     expect(parsed).toMatchObject({
       models: expect.anything(),
       storage: {
-        tables: expect.anything(),
+        namespaces: expect.objectContaining({
+          [UNBOUND_NAMESPACE_ID]: expect.objectContaining({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: expect.anything(),
+          }),
+        }),
       },
     });
     // Required top-level fields (capabilities, extensionPacks, meta) are preserved even when empty.
@@ -148,37 +162,33 @@ describe('canonicalization', () => {
 
   it('preserves semantic array order for column lists', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              first: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              second: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: {
-              columns: ['second', 'first'],
-            },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            first: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            second: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          },
+          primaryKey: {
+            columns: ['second', 'first'],
           },
         },
-      },
+      }),
     });
 
     const result1 = canonicalizeContract(ir);
 
     const ir2 = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              first: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              second: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: {
-              columns: ['first', 'second'],
-            },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            first: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            second: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          },
+          primaryKey: {
+            columns: ['first', 'second'],
           },
         },
-      },
+      }),
     });
 
     const result2 = canonicalizeContract(ir2);
@@ -188,25 +198,23 @@ describe('canonicalization', () => {
 
   it('sorts indexes by canonical name', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            indexes: [
-              { columns: ['id'], name: 'user_email_idx' },
-              { columns: ['id'], name: 'user_name_idx' },
-            ],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           },
+          indexes: [
+            { columns: ['id'], name: 'user_email_idx' },
+            { columns: ['id'], name: 'user_name_idx' },
+          ],
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const indexes = user['indexes'] as Array<{ name: string }>;
     const indexNames = indexes.map((idx) => idx.name);
@@ -215,27 +223,25 @@ describe('canonicalization', () => {
 
   it('sorts uniques by canonical name', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              username: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            uniques: [
-              { columns: ['username'], name: 'user_username_key' },
-              { columns: ['email'], name: 'user_email_key' },
-            ],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            username: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
+          uniques: [
+            { columns: ['username'], name: 'user_username_key' },
+            { columns: ['email'], name: 'user_email_key' },
+          ],
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const uniques = user['uniques'] as Array<{ name: string }>;
     const uniqueNames = uniques.map((u) => u.name);
@@ -244,24 +250,22 @@ describe('canonicalization', () => {
 
   it('preserves column order in composite unique constraints', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              first_name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              last_name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            uniques: [{ columns: ['last_name', 'first_name'], name: 'user_name_key' }],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            first_name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            last_name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
+          uniques: [{ columns: ['last_name', 'first_name'], name: 'user_name_key' }],
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const uniques = user['uniques'] as Array<{ columns: string[] }>;
     expect(uniques[0]!.columns).toEqual(['last_name', 'first_name']);
@@ -269,23 +273,21 @@ describe('canonicalization', () => {
 
   it('sorts nested object keys lexicographically', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              z_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              a_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              m_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            z_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            a_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            m_field: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const columns = user['columns'] as Record<string, unknown>;
     const columnKeys = Object.keys(columns);
@@ -371,21 +373,19 @@ describe('canonicalization', () => {
 
   it('omits generated false', () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false, generated: false },
-            },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false, generated: false },
           },
         },
-      },
+      }),
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
+    const tables = tablesFromCanonicalStorage(storage);
     const user = tables['user'] as Record<string, unknown>;
     const columns = user['columns'] as Record<string, unknown>;
     const id = columns['id'] as Record<string, unknown>;

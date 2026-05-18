@@ -24,6 +24,7 @@ import {
 } from '@prisma-next/migration-tools/refs';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
@@ -92,76 +93,70 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
-            },
-          },
-          post: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+        post: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+            },
+          },
+        },
+      }),
     });
     const contractC = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
-            },
-          },
-          post: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
-            },
-          },
-          comment: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+        post: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+            },
+          },
+        },
+        comment: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+            },
+          },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {
@@ -236,43 +231,39 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
-            },
-          },
-          post: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+        post: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+            },
+          },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {
@@ -347,43 +338,39 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
-            },
-          },
-          post: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+        post: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+            },
+          },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {
@@ -438,43 +425,39 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await mkdir(migrationsDir, { recursive: true });
 
     const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+      }),
     });
     const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
-            },
-          },
-          post: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-              },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
             },
           },
         },
-      },
+        post: {
+          columns: {
+            id: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+            },
+          },
+        },
+      }),
     });
 
     await writeAttestedMigration(migrationsDir, {

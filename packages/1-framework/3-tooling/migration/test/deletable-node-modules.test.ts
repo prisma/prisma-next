@@ -26,6 +26,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -218,7 +219,14 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     // value here is the same shape the validator will return.
     const spaceContract = createSqlContract({
       target: 'postgres',
-      storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { test_box: { columns: { x: {}, y: {} } } },
+          },
+        },
+      },
     });
     await emitContractSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
       contract: spaceContract as unknown as Record<string, unknown>,
@@ -247,7 +255,14 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
   it('loader → verifier walk to completion with node_modules removed', async () => {
     const appContract = createSqlContract({
       target: 'postgres',
-      storage: { tables: { user: { columns: { id: {} } } } },
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { user: { columns: { id: {} } } },
+          },
+        },
+      },
     });
 
     const declaredExtensions: ReadonlyArray<DeclaredExtensionEntry> = [

@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract, StorageBase } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 type MongoStorageLike = StorageBase & { readonly collections: Record<string, unknown> };
 
@@ -231,7 +232,7 @@ describe('loadContractSpaceAggregate', () => {
       // Validator throws for the on-disk contract — simulates ArkType
       // surfacing a structural failure for a corrupt contract.json.
       const failingValidator = (_json: unknown): Contract => {
-        throw new Error('storage.tables.users is missing');
+        throw new Error('storage.namespaces.__unbound__.tables.users is missing');
       };
 
       const result = await loadContractSpaceAggregate(
@@ -251,7 +252,7 @@ describe('loadContractSpaceAggregate', () => {
       expect(failure.kind).toBe('validationFailure');
       if (failure.kind !== 'validationFailure') return;
       expect(failure.spaceId).toBe('cipherstash');
-      expect(failure.detail).toContain('storage.tables.users is missing');
+      expect(failure.detail).toContain('storage.namespaces.__unbound__.tables.users is missing');
     });
   });
 
@@ -293,11 +294,19 @@ describe('loadContractSpaceAggregate', () => {
       // App claims `users`; extension claims `users` as well.
       const appContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { users: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { users: {} } },
+          },
+        },
       });
       const extContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { users: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { users: {} } },
+          },
+        },
       });
 
       const cipherJson = { id: 'cipher-collides' };
@@ -425,11 +434,19 @@ describe('loadContractSpaceAggregate', () => {
 
       const cipherContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { cipher_state: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { cipher_state: {} } },
+          },
+        },
       });
       const pgvectorContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { pgvector_state: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { pgvector_state: {} } },
+          },
+        },
       });
       const validator = makeIdentityValidator(
         new Map([
@@ -444,7 +461,11 @@ describe('loadContractSpaceAggregate', () => {
           targetId: 'postgres',
           appContract: createSqlContract({
             target: 'postgres',
-            storage: { tables: { app_user: {} } },
+            storage: {
+              namespaces: {
+                [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { app_user: {} } },
+              },
+            },
           }),
           validateContract: validator,
           declaredExtensions: [

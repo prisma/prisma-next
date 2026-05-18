@@ -15,6 +15,7 @@ import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/migrati
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
+import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {
@@ -73,15 +74,13 @@ describe('migration plan — core flow', () => {
     await mkdir(migrationsDir, { recursive: true });
 
     const toContract = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
+      storage: sqlTestStorageWithTables({
+        user: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },
         },
-      },
+      }),
     });
 
     const ops: MigrationPlanOperation[] = [createTableOp('user')];
@@ -165,25 +164,21 @@ describe('migration plan — core flow', () => {
       await mkdir(migrationsDir, { recursive: true });
 
       const contractA = createSqlContract({
-        storage: {
-          tables: {
-            user: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-            },
+        storage: sqlTestStorageWithTables({
+          user: {
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
           },
-        },
+        }),
       });
       const contractB = createSqlContract({
-        storage: {
-          tables: {
-            user: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-            },
-            post: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-            },
+        storage: sqlTestStorageWithTables({
+          user: {
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
           },
-        },
+          post: {
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+          },
+        }),
       });
 
       // First migration: empty -> A

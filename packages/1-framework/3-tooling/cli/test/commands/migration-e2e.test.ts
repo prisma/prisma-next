@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -15,6 +16,7 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 function attestedMetadata(
   base: Omit<MigrationMetadata, 'migrationHash'>,
@@ -78,16 +80,14 @@ describe('migration plan → emit end-to-end', () => {
       await mkdir(migrationsDir, { recursive: true });
 
       const toContract = createSqlContract({
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
+        storage: sqlTestStorageWithTables({
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
           },
-        },
+        }),
       });
 
       const ops: MigrationPlanOperation[] = [createTableOp('user')];
@@ -131,25 +131,21 @@ describe('migration plan → emit end-to-end', () => {
         await mkdir(migrationsDir, { recursive: true });
 
         const contractA = createSqlContract({
-          storage: {
-            tables: {
-              user: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              },
+          storage: sqlTestStorageWithTables({
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
             },
-          },
+          }),
         });
         const contractB = createSqlContract({
-          storage: {
-            tables: {
-              user: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              },
-              post: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              },
+          storage: sqlTestStorageWithTables({
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
             },
-          },
+            post: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            },
+          }),
         });
 
         // Plan 1: empty → A
@@ -220,13 +216,11 @@ describe('migration plan → emit end-to-end', () => {
       await mkdir(migrationsDir, { recursive: true });
 
       const contract = createSqlContract({
-        storage: {
-          tables: {
-            user: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-            },
+        storage: sqlTestStorageWithTables({
+          user: {
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
           },
-        },
+        }),
       });
 
       // First migration
@@ -278,7 +272,13 @@ describe('migration plan → emit end-to-end', () => {
         to: EMPTY_CONTRACT_HASH,
         migrationHash: null,
         fromContract: null,
-        toContract: createSqlContract({ storage: { tables: {} } }),
+        toContract: createSqlContract({
+          storage: {
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} },
+            },
+          },
+        }),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
         providedInvariants: [],

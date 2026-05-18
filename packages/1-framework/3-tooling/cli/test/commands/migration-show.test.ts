@@ -26,6 +26,7 @@ import {
 } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 // Track every temp dir handed out by `createTempDir` so the suite-wide
 // `afterEach` can remove them — even when an assertion fails — keeping
@@ -108,11 +109,9 @@ describe('resolveByHashPrefix', () => {
     await mkdir(migrationsDir, { recursive: true });
 
     const contract = createSqlContract({
-      storage: {
-        tables: {
-          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
-        },
-      },
+      storage: sqlTestStorageWithTables({
+        user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+      }),
     });
 
     await setupMigrationDir(
@@ -139,11 +138,9 @@ describe('resolveByHashPrefix', () => {
     await mkdir(migrationsDir, { recursive: true });
 
     const contract = createSqlContract({
-      storage: {
-        tables: {
-          user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
-        },
-      },
+      storage: sqlTestStorageWithTables({
+        user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
+      }),
     });
 
     await setupMigrationDir(

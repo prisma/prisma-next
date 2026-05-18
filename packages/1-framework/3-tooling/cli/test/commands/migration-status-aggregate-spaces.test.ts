@@ -1,3 +1,4 @@
+import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSpaceAggregate,
@@ -72,9 +73,17 @@ function makeHydratedGraph(empty: boolean): HydratedMigrationGraph {
 }
 
 function makeMember(spaceId: string, hash: string, empty = false): ContractSpaceMember {
+  const base = createSqlContract();
+  const contract: Contract = {
+    ...base,
+    storage: {
+      ...base.storage,
+      storageHash: hash as Contract['storage'] extends { storageHash: infer H } ? H : never,
+    },
+  };
   return {
     spaceId,
-    contract: { storage: { storageHash: hash, tables: {} } } as unknown as Contract,
+    contract,
     headRef: { hash, invariants: [] },
     migrations: makeHydratedGraph(empty),
   };
