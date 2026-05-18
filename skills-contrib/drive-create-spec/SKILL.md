@@ -1,15 +1,33 @@
 ---
 name: drive-create-spec
 description: >
-  Capture a settled design as an unambiguous engineering spec ready to hand to an implementer.
-  Use when the user wants to write up a spec, PRD, or product requirements document at the end
-  of a design phase, or to record a finished design from a conversation summary. This skill is
-  for *recording* a design, not for facilitating design discussion (different skills handle that).
+  DEPRECATED — split into drive-project-specify (project-scope spec) and
+  drive-slice-specify (slice-scope spec). Prefer the scope-specific variants. This body
+  remains as shared reference material (template structure, anti-patterns, code-sample
+  guidance) the split skills reference. New invocations should pick the right scoped
+  skill; consumers using drive-create-spec via drive-reconcile-skills should migrate.
 metadata:
-  version: "2026.3.06"
+  version: "2026.5.18"
+  status: deprecated
+  superseded_by:
+    - drive-project-specify
+    - drive-slice-specify
 ---
 
-# Create Spec
+# Drive: Create Spec — DEPRECATED
+
+**This skill is deprecated.** Use the scope-specific variants instead:
+
+- **Project specs** → `drive-project-specify` (`projects/<project>/spec.md`).
+- **Slice specs** → `drive-slice-specify` (`projects/<project>/slices/<slice>/spec.md` for in-project; inline in the PR description for orphan slices).
+
+The split is per [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17: project and slice specs differ in purpose, scope, and template; one skill conflated them at the cost of always asking *"what scope?"* at entry.
+
+The body below remains as shared reference material — template structure, anti-patterns, code-sample guidance — that both scope-specific variants link back to. Treat the body as documentation, not invokable behaviour.
+
+---
+
+# Create Spec (reference)
 
 Capture a settled design as an unambiguous engineering spec ready to hand to an implementer. The implementer should be able to read the spec alone and understand what the expected solution looks like, what's pinned down, and what degrees of freedom they have.
 
