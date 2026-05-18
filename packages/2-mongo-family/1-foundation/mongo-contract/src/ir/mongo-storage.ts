@@ -3,53 +3,84 @@ import {
   freezeNode,
   IRNodeBase,
   type Namespace,
+  NamespaceBase,
   type Storage,
+  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { MongoCollection } from './mongo-collection';
+import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
+import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
-/**
- * Construction input shape for {@link MongoStorage}. Mirrors the
- * required runtime fields explicitly so the family-base serializer's
- * hydration walker can hand the class a typed literal.
- */
-export interface MongoStorageInput<THash extends string = string> {
-  readonly storageHash: StorageHashBase<THash>;
-  readonly collections: Readonly<Record<string, MongoCollection>>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+export interface MongoNamespaceTablesInput {
+  readonly id: string;
+  readonly tables?: Record<string, MongoCollection | MongoCollectionInput>;
 }
 
-/**
- * Mongo family storage IR class. Carries the family-shared
- * `storage.collections` map alongside the framework-promised
- * `namespaces` map — single concrete class at the family layer (the
- * Mongo family has one target today, and the data shape is uniform
- * across the family; no abstract base earns its existence yet).
- *
- * `namespaces` is supplied by the caller. The Mongo target wraps a
- * deserialized `MongoContract` envelope at
- * `MongoTargetContractSerializer.constructTargetContract`, providing
- * the default `{ [UNBOUND_NAMESPACE_ID]:
- * MongoTargetUnboundDatabase.instance }` map at that target-layer
- * site. The foundation-layer class stays target-agnostic.
- *
- * Constructed instances are frozen via `freezeNode(this)`; instance
- * fields are JSON-clean by construction (`storageHash`, `collections`,
- * `namespaces` all enumerable own properties). The persisted on-disk
- * envelope shape is target-owned: `MongoTargetContractSerializer.serializeContract`
- * decides whether `namespaces` round-trips through JSON or is stripped
- * for the JSON envelope.
- */
+export interface MongoStorageInput<THash extends string = string> {
+  readonly storageHash: StorageHashBase<THash>;
+  readonly namespaces?: Readonly<Record<string, Namespace | MongoNamespaceTablesInput>>;
+}
+
+const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
+  [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance,
+});
+
+class MongoNamespacePayload extends NamespaceBase {
+  declare readonly kind?: string;
+
+  readonly id: string;
+  readonly tables: Readonly<Record<string, MongoCollection>>;
+
+  constructor(input: MongoNamespaceTablesInput) {
+    super();
+    this.id = input.id;
+    this.tables = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.tables ?? {}).map(([name, c]) => [
+          name,
+          c instanceof MongoCollection ? c : new MongoCollection(c),
+        ]),
+      ),
+    );
+    Object.defineProperty(this, 'kind', {
+      value: 'mongo-namespace',
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    freezeNode(this);
+  }
+}
+
+function normaliseNamespaceEntry(
+  nsKey: string,
+  ns: Namespace | MongoNamespaceTablesInput,
+): Namespace {
+  if (ns instanceof NamespaceBase) {
+    return ns;
+  }
+  const tableCount = Object.keys(ns.tables ?? {}).length;
+  if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0) {
+    return MongoUnboundNamespace.instance;
+  }
+  return new MongoNamespacePayload(ns as MongoNamespaceTablesInput);
+}
+
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {
   readonly kind = 'mongo-storage' as const;
   readonly storageHash: StorageHashBase<THash>;
-  readonly collections: Readonly<Record<string, MongoCollection>>;
   readonly namespaces: Readonly<Record<string, Namespace>>;
 
   constructor(input: MongoStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.collections = input.collections;
-    this.namespaces = input.namespaces;
+    this.namespaces = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.namespaces ?? DEFAULT_NAMESPACES).map(([nsKey, ns]) => [
+          nsKey,
+          normaliseNamespaceEntry(nsKey, ns),
+        ]),
+      ),
+    );
     freezeNode(this);
   }
 }

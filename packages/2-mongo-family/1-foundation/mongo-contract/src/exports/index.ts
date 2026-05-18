@@ -59,6 +59,7 @@ export type {
   MongoTimeSeriesGranularity,
 } from '../ir/mongo-time-series-collection-options';
 export { MongoTimeSeriesCollectionOptions } from '../ir/mongo-time-series-collection-options';
+export { MongoUnboundNamespace } from '../ir/mongo-unbound-namespace';
 export type {
   MongoValidatorInput,
   MongoValidatorValidationAction,
