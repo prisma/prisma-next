@@ -13,9 +13,8 @@
 - Apply canonicalization in the emitter after validation and normalization and before hashing
 - Compute `storageHash` plus `profileHash` over canonical bytes, and include `executionHash` only when execution defaults are emitted in the canonical artifact
 - Treat any divergence from these rules as an emitter bug
-- Define a `canonicalVersion` field and require it to be embedded in every stored contract blob and DB marker
 - State that TS-first and PSL-first must canonicalize to the identical JSON and `storageHash` for equivalent intent
-- Require a recanonicalize tool and policy: canonicalization rule changes bump `canonicalVersion` and require bulk-upgrading stored blobs intentionally
+- When the canonicalization rules change, the change is breaking — the new ruleset produces different bytes for the same logical contract, so every consumer that hashed or stored the old form must re-emit. This is handled by re-emit / re-sign rather than by versioning the algorithm at runtime.
 
 ## Canonical JSON profile
 
@@ -101,7 +100,6 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 - Normalize then canonicalize, then compute hashes, then write artifacts
 - Provide `--verify` mode that re-parses and re-emits to assert byte-identical output
 - Provide a `prisma-next verify contract.json` command to check adherence outside of emit
-- Provide a `prisma-next recanonicalize` command to bulk-upgrade contract blobs when `canonicalVersion` changes
 - Ensure TS-first and PSL-first projects produce identical canonical JSON and `storageHash` for the same logical schema
 
 ## Consumer responsibilities
@@ -158,8 +156,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 
 - Older contracts without canonicalization are re-emitted on first emit and pick up hashes accordingly
 - Schema version bump if canonicalization rules change in a breaking way
-- `canonicalVersion` defaults to 1 for existing contracts; older contracts without this field are accepted
-- Canonicalization rule changes bump `canonicalVersion` and require bulk-upgrading stored blobs deliberately (hashes will change if canonical bytes change)
+- Canonicalization rule changes are breaking: hashes change because canonical bytes change. Existing stored contract blobs and DB markers must be re-emitted / re-signed against the new ruleset; there is no in-band version field on the contract or marker for the canonicalizer (the earlier `canonicalVersion` field was retired — tracked separately under the migration-area Linear project).
 
 ## Open questions
 
