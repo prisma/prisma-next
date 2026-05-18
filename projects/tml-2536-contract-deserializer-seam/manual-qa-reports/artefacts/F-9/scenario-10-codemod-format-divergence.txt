@@ -1,0 +1,93 @@
+Scenario 10 step 6 — codemod output vs PR-branch state for the head bookend snapshot.
+File: examples/prisma-next-demo/migrations/app/20260518T1701_namespaces_bookend/end-contract.json
+HEAD: ea9e9e3e52fdb4cde45bf59e7a353cb5261788ff
+
+----------------------------------------------------------------------
+Step 6 evidence:
+
+$ diff /tmp/qa-end-contract-orig.json examples/prisma-next-demo/migrations/app/20260518T1701_namespaces_bookend/end-contract.json
+119,124c119,120
+<             "localFields": [
+<               "userId"
+<             ],
+<             "targetFields": [
+<               "id"
+<             ]
+---
+>             "localFields": ["userId"],
+>             "targetFields": ["id"]
+212,217c208,209
+<             "localFields": [
+<               "userId"
+<             ],
+<             "targetFields": [
+<               "id"
+<             ]
+---
+>             "localFields": ["userId"],
+>             "targetFields": ["id"]
+
+(< = original PR state / git HEAD; > = post-codemod)
+
+----------------------------------------------------------------------
+Semantic compare:
+
+$ python3 -c "
+import json
+orig = json.load(open('/tmp/qa-end-contract-orig.json'))
+post = json.load(open('examples/prisma-next-demo/migrations/app/20260518T1701_namespaces_bookend/end-contract.json'))
+print('semantically equal' if orig == post else 'NOT semantically equal')
+"
+semantically equal
+
+----------------------------------------------------------------------
+HEAD format (PR-branch state) for the same lines:
+
+$ git show HEAD:examples/prisma-next-demo/migrations/app/20260518T1701_namespaces_bookend/end-contract.json | sed -n '115,125p'
+      "relations": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+
+----------------------------------------------------------------------
+Format consistency check inside the demo:
+
+$ rg -n 'localFields|targetFields' examples/prisma-next-demo/migrations/app/20260422T0720_initial/end-contract.json | head
+119:            "localFields": ["userId"],
+120:            "targetFields": ["id"]
+208:            "localFields": ["userId"],
+209:            "targetFields": ["id"]
+
+So the demo's own committed history is itself inconsistent: 20260422T0720_initial uses inline short arrays (matches codemod output), 20260518T1701_namespaces_bookend uses multi-line short arrays (doesn't match codemod output).
+
+----------------------------------------------------------------------
+End-user instructions claim (skills/upgrade/prisma-next-upgrade/upgrades/0.9-to-0.10/instructions.md L77):
+
+  The whole snapshot is re-serialised via `JSON.stringify(value, null, 2) + '\n'`
+  — the same formatting the CLI uses when authoring snapshots originally. On
+  CLI-authored snapshots, the diff outside `storage.types` is zero.
+
+Both halves are wrong:
+1. The codemod actually uses a custom formatter (stamp-storage-types-kind.ts
+   L246–273: `formatJson`, `INLINE_ARRAY_THRESHOLD = 80`), not plain
+   `JSON.stringify(null, 2)`. The codemod's own internal docstring (L232–244)
+   explicitly notes the divergence.
+2. The diff outside `storage.types` is NOT zero against the head bookend
+   snapshot (see the diff above) because the canonical writer's output isn't
+   consistently inline-short-arrays.
+
+Extension-author sibling docs (skills/extension-author/prisma-next-extension-upgrade/upgrades/0.9-to-0.10/instructions.md L73) describe the formatter more accurately but still over-promise the diff zero.
+
+----------------------------------------------------------------------
+Operational impact: a real 0.9 user running the codemod against a project
+whose snapshots use the multi-line short-array style will see formatting-only
+diff noise on every short-primitive-array slot, in addition to the legitimate
+`kind`-stamping changes inside `storage.types`. The upgrade still succeeds
+(plan post-codemod is `noOp: true`) but PR review is harder.
