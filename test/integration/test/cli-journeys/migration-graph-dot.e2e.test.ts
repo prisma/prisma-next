@@ -35,16 +35,12 @@ withTempDir(({ createTempDir }) => {
         const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
         expect(plan.exitCode, 'plan').toBe(0);
 
-        // Vitest runs with stdout.isTTY=false, so `parseGlobalFlags` will
-        // auto-enable `flags.json`. The fix makes `--dot` take precedence
-        // anyway; the assertion is that the output is DOT, not JSON.
-        const graph = await runMigrationGraph(ctx, ['--dot']);
-        expect(graph.exitCode, 'graph exit code').toBe(0);
-
-        // Reproduce the F-7 scenario: pipe-style invocation (isTTY=false)
-        // makes `parseGlobalFlags` auto-enable `flags.json`. Before the
-        // fix this caused the JSON branch to win over `--dot`; after the
-        // fix `--dot` takes precedence and the output is DOT.
+        // Reproduce the non-TTY DOT regression scenario: pipe-style
+        // invocation (`migration graph --dot | dot -Tsvg`) makes
+        // `parseGlobalFlags` auto-enable `flags.json`. The format
+        // dispatch must honour the explicit `--dot` flag over the
+        // auto-JSON default, otherwise the pipe-receiver gets JSON it
+        // can't parse.
         const graphDot = await runMigrationGraph(ctx, ['--dot'], { isTTY: false });
         expect(graphDot.exitCode, 'graph exit code').toBe(0);
         expect(graphDot.stdout, 'DOT preamble appears').toContain('digraph migrations {');

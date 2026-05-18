@@ -1,12 +1,12 @@
 /**
- * `migration show` is documented as offline and read-only in the spec, but
- * it used to be gated behind the contract-space aggregate loader. When an
- * extension was declared without its migrations directory materialised on
- * disk — common in a fresh checkout before the user has ever run
- * `migrate` — the aggregate loader threw `PN-MIG-5001` (layout violation)
- * and blocked every input shape: wrong-grammar diagnostics, hash prefixes,
- * and even valid migration directory names. The verb was effectively
- * unreachable in canonical demo state.
+ * `migration show` is an offline read-only verb but it used to be gated
+ * behind the contract-space aggregate loader. When an extension was
+ * declared without its migrations directory materialised on disk — common
+ * in a fresh checkout before the user has ever run `migrate` — the
+ * aggregate loader threw `PN-MIG-5001` (layout violation) and blocked
+ * every input shape: wrong-grammar diagnostics, hash prefixes, and even
+ * valid migration directory names. The verb was effectively unreachable
+ * in canonical demo state.
  *
  * The fix follows the same pattern the sibling read-only verbs already
  * use (`migration list`, `migration graph`, `migration check`): when the
@@ -140,8 +140,8 @@ withTempDir(({ createTempDir }) => {
         // Same unmigrated-extensions state as the wrong-grammar case; a
         // valid app-space migration must resolve and report its
         // contents instead of failing on the aggregate-loader layout
-        // check. The verb's offline-by-design framing in spec FR3 only
-        // holds if explicit targets bypass aggregate enumeration.
+        // check. The verb is offline and read-only, so the explicit-
+        // target path bypasses aggregate enumeration entirely.
         const show = await runMigrationShow(ctx, [dirName, '--json']);
         expect(show.exitCode, 'show exits 0').toBe(0);
 

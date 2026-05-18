@@ -288,8 +288,8 @@ async function executeMigrationShowCommand(
   //    an extension is declared but its migrations directory hasn't been
   //    materialised. Gating an offline read-only inspect command on that
   //    check forces users to run `migrate` against a database before they
-  //    can see what a migration contains — which contradicts the verb's
-  //    documented offline-by-design framing in spec FR3.
+  //    can see what a migration contains — which contradicts what an
+  //    offline read-only verb should require.
   //
   // Same pattern as `migration list`, `migration graph`, `migration check`:
   // those verbs read `appMigrationsDir` directly without ever consulting
