@@ -27,7 +27,7 @@ DoR is the *pickup* gate — pass/fail, structural, not negotiable. Three scopes
 |---|---|---|
 | **Project** (light) | Purpose + scope boundary + project-DoD exist; triage verdict is "project." | `drive-create-project` at project initiation. |
 | **Slice** (heaviest) | Slice spec + slice plan exist; every dispatch sized ≤ M; outcome fits one PR; calibration entries linked; spike dependencies resolved; design calls settled. | `drive-slice-specify` / `drive-slice-plan` at slice initiation. |
-| **Dispatch** (overlay-bound) | Brief assembled per [`brief-discipline.md`](brief-discipline.md); sized ≤ M; model tier declared; inputs loadable; gates runnable; overlay matches in edge-case table. | `drive-orchestrate-plan` at dispatch pre-flight. |
+| **Dispatch** (overlay-bound) | Brief assembled per [`brief-discipline.md`](brief-discipline.md); sized ≤ M; model tier declared; inputs loadable; gates runnable; overlay matches in edge-case table. | `drive-build-workflow` at dispatch pre-flight. |
 
 The protocol (canonical skill bodies) carries the *shape*. Your team's `drive/<category>/README.md` carries the *content* — the team-specific items the overlay adds.
 
@@ -72,7 +72,7 @@ A dispatch is ready to delegate when:
 6. **Gates are runnable.** Each command in the "Done when" section runs from the repo root. A check that depends on an env var nobody set or a tool nobody installed is not ready.
 7. **Implementer + reviewer are named.** The brief identifies who; the implementer (subagent or operator) has the context to execute; the reviewer is configured to verify.
 
-Dispatch DoR is the gate `drive-orchestrate-plan` runs at pre-flight. Every dispatch passes through it; no exceptions.
+Dispatch DoR is the gate `drive-build-workflow` runs at pre-flight. Every dispatch passes through it; no exceptions.
 
 ## Templates
 
@@ -145,7 +145,7 @@ Each `drive/<category>/README.md` adds team-specific DoR items the matching skil
 | `drive-create-project` | `drive/project/README.md` | Project-DoR items (Linear setup, branch naming, etc.) |
 | `drive-slice-specify` | `drive/spec/README.md` | Slice-DoR items related to spec content |
 | `drive-slice-plan` | `drive/plan/README.md` | Slice-DoR items related to plan structure |
-| `drive-orchestrate-plan` | `drive/plan/README.md` | Dispatch-DoR items (brief assembly conventions, model-tier routing rules) |
+| `drive-build-workflow` | `drive/plan/README.md` | Dispatch-DoR items (brief assembly conventions, model-tier routing rules) |
 
 Worked example for `prisma-next`:
 
@@ -172,7 +172,7 @@ DoR is **not**:
 
 ## Anti-patterns
 
-1. **"Soft" DoR (suggested, not enforced).** Implementations skip the gate when it's inconvenient; failures recur; the team blames the implementer. The gate must be enforced — by `drive-orchestrate-plan` refusing to dispatch with unmet DoR, by the orchestrator refusing to start a slice plan whose dispatches don't pass dispatch DoR, by triage refusing to admit a slice that won't fit.
+1. **"Soft" DoR (suggested, not enforced).** Implementations skip the gate when it's inconvenient; failures recur; the team blames the implementer. The gate must be enforced — by `drive-build-workflow` refusing to dispatch with unmet DoR, by the orchestrator refusing to start a slice plan whose dispatches don't pass dispatch DoR, by triage refusing to admit a slice that won't fit.
 2. **Wishlist DoR.** Items like "code is well-organised" or "the design is right." Uncheckable; doesn't gate anything. Symptom: every retro discovers the gate didn't catch what it was supposed to.
 3. **DoR that re-validates DoD.** "All tests passing" is a DoD item, not a DoR item. DoR is for pre-conditions of *starting*, not pre-conditions of *succeeding*.
 4. **Identical DoR at every scope.** Each scope has different concerns: project DoR is scope-and-purpose; slice DoR is decomposition-and-fit; dispatch DoR is brief-readiness. A single shared DoR misses per-scope concerns or imposes irrelevant ones.

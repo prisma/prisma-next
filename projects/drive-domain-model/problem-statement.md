@@ -55,7 +55,7 @@ A new `drive-triage-work` skill that every entry into Drive runs first — Linea
 
 Triage runs at every fresh entry AND mid-flight when scope shifts. Today there's no triage skill — the operator picks a workflow from intuition, and `drive-create-project`'s gravity wins by default.
 
-### 3. Agile-style dispatch discipline grafted onto `drive-orchestrate-plan`
+### 3. Agile-style dispatch discipline grafted onto the slice implementation loop
 
 The standard Scrum / XP / Kanban response to the same failure shape in human teams, transposed for agent execution:
 
@@ -69,30 +69,35 @@ None of these are new ideas — they're the standard responses to the same failu
 
 ## What it looks like as Ignite-side PRs
 
-Stacks on top of [PR #93](https://github.com/prisma/ignite/pull/93).
+Stacks on top of [PR #93](https://github.com/prisma/ignite/pull/93). The restructure introduces a two-tier split: **workflow skills** (`drive-<verb>-workflow`) that pilot multi-step loops, and **atomic skills** that do one bounded thing. Both are first-class — humans at the "zero AI" end invoke atomic skills as building blocks; moving toward full delegation hands more of the loop to the workflow skills.
 
-**Two splits** (per-scope variants of existing skills):
+**Workflow tier (three; all new or renamed):**
+
+- `drive-start-workflow` (new) — pilots triage + the verdict's setup chain.
+- `drive-build-workflow` (renamed + augmented from `drive-orchestrate-plan`) — pilots the slice's dispatch loop with per-dispatch DoR + WIP inspection + per-dispatch DoD + brief template + L/XL refusal + design-discussion stop-condition.
+- `drive-deliver-workflow` (new) — pilots the project lifecycle.
+
+**Atomic-tier splits** (per-scope variants of existing skills):
 
 - `drive-create-spec` → `drive-project-specify` + `drive-slice-specify`.
 - `drive-create-plan` → `drive-project-plan` + `drive-slice-plan`.
 
-**Three new skills:**
+**Atomic-tier new skills:**
 
 - `drive-triage-work` (entry-point + mid-flight scope re-evaluator).
 - `drive-health-check` (project rollup; session-bookended or trigger-fired).
 - `drive-retro-run` (trigger-based retro template).
 
-**Five augmentations** to existing skills:
+**Atomic-tier augmentations:**
 
-- `drive-orchestrate-plan` — per-dispatch DoR + WIP inspection + per-dispatch DoD + brief template + L/XL refusal + design-discussion stop-condition.
 - `drive-close-project` — mandatory final retro.
 - `drive-create-project` — project DoR check + `drive/<category>/README.md` bootstrap.
-- `drive-discussion` — promoted from mode skill to first-class cross-cutting workflow.
+- `drive-discussion` — promoted from mode skill to first-class cross-cutting workflow standing (stays atomic).
 - `drive-pr-description` — extended to handle the direct-change case.
 
 **Vocabulary refresh** across all unchanged skills — "milestone" and "task" retire; "step" demotes to implementer-internal.
 
-[`skill-restructure.md`](skill-restructure.md) has the per-PR sequencing.
+We're building the family locally in `prisma-next` first (`.agents/skills/drive-*/SKILL.md`) and trialing for a couple of weeks of real work. Once we know what survived, we'll open the upstream PR series. [`skill-restructure.md`](skill-restructure.md) has the target inventory; [`plan.md`](plan.md) has the build + promotion sequencing.
 
 ## How it leans on PR #93
 
@@ -107,13 +112,14 @@ So the restructure isn't a sweeping rewrite that breaks consumers. Each consumer
 ## What we'd like from you
 
 1. A read of [`spec.md`](spec.md) — does the proposed model fit where canonical is heading? Are there constraints we missed (frontmatter conventions, naming patterns, in-flight work we'd collide with)?
-2. A read of [`skill-restructure.md`](skill-restructure.md) § "Implementation sequencing" — is the per-PR ordering reviewable? Is the dependency chain on PR #93 OK?
+2. A read of [`skill-restructure.md`](skill-restructure.md) — does the workflow-vs-atomic tier split make sense? Does the inventory cover what canonical needs?
 3. Pushback on anything that conflicts with where Drive is heading on your side, especially:
-   - The new skill names (we tried to follow the dominant `drive-<verb>-<noun>` and `drive-<sub-namespace>-<verb>` shapes).
+   - The two-tier split (workflow skills with `-workflow` suffix vs atomic skills).
+   - The new skill names (we tried to follow the dominant `drive-<verb>-<noun>` and `drive-<sub-namespace>-<verb>` shapes; the `-workflow` suffix is a new shape).
    - The new `drive/<category>/README.md` categories the new skills introduce (`triage`, `retro`, `health`).
-   - Promoting `drive-discussion` from mode skill to first-class.
+   - Promoting `drive-discussion` from mode skill to first-class workflow standing.
 
-Not asking for an omnibus PR. The restructure ships per-skill (one or two related skills per PR); happy to land them in whichever order works for the canonical roadmap.
+We're not opening the upstream PRs yet — we want to trial the family locally in `prisma-next` for a couple of weeks first, so what we promote upstream is what survived real use. The restructure will ship per-skill (one or two related skills per PR); happy to land them in whichever order works for the canonical roadmap.
 
 ## Where the rest of the material is
 

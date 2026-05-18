@@ -30,7 +30,7 @@ A spike is a dispatch with three differences from a regular dispatch — same br
 | "Done when" | "Gates pass; intent validated" | "Artefact exists at the named path; answers the question; downstream dispatch's brief can be assembled from it" |
 | Question shape | "Make X true" | "What's true about Y in this codebase right now?" |
 
-`drive-orchestrate-plan` runs spikes the same way it runs any other dispatch. There's no separate skill. Triage may also emit "spike first" as a verdict when the entry point can't be sized without a probe; re-triage runs on the artefact.
+`drive-build-workflow` runs spikes the same way it runs any other dispatch. There's no separate skill. Triage may also emit "spike first" as a verdict when the entry point can't be sized without a probe; re-triage runs on the artefact.
 
 ## When a spike is the right move
 

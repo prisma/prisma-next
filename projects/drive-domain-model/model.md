@@ -135,7 +135,7 @@ One persona:
 
 The test for whether a role is real: *can the same person fluidly play this role and another in the same minute, or does role-switching require a context shift?* Project owner is real because scope decisions require a zoom-out stance. Implementer-vs-reviewer is real because reviewing is adversarial reading. Spec-author-vs-plan-author is not real; the same brain does both in continuous sequence.
 
-**Role-wearing trajectory.** Today the human wears project owner + agile orchestrator + implementer (sometimes). The orchestrator agent wears agile orchestrator during dispatch loops (per `drive-orchestrate-plan`); the implementer subagent wears implementer; the reviewer subagent wears reviewer. As confidence in the methodology accrues, the orchestrator agent eventually wears agile orchestrator at all levels (triage, dispatch loop, retro-running, protocol maintenance) and the human's residual role becomes design-level (project spec authoring, design discussion participation, falsified-assumption escalation). See [`principles/roles-and-personas.md`](principles/roles-and-personas.md) for the full mapping.
+**Role-wearing trajectory.** Today the human wears project owner + agile orchestrator + implementer (sometimes). The orchestrator agent wears agile orchestrator during dispatch loops (per `drive-build-workflow`); the implementer subagent wears implementer; the reviewer subagent wears reviewer. As confidence in the methodology accrues, the orchestrator agent eventually wears agile orchestrator at all levels (triage, dispatch loop, retro-running, protocol maintenance) and the human's residual role becomes design-level (project spec authoring, design discussion participation, falsified-assumption escalation). See [`principles/roles-and-personas.md`](principles/roles-and-personas.md) for the full mapping.
 
 ## Layer 3: workflows
 
@@ -305,7 +305,7 @@ Output:        spec edit + plan edit (project or slice scope; may
                the call + rationale.
 ```
 
-The agile orchestrator's responsibility includes **recognising when design discussion is needed** and pulling the operator in. In interactive mode that means surfacing a structured decision; in unattended mode it means firing a stop-condition and logging the trigger for the operator's return (per `drive-orchestrate-plan` § Unattended mode).
+The agile orchestrator's responsibility includes **recognising when design discussion is needed** and pulling the operator in. In interactive mode that means surfacing a structured decision; in unattended mode it means firing a stop-condition and logging the trigger for the operator's return (per `drive-build-workflow` § Unattended mode).
 
 State of an aggregate is what falls out of workflows running, not what they are named after. A slice transitions to `delivered` because slice closure ran successfully; we don't model "delivered" as a separate event-emission step.
 
@@ -398,7 +398,7 @@ The on-disk shape of an artefact is **per-context**. The model deliberately allo
 | Spike artefact (dispatch-scope) | `projects/<project>/spikes/<date>-<q>.md` for in-project spikes; transient scratch for orphan-context spikes |
 | Spike artefact (slice-scope) | A doc PR (an ADR, an analysis); shipped under the project's normal docs path |
 | Deployment plan | `projects/<project>/deployment-plan.md` (project-scope) |
-| Review artefacts | `projects/<project>/reviews/{code-review,system-design-review,walkthrough}.md` (per `drive-orchestrate-plan`); for orphan slices, lighter shape attached to the PR review surface |
+| Review artefacts | `projects/<project>/reviews/{code-review,system-design-review,walkthrough}.md` (per `drive-build-workflow`); for orphan slices, lighter shape attached to the PR review surface |
 | Manual-QA script | `projects/<project>/manual-qa.md` (in-project); inline QA section in PR description (orphan). Per [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) `drive-qa-plan`. |
 | Manual-QA run report | `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (in-project); inline QA findings in PR review thread (orphan). Per `drive-qa-run`. One per run; reports accumulate (never overwritten) so the QA history is auditable. |
 | Scope-deferred candidates (during project) | `projects/<project>/deferred.md`. Reviewed at project closure; each item triaged individually |
@@ -474,39 +474,55 @@ The demotion path is heavier — more Linear state to clean up. The agile orches
 
 Sketched here; the full skill-restructure plan with sequencing lives in [`skill-restructure.md`](skill-restructure.md).
 
-### Skills that split or augment
+### Two skill tiers: workflow and atomic
+
+A new structural distinction the restructure introduces:
+
+- **Workflow skills** (`drive-<verb>-workflow`) pilot a multi-step loop top-to-bottom. The orchestrator (human or agent wearing the hat) invokes a workflow skill and it returns when the scope's DoD is met. Workflow skills call atomic skills as steps in their loop.
+- **Atomic skills** (`drive-<verb>-<noun>` or `drive-<sub-namespace>-<verb>`) do one bounded thing. Called either directly by the operator or by a workflow skill as one step in its loop. Most skills are atomic.
+
+The distinction matters because it sets human expectations and supports gradual AI adoption (per [`principles/gradual-ai-adoption.md`](principles/gradual-ai-adoption.md)): a team member at the "zero AI" end of the spectrum invokes atomic skills directly as building blocks; the same team member moving toward "full delegation" hands more of the loop to the workflow skills. The atomic-skill tier is a first-class concern, not internal plumbing for the workflow tier.
+
+Workflow skills (three; all new or renamed):
+
+| Skill | Pilots | Replaces / new? |
+|---|---|---|
+| **`drive-start-workflow`** | Triage + the verdict's setup. Routes the work to its right shape and runs the immediate downstream setup (creates the project / scaffolds the slice / opens the direct-change PR). Fires at fresh entry AND mid-flight (promote / demote). | New |
+| **`drive-build-workflow`** | A slice's implementation loop: pre-flight DoR → dispatch loop with WIP inspection → post-flight DoD → review → close. Plus the augmentations (intent-validation, L/XL refusal, design-discussion stop-condition). | Renamed + augmented from `drive-orchestrate-plan` |
+| **`drive-deliver-workflow`** | A project's lifecycle: project init → slice-by-slice (each via `drive-build-workflow`) → health checks → retros on triggers → mandatory final retro → close. | New |
+
+### Atomic skills that split
 
 | Canonical skill | Today | Under this model |
 |---|---|---|
 | `drive-create-spec` | Produces "a spec" — scope implicit. | **Splits** into `drive-project-specify` and `drive-slice-specify`. Body differs meaningfully (project: purpose + scope boundary + project-DoD; slice: scope-within-project + slice-DoD + Example-Mapping edge cases). |
 | `drive-create-plan` | Produces "a plan" with a milestone → task two-level decomposition that floats across scopes. | **Splits** into `drive-project-plan` (slice composition; stack/parallel) and `drive-slice-plan` (dispatch sequence; sizing discipline; DoR-per-dispatch). |
-| `drive-orchestrate-plan` | Orchestrates "a plan" — scope implicit. | Becomes slice-scope only. Augmented with: explicit DoR pre-flight per dispatch; WIP-inspection cadence as a named loop step; DoD post-flight per dispatch; brief template; L/XL refusal at dispatch time (defense in depth). |
 
-### Skills that stay (some lightly augmented)
+### Atomic skills that stay (some lightly augmented)
 
 | Canonical skill | Scope | Augmentation |
 |---|---|---|
-| `drive-create-project` | Project | Seed placeholders for slice template + calibration links |
-| `drive-close-project` | Project | Mandatory final retro step (calls `drive-retro-run`) |
+| `drive-create-project` | Project | Seed placeholders for slice template + calibration links; called by `drive-deliver-workflow` at project init. |
+| `drive-close-project` | Project | Mandatory final retro step (calls `drive-retro-run`); called by `drive-deliver-workflow` at project close. |
 | `drive-create-deployment-plan` | Project | None |
-| `drive-pr-description` | Slice | None |
+| `drive-pr-description` | Slice / direct change | Extended to handle the direct-change case (only persisted intent artefact for a direct change). |
 | `drive-pr-walkthrough` | Slice | None |
 | `drive-review-code` | Slice | None |
 | `drive-post-update` | Project | None |
 | `drive-list` (in `.system/`) | Cross-cutting | None |
-| `drive-discussion` (mode) | Cross-cutting | None; promoted to first-class workflow in this model |
+| `drive-discussion` (mode) | Cross-cutting | None; promoted to first-class workflow standing in this model (still a mode skill, still atomic — fires on trigger from any workflow skill or operator invocation). |
 
-### New skills
+### New atomic skills
 
-| Skill | Scope | Workflow |
+| Skill | Scope | Purpose |
 |---|---|---|
-| **`drive-triage-work`** | Cross-cutting (entry) | Runs the triage workflow at any entry point AND mid-flight; outputs one of the eight triage verdicts; routes to the right downstream workflow. |
-| **`drive-health-check`** | Project (rollup) | Produces session-bookended (interactive) or trigger-fired (unattended) project rollups: slice progress, drifted slices, dispatch throughput so far, calibration signals, recommended next pick. |
-| **`drive-retro-run`** | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical vs project-context vs ADR home, name the update, land it in the matching memory home. Mandatory at project closure; trigger-fired on dispatch failure / drift / escapee. |
+| **`drive-triage-work`** | Cross-cutting (entry) | Runs the triage decision tree and outputs one of the eight verdicts. Called by `drive-start-workflow` (which then executes the verdict's setup). Operators can also invoke it directly. |
+| **`drive-health-check`** | Project (rollup) | Produces session-bookended (interactive) or trigger-fired (unattended) project rollups: slice progress, drifted slices, dispatch throughput so far, calibration signals, recommended next pick. Called by `drive-deliver-workflow` on cadence; operators can invoke it directly. |
+| **`drive-retro-run`** | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical vs project-context vs ADR home, name the update, land it in the matching memory home. Mandatory at project closure (enforced by `drive-deliver-workflow`); trigger-fired on dispatch failure / drift / escapee (from `drive-build-workflow`). |
 
 ### Direct change has no dedicated skill
 
-Triage's "direct change" verdict routes the developer straight to `gh pr create`. No Drive skill is involved in execution; the implementer reads the intent, makes the edit, opens the PR. (Drive could observe — e.g., a future skill might check that a direct-change PR is small enough to merit the verdict — but the path is deliberately ceremonial-light.)
+Triage's "direct change" verdict routes the developer straight to `gh pr create`. No Drive skill is involved in execution; the implementer reads the intent, makes the edit, opens the PR. `drive-start-workflow` orchestrates this path by calling `drive-pr-description` (in its direct-change framing) and then returning; the path is deliberately ceremonial-light.
 
 ## Open questions
 

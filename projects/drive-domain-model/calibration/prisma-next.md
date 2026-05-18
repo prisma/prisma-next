@@ -6,7 +6,7 @@ Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principl
 
 | Section | Content | Eventual home in `prisma-next/` |
 |---|---|---|
-| § 1 | Reference tasks for t-shirt-size anchoring | `drive/plan/README.md` (read by `drive-slice-plan`, `drive-orchestrate-plan`) |
+| § 1 | Reference tasks for t-shirt-size anchoring | `drive/plan/README.md` (read by `drive-slice-plan`, `drive-build-workflow`) |
 | § 2 | Definition of Ready overlays at three scopes | Split: `drive/project/README.md` (project DoR), `drive/spec/README.md` + `drive/plan/README.md` (slice DoR), `drive/plan/README.md` (dispatch DoR) |
 | § 3 | Definition of Done overlays at three scopes | Split: `drive/project/README.md` + `drive/qa/README.md` (project DoD), `drive/plan/README.md` + `drive/qa/README.md` + `drive/pr/README.md` (slice DoD), `drive/plan/README.md` (dispatch DoD) |
 | § 4 | Failure-mode catalogue | `drive/plan/README.md` (drawn from by brief assembly per [`brief-discipline.md`](../principles/brief-discipline.md)) |

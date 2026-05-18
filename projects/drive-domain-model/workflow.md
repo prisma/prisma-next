@@ -6,6 +6,15 @@ The operational layer on top of [`model.md`](model.md). Every drive-* skill plug
 
 Reading guide: skip to [the lifecycle table](#lifecycle) if you know the vocabulary; skip to [the cadence summary](#cadence-summary) if you want to know what fires when; skip to [the skill surface](#skill-surface-forward-look) if you want to know what's new versus existing.
 
+## Two skill tiers
+
+A structural distinction the restructure introduces (per [`model.md`](model.md) § "Two skill tiers: workflow and atomic"):
+
+- **Workflow skills** (`drive-<verb>-workflow`) pilot a multi-step loop top-to-bottom. They call atomic skills as steps. Three of them — `drive-start-workflow` (triage + verdict setup), `drive-build-workflow` (slice implementation loop), `drive-deliver-workflow` (project lifecycle).
+- **Atomic skills** do one bounded thing. Called by workflow skills or directly by the operator. Most skills are atomic.
+
+The `Drive skill(s)` column in the lifecycle table below names the atomic skill that does the work of each phase; the workflow skill that pilots the phase appears as the row's outer container where relevant (Slice execution rows are piloted by `drive-build-workflow`; Project initiation / closure rows by `drive-deliver-workflow`; Triage by `drive-start-workflow`).
+
 ## Drive's Agile lineage (one sentence per influence)
 
 - **Kanban (the substrate).** Continuous flow, WIP limits as a structural rule (our size caps are the WIP-shape rule — PR-cap on slices, M-cap on dispatches), pull over push, throughput as the diagnostic.
@@ -32,10 +41,10 @@ Phases in rows. Bold = new (this project adds it); plain = exists today; italic 
 | Plan: project plan | Project initiation | Release planning + WIP-cap commitment (Kanban) | **`drive-project-plan`** (new — split from `drive-create-plan`) | Per project | Project owner | `projects/<x>/plan.md` (slice + direct-change composition; stack/parallel) | — |
 | Plan: slice spec | Slice initiation | Story writing + Example Mapping (SBE) | **`drive-slice-specify`** (new — split from `drive-create-spec`) | Per slice | Implementer | Slice spec (in-project: `projects/<x>/slices/<s>/spec.md`; orphan: inline in PR description) | — |
 | Plan: slice plan | Slice initiation | Sprint planning + relative estimation (Scrum) | **`drive-slice-plan`** (new — split from `drive-create-plan`) + **sizing step** + **DoR-per-dispatch gate** | Per slice | Implementer (often with agile-orchestrator review) | Slice plan: dispatch sequence; every dispatch ≤ M; DoR + DoD declared per dispatch | DoR met for every dispatch; no L/XL dispatch admitted |
-| Spike (brief-type variant) | Slice execution (single-dispatch slice plan) OR Triage spike-first | Spike (XP / Scrum) | *`drive-orchestrate-plan`* (single dispatch with spike-flavoured brief) | Per planning unknown | Implementer | `projects/<x>/spikes/<date>-<q>.md` artefact (dispatch-scope) OR a doc PR (slice-scope) | Spike-DoR; spike-DoD = artefact is actionable |
-| Execute: brief + dispatch | Slice execution | Story kickoff + pull (XP + Kanban) | *`drive-orchestrate-plan`* + **brief template** | Per dispatch | Agile orchestrator delegates → implementer executes | Dispatch brief; commits | DoR pre-flight checklist |
-| Execute: **WIP inspection** | Slice execution | Pair-programming review (XP) / WIP-flow inspection (Kanban) | *`drive-orchestrate-plan`* + **WIP-inspection step** | ≤ 5 min within each dispatch | Agile orchestrator | Inspection note (light; promoted to a finding on drift) | — |
-| Execute: close dispatch | Slice execution | Acceptance test (XP / SBE) | *`drive-orchestrate-plan`* (reviewer subagent) | Per dispatch | Reviewer | Reviewer verdict + refreshed review artefacts | DoD post-flight checklist |
+| Spike (brief-type variant) | Slice execution (single-dispatch slice plan) OR Triage spike-first | Spike (XP / Scrum) | *`drive-build-workflow`* (single dispatch with spike-flavoured brief) | Per planning unknown | Implementer | `projects/<x>/spikes/<date>-<q>.md` artefact (dispatch-scope) OR a doc PR (slice-scope) | Spike-DoR; spike-DoD = artefact is actionable |
+| Execute: brief + dispatch | Slice execution | Story kickoff + pull (XP + Kanban) | *`drive-build-workflow`* + **brief template** | Per dispatch | Agile orchestrator delegates → implementer executes | Dispatch brief; commits | DoR pre-flight checklist |
+| Execute: **WIP inspection** | Slice execution | Pair-programming review (XP) / WIP-flow inspection (Kanban) | *`drive-build-workflow`* + **WIP-inspection step** | ≤ 5 min within each dispatch | Agile orchestrator | Inspection note (light; promoted to a finding on drift) | — |
+| Execute: close dispatch | Slice execution | Acceptance test (XP / SBE) | *`drive-build-workflow`* (reviewer subagent) | Per dispatch | Reviewer | Reviewer verdict + refreshed review artefacts | DoD post-flight checklist |
 | **Project-health rollup** | Cross-cutting | Daily scrum + WIP-board review (Scrum + Kanban) | **`drive-health-check`** (new) | Session-bookended (interactive) + per-slice + unattended triggers (§ Project-health rollup cadence) | Agile orchestrator (operator + orchestrator agent) | Rollup (short, written) | — |
 | Review (PR) | Slice review | Code review + acceptance testing | `drive-review-code`, `drive-pr-walkthrough`, `drive-pr-local-review`, `review-{fetch,triage,implement}-phase` | Per PR | Reviewer (distinct from implementer) + senior operator | Review artefacts | DoD-equivalent at PR scope |
 | Manual QA: author script | Slice review | Acceptance-test authoring (XP / SBE — judgement layer beyond CI) | `drive-qa-plan` ([PR #93](https://github.com/prisma/ignite/pull/93)) | Per slice that touches user-observable surface (else explicit N/A) | Implementer (typically) | `projects/<x>/manual-qa.md` script (in-project) or PR-inline QA section (orphan); project-specific context comes from `drive/qa/README.md` | Slice DoD requires it (or honest N/A) |
@@ -75,24 +84,32 @@ Per-dispatch is too noisy (polling cadence); per-project alone is too coarse (dr
 
 | Cadence | Rituals |
 |---|---|
-| Per entry point | `drive-triage-work` |
-| Per direct change | Edit → `gh pr create` → review → merge |
-| Per project | `drive-create-project`, `drive-project-specify`, `drive-project-plan`, `drive-create-deployment-plan` (if applicable), `drive-close-project` (with mandatory final retro) |
-| Per slice | `drive-slice-specify`, `drive-slice-plan`, `drive-orchestrate-plan` (loop), `drive-review-code`, `drive-pr-walkthrough`, `drive-pr-description`, `drive-qa-plan`, `drive-qa-run` |
-| Per dispatch (inside the orchestrate loop) | DoR pre-flight → brief assembly → delegate → WIP inspection (≤ 5 min) → DoD post-flight → reviewer verdict |
+| Per entry point | `drive-start-workflow` (pilots; calls `drive-triage-work` then verdict setup) |
+| Per direct change | `drive-start-workflow` routes to `drive-pr-description` direct-change framing → edit → `gh pr create` → review → merge |
+| Per project | `drive-deliver-workflow` (pilots; calls `drive-create-project`, `drive-project-specify`, `drive-project-plan`, `drive-create-deployment-plan` if applicable, `drive-close-project` with mandatory final retro) |
+| Per slice | `drive-slice-specify`, `drive-slice-plan`, `drive-build-workflow` (pilots the dispatch loop, calling `drive-review-code`, `drive-pr-walkthrough`, `drive-pr-description`, `drive-qa-plan`, `drive-qa-run`) |
+| Per dispatch (inside `drive-build-workflow`'s loop) | DoR pre-flight → brief assembly → delegate → WIP inspection (≤ 5 min) → DoD post-flight → reviewer verdict |
 | Session-bookended (interactive) | `drive-health-check` (open + close) |
 | Trigger-fired (any mode) | `drive-discussion`, `drive-retro-run`, mid-flight `drive-triage-work` (for promotion / demotion / surfaced scope) |
 | Mandatory at project close | Final `drive-retro-run` (if it didn't produce a canonical / project-context / ADR update, retro failed) |
 
 ## Skill surface (forward look)
 
-The map exposes three new skills, four split-from-old skills, two augmentations, and a promotion of an existing mode skill. Full detail in [`skill-restructure.md`](skill-restructure.md).
+The map exposes two workflow skills new and one renamed, three new atomic skills, four split-from-old atomic skills, two atomic augmentations, and a promotion of an existing mode skill. Full detail in [`skill-restructure.md`](skill-restructure.md).
 
-- **New skills.** `drive-triage-work`, `drive-health-check`, `drive-retro-run`.
+**Workflow tier:**
+
+- **`drive-start-workflow`** (new) — pilots triage + the verdict's setup chain.
+- **`drive-build-workflow`** (renamed + augmented from `drive-orchestrate-plan`) — pilots the slice's dispatch loop (per-dispatch DoR / DoD; WIP-inspection step; brief template; L/XL refusal; design-discussion stop-condition).
+- **`drive-deliver-workflow`** (new) — pilots a project's lifecycle (init → slices → health → retros → mandatory close retro).
+
+**Atomic tier:**
+
+- **New.** `drive-triage-work`, `drive-health-check`, `drive-retro-run`.
 - **Split from `drive-create-spec`.** `drive-project-specify`, `drive-slice-specify`.
 - **Split from `drive-create-plan`.** `drive-project-plan`, `drive-slice-plan`.
-- **Augmented.** `drive-orchestrate-plan` (per-dispatch DoR / DoD; WIP-inspection step; brief template; L/XL refusal; design-discussion stop-condition), `drive-close-project` (mandatory final retro).
-- **Promoted to first-class.** `drive-discussion` (was a mode skill; now an explicit cross-cutting workflow).
+- **Augmented.** `drive-close-project` (mandatory final retro hook), `drive-pr-description` (direct-change framing).
+- **Promoted to first-class.** `drive-discussion` (was a mode skill; now an explicit cross-cutting workflow trigger; stays atomic — fires on trigger from any workflow skill or operator invocation).
 - **Spike stays a brief-type variant, not a skill.** Becomes a single-dispatch slice plan with a spike-flavoured brief, whose DoD is "the artefact is actionable" rather than "code is committed." See [`principles/spikes.md`](principles/spikes.md).
 - **One always-applied rule.** Carries the hard invariants (size caps at both scopes, WIP-inspection cadence, no-silent-amendments) so they're strong memory and skills can reference rather than re-state.
 

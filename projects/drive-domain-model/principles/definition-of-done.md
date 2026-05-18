@@ -25,7 +25,7 @@ DoD is the *handoff* gate — pass/fail, structural, not negotiable. Three scope
 |---|---|---|
 | **Project** | All slices delivered + outcomes hold + deferred-work triaged + docs migrated + manual-QA coverage adequate + **mandatory final retro** + Linear cleanup + folder deleted. | `drive-close-project` at project closure. |
 | **Slice** | Spec outcome met + all dispatches done + PR review-clean + intent-validation passes + no silent amendments (I12) + manual-QA satisfied (or honest N/A). | Slice closure ritual at PR merge. |
-| **Dispatch** | All "Done when" gates pass + every edge case handled per disposition + no scope-out touched + reviewer verdict accept + intent-validation passes. | `drive-orchestrate-plan` at dispatch post-flight. |
+| **Dispatch** | All "Done when" gates pass + every edge case handled per disposition + no scope-out touched + reviewer verdict accept + intent-validation passes. | `drive-build-workflow` at dispatch post-flight. |
 
 DoD has a stronger role than DoR for one reason: **it's the contract the reviewer verifies.** Without DoD, the reviewer has nothing sharp to check — only "does this look right?" which is fragile. With it, the reviewer runs the same commands and asks the same questions every time.
 
@@ -88,7 +88,7 @@ A dispatch is done when:
 6. **Per-slice review artefacts refreshed.** `code-review.md`, `system-design-review.md`, `walkthrough.md` reflect what the dispatch landed.
 7. **(Spike-flavoured)** Artefact exists at named path with named shape, per [`spikes.md`](spikes.md).
 
-Dispatch DoD is the gate `drive-orchestrate-plan` runs at post-flight. Every dispatch passes through it.
+Dispatch DoD is the gate `drive-build-workflow` runs at post-flight. Every dispatch passes through it.
 
 ## Templates
 
@@ -177,11 +177,11 @@ Each `drive/<category>/README.md` adds team-specific DoD items the matching skil
 | Skill | Reads | Adds overlays for |
 |---|---|---|
 | `drive-close-project` | `drive/project/README.md` + `drive/qa/README.md` | Project-DoD items + project-scope QA coverage check |
-| `drive-orchestrate-plan` (at slice closure) | `drive/plan/README.md` | Most slice-DoD items |
+| `drive-build-workflow` (at slice closure) | `drive/plan/README.md` | Most slice-DoD items |
 | `drive-pr-description` / `drive-pr-walkthrough` | `drive/pr/README.md` | PR-shape items in slice DoD |
 | `drive-review-code` | `drive/code-review/README.md` | Reviewer-verdict items in slice DoD |
 | `drive-qa-plan` / `drive-qa-run` | `drive/qa/README.md` | Manual-QA items in slice + project DoD |
-| `drive-orchestrate-plan` (at dispatch closure) | `drive/plan/README.md` | Dispatch-DoD items |
+| `drive-build-workflow` (at dispatch closure) | `drive/plan/README.md` | Dispatch-DoD items |
 
 Worked example for `prisma-next`:
 
@@ -208,7 +208,7 @@ DoD is **not**:
 
 ## Anti-patterns
 
-1. **"Soft" DoD.** Items skipped under deadline pressure. Drift slips through. The gate must be enforced — `drive-orchestrate-plan` refuses to close a dispatch with unmet DoD; slice closure refuses to merge with unmet slice DoD; `drive-close-project` refuses to delete `projects/<x>/` with unmet project DoD.
+1. **"Soft" DoD.** Items skipped under deadline pressure. Drift slips through. The gate must be enforced — `drive-build-workflow` refuses to close a dispatch with unmet DoD; slice closure refuses to merge with unmet slice DoD; `drive-close-project` refuses to delete `projects/<x>/` with unmet project DoD.
 2. **DoD = CI gates only.** Skips intent-validation and manual QA. Symptom: typecheck/test/lint all pass, but the dispatch silently solved the wrong problem (the `StorageTable` example above) or shipped a feature whose CLI diagnostic is incomprehensible because CI doesn't read English. Intent-validation is non-optional in dispatch + slice DoD; manual QA is non-optional in slice DoD whenever the change touches user-observable surface.
 3. **DoD authored by the implementer post-hoc.** The brief's "Done when" is the contract; the implementer cannot edit the gate they're being evaluated against. (Operator-authorised mid-flight edits via design discussion are fine; silent implementer-side edits violate I12.)
 4. **Wishlist DoD.** Items like "the code is elegant" or "the abstractions are right." Uncheckable; doesn't gate handoff. Aspirational quality belongs in code-review feedback.

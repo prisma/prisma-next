@@ -128,7 +128,7 @@ Failure modes that go uncaptured re-happen.
 
 **Context.** Sometimes the agile orchestrator hits a planning question with legitimate unknowns ("how many test sites do we actually need to migrate?", "what's the right shape of this abstraction?"). Guessing leads to bad estimates and bad briefs.
 
-**Choice.** Adopt the Agile spike pattern. A spike is a time-boxed investigation whose Definition of Done is "you have an actionable understanding of what to do," not working code. Spikes have their own DoR (the question is well-formed) and DoD (an output artefact answers the question). Mechanically, a spike is a single-dispatch slice plan with a spike-flavoured brief — no dedicated skill required; `drive-orchestrate-plan` runs it. Spike-first is also a triage verdict for the case where the entire entry-point can't be sized yet.
+**Choice.** Adopt the Agile spike pattern. A spike is a time-boxed investigation whose Definition of Done is "you have an actionable understanding of what to do," not working code. Spikes have their own DoR (the question is well-formed) and DoD (an output artefact answers the question). Mechanically, a spike is a single-dispatch slice plan with a spike-flavoured brief — no dedicated skill required; `drive-build-workflow` runs it. Spike-first is also a triage verdict for the case where the entire entry-point can't be sized yet.
 
 **Why.** Standard Agile pattern, same role for us. Investigation before commitment. Modelling it as a brief-type variant rather than a separate skill keeps the workflow shape uniform — the orchestrator dispatches a spike the same way it dispatches anything else, just with a different brief DoD.
 
@@ -174,7 +174,7 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 **Context.** Even a slice carries some ceremony — a spec (even inline), a plan (even collapsed), a dispatch loop. For trivial work (copy changes, config flips, one-line bugfixes), the slice ceremony is overkill. The user surfaced this gap explicitly: "our triage and execution workflow needs to handle the case where even a Slice is too much overhead: just get the work done, open a PR."
 
 **Options considered.**
-- (a) Treat trivial work as a "slice with no ceremony" — still goes through `drive-orchestrate-plan` but with relaxed defaults.
+- (a) Treat trivial work as a "slice with no ceremony" — still goes through `drive-build-workflow` but with relaxed defaults.
 - (b) Bypass Drive entirely for trivial work — operator runs `gh pr create` directly without ever invoking a Drive skill.
 - (c) Add a fourth unit (direct change) as a sibling of slice. Triage decides; the unit has no spec / no plan / no dispatch ceremony; intent lives in the PR body.
 
@@ -265,7 +265,7 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 
 **Why.** The caps capture different concerns: PR-cap is about review / debug / deploy / rollback debugability; M-cap is about agent-session inspectability and orchestrator recoverability. Both are real, both need enforcement, neither subsumes the other.
 
-**Affected.** `model.md` adds I11. `drive-triage-work` enforces PR-cap at admission. `drive-slice-plan` enforces M-cap at planning. `drive-orchestrate-plan` enforces M-cap defensively at dispatch time.
+**Affected.** `model.md` adds I11. `drive-triage-work` enforces PR-cap at admission. `drive-slice-plan` enforces M-cap at planning. `drive-build-workflow` enforces M-cap defensively at dispatch time.
 
 ## 19. No silent agent-side amendments after first dispatch (I12)
 
@@ -275,9 +275,9 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 
 **Choice.** Codified as invariant I12 in `model.md`. Every spec / plan amendment after the first dispatch of a slice starts is either (a) the output of a design discussion with operator participation, or (b) an explicit operator-authorised edit. Silent agent-side amendments are forbidden.
 
-**Why.** The artefact contract is the team's protocol-as-memory; silent amendments break the contract. Forcing escalation surfaces the design call to the operator, where the design discussion ritual resolves it. In unattended mode, this is enforced by a stop-condition in `drive-orchestrate-plan` (orchestrator halts, logs the trigger for the operator's return).
+**Why.** The artefact contract is the team's protocol-as-memory; silent amendments break the contract. Forcing escalation surfaces the design call to the operator, where the design discussion ritual resolves it. In unattended mode, this is enforced by a stop-condition in `drive-build-workflow` (orchestrator halts, logs the trigger for the operator's return).
 
-**Affected.** `model.md` adds I12. `drive-orchestrate-plan` augmentation includes a design-discussion stop-condition on assumption-falsification. `drive-discussion` is the resolution mechanism.
+**Affected.** `model.md` adds I12. `drive-build-workflow` augmentation includes a design-discussion stop-condition on assumption-falsification. `drive-discussion` is the resolution mechanism.
 
 ## 20. Project consolidation: agile-agent-orchestration + drive-domain-model → drive-domain-model
 
@@ -338,3 +338,69 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 **Why.** Generic "calibration" guidance is undisciplined — teams add items where it's convenient (often inside in-repo skill copies, which then drift from canonical). Naming the per-overlay home turns "where does this go?" into a lookup rather than a judgement call. The PR #93 convention guarantees the file is loaded by the matching skill; the reconciliation skills guarantee drift gets routed back rather than rotting. Together they make protocol-as-memory operational.
 
 **Affected.** `principles/protocol-as-memory.md` rewritten around two homes + a reconciliation loop, with `drive/<category>/README.md` added as a strong memory surface in the tier table. `principles/retro.md` mandatory-output section restructured into canonical update / project-context update / ADR (with explicit home selection heuristic) and the worked example lands in `drive/plan/README.md`. `principles/definition-of-ready.md` and `principles/definition-of-done.md` § "How calibration overlays the protocol" name the per-overlay destination. `principles/brief-discipline.md` names `drive/plan/README.md` as the canonical home for failure-mode catalogue + grep library + reference tasks + model-tier routing. `calibration/prisma-next.md` opens with a section-by-section mapping table to the destination READMEs. Skill-restructure already reflected this (D21); this decision codifies the principle-level commitment.
+
+## 24. Skills split into two tiers: workflow (pilots multi-step loops) and atomic (does one bounded thing)
+
+**Date.** 2026-05-18.
+
+**Context.** The restructure proposed several new "orchestrating" skills (`drive-orchestrate-plan`-style) alongside many "do one thing" skills. The boundary was implicit; consumers reading the inventory had no signal for which skill expects to be invoked top-down versus called as a step inside something else. The implicit structure also conflicted with the gradual-AI-adoption principle (D26), which needs both tiers to be first-class: a human at the "zero AI" end invokes atomic skills directly as building blocks; moving toward full delegation hands more of the loop to workflow skills.
+
+**Options considered.**
+- (a) Keep the inventory flat; rely on skill names + descriptions to signal intent.
+- (b) Make the two-tier distinction explicit via a naming convention: workflow skills end in `-workflow` (`drive-<verb>-workflow`); atomic skills use the standard shapes (`drive-<verb>-<noun>`, `drive-<sub-namespace>-<verb>`).
+- (c) Drop the workflow tier entirely; have the operator (or an outer agent loop) compose atomic skills by hand each time.
+
+**Choice.** (b). Workflow skills end in `-workflow`. Three of them: `drive-start-workflow` (triage + verdict setup), `drive-build-workflow` (slice implementation loop), `drive-deliver-workflow` (project lifecycle). Everything else is atomic.
+
+**Why.** The naming convention surfaces the distinction at a glance. Both tiers are first-class — workflow skills aren't internal plumbing; they're a directly invokable entry point for operators who want the loop driven for them. Atomic skills aren't second-class building blocks; they're a directly invokable entry point for operators who want to drive each step themselves. (c) was rejected because it forces every operator to re-derive the loop each time, which defeats the protocol-as-memory principle.
+
+**Affected.** `model.md` § "Two skill tiers" introduced; the workflow-skill table replaces the implicit orchestration discussion. `skill-restructure.md` § 1 restructured around the workflow / atomic split. `workflow.md` § "Two skill tiers" added. `spec.md` At-a-glance + deliverables tables updated.
+
+## 25. Rename `drive-orchestrate-plan` to `drive-build-workflow`
+
+**Date.** 2026-05-18.
+
+**Context.** `drive-orchestrate-plan` named what the skill *did* in an early model where "plan" was the central artefact. Under the consolidated model, the skill pilots the slice implementation loop — it doesn't "orchestrate a plan," it builds the slice. The old name was also incompatible with the new workflow-tier naming convention (D24).
+
+**Options considered.**
+- (a) Keep the name; document the new behaviour under it.
+- (b) Rename to `drive-build-workflow`, fitting the new convention.
+- (c) Use a different verb (`drive-execute-workflow`, `drive-run-workflow`).
+
+**Choice.** (b). `drive-build-workflow`.
+
+**Why.** "Build" matches the agile lineage (the slice implementation loop is the place where building happens) and the consumer mental model. "Execute" was second-best but already overloaded by Drive's "Slice execution" workflow naming. "Orchestrate" was rejected as too long and as conflating the skill (which pilots a loop) with the role wearing the agile-orchestrator hat.
+
+**Affected.** Mechanical rename across all project docs. Skills under `prisma/ignite` will adopt the new name during Phase 3 promotion (per `plan.md`); consumers using `drive-orchestrate-plan` migrate via `drive-reconcile-skills`.
+
+## 26. Gradual AI adoption as a first-class principle of the methodology
+
+**Date.** 2026-05-18.
+
+**Context.** The methodology has always anticipated a trajectory from human-driven Drive to agent-driven Drive (D6 — "agent teams ARE teams"). What wasn't explicit: the trajectory is gradual and walkable, and the protocol must support participation at every point on the spectrum — not just the endpoints. Without this, the workflow-tier split (D24) could read as "the workflow skills exist to replace humans" rather than "the workflow skills exist so humans can incrementally delegate."
+
+**Options considered.**
+- (a) Leave the trajectory implicit; let it be inferred from D6 + role docs.
+- (b) Name "gradual AI adoption" as a first-class principle; a new principle document; references in `spec.md`, `roles-and-personas.md`, `protocol-as-memory.md`.
+
+**Choice.** (b). New principle document `principles/gradual-ai-adoption.md`. Cross-references from the spec design tenets, the roles-and-personas trajectory, and the protocol-as-memory surfaces.
+
+**Why.** The implicit trajectory has produced a real friction: team members at the "zero AI" end are unsure how to participate; team members at the "full delegation" end skip rituals that the rituals existed to make hard to skip. Naming the principle makes the surfaces (atomic skills, workflow skills, project-context READMEs, skill bodies) targets that *deliberately* serve both human and agent participation, not just one or the other.
+
+**Affected.** `principles/gradual-ai-adoption.md` (new). `spec.md` At-a-glance names it as a design tenet. `principles/roles-and-personas.md` walkable-transitions section added. `principles/protocol-as-memory.md` notes that memory surfaces serve both agents and humans. `model.md` role-wearing trajectory cross-links the principle.
+
+## 27. Build the Drive skill family locally in `prisma-next` and trial before opening upstream PRs
+
+**Date.** 2026-05-18.
+
+**Context.** Earlier sequencing (in the original `plan.md`) opened upstream PRs incrementally as each skill was drafted. The risk: design problems crystallize into canonical bodies that downstream consumers then have to migrate around, and reviewers can't trial the family as a whole because no piece is downstream-ready until the whole series lands.
+
+**Options considered.**
+- (a) Continue with incremental upstream PRs as designed.
+- (b) Build the whole family locally in `prisma-next` (`.agents/skills/drive-*/`), trial for ~2 weeks of real use, then open the upstream PR series with the trialed shape.
+
+**Choice.** (b). Build locally first, trial, then promote.
+
+**Why.** The trial period is the cheapest way to catch design problems before they hit canonical bodies. The family is mutually-dependent (the workflow skills call the atomic skills; the augmented `drive-build-workflow` depends on the new `drive-retro-run`); trialling pieces in isolation upstream would be partial validation at best. Promoting only what survived the trial keeps canonical churn down. (a) was rejected because the cost of crystallizing a wrong-shape skill in canonical is high (consumer migration) and the cost of trialling locally is low (one repo, one team, no consumer impact).
+
+**Affected.** `plan.md` rewritten into three phases (shape / build + trial / promote). `spec.md` deliverables tables split into "locally-built skill family" and "upstream-promotion deliverables." `skill-restructure.md` § 4 reframed as build-locally sequencing with Phase 3 as upstream promotion. `problem-statement.md` "What we'd like from you" section notes that upstream PRs come after the trial.

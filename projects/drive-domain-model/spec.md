@@ -4,15 +4,17 @@
 
 ## At a glance
 
-We are pinning Drive's domain model and threading Agile-style dispatch discipline into the workflows where agent execution happens. Concretely, we are shipping (canonical-side, in [`prisma/ignite`](https://github.com/prisma/ignite)):
+We are pinning Drive's domain model and threading Agile-style dispatch discipline into the workflows where agent execution happens. Concretely, we are shipping:
 
 1. **Three sized units of work** — Direct change (no ceremony), Slice (one PR with spec + plan), Project (composition of slices). Plus one delegation unit, Dispatch (one agent session).
 2. **A triage workflow** that runs at every entry point and routes work to one of eight outcomes — including a lightweight path for trivial work and explicit promote/demote paths for mid-flight scope shifts.
 3. **Dispatch-level discipline** — Definition of Ready and Definition of Done per dispatch, a ≤ 5-minute WIP-inspection cadence, an M-cap that refuses oversized dispatches, and a stop-condition when an assumption is falsified mid-flight.
-4. **A canonical skill restructure** — three new skills, two scope-splits, four augmentations — landed as a series of small PRs that stack on top of [PR #93](https://github.com/prisma/ignite/pull/93).
-5. **A rewritten `drive-process.md`** that teaches the consolidated model and dispatch discipline.
+4. **A skill restructure with two tiers** — *workflow skills* (`drive-<verb>-workflow`) that pilot multi-step loops, and *atomic skills* that do one bounded thing. Three workflow skills (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`), seven new atomic skills, four atomic augmentations, one promotion. The two-tier split supports gradual AI adoption: humans at the "zero AI" end invoke atomic skills as building blocks; moving toward "full delegation" hands more of the loop to workflow skills.
+5. **A rewritten `drive-process.md`** that teaches the consolidated model, the two skill tiers, and dispatch discipline.
 
-The model lives in [`model.md`](model.md). The operational lifecycle lives in [`workflow.md`](workflow.md). The skill restructure lives in [`skill-restructure.md`](skill-restructure.md). The externally-shareable problem framing lives in [`problem-statement.md`](problem-statement.md).
+The skill family is built **locally in `prisma-next`** first (`.agents/skills/drive-*/SKILL.md`), validated by a couple of weeks of real use, and then promoted upstream to [`prisma/ignite`](https://github.com/prisma/ignite) as a series of small PRs stacked on [PR #93](https://github.com/prisma/ignite/pull/93). See [`plan.md`](plan.md) for the execution sequence.
+
+The model lives in [`model.md`](model.md). The operational lifecycle lives in [`workflow.md`](workflow.md). The skill restructure lives in [`skill-restructure.md`](skill-restructure.md). The externally-shareable problem framing lives in [`problem-statement.md`](problem-statement.md). The gradual-AI-adoption principle lives in [`principles/gradual-ai-adoption.md`](principles/gradual-ai-adoption.md).
 
 ## The problem (compressed)
 
@@ -93,7 +95,7 @@ A Linear ticket says "implement the new TypeScript backend's contract emitter." 
 2. Triage runs the **promotion ceremony**: creates a Linear Project, moves the original ticket into it, marks the ticket Done, renames it `Plan: TypeScript backend emitter` (forward-pointer to the project), then routes to **Project initiation**.
 3. **Project initiation** runs `drive-create-project` → scaffolds `projects/typescript-emitter/` → `drive-project-specify` → writes `spec.md` with purpose, scope boundary, project-DoD (often via **Design discussion** with the operator) → `drive-project-plan` → writes `plan.md` composing the project from known + anticipated slices (stack and parallelism declared).
 4. The first slice runs **Slice initiation** → `drive-slice-specify` writes the slice spec under `projects/typescript-emitter/slices/<slice>/spec.md` → `drive-slice-plan` decomposes into a sequence of dispatches, each sized ≤ M, each with DoR + DoD declared.
-5. **Slice execution** runs `drive-orchestrate-plan`'s dispatch loop: pre-flight DoR → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD → reviewer subagent verdict → loop to next dispatch.
+5. **Slice execution** runs `drive-build-workflow`'s dispatch loop: pre-flight DoR → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD → reviewer subagent verdict → loop to next dispatch.
 6. When a dispatch's brief assumes "the existing emitter's column-naming pass is per-target" and the implementer discovers it's per-codec, the orchestrator hits invariant I12: stop, escalate to **Design discussion** with the operator, output a spec/plan edit + a `design-decisions.md` entry, resume.
 7. Slice execution → **Slice review** (`drive-review-code`, `drive-pr-walkthrough`, `drive-qa-plan`, `drive-qa-run`) → **Slice closure** (PR merged, deferred candidates recorded, health rollup) → next slice.
 8. Last slice merges → **Project closure** runs `drive-close-project` → mandatory final retro via `drive-retro-run` → migrate long-lived docs → delete `projects/typescript-emitter/`.
@@ -113,21 +115,44 @@ What this satisfies: **FR7** (demotion), **I2** (scope bounded by spec — the s
 
 ## Project deliverables
 
-What this project ships, framed as outputs of the design above.
+What this project ships, framed as outputs of the design above. The skill family is built locally in `prisma-next` first; the upstream-promotion PRs land later (see [`plan.md`](plan.md)).
 
-### Canonical-side deliverables (in `prisma/ignite`, stacked on PR #93)
+### Locally-built skill family (in `prisma-next` `.agents/skills/`)
+
+**Workflow tier (three; all new or renamed):**
 
 | Deliverable | What it is | Design it implements |
 |---|---|---|
-| `drive-triage-work` | New skill. Runs the triage workflow at any entry point AND mid-flight; outputs one of eight verdicts; routes to the next workflow. | Layer 2 — Triage; Walkthroughs 1, 2, 3. |
+| `drive-start-workflow` | Pilots triage + the verdict's setup chain. Calls `drive-triage-work` then runs the verdict's setup. | Layer 2 — Triage; Walkthroughs 1, 2, 3; gradual-AI-adoption principle. |
+| `drive-build-workflow` (renamed + augmented from `drive-orchestrate-plan`) | Pilots a slice's implementation loop: pre-flight DoR → dispatch loop with WIP inspection → post-flight DoD → review → close. | Layer 2 — Slice execution; Layer 3 — I8, I11, I12; Walkthrough 2. |
+| `drive-deliver-workflow` | Pilots a project's lifecycle: init → slices → health → retros → mandatory close retro. | Layer 2 — Project initiation + closure; Layer 3 — I10. |
+
+**Atomic tier — new (seven):**
+
+| Deliverable | What it is | Design it implements |
+|---|---|---|
+| `drive-triage-work` | Runs the triage decision tree; outputs one of eight verdicts. Called by `drive-start-workflow`; also directly invokable. | Layer 2 — Triage. |
 | `drive-project-specify` + `drive-slice-specify` | Split from `drive-create-spec`. Different inputs / outputs / templates per scope. | Layer 1 — Project vs Slice distinction; Walkthrough 2. |
 | `drive-project-plan` + `drive-slice-plan` | Split from `drive-create-plan`. Project-plan composes slices; slice-plan composes dispatches with sizing + DoR. | Layer 1 — Project vs Slice distinction; Layer 3 — I11. |
-| `drive-orchestrate-plan` (augmented) | Per-dispatch DoR pre-flight, WIP-inspection cadence, per-dispatch DoD post-flight, brief template, L/XL refusal, design-discussion stop-condition. | Layer 3 — I8, I11, I12; Walkthrough 2. |
-| `drive-close-project` (augmented) | Mandatory final retro step (calls `drive-retro-run`). | Layer 2 — Project closure; protocol-as-memory principle. |
-| `drive-discussion` (promoted) | From generic mode skill to first-class cross-cutting workflow. | Layer 2 — Design discussion; Layer 3 — I12. |
-| `drive-health-check` | New skill. Project rollup; session-bookended (interactive) or trigger-fired (unattended). | Layer 2 — cross-cutting; Walkthrough 3 (mid-flight detection). |
-| `drive-retro-run` | New skill. Trigger-based retro template; lands the learning in canonical / project-context / ADR. | protocol-as-memory principle. |
-| `docs/engineering/drive-process.md` | Rewritten to teach the consolidated model + dispatch discipline. Preserves PR #93 content (Skill Map, "Project context for drive skills") and layers the model on top. | All three layers + PR #93 base. |
+| `drive-health-check` | Project rollup; session-bookended (interactive) or trigger-fired (unattended). Called by `drive-deliver-workflow`; directly invokable. | Layer 2 — cross-cutting; Walkthrough 3 (mid-flight detection). |
+| `drive-retro-run` | Trigger-based retro template; lands the learning in canonical / project-context / ADR. Called by both workflow skills on triggers; directly invokable. | protocol-as-memory principle. |
+
+**Atomic tier — augmentations (four):**
+
+| Deliverable | What it is | Design it implements |
+|---|---|---|
+| `drive-close-project` (augmented) | Mandatory final retro hook (calls `drive-retro-run`); refusal to delete `projects/<x>/` while project DoD is unmet. | Layer 2 — Project closure; protocol-as-memory principle. |
+| `drive-create-project` (augmented) | Project DoR check at entry; seeds `drive/<category>/README.md` entries via `drive-bootstrap-context`. | Layer 2 — Project initiation; project DoR. |
+| `drive-discussion` (promoted) | From generic mode skill to first-class cross-cutting workflow trigger. Stays atomic. | Layer 2 — Design discussion; Layer 3 — I12. |
+| `drive-pr-description` (augmented) | Extended for the direct-change case. | Layer 1 — Direct change. |
+
+### Upstream-promotion deliverables (in `prisma/ignite`, stacked on PR #93)
+
+After the local trial, each surviving skill is promoted upstream as its own PR. The per-PR sequence aligns with [`skill-restructure.md`](skill-restructure.md) § 4. Plus:
+
+| Deliverable | What it is | Design it implements |
+|---|---|---|
+| `docs/engineering/drive-process.md` rewrite | Rewritten to teach the consolidated model, the two skill tiers, and dispatch discipline. Preserves PR #93 content (Skill Map, "Project context for drive skills") and layers the model on top. | All three layers + PR #93 base. |
 
 ### In-project deliverables (under `projects/drive-domain-model/`)
 
@@ -137,8 +162,8 @@ What this project ships, framed as outputs of the design above.
 | [`workflow.md`](workflow.md) | Drafted | Operational lifecycle map (every skill plugs into a named phase). |
 | [`problem-statement.md`](problem-statement.md) | Drafted | Self-contained problem framing for canonical-side maintainers (Ignite team). |
 | [`skill-restructure.md`](skill-restructure.md) | Drafted | Workflow → skill map + per-skill verdict + implementation sequencing. |
-| [`design-decisions.md`](design-decisions.md) | Living | 23 decisions with options + choice + rationale (the alternatives ledger). |
-| [`principles/`](principles/) | Drafted | Per-principle deep-dives: protocol-as-memory, brief-discipline, DoR, DoD, retro, roles-and-personas, spikes, decomposition-and-cost. |
+| [`design-decisions.md`](design-decisions.md) | Living | Decisions with options + choice + rationale (the alternatives ledger). |
+| [`principles/`](principles/) | Drafted | Per-principle deep-dives: protocol-as-memory, brief-discipline, DoR, DoD, retro, roles-and-personas, spikes, decomposition-and-cost, gradual-ai-adoption. |
 | [`calibration/prisma-next.md`](calibration/prisma-next.md) | Drafted | Worked-example calibration; demonstrates how project-context overlays map to `drive/<category>/README.md` per PR #93. |
 | [`plan.md`](plan.md) | Pending | Execution plan for landing the canonical-side deliverables. |
 
@@ -164,24 +189,37 @@ Grouped by which design layer they verify.
 
 ### Workflows are implementable (Layer 2)
 
-- [ ] **AC4.** `drive-triage-work` exists at `skills/.experimental/drive-triage-work/SKILL.md` in `prisma/ignite`. Implements the eight-verdict decision tree, runs at entry-time AND mid-flight, wired to the `drive/<category>/README.md` convention.
-- [ ] **AC5.** `drive-orchestrate-plan` is augmented with per-dispatch DoR pre-flight, WIP-inspection cadence as a named loop step, per-dispatch DoD post-flight, brief template, L/XL refusal, and design-discussion stop-condition on assumption-falsification.
-- [ ] **AC6.** Each remaining canonical drive-* skill that needs rewriting (per [`skill-restructure.md`](skill-restructure.md)) has been rewritten in a separate PR. Each PR's body references this spec and the relevant [`model.md`](model.md) section. PRs are independently reviewable.
-- [ ] **AC7.** A grep across canonical drive-* skill bodies for floating-scope vocabulary (`\bmilestone\b`, `\btask\b` in its pre-model sense, `\bstep\b` in its planning-sense pre-model use) returns only matches inside explicit deprecation notices or model-teaching examples.
+The skill family is built in two phases: (a) local build + trial in `prisma-next` (`.agents/skills/`), then (b) upstream promotion to `prisma/ignite`. ACs below are scoped accordingly.
 
-### Walkthroughs run end-to-end
+**Local build (`prisma-next` `.agents/skills/`):**
 
-- [ ] **AC8.** Walkthrough 1 (direct change): a trivial entry point runs through `drive-triage-work` → "direct change" verdict → `gh pr create` with intent in the PR body, no on-disk artefact.
-- [ ] **AC9.** Walkthrough 2 (multi-PR project): a project-sized entry point runs through triage → promotion → project initiation → slice initiation → slice execution → slice review → slice closure → project closure with mandatory final retro.
-- [ ] **AC10.** Walkthrough 2 mid-flight branch: an in-flight slice hits an assumption-falsification → orchestrator escalates to design discussion → spec/plan edit produced → `design-decisions.md` entry recorded.
-- [ ] **AC11.** Walkthrough 3 (demotion): a mid-flight project where the remaining scope is one PR routes through the demotion workflow → surviving Linear issue stands alone → project Cancelled or Completed → on-disk artefacts retired.
-- [ ] **AC12.** An orphan slice runs end-to-end: a bug-fix-scale entry point runs through triage → orphan slice initiation → execution → review → closure → exactly one PR with the slice spec inline in the PR description and no `projects/<x>/` artefact.
+- [ ] **AC4.** The three workflow skills exist locally: `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`. Each pilots its named multi-step loop end-to-end; each is directly invokable; each calls atomic skills as documented steps.
+- [ ] **AC5.** `drive-triage-work` exists locally. Implements the eight-verdict decision tree; runs at entry-time AND mid-flight (called by `drive-start-workflow` in both modes); wired to the `drive/<category>/README.md` convention.
+- [ ] **AC6.** `drive-build-workflow` carries the five augmentations: per-dispatch DoR pre-flight, WIP-inspection cadence as a named loop step, per-dispatch DoD post-flight, brief template, L/XL refusal + design-discussion stop-condition on assumption-falsification.
+- [ ] **AC7.** Each remaining canonical drive-* skill listed in [`skill-restructure.md`](skill-restructure.md) (splits, new atomic skills, augmentations, vocabulary-only refresh) exists in its restructured form locally. Each skill body references the principle docs it depends on.
+- [ ] **AC8.** A grep across `prisma-next` `.agents/skills/drive-*` skill bodies for floating-scope vocabulary (`\bmilestone\b`, `\btask\b` in its pre-model sense, `\bstep\b` in its planning-sense pre-model use) returns only matches inside explicit deprecation notices or model-teaching examples.
+
+**Trial validation:**
+
+- [ ] **AC9.** The skill family has been used in real `prisma-next` work for at least two weeks. Retros have fired on at least three real triggers; each landed an update in a memory-strong surface (canonical body / `drive/<category>/README.md` / ADR).
+
+**Upstream promotion (`prisma/ignite`):**
+
+- [ ] **AC10.** Each surviving skill has its own PR in `prisma/ignite`, stacked on PR #93, independently reviewable. Each PR's body references this spec and the relevant [`model.md`](model.md) / [`principles/`](principles/) sections.
+
+### Walkthroughs run end-to-end (via the local skill family)
+
+- [ ] **AC11.** Walkthrough 1 (direct change): a trivial entry point runs through `drive-start-workflow` → `drive-triage-work` outputs "direct change" verdict → `drive-pr-description` (direct-change framing) → `gh pr create` with intent in the PR body, no on-disk artefact.
+- [ ] **AC12.** Walkthrough 2 (multi-PR project): a project-sized entry point runs through `drive-start-workflow` → promotion → `drive-deliver-workflow` → project initiation → slice-by-slice via `drive-build-workflow` → slice review → slice closure → project closure with mandatory final retro.
+- [ ] **AC13.** Walkthrough 2 mid-flight branch: an in-flight slice (inside `drive-build-workflow`) hits an assumption-falsification → stop-condition fires → escalates to `drive-discussion` → spec/plan edit produced → `design-decisions.md` entry recorded.
+- [ ] **AC14.** Walkthrough 3 (demotion): a mid-flight project where the remaining scope is one PR routes through `drive-start-workflow` in mid-flight mode → demotion ceremony → surviving Linear issue stands alone → project Cancelled or Completed → on-disk artefacts retired.
+- [ ] **AC15.** An orphan slice runs end-to-end: a bug-fix-scale entry point runs through `drive-start-workflow` → orphan slice setup → `drive-build-workflow` → exactly one PR with the slice spec inline in the PR description and no `projects/<x>/` artefact.
 
 ### Documentation lands
 
-- [ ] **AC13.** `docs/engineering/drive-process.md` in `prisma/ignite` is rewritten to teach the consolidated model + dispatch discipline. The PR #93 content (Skill Map, "Project context for drive skills" section) is preserved and integrated.
-- [ ] **AC14.** [`calibration/prisma-next.md`](calibration/prisma-next.md) is the worked-example calibration: reference tasks for t-shirt sizing, DoR / DoD overlays for `prisma-next`, failure-mode catalogue, grep library, manual-QA context, with a section-by-section mapping table to its destination `drive/<category>/README.md` files.
-- [ ] **AC15.** The synthesis of the drive-context-convention audit (`projects/drive-context-convention/audit/SYNTHESIS.md` in `prisma/ignite`) carries a header / footer annotation explaining which Tier 1 recommendations were superseded by this project, with pointers. Audit reports themselves stay unmodified.
+- [ ] **AC16.** `docs/engineering/drive-process.md` in `prisma/ignite` is rewritten to teach the consolidated model, the two skill tiers (workflow + atomic), and dispatch discipline. The PR #93 content (Skill Map, "Project context for drive skills" section) is preserved and integrated.
+- [ ] **AC17.** [`calibration/prisma-next.md`](calibration/prisma-next.md) is the worked-example calibration: reference tasks for t-shirt sizing, DoR / DoD overlays for `prisma-next`, failure-mode catalogue, grep library, manual-QA context, with a section-by-section mapping table to its destination `drive/<category>/README.md` files.
+- [ ] **AC18.** The synthesis of the drive-context-convention audit (`projects/drive-context-convention/audit/SYNTHESIS.md` in `prisma/ignite`) carries a header / footer annotation explaining which Tier 1 recommendations were superseded by this project, with pointers. Audit reports themselves stay unmodified.
 
 ## Alternatives considered
 
@@ -208,7 +246,7 @@ Working positions; resolved questions are recorded in [`model.md`](model.md) § 
 1. **What enforces I1 (one slice → one PR)?** Working position: agile-orchestrator WIP-inspection during slice execution surfaces "should we split?" mid-flight; no hard gate.
 2. **What enforces I2 (project scope doesn't expand)?** Working position: triage itself enforces — every time new work surfaces, mid-flight triage re-reads the project spec to make the in-or-out call.
 3. **Scope-deferred work landing pad.** Working position: `projects/<project>/deferred.md` during a project; reviewed at project closure. Per-orphan-work: operator scratch.
-4. **What enforces I12 (no silent agent-side amendments)?** Working position: orchestrator stop-condition fires on detected drift (per `drive-orchestrate-plan` unattended-mode rules); design discussion produces the amendment with operator participation.
+4. **What enforces I12 (no silent agent-side amendments)?** Working position: orchestrator stop-condition fires on detected drift (per `drive-build-workflow` unattended-mode rules); design discussion produces the amendment with operator participation.
 5. **Name for the triage skill.** Working position: `drive-triage-work` — aspirationally compliant with the `<scope>-<verb>-<noun>` taxonomy in `skills/README.md`.
 6. **How is the project spec written when full scope isn't knowable yet?** Working position: two passes — purpose statement fixed in the first pass (immutable per I7); scope boundary sharpened in later passes as slices deliver. Design discussion is the mechanism for the second pass.
 7. **Stacked PRs in Linear.** Linear has no first-class stacking metadata. Working position: each PR is its own Linear issue; the stack order is recorded in the project plan and in the PR descriptions; Linear sees a sequence of issues without explicit stacking metadata.
@@ -227,7 +265,7 @@ Working positions; resolved questions are recorded in [`model.md`](model.md) § 
 - [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration
 - [`skill-restructure.md`](skill-restructure.md) — proposed skill set with augmentations + implementation sequencing
 - [`plan.md`](plan.md) — execution plan (upcoming)
-- `docs/engineering/drive-process.md` (in `prisma/ignite`) — canonical Drive process doc; rewritten as AC13
+- `docs/engineering/drive-process.md` (in `prisma/ignite`) — canonical Drive process doc; rewritten as AC16
 - `skills/README.md` (in `prisma/ignite`) — naming taxonomy this model layers on top of
 - `wip/unattended-decisions.md` — the 2026-05-17 dispatch-drift capture that motivated the methodology half
 - [PR #93](https://github.com/prisma/ignite/pull/93) — the drive-context-convention machinery this project stacks on top of
