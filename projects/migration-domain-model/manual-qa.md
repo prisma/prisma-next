@@ -169,23 +169,25 @@ For each of the following invocations, run the command and observe stderr + exit
    ```
    Read the exit code and the human-readable output.
 
-2. **Plant the corruption.** Pick a non-initial migration (e.g. `20260422T0742_migration`). Edit its `migration.json` and replace the `to` field with an obviously-wrong hash (something like `sha256:0000000000000000000000000000000000000000000000000000000000000000`). Save.
+2. **Plant the corruption.** Pick a non-initial migration (e.g. `20260422T0742_migration`). Edit its **`end-contract.json`** (NOT `migration.json`) and replace `storage.storageHash` with an obviously-wrong hash, e.g. `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`. Save.
+
+   The recipe must target `end-contract.json` rather than `migration.json` because PN-005 is the *within-migration snapshot-consistency* check — it detects drift between the manifest's `metadata.to` and the recorded snapshot's `storageHash`. Mutating `migration.json` invalidates the `migrationHash` first, which makes the loader throw PN-001 (HASH_MISMATCH) before PN-005 has a chance to fire.
 
    Concretely:
    ```bash
    # Inspect the original first so you can restore by memory or by git
-   cat migrations/app/20260422T0742_migration/migration.json | head -30
-   # Hand-edit: open in your editor, change "to": "sha256:..." to "sha256:0000…"
+   cat migrations/app/20260422T0742_migration/end-contract.json | head -20
+   # Hand-edit end-contract.json: change "storageHash": "sha256:..." to "sha256:dddd…"
    ```
 
-3. **Hot check (corruption-positive).**
+3. **Hot check, graph-wide (corruption-positive).**
    ```bash
    pnpm exec prisma-next migration check ; echo "exit=$?"
    pnpm exec prisma-next migration check --json | head -60
    ```
    Read the exit code, the human-readable output, and the JSON envelope.
 
-4. **Per-migration check.** Run `pnpm exec prisma-next migration check 20260422T0742_migration --json | head -60` to confirm the targeted check also catches the planted corruption.
+4. **Hot check, per-migration.** Run `pnpm exec prisma-next migration check 20260422T0742_migration --json | head -60` to confirm the targeted check catches the same corruption. (Per-migration mode used to be a false-negative on PN-005 — fixed in this round; the scenario verifies the fix holds.)
 
 ### What you should see
 
@@ -204,7 +206,7 @@ For each of the following invocations, run the command and observe stderr + exit
 ### Restore
 
 ```bash
-git checkout -- migrations/app/20260422T0742_migration/migration.json
+git checkout -- migrations/app/20260422T0742_migration/end-contract.json
 git status   # must be clean — no other files mutated
 ```
 
