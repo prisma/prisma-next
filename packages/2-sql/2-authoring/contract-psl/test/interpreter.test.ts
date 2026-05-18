@@ -83,11 +83,13 @@ describe('interpretPslDocumentToSqlContract', () => {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       tables: {
-        user: {
-          columns: {
-            email: {
-              codecId: 'custom/text@1',
-              nativeType: 'custom_text',
+        __unbound__: {
+          user: {
+            columns: {
+              email: {
+                codecId: 'custom/text@1',
+                nativeType: 'custom_text',
+              },
             },
           },
         },
@@ -133,11 +135,13 @@ describe('interpretPslDocumentToSqlContract', () => {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       tables: {
-        user: {
-          columns: {
-            slug: {
-              codecId: 'pg/text@1',
-              nativeType: 'text',
+        __unbound__: {
+          user: {
+            columns: {
+              slug: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+              },
             },
           },
         },
@@ -207,12 +211,14 @@ model Comment {
     expect(result.value.roots).toEqual({ user: 'User' });
     expect(result.value.storage).toMatchObject({
       tables: {
-        user: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-            email: { codecId: 'pg/text@1', nativeType: 'text' },
+        __unbound__: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              email: { codecId: 'pg/text@1', nativeType: 'text' },
+            },
+            primaryKey: { columns: ['id'] },
           },
-          primaryKey: { columns: ['id'] },
         },
       },
     });
@@ -249,12 +255,14 @@ model Comment {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        idlessThing: {
-          columns: {
-            email: { codecId: 'pg/text@1', nativeType: 'text' },
-            token: { codecId: 'pg/text@1', nativeType: 'text' },
+        __unbound__: {
+          idlessThing: {
+            columns: {
+              email: { codecId: 'pg/text@1', nativeType: 'text' },
+              token: { codecId: 'pg/text@1', nativeType: 'text' },
+            },
+            uniques: [{ columns: ['email'] }],
           },
-          uniques: [{ columns: ['email'] }],
         },
       },
     });
@@ -297,8 +305,10 @@ model Comment {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        compositeThing: {
-          primaryKey: { columns: ['email', 'token'] },
+        __unbound__: {
+          compositeThing: {
+            primaryKey: { columns: ['email', 'token'] },
+          },
         },
       },
     });
@@ -327,10 +337,12 @@ model Comment {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        composite_thing: {
-          primaryKey: {
-            columns: ['email_address', 'api_token'],
-            name: 'composite_thing_pkey',
+        __unbound__: {
+          composite_thing: {
+            primaryKey: {
+              columns: ['email_address', 'api_token'],
+              name: 'composite_thing_pkey',
+            },
           },
         },
       },
@@ -380,45 +392,49 @@ model Post {
     expect(result.value.roots).toEqual({ user: 'User', post: 'Post' });
     expect(result.value.storage).toMatchObject({
       types: {
-        Email: { codecId: 'pg/text@1', nativeType: 'text' },
-        Role: {
-          kind: 'postgres-enum',
-          name: 'Role',
-          nativeType: 'Role',
-          values: ['USER', 'ADMIN'],
+        __unbound__: {
+          Email: { codecId: 'pg/text@1', nativeType: 'text' },
+          Role: {
+            kind: 'postgres-enum',
+            name: 'Role',
+            nativeType: 'Role',
+            values: ['USER', 'ADMIN'],
+          },
         },
       },
       tables: {
-        user: {
-          columns: {
-            id: {
-              default: { kind: 'function', expression: 'autoincrement()' },
-            },
-            createdAt: {
-              default: { kind: 'function', expression: 'now()' },
-            },
-            isActive: {
-              default: { kind: 'literal', value: true },
-            },
-            nickname: {
-              nullable: true,
+        __unbound__: {
+          user: {
+            columns: {
+              id: {
+                default: { kind: 'function', expression: 'autoincrement()' },
+              },
+              createdAt: {
+                default: { kind: 'function', expression: 'now()' },
+              },
+              isActive: {
+                default: { kind: 'literal', value: true },
+              },
+              nickname: {
+                nullable: true,
+              },
             },
           },
-        },
-        post: {
-          uniques: [{ columns: ['title', 'userId'] }],
-          indexes: [{ columns: ['userId'] }],
-          foreignKeys: [
-            {
-              source: { columns: ['userId'] },
-              target: {
-                table: 'user',
-                columns: ['id'],
+          post: {
+            uniques: [{ columns: ['title', 'userId'] }],
+            indexes: [{ columns: ['userId'] }],
+            foreignKeys: [
+              {
+                source: { columns: ['userId'] },
+                target: {
+                  table: 'user',
+                  columns: ['id'],
+                },
+                onDelete: 'cascade',
+                onUpdate: 'cascade',
               },
-              onDelete: 'cascade',
-              onUpdate: 'cascade',
-            },
-          ],
+            ],
+          },
         },
       },
     });
@@ -465,26 +481,28 @@ model Member {
     expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
     expect(result.value.storage).toMatchObject({
       tables: {
-        org_team: {
-          columns: {
-            team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-          },
-          primaryKey: { columns: ['team_id'] },
-        },
-        team_member: {
-          columns: {
-            member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-            team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
-          },
-          primaryKey: { columns: ['member_id'] },
-          indexes: [{ columns: ['team_ref'] }],
-          uniques: [{ columns: ['team_ref', 'member_id'] }],
-          foreignKeys: [
-            {
-              source: { columns: ['team_ref'] },
-              target: { table: 'org_team', columns: ['team_id'] },
+        __unbound__: {
+          org_team: {
+            columns: {
+              team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
             },
-          ],
+            primaryKey: { columns: ['team_id'] },
+          },
+          team_member: {
+            columns: {
+              member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
+            },
+            primaryKey: { columns: ['member_id'] },
+            indexes: [{ columns: ['team_ref'] }],
+            uniques: [{ columns: ['team_ref', 'member_id'] }],
+            foreignKeys: [
+              {
+                source: { columns: ['team_ref'] },
+                target: { table: 'org_team', columns: ['team_id'] },
+              },
+            ],
+          },
         },
       },
     });
@@ -559,10 +577,12 @@ model OrderItem {
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
         tables: {
-          order_item: {
-            primaryKey: {
-              columns: ['order_id', 'product_id'],
-              name: 'order_item_pkey',
+          __unbound__: {
+            order_item: {
+              primaryKey: {
+                columns: ['order_id', 'product_id'],
+                name: 'order_item_pkey',
+              },
             },
           },
         },
@@ -593,8 +613,10 @@ model OrderItem {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        membership: {
-          primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+        __unbound__: {
+          membership: {
+            primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+          },
         },
       },
     });
@@ -623,15 +645,17 @@ model OrderItem {
 
       expect(result.value.storage).toMatchObject({
         tables: {
-          doc: {
-            indexes: [
-              {
-                columns: ['body'],
-                name: 'doc_body_bm25_idx',
-                type: 'bm25',
-                options: { key_field: 'id' },
-              },
-            ],
+          __unbound__: {
+            doc: {
+              indexes: [
+                {
+                  columns: ['body'],
+                  name: 'doc_body_bm25_idx',
+                  type: 'bm25',
+                  options: { key_field: 'id' },
+                },
+              ],
+            },
           },
         },
       });
@@ -657,8 +681,10 @@ model OrderItem {
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
         tables: {
-          doc: {
-            indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+          __unbound__: {
+            doc: {
+              indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+            },
           },
         },
       });
@@ -767,7 +793,7 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
-        tables: { doc: { indexes: [{ columns: ['body'] }] } },
+        tables: { __unbound__: { doc: { indexes: [{ columns: ['body'] }] } } },
       });
     });
   });

@@ -45,9 +45,11 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     expect(result.value.roots).toEqual({});
     expect(result.value.models).toEqual({});
     expect(storage.types).toMatchObject({
-      Email: {
-        codecId: 'pg/text@1',
-        nativeType: 'text',
+      __unbound__: {
+        Email: {
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+        },
       },
     });
   });

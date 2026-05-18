@@ -184,30 +184,34 @@ model Document {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       types: {
-        Role: {
-          kind: 'postgres-enum',
-          name: 'Role',
-          nativeType: 'Role',
-          values: ['USER', 'ADMIN'],
-        },
-        Embedding1536: {
-          codecId: 'custom/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
+        __unbound__: {
+          Role: {
+            kind: 'postgres-enum',
+            name: 'Role',
+            nativeType: 'Role',
+            values: ['USER', 'ADMIN'],
+          },
+          Embedding1536: {
+            codecId: 'custom/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
         },
       },
       tables: {
-        document: {
-          columns: {
-            role: {
-              codecId: 'test/enum@1',
-              nativeType: 'Role',
-              typeRef: 'Role',
-            },
-            embedding: {
-              codecId: 'custom/vector@1',
-              nativeType: 'vector',
-              typeRef: 'Embedding1536',
+        __unbound__: {
+          document: {
+            columns: {
+              role: {
+                codecId: 'test/enum@1',
+                nativeType: 'Role',
+                typeRef: 'Role',
+              },
+              embedding: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                typeRef: 'Embedding1536',
+              },
             },
           },
         },
@@ -255,10 +259,12 @@ model Post {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       types: {
-        Tag: {
-          codecId: 'custom/enum@1',
-          nativeType: 'Tag',
-          typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
+        __unbound__: {
+          Tag: {
+            codecId: 'custom/enum@1',
+            nativeType: 'Tag',
+            typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
+          },
         },
       },
     });
@@ -320,29 +326,33 @@ model Document {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       types: {
-        ShortName: {
-          codecId: 'custom/varchar@1',
-          nativeType: 'character varying',
-          typeParams: { length: 35 },
-        },
-        Embedding1536: {
-          codecId: 'custom/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
+        __unbound__: {
+          ShortName: {
+            codecId: 'custom/varchar@1',
+            nativeType: 'character varying',
+            typeParams: { length: 35 },
+          },
+          Embedding1536: {
+            codecId: 'custom/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
         },
       },
       tables: {
-        document: {
-          columns: {
-            shortName: {
-              codecId: 'custom/varchar@1',
-              nativeType: 'character varying',
-              typeRef: 'ShortName',
-            },
-            embedding: {
-              codecId: 'custom/vector@1',
-              nativeType: 'vector',
-              typeRef: 'Embedding1536',
+        __unbound__: {
+          document: {
+            columns: {
+              shortName: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                typeRef: 'ShortName',
+              },
+              embedding: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                typeRef: 'Embedding1536',
+              },
             },
           },
         },
@@ -405,17 +415,19 @@ model Document {
     expect(storage.types).toBeUndefined();
     expect(result.value.storage).toMatchObject({
       tables: {
-        document: {
-          columns: {
-            shortName: {
-              codecId: 'custom/varchar@1',
-              nativeType: 'character varying',
-              nullable: false,
-            },
-            embedding: {
-              codecId: 'custom/vector@1',
-              nativeType: 'vector',
-              nullable: true,
+        __unbound__: {
+          document: {
+            columns: {
+              shortName: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                nullable: false,
+              },
+              embedding: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                nullable: true,
+              },
             },
           },
         },
@@ -472,22 +484,26 @@ model Document {
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
       types: {
-        ShortName: {
-          codecId: 'custom/varchar@1',
-          nativeType: 'character varying',
-          typeParams: {
-            length: 35,
-            label: 'short',
+        __unbound__: {
+          ShortName: {
+            codecId: 'custom/varchar@1',
+            nativeType: 'character varying',
+            typeParams: {
+              length: 35,
+              label: 'short',
+            },
           },
         },
       },
       tables: {
-        document: {
-          columns: {
-            shortName: {
-              codecId: 'custom/varchar@1',
-              nativeType: 'character varying',
-              typeRef: 'ShortName',
+        __unbound__: {
+          document: {
+            columns: {
+              shortName: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                typeRef: 'ShortName',
+              },
             },
           },
         },
@@ -543,7 +559,7 @@ model Doc {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
-        types: { Short: { typeParams: { length: 35, label: 'short' } } },
+        types: { __unbound__: { Short: { typeParams: { length: 35, label: 'short' } } } },
       });
     });
 

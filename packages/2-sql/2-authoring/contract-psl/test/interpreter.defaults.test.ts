@@ -79,28 +79,30 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     });
     expect(result.value.storage).toMatchObject({
       tables: {
-        defaults: {
-          columns: {
-            idNanoidDefault: {
-              codecId: 'sql/char@1',
-              nativeType: 'character',
-              typeParams: { length: 21 },
-            },
-            idNanoidSized: {
-              codecId: 'sql/char@1',
-              nativeType: 'character',
-              typeParams: { length: 16 },
-            },
-            dbExpr: {
-              default: {
-                kind: 'function',
-                expression: 'gen_random_uuid()',
+        __unbound__: {
+          defaults: {
+            columns: {
+              idNanoidDefault: {
+                codecId: 'sql/char@1',
+                nativeType: 'character',
+                typeParams: { length: 21 },
               },
-            },
-            createdAt: {
-              default: {
-                kind: 'function',
-                expression: 'now()',
+              idNanoidSized: {
+                codecId: 'sql/char@1',
+                nativeType: 'character',
+                typeParams: { length: 16 },
+              },
+              dbExpr: {
+                default: {
+                  kind: 'function',
+                  expression: 'gen_random_uuid()',
+                },
+              },
+              createdAt: {
+                default: {
+                  kind: 'function',
+                  expression: 'now()',
+                },
               },
             },
           },
@@ -205,18 +207,20 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        defaults: {
-          columns: {
-            touchedAt: {
-              default: {
-                kind: 'function',
-                expression: 'clock_timestamp()',
+        __unbound__: {
+          defaults: {
+            columns: {
+              touchedAt: {
+                default: {
+                  kind: 'function',
+                  expression: 'clock_timestamp()',
+                },
               },
-            },
-            payload: {
-              default: {
-                kind: 'function',
-                expression: "'{}'::jsonb",
+              payload: {
+                default: {
+                  kind: 'function',
+                  expression: "'{}'::jsonb",
+                },
               },
             },
           },
@@ -446,15 +450,17 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        synthetic: {
-          columns: {
-            example: {
-              codecId: 'pg/text@1',
-              nativeType: 'text',
-              nullable: false,
-              default: {
-                kind: 'function',
-                expression: "'synthetic-default'",
+        __unbound__: {
+          synthetic: {
+            columns: {
+              example: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: false,
+                default: {
+                  kind: 'function',
+                  expression: "'synthetic-default'",
+                },
               },
             },
           },
@@ -510,11 +516,13 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        synthetic: {
-          columns: {
-            example: {
-              codecId: 'pg/text@1',
-              nativeType: 'text',
+        __unbound__: {
+          synthetic: {
+            columns: {
+              example: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+              },
             },
           },
         },

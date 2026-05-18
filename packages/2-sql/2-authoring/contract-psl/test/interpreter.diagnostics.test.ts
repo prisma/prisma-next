@@ -701,7 +701,9 @@ model User {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage).toMatchObject({ types: { Short: expect.any(Object) } });
+    expect(result.value.storage).toMatchObject({
+      types: { __unbound__: { Short: expect.any(Object) } },
+    });
   });
 
   it('surfaces value-object field errors through the diagnostics gate', () => {

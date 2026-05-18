@@ -122,12 +122,14 @@ model User {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        user: {
-          columns: {
-            homeAddress: {
-              nativeType: 'jsonb',
-              codecId: 'pg/jsonb@1',
-              nullable: true,
+        __unbound__: {
+          user: {
+            columns: {
+              homeAddress: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: true,
+              },
             },
           },
         },
@@ -166,12 +168,14 @@ model User {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        user: {
-          columns: {
-            tags: {
-              nativeType: 'jsonb',
-              codecId: 'pg/jsonb@1',
-              nullable: false,
+        __unbound__: {
+          user: {
+            columns: {
+              tags: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
+              },
             },
           },
         },
@@ -215,12 +219,14 @@ model User {
 
     expect(result.value.storage).toMatchObject({
       tables: {
-        user: {
-          columns: {
-            addresses: {
-              nativeType: 'jsonb',
-              codecId: 'pg/jsonb@1',
-              nullable: false,
+        __unbound__: {
+          user: {
+            columns: {
+              addresses: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
+              },
             },
           },
         },

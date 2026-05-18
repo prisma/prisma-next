@@ -84,7 +84,9 @@ describe('prismaContract provider helper', () => {
         target: 'postgres',
         storage: {
           tables: {
-            user: expect.any(Object),
+            __unbound__: {
+              user: expect.any(Object),
+            },
           },
         },
       });
@@ -117,7 +119,9 @@ describe('prismaContract provider helper', () => {
       expect(result.value).toMatchObject({
         storage: {
           tables: {
-            user: expect.any(Object),
+            __unbound__: {
+              user: expect.any(Object),
+            },
           },
         },
       });
@@ -341,12 +345,14 @@ model Post {
       };
 
       expect(storage.tables).toMatchObject({
-        document: {
-          columns: {
-            embedding: {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeParams: { length: 1536 },
+        __unbound__: {
+          document: {
+            columns: {
+              embedding: {
+                codecId: 'pg/vector@1',
+                nativeType: 'vector',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
@@ -454,12 +460,14 @@ model Document {
       });
       expect(result.value.storage).toMatchObject({
         tables: {
-          user: {
-            columns: {
-              dbExpr: {
-                default: {
-                  kind: 'function',
-                  expression: 'gen_random_uuid()',
+          __unbound__: {
+            user: {
+              columns: {
+                dbExpr: {
+                  default: {
+                    kind: 'function',
+                    expression: 'gen_random_uuid()',
+                  },
                 },
               },
             },
