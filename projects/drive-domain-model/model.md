@@ -378,9 +378,12 @@ The on-disk shape of an artefact is **per-context**. The model deliberately allo
 | Spike artefact (slice-scope) | A doc PR (an ADR, an analysis); shipped under the project's normal docs path |
 | Deployment plan | `projects/<project>/deployment-plan.md` (project-scope) |
 | Review artefacts | `projects/<project>/reviews/{code-review,system-design-review,walkthrough}.md` (per `drive-orchestrate-plan`); for orphan slices, lighter shape attached to the PR review surface |
+| Manual-QA script | `projects/<project>/manual-qa.md` (in-project); inline QA section in PR description (orphan). Per [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) `drive-qa-plan`. |
+| Manual-QA run report | `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (in-project); inline QA findings in PR review thread (orphan). Per `drive-qa-run`. One per run; reports accumulate (never overwritten) so the QA history is auditable. |
 | Scope-deferred candidates (during project) | `projects/<project>/deferred.md`. Reviewed at project closure; each item triaged individually |
 | Dispatch brief | Transient — assembled at dispatch time from the slice plan + spike artefacts; not separately persisted |
 | `design-decisions.md` entry (per project) | `projects/<project>/design-decisions.md`; orphan work uses operator scratch or in-PR captures |
+| Project-context conventions (per consumer repo) | `drive/<category>/README.md` (categories: `spec`, `project`, `plan`, `qa`, `code-review`, `pr`, `deployment`, `post-update`). Read by drive-* skills as workflow step 1. Per [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93). |
 
 The forcing principle: **persistence is per-context, not uniform.** Without this concession, triage will keep routing-to-project just to use the tooling.
 
