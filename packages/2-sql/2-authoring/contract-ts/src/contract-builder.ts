@@ -56,6 +56,7 @@ type ContractDefinition<
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+  Namespaces extends readonly string[] | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -64,7 +65,7 @@ type ContractDefinition<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
-  readonly namespaces?: readonly string[];
+  readonly namespaces?: Namespaces;
   readonly createNamespace?: (id: string) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
@@ -79,6 +80,7 @@ type ContractScaffold<
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+  Namespaces extends readonly string[] | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -87,7 +89,7 @@ type ContractScaffold<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
-  readonly namespaces?: readonly string[];
+  readonly namespaces?: Namespaces;
   readonly createNamespace?: (id: string) => Namespace;
   readonly codecLookup?: CodecLookup;
 };
@@ -306,6 +308,7 @@ export function defineContract<
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+  const Namespaces extends readonly string[] | undefined = undefined,
 >(
   definition: ContractDefinition<
     Family,
@@ -316,7 +319,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >,
 ): SqlContractResult<
   ContractDefinition<
@@ -328,7 +332,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >
 >;
 export function defineContract<
@@ -346,6 +351,7 @@ export function defineContract<
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+  const Namespaces extends readonly string[] | undefined = undefined,
 >(
   definition: ContractScaffold<
     Family,
@@ -354,7 +360,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >,
   factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
 ): SqlContractResult<
@@ -367,7 +374,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >
 >;
 export function defineContract(
