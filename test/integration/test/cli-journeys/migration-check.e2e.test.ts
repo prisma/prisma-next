@@ -203,10 +203,12 @@ withTempDir(({ createTempDir }) => {
       timeouts.typeScriptCompilation,
     );
 
-    // F-2 regression: the per-migration code path used to only run PN-001
-    // and PN-002 — it skipped the snapshot-consistency check that the
-    // graph-wide path performs. Lift the check into a shared helper and
-    // pin parity here so the asymmetry can't drift back.
+    // The per-migration code path used to only run PN-001 and PN-002 — it
+    // skipped the snapshot-consistency check that the graph-wide path
+    // performs, so a corruption that graph-wide caught reported `ok: true`
+    // in per-migration mode. The shared snapshot-consistency helper is
+    // now called from both branches; this test pins the parity so the
+    // asymmetry can't drift back.
     it(
       'per-migration check detects PN-MIG-CHECK-005 in the same way graph-wide does',
       async () => {

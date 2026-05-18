@@ -1,16 +1,15 @@
 /**
- * F-7 regression — `migration graph --dot` must produce DOT even when
- * stdout is non-TTY (auto-JSON).
+ * `migration graph --dot` must produce DOT even when stdout is non-TTY.
  *
- * Before the fix in this round, the format dispatch checked `flags.json`
- * before `options.dot`. `parseGlobalFlags` auto-enables `flags.json` when
- * `!process.stdout.isTTY` (per CLI Style Guide § JSON Semantics), which
- * meant a user piping the output (`migration graph --dot | dot -Tsvg`)
- * got JSON instead of DOT. The pipe-receiver then errored.
+ * `parseGlobalFlags` auto-enables `flags.json` when `!process.stdout.isTTY`
+ * (per CLI Style Guide § JSON Semantics). The format dispatch in
+ * `migration graph` used to check `flags.json` before `options.dot`, which
+ * meant a user piping the output (`migration graph --dot | dot -Tsvg`) got
+ * the auto-JSON envelope instead of DOT and the pipe-receiver errored.
  *
- * The fix reverses the precedence: explicit format flags (`--dot`) win
- * over the auto-JSON default. This test pins the precedence so a future
- * format flag can't quietly drift back into the shadowed shape.
+ * Explicit format flags (`--dot`) win over the auto-JSON default. This
+ * test pins the precedence so a future format flag can't quietly drift
+ * back into the shadowed shape.
  */
 
 import { describe, expect, it } from 'vitest';
