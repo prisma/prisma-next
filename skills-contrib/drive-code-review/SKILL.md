@@ -206,7 +206,7 @@ Write `code-review.md` into the artefact directory.
 
 ### Categorisation heuristic
 
-Do **not** use blocking / non-blocking / nits tiers. Agents do implementation — perceived effort is not a useful signal for whether something should be fixed. The only legitimate reason to defer a finding is **scope**: fixing it would pull in work that belongs to a different PR or milestone. If a finding is in scope, it goes in **Findings** and gets addressed. If fixing it would expand scope, it goes in **Deferred** with a clear reason.
+Do **not** use blocking / non-blocking / nits tiers. Agents do implementation — perceived effort is not a useful signal for whether something should be fixed. The only legitimate reason to defer a finding is **scope**: fixing it would pull in work that belongs to a different PR or scope unit (a different slice / project). If a finding is in scope, it goes in **Findings** and gets addressed. If fixing it would expand scope, it goes in **Deferred** with a clear reason.
 
 Prioritise findings by impact: security > correctness > performance > maintainability > style.
 

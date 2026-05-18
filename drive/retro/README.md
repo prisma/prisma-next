@@ -1,0 +1,39 @@
+# drive/retro — project-context for retros
+
+Loaded by `drive-retro-run`. Holds prisma-next's retro conventions, recurring-pattern catalogue, and landing-surface preferences.
+
+## Landing-surface preferences
+
+When a retro lesson could land in multiple surfaces, the team's preference:
+
+- **Calibration of size / cost / DoR items** → `drive/plan/README.md` (project-context). These rarely generalise; they're tied to this repo's package layout and CI shape.
+- **Triage / sizing heuristics** → `drive/triage/README.md`.
+- **Failure-mode patterns specific to this codebase** → `drive/plan/README.md` § Failure-mode catalogue.
+- **Failure-mode patterns that generalise to any contract-first system** → canonical (via `drive-update-skills`).
+- **Durable architectural decisions** → ADR under `docs/architecture docs/adrs/`.
+- **Process changes that affect the whole methodology** → propose upstream PR to `prisma/ignite` (after one or two repetitions to confirm the pattern).
+
+## Recurring-pattern catalogue
+
+Patterns the team has seen multiple times. Each entry: pattern → severity → mitigation surface (where it landed).
+
+_(Empty at seeding; populated by retros over time.)_
+
+## Mandatory-final-retro template
+
+Per `drive-retro-run` § Step 8, the project-close retro covers the project as a whole. Template prompts:
+
+1. **What went well?** Patterns worth keeping; calibrations that proved out; protocol points that earned their cost.
+2. **What surprised us?** Things the protocol didn't predict; assumptions that turned out to be wrong; sizing that drifted.
+3. **What lessons land where?** For each lesson: pick canonical / project-context / ADR per the preferences above.
+4. **What deferred work surfaced?** Items in `projects/<project>/deferred.md` that should become Linear tickets vs items that should just be discarded.
+5. **What's the ADR-worthy decision (if any)?** Not every project has one; many do.
+6. **What's the one-sentence summary for the team channel?** A retro that doesn't get communicated to the wider team is half-landed.
+
+## Retro-trigger frequency baselines
+
+- Healthy team: ~1 retro per slice (on average), most fired as dispatch-failure or drift triggers.
+- Mature team on a stable subsystem: < 1 retro per slice, fired mostly on surprise / scope-shift triggers.
+- New domain / first project in a subsystem: 2-3 retros per slice, mostly on calibration surprises. Expected; the lessons are populating the project-context surfaces.
+
+If retros stop firing for weeks: check whether (a) the team's actually triggering them when triggers hit OR (b) the project is genuinely going so smoothly that no triggers fire. The second is rare.
