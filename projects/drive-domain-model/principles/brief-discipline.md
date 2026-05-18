@@ -228,17 +228,17 @@ The well-shaped brief is verbose but unsurprising. The dispatch produced from it
 
 ## Practical implications
 
-1. **Brief assembly is part of the agile orchestrator's job.** The persona's responsibility includes pulling the inputs together, threading the calibration entries that apply, naming the edge cases, picking the tier. This work happens at delegation time, not at planning time — the brief is fresh per dispatch.
+1. **Brief assembly is part of the agile orchestrator's job.** The persona's responsibility includes pulling the inputs together, threading the team-context entries that apply (from `drive/plan/README.md` per [PR #93](https://github.com/prisma/ignite/pull/93)'s project-context convention — the canonical home for the failure-mode catalogue + grep library + reference tasks + model-tier routing), naming the edge cases, picking the tier. This work happens at delegation time, not at planning time — the brief is fresh per dispatch.
 2. **Slice plans carry brief skeletons.** Each dispatch in the slice plan carries enough metadata that brief assembly can pick it up without re-deriving from the slice spec. Slice planning is where the size + tier + edge-case-set is declared; brief assembly is where it's instantiated.
 3. **Briefs are transient.** They live in dispatch transcripts; they don't persist as separate artefacts. The slice plan + spike artefacts + calibration are the durable inputs.
-4. **Calibration's failure-mode catalogue feeds brief assembly.** Each calibration entry that applies to the current dispatch's shape gets named in the "Inputs" section + threaded into the edge-case table. This is how the team's accumulated memory gets into the brief.
+4. **`drive/plan/README.md`'s failure-mode catalogue feeds brief assembly.** Each catalogue entry that applies to the current dispatch's shape gets named in the "Inputs" section + threaded into the edge-case table. This is how the team's accumulated memory gets into the brief — `drive-orchestrate-plan` reads `drive/plan/README.md` as workflow step 1 (per PR #93's project-context convention), and the brief assembly threads the relevant entries.
 5. **WIP-inspection's diff-reading uses the brief as the comparison.** "Is what just got committed in the brief's scope?" "Does it touch files the brief named?" "Did the implementer hit an edge case we pre-named?" Without a brief with explicit scope + edge cases, WIP-inspection has nothing sharp to ask.
 
 ## Failure mode this principle directly prevents
 
 The silent-accommodation failure mode: implementer encounters an edge case, makes a private decision, the dispatch drifts in a way that passes validation gates while violating the spec. Brief discipline pre-names the edge cases with dispositions so the implementer has no edge case to silently accommodate — every plausible call is already declared.
 
-Worth naming: the *first* time an edge case happens, the brief was the wrong place to catch it (we didn't know to name it). That's a retro trigger — the lesson goes into calibration's failure-mode catalogue, and subsequent briefs that match the dispatch shape pull the calibration entry and pre-name the edge case. The brief discipline + the calibration accretion compound.
+Worth naming: the *first* time an edge case happens, the brief was the wrong place to catch it (we didn't know to name it). That's a retro trigger — the lesson goes into the team's `drive/plan/README.md` failure-mode catalogue, and subsequent briefs that match the dispatch shape pull the entry and pre-name the edge case. The brief discipline + the project-context accretion compound.
 
 ## Related principles
 

@@ -13,7 +13,7 @@ DoR is the *pickup* gate. Definition of Done (next principle) is the *handoff* g
 A few words this principle reuses, defined once:
 
 - **Pickup.** The moment work transitions from "not yet started" to "in flight." For a project: when the first slice initiates under it. For a slice: when its first dispatch is delegated. For a dispatch: when the brief is handed to the implementer (subagent or operator).
-- **Ready to start** (synonym: **pickable**). A unit whose DoR is satisfied. The shorthand "pickable" appears in some places because it's the established Agile vocabulary for this state; treat it as exactly equivalent to "DoR-satisfied — every pickup pre-condition is met."
+- **Ready to start.** A unit whose DoR is satisfied — every pickup pre-condition the checklist names is met. The DoR check is structural, not a vibe-check.
 - **Pickup pre-condition.** A specific structural fact about the unit that must be true before pickup — e.g. "the slice plan exists and every dispatch in it is sized ≤ M," "the brief's linked spike artefact is at the named path and readable." Each DoR checklist item names one pickup pre-condition.
 - **Gap.** A pickup pre-condition that is *not* met. When DoR check finds a gap, the next action is to resolve the gap (not to delegate the unit and hope).
 
@@ -183,15 +183,21 @@ If we'd skipped the gate ("close enough; the grep patterns are universal"), the 
 
 ## How calibration overlays the protocol
 
-The protocol's DoR templates carry the universal items — the ones every team needs because every team can hit the failure modes they prevent. The calibration overlays the team-specific items.
+The protocol's DoR templates carry the universal items — the ones every team needs because every team can hit the failure modes they prevent. The team's project-context overlays the team-specific items.
 
-Worked example for `prisma-next`:
+Per the project-context convention from [PR #93](https://github.com/prisma/ignite/pull/93), each overlay lives in the matching `drive/<category>/README.md` in the consumer repo (per [`protocol-as-memory.md`](protocol-as-memory.md) § "Two homes for memory"):
 
-- **Project DoR calibration:** A Linear Project exists; the original ticket has been promoted-pattern-applied (per `model.md` § "Linear sync — Promotion pattern") if the project started from a ticket; the project's working branch is named with the Linear Project ID.
-- **Slice DoR calibration:** A Linear issue is created and linked from the slice spec; the slice's PR-to-be will have a `Refs: <issue-id>` line; the slice's parent branch is the project's working branch (or main for orphan slices).
-- **Dispatch DoR calibration:** The brief's "Inputs" section references the relevant `prisma-next` failure-mode entries (e.g. "Dual-shape support relocated under a new name") and grep library patterns (`'columns' in`, `looksLike`); the brief's tier is one of the three the team uses (Opus / Sonnet / composer); the brief specifies a slice plan path under `projects/<x>/slices/<s>/`.
+- **Project-DoR overlays** → `drive/project/README.md` (read by `drive-create-project`).
+- **Slice-DoR overlays** → `drive/spec/README.md` (read by `drive-slice-specify`) + `drive/plan/README.md` (read by `drive-slice-plan`), split by which skill enforces which item.
+- **Dispatch-DoR overlays** → `drive/plan/README.md` (read by `drive-orchestrate-plan` as it runs the dispatch loop, including brief assembly).
 
-Calibration items grow as failures happen — every retro that surfaces "we should have caught this at pickup" adds an item to the calibration's DoR overlay. The protocol layer stays small; the calibration grows.
+Worked example for `prisma-next` (showing each overlay's destination home):
+
+- **Project DoR overlay** (`prisma-next/drive/project/README.md`): A Linear Project exists; the original ticket has been promoted-pattern-applied (per `model.md` § "Linear sync — Promotion pattern") if the project started from a ticket; the project's working branch is named with the Linear Project ID.
+- **Slice DoR overlay** (`prisma-next/drive/spec/README.md` + `drive/plan/README.md`): A Linear issue is created and linked from the slice spec; the slice's PR-to-be will have a `Refs: <issue-id>` line; the slice's parent branch is the project's working branch (or main for orphan slices).
+- **Dispatch DoR overlay** (`prisma-next/drive/plan/README.md`): The brief's "Inputs" section references the relevant failure-mode entries (e.g. "Dual-shape support relocated under a new name") and grep library patterns (`'columns' in`, `looksLike`); the brief's tier is one of the three the team uses (Opus / Sonnet / composer); the brief specifies a slice plan path under `projects/<x>/slices/<s>/`.
+
+Overlay items grow as failures happen — every retro that surfaces "we should have caught this at pickup" adds an item to the matching `drive/<category>/README.md`. The protocol layer (canonical skill body) stays small; the project-context grows.
 
 ## Practical implications
 
@@ -205,7 +211,7 @@ Calibration items grow as failures happen — every retro that surfaces "we shou
 
 Two failure modes:
 
-- **Pickable-looking-but-not.** A unit looks ready, the team starts the work, the work drifts because a pre-condition was missing. DoR catches the missing pre-condition at pickup, before drift accumulates.
+- **Ready-looking-but-not.** A unit looks ready, the team starts the work, the work drifts because a pre-condition was missing. DoR catches the missing pre-condition at pickup, before drift accumulates.
 - **Silent waiver.** Without an explicit gate, "we'll figure it out as we go" becomes the default and pre-conditions go unchecked. The gate forces the check.
 
 ## Related principles

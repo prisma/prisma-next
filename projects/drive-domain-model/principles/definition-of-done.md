@@ -207,11 +207,17 @@ Work to resolve: a follow-up dispatch (sized S) that converts the two programmat
 
 ## How calibration overlays the protocol
 
-Worked example for `prisma-next`:
+Per the project-context convention from [PR #93](https://github.com/prisma/ignite/pull/93), each overlay lives in the matching `drive/<category>/README.md` in the consumer repo (per [`protocol-as-memory.md`](protocol-as-memory.md) § "Two homes for memory"):
 
-- **Project DoD calibration:** A linkable summary of the project's outcomes is added to the relevant team's docs index; any new architecture docs are linked from `docs/architecture docs/`; Linear status update with final retro link; `drive/qa/README.md` reviewed and updated if the project surfaced new audiences or coverage-gate gaps.
-- **Slice DoD calibration:** Linear issue moved to "Ready to be merged" (the team's terminal-before-merge state); PR title carries Linear ticket prefix; PR description follows `drive-pr-description` shape; the manual-QA script (when applicable) names the two consumer audiences `prisma-next` typically QAs against (extension authors via `packages/3-extensions/`, end users via `examples/`).
-- **Dispatch DoD calibration:** Brief's calibration entries were checked during execution and noted as "avoided" in the dispatch summary; the team's standard test invocation (`pnpm test:packages`) is in the DoD section; `pnpm lint:deps` check is in the DoD section for any dispatch touching package imports.
+- **Project-DoD overlays** → `drive/project/README.md` (read by `drive-close-project`) + `drive/qa/README.md` (for the project-scope QA coverage check).
+- **Slice-DoD overlays** → `drive/plan/README.md` (most overlay items — read by `drive-orchestrate-plan` at slice closure) + `drive/qa/README.md` (manual-QA gate) + `drive/pr/README.md` (PR-shape items) + `drive/code-review/README.md` (reviewer-verdict items).
+- **Dispatch-DoD overlays** → `drive/plan/README.md` (read by `drive-orchestrate-plan` at dispatch closure).
+
+Worked example for `prisma-next` (showing each overlay's destination home):
+
+- **Project DoD overlay** (`prisma-next/drive/project/README.md` + `drive/qa/README.md`): A linkable summary of the project's outcomes is added to the team's docs index; any new architecture docs are linked from `docs/architecture docs/`; Linear status update with final retro link; `drive/qa/README.md` reviewed and updated if the project surfaced new audiences or coverage-gate gaps.
+- **Slice DoD overlay** (`prisma-next/drive/plan/README.md` + `drive/qa/README.md` + `drive/pr/README.md`): Linear issue moved to "Ready to be merged" (the team's terminal-before-merge state); PR title carries Linear ticket prefix; PR description follows `drive-pr-description` shape; the manual-QA script (when applicable) names the two consumer audiences `prisma-next` typically QAs against (extension authors via `packages/3-extensions/`, end users via `examples/`).
+- **Dispatch DoD overlay** (`prisma-next/drive/plan/README.md`): Brief's referenced failure-mode entries were checked during execution and noted as "avoided" in the dispatch summary; the team's standard test invocation (`pnpm test:packages`) is in the DoD section; `pnpm lint:deps` check is in the DoD section for any dispatch touching package imports.
 
 Same growth-by-retro-accretion pattern as DoR's calibration overlay.
 
