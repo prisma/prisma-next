@@ -73,9 +73,10 @@ export function parseContractRef(
   if (isHexPrefix(input)) {
     const prefix = normalizeHashPrefix(input);
     const matches = [...ctx.graph.nodes].filter((n) => n.startsWith(prefix));
-    if (matches.length === 1) {
+    const [firstMatch] = matches;
+    if (matches.length === 1 && firstMatch !== undefined) {
       candidates.push({
-        hash: matches[0]!,
+        hash: firstMatch,
         provenance: { kind: 'hash', input },
         label: `hash prefix "${input}"`,
       });
@@ -84,9 +85,9 @@ export function parseContractRef(
     }
   }
 
-  if (candidates.length === 1) {
-    const c = candidates[0]!;
-    return ok({ hash: c.hash, provenance: c.provenance });
+  const [firstCandidate] = candidates;
+  if (candidates.length === 1 && firstCandidate !== undefined) {
+    return ok({ hash: firstCandidate.hash, provenance: firstCandidate.provenance });
   }
 
   if (candidates.length > 1) {
