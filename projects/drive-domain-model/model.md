@@ -1,62 +1,82 @@
 # Drive domain model
 
-**Status:** Living. The pinned model that subsequent docs (spec, plan, principles, calibration, skill restructuring) all build on.
+## At a glance
 
-**Voice:** project-manager lens, hardened with DDD ubiquitous-language discipline and agile-specialist invariants. Implementation surface (skill bodies, file paths, templates) is downstream and intentionally out of scope here.
+Drive's domain model has three sized **units of work** (Direct change, Slice, Project), one **delegation unit** (Dispatch), eight **workflows** (seven lifecycle-stage + one cross-cutting), three **aggregate roots** that the workflows mutate, and twelve **invariants** that hold across everything. Two forcing constraints — the PR cap (units of work) and the M-cap (dispatches) — keep work appropriately sized; an anti-corruption layer maps Drive's units to Linear's.
 
-**Companion documents:**
-- [`workflow.md`](workflow.md) — Drive ↔ Agile workflow map; reads as the operational layer on top of this model
-- [`spec.md`](spec.md) — project scope and acceptance criteria
-- [`design-decisions.md`](design-decisions.md) — chronological decisions log
-- [`principles/`](principles/) — per-principle deep-dives (protocol-as-memory, decomposition-and-cost, brief-discipline, definition-of-ready, definition-of-done, retro, roles-and-personas, spikes)
-- [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration
+```
+Sized units (smallest → largest):
+  Direct change  →  Slice  →  Project
+      (no spec)     (one PR)   (composes slices)
 
-## Why this exists
+Delegation unit:
+  Dispatch  =  one agent session inside Slice execution
 
-Drive's predecessor canonical was built on a fuzzy model: "project," "milestone," "task," "plan," and "spec" each got used at multiple scopes, and the canonical skill bodies did not say which scope they meant when. At least one consumer (`prisma-next`) rejected the canonical Linear-sync workflow because of this ambiguity — the Linear ceremony operated on units that weren't pinned, so what got synced where was unanswerable except by reference to the original author's mental model.
+Workflows (eight):
+  Triage → {Project init | Slice init | Direct change | Spike | Defer | Promote | Demote}
+  Project init → Slice init → Slice exec → Slice review → Slice closure → Project closure
+  Design discussion (cross-cutting; fires on triggers across the lifecycle)
 
-A second failure mode reinforced the first: the canonical's only documented entry path produced a `projects/<name>/` directory with full project shape, regardless of work size. Bug fixes and one-line changes were coerced into project-scope because that was the only path the tooling exposed.
+Forcing constraints:
+  Units of work bounded by PR cap (triage enforces).
+  Dispatches bounded by M cap (slice planning enforces; slice execution refuses L/XL).
 
-A third failure mode lived at a different scale: even when the unit was clear, agent dispatches inside a "task" frequently ran feature-sized scopes for hours without orchestrator inspection, producing drift that passed validation gates but violated the spec. The cure for that — sizing discipline, Definition of Ready / Done, WIP inspection cadence, retros — is classical Agile, transposed for agent teams.
+Linear sync:
+  Anti-corruption layer maps Drive units → Linear units; promotion + demotion are
+  the symmetric mid-flight reshape ceremonies.
+```
 
-This document pins the units precisely so the workflow lands somewhere obvious, adds lightweight paths for the small case, and threads dispatch-level discipline into the workflows where the agent execution actually happens. It is the consolidated output of two predecessor projects (the domain-model work + the agile-methodology work); see [`design-decisions.md`](design-decisions.md) for the chronological record.
+This document is the source of truth. The spec ([`spec.md`](spec.md)) sets the project's scope and acceptance criteria; the workflow map ([`workflow.md`](workflow.md)) is the operational layer that names every skill plug-point.
 
-## The forcing constraints
+## Two forcing constraints
 
-Drive serves two distinct size pressures, each with its own forcing unit:
+The model's two structural constraints. Everything downstream — sizing, triage outcomes, dispatch discipline — falls out of these.
 
-1. **The pull request is the unit Drive ultimately serves.** A PR has a natural size cap. Above the cap, PRs become hard to review, debug, deploy, and roll back. Below the cap (down to one-line fixes), they remain useful. The cap varies by codebase but is real and bounded.
-2. **The dispatch is the unit Drive delegates to agents.** A dispatch is one agent session. Long-running dispatches are hard for the orchestrator to inspect, hard to recover from when drift emerges, and pressure the implementer model into capability that should be reserved for genuine judgment. A dispatch has its own complexity cap (M, t-shirt-sized) and wall-clock time-box per tier.
+### The PR cap (the unit-of-work constraint)
 
-Drive does not produce PRs or dispatches directly. It produces specs and plans that *compose into* PRs and that *decompose into* dispatches. The two caps act independently and together: triage refuses to admit a slice that won't fit in one PR (the PR cap); slice planning refuses to declare a dispatch above M (the dispatch cap).
+A pull request has a natural size cap. Above the cap, PRs become hard to review, debug, deploy, and roll back. Below the cap (down to one-line fixes), they remain useful. The cap varies by codebase but is real and bounded.
 
-## Ubiquitous language
+Drive does not produce PRs directly. It produces specs and plans that *compose into* PRs. The PR cap therefore shows up as the **slice / direct-change cap** — the unit of work that delivers exactly one PR cannot exceed what one PR can absorb. Triage enforces this on admission: any candidate unit that wouldn't fit in one PR is admitted as a Project (which composes multiple PRs) instead.
+
+### The M cap (the dispatch constraint)
+
+A dispatch is one agent session. Long-running dispatches are hard for the orchestrator to inspect, hard to recover from when drift emerges, and pressure the implementer model into capability that should be reserved for genuine judgment.
+
+Drive does not run dispatches directly either. The slice plan *decomposes into* dispatches. The dispatch cap therefore shows up as **complexity ≤ M** (t-shirt sized) plus a per-size wall-clock time-box. Slice planning enforces the cap; slice execution refuses L/XL even if a plan slipped one through (defense in depth).
+
+### The two caps act independently
+
+The PR cap is about review-ability, rollback-ability, debug-ability. The M cap is about agent-session inspect-ability, orchestrator recover-ability. **Neither subsumes the other** — a slice can fit one PR but require multiple dispatches; a single dispatch can never span multiple PRs. Codified as invariant **I11**.
+
+## Layer 1: ubiquitous language
+
+The terms below are pinned. Every drive-* skill body uses these and only these for the units they mean.
 
 | Term | Definition |
 |---|---|
 | **PR (pull request)** | The forcing unit Drive ultimately serves. Has a natural size cap. Drive does not produce PRs directly; it produces specs and plans that lead to PRs. |
+| **Direct change** | The smallest unit. One PR with intent in the PR body; no spec, no plan, no dispatch ceremony. The lightweight path for trivial work (copy changes, config flips, one-line fixes). Sibling of Slice — both can exist orphan, both can compose under a project. |
 | **Slice** | One PR-sized unit of work. Has a slice spec and a slice plan; delivers exactly one PR. The slice's dispatch plan decomposes the work for agent execution. |
-| **Direct change** | A unit smaller than a slice. One PR with intent in the PR body; no spec, no plan, no dispatch ceremony. The lightweight path for trivial work (copy changes, config flips, one-line fixes). Sibling of slice — both can exist orphan, both can compose under a project. |
-| **Project** | Composition of slices and/or direct changes under a single overarching purpose. Has a project spec, a project plan, and a project-DoD. |
-| **Project spec** | Artefact stating a project's overarching purpose, scope boundary, and project-DoD. |
+| **Project** | Composition of slices and/or direct changes under one overarching purpose. Has a project spec, a project plan, and a project-DoD. |
+| **Dispatch** | The agent-session delegation unit. One delegation to an implementer subagent — may contain multiple logical steps but presents as one orchestrator-to-implementer interaction. Drive surfaces, sizes, gates, and inspects dispatches; the steps inside are below the Drive-care line. |
+| **Step** | Logical-increment unit inside a dispatch. The implementer composes them while executing. Below the Drive-care line; Drive does not surface or gate steps individually. |
+| **Project spec** | Artefact stating a project's purpose, scope boundary, and project-DoD. |
 | **Slice spec** | Artefact stating a slice's purpose, scope (within the parent project's purpose, if any), and slice-DoD. For orphan slices, may live inline in the PR description. |
 | **Project plan** | Sketch of the slices and direct changes composing a project — known and anticipated. Sequences them, identifies stacking and parallelism. Does not enumerate the dispatches inside any one slice. |
-| **Slice plan** | Sequence of **dispatches** that will deliver one PR. Each dispatch sized ≤ M, with declared DoR and DoD. Does not enumerate the steps inside any one dispatch. |
-| **Dispatch** | The agent-session aggregation unit. One delegation to an implementer subagent — may contain multiple logical steps but presents as one orchestrator-to-implementer interaction. Drive surfaces, sizes, gates, and inspects dispatches; the steps inside are below the Drive-care line. |
-| **Step** | A logical-increment unit inside a dispatch. The implementer composes them while executing. Below the Drive-care line; Drive does not surface or gate steps individually. |
+| **Slice plan** | Sequence of dispatches that will deliver one PR. Each dispatch sized ≤ M, with declared DoR and DoD. Does not enumerate the steps inside any one dispatch. |
 | **Brief** | The artefact passed to a dispatch at delegation time. Carries DoR satisfaction, scope, edge cases pre-named with dispositions (Example Mapping), validation gates, time-box, model tier. The dispatch-level analogue of a slice spec. |
 | **Purpose statement** | The "why" of a project. Declared in the project spec. Immutable after the first slice or direct change starts (I7). |
 | **Scope boundary** | The "what's in" of a project. Declared in the project spec. May sharpen; never expands outside the purpose (I2). |
-| **Definition of Ready (DoR)** | Criteria the unit must satisfy before work on it begins. Declared per scope (slice DoR, dispatch DoR, spike DoR; project DoR is light by comparison). |
+| **Definition of Ready (DoR)** | Criteria the unit must satisfy before work on it begins. Declared per scope (dispatch DoR, slice DoR, spike DoR; project DoR is light by comparison). |
 | **Definition of Done (DoD)** | Criteria for "done" at a given scope. Explicit at three scopes: dispatch (I8), slice (I9), project (I10). |
 | **Stack** | A sequence of slices where each PR depends on the previous; lands in order. |
 | **Parallel** | Slices whose PRs are independent and may land in any order. |
 | **Spike** | A brief-type (not a separate unit). May manifest at slice scope (a research slice that ships a doc PR) or dispatch scope (an investigation dispatch whose output is a written artefact consumed by the next dispatch). Spike DoD is "an actionable artefact exists," not "code is committed." |
-| **Design discussion** | A collaborative shape between operator and agile orchestrator that fires at trigger points (pre-spec, mid-spec, mid-flight on falsified assumption, mid-flight on obstacle). Cross-cutting workflow, not a lifecycle stage. Output: spec/plan edits + a `design-decisions.md` entry. Backed by the existing `drive-discussion` mode skill. |
+| **Design discussion** | A collaborative shape between operator and agile orchestrator that fires at trigger points (pre-spec, mid-spec, mid-flight on falsified assumption, mid-flight on obstacle, explicit request). Cross-cutting workflow, not a lifecycle stage. Output: spec/plan edits + a `design-decisions.md` entry. Backed by the `drive-discussion` mode skill. |
 
-**Retired terms.** The words **milestone** and **task** retire from Drive's vocabulary. (Linear has milestones; that's the Tracker context's vocabulary. Drive's own units never use the word.) Their predecessor uses get re-pinned: "milestone" → "slice"; "task" → "slice" or "dispatch" depending on the predecessor's intended scope.
+**Retired terms.** The words **milestone** and **task** retire from Drive's vocabulary. (Linear has milestones; that's the Tracker context's vocabulary. Drive's own units never use the word.) Predecessor uses get re-pinned: "milestone" → "slice"; "task" → "slice" or "dispatch" depending on the predecessor's intended scope.
 
-## Bounded contexts
+## Layer 1.5: bounded contexts (where each word applies)
 
 ```text
 ┌─ Drive Planning context ──────────────────────────────────────┐
@@ -97,7 +117,7 @@ Drive does not produce PRs or dispatches directly. It produces specs and plans t
 
 The Planning context is what Drive owns. The Execution context is below-the-line; Drive doesn't prescribe its internals. Review and Deployment are adjacent — Drive serves them but doesn't own their rhythm. The Tracker context (Linear) is external; the anti-corruption layer keeps Drive's domain uncorrupted by Linear's data model.
 
-## Roles and personas
+## Layer 2: roles and personas
 
 Three roles:
 
@@ -115,17 +135,17 @@ One persona:
 
 The test for whether a role is real: *can the same person fluidly play this role and another in the same minute, or does role-switching require a context shift?* Project owner is real because scope decisions require a zoom-out stance. Implementer-vs-reviewer is real because reviewing is adversarial reading. Spec-author-vs-plan-author is not real; the same brain does both in continuous sequence.
 
-**Role-wearing trajectory.** Today the human wears project owner + agile orchestrator + implementer (sometimes). The orchestrator agent wears agile orchestrator during dispatch loops (per `drive-orchestrate-plan`); the implementer subagent wears implementer; the reviewer subagent wears reviewer. As confidence in the methodology accrues, the orchestrator agent eventually wears agile orchestrator at all levels (triage, dispatch loop, retro-running, protocol maintenance) and the human's residual role becomes design-level (project spec authoring, design discussion participation, falsified-assumption escalation). See [`principles/roles-and-personas.md`](principles/roles-and-personas.md) for the full mapping (upcoming).
+**Role-wearing trajectory.** Today the human wears project owner + agile orchestrator + implementer (sometimes). The orchestrator agent wears agile orchestrator during dispatch loops (per `drive-orchestrate-plan`); the implementer subagent wears implementer; the reviewer subagent wears reviewer. As confidence in the methodology accrues, the orchestrator agent eventually wears agile orchestrator at all levels (triage, dispatch loop, retro-running, protocol maintenance) and the human's residual role becomes design-level (project spec authoring, design discussion participation, falsified-assumption escalation). See [`principles/roles-and-personas.md`](principles/roles-and-personas.md) for the full mapping.
 
-## Workflows
+## Layer 3: workflows
 
-Drive runs in eight workflows. Seven are lifecycle-stage; one (design discussion) is cross-cutting and fires at trigger points across the lifecycle.
+Eight workflows. Seven are lifecycle-stage; one (design discussion) is cross-cutting and fires at trigger points across the lifecycle.
 
 These sit on top of (and refine) the four-stage lifecycle described in [the skills README's Drive project lifecycle diagram](../../skills/README.md): **Plan** (triage + initiation), **Execute** (slice execution), **Review** (slice review), **Ship** (slice + project closure).
 
-### 1. Triage
+### 1. Triage (the load-bearing one)
 
-The load-bearing workflow. Runs at every entry point AND mid-flight when scope shifts. Currently absent from canonical Drive.
+Runs at every entry point AND mid-flight when scope shifts. Currently absent from canonical Drive. Without it, the canonical's project-shape gravity (only `drive-create-project` exposes an entry path) wins by default and small work gets coerced into project-scope.
 
 ```text
 Triggered by:  (a) a fresh entry point — Linear ticket, bug report,
@@ -139,16 +159,16 @@ Driven by:     agile orchestrator.
 
 Decision tree:
   1. Is this trivial enough to skip slice ceremony entirely?
-     (Copy change, config flip, one-line fix; reviewer can verify by
-      reading the diff in ~30 seconds.)
+     (Copy change, config flip, one-line fix; reviewer can verify
+      by reading the diff in ~30 seconds.)
      – Yes → direct change.
      – No  → continue.
   2. Does an existing open project's purpose cover this?
      – Yes → in-project slice (or in-project direct change).
      – No  → continue.
   3. Can we size this without further investigation?
-     – No  → spike first (queue a single spike dispatch; re-triage
-              on artefact).
+     – No  → spike first (queue a single spike dispatch;
+              re-triage on artefact).
      – Yes → continue.
   4. Does this plausibly fit in one PR?
      – Consider: surface area, files touched, decisions involved,
@@ -231,7 +251,8 @@ Outputs:       PR opened; code on the branch; validation gates from
 Triggered by:  slice execution opening a PR.
 Driven by:     reviewer.
 Outputs:       review verdict (accept / request changes); findings
-               to address or accept.
+               to address or accept; manual-QA script + run report
+               (per `drive-qa-plan` + `drive-qa-run`).
 ```
 
 ### 6. Slice closure
@@ -253,8 +274,8 @@ Outputs:       PR merged; slice marked delivered; scope-deferred
 Triggered by:  all planned slices delivered, OR project abandoned.
 Driven by:     project owner (wearing the agile-orchestrator hat).
 Outputs:       project closed; deferred-work bundle handed off;
-               mandatory final retro (protocol / calibration / ADR
-               update — if none, retro failed); long-lived docs
+               mandatory final retro (protocol / project-context /
+               ADR update — if none, retro failed); long-lived docs
                migrated; projects/<project>/ deleted.
 ```
 
@@ -288,7 +309,7 @@ The agile orchestrator's responsibility includes **recognising when design discu
 
 State of an aggregate is what falls out of workflows running, not what they are named after. A slice transitions to `delivered` because slice closure ran successfully; we don't model "delivered" as a separate event-emission step.
 
-## Aggregates
+## Layer 4: aggregates
 
 Three aggregate roots, expressed in workflow terms rather than DDD-classroom terms:
 
@@ -300,7 +321,7 @@ Project references slices and direct changes by ID. Slices may reference back to
 
 The aggregate split matters because it tells us what skills can do what without re-running which other skills. A skill that re-plans a slice doesn't have to re-author its parent project. A skill that adds a slice to a project doesn't have to author the new slice's spec.
 
-## Invariants
+## Layer 5: invariants
 
 ```text
 I1  A slice OR a direct change delivers exactly one PR.
@@ -343,7 +364,7 @@ I11 is the structural ratchet against runaway agent dispatches and unreviewable 
 
 I12 is the structural ratchet against assumption-falsification being silently accommodated: when an assumption breaks, the orchestrator must surface to the operator (or, in unattended mode, halt) rather than amend the spec/plan privately.
 
-## Scope discipline
+## Scope discipline (both directions)
 
 Scope discipline operates in both directions.
 
@@ -404,7 +425,7 @@ One-tier mapping via the anti-corruption layer. Pinned units → fixed Linear tr
 
 `save_status_update` is project-scope only. The agent's dispatch-level decomposition does not sync anywhere.
 
-### Promotion pattern (case (b) workflow)
+### Promotion pattern (ticket → project)
 
 Triggered when triage decides a ticket represents work too big for a single slice — needs project ceremony.
 
@@ -415,8 +436,8 @@ Triggered when triage decides a ticket represents work too big for a single slic
    (update_issue with project = <new project id>).
 3. Mark the ticket Done; either:
      a. Rename to "Plan: <project name>" — clear forward-pointer.
-     b. Add a comment "Converted to project: <project url>" — preserves
-        original title.
+     b. Add a comment "Converted to project: <project url>" —
+        preserves original title.
 4. Continue with drive-create-project → drive-project-specify →
    drive-project-plan. Slices subsequently created as new Linear
    issues under the project.
@@ -424,7 +445,7 @@ Triggered when triage decides a ticket represents work too big for a single slic
 
 The original ticket survives as a marker of "the original ask"; the project becomes the durable handle going forward.
 
-### Demotion pattern (the symmetric case)
+### Demotion pattern (project → slice or direct change)
 
 Triggered when triage decides an in-flight project has shrunk to fit one PR (or even one direct change).
 
@@ -451,7 +472,7 @@ The demotion path is heavier — more Linear state to clean up. The agile orches
 
 ## Implications for existing canonical Drive
 
-Sketched here; the full skill-restructuring plan lives in [`skill-restructure.md`](skill-restructure.md) (upcoming).
+Sketched here; the full skill-restructure plan with sequencing lives in [`skill-restructure.md`](skill-restructure.md).
 
 ### Skills that split or augment
 
@@ -481,7 +502,7 @@ Sketched here; the full skill-restructuring plan lives in [`skill-restructure.md
 |---|---|---|
 | **`drive-triage-work`** | Cross-cutting (entry) | Runs the triage workflow at any entry point AND mid-flight; outputs one of the eight triage verdicts; routes to the right downstream workflow. |
 | **`drive-health-check`** | Project (rollup) | Produces session-bookended (interactive) or trigger-fired (unattended) project rollups: slice progress, drifted slices, dispatch throughput so far, calibration signals, recommended next pick. |
-| **`drive-retro-run`** | Trigger-based | Runs the retro template: surface the failure or learning, decide protocol vs calibration vs ADR, name the update, land it in the strong-memory surface. Mandatory at project closure; trigger-fired on dispatch failure / drift / escapee. |
+| **`drive-retro-run`** | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical vs project-context vs ADR home, name the update, land it in the matching memory home. Mandatory at project closure; trigger-fired on dispatch failure / drift / escapee. |
 
 ### Direct change has no dedicated skill
 
@@ -496,36 +517,24 @@ Resolved during consolidation, recorded here as closed for the historical trail:
 - ~~OQ6. Split `drive-create-spec` / `drive-create-plan` or take a scope flag?~~ **Closed.** Split. The two pairs (`drive-project-specify` / `drive-slice-specify`; `drive-project-plan` / `drive-slice-plan`) have genuinely different inputs, outputs, audiences, and shape. A scope flag papers over the difference.
 - ~~OQ10. What happens to "milestone" as a word?~~ **Closed.** Retired from Drive vocabulary entirely.
 
-Still open:
-
-1. **What enforces I1 (one slice / direct change → one PR)?** Working position: agile-orchestrator WIP-inspection during slice execution surfaces "should we split?" mid-flight; no hard gate (operator has final say).
-2. **What enforces I2 (project scope doesn't expand)?** Working position: triage itself enforces — every time new work surfaces, mid-flight triage re-reads the project spec to make the in-or-out call.
-3. **Scope-deferred work landing pad.** Working position: `projects/<project>/deferred.md` during a project; reviewed at project closure; each item triaged individually. Per-orphan-work: operator scratch.
-4. **What enforces I12 (no silent agent-side amendments)?** Working position: orchestrator stop-condition fires on detected drift (per `drive-orchestrate-plan` unattended-mode rules); design discussion produces the amendment with operator participation. Implementation detail in `drive-orchestrate-plan` augmentation.
-5. **Name for the triage skill.** Working position: `drive-triage-work` — aspirationally compliant with the `<scope>-<verb>-<noun>` taxonomy in `skills/README.md`. Bare `drive-triage` is acceptable but reads incomplete.
-6. **How is the project spec written when full scope isn't knowable yet?** Working position: two passes — purpose statement fixed in the first pass (immutable per I7); scope boundary sharpened in later passes as slices deliver. Design discussion is the mechanism for the second pass.
-7. **Stacked PRs in Linear.** Linear has no first-class stacking metadata. Working position: each PR is its own Linear issue; the stack order is recorded in the project plan and in the PR descriptions; Linear sees a sequence of issues without explicit stacking metadata.
-8. **N for the unattended-mode "consecutive dispatches without milestone progress" drift alarm in `drive-health-check`.** Working position: calibrate per-project; default to 3.
-9. **Demotion authorisation.** Working position: agile orchestrator surfaces a demotion candidate as a structured decision; operator authorises before any Linear cleanup runs.
+Still open (working positions): see [`spec.md`](spec.md) § Open questions for the full list with working positions.
 
 ## What this document does *not* decide
 
-- The bodies of any skills (skill restructuring lives in `skill-restructure.md`).
-- The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under `principles/`).
+- The bodies of any skills (skill restructuring lives in [`skill-restructure.md`](skill-restructure.md)).
+- The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under [`principles/`](principles/)).
 - The migration plan from canonical to the new model (per-consumer adoption is downstream).
-- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's calibration; `calibration/prisma-next.md` is the worked example).
+- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's calibration; [`calibration/prisma-next.md`](calibration/prisma-next.md) is the worked example).
 
-All of those are downstream. This document is the input; the spec drives the implementation.
+All of those are downstream. This document is the input.
 
 ## Pointers
 
 - [`workflow.md`](workflow.md) — operational layer (the lifecycle map with skills + agile parallels + cadences)
-- [`spec.md`](spec.md) — project scope and acceptance criteria (unified across both predecessor projects)
-- [`plan.md`](plan.md) — execution plan for landing this work (upcoming)
-- [`design-decisions.md`](design-decisions.md) — chronological decisions log
+- [`spec.md`](spec.md) — project scope and acceptance criteria
+- [`problem-statement.md`](problem-statement.md) — self-contained problem framing for canonical-side maintainers
+- [`design-decisions.md`](design-decisions.md) — chronological decisions log (the full alternatives ledger)
 - [`principles/`](principles/) — per-principle deep-dives
 - [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration
-- [`skill-restructure.md`](skill-restructure.md) — proposed skill set with augmentations (upcoming)
-- `docs/engineering/drive-process.md` (in `prisma/ignite`) — canonical Drive process doc; rewritten as a downstream step
-- `skills/README.md` (in `prisma/ignite`) — naming taxonomy this model layers on top of
-- `reference/ignite/skills/` (local) — cloned canonical skill bodies for reading; not committed
+- [`skill-restructure.md`](skill-restructure.md) — proposed skill set with augmentations + implementation sequencing
+- [`plan.md`](plan.md) — execution plan (upcoming)
