@@ -267,7 +267,7 @@ export function createDbSignCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option(
       '--contract <contract>',
-      'Contract reference (hash, prefix, ref name, or migration dir name)',
+      'Contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .action(async (positionalContract: string | undefined, options: DbSignOptions) => {
       const flags = parseGlobalFlags(options);

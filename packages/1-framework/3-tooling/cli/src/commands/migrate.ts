@@ -296,7 +296,7 @@ export function createMigrateCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option(
       '--to <contract>',
-      'Target contract reference (hash, prefix, ref name, or migration dir name)',
+      'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .action(async (options: MigrateCommandOptions) => {
       const flags = parseGlobalFlags(options);

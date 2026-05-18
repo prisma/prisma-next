@@ -520,7 +520,7 @@ export function createMigrationPlanCommand(): Command {
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
     .option(
       '--from <contract>',
-      'Starting contract reference (hash, prefix, ref name, or migration dir name)',
+      'Starting contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);

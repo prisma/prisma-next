@@ -1089,9 +1089,12 @@ export function createMigrationStatusCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option(
       '--to <contract>',
-      'Target contract reference (hash, prefix, ref name, or migration dir name)',
+      'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
-    .option('--from <contract>', 'Origin contract reference (for offline path computation)')
+    .option(
+      '--from <contract>',
+      'Origin contract reference; same grammar as --to. Supplying --from switches to offline path computation.',
+    )
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });

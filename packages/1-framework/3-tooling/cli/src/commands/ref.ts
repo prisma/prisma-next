@@ -134,7 +134,10 @@ function createRefSetCommand(): Command {
   );
   addGlobalOptions(command)
     .argument('<name>', 'Ref name (e.g., staging, production)')
-    .argument('<contract>', 'Contract reference (hash, prefix, ref name, or migration dir name)')
+    .argument(
+      '<contract>',
+      'Contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
+    )
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(
       async (

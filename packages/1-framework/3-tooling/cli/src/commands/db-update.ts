@@ -226,7 +226,7 @@ export function createDbUpdateCommand(): Command {
   addMigrationCommandOptions(command);
   command.option(
     '--to <contract>',
-    'Target contract reference (hash, prefix, ref name, or migration dir name)',
+    'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
   );
   command.action(async (options: DbUpdateOptions) => {
     const flags = parseGlobalFlags(options);
