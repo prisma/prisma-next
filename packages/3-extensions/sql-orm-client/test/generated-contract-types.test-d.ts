@@ -45,31 +45,33 @@ type GeneratedLikeContractBase = Contract<
   {
     storageHash: StorageHashBase<string>;
     tables: {
-      user: {
-        namespaceId: '__unbound__';
-        columns: {
-          id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
-          metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+      __unbound__: {
+        user: {
+          namespaceId: '__unbound__';
+          columns: {
+            id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+            name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+            email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+            active: { nativeType: 'bool'; codecId: 'pg/bool@1'; nullable: false };
+            metadata: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+          };
+          primaryKey: { columns: ['id'] };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
         };
-        primaryKey: { columns: ['id'] };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
-      };
-      post: {
-        namespaceId: '__unbound__';
-        columns: {
-          id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+        post: {
+          namespaceId: '__unbound__';
+          columns: {
+            id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+            userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+            title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          };
+          primaryKey: { columns: ['id'] };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
         };
-        primaryKey: { columns: ['id'] };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
       };
     };
     namespaces: { __unbound__: { id: '__unbound__' } };
@@ -397,18 +399,20 @@ type VOContractBase = Contract<
   {
     storageHash: StorageHashBase<string>;
     tables: {
-      users: {
-        namespaceId: '__unbound__';
-        columns: {
-          id: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
-          name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
-          home_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: true };
-          work_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+      __unbound__: {
+        users: {
+          namespaceId: '__unbound__';
+          columns: {
+            id: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
+            name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+            home_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: true };
+            work_address: { nativeType: 'jsonb'; codecId: 'pg/jsonb@1'; nullable: false };
+          };
+          primaryKey: { columns: ['id'] };
+          uniques: [];
+          indexes: [];
+          foreignKeys: [];
         };
-        primaryKey: { columns: ['id'] };
-        uniques: [];
-        indexes: [];
-        foreignKeys: [];
       };
     };
     namespaces: { __unbound__: { id: '__unbound__' } };

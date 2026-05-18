@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
   AndExpr,
@@ -127,7 +127,8 @@ function resolveColumn(
   tableName: string,
   columnName: string,
 ): { readonly codecId: string; readonly nullable: boolean } | undefined {
-  const column = contract.storage.tables?.[tableName]?.columns?.[columnName];
+  const table = findTableByName(contract.storage, tableName);
+  const column = table?.columns?.[columnName];
   if (!column) return undefined;
   return { codecId: column.codecId, nullable: column.nullable };
 }

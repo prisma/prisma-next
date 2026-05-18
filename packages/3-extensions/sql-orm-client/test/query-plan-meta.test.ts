@@ -1,3 +1,4 @@
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import {
   ColumnRef,
   ProjectionItem,
@@ -16,7 +17,7 @@ import { baseContract } from './collection-fixtures';
 describe('query plan meta', () => {
   it('resolves table columns and rejects unknown tables', () => {
     expect(resolveTableColumns(baseContract, 'users')).toEqual(
-      Object.keys(baseContract.storage.tables.users.columns),
+      Object.keys(findTableByName(baseContract.storage, 'users')!.columns),
     );
     expect(() => resolveTableColumns(baseContract, 'missing')).toThrow(
       'Unknown table "missing" in SQL ORM query planner',

@@ -149,10 +149,13 @@ describe('mutation-executor', () => {
         ...contract.storage,
         tables: {
           ...contract.storage.tables,
-          users: {
-            ...contract.storage.tables.users,
-            primaryKey: {
-              columns: ['pk_id'],
+          __unbound__: {
+            ...contract.storage.tables.__unbound__,
+            users: {
+              ...contract.storage.tables.__unbound__.users,
+              primaryKey: {
+                columns: ['pk_id'],
+              },
             },
           },
         },

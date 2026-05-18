@@ -1,3 +1,4 @@
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   BinaryExpr,
@@ -19,11 +20,8 @@ describe('filters', () => {
   const context = getTestContext();
 
   function paramRef(table: string, column: string, value: unknown): ParamRef {
-    const tables = context.contract.storage.tables as Record<
-      string,
-      { columns: Record<string, { codecId?: string }> } | undefined
-    >;
-    const codecId = tables[table]?.columns[column]?.codecId;
+    const tableDef = findTableByName(context.contract.storage, table);
+    const codecId = tableDef?.columns[column]?.codecId;
     return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
   }
 

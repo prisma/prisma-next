@@ -1,3 +1,4 @@
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   assertReturningCapability,
@@ -75,7 +76,7 @@ describe('collection-contract capability detection', () => {
   it('keeps the 1:1 profile relation backed by a unique child key', () => {
     const contract = getTestContract();
 
-    expect(contract.storage.tables.profiles.uniques).toContainEqual({
+    expect(findTableByName(contract.storage, 'profiles')!.uniques).toContainEqual({
       columns: ['user_id'],
     });
   });

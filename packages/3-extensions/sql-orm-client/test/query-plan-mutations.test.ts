@@ -1,3 +1,4 @@
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import {
   BinaryExpr,
   ColumnRef,
@@ -32,10 +33,8 @@ function usersColParam(
   column: string,
   value: unknown,
 ): ParamRef {
-  const columns = contract.storage.tables.users?.columns as
-    | Record<string, { codecId?: string }>
-    | undefined;
-  const columnMeta = columns?.[column];
+  const table = findTableByName(contract.storage, 'users');
+  const columnMeta = table?.columns?.[column];
   return ParamRef.of(value, {
     name: column,
     codec: { codecId: columnMeta?.codecId ?? 'unknown' },
@@ -112,7 +111,7 @@ describe('query plan mutations', () => {
     expect(plan.ast.onConflict?.action?.kind).toBe('do-nothing');
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com']);
     expect(plan.ast.returning?.map((item) => item.alias)).toEqual(
-      Object.keys(contract.storage.tables.users.columns),
+      Object.keys(findTableByName(contract.storage, 'users')!.columns),
     );
   });
 

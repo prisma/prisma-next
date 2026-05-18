@@ -23,6 +23,27 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
 
+// TODO(TML-2550): remove bridge — redesign ORM types for namespace-aware access
+type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (
+  x: infer I,
+) => void
+  ? I
+  : never;
+
+type FlatTablesOf<TablesByNamespace> = [TablesByNamespace] extends [
+  Readonly<Record<string, infer V>>,
+]
+  ? [V] extends [StorageTable]
+    ? TablesByNamespace
+    : [V] extends [Readonly<Record<string, StorageTable>>]
+      ? UnionToIntersection<V>
+      : Record<string, StorageTable>
+  : Record<string, StorageTable>;
+
+type FlatTables<TContract extends Contract<SqlStorage>> = FlatTablesOf<
+  TContract['storage']['tables']
+>;
+
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
 export interface IncludeScalar<Result> extends RowSelection<Result> {
@@ -584,14 +605,11 @@ type ResolvedStorageColumn<
 > =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
     ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
-      ? TContract['storage']['tables'] extends Record<
-          string,
-          { readonly columns: Record<string, unknown> }
-        >
-        ? TableName extends keyof TContract['storage']['tables']
-          ? ColName extends keyof TContract['storage']['tables'][TableName]['columns']
-            ? TContract['storage']['tables'][TableName]['columns'][ColName] extends StorageColumn
-              ? TContract['storage']['tables'][TableName]['columns'][ColName]
+      ? FlatTables<TContract> extends Record<string, { readonly columns: Record<string, unknown> }>
+        ? TableName extends keyof FlatTables<TContract>
+          ? ColName extends keyof FlatTables<TContract>[TableName]['columns']
+            ? FlatTables<TContract>[TableName]['columns'][ColName] extends StorageColumn
+              ? FlatTables<TContract>[TableName]['columns'][ColName]
               : never
             : never
           : never
@@ -787,9 +805,9 @@ export type ResolvedCreateInput<
 
 type ModelStorageTableDef<TContract extends Contract<SqlStorage>, ModelName extends string> =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? TContract['storage']['tables'] extends Record<string, unknown>
-      ? TableName extends keyof TContract['storage']['tables']
-        ? TContract['storage']['tables'][TableName]
+    ? FlatTables<TContract> extends Record<string, unknown>
+      ? TableName extends keyof FlatTables<TContract>
+        ? FlatTables<TContract>[TableName]
         : never
       : never
     : never;
@@ -1130,8 +1148,8 @@ type IsToOneRelationNullable<
   RelName extends string,
 > =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? TableName extends keyof TContract['storage']['tables']
-      ? TContract['storage']['tables'][TableName] extends infer Table extends StorageTable
+    ? TableName extends keyof FlatTables<TContract>
+      ? FlatTables<TContract>[TableName] extends infer Table extends StorageTable
         ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
           ? RelName extends keyof Rels
             ? RelationLocalFieldColumns<

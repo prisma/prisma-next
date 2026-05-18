@@ -1,3 +1,4 @@
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   BinaryExpr,
@@ -28,13 +29,8 @@ import { baseContract, createCollection, createCollectionFor } from './collectio
 import { buildMixedPolyContract, isSelectAst } from './helpers';
 
 function codecForColumn(table: string, column: string): string {
-  const columnMeta = (
-    baseContract.storage.tables as Record<
-      string,
-      { columns: Record<string, { codecId: string; nullable: boolean }> }
-    >
-  )[table]!.columns[column]!;
-  return columnMeta.codecId;
+  const tableDef = findTableByName(baseContract.storage, table)!;
+  return tableDef.columns[column]!.codecId;
 }
 
 function paramCodecs(plan: { ast: { collectParamRefs(): ParamRef[] } }): Array<string | undefined> {
@@ -349,19 +345,17 @@ describe('compileSelectWithIncludeStrategy', () => {
 });
 
 describe('compileSelect MTI JOINs', () => {
-  type AnyContract = {
-    storage: { tables: Record<string, { columns: Record<string, { codecId: string }> }> };
-  };
   function codecRefForColumn(
-    contract: AnyContract,
+    contract: { storage: Pick<typeof baseContract.storage, 'tables'> },
     table: string,
     column: string,
   ): { codecId: string } | undefined {
-    const codecId = contract.storage.tables[table]?.columns[column]?.codecId;
+    const tableDef = findTableByName(contract.storage, table);
+    const codecId = tableDef?.columns[column]?.codecId;
     return codecId ? { codecId } : undefined;
   }
   function projectionFor(
-    contract: AnyContract,
+    contract: { storage: Pick<typeof baseContract.storage, 'tables'> },
     table: string,
     columns: readonly string[],
   ): ProjectionItem[] {
