@@ -3,8 +3,11 @@ import { contract } from '../prisma/contract';
 
 describe('demo TS contract authoring', () => {
   it('keeps Post.userId storage aligned with User.id', () => {
-    const userIdColumn = contract.storage.tables.post.columns.userId;
-    const userIdTargetColumn = contract.storage.tables.user.columns.id;
+    const postTable = contract.storage.tables['public']?.post;
+    const userTable = contract.storage.tables['auth']?.user;
+    if (!postTable || !userTable) throw new Error('expected post and user tables');
+    const userIdColumn = postTable.columns.userId;
+    const userIdTargetColumn = userTable.columns.id;
 
     expect(userIdColumn.codecId).toBe(userIdTargetColumn.codecId);
     expect(userIdColumn.nativeType).toBe(userIdTargetColumn.nativeType);

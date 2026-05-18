@@ -42,7 +42,9 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       },
     );
 
-    const indexes = contract.storage.tables.doc.indexes;
+    const docTable = contract.storage.tables['__unbound__']?.doc;
+    if (!docTable) throw new Error('expected doc table');
+    const indexes = docTable.indexes;
     expect(indexes).toHaveLength(1);
     expect(indexes[0]).toMatchObject({
       columns: ['body'],

@@ -40,22 +40,25 @@ describe('builder integration', () => {
       storage: {
         storageHash: 'sha256:test-core',
         tables: expect.objectContaining({
-          user: expect.anything(),
+          __unbound__: expect.objectContaining({
+            user: expect.anything(),
+          }),
         }),
       },
     });
-    const userTable = contract.storage.tables.user;
+    const userTable = contract.storage.tables.__unbound__.user;
     expect(userTable).toBeDefined();
     expect(userTable?.columns).toMatchObject({
       id: expect.anything(),
       email: expect.anything(),
       createdAt: expect.anything(),
     });
-    expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'user'>();
+    expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'__unbound__'>();
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     type IntCodecOutput = ContractCodecTypes['pg/int4@1']['output'];
     expectTypeOf<IntCodecOutput>().toEqualTypeOf<number>();
-    type ColumnMeta = (typeof contract)['storage']['tables']['user']['columns']['id'];
+    type ColumnMeta =
+      (typeof contract)['storage']['tables']['__unbound__']['user']['columns']['id'];
     expectTypeOf<ColumnMeta['codecId']>().toExtend<string>();
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 

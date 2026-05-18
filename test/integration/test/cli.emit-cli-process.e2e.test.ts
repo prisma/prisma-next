@@ -21,24 +21,26 @@ type EmittedContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
-      readonly user: {
-        readonly namespaceId: '__unbound__';
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
+      readonly __unbound__: {
+        readonly user: {
+          readonly namespaceId: '__unbound__';
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly email: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
     };
     readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
@@ -126,7 +128,9 @@ describe('contract emit command (CLI process e2e)', () => {
         target: 'postgres',
         storage: {
           tables: {
-            user: expect.anything(),
+            __unbound__: {
+              user: expect.anything(),
+            },
           },
         },
       });

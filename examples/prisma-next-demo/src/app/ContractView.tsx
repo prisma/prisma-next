@@ -135,9 +135,11 @@ export function ContractView({ contract }: { contract: Contract }) {
       </Section>
 
       <Section title="Tables">
-        {Object.entries(contract.storage.tables).map(([tableName, table]) => (
-          <TableCard key={tableName} tableName={tableName} table={table} />
-        ))}
+        {Object.entries(contract.storage.tables).flatMap(([namespaceId, tablesInNs]) =>
+          Object.entries(tablesInNs).map(([tableName, table]) => (
+            <TableCard key={`${namespaceId}/${tableName}`} tableName={tableName} table={table} />
+          )),
+        )}
       </Section>
 
       <Section title="Capabilities">

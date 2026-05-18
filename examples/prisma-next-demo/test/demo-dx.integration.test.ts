@@ -61,8 +61,10 @@ describe('demo contract visualization DX', () => {
       expect(typeof m['relations']).toBe('object');
     }
 
-    for (const [, table] of Object.entries(contract.storage.tables)) {
-      expect(table.columns).toBeDefined();
+    for (const [, tablesInNs] of Object.entries(contract.storage.tables)) {
+      for (const [, table] of Object.entries(tablesInNs)) {
+        expect(table.columns).toBeDefined();
+      }
     }
   });
 });
