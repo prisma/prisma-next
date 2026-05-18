@@ -35,8 +35,14 @@ const emptyContract: MongoContract = {
     },
   },
   storage: {
-    collections: {
-      users: new MongoCollection(),
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__' as const,
+        kind: 'mongo-namespace' as const,
+        tables: {
+          users: new MongoCollection(),
+        },
+      },
     },
     storageHash: coreHash('sha256:empty-contract'),
   },
@@ -61,12 +67,18 @@ const indexedContract: MongoContract = {
     },
   },
   storage: {
-    collections: {
-      users: new MongoCollection({
-        indexes: [
-          new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
-        ],
-      }),
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__' as const,
+        kind: 'mongo-namespace' as const,
+        tables: {
+          users: new MongoCollection({
+            indexes: [
+              new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+            ],
+          }),
+        },
+      },
     },
     storageHash: coreHash('sha256:indexed-contract'),
   },

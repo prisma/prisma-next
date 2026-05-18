@@ -68,7 +68,6 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -140,19 +139,23 @@ function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlS
     profileHash: APP_PROFILE_HASH,
     storage: {
       storageHash: APP_CONTRACT_HASH,
-      tables: {
-        [APP_TABLE]: {
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            [APP_FIELD]: embeddingColumn,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            [APP_TABLE]: {
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                [APP_FIELD]: embeddingColumn,
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
-      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     },
     roots: {},
     models: {},

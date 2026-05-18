@@ -52,11 +52,14 @@ const singleModelContract = defineContract({
 });
 
 test('table name literals survive in storage.tables (single model)', () => {
-  expectTypeOf<keyof typeof singleModelContract.storage.tables>().toEqualTypeOf<'user'>();
+  expectTypeOf<
+    keyof typeof singleModelContract.storage.namespaces.__unbound__.tables
+  >().toEqualTypeOf<'user'>();
 });
 
 test('column name literals survive in storage.tables[name].columns', () => {
-  type UserColumns = (typeof singleModelContract.storage.tables)['user']['columns'];
+  type UserColumns =
+    (typeof singleModelContract.storage.namespaces.__unbound__.tables)['user']['columns'];
   expectTypeOf<keyof UserColumns>().toEqualTypeOf<'id' | 'email'>();
 });
 
@@ -74,7 +77,9 @@ test('deserializeContract preserves table name literals', () => {
   const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
   ) as typeof singleModelContract;
-  expectTypeOf<keyof typeof validated.storage.tables>().toEqualTypeOf<'user'>();
+  expectTypeOf<
+    keyof typeof validated.storage.namespaces.__unbound__.tables
+  >().toEqualTypeOf<'user'>();
 });
 
 test('deserializeContract preserves model name literals', () => {
@@ -121,7 +126,9 @@ const multiModelContract = defineContract({
 });
 
 test('multi-model contract preserves table name literals', () => {
-  expectTypeOf<keyof typeof multiModelContract.storage.tables>().toEqualTypeOf<'user' | 'post'>();
+  expectTypeOf<
+    keyof typeof multiModelContract.storage.namespaces.__unbound__.tables
+  >().toEqualTypeOf<'user' | 'post'>();
 });
 
 test('multi-model contract preserves model name literals', () => {
@@ -129,7 +136,8 @@ test('multi-model contract preserves model name literals', () => {
 });
 
 test('multi-model contract preserves column literals per table', () => {
-  type PostColumns = (typeof multiModelContract.storage.tables)['post']['columns'];
+  type PostColumns =
+    (typeof multiModelContract.storage.namespaces.__unbound__.tables)['post']['columns'];
   expectTypeOf<keyof PostColumns>().toEqualTypeOf<'id' | 'userId' | 'title'>();
 });
 
