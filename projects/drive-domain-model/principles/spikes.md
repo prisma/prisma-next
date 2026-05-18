@@ -1,14 +1,16 @@
-# Principle: Spikes Are Time-Boxed Investigations With Artefact Output
+# Principle: Spikes Are Time-Boxed Investigations With Artefact Output (Brief-Type, Not a Separate Skill)
 
 ## Thesis
 
 A spike is a short, time-boxed investigation whose Definition of Done is "you have an actionable understanding of what to do," not working code. Spikes exist because some planning-time questions cannot be answered by reasoning from the brief — they need a small probe into the codebase / system / environment. The output of a spike is an artefact (a decomposition plan, an estimate range, an approach proposal, a list of consumers) that downstream dispatches consume.
 
-Spikes are the only ritual in the protocol that produces a written artefact rather than executed code. That makes them load-bearing for the team's memory in a way other dispatches are not.
+Mechanically, a spike is a **brief-type variant of an ordinary dispatch**, not a separate skill or workflow. A spike-flavoured brief carries a different DoD ("the artefact is actionable") and a different output expectation (a written artefact, not committed code). Spike dispatches are runnable by `drive-orchestrate-plan` the same way any other dispatch is — just with a different brief shape. Triage may also emit "spike first" as a verdict when the entry-point can't be sized without a probe.
+
+Spikes are the only dispatch type in the protocol that produces a written artefact rather than executed code. That makes them load-bearing for the team's memory in a way other dispatches are not.
 
 ## When to use a spike
 
-A spike is warranted when **the orchestrator cannot decompose or size a task without first answering a question that the codebase can answer**.
+A spike is warranted when **the agile orchestrator cannot decompose, size, or triage work without first answering a question that the codebase can answer**.
 
 Examples of spike-worthy questions:
 
@@ -111,10 +113,11 @@ A useful default: **spike outputs that inform the next dispatch live in the proj
 
 ## Practical implications
 
-1. **The protocol explicitly supports spikes as a first-class dispatch type.** Briefs, DoR, DoD, time-boxing all apply, with the modification that the deliverable is an artefact rather than code.
-2. **The orchestrator's planning includes "what spikes do we need?" as an explicit step.** Before committing to a decomposition, the orchestrator surfaces the unknowns and queues spikes for the ones that can't be reasoned from the brief.
-3. **Spike artefacts have a retention policy.** Default: spike artefacts under `projects/<x>/spikes/` are deleted at project close-out (per the transient-projects discipline) unless they've graduated to a long-lived doc in `docs/` or a calibration entry.
-4. **Spikes can be dispatched to cheaper agents.** Per [`decomposition-and-cost.md`](decomposition-and-cost.md), spikes are typically high-surface low-conceptual work (read code, count things, structure findings). Cheap-tier dispatch with strong DoD is the right shape.
+1. **The protocol explicitly supports spikes as a brief-type variant.** Briefs, DoR, DoD, time-boxing all apply, with the modification that the deliverable is an artefact rather than code. No separate skill required — `drive-orchestrate-plan` runs a spike dispatch the same way it runs any other dispatch, just with a spike-flavoured brief.
+2. **The agile orchestrator's planning includes "what spikes do we need?" as an explicit step.** Before committing to a decomposition, the orchestrator surfaces the unknowns and queues spikes for the ones that can't be reasoned from the brief.
+3. **"Spike first" is a triage verdict.** When triage can't size or decompose without a probe, it routes to a single-dispatch slice plan with a spike-flavoured brief; re-triage runs on the artefact.
+4. **Spike artefacts have a retention policy.** Default: spike artefacts under `projects/<x>/spikes/` are deleted at project close-out (per the transient-projects discipline) unless they've graduated to a long-lived doc in `docs/` or a calibration entry.
+5. **Spikes can be dispatched to cheaper agents.** Per [`decomposition-and-cost.md`](decomposition-and-cost.md), spikes are typically high-surface low-conceptual work (read code, count things, structure findings). Cheap-tier dispatch with strong DoD is the right shape.
 
 ## Failure mode this principle directly prevents
 

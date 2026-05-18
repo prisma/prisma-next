@@ -2,7 +2,7 @@
 
 ## Thesis
 
-Agent teams have no organic memory transmission between dispatches. Rituals (DoR, DoD, standup-style checks, brief discipline, written failure-mode catalogues) are not supplements to memory the way they are for human teams — they ARE the memory. Every failure mode we don't write into the protocol re-happens.
+Agent teams have no organic memory transmission between dispatches. Rituals (Definition of Ready, Definition of Done, WIP-inspection cadence, brief discipline, written failure-mode catalogues, design discussions, retros) are not supplements to memory the way they are for human teams — they ARE the memory. Every failure mode we don't write into the protocol re-happens.
 
 ## The asymmetry with human teams
 
@@ -28,11 +28,12 @@ Every dispatch is a fresh team member onboarded from cold. The only context an a
 
 For agent teams, the rituals are not supplements — they are the entire memory store. Specifically:
 
-- **Definition of Ready** is the team's accumulated wisdom about what makes a task pickable. Without it, every dispatch re-discovers the same scoping mistakes.
-- **Definition of Done** is the team's accumulated wisdom about what makes a task verified. Without it, every dispatch re-discovers the same verification gaps.
+- **Definition of Ready** is the team's accumulated wisdom about what makes a dispatch (or slice, or project) pickable. Without it, every dispatch re-discovers the same scoping mistakes.
+- **Definition of Done** is the team's accumulated wisdom about what makes a dispatch (or slice, or project) verified. Without it, every dispatch re-discovers the same verification gaps.
 - **Brief discipline** (pre-naming edge cases with dispositions) is the team's accumulated wisdom about which traps lurk in this domain. Without it, every implementer re-falls into them.
 - **Failure-mode catalogue** is the team's accumulated wisdom about what's gone wrong before. Without it, every recurrence feels novel.
 - **Grep library** is the team's accumulated wisdom about which anti-patterns to search for. Without it, every drift detection starts from zero.
+- **Design-decisions log** is the team's accumulated wisdom about which paths were considered and rejected. Without it, every design discussion re-litigates settled calls.
 
 When a failure mode happens for the first time, the cost is unavoidable. When it happens for the second time, the cost is structural — it means the lesson from the first time didn't land in the protocol.
 
@@ -58,12 +59,12 @@ This creates a structural rule: **team-specific additions to any ritual MUST lan
 - A team that requires every PR to link a Linear ticket adds that to its **Definition of Ready** in its own project calibration doc — not into the shared DoR template.
 - A team that requires a screenshot in every UI-changing PR adds that to its **Definition of Done** in its calibration — not into the shared DoD checklist.
 - A team that has discovered a recurring anti-pattern (e.g. "dual-shape support relocated under new names") adds it to its **failure-mode catalogue** and **grep library** — not into the shared protocol.
-- A team that wants the standup-style check to ask an extra question ("are we still on the right model tier?") records that in its **brief discipline** layer — not into the shared standup pattern.
+- A team that wants the WIP-inspection cadence to ask an extra question ("are we still on the right model tier?") records that in its **brief discipline** layer — not into the shared WIP-inspection pattern.
 
 The shared methodology defines:
 
-- The **shape** of each ritual (what DoR is, what DoD is, what brief discipline means, what the standup-style check asks)
-- The **invariants** every team must honour (no L/XL dispatch, 5-min check cadence, intent-validated reviewer verdicts, etc.)
+- The **shape** of each ritual (what DoR is, what DoD is, what brief discipline means, what the WIP-inspection cadence asks, what a design discussion produces, what a retro produces)
+- The **invariants** every team must honour (no L/XL dispatch, WIP-inspection cadence ≤ 5 min, intent-validated reviewer verdicts, no silent agent-side amendments, etc.)
 - The **gate patterns** that compose into project-specific gates
 
 Project calibration defines:
@@ -115,3 +116,5 @@ The recurring failure where a team-of-amnesiacs re-falls into the same trap each
 
 - **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — why the protocol's "small dispatches" rule also enables cheaper agents.
 - **[`spikes.md`](spikes.md)** — the only ritual that produces an output artefact instead of working code; the artefact IS memory for the dispatches that depend on it.
+- (Upcoming) **`brief-discipline.md`** — Example Mapping in every dispatch brief; the brief itself is the running specification.
+- (Upcoming) **`retro.md`** — the trigger-based learning ritual; without it, the team has no learning mechanism.
