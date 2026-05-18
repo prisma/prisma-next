@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
@@ -142,11 +143,20 @@ async function executeMigrateCommand(
     }
   }
 
+  // Construct the family instance up-front so the on-disk contract read
+  // crosses the serializer seam (`familyInstance.validateContract`) at
+  // the read site. The downstream `client.migrationApply({ contract })`
+  // re-validates internally (no harm — validation is idempotent), but
+  // closing the gap at the read site is what makes the cast-pattern
+  // lint enforceable and matches the other CLI commands. See TML-2536.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
   const contractPathAbsolute = resolveContractPath(config);
   let contractRaw: Contract;
+  let contractContent: string;
   try {
-    const contractContent = await readFile(contractPathAbsolute, 'utf-8');
-    contractRaw = JSON.parse(contractContent) as Contract;
+    contractContent = await readFile(contractPathAbsolute, 'utf-8');
   } catch (error) {
     if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
       return notOk(
@@ -158,7 +168,17 @@ async function executeMigrateCommand(
     }
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
+  }
+  try {
+    contractRaw = familyInstance.validateContract(JSON.parse(contractContent));
+  } catch (error) {
+    return notOk(
+      errorContractValidationFailed(
+        `Contract at ${contractPathAbsolute} failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );

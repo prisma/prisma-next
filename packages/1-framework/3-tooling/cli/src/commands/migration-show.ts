@@ -370,20 +370,24 @@ async function executeMigrationShowCommand(
     );
   }
 
+  // Construct the family instance up-front so the on-disk app contract
+  // read crosses the serializer seam (`familyInstance.validateContract`)
+  // at the read site. See TML-2536.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
   let appContract: Contract;
   try {
-    appContract = JSON.parse(contractJsonContent) as Contract;
+    appContract = familyInstance.validateContract(JSON.parse(contractJsonContent));
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract at ${contractPathAbsolute} failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );
   }
 
-  const stack = createControlStack(config);
-  const familyInstance = config.family.create(stack);
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,

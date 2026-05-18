@@ -82,8 +82,22 @@ async function writeTestPackage(
 }
 
 function setupConfigMock(): void {
+  // The mocked family.create() returns a stub family instance whose
+  // `validateContract` is a pass-through. The tamper tests construct
+  // an intentionally-skeletal contract (just `storage.storageHash`) to
+  // get past the read-and-validate step in commands like `migrate` /
+  // `migration plan` / `migration new` — the bug under test is about
+  // **migration tamper detection**, not contract validation. The
+  // pass-through stub keeps the contract read crossing the seam
+  // (TML-2536's invariant) while letting the test drive at the
+  // post-read tamper code path.
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue({}) },
+    family: {
+      familyId: TARGET_FAMILY,
+      create: vi.fn().mockReturnValue({
+        validateContract: (json: unknown) => json,
+      }),
+    },
     target: {
       id: TARGET,
       familyId: TARGET_FAMILY,

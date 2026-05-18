@@ -73,6 +73,12 @@ async function executeMigrationNewCommand(
   const config = await loadConfig(options.config);
   const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
 
+  // Construct the family instance up-front so the on-disk contract read
+  // below crosses the serializer seam (`familyInstance.validateContract`)
+  // at the read site, not somewhere downstream. See TML-2536.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
   const contractPathAbsolute = resolveContractPath(config);
 
   let contractJsonContent: string;
@@ -90,24 +96,20 @@ async function executeMigrationNewCommand(
     throw error;
   }
 
-  let toContractJson: Contract;
+  let toContract: Contract;
   try {
-    toContractJson = JSON.parse(contractJsonContent) as Contract;
+    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent));
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {
-        why: `Failed to parse ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Failed to deserialize ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
         fix: 'Run `prisma-next contract emit` to regenerate the contract',
       }),
     );
   }
 
-  const toStorageHash = (
-    (toContractJson as unknown as Record<string, unknown>)['storage'] as
-      | Record<string, unknown>
-      | undefined
-  )?.['storageHash'] as string | undefined;
-  if (!toStorageHash) {
+  const toStorageHash = toContract.storage?.storageHash;
+  if (typeof toStorageHash !== 'string') {
     return notOk(
       errorRuntime('Contract is missing storageHash', {
         why: `Contract at ${contractPathAbsolute} has no storageHash`,
