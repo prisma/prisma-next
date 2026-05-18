@@ -18,16 +18,6 @@
       "sourceType": "github",
       "skillPath": "skills/.curated/drive-pr-description/SKILL.md",
       "computedHash": "b8870bee3069b1e8adc286cf62ccb847d25ee0981a3fdf78b1a49b41aed176fe"
-    },
-    "drive-qa-plan": {
-      "source": "/Users/wmadden/Projects/prisma/ignite",
-      "sourceType": "local",
-      "computedHash": "c14b580f0043f7e2b9deb89f652e5fd4a872fb0fe139c1cb46f343c73ac86512"
-    },
-    "drive-qa-run": {
-      "source": "/Users/wmadden/Projects/prisma/ignite",
-      "sourceType": "local",
-      "computedHash": "34077c305139a0e3678514528b1290548af80e31b8d40466978a9ff1294eb8d8"
     }
   }
 }
