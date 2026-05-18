@@ -55,11 +55,11 @@ export abstract class MongoContractSerializerBase<TContract>
    * default.
    *
    * The returned `MongoContract` carries class instances under
-   * `storage.collections` (each value is a `MongoCollection`, with
-   * nested `MongoIndex` / `MongoValidator` / `MongoCollectionOptions`
-   * constructed by the `MongoCollection` constructor). The rest of the
-   * contract envelope (models, valueObjects, capabilities, …) remains
-   * in plain-JSON form; those IR layers are handled by sibling
+   * `storage.namespaces[namespaceId].tables[collectionName]` (each value is a
+   * `MongoCollection`, with nested `MongoIndex` / `MongoValidator` /
+   * `MongoCollectionOptions` constructed by the `MongoCollection` constructor).
+   * The rest of the contract envelope (models, valueObjects, capabilities, …)
+   * remains in plain-JSON form; those IR layers are handled by sibling
    * subsystems and don't sit behind this SPI.
    */
   protected parseMongoContractStructure(json: unknown): MongoContract {
@@ -76,10 +76,10 @@ export abstract class MongoContractSerializerBase<TContract>
     // hand-authored `MongoContract<S, M>` generic surface. The schema and
     // the type are kept in lockstep by the round-trip fixtures under
     // `test/validate.test.ts`. The hydration walk below additionally
-    // re-shapes `storage.collections` from plain data into IR-class
-    // instances, so the `MongoContract` returned here carries class
-    // identity under `storage.collections.*` (and transitively under
-    // `indexes` / `validator` / `options`).
+    // re-shapes `storage.namespaces.*.tables` from plain data into IR-class
+    // instances, so the `MongoContract` returned here carries class identity
+    // under those tables maps (and transitively under `indexes` / `validator`
+    // / `options`).
     const validatedShape = parsed as unknown as MongoContract;
 
     const hydratedContract = this.hydrateMongoContract(validatedShape);
@@ -91,23 +91,37 @@ export abstract class MongoContractSerializerBase<TContract>
   }
 
   /**
-   * Walk a structurally-validated Mongo contract and convert
-   * `storage.collections` entries from plain data into
-   * `MongoCollection` IR-class instances. Idempotent: already-class
+   * Walk a structurally-validated Mongo contract and convert each
+   * `storage.namespaces[nsId].tables[collectionName]` entry from plain
+   * data into `MongoCollection` IR-class instances. Idempotent: already-class
    * instances pass through unchanged.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
-    const rawCollections = contract.storage.collections;
-    const hydrated: Record<string, MongoCollection> = {};
-    for (const [name, raw] of Object.entries(rawCollections)) {
-      hydrated[name] =
-        raw instanceof MongoCollection ? raw : new MongoCollection(raw as MongoCollectionInput);
-    }
+    const rawNamespaces = contract.storage.namespaces;
+    const hydratedNamespaces = Object.fromEntries(
+      Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
+        const rawTables = nsEnvelope.tables ?? {};
+        const hydratedTables = Object.fromEntries(
+          Object.entries(rawTables).map(([name, raw]) => [
+            name,
+            raw instanceof MongoCollection ? raw : new MongoCollection(raw as MongoCollectionInput),
+          ]),
+        );
+        return [
+          nsId,
+          {
+            ...nsEnvelope,
+            id: nsEnvelope.id,
+            tables: hydratedTables,
+          },
+        ];
+      }),
+    );
     return {
       ...contract,
       storage: {
         ...contract.storage,
-        collections: hydrated,
+        namespaces: hydratedNamespaces,
       },
     };
   }

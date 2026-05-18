@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
@@ -6,8 +7,21 @@ import { MongoTargetSchemaVerifier } from '../src/core/mongo-target-schema-verif
 function deserializedContract() {
   const json = {
     targetFamily: 'mongo' as const,
+    target: 'mongo',
+    profileHash: 'sha256:test',
     roots: { items: 'Item' },
-    storage: { collections: { items: {} } },
+    storage: {
+      storageHash: 'sha256:test',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          kind: 'mongo-database',
+          tables: {
+            items: {},
+          },
+        },
+      },
+    },
     models: {
       Item: {
         fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
@@ -23,8 +37,19 @@ describe('MongoTargetSchemaVerifier', () => {
     const verifier = new MongoTargetSchemaVerifier();
     const json = {
       targetFamily: 'mongo' as const,
+      target: 'mongo',
+      profileHash: 'sha256:test',
       roots: {},
-      storage: { collections: {} },
+      storage: {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            kind: 'mongo-database',
+            tables: {},
+          },
+        },
+      },
       models: {},
     };
     const contract = new MongoTargetContractSerializer().deserializeContract(json);
