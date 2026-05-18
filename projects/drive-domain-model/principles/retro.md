@@ -1,10 +1,32 @@
 # Principle: Retros Are Trigger-Based And Must Produce an Update
 
-## Thesis
+## At a glance
 
-A **retro** is the team's only learning mechanism. It runs **trigger-based** — when something happened that's worth learning from — not on a calendar cadence. Every retro must produce a **protocol update, calibration update, or ADR**. If it produces none of those, the retro failed; the lesson didn't land in a surface that subsequent dispatches will read.
+**Retros are trigger-based, not calendar-based.** They fire when something happened that's worth learning from — and every retro must produce one of three durable outputs. If none lands, the retro failed.
 
-For human teams, retros are one of several learning mechanisms (continuity of personnel, shared experience, apprenticeship, repeated codebase exposure). For agent teams, retros are *the* mechanism — per [`protocol-as-memory.md`](protocol-as-memory.md), nothing else accumulates between dispatches. A retro that doesn't update the protocol or calibration is a retro the team didn't have.
+**Triggers** (in order of cost-of-missing):
+
+| Trigger | Required? |
+|---|---|
+| Dispatch failure | Yes |
+| Drift event caught by WIP-inspection (calibration-worthy) | Yes |
+| Escapee bug caught downstream | Yes |
+| Slice close where a learning surfaced | Asked, not required |
+| Project close | Yes — mandatory per project DoD |
+| Calibration miss | Yes |
+| Explicit operator request | Yes |
+
+**Mandatory output** — pick at least one:
+
+| Output | Lands where | Effective when |
+|---|---|---|
+| **Canonical protocol update** (cross-team lesson) | Upstream PR to [`prisma/ignite`](https://github.com/prisma/ignite) | Next `drive-update-skills` run |
+| **Project-context update** (team-specific lesson) | Commit to `drive/<category>/README.md` in the consumer repo | Immediately (next drive-* invocation) |
+| **ADR** (architectural call surfaced by the trigger) | `docs/architecture docs/adrs/` | On merge |
+
+Calendar-based retros are deliberately absent — they generate noise (most days have nothing to retro) and miss the right moment (lessons are freshest immediately after the trigger). Retros are run by the agile orchestrator alone (no committee), time-boxed ≤ 15 min per trigger; longer means the trigger contained multiple lessons — split into multiple retros.
+
+For agent teams, retros are the **only** learning mechanism (per [`protocol-as-memory.md`](protocol-as-memory.md) — nothing else accumulates between dispatches). A retro without a landed update in a memory-strong surface is a retro the team didn't have.
 
 ## Triggers
 

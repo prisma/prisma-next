@@ -1,12 +1,12 @@
 # Principle: The Brief Is The Dispatch's Running Specification
 
-## Thesis
+## At a glance
 
-A **brief** is the artefact passed to a dispatch at delegation time. It is the dispatch's running specification: what to do, what edge cases to expect with their pre-named dispositions, what verifies "done," what's out of scope, what's the time-box, what's the model tier. Without brief discipline, the dispatch silently expands its interpretation of the work and the orchestrator's WIP-inspection cadence has nothing to compare reality against.
+**Every dispatch carries a brief with eight required sections** — Outcome, Scope (in / out), Edge cases + dispositions, Validation gates / DoD, Size + time-box, Model tier, Inputs, Implementer + Reviewer. No section may be omitted; calibration may overlay additional ones. Per-section detail (what each section captures, why it's load-bearing) is below in § What a brief contains.
 
-Brief discipline is the dispatch-scope analogue of Specification by Example / Example Mapping: every brief carries the worked examples that will trip the implementer, with the disposition pre-named. Pre-naming dispositions is the structural fix for the "silent accommodation" failure mode — the implementer cannot interpret an edge case as the brief failed to anticipate, because the brief did anticipate it.
+The brief is the dispatch's running specification + the contract Definition of Done verifies. **Pre-naming edge cases with dispositions is the structural fix** for the silent-accommodation failure mode — the implementer cannot interpret an edge case the brief already covers. Pre-naming is the dispatch-scope analogue of Specification by Example / Example Mapping.
 
-The brief is also the unit the Definition of Ready gates and the Definition of Done verifies. DoR asks the structural question "are the brief's required sections present, are the inputs it links actually loadable, and are the validation gates runnable?" — not the vibe question "does this look ready to me?". DoD asks "did the dispatch fulfil the contract this brief declares?"
+Briefs are assembled by the agile orchestrator at delegation time (fresh per dispatch, drawing from the slice spec + slice plan + spike artefacts + the team's `drive/plan/README.md`); they're transient — the slice plan, spike artefacts, and calibration are the durable inputs. Implementer-side amendments to the brief are forbidden by invariant I12.
 
 ## What a brief contains
 

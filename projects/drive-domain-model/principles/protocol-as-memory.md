@@ -1,8 +1,15 @@
 # Principle: The Protocol Is the Team's Memory
 
-## Thesis
+## At a glance
 
-Agent teams have no organic memory transmission between dispatches. Rituals (Definition of Ready, Definition of Done, WIP-inspection cadence, brief discipline, written failure-mode catalogues, design discussions, retros) are not supplements to memory the way they are for human teams — they ARE the memory. Every failure mode we don't write into the protocol re-happens.
+**Drive's memory lives in two homes**, kept in sync by a reconciliation loop:
+
+1. **Canonical `drive-*` skill bodies** in [`prisma/ignite`](https://github.com/prisma/ignite) — portable methodology shared across every team that runs Drive. Defines the *shape* of each ritual (DoR, DoD, brief, retro, WIP inspection, design discussion) and the invariants every team must honour.
+2. **`drive/<category>/README.md`** in each consumer repo — team-specific protocol loaded by the matching drive-* skill as workflow step 1. Holds *content* (failure-mode catalogues, grep libraries, reference tasks, DoR / DoD overlays, calibration entries).
+
+The **reconciliation loop** — `drive-reconcile-skills` (auto-classifies in-repo skill drift to the right home) + `drive-update-skills` (syncs canonical updates), both shipped in [PR #93](https://github.com/prisma/ignite/pull/93) — keeps the two homes in sync.
+
+**Every failure mode we don't write into one of those two homes re-happens.** Agent teams have none of the organic memory transmission (continuity of personnel, water-cooler context, apprenticeship, codebase familiarity) human teams rely on to learn from mistakes. Rituals don't *supplement* memory the way they do for human teams; for agent teams the rituals (and the surfaces they read) **are** the memory.
 
 ## The asymmetry with human teams
 

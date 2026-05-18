@@ -1,10 +1,18 @@
 # Principle: Decomposition Is Cost Optimization, Not Just Quality Optimization
 
-## Thesis
+## At a glance
 
-Well-decomposed M-sized dispatches with clear Definition of Done are safe to delegate to cheaper / faster models. The verification gates catch drift; the small scope limits blast radius; the explicit brief reduces interpretation latitude. Decomposition therefore unlocks cost optimization in addition to its primary quality benefits.
+**Decompose every dispatch to ≤ M complexity with a sharp Definition of Done, then route each dispatch to the cheapest tier that can safely execute it.** The routing rule by shape:
 
-This is the agent-team analogue of the Agile insight that pulling small stories enables junior developers to pick them up confidently — the cost shift is the same shape (cheaper labour on safer work), just with model tiers instead of seniority levels.
+| Dispatch shape | Tier | Why |
+|---|---|---|
+| High conceptual difficulty (design judgment, spec interpretation, novel patterns) | Orchestrator tier (Opus or equivalent) | Capability to navigate ambiguity safely. |
+| High surface, low conceptual (codemods, mechanical migrations, batch fixes) | Cheaper tier (Sonnet / composer) | Well-bounded, verifiable; capability premium wasted. |
+| High blast radius (regardless of conceptual difficulty) | Orchestrator tier OR smaller dispatch | Risk dominates — pay for capability or shrink the dispatch until the risk drops. |
+| Spike (brief-type variant) | Cheaper tier with short time-box | Output is an artefact, not design judgment. |
+| L or XL composite shape | **Refuse — decompose first.** | No tier is safe at this shape. |
+
+**Decomposition is the precondition that makes cheap-tier dispatching safe.** Without it, every dispatch pays the capability premium because no other tier is safe — the verification gates can't catch drift on feature-sized scopes. The agent-team analogue of the Agile insight that pulling small stories enables junior developers to pick them up confidently — same shape (cheaper labour on safer work), just with model tiers instead of seniority levels.
 
 ## Why feature-sized dispatches force expensive models
 

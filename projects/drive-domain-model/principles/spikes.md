@@ -1,12 +1,16 @@
 # Principle: Spikes Are Time-Boxed Investigations With Artefact Output (Brief-Type, Not a Separate Skill)
 
-## Thesis
+## At a glance
 
-A spike is a short, time-boxed investigation whose Definition of Done is "you have an actionable understanding of what to do," not working code. Spikes exist because some planning-time questions cannot be answered by reasoning from the brief — they need a small probe into the codebase / system / environment. The output of a spike is an artefact (a decomposition plan, an estimate range, an approach proposal, a list of consumers) that downstream dispatches consume.
+**A spike is a brief-type variant of an ordinary dispatch — not a separate skill or workflow.** Three differences from a regular dispatch:
 
-Mechanically, a spike is a **brief-type variant of an ordinary dispatch**, not a separate skill or workflow. A spike-flavoured brief carries a different DoD ("the artefact is actionable") and a different output expectation (a written artefact, not committed code). Spike dispatches are runnable by `drive-orchestrate-plan` the same way any other dispatch is — just with a different brief shape. Triage may also emit "spike first" as a verdict when the entry-point can't be sized without a probe.
+1. **DoD is "an actionable artefact exists,"** not "code is committed."
+2. **Output lives at a named path with a named shape** (typically `projects/<x>/spikes/<date>-<q>.md`, or a doc PR for slice-scope spikes). The artefact IS the deliverable — not "what I learned in passing."
+3. **Question is specific and answerable from the codebase / system / environment** — not a design call (that's a design discussion) and not a vague "explore the area."
 
-Spikes are the only dispatch type in the protocol that produces a written artefact rather than executed code. That makes them load-bearing for the team's memory in a way other dispatches are not.
+`drive-orchestrate-plan` runs spikes the same way it runs any other dispatch; only the brief shape differs. Triage may also emit "spike first" as a verdict when the entry point can't be sized without a probe; re-triage runs on the artefact.
+
+Spikes are the only dispatch type that produces a written artefact rather than executed code. That makes them load-bearing for the team's protocol-as-memory in a way other dispatches are not — the artefact is what subsequent dispatches read to do their work.
 
 ## When to use a spike
 
