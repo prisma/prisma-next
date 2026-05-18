@@ -27,8 +27,18 @@ import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
   isPostgresEnumStorageEntry,
   type SqlStorage,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+
+// Framework `Namespace.tables` is widened to `Record<string, object>` so
+// emitted `contract.d.ts` table literals satisfy it structurally. At
+// runtime, every `SqlStorage` namespace holds `StorageTable` instances —
+// the constructor enforces it. Narrowing per-iteration with a single-step
+// cast (not `as unknown as`) keeps Pattern C walks readable without
+// weakening the substrate type.
+type SqlNamespaceTables = Readonly<Record<string, StorageTable>>;
+
 import {
   createSqlOperationRegistry,
   type SqlOperationDescriptors,
@@ -315,7 +325,7 @@ function collectTypeRefSites(
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (typeof column.typeRef !== 'string') continue;
         const list = sites.get(column.typeRef);
@@ -375,7 +385,7 @@ function validateColumnTypeParams(
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeParams) {
           const descriptor = codecDescriptors.get(column.codecId);
@@ -404,7 +414,7 @@ function assertColumnCodecIntegrity(
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
         if (!ref) continue;
@@ -519,7 +529,7 @@ function buildContractCodecRegistry(
   }
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
@@ -551,7 +561,7 @@ function buildContractCodecRegistry(
   });
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
         if (!ref) continue;

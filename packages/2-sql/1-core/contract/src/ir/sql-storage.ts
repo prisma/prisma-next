@@ -121,23 +121,21 @@ function normaliseNamespaceEntry(
  * responsibility (so the family base does not import target-specific
  * subclasses).
  */
-// SQL concretions always store `StorageTable` instances in `tables`.
-// Narrowing the namespace map here lets target/family-level consumers
-// iterate `namespaces[*].tables[*]` and recover the concrete table type
-// without the framework's wider `object` value forcing per-site casts.
+// SQL concretions always store `StorageTable`-shaped values in `tables`.
+// The `__unbound__` slot is statically narrowed to `StorageTable` so DSL
+// surfaces and runtime walkers that target the late-binding default can
+// recover the concrete table type without a cast. Other namespace entries
+// stay at the framework `Namespace` (with `tables: Record<string, object>`)
+// to remain compatible with structurally-typed emitted `contract.d.ts`
+// table literals — those literals omit the optional `kind` discriminator
+// and the wider entry type accepts them without a class-instance check.
 export type SqlNamespace = Namespace & {
   readonly tables: Readonly<Record<string, StorageTable>>;
 };
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  // The `__unbound__` namespace is always present at runtime — every SQL
-  // contract has a late-binding slot whose binding the target resolves at
-  // connection time. Every namespace's `tables` slot is narrowed to
-  // `StorageTable` (rather than the framework's wider `object`) so DSL
-  // surfaces and runtime walkers can address it without an optional
-  // narrowing dance at every call site.
-  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
+  readonly namespaces: Readonly<Record<string, Namespace>> & {
     readonly __unbound__: SqlNamespace;
   };
   declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
@@ -155,7 +153,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
     if (!normalised[UNBOUND_NAMESPACE_ID]) {
       normalised[UNBOUND_NAMESPACE_ID] = SqlUnboundNamespace.instance;
     }
-    this.namespaces = Object.freeze(normalised) as Readonly<Record<string, SqlNamespace>> & {
+    this.namespaces = Object.freeze(normalised) as Readonly<Record<string, Namespace>> & {
       readonly __unbound__: SqlNamespace;
     };
     if (input.types !== undefined) {

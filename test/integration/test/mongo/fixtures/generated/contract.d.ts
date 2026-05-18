@@ -83,8 +83,9 @@ type ContractBase = ContractType<
     readonly namespaces: {
       readonly __unbound__: {
         readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
         readonly tables: {
-          readonly tasks: Record<string, never>;
+          readonly tasks: { readonly kind: 'mongo-collection' };
           readonly users: {
             readonly kind: 'mongo-collection';
             readonly indexes: readonly [

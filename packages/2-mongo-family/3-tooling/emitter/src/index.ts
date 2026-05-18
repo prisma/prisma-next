@@ -19,13 +19,6 @@ function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
 }
 
 function generateMongoCollectionEntryType(coll: MongoCollection): string {
-  if (
-    (coll.indexes === undefined || coll.indexes.length === 0) &&
-    coll.validator === undefined &&
-    coll.options === undefined
-  ) {
-    return 'Record<string, never>';
-  }
   return serializeValue(coll);
 }
 
@@ -54,8 +47,9 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
     const tablesType = generateMongoNamespaceTablesType(
       ns.tables as Readonly<Record<string, MongoCollection>>,
     );
+    const nsKind = (ns as { kind?: string }).kind ?? 'mongo-namespace';
     parts.push(
-      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly tables: ${tablesType} }`,
+      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly kind: ${serializeValue(nsKind)}; readonly tables: ${tablesType} }`,
     );
   }
   return `{ ${parts.join('; ')} }`;
