@@ -84,12 +84,13 @@ function normaliseNamespaceEntry(
   if (ns instanceof NamespaceBase) {
     return ns;
   }
-  const tableCount = Object.keys(ns.tables ?? {}).length;
-  const typeCount = Object.keys(ns.types ?? {}).length;
+  const input = ns as SqlNamespaceTablesInput; // JSON namespace payloads match SqlNamespaceTablesInput before SqlNamespacePayload materialises StorageTable instances.
+  const tableCount = Object.keys(input.tables ?? {}).length;
+  const typeCount = Object.keys(input.types ?? {}).length;
   if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0 && typeCount === 0) {
     return SqlUnboundNamespace.instance;
   }
-  return new SqlNamespacePayload(ns as SqlNamespaceTablesInput);
+  return new SqlNamespacePayload(input);
 }
 
 /**
