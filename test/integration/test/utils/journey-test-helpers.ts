@@ -415,8 +415,9 @@ export async function runMigrationList(
 export async function runMigrationGraph(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> {
-  return runCommand(createMigrationGraphCommand(), ctx, extraArgs);
+  return runCommand(createMigrationGraphCommand(), ctx, extraArgs, options);
 }
 
 export async function runMigrationCheck(

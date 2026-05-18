@@ -134,7 +134,21 @@ export function createMigrationGraphCommand(): Command {
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
       const result = await executeMigrationGraphCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (graphResult) => {
-        if (flags.json) {
+        // Explicit format flags win over the auto-JSON default. `flags.json`
+        // is auto-enabled when stdout is non-TTY (per CLI Style Guide §
+        // JSON Semantics); without this ordering, `migration graph --dot |
+        // dot -Tsvg` pipes JSON into the GraphViz binary, which then
+        // errors. `--dot` is the more specific instruction; honour it.
+        if (options.dot) {
+          const lines = ['digraph migrations {'];
+          for (const edge of graphResult.graph.migrationByHash.values()) {
+            const from = edge.from.slice(0, 12);
+            const to = edge.to.slice(0, 12);
+            lines.push(`  "${from}" -> "${to}" [label="${edge.dirName}"];`);
+          }
+          lines.push('}');
+          ui.output(lines.join('\n'));
+        } else if (flags.json) {
           const nodes = [...graphResult.graph.nodes];
           const edges = [...graphResult.graph.migrationByHash.values()].map((e) => ({
             dirName: e.dirName,
@@ -145,15 +159,6 @@ export function createMigrationGraphCommand(): Command {
           ui.output(
             JSON.stringify({ ok: true, nodes, edges, summary: graphResult.summary }, null, 2),
           );
-        } else if (options.dot) {
-          const lines = ['digraph migrations {'];
-          for (const edge of graphResult.graph.migrationByHash.values()) {
-            const from = edge.from.slice(0, 12);
-            const to = edge.to.slice(0, 12);
-            lines.push(`  "${from}" -> "${to}" [label="${edge.dirName}"];`);
-          }
-          lines.push('}');
-          ui.output(lines.join('\n'));
         } else if (!flags.quiet) {
           const renderInput = migrationGraphToRenderInput({
             graph: graphResult.graph,
