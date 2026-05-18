@@ -291,3 +291,34 @@ Both layers are living documents. Each failure mode prompts a check: "does this 
 
 **Affected.** Folder structure, file names, on-disk artefacts. The sibling project's reference branch is abandoned (no PR opened from it).
 
+## 21. PR #93 (drive-context-convention + QA pair + meta-skills) is the assumed-landed base for all canonical-side work
+
+**Date.** 2026-05-18.
+
+**Context.** [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) introduces machinery this project's skill restructuring depends on: the project-context convention (`drive/<category>/README.md` read by drive-* skills as workflow step 1), the manual-QA pair (`drive-qa-plan` + `drive-qa-run`), and three meta-skills (`drive-bootstrap-context`, `drive-reconcile-skills`, `drive-update-skills`). PR #93 ships independently and will land before any of this project's per-skill PRs.
+
+**Options considered.**
+- (a) Treat PR #93 as orthogonal — restructure plan ignores it; consumer migration handles the integration later.
+- (b) Treat PR #93 as the assumed-landed base — every restructure PR stacks on top of it; DoR / DoD / model / workflow docs reference its surface as already-existing.
+
+**Choice.** (b). PR #93 is the base.
+
+**Why.** The QA pair is non-optional for slice + project DoD (it's the only canonical answer to "what does manual QA look like for a slice?"), and the project-context convention is the only canonical answer to "where do project-specific QA / spec / plan facts live?". Without PR #93, the restructure ships into a vacuum and consumers have to reinvent both. Treating PR #93 as the base also lets the restructure PRs reuse `drive-reconcile-skills` for consumer adoption — already part of the PR #93 surface.
+
+**Affected.** `spec.md` references PR #93 throughout. `skill-restructure.md` § "Base assumption" makes the dependency explicit. `principles/definition-of-done.md` references `drive-qa-plan` / `drive-qa-run` / `drive/qa/README.md` as canonical. `model.md` and `workflow.md` reference the project-context convention where appropriate.
+
+## 22. Manual QA is a slice-DoD and project-DoD gate, distinct from CI gates and intent-validation
+
+**Date.** 2026-05-18.
+
+**Context.** The DoD principle initially treated "validation gates" as a single category (CI + intent-validation lumped together). The user surfaced that DoD was missing manual QA, with PR #93's `drive-qa-plan` + `drive-qa-run` as the canonical manual-QA discipline. The three categories (CI, intent-validation, manual QA) cover three distinct gap classes and should be treated independently in DoD.
+
+**Options considered.**
+- (a) Keep the "validation gates" category lumped; treat manual QA as a calibration-overlay item.
+- (b) Split into three categories (CI / intent / manual QA); make all three non-optional where applicable, with explicit N/A for slices that don't touch user-observable surface.
+
+**Choice.** (b). Three distinct categories in DoD, each non-optional where applicable. Slice DoD requires a manual-QA script + ≥ 1 run report whenever the slice touches user-observable surface; pure-refactor slices are explicitly marked "Manual QA: N/A — no user-observable change" with a rationale.
+
+**Why.** Each category catches a different failure class. CI catches mechanical contract violations; intent-validation catches "the implementer routed around the gate"; manual QA catches diagnostic clarity, end-to-end developer-journey breaks, original-bug regressions, gate-of-gate sanity, and exploratory unknowns. Lumping any two together makes the gap class invisible. The explicit-N/A discipline forces the slice author to confront the question rather than skip it silently.
+
+**Affected.** `principles/definition-of-done.md` § "CI gates, intent-validation, and manual QA are three different things" introduces the categories; § Slice DoD adds the manual-QA gate item; § Project DoD adds the manual-QA coverage check across slices; templates updated; anti-pattern #2 broadened from "validation-gates only" to "CI-gates only"; calibration overlay example for `prisma-next` adds QA references.
