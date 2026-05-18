@@ -6,9 +6,14 @@
     "users": "User"
   },
   "storage": {
-    "collections": {
-      "tasks": {},
-      "users": {}
+    "namespaces": {
+      "__unbound__": {
+        "id": "__unbound__",
+        "tables": {
+          "tasks": {},
+          "users": {}
+        }
+      }
     }
   },
   "models": {

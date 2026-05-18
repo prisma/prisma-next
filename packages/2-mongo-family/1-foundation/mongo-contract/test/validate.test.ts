@@ -1,12 +1,21 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { validateMongoContract } from '../src/validate-mongo-contract';
 import ormContractJson from './fixtures/orm-contract.json';
+
+function nsWrap(tables: Record<string, unknown>) {
+  return {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
+  };
+}
 
 function makeValidContractJson() {
   return {
     targetFamily: 'mongo',
     roots: { items: 'Item' },
-    storage: { collections: { items: {} } },
+    storage: { ...nsWrap({ items: {} }) },
     models: {
       Item: {
         fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
@@ -73,7 +82,7 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               indexes: [
                 {
@@ -83,7 +92,7 @@ describe('validateMongoContract()', () => {
                 { keys: [{ field: 'name', direction: 'text' }] },
               ],
             },
-          },
+          }),
         },
         models: {
           Item: {
@@ -98,7 +107,7 @@ describe('validateMongoContract()', () => {
 
       const result = validateMongoContract(json);
 
-      expect(result.contract.storage.collections['items']).toEqual({
+      expect(result.contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['items']).toEqual({
         indexes: [
           {
             keys: [{ field: '_id', direction: 1 }],
@@ -113,11 +122,11 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               indexes: [{ keys: [] }],
             },
-          },
+          }),
         },
       };
 
@@ -128,7 +137,7 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               options: {
                 capped: { size: 4096, max: 100 },
@@ -143,13 +152,13 @@ describe('validateMongoContract()', () => {
                 },
               },
             },
-          },
+          }),
         },
       };
 
       const result = validateMongoContract(json);
 
-      expect(result.contract.storage.collections['items']).toEqual({
+      expect(result.contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['items']).toEqual({
         options: {
           capped: { size: 4096, max: 100 },
           collation: { locale: 'en', strength: 2 },
@@ -169,7 +178,7 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               indexes: [
                 {
@@ -181,7 +190,7 @@ describe('validateMongoContract()', () => {
                 },
               ],
             },
-          },
+          }),
         },
         models: {
           Item: {
@@ -196,7 +205,7 @@ describe('validateMongoContract()', () => {
 
       const result = validateMongoContract(json);
 
-      expect(result.contract.storage.collections['items']).toEqual({
+      expect(result.contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['items']).toEqual({
         indexes: [
           {
             keys: [{ field: 'name', direction: 'text' }],
@@ -213,13 +222,13 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               options: {
                 unsupported: true,
               },
             },
-          },
+          }),
         },
       };
 
@@ -230,11 +239,11 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               indexes: [{ keys: [{ field: '_id', direction: 1 }], unsupported: true }],
             },
-          },
+          }),
         },
       };
 
@@ -245,7 +254,7 @@ describe('validateMongoContract()', () => {
       const json = {
         ...makeValidContractJson(),
         storage: {
-          collections: {
+          ...nsWrap({
             items: {
               options: {
                 timeseries: {
@@ -254,7 +263,7 @@ describe('validateMongoContract()', () => {
                 },
               },
             },
-          },
+          }),
         },
       };
 
@@ -277,7 +286,7 @@ describe('validateMongoContract()', () => {
       const json = {
         targetFamily: 'mongo',
         roots: { items: 'Item' },
-        storage: { collections: { items: {}, tags: {} } },
+        storage: { ...nsWrap({ items: {}, tags: {} }) },
         models: {
           Item: {
             fields: {
@@ -329,7 +338,7 @@ describe('validateMongoContract()', () => {
 
     it('accepts collection with valid indexes', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [
           { keys: [{ field: 'name', direction: 1 }] },
           { keys: [{ field: 'email', direction: 1 }], unique: true },
@@ -349,97 +358,97 @@ describe('validateMongoContract()', () => {
           { keys: [{ field: 'coords', direction: '2d' }] },
           { keys: [{ field: 'hash', direction: 'hashed' }] },
         ],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts index with partialFilterExpression', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [
           {
             keys: [{ field: 'status', direction: 1 }],
             partialFilterExpression: { status: { $eq: 'active' } },
           },
         ],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('rejects index with empty keys array', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [] }],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects index key with invalid direction', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [{ field: 'name', direction: 'invalid' }] }],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects index key missing field', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [{ direction: 1 }] }],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects index with extra properties', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [{ field: 'name', direction: 1 }], extra: true }],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects collection with extra properties', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
         extra: true,
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('accepts index with wildcardProjection', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [
           {
             keys: [{ field: '$**', direction: 1 }],
             wildcardProjection: { name: 1, email: 1 },
           },
         ],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts index with collation', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [
           {
             keys: [{ field: 'name', direction: 1 }],
             collation: { locale: 'en', strength: 2 },
           },
         ],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts index with text options (weights, default_language, language_override)', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [
           {
             keys: [{ field: 'bio', direction: 'text' }],
@@ -448,7 +457,7 @@ describe('validateMongoContract()', () => {
             language_override: 'lang',
           },
         ],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
@@ -457,85 +466,85 @@ describe('validateMongoContract()', () => {
   describe('storage validator validation', () => {
     it('accepts collection with valid validator', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         validator: {
           jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
           validationLevel: 'strict',
           validationAction: 'error',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with validator and indexes', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
         validator: {
           jsonSchema: { bsonType: 'object' },
           validationLevel: 'moderate',
           validationAction: 'warn',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('rejects validator with invalid validationLevel', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         validator: {
           jsonSchema: {},
           validationLevel: 'invalid',
           validationAction: 'error',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects validator with invalid validationAction', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         validator: {
           jsonSchema: {},
           validationLevel: 'strict',
           validationAction: 'invalid',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects validator missing jsonSchema', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         validator: {
           validationLevel: 'strict',
           validationAction: 'error',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects validator missing validationLevel', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         validator: {
           jsonSchema: { bsonType: 'object' },
           validationAction: 'error',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects validator missing validationAction', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         validator: {
           jsonSchema: { bsonType: 'object' },
           validationLevel: 'strict',
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
   });
@@ -543,91 +552,92 @@ describe('validateMongoContract()', () => {
   describe('storage collection options validation', () => {
     it('accepts collection with capped option', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: { capped: { size: 1048576 } },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with capped option including max', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: { capped: { size: 1048576, max: 1000 } },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with timeseries option', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: {
           timeseries: { timeField: 'timestamp', metaField: 'meta', granularity: 'hours' },
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with collation option', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: { collation: { locale: 'en', strength: 2 } },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with changeStreamPreAndPostImages', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: { changeStreamPreAndPostImages: { enabled: true } },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with clusteredIndex', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: { clusteredIndex: { name: 'myCluster' } },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('rejects capped option without required size', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         options: { capped: { max: 100 } },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('rejects invalid wildcardProjection values', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [
           {
             keys: [{ field: '$**', direction: 1 }],
             wildcardProjection: { name: 2 },
           },
         ],
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       expect(() => validateMongoContract(json)).toThrow();
     });
 
     it('accepts collection with no validator or options (backward compat)', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {};
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] =
+        {};
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });
 
     it('accepts collection with all options combined', () => {
       const json = makeValidContractJson();
-      json.storage.collections.items = {
+      (json.storage.namespaces[UNBOUND_NAMESPACE_ID].tables as Record<string, unknown>)['items'] = {
         indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
         validator: {
           jsonSchema: { bsonType: 'object' },
@@ -638,7 +648,7 @@ describe('validateMongoContract()', () => {
           changeStreamPreAndPostImages: { enabled: true },
           collation: { locale: 'en' },
         },
-      } as typeof json.storage.collections.items;
+      } as Record<string, unknown>;
       const result = validateMongoContract(json);
       expect(result.contract).toBeDefined();
     });

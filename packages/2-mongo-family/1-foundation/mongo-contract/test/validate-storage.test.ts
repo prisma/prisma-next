@@ -1,17 +1,28 @@
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import type { MongoContract } from '../src/contract-types';
 import { MongoCollection } from '../src/ir/mongo-collection';
+import { MongoStorage } from '../src/ir/mongo-storage';
 import { validateMongoStorage } from '../src/validate-storage';
 
 const DUMMY_HASH = coreHash('sha256:test');
+
+function storageWithItemsTables(tables: Record<string, MongoCollection>): MongoContract['storage'] {
+  return new MongoStorage({
+    storageHash: DUMMY_HASH,
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
+  });
+}
 
 function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContract {
   return {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { items: 'Item' },
-    storage: { storageHash: DUMMY_HASH, collections: { items: new MongoCollection() } },
+    storage: storageWithItemsTables({ items: new MongoCollection() }),
     models: {
       Item: {
         fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
@@ -188,10 +199,10 @@ describe('validateMongoStorage()', () => {
 
     it('accepts reference relation with valid fields', () => {
       const contract = makeMinimalContract({
-        storage: {
-          storageHash: DUMMY_HASH,
-          collections: { items: new MongoCollection(), users: new MongoCollection() },
-        },
+        storage: storageWithItemsTables({
+          items: new MongoCollection(),
+          users: new MongoCollection(),
+        }),
         models: {
           Item: {
             fields: {
@@ -223,10 +234,10 @@ describe('validateMongoStorage()', () => {
   describe('variant collection must match base', () => {
     it('rejects variant with a different collection than its base', () => {
       const contract = makeMinimalContract({
-        storage: {
-          storageHash: DUMMY_HASH,
-          collections: { items: new MongoCollection(), other: new MongoCollection() },
-        },
+        storage: storageWithItemsTables({
+          items: new MongoCollection(),
+          other: new MongoCollection(),
+        }),
         models: {
           Item: {
             fields: {
@@ -255,7 +266,7 @@ describe('validateMongoStorage()', () => {
 
     it('accepts variant with same collection as its base', () => {
       const contract = makeMinimalContract({
-        storage: { storageHash: DUMMY_HASH, collections: { items: new MongoCollection() } },
+        storage: storageWithItemsTables({ items: new MongoCollection() }),
         models: {
           Item: {
             fields: {
@@ -282,9 +293,9 @@ describe('validateMongoStorage()', () => {
   });
 
   describe('collection-model consistency', () => {
-    it('rejects model referencing a collection not in storage.collections', () => {
+    it('rejects model referencing a collection not declared in namespace tables', () => {
       const contract = makeMinimalContract({
-        storage: { storageHash: DUMMY_HASH, collections: {} },
+        storage: storageWithItemsTables({}),
         models: {
           Item: {
             fields: {
@@ -296,7 +307,7 @@ describe('validateMongoStorage()', () => {
         },
       });
       expect(() => validateMongoStorage(contract)).toThrow(
-        /model.*Item.*collection.*items.*not.*storage/i,
+        /model.*Item.*collection.*items.*not declared/i,
       );
     });
   });
