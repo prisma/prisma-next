@@ -165,7 +165,7 @@ function normaliseTypeEntry(
       return entry;
     }
     throw new Error(
-      'Encountered raw postgres-enum JSON in storage.types without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.',
+      'Encountered raw postgres-enum JSON in document-scoped storage.types; postgres enums belong under storage.namespaces[namespaceId].types and require PostgresContractSerializer.',
     );
   }
   if (isStorageTypeInstance(entry)) {

@@ -4,25 +4,23 @@ import {
   type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
 import type { AuthoringEntityContext } from '@prisma-next/framework-components/authoring';
-import type { SqlStorage, SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
+import {
+  type Namespace,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
+import {
+  type SqlNamespaceTablesInput,
+  type SqlStorage,
+  type SqlStorageTypeEntry,
+  StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PostgresEnumType } from './postgres-enum-type';
+import { PostgresSchema } from './postgres-schema';
 
-/**
- * Build the hydration registry from this target pack's literal
- * `postgresAuthoringEntityTypes`. Extension-pack-contributed entity
- * types do not reach this registry today; the surface is honest for
- * in-tree consumers (Postgres pack only) and the slot stays
- * deserializable because the family-layer validator's
- * `StorageTypeEntrySchema` only admits kinds whose factory the
- * Postgres pack already ships.
- *
- * Future open (F14): lift the registry build to descriptor-composition
- * time, threading the composed `AuthoringContributions.entityTypes`
- * from extension packs, so a real extension pack shipping a
- * round-trip-needing entity type can be deserialized end-to-end.
- * Earned by the first such extension pack in tree.
- */
 function buildPostgresEntityTypeRegistry(): ReadonlyMap<string, SqlEntityHydrationFactory> {
   const ctx: AuthoringEntityContext = { family: 'sql', target: 'postgres' };
   const registry = new Map<string, SqlEntityHydrationFactory>();
@@ -47,24 +45,111 @@ function buildPostgresEntityTypeRegistry(): ReadonlyMap<string, SqlEntityHydrati
   return registry;
 }
 
-/**
- * Postgres target `ContractSerializer` concretion. Inherits the full
- * SQL-family deserialization pipeline (structural validation +
- * hydration walker that materialises the SQL Contract IR class
- * hierarchy from the validated JSON envelope). Polymorphic
- * `storage.types` entries hydrate through the pack contribution registry
- * keyed by each entity type's declared `discriminator` (matching the
- * enumerable `kind` on the persisted JSON envelope).
- *
- * `serializeContract` falls through to the family-base default —
- * Postgres' contract is JSON-clean today (`PostgresEnumType`
- * instances are frozen with enumerable own properties, so
- * `JSON.stringify` produces the canonical envelope shape). Once
- * target-only fields land (e.g. per-target derived storage fields)
- * this is the home for stripping them from the persisted envelope.
- */
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     super(buildPostgresEntityTypeRegistry());
+  }
+
+  protected override hydrateSqlNamespaceEntry(
+    nsId: string,
+    raw: Namespace | Record<string, unknown>,
+  ): Namespace | SqlNamespaceTablesInput {
+    if (raw instanceof NamespaceBase) {
+      return raw;
+    }
+    const obj = raw as {
+      id?: string;
+      tables?: Record<string, unknown>;
+      types?: Record<string, unknown>;
+    };
+    const id = obj.id ?? nsId;
+    const tables = Object.fromEntries(
+      Object.entries(obj.tables ?? {}).map(([tableName, table]) => [
+        tableName,
+        table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+      ]),
+    );
+    const typeEntries = obj.types;
+    const hydratedNsTypes =
+      typeEntries !== undefined && Object.keys(typeEntries).length > 0
+        ? Object.fromEntries(
+            Object.entries(typeEntries).map(([typeName, entry]) => {
+              const plain = entry as Record<string, unknown>;
+              const withName = {
+                ...plain,
+                kind: 'postgres-enum' as const,
+                name: typeof plain.name === 'string' ? plain.name : typeName,
+                nativeType:
+                  typeof plain.nativeType === 'string'
+                    ? plain.nativeType
+                    : typeof plain.name === 'string'
+                      ? plain.name
+                      : typeName,
+              };
+              return [typeName, this.hydrateStorageTypeEntry(withName as SqlStorageTypeEntry)];
+            }),
+          )
+        : undefined;
+
+    const emptyTables = Object.keys(tables).length === 0;
+    const emptyTypes = !hydratedNsTypes || Object.keys(hydratedNsTypes).length === 0;
+    if (id === UNBOUND_NAMESPACE_ID && emptyTables && emptyTypes) {
+      return PostgresSchema.unbound;
+    }
+    return new PostgresSchema({
+      id,
+      tables,
+      ...(hydratedNsTypes !== undefined ? { types: hydratedNsTypes } : {}),
+    });
+  }
+
+  override serializeContract(contract: Contract<SqlStorage>): JsonObject {
+    const { storage, ...rest } = contract;
+    const namespacesJson: Record<string, JsonObject> = {};
+    for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+      if (ns instanceof PostgresSchema) {
+        namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
+      } else {
+        throw new Error(
+          `PostgresContractSerializer.serializeContract: unexpected namespace value for "${nsId}"`,
+        );
+      }
+    }
+    const storageOut: JsonObject = {
+      storageHash: String(storage.storageHash),
+      namespaces: namespacesJson,
+    };
+    if (storage.types !== undefined) {
+      const typesOut: Record<string, JsonObject> = {};
+      for (const [name, entry] of Object.entries(storage.types)) {
+        typesOut[name] = this.serializeJsonValue(entry) as JsonObject;
+      }
+      storageOut.types = typesOut;
+    }
+    return {
+      ...rest,
+      storage: storageOut,
+    } as JsonObject;
+  }
+
+  private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
+    const tablesOut: Record<string, JsonObject> = {};
+    for (const [tableName, table] of Object.entries(ns.tables)) {
+      tablesOut[tableName] = this.serializeJsonValue(table) as JsonObject;
+    }
+    const typesOut: Record<string, JsonObject> = {};
+    for (const [typeName, ty] of Object.entries(ns.types)) {
+      typesOut[typeName] = this.serializeJsonValue(ty) as JsonObject;
+    }
+    return {
+      id: ns.id,
+      kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
+      tables: tablesOut,
+      types: typesOut,
+    };
+  }
+
+  private serializeJsonValue(value: unknown): unknown {
+    return JSON.parse(JSON.stringify(value)) as unknown;
   }
 }

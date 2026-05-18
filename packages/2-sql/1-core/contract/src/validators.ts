@@ -98,43 +98,19 @@ const StorageTypeInstanceSchema = type
   });
 
 /**
- * Polymorphic enum-type entry under `storage.types[name]`. Carries an
- * enumerable literal `kind: 'postgres-enum'` discriminator so the
- * per-target hydration walker can dispatch cleanly back to a typed
- * IR-class instance during `deserializeContract`. The discriminator
- * reflects target-level behaviour (Postgres-native enums versus
- * family-layer codec triples) — not the family abstract altitude alone.
- *
- * The schema literal lives at the family layer today because
- * registry-driven validation for arbitrary slot shapes is not wired
- * yet; once a second polymorphic kind ships through the slot, this
- * structural enumeration can move to the registry-dispatch site and
- * per-target schemas can live in their target packages.
+ * Postgres native enum entry under `storage.namespaces[namespaceId].types[name]`.
+ * Document-scoped `storage.types` carries codec aliases only
+ * (`DocumentScopedStorageTypeSchema`).
  */
 const PostgresEnumTypeSchema = type({
   kind: "'postgres-enum'",
-  name: 'string',
-  nativeType: 'string',
+  'name?': 'string',
+  'nativeType?': 'string',
   values: type.string.array().readonly(),
 });
 
-/**
- * Family-layer arktype validation enumerates the polymorphic shapes the
- * SQL family ships today (codec-instance + Postgres-enum). Pack-contributed
- * entity types ship a parallel arktype schema entry here when they
- * introduce a new persisted shape; the registry-driven hydration seam at
- * `SqlContractSerializerBase.hydrateStorageTypeEntry` is open, but the
- * family-layer structural validator is closed by design — extension
- * packs cannot inject arbitrary persisted shapes through the slot
- * without their structural shape being known at the family layer.
- *
- * A future refinement is to lift `StorageTypeEntrySchema` toward an
- * `unknown` fallback and move structural diagnostics to the
- * registry-dispatch site at hydration time, earned once a non-enum
- * storage shape needs to flow through the slot without growing another
- * closed union arm here first.
- */
-const StorageTypeEntrySchema = PostgresEnumTypeSchema.or(StorageTypeInstanceSchema);
+/** Document-scoped `storage.types`: codec triples only. */
+const DocumentScopedStorageTypeSchema = StorageTypeInstanceSchema;
 
 const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
   columns: type.string.array().readonly(),
@@ -189,14 +165,17 @@ const StorageTableSchema = type({
  * late-bound slot holds authored tables.
  */
 const NamespaceEntrySchema = type({
+  '+': 'reject',
   id: 'string',
+  'kind?': 'string',
   'tables?': type({ '[string]': StorageTableSchema }),
+  'types?': type({ '[string]': PostgresEnumTypeSchema }),
 });
 
 const StorageSchema = type({
   '+': 'reject',
   storageHash: 'string',
-  'types?': type({ '[string]': StorageTypeEntrySchema }),
+  'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
   'namespaces?': type({ '[string]': NamespaceEntrySchema }),
 });
 
@@ -206,7 +185,7 @@ type NamespacedStorageWalk = {
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
   return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(ns.tables).map(([tableName, table]) => ({
+    Object.entries(ns.tables ?? {}).map(([tableName, table]) => ({
       namespaceId,
       tableName,
       table,
@@ -216,7 +195,7 @@ function eachStorageTable(storage: NamespacedStorageWalk) {
 
 function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: string): unknown {
   for (const ns of Object.values(storage.namespaces)) {
-    const t = ns.tables[tableName];
+    const t = (ns.tables ?? {})[tableName];
     if (t !== undefined) {
       return t;
     }
@@ -227,7 +206,7 @@ function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: 
 function allStorageTableNames(storage: NamespacedStorageWalk): Set<string> {
   const names = new Set<string>();
   for (const ns of Object.values(storage.namespaces)) {
-    for (const k of Object.keys(ns.tables)) {
+    for (const k of Object.keys(ns.tables ?? {})) {
       names.add(k);
     }
   }
