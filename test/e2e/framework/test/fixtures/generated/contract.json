@@ -612,6 +612,7 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
         "tables": {
           "comment": {
             "columns": {
@@ -649,11 +650,14 @@
                 "nullable": true
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "embedding": {
             "columns": {
@@ -696,11 +700,14 @@
                 }
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "event": {
             "columns": {
@@ -736,11 +743,14 @@
                 "nullable": false
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "literal_defaults": {
             "columns": {
@@ -822,11 +832,14 @@
                 "nullable": false
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "param_types": {
             "columns": {
@@ -913,11 +926,14 @@
                 }
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "post": {
             "columns": {
@@ -965,11 +981,14 @@
                 "nullable": false
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "user": {
             "columns": {
@@ -1010,6 +1029,8 @@
                 "nullable": true
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
@@ -1027,7 +1048,7 @@
         }
       }
     },
-    "storageHash": "sha256:ba74fb5d0654ee3abf0768015e36c1db8918bedde0a2064d9f58000c95978f76"
+    "storageHash": "sha256:c01040e095a1fe5dd776c2d5afe4a7767c506e044e96ecd46bfa369a75a13733"
   },
   "execution": {
     "executionHash": "sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27",

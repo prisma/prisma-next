@@ -381,6 +381,7 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
         "tables": {
           "bug": {
             "columns": {
@@ -394,7 +395,10 @@
                 "nativeType": "text",
                 "nullable": true
               }
-            }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "uniques": []
           },
           "feature": {
             "columns": {
@@ -408,7 +412,10 @@
                 "nativeType": "text",
                 "nullable": true
               }
-            }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "uniques": []
           },
           "post": {
             "columns": {
@@ -455,11 +462,13 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "task": {
             "columns": {
@@ -525,11 +534,13 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "user": {
             "columns": {
@@ -572,16 +583,21 @@
                 "typeRef": "user_type"
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           }
         }
       },
       "public": {
         "id": "public",
+        "kind": "postgres-schema",
+        "tables": {},
         "types": {
           "user_type": {
             "codecId": "pg/enum@1",
@@ -596,7 +612,7 @@
         }
       }
     },
-    "storageHash": "sha256:344aa37c49dc43344da6e5c7592a41a98296882c6f7d89df3128dfa9f8488ed8"
+    "storageHash": "sha256:9908876e9c812ce022980ef3ff90794811e10544b455b647135f11217f2edbe7"
   },
   "execution": {
     "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",

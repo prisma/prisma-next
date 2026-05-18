@@ -391,6 +391,7 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
         "tables": {
           "bug": {
             "columns": {
@@ -404,7 +405,10 @@
                 "nativeType": "text",
                 "nullable": true
               }
-            }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "uniques": []
           },
           "feature": {
             "columns": {
@@ -418,7 +422,10 @@
                 "nativeType": "text",
                 "nullable": true
               }
-            }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "uniques": []
           },
           "post": {
             "columns": {
@@ -471,11 +478,13 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "task": {
             "columns": {
@@ -541,11 +550,13 @@
                 }
               }
             ],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           },
           "user": {
             "columns": {
@@ -588,16 +599,21 @@
                 "typeRef": "user_type"
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           }
         }
       },
       "public": {
         "id": "public",
+        "kind": "postgres-schema",
+        "tables": {},
         "types": {
           "user_type": {
             "codecId": "pg/enum@1",
@@ -612,7 +628,7 @@
         }
       }
     },
-    "storageHash": "sha256:ac536ad4cbe43c0f218edc3710ca80f9b759f9df950971bfdbd40c46dc6335c0",
+    "storageHash": "sha256:78a45030d50fe0b9ac365d3ce7812be7ed0aa8304e6c7da7783a968b18ad4f94",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

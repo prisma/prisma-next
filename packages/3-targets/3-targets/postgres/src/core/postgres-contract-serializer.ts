@@ -81,26 +81,32 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       if (ns instanceof PostgresSchema) {
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
-      } else if (nsId === UNBOUND_NAMESPACE_ID) {
-        // Family-level SqlUnboundNamespace is the default singleton for
-        // Postgres contracts that don't yet declare a `namespace unbound`
-        // block. Serialise it as a postgres-unbound-schema with the same
-        // tables/types semantics PostgresSchema would produce.
+      } else {
+        // Family-level SqlNamespacePayload / SqlUnboundNamespace haven't
+        // been promoted to a PostgresSchema instance yet (e.g. they came
+        // straight from the TS builder, which uses the family-shared
+        // SqlStorage constructor). Serialise them as postgres-schema /
+        // postgres-unbound-schema so the round-trip through
+        // deserializeContract hydrates them back into PostgresSchema
+        // instances.
+        const isUnboundSlot = nsId === UNBOUND_NAMESPACE_ID;
+        const nsTypes = (ns as { readonly types?: Readonly<Record<string, unknown>> }).types ?? {};
         namespacesJson[nsId] = {
           id: nsId,
-          kind: 'postgres-unbound-schema',
+          kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
           tables: Object.fromEntries(
             Object.entries(ns.tables).map(([tableName, table]) => [
               tableName,
               this.serializeJsonValue(table) as JsonObject,
             ]),
           ),
-          types: {},
+          types: Object.fromEntries(
+            Object.entries(nsTypes).map(([typeName, entry]) => [
+              typeName,
+              this.serializeJsonValue(entry) as JsonObject,
+            ]),
+          ),
         };
-      } else {
-        throw new Error(
-          `PostgresContractSerializer.serializeContract: unexpected namespace value for "${nsId}"`,
-        );
       }
     }
     const storageOut: Record<string, unknown> = {

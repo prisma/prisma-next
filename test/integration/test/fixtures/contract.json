@@ -52,6 +52,7 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
         "tables": {
           "user": {
             "columns": {
@@ -71,16 +72,19 @@
                 "nullable": false
               }
             },
+            "foreignKeys": [],
+            "indexes": [],
             "primaryKey": {
               "columns": [
                 "id"
               ]
-            }
+            },
+            "uniques": []
           }
         }
       }
     },
-    "storageHash": "sha256:3a6dad453453908b2c4540da66c4ca45a2c5a990634458d28ac706f6c14b3915"
+    "storageHash": "sha256:dce59e55ea27ee077fccb16ab776cc36817f1d60352a358267cbbbdf876dc9b1"
   },
   "capabilities": {
     "postgres": {
