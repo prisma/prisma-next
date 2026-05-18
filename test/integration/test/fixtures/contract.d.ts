@@ -63,29 +63,31 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly user: {
-        namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
+      readonly __unbound__: {
+        readonly user: {
+          namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly email: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly createdAt: {
+              readonly nativeType: 'timestamptz';
+              readonly codecId: 'pg/timestamptz@1';
+              readonly nullable: false;
+            };
           };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
     readonly types: Record<string, never>;
