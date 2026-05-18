@@ -143,12 +143,7 @@ describe('canonicalization', () => {
     expect(parsed).toMatchObject({
       models: expect.anything(),
       storage: {
-        namespaces: expect.objectContaining({
-          [UNBOUND_NAMESPACE_ID]: expect.objectContaining({
-            id: UNBOUND_NAMESPACE_ID,
-            tables: expect.anything(),
-          }),
-        }),
+        namespaces: expect.anything(),
       },
     });
     // Required top-level fields (capabilities, extensionPacks, meta) are preserved even when empty.
@@ -158,6 +153,23 @@ describe('canonicalization', () => {
       meta: expect.anything(),
     });
     expect(parsed).not.toHaveProperty('relations');
+  });
+
+  it('preserves an empty per-namespace tables slot as a required structural key', () => {
+    const ir = createTestContract({
+      storage: {
+        namespaces: {
+          public: { id: 'public', tables: {} },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const namespaces = storage['namespaces'] as Record<string, unknown>;
+    const publicNs = namespaces['public'] as Record<string, unknown>;
+    expect(publicNs).toMatchObject({ id: 'public', tables: {} });
   });
 
   it('preserves semantic array order for column lists', () => {
@@ -294,59 +306,72 @@ describe('canonicalization', () => {
     expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
   });
 
-  describe('Mongo storage.collections preservation', () => {
-    it('preserves empty storage.collections container', () => {
+  describe('Mongo namespaced storage preservation', () => {
+    it('preserves namespace tables container with empty payloads', () => {
       const ir = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
-        storage: { collections: {} },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: { users: {}, posts: {} },
+            },
+          },
+        },
       });
 
       const result = canonicalizeContract(ir);
       const parsed = JSON.parse(result) as Record<string, unknown>;
-      const storage = parsed['storage'] as Record<string, unknown>;
-      expect(storage['collections']).toEqual({});
+      const tables = tablesFromCanonicalStorage(parsed['storage'] as Record<string, unknown>);
+      expect(tables['users']).toEqual({});
+      expect(tables['posts']).toEqual({});
     });
 
-    it('preserves collection entries with empty payloads', () => {
+    it('sorts collection names lexicographically within a namespace', () => {
       const ir = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
-        storage: { collections: { users: {}, posts: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: { zebras: {}, apples: {}, mangoes: {} },
+            },
+          },
+        },
       });
 
       const result = canonicalizeContract(ir);
       const parsed = JSON.parse(result) as Record<string, unknown>;
-      const storage = parsed['storage'] as Record<string, unknown>;
-      const collections = storage['collections'] as Record<string, unknown>;
-      expect(collections['users']).toEqual({});
-      expect(collections['posts']).toEqual({});
+      const tables = tablesFromCanonicalStorage(parsed['storage'] as Record<string, unknown>);
+      expect(Object.keys(tables)).toEqual(['apples', 'mangoes', 'zebras']);
     });
 
-    it('sorts collection names lexicographically', () => {
-      const ir = createTestContract({
-        targetFamily: 'mongo',
-        target: 'mongo',
-        storage: { collections: { zebras: {}, apples: {}, mangoes: {} } },
-      });
-
-      const result = canonicalizeContract(ir);
-      const parsed = JSON.parse(result) as Record<string, unknown>;
-      const storage = parsed['storage'] as Record<string, unknown>;
-      const collections = storage['collections'] as Record<string, unknown>;
-      expect(Object.keys(collections)).toEqual(['apples', 'mangoes', 'zebras']);
-    });
-
-    it('produces different hashes when collections differ', () => {
+    it('produces different hashes when namespace tables differ', () => {
       const ir1 = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
-        storage: { collections: { users: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: { users: {} },
+            },
+          },
+        },
       });
       const ir2 = createTestContract({
         targetFamily: 'mongo',
         target: 'mongo',
-        storage: { collections: { users: {}, posts: {} } },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: { users: {}, posts: {} },
+            },
+          },
+        },
       });
 
       const result1 = canonicalizeContract(ir1);

@@ -69,11 +69,24 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
 
     if (isDefaultValue(value)) {
       const isRequiredModels = isArrayEqual(currentPath, ['models']);
-      const isRequiredTables = isArrayEqual(currentPath, ['storage', 'tables']);
-      const isRequiredCollections = isArrayEqual(currentPath, ['storage', 'collections']);
-      const isCollectionEntry =
+      const isRequiredNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
+      const isNamespaceSlot =
         currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'collections']);
+        isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'namespaces']);
+      const isRequiredNamespaceTables =
+        currentPath.length === 4 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'tables';
+      // Preserve per-table payloads even when empty. SQL tables are never
+      // emitted empty; Mongo collections legitimately are (a declared
+      // collection with no schema is a valid representation), and the
+      // family-agnostic canonicalizer must not strip them.
+      const isNamespaceTableEntry =
+        currentPath.length === 5 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'tables';
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
@@ -90,24 +103,24 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isModelStorage =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[2]], ['models', 'storage']);
-      const isTableUniques =
-        currentPath.length === 4 &&
-        isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
-          ['storage', 'tables', 'uniques'],
-        );
-      const isTableIndexes =
-        currentPath.length === 4 &&
-        isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
-          ['storage', 'tables', 'indexes'],
-        );
-      const isTableForeignKeys =
-        currentPath.length === 4 &&
-        isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
-          ['storage', 'tables', 'foreignKeys'],
-        );
+      const isNamespaceTableUniques =
+        currentPath.length === 6 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'tables' &&
+        currentPath[5] === 'uniques';
+      const isNamespaceTableIndexes =
+        currentPath.length === 6 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'tables' &&
+        currentPath[5] === 'indexes';
+      const isNamespaceTableForeignKeys =
+        currentPath.length === 6 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'tables' &&
+        currentPath[5] === 'foreignKeys';
 
       // `storage.types.<name>.typeParams` is part of the StorageTypeInstance
       // shape (validators require it). Preserve it even when empty so the
@@ -119,19 +132,21 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         key === 'typeParams';
 
       const isFkBooleanField =
-        currentPath.length === 5 &&
+        currentPath.length === 7 &&
         currentPath[0] === 'storage' &&
-        currentPath[1] === 'tables' &&
-        currentPath[3] === 'foreignKeys' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'tables' &&
+        currentPath[5] === 'foreignKeys' &&
         (key === 'constraint' || key === 'index');
 
       const isNullableField = key === 'nullable';
 
       if (
         !isRequiredModels &&
-        !isRequiredTables &&
-        !isRequiredCollections &&
-        !isCollectionEntry &&
+        !isRequiredNamespaces &&
+        !isNamespaceSlot &&
+        !isRequiredNamespaceTables &&
+        !isNamespaceTableEntry &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
@@ -140,9 +155,9 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isExtensionNamespace &&
         !isModelRelations &&
         !isModelStorage &&
-        !isTableUniques &&
-        !isTableIndexes &&
-        !isTableForeignKeys &&
+        !isNamespaceTableUniques &&
+        !isNamespaceTableIndexes &&
+        !isNamespaceTableForeignKeys &&
         !isFkBooleanField &&
         !isNullableField &&
         !isStorageTypeTypeParams
@@ -175,8 +190,13 @@ function sortObjectKeys(obj: unknown): unknown {
   return sorted;
 }
 
-type StorageObject = {
+type NamespaceObject = {
   tables?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+type StorageObject = {
+  namespaces?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -186,48 +206,67 @@ type TableObject = {
   [key: string]: unknown;
 };
 
+function sortTableArrays(tableObj: TableObject): TableObject {
+  const sortedTable: TableObject = { ...tableObj };
+
+  if (Array.isArray(tableObj.indexes)) {
+    sortedTable.indexes = [...tableObj.indexes].sort((a, b) => {
+      const nameA = (a as { name?: string })?.name || '';
+      const nameB = (b as { name?: string })?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+  }
+
+  if (Array.isArray(tableObj.uniques)) {
+    sortedTable.uniques = [...tableObj.uniques].sort((a, b) => {
+      const nameA = (a as { name?: string })?.name || '';
+      const nameB = (b as { name?: string })?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+  }
+
+  return sortedTable;
+}
+
 function sortIndexesAndUniques(storage: unknown): unknown {
   if (!storage || typeof storage !== 'object') {
     return storage;
   }
 
   const storageObj = storage as StorageObject;
-  if (!storageObj.tables || typeof storageObj.tables !== 'object') {
+  if (!storageObj.namespaces || typeof storageObj.namespaces !== 'object') {
     return storage;
   }
 
-  const tables = storageObj.tables;
-  const result: StorageObject = { ...storageObj };
+  const namespaces = storageObj.namespaces;
+  const result: StorageObject = { ...storageObj, namespaces: {} };
+  const resultNamespaces = result.namespaces as Record<string, unknown>;
 
-  result.tables = {};
-  const sortedTableNames = Object.keys(tables).sort();
-  for (const tableName of sortedTableNames) {
-    const table = tables[tableName];
-    if (!table || typeof table !== 'object') {
-      result.tables[tableName] = table;
+  for (const nsId of Object.keys(namespaces)) {
+    const ns = namespaces[nsId];
+    if (!ns || typeof ns !== 'object') {
+      resultNamespaces[nsId] = ns;
       continue;
     }
 
-    const tableObj = table as TableObject;
-    const sortedTable: TableObject = { ...tableObj };
-
-    if (Array.isArray(tableObj.indexes)) {
-      sortedTable.indexes = [...tableObj.indexes].sort((a, b) => {
-        const nameA = (a as { name?: string })?.name || '';
-        const nameB = (b as { name?: string })?.name || '';
-        return nameA.localeCompare(nameB);
-      });
+    const nsObj = ns as NamespaceObject;
+    if (!nsObj.tables || typeof nsObj.tables !== 'object') {
+      resultNamespaces[nsId] = ns;
+      continue;
     }
 
-    if (Array.isArray(tableObj.uniques)) {
-      sortedTable.uniques = [...tableObj.uniques].sort((a, b) => {
-        const nameA = (a as { name?: string })?.name || '';
-        const nameB = (b as { name?: string })?.name || '';
-        return nameA.localeCompare(nameB);
-      });
+    const sortedTables: Record<string, unknown> = {};
+    const sortedTableNames = Object.keys(nsObj.tables).sort();
+    for (const tableName of sortedTableNames) {
+      const table = nsObj.tables[tableName];
+      if (!table || typeof table !== 'object') {
+        sortedTables[tableName] = table;
+        continue;
+      }
+      sortedTables[tableName] = sortTableArrays(table as TableObject);
     }
 
-    result.tables[tableName] = sortedTable;
+    resultNamespaces[nsId] = { ...nsObj, tables: sortedTables };
   }
 
   return result;
