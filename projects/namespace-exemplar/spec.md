@@ -22,7 +22,7 @@ This spec replaces that scope with a focused, self-consistent description of a s
 
 A single PR that:
 
-1. Makes `Namespace` a real polymorphic container (its `tables`, `types`, and target-specific slots live as fields on the Namespace instance).
+1. Makes `Namespace` a real polymorphic container (its `tables`, per-schema database type entries, and target-specific per-schema slots live as fields on the Namespace instance; codec type aliases continue to live at document scope on `Storage`).
 2. Ships PostgresSchema + PostgresUnboundSchema + SqliteUnboundDatabase + MongoTargetUnboundDatabase concretions.
 3. Lifts the `namespace { … }` PSL block into the framework parser (per-target interpreter validates whether the target supports it).
 4. Lifts the TS builder `namespaces` declaration + per-model `namespace` field into the SQL DSL.
@@ -55,16 +55,21 @@ A single PR that:
             ]
           }
         },
-        "types": {}
+        "types": {
+          "user_type": { "kind": "postgres-enum", "values": ["admin", "user"] }
+        }
       },
       "auth": {
         "id": "auth",
         "kind": "postgres-schema",
         "tables": {
-          "user": { "columns": { "id": { … }, "email": { … } }, "primaryKey": { "columns": ["id"] } }
+          "user": { "columns": { "id": { … }, "email": { … }, "kind": { "nativeType": { "namespaceId": "public", "typeName": "user_type" } } }, "primaryKey": { "columns": ["id"] } }
         },
         "types": {}
       }
+    },
+    "types": {
+      "Embedding1536": { "kind": "codec-instance", "codecId": "pgvector/vector@1", "parameters": { "dimensions": 1536 } }
     },
     "storageHash": "sha256:…"
   }
@@ -119,7 +124,7 @@ The model handle returned by `model(…)` carries its namespace coordinate, so `
 
 These are the load-bearing decisions for this PR. Anything not on this list is out of scope (see Non-goals).
 
-- **D1. Namespace is a real container.** Tables, types, and any target-specific slot kinds live as fields on the `Namespace` instance, not as sibling fields on `Storage`. `Storage` is `{ namespaces, storageHash, … }` and nothing more at the slot-kind level. This forecloses the dual-source-of-truth failure mode that doomed the previous attempt — the value at `storage.namespaces[X]` is the *only* place anything in namespace X is recorded.
+- **D1. Namespace is a real container.** Anything that has database identity inside a schema — tables, per-schema database type entries (e.g. Postgres enums), and any future per-schema slot kinds (sequences, views, functions when those land) — lives as fields on the `Namespace` instance. `Storage` carries the `namespaces` map, the `storageHash`, and only document-scoped slots that genuinely have no per-schema identity (codec type aliases at `storage.types` — see FR1). This forecloses the dual-source-of-truth failure mode that doomed the previous attempt: the value at `storage.namespaces[X]` is the *only* place anything in namespace X is recorded.
 
 - **D2. `__unbound__` is a per-target singleton subclass.** Each target that ships Namespace also ships exactly one singleton subclass for the late-bound slot: `PostgresUnboundSchema extends PostgresSchema` (qualifier-eliding DDL emission), `SqliteUnboundDatabase extends SqliteDatabase` (trivial singleton — SQLite has only one database), `MongoTargetUnboundDatabase extends MongoTargetDatabase` (connection-`db` binding). Accessed via a stable static reference (`PostgresSchema.unbound`, etc.). Call sites stay polymorphic — no `if (namespace.id === '__unbound__')` branches anywhere.
 
@@ -133,9 +138,13 @@ These are the load-bearing decisions for this PR. Anything not on this list is o
 
 ## Functional requirements
 
-- **FR1. Storage shape.** `interface Storage extends IRNode { readonly namespaces: Record<NamespaceId, Namespace>; readonly storageHash: StorageHashBase<...>; … }`. Per family: `abstract class SqlStorage extends SqlNode implements Storage` carries the same shape; per target: `class PostgresStorage extends SqlStorage` (if target-specific Storage state earns a subclass) or the target consumes `SqlStorage` directly. **There is no `tables` field on `Storage`** — that surface lives one level deeper, on each `Namespace`.
+- **FR1. Storage shape.** `interface Storage extends IRNode { readonly namespaces: Record<NamespaceId, Namespace>; readonly types: Record<TypeName, StorageTypeInstance>; readonly storageHash: StorageHashBase<...>; … }`. Per family: `abstract class SqlStorage extends SqlNode implements Storage` carries the same shape; per target: `class PostgresStorage extends SqlStorage` (if target-specific Storage state earns a subclass) or the target consumes `SqlStorage` directly. **There is no `tables` field on `Storage`** — tables live one level deeper, on each `Namespace`. `Storage.types` is **document-scoped and holds codec type aliases only** (e.g. `Embedding1536 = pgvector.Vector(1536)` — contract-level naming conveniences with no database identity). Per-schema database type entries (Postgres enums today; future per-schema types) live on `Namespace`, see FR2. The same-name collision between `Storage.types` and `Namespace.types` is acknowledged technical debt scoped to this PR; [TML-2563](https://linear.app/prisma-company/issue/TML-2563) renames `Storage.types` → `Storage.typeAliases` as a follow-up.
 
-- **FR2. Namespace shape.** `interface Namespace extends IRNode { readonly id: NamespaceId; readonly tables: Record<TableName, StorageTable>; readonly types: Record<TypeName, StorageType>; … }`. Target concretions extend this with target-specific slot kinds (Postgres may add `functions`, `sequences`, `views` in follow-on work — out of scope here, but the shape admits them without churn). The Namespace subclass IS the container; the namespace's id appears once, on the Namespace value, not duplicated as a stamp on every contained Table/Type.
+- **FR2. Namespace shape.** `interface Namespace extends IRNode { readonly id: NamespaceId; readonly tables: Record<TableName, StorageTable>; readonly types: Record<TypeName, NamespaceType>; … }`. `Namespace.types` is **schema-bound and holds per-schema database type entries** — today, Postgres-enum entries (`kind: 'postgres-enum'`, structurally satisfying `PostgresEnumStorageEntry`). Future per-schema database type kinds (Postgres composite types, future per-schema view metadata, etc.) extend the polymorphic value type without changing the slot's name. Target concretions extend Namespace with target-specific slot kinds beyond `tables` + `types` (Postgres may add `functions`, `sequences` in follow-on work — out of scope here, but the shape admits them without churn). The Namespace subclass IS the container; the namespace's id appears once, on the Namespace value, not duplicated as a stamp on every contained Table or per-schema Type entry.
+
+  **PSL lowering for `enum X { … }` declarations.** An enum declared at PSL top level (no enclosing `namespace { … }` block) lowers to the *implicit* `PslNamespace { name: '__unspecified__', … }` AST entry — same lowering path as top-level models. Each target's interpreter then maps the implicit entry to its default IR slot (Postgres → `public`; SQLite/Mongo reject enums as they reject all top-level type-bound declarations under § FR4). An enum declared inside a `namespace foo { enum X { … } }` block lowers to that namespace's `Namespace.types[X]`. Single rule, mirrors how tables work.
+
+  **Cross-namespace type references.** A field column whose `nativeType` is a Postgres enum declared in another namespace (e.g. column in `public.profile` typed `auth.user_type`) is a cross-namespace type reference. The column's `nativeType` carries the namespace coordinate (`{ namespaceId: 'auth', typeName: 'user_type' }`). The planner emits qualified DDL (`"auth"."user_type"`); the verifier matches type-bound columns on `(namespaceId, typeName)`. This is symmetric with cross-namespace FK references (FR6) — coordinate, not annotation.
 
 - **FR3. PSL parser.** `PslDocumentAst` carries `namespaces: readonly PslNamespace[]` as the *only* models container. Top-level declarations (no enclosing `namespace { … }` block) are collected into an implicit `PslNamespace { name: '__unspecified__', … }`. Nested `namespace a { namespace b { … } }` is a parse error (database namespaces are flat). Multiple `namespace foo { … }` blocks for the same name merge into one logical entry. `types { … }` blocks remain document-scoped and may not appear inside a `namespace { … }` block.
 
@@ -150,7 +159,7 @@ These are the load-bearing decisions for this PR. Anything not on this list is o
 
 - **FR7. Serializer round-trip.** Each family's `ContractSerializer` (`SqlContractSerializerBase`, `MongoContractSerializerBase`) round-trips the new shape: `deserializeContract(JSON.parse(JSON.stringify(serializeContract(contract))))` yields a structurally equivalent class hierarchy. `JSON.stringify` over the class instance produces the same canonical JSON shape as `serializeContract`. The shape is the same in JSON and in memory — no transitional dual-shape view, no helper that "flattens" or "nests" between them.
 
-- **FR8. Emitter.** `prisma-next contract emit` generates `contract.d.ts` with literal types matching the runtime IR exactly: `{ readonly storage: { readonly namespaces: { readonly auth: { readonly tables: { readonly user: { … } } }, readonly public: { … } } } }`. No `FlatTablesOf<C>` bridge — the DSL surface uses the namespace-keyed shape directly. (Namespace-aware DSL ergonomics — `db.auth.user.create(…)` style — are TML-2550, out of scope here. Within scope: the DSL surface accepts the new shape without a transitional bridge type.)
+- **FR8. Emitter.** `prisma-next contract emit` generates `contract.d.ts` with literal types matching the runtime IR exactly: `{ readonly storage: { readonly namespaces: { readonly auth: { readonly tables: { readonly user: { … } }, readonly types: { readonly user_type: { … } } }, readonly public: { … } }, readonly types: { readonly Embedding1536: { … } } } }`. Namespace-level `types` and storage-level `types` are distinct literal positions; no `FlatTablesOf<C>` bridge — the DSL surface uses the namespace-keyed shape directly. (Namespace-aware DSL ergonomics — `db.auth.user.create(…)` style — are TML-2550, out of scope here. Within scope: the DSL surface accepts the new shape without a transitional bridge type.)
 
 - **FR9. DDL emission (Postgres).** Named-schema namespaces emit qualified DDL: `CREATE TABLE "auth"."user" (…)`, `ALTER TABLE "public"."post" ADD CONSTRAINT … REFERENCES "auth"."user"("id")`. The IR `__unbound__` slot (`PostgresUnboundSchema`) emits unqualified DDL: `CREATE TABLE "user" (…)`, `REFERENCES "user"("id")`. `CREATE SCHEMA "auth"` is emitted as a planner-step when the contract introduces a new named namespace that isn't already in the introspected schema.
 
