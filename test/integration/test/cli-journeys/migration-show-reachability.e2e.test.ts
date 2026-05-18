@@ -158,5 +158,40 @@ withTempDir(({ createTempDir }) => {
       },
       timeouts.typeScriptCompilation,
     );
+
+    it(
+      'no-target invocation still surfaces aggregate-loader layout violations',
+      async () => {
+        const ctx: JourneyContext = setupJourney({ createTempDir });
+
+        const emit = await runContractEmit(ctx);
+        expect(emit.exitCode, 'emit').toBe(0);
+        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
+        expect(plan.exitCode, 'plan').toBe(0);
+
+        setupUnmigratedExtensionsState(ctx);
+
+        // No positional target: `migration show` is supposed to
+        // enumerate every loaded space's latest migration. The
+        // aggregate-loader still runs here, which is the legitimate
+        // place for its layout-integrity check. A future simplification
+        // that accidentally removes that check would let the verb
+        // silently miss the unmigrated extension; this assertion pins
+        // the contrary.
+        const show = await runMigrationShow(ctx, ['--json']);
+        expect(show.exitCode, 'no-target show exits non-zero').not.toBe(0);
+
+        const json = parseJsonOutput(show);
+        expect(json?.['ok'], 'response is an error envelope').toBe(false);
+        expect(json?.['code'], 'layout-integrity code fires').toBe('PN-MIG-5001');
+
+        const why = json?.['why'];
+        expect(
+          typeof why === 'string' && why.includes('pgvector'),
+          'why names the unmigrated extension',
+        ).toBe(true);
+      },
+      timeouts.typeScriptCompilation,
+    );
   });
 });
