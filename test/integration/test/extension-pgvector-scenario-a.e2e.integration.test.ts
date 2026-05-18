@@ -141,16 +141,18 @@ function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlS
     storage: {
       storageHash: APP_CONTRACT_HASH,
       tables: {
-        [APP_TABLE]: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            [APP_FIELD]: embeddingColumn,
+        [UNBOUND_NAMESPACE_ID]: {
+          [APP_TABLE]: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              [APP_FIELD]: embeddingColumn,
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

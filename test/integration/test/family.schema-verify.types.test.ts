@@ -219,19 +219,23 @@ describe('family instance schemaVerify - types', () => {
         });
 
         // Modify contract to use a type ID not in the registry
+        const userTable = contract.storage.tables['__unbound__']!['user']!;
         const contractWithUnknownType = {
           ...contract,
           storage: {
             ...contract.storage,
             tables: {
               ...contract.storage.tables,
-              user: {
-                ...contract.storage.tables.user,
-                columns: {
-                  ...contract.storage.tables.user.columns,
-                  email: {
-                    ...contract.storage.tables.user.columns.email,
-                    codecId: 'pg/unknown-type@1' as const, // Type not in registry
+              __unbound__: {
+                ...contract.storage.tables['__unbound__'],
+                user: {
+                  ...userTable,
+                  columns: {
+                    ...userTable.columns,
+                    email: {
+                      ...userTable.columns['email']!,
+                      codecId: 'pg/unknown-type@1' as const, // Type not in registry
+                    },
                   },
                 },
               },

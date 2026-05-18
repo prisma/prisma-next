@@ -52,11 +52,14 @@ const singleModelContract = defineContract({
 });
 
 test('table name literals survive in storage.tables (single model)', () => {
-  expectTypeOf<keyof typeof singleModelContract.storage.tables>().toEqualTypeOf<'user'>();
+  type UnboundTables = NonNullable<(typeof singleModelContract.storage.tables)['__unbound__']>;
+  expectTypeOf<keyof UnboundTables>().toEqualTypeOf<'user'>();
 });
 
 test('column name literals survive in storage.tables[name].columns', () => {
-  type UserColumns = (typeof singleModelContract.storage.tables)['user']['columns'];
+  type UserColumns = NonNullable<
+    NonNullable<(typeof singleModelContract.storage.tables)['__unbound__']>['user']
+  >['columns'];
   expectTypeOf<keyof UserColumns>().toEqualTypeOf<'id' | 'email'>();
 });
 
@@ -74,7 +77,8 @@ test('deserializeContract preserves table name literals', () => {
   const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
   ) as typeof singleModelContract;
-  expectTypeOf<keyof typeof validated.storage.tables>().toEqualTypeOf<'user'>();
+  type UnboundTables = NonNullable<(typeof validated.storage.tables)['__unbound__']>;
+  expectTypeOf<keyof UnboundTables>().toEqualTypeOf<'user'>();
 });
 
 test('deserializeContract preserves model name literals', () => {
@@ -121,7 +125,8 @@ const multiModelContract = defineContract({
 });
 
 test('multi-model contract preserves table name literals', () => {
-  expectTypeOf<keyof typeof multiModelContract.storage.tables>().toEqualTypeOf<'user' | 'post'>();
+  type UnboundTables = NonNullable<(typeof multiModelContract.storage.tables)['__unbound__']>;
+  expectTypeOf<keyof UnboundTables>().toEqualTypeOf<'user' | 'post'>();
 });
 
 test('multi-model contract preserves model name literals', () => {
@@ -129,7 +134,9 @@ test('multi-model contract preserves model name literals', () => {
 });
 
 test('multi-model contract preserves column literals per table', () => {
-  type PostColumns = (typeof multiModelContract.storage.tables)['post']['columns'];
+  type PostColumns = NonNullable<
+    NonNullable<(typeof multiModelContract.storage.tables)['__unbound__']>['post']
+  >['columns'];
   expectTypeOf<keyof PostColumns>().toEqualTypeOf<'id' | 'userId' | 'title'>();
 });
 

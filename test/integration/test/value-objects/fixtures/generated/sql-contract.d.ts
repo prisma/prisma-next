@@ -34,35 +34,37 @@ export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTy
 type ContractBase = ContractShape<
   {
     readonly tables: {
-      readonly shop: {
-        readonly namespaceId: '__unbound__';
-        columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
+      readonly __unbound__: {
+        readonly shop: {
+          readonly namespaceId: '__unbound__';
+          columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+              readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
+            };
+            readonly name: {
+              readonly nativeType: 'text';
+              readonly codecId: 'pg/text@1';
+              readonly nullable: false;
+            };
+            readonly location: {
+              readonly nativeType: 'jsonb';
+              readonly codecId: 'pg/jsonb@1';
+              readonly nullable: false;
+            };
+            readonly notes: {
+              readonly nativeType: 'jsonb';
+              readonly codecId: 'pg/jsonb@1';
+              readonly nullable: true;
+            };
           };
-          readonly name: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly location: {
-            readonly nativeType: 'jsonb';
-            readonly codecId: 'pg/jsonb@1';
-            readonly nullable: false;
-          };
-          readonly notes: {
-            readonly nativeType: 'jsonb';
-            readonly codecId: 'pg/jsonb@1';
-            readonly nullable: true;
-          };
+          primaryKey: { readonly columns: readonly ['id'] };
+          uniques: readonly [];
+          indexes: readonly [];
+          foreignKeys: readonly [];
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
     readonly types: Record<string, never>;
