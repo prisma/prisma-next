@@ -204,9 +204,6 @@ contractCommand.addCommand(contractEmitCommand);
 const contractInferCommand = createContractInferCommand();
 contractCommand.addCommand(contractInferCommand);
 
-// Register contract command
-program.addCommand(contractCommand);
-
 // Register db subcommand
 const dbCommand = new Command('db');
 setCommandDescriptions(
@@ -242,9 +239,6 @@ dbCommand.addCommand(dbSchemaCommand);
 // Add sign subcommand to db
 const dbSignCommand = createDbSignCommand();
 dbCommand.addCommand(dbSignCommand);
-
-// Register db command
-program.addCommand(dbCommand);
 
 // Register migration subcommand
 const migrationCommand = new Command('migration');
@@ -286,19 +280,26 @@ migrationCommand.addCommand(migrationGraphCommand);
 const migrationCheckCommand = createMigrationCheckCommand();
 migrationCommand.addCommand(migrationCheckCommand);
 
-program.addCommand(migrationCommand);
-
 // Top-level migrate command
 const migrateCommand = createMigrateCommand();
-program.addCommand(migrateCommand);
 
 // Top-level ref command (replaces `migration ref`)
 const refCommand = createRefCommand();
-program.addCommand(refCommand);
 
-// Register init command (top-level, not nested)
+// Top-level init command
 const initCommand = createInitCommand();
+
+// Register top-level commands in the order the spec's intended-surface
+// diagram lists them: verbs (init, migrate) first, then subject
+// namespaces (contract, db, migration, ref). The order shows up in
+// `prisma-next --help` and is the first thing a new user sees, so it
+// matches the order spec.md uses to introduce the surface.
 program.addCommand(initCommand);
+program.addCommand(migrateCommand);
+program.addCommand(contractCommand);
+program.addCommand(dbCommand);
+program.addCommand(migrationCommand);
+program.addCommand(refCommand);
 
 // Create help command
 const helpCommand = new Command('help')
