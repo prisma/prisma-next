@@ -563,6 +563,7 @@
     },
     "types": {
       "Embedding1536": {
+        "kind": "codec-instance",
         "codecId": "pg/vector@1",
         "nativeType": "vector",
         "typeParams": {
@@ -570,11 +571,11 @@
         }
       },
       "user_type": {
-        "codecId": "pg/enum@1",
+        "kind": "postgres-enum",
+        "name": "user_type",
         "nativeType": "user_type",
-        "typeParams": {
-          "values": ["admin", "user"]
-        }
+        "values": ["admin", "user"],
+        "codecId": "pg/enum@1"
       }
     }
   },
