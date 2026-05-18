@@ -44,9 +44,7 @@
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "record": "turbo run record --filter=@prisma-next/cli --",
     "clean": "turbo run clean",
-    "prepare": "husky",
-    "setup:contrib-skills": "node scripts/setup-contrib-skills.mjs",
-    "postinstall": "node scripts/setup-contrib-skills.mjs"
+    "prepare": "husky && skills add ./skills-contrib --skill '*' --agent universal claude-code -y"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
