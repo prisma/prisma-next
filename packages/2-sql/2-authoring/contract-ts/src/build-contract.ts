@@ -30,6 +30,7 @@ import {
   type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   SqlStorage,
+  type SqlStorageInput,
   type StorageColumn,
   StorageTable,
   type StorageTableInput,
@@ -515,8 +516,12 @@ export function buildSqlContractFromDefinition(
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
-    : computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
-  const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
+    : computeStorageHash({
+        target,
+        targetFamily,
+        storage: storageWithoutHash as Record<string, unknown>,
+      });
+  const storage = new SqlStorage({ ...storageWithoutHash, storageHash } as SqlStorageInput); // Builder types are wider than SqlStorageInput until SqlStorage normalises document types.
 
   const executionSection =
     executionDefaults.length > 0
