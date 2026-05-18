@@ -84,8 +84,9 @@ export function parseMigrationRef(
       hash.startsWith(prefix),
     );
 
-    if (migMatches.length === 1) {
-      const [, matchedEdge] = migMatches[0]!;
+    const [firstMigMatch] = migMatches;
+    if (migMatches.length === 1 && firstMigMatch !== undefined) {
+      const [, matchedEdge] = firstMigMatch;
       return ok({
         dirName: matchedEdge.dirName,
         migrationHash: matchedEdge.migrationHash,
