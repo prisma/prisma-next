@@ -59,7 +59,7 @@ The full code is `PN-<domain>-<NNNN>`. Domains in use: `CLI`, `MIG`, `RUN`, `CON
 
 ### Wrapped errors and `meta.code`
 
-Some commands re-wrap a downstream error into a `PN-RUN-3000` (`errorRuntime`) envelope and stash the original code on `meta.code`. The most important case: `migration apply` wraps `MigrationToolsError` (which has codes like `MIGRATION.HASH_MISMATCH`, `MIGRATION.STALE_CONTRACT_BOOKENDS`, `MIGRATION.AMBIGUOUS_TARGET`) via `mapMigrationToolsError`. The envelope you see is `code: 'PN-RUN-3000'` with `meta.code: 'MIGRATION.HASH_MISMATCH'`. **Always check `meta.code` when `code` is `PN-RUN-3000`** — that's where the routing-quality information lives.
+Some commands re-wrap a downstream error into a `PN-RUN-3000` (`errorRuntime`) envelope and stash the original code on `meta.code`. The most important case: `migrate` wraps `MigrationToolsError` (which has codes like `MIGRATION.HASH_MISMATCH`, `MIGRATION.STALE_CONTRACT_BOOKENDS`, `MIGRATION.AMBIGUOUS_TARGET`) via `mapMigrationToolsError`. The envelope you see is `code: 'PN-RUN-3000'` with `meta.code: 'MIGRATION.HASH_MISMATCH'`. **Always check `meta.code` when `code` is `PN-RUN-3000`** — that's where the routing-quality information lives.
 
 ### How to ask for the full envelope
 
@@ -74,22 +74,22 @@ The single source of truth: read the envelope, find the row by `code` (or `meta.
 | `PN-CLI-4001` *Config file not found* | Most `prisma-next` commands | Run `prisma-next init`, or pass `--config <path>`. |
 | `PN-CLI-4002` *Contract configuration missing* | `contract emit`, `db *` | Add `contract: { ... }` to `prisma-next.config.ts`. See `prisma-next-contract`. |
 | `PN-CLI-4003` *Contract validation failed* | `contract emit`, `db *` | Re-run `pnpm prisma-next contract emit` after fixing the contract source named in `where.path`. See `prisma-next-contract`. |
-| `PN-CLI-4005` *Database connection is required* | `db *`, `migration apply`, `migration status` | Pass `--db <url>` or set `db.connection` in `prisma-next.config.ts`. |
+| `PN-CLI-4005` *Database connection is required* | `db *`, `migrate`, `migration status` | Pass `--db <url>` or set `db.connection` in `prisma-next.config.ts`. |
 | `PN-CLI-4011` *Missing extension packs in config* | `contract emit` (e.g. contract uses `pgvector.Vector(...)` but config does not list the pgvector pack) | Add the descriptors named in `meta.missingExtensionPacks` to `extensionPacks` in `prisma-next.config.ts`. See `prisma-next-contract`. |
 | `PN-CLI-4020` *Migration planning failed* | `db init`, `db update` | Inspect `meta.conflicts`. Recovery is per-conflict — chain to `prisma-next-migrations`. |
 | `PN-CLI-5002/5003/5004/…` *Init errors* | `prisma-next init` | Re-run with the missing/invalid flags listed in `meta.missingFlags` or `meta.allowed`. |
-| `PN-MIG-2001` *Unfilled migration placeholder* | `node migrations/app/<dir>/migration.ts` (self-emit) or `migration apply` | Edit `migration.ts`, replace the named `placeholder("<slot>")` with a real query closure, self-emit. See `prisma-next-migrations`. |
+| `PN-MIG-2001` *Unfilled migration placeholder* | `node migrations/app/<dir>/migration.ts` (self-emit) or `migrate` | Edit `migration.ts`, replace the named `placeholder("<slot>")` with a real query closure, self-emit. See `prisma-next-migrations`. |
 | `PN-MIG-2002` *migration.ts not found* | Reading a migration package | Restore from version control or scaffold a fresh package with `migration plan`. |
 | `PN-MIG-2003` *Invalid default export* | Loading `migration.ts` | Use `export default class extends Migration { ... }` (or factory `() => ({ ... })`). See `prisma-next-migrations`. |
 | `PN-MIG-2005` *dataTransform contract mismatch* | Building a data-transform query plan | Pass the same `endContract` reference to both `dataTransform(endContract, …)` and the query-builder context. |
 | `PN-RUN-3001` *Database not signed* | `db verify`, runtime startup | DB has no marker yet. Run `prisma-next db init --db <url>` (baseline empty DB) or `db update --db <url>` (apply contract directly). |
-| `PN-RUN-3002` *Hash mismatch* | `db verify`, runtime startup | Marker disagrees with contract hash. Either migrate forward (`migration apply` / `db update`), or — if the DB is correct after a manual fix-up — `db sign`. See `prisma-next-migrations`. |
+| `PN-RUN-3002` *Hash mismatch* | `db verify`, runtime startup | Marker disagrees with contract hash. Either migrate forward (`migrate` / `db update`), or — if the DB is correct after a manual fix-up — `db sign`. See `prisma-next-migrations`. |
 | `PN-RUN-3003` *Target mismatch* | Runtime startup | Contract target ≠ config target; align them (see `meta.expected` / `meta.actual`). |
 | `PN-RUN-3004` *Schema verification failed* | `db verify` (full mode) | Inspect `meta.verificationResult`. Run `db update` to reconcile, or adjust contract. |
 | `PN-RUN-3010` *Schema verification failed (CLI surface)* | `db verify` schema-only | Same as 3004. |
-| `PN-RUN-3020` *Migration runner failed* | `migration apply`, `db update`, `db init` | Inspect `meta` for the conflict; reconcile schema drift, then re-run. Previously applied migrations are preserved. |
-| `PN-RUN-3030` *Destructive changes require confirmation* | `db update` (interactive prompt fires; non-interactive returns this code) | Re-run with `-y` (or `--yes`) to apply, or `--dry-run` to preview. **Only `db update` has this flow** — `migration apply` does not gate destructive ops on a flag. |
-| `PN-RUN-3000` *(wrapper)* | `migration apply`, others wrapping `MigrationToolsError` | Read `meta.code`. Cases: `MIGRATION.HASH_MISMATCH` (re-emit: `node migrations/app/<dir>/migration.ts`); `MIGRATION.AMBIGUOUS_TARGET` (concurrent migrations — `prisma-next-migration-review`); `MIGRATION.STALE_CONTRACT_BOOKENDS` (re-run `migration plan`); `MIGRATION.NO_INVARIANT_PATH` / `MIGRATION.UNKNOWN_INVARIANT` (`prisma-next-migration-review`). |
+| `PN-RUN-3020` *Migration runner failed* | `migrate`, `db update`, `db init` | Inspect `meta` for the conflict; reconcile schema drift, then re-run. Previously applied migrations are preserved. |
+| `PN-RUN-3030` *Destructive changes require confirmation* | `db update` (interactive prompt fires; non-interactive returns this code) | Re-run with `-y` (or `--yes`) to apply, or `--dry-run` to preview. **Only `db update` has this flow** — `migrate` does not gate destructive ops on a flag. |
+| `PN-RUN-3000` *(wrapper)* | `migrate`, others wrapping `MigrationToolsError` | Read `meta.code`. Cases: `MIGRATION.HASH_MISMATCH` (re-emit: `node migrations/app/<dir>/migration.ts`); `MIGRATION.AMBIGUOUS_TARGET` (concurrent migrations — `prisma-next-migration-review`); `MIGRATION.STALE_CONTRACT_BOOKENDS` (re-run `migration plan`); `MIGRATION.NO_INVARIANT_PATH` / `MIGRATION.UNKNOWN_INVARIANT` (`prisma-next-migration-review`). |
 | `PN-SCHEMA-0001` | `db verify` schema check | Live schema does not satisfy contract. `meta.verificationResult` has the diff. Run `db update` or adjust the contract. |
 | `MIGRATION.UP_TO_DATE` / `.DATABASE_BEHIND` / `.INVARIANTS_PENDING` | `migration status` `info` diagnostics | Informational; exit 0. No action needed unless `INVARIANTS_PENDING` matters for your CI gate. See `prisma-next-migration-review`. |
 | `MIGRATION.NO_MARKER` / `.MARKER_NOT_IN_HISTORY` / `.DIVERGED` / `CONTRACT.AHEAD` / `CONTRACT.UNREADABLE` | `migration status` `warn` diagnostics (exit 0; CI gates parse `--json`) | Read `severity` *and* `code`. `prisma-next-migration-review` covers the diamond/diverged/marker-out-of-history flows. |
@@ -110,7 +110,7 @@ If the envelope's `code` is not in this table, follow the envelope's `fix` field
 2. **Ignoring `severity`.** `migration status` emits warn-level diagnostics and **exits 0**. An agent that only checks exit code misses every concurrent-migration warning.
 3. **Skipping `meta.code` on `PN-RUN-3000`.** That envelope is a wrapper — the real code lives on `meta.code`.
 4. **Treating drift as something to silence with `db sign`.** `db sign` writes the marker from the current contract hash, but it requires schema verification to pass first. Run `db verify` before reaching for `db sign`.
-5. **Re-running `migration apply` after a partial failure without inspecting state.** `db schema --db <url>` shows the live shape; `migration status --db <url> --json` shows where the marker actually is.
+5. **Re-running `migrate` after a partial failure without inspecting state.** `db schema --db <url>` shows the live shape; `migration status --db <url> --json` shows where the marker actually is.
 
 ## What Prisma Next doesn't do yet
 
@@ -130,5 +130,5 @@ If the envelope's `code` is not in this table, follow the envelope's `fix` field
 - [ ] Read every field — `code`, `severity`, `why`, `fix`, `meta` (or `details`), `where` if present.
 - [ ] If `code` is `PN-RUN-3000`, also read `meta.code`.
 - [ ] Routed on `code` to the next move (and chained to the matching authoring skill where the table says so).
-- [ ] Re-verified with the relevant CLI command (`db verify`, `migration status --json`, `contract emit`, `migration apply`).
+- [ ] Re-verified with the relevant CLI command (`db verify`, `migration status --json`, `contract emit`, `migrate`).
 - [ ] Did not confabulate a Studio / EXPLAIN / query-log API — used the documented workaround and routed unmet capability gaps to `prisma-next-feedback`.

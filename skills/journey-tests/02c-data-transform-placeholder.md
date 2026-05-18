@@ -21,5 +21,5 @@
 
 - [ ] Placeholder replaced, not left as-is.
 - [ ] Self-emit ran (timestamps on `ops.json` advanced after the TS edit).
-- [ ] `migration apply` completed without `MIGRATION.PLACEHOLDER_NOT_FILLED`.
+- [ ] `migrate` completed without `MIGRATION.PLACEHOLDER_NOT_FILLED`.
 - [ ] Existing rows have a non-null `displayName`.

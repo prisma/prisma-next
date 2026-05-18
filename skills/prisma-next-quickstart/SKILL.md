@@ -10,9 +10,9 @@ description: >-
   init` greenfield setup; and for `prisma-next contract infer` + `db sign`
   against an existing database. Also covers the connect-write-read first-arc
   orientation, the day-to-day commands (`contract emit`, `db init`, `db
-  update`, `migration plan`, `migration apply`, `db schema`, `db verify`), and
+  update`, `migration plan`, `migrate`, `db schema`, `db verify`), and
   routing to `prisma-next-contract` / `prisma-next-queries` /
-  `prisma-next-runtime` for the next move. Flags --target, --authoring,
+  `prisma-next-runtime` for the next move. Flags: --target, --authoring,
   --schema-path, --probe-db, --output.
 ---
 
@@ -167,7 +167,7 @@ Run the snippet from *Your first arc — connect, write, read* above against wha
 Now ask the user what they want to build. Route to the skill that owns that move:
 
 - More queries (filters, joins, transactions, raw SQL, TypedSQL) → `prisma-next-queries`.
-- Add a model, change a field, add a relation → `prisma-next-contract`. They'll touch `contract emit` and `db update` (or `migration plan` + `migration apply`) as part of that workflow.
+- Add a model, change a field, add a relation → `prisma-next-contract`. They'll touch `contract emit` and `db update` (or `migration plan` + `migrate`) as part of that workflow.
 - Middleware, environment config, multiple targets → `prisma-next-runtime`.
 - Vite / Next.js / dev-server integration → `prisma-next-build`.
 - They want a fuller toolbelt overview at this point — *Commands you'll use day-to-day* below is the one-glance summary.
@@ -282,7 +282,7 @@ A reference table — not a script to recite at the user. Commands surface in th
 | Re-emit `contract.json` + `contract.d.ts` after editing the contract source | `prisma-next contract emit` | `prisma-next-contract` |
 | Quick dev-only schema sync (no migration history kept) | `prisma-next db update` | `prisma-next-migrations` |
 | Plan a migration from a contract diff | `prisma-next migration plan --name <slug>` | `prisma-next-migrations` |
-| Apply pending migrations | `prisma-next migration apply` | `prisma-next-migrations` |
+| Apply pending migrations | `prisma-next migrate` | `prisma-next-migrations` |
 | Inspect the live database | `prisma-next db schema` | `prisma-next-debug` |
 | Confirm the DB matches the contract (drift check) | `prisma-next db verify` | `prisma-next-debug` |
 | Bring an existing DB into a PN contract | `prisma-next contract infer --db "$DATABASE_URL"` | this skill (brownfield) |
@@ -299,7 +299,7 @@ Switch authoring later by re-running `prisma-next init` in the same directory. T
 ## Common Pitfalls
 
 1. **Running `prisma-next init <project-name>` with a positional argument.** `init` operates on the current working directory; there is no positional project-name argument. `mkdir foo && cd foo && pnpm dlx prisma-next init`.
-2. **`init` doesn't connect to your database.** It only scaffolds files and installs dependencies (and runs the initial `contract emit`). You connect with `db init` / `db update` / `migration apply`. If `init` succeeds and queries fail, the issue is `DATABASE_URL`, not `init`.
+2. **`init` doesn't connect to your database.** It only scaffolds files and installs dependencies (and runs the initial `contract emit`). You connect with `db init` / `db update` / `migrate`. If `init` succeeds and queries fail, the issue is `DATABASE_URL`, not `init`.
 3. **Treating inferred PSL as the final contract.** `contract infer` produces a starting point. Don't `db sign` against a contract you haven't read.
 4. **Forgetting to emit after editing the contract.** The contract artefacts (`contract.json`, `contract.d.ts`) are stale until you run `contract emit`. If the type-checker says a model "doesn't exist", you skipped emit.
 5. **Setting `DATABASE_URL` in `prisma-next.config.ts` instead of `.env`.** The config reads `.env` automatically via `dotenv/config`. Hardcoding the URL leaks credentials and bypasses per-environment overrides. See `prisma-next-runtime`.

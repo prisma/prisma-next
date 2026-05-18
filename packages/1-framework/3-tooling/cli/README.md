@@ -1017,12 +1017,12 @@ prisma-next migration status [--db <url>] [--ref <name>] [--config <path>] [--js
 
 **Branched graphs:** When the migration graph has multiple branches (divergence), status reports an `AMBIGUOUS_TARGET` error with the divergence point and branch details. Use `--ref` to target a specific branch.
 
-### `prisma-next migration apply`
+### `prisma-next migrate`
 
 Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration graph to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.
 
 ```bash
-prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next migrate [--db <url>] [--to <contract>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
@@ -1045,7 +1045,7 @@ prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--jso
 
 **Config requirements:** Requires `driver` and `db.connection` (or `--db`). `migrations.dir` is optional and defaults to `migrations/`.
 
-**Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migration apply` resumes from the last successful migration.
+**Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migrate` resumes from the last successful migration.
 
 **Ref-based routing:** With `--ref`, apply targets the ref's hash instead of the contract hash. This enables multi-environment workflows where staging and production track different points in the migration graph.
 
@@ -1069,10 +1069,9 @@ The scaffolded `migration.ts` calls `MigrationCLI.run(import.meta.url, ...)` fro
 Manage named refs in `migrations/refs.json`. Refs map logical environment names (e.g., `staging`, `production`) to contract hashes, enabling multi-environment migration workflows where different environments track different points in the migration graph.
 
 ```bash
-prisma-next migration ref set <name> <hash>    # Set a ref to a contract hash
-prisma-next migration ref get <name>            # Get the hash for a ref
-prisma-next migration ref delete <name>         # Delete a ref
-prisma-next migration ref list                  # List all refs
+prisma-next ref set <name> <contract>          # Set a ref to a contract (hash, ref, dir, ...)
+prisma-next ref list                           # List all refs (use `ref list` and filter for one ref)
+prisma-next ref delete <name>                  # Delete a ref
 ```
 
 **Options (all subcommands):**
