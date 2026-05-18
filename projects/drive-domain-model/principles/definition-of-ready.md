@@ -1,12 +1,18 @@
 # Principle: Definition of Ready Gates Pickup at Three Scopes
 
-## Thesis
+## At a glance
 
-**Definition of Ready (DoR)** is the team's pre-condition checklist for picking up a unit of work. If DoR is not satisfied, the unit is **not ready to start** — the agile orchestrator either resolves the gap before delegating or surfaces the gap (often as a design discussion). DoR is the structural fix for the failure mode where a unit *looks* ready but isn't, and the implementer discovers the gap mid-dispatch (drift) or quietly accommodates around it (silent expansion).
+**DoR is the pickup gate** — a pass/fail checklist a unit must satisfy before work on it starts. If DoR is not satisfied, the work is to **resolve the gap**, not to start the unit. Gates three scopes:
 
-DoR gates **three scopes**: project, slice, dispatch. The shape is the same at every scope (a checklist with pass/fail items); the content scales with the unit. The protocol carries the shape; calibration carries the content.
+| Scope | Gate focus | Checked by |
+|---|---|---|
+| **Project** (light) | Purpose + scope boundary + project-DoD exist; triage verdict is "project." | `drive-create-project` at project initiation. |
+| **Slice** (heaviest) | Slice spec + slice plan exist; every dispatch sized ≤ M; outcome fits one PR; calibration entries linked; spike dependencies resolved; design calls settled. | `drive-slice-specify` / `drive-slice-plan` at slice initiation. |
+| **Dispatch** (calibration-bound) | Brief assembled per [`brief-discipline.md`](brief-discipline.md); sized ≤ M; model tier declared; inputs loadable; validation gates runnable; calibration matches in edge-case table. | `drive-orchestrate-plan` at dispatch pre-flight. |
 
-DoR is the *pickup* gate. Definition of Done (next principle) is the *handoff* gate. Together they bookend every unit of work.
+**Shape is identical at every scope; content scales with the unit.** The protocol (canonical skill bodies) carries the shape; the team's project-context (the matching `drive/<category>/README.md` per [PR #93](https://github.com/prisma/ignite/pull/93)) carries the content.
+
+DoR is the *pickup* gate. [`definition-of-done.md`](definition-of-done.md) is the *handoff* gate. Together they bookend every unit of work.
 
 ## Terminology
 
@@ -220,5 +226,5 @@ Two failure modes:
 - **[`brief-discipline.md`](brief-discipline.md)** — dispatch DoR substantially asks "is the brief assembled per brief discipline?"
 - **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the M-cap at dispatch DoR is the size invariant cost optimization depends on.
 - **[`roles-and-personas.md`](roles-and-personas.md)** — the agile orchestrator persona runs DoR at every scope.
-- (Upcoming) **`definition-of-done.md`** — the handoff gate that bookends every unit; together with DoR they form the unit's contract.
+- **[`definition-of-done.md`](definition-of-done.md)** — the handoff gate that bookends every unit; together with DoR they form the unit's contract.
 - [`retro.md`](retro.md) — when DoR catches a gap, it's the gate working; when it doesn't, the retro updates the calibration's DoR overlay.

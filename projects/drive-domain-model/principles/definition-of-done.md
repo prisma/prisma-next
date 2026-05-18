@@ -1,12 +1,22 @@
 # Principle: Definition of Done Gates Handoff at Three Scopes
 
-## Thesis
+## At a glance
 
-**Definition of Done (DoD)** is the team's verification checklist for completing a unit of work. If DoD is not satisfied, the unit is not done — the implementer either resolves the gap before declaring done or the gap is escalated as a design discussion. DoD is the structural fix for the failure mode where a unit "looks done" but isn't, and the gap is discovered downstream (broken build, escapee bug, post-merge revert).
+**DoD is the handoff gate** — a pass/fail checklist a unit must satisfy before being declared done. If DoD is not satisfied, the work is to **resolve the gap**, not to declare done. Gates three scopes:
 
-DoD gates **three scopes**: project, slice, dispatch. The shape is the same at every scope (a checklist with pass/fail items); the content scales with the unit. The protocol carries the shape; calibration carries the content.
+| Scope | Gate focus | Checked by |
+|---|---|---|
+| **Project** | All slices delivered + outcomes hold + deferred-work triaged + docs migrated + manual-QA coverage adequate + **mandatory final retro** + Linear cleanup + folder deleted. | `drive-close-project` at project closure. |
+| **Slice** | Spec outcome met + all dispatches done + PR review-clean + intent-validation passes + no silent amendments (I12) + manual-QA satisfied (or honest N/A). | Slice closure ritual at PR merge. |
+| **Dispatch** | All brief validation gates pass + every edge case handled per disposition + no scope-out touched + reviewer verdict accept + intent-validation passes. | `drive-orchestrate-plan` at dispatch post-flight. |
 
-DoD is the *handoff* gate. Definition of Ready (previous principle) is the *pickup* gate. Together they bookend every unit of work.
+**Three distinct verification categories**, each closing a different gap class:
+
+- **CI gates** verify the *mechanical* contract (compile, tests, lint, greps).
+- **Intent-validation** verifies the work delivered *what the spec asked for* — catches "the implementer routed around the gate" cases CI cannot.
+- **Manual QA** verifies what CI cannot meaningfully cover (diagnostic clarity, end-to-end developer journey, original-bug regression, gate-of-gate sanity, exploratory unknowns). Authored via `drive-qa-plan` and executed via `drive-qa-run` ([PR #93](https://github.com/prisma/ignite/pull/93)). Slice + project DoD require it whenever the unit touches user-observable surface (else explicit N/A with rationale).
+
+DoD is the *handoff* gate. [`definition-of-ready.md`](definition-of-ready.md) is the *pickup* gate. The protocol (canonical skill bodies) carries the shape; the team's project-context (the matching `drive/<category>/README.md`) carries the content.
 
 ## Why DoD matters
 

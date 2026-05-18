@@ -1,12 +1,22 @@
 # Principle: Three Roles + One Persona, Wearable By Humans Or Agents
 
-## Thesis
+## At a glance
 
-Drive recognises **three roles** (project owner, implementer, reviewer) and **one persona** (agile orchestrator). The roles are distinct because each requires a different stance the same brain cannot fluidly switch between in the same minute. The persona is the orientation the actor running scope discipline wears at any given moment, independent of which role they hold.
+**Drive recognises three roles and one persona.**
 
-All four can be played by humans, by agents, or in mixed configurations. The current configuration is "human wears most; orchestrator agent wears agile orchestrator during dispatch loops"; the trajectory is "orchestrator agent eventually wears agile orchestrator at all scopes; human's residual role becomes design-level."
+| Role | Owns | Why it's a real role |
+|---|---|---|
+| **Project owner** | Purpose statement + scope decisions + project-DoD + sign-off | Zoom-out stance — incompatible with in-the-weeds coding in the same minute. |
+| **Implementer** | Slice spec + slice plan + dispatch execution + PR open | Continuous flow state across spec / plan / execute. |
+| **Reviewer** | Slice review (verdict + findings) | Adversarial reading — incompatible with the "I made this work" stance the implementer just exited. |
 
-This principle is the team-shape companion to [`protocol-as-memory.md`](protocol-as-memory.md): the rituals are the memory, the roles are the actors who execute them.
+| Persona | Stance |
+|---|---|
+| **Agile orchestrator** | Scope discipline, sizing instinct, process facilitation (DoR / DoD / WIP-inspection / brief / design-discussion escalation / retro running). Worn by whichever actor is currently running scope discipline or driving the dispatch loop. Independent of role. |
+
+**All four can be played by humans, by agents, or in mixed configurations.** Today the human wears most; the orchestrator agent wears the agile-orchestrator persona during dispatch loops. The trajectory hands the persona to the orchestrator agent at all scopes (triage, dispatch loop, retro-running, protocol maintenance) as the team's calibration matures; the human's residual role becomes design-level (project spec authoring, design-discussion participation, falsified-assumption escalation).
+
+The role/persona split is the team-shape companion to [`protocol-as-memory.md`](protocol-as-memory.md): the rituals are the memory; the roles and persona are the actors who execute them.
 
 ## The three roles
 
@@ -134,7 +144,7 @@ Two recurring failures:
 ## Related principles
 
 - **[`protocol-as-memory.md`](protocol-as-memory.md)** — the rituals the persona facilitates ARE the team's memory; without the persona, the rituals don't fire and the memory doesn't accumulate.
-- (Upcoming) **`brief-discipline.md`** — every brief carries an implementer assignment + an expected reviewer; the persona's job is to assemble the brief.
-- (Upcoming) **`definition-of-ready.md`** — the gate the persona runs before delegating to the implementer.
-- (Upcoming) **`definition-of-done.md`** — the gate the persona runs before accepting the implementer's work.
-- (Upcoming) **`retro.md`** — the persona owns running the retro and lands the resulting protocol / calibration / ADR update.
+- **[`brief-discipline.md`](brief-discipline.md)** — every brief carries an implementer assignment + an expected reviewer; the persona's job is to assemble the brief.
+- **[`definition-of-ready.md`](definition-of-ready.md)** — the gate the persona runs before delegating to the implementer.
+- **[`definition-of-done.md`](definition-of-done.md)** — the gate the persona runs before accepting the implementer's work.
+- **[`retro.md`](retro.md)** — the persona owns running the retro and lands the resulting protocol / calibration / ADR update.
