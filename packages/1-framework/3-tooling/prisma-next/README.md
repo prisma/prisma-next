@@ -48,7 +48,7 @@ Init prompts for your database (PostgreSQL or MongoDB) and schema location, scaf
 | `prisma-next migration plan` | Plan a new migration from contract changes. |
 | `prisma-next migration show` | Display a migration package. |
 | `prisma-next migration status` | Show the migration graph and applied status. |
-| `prisma-next migration apply` | Apply planned migrations to the database. |
+| `prisma-next migrate` | Apply planned migrations to the database. |
 | `prisma-next migration verify` | Verify a migration package's integrity. |
 | `prisma-next migration ref` | Manage named refs in `migrations/refs.json`. |
 
