@@ -1,7 +1,7 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 type LegacyStorage = Record<string, unknown> & {
-  readonly tables?: Readonly<Record<string, unknown>>;
+  readonly tables?: Readonly<Record<string, unknown>> | null;
 };
 
 export function storageWithNamespacedTables(storage: LegacyStorage): Record<string, unknown> {

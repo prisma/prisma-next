@@ -38,7 +38,7 @@ describe('SqlStorage.namespaces population', () => {
       models: [minimalModelArgs],
     });
     expect(Object.keys(contract.storage.namespaces)).toEqual([UNBOUND_NAMESPACE_ID]);
-    const slot = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    const slot = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
     expect(slot).not.toBe(SqlUnboundNamespace.instance);
     expect(slot.id).toBe(UNBOUND_NAMESPACE_ID);
     expect(slot.tables['app_user']).toBeDefined();
