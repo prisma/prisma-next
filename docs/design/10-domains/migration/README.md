@@ -131,7 +131,7 @@ Both grammars borrow two ideas from Git (prefix-matching on hashes and the `^` o
 
 #### Examples
 
-```
+```sh
 prisma-next migrate --to production                            # ref name → contract
 prisma-next migrate --to 1f3b7c4a                              # hash prefix → contract
 prisma-next migrate --to 20260117T1042_add_users_table         # migration dir → to-contract
@@ -195,8 +195,8 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 
 ### Operations and migrations
 
-- **Migration** — a unit of intent that takes the database from one **contract** to another. The canonical user-facing term. Refers indifferently to the conceptual unit, the on-disk directory, and the graph entity — exact meaning falls out of context.
-- **Migration package** — internal/architectural term for the on-disk directory specifically (its files: `migration.json`, `ops.json`, `migration.ts`, `start-contract.json`, `end-contract.json`, optional typings). Used in dev docs when filesystem shape matters; in user-facing prose, just say "migration."
+- **Migration** — the on-disk artifact: the directory that contains `migration.json`, `ops.json`, `migration.ts`, and contract snapshots. When the conceptual or graph-theoretic meaning is intended, use an explicitly qualified term: "conceptual migration" (the unit of intent that advances the database from one contract to another) or "migration edge" (the directed graph edge — see below).
+- **Migration package** — synonym for "migration" (the on-disk directory). Preferred in dev docs and architectural text when the filesystem shape is what matters. In user-facing prose, just say "migration."
 - **Migration directory name** — the conventional user-facing identifier for a migration: `<YYYYMMDDTHHMM>_<sanitized-slug>` (UTC, minute precision). Created at planning time from `--name <slug>`. The timestamp prefix is **convention**, not invariant — the directory name is user-controlled. Uniqueness within the app contract space is enforced at planning time (collisions are rejected); ambiguity at resolution time (e.g. a hex-named directory colliding with a hash prefix) produces an explicit error.
 - **`migration.json`** / **Manifest** — the migration's metadata file. Records `from`, `to`, `migrationHash`, `providedInvariants`, `labels`, `createdAt`, and the (non-identity) `fromContract` / `toContract` snapshots.
 - **`ops.json`** — the migration's op list in post-lowering form. *The migration contract* — what the runner trusts and replays. Never compiled, never `eval`'d at execution time.

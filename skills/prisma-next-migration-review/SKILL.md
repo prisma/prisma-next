@@ -157,7 +157,7 @@ The gate is `migration status --to <env> --db $URL`: it computes the path from t
 - name: Verify staging is reachable
   run: |
     pnpm prisma-next migration status \
-      --ref staging --db "$STAGING_DATABASE_URL" --json > status.json
+      --to staging --db "$STAGING_DATABASE_URL" --json > status.json
     node -e '
       const s = JSON.parse(require("fs").readFileSync("status.json", "utf8"));
       const warns = (s.diagnostics ?? []).filter(d => d.severity === "warn");
