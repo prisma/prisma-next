@@ -16,6 +16,14 @@ The skill family is built **locally in `prisma-next`** first (`.agents/skills/dr
 
 The model lives in [`model.md`](model.md). The operational lifecycle lives in [`workflow.md`](workflow.md). The skill restructure lives in [`skill-restructure.md`](skill-restructure.md). The externally-shareable problem framing lives in [`problem-statement.md`](problem-statement.md). The gradual-AI-adoption principle lives in [`principles/gradual-ai-adoption.md`](principles/gradual-ai-adoption.md).
 
+## Design tenets
+
+Two tenets cut across the design. Everything else is downstream of these.
+
+1. **Gradual AI adoption.** A team's use of Drive sits on a spectrum from "human reads, writes, decides everything; agents only execute narrow tasks" to "agent runs the whole loop; human only at the project-spec layer." Every team is at some point on this spectrum today; every team's point moves over time. The methodology supports participation at any point — both the atomic and workflow skill tiers are first-class, every protocol artefact is human-readable and human-runnable, and the project-context surfaces (`drive/<category>/README.md`) serve both humans and agents. See [`principles/gradual-ai-adoption.md`](principles/gradual-ai-adoption.md) for the principle and [`principles/roles-and-personas.md`](principles/roles-and-personas.md) § "Walkable transitions" for the concrete intermediate points an operator can occupy.
+
+2. **Protocol as memory.** Agent teams have none of the human-team continuity mechanisms (people stick around, hallway conversations, apprenticeship, codebase familiarity). The protocol — the rituals, the skill bodies, the `drive/<category>/README.md` overlays — IS the team's memory. Anything that isn't written into a surface the next agent will read does not exist for the next agent. See [`principles/protocol-as-memory.md`](principles/protocol-as-memory.md).
+
 ## The problem (compressed)
 
 Two failure modes in today's canonical Drive compound:

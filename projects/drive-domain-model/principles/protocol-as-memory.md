@@ -31,6 +31,8 @@ The **shared playbook** lives upstream in [`prisma/ignite`](https://github.com/p
 
 **Your team's notes** live in `your-repo/drive/<category>/README.md`. The first thing every drive-* skill does when it runs is read its matching README. So if `drive/plan/README.md` says "every brief in this repo needs a `Customer impact:` section," every brief assembled in this repo gets that section — without anyone touching the shared skill body.
 
+Both surfaces are **human-readable and human-runnable**, not just agent context loaders. A team member who hasn't invoked a single drive-* skill can read `drive/plan/README.md` directly to consult the team's failure-mode catalogue; they can read a canonical skill body to learn what shape a brief is supposed to have. This is what makes the gradual-AI-adoption spectrum walkable (see [`gradual-ai-adoption.md`](gradual-ai-adoption.md)) — humans participate in the protocol at any level, from "running everything by hand using the docs" to "letting `drive-build-workflow` pilot the loop."
+
 ## What goes where
 
 **In the shared skill body** (which means: not edited in your repo, but proposed upstream to `prisma/ignite`):
@@ -145,6 +147,7 @@ The mechanics of retros (when they fire, what triggers count, the template) live
 ## Related principles
 
 - **[`retro.md`](retro.md)** — the ritual that lands the lessons. Triggers and template.
+- **[`gradual-ai-adoption.md`](gradual-ai-adoption.md)** — the memory surfaces are designed for both humans and agents; this is what makes the spectrum from "zero AI" to "full delegation" walkable.
 - **[`brief-discipline.md`](brief-discipline.md)** — the brief draws from `drive/plan/README.md`'s failure-mode catalogue and grep library every time it's assembled.
 - **[`definition-of-ready.md`](definition-of-ready.md)** + **[`definition-of-done.md`](definition-of-done.md)** — the templates carry the gate's shape; `drive/<category>/README.md` overlays carry the team-specific gate items.
 - **`drive-reconcile-skills` + `drive-update-skills`** ([PR #93](https://github.com/prisma/ignite/pull/93)) — the meta-skills that keep canonical and your local copy in sync.

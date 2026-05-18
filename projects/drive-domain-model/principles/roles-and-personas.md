@@ -31,6 +31,20 @@ Two rules govern how fast you can delegate:
 1. **Delegate when your `drive/<category>/README.md` carries the lessons.** A role is safe to hand to an agent once your team's project-context overlays capture the failure modes that would otherwise need human judgment. If your overlays are sparse, keep the operator in the loop.
 2. **Delegation is per-role and per-scope, not all-or-nothing.** You can delegate implementer + reviewer for low-risk slices while staying in the loop for high-risk ones.
 
+## Walkable transitions
+
+The trajectory above is a spectrum, not a step function — see [`gradual-ai-adoption.md`](gradual-ai-adoption.md) for the principle. Three concrete intermediate points an operator can occupy *today* without committing to "agent runs the loop":
+
+| Point | What the operator does | Drive skills they invoke |
+|---|---|---|
+| **Manual** | Reads `principles/` + `drive/<category>/README.md` directly; runs the rituals by hand. No drive-* skills involved. | None — git, GitHub, Linear directly. |
+| **Atomic invocation** | Invokes individual atomic skills as building blocks (`drive-slice-specify` to scaffold a spec; `drive-slice-plan` to lay out dispatches; `drive-pr-description` to draft a PR body). Operator stays in the loop between invocations. | Atomic skills only; no workflow skills. |
+| **Workflow invocation** | Invokes a workflow skill (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) and lets it pilot the loop top-to-bottom. Operator handles design discussions + assumption-falsification escalations that fire to them. | Workflow skills + (transparently) the atomic skills they call. |
+
+Each point is a fully valid mode of operation. Moving from one to the next is a deliberate choice, not an inevitability — a team that stays at "atomic invocation" indefinitely is operating Drive correctly; they're just not delegating more.
+
+The cost of staying low on the spectrum: more operator time per slice. The cost of moving high too fast: the agent loop runs without the lessons the overlays would have provided, and drift recurs in the ways the overlays would have caught. Both gates are observable; both regress if you move too fast and surface in retros.
+
 ## What makes a role real
 
 A role is real when **the same person can't fluidly switch to another role in the same minute without a context shift.**
@@ -105,6 +119,7 @@ For projects whose purpose is captured by a stable input artefact that doesn't n
 
 ## Related principles
 
+- **[`gradual-ai-adoption.md`](gradual-ai-adoption.md)** — the trajectory across the human / agent spectrum is walkable; every point is a valid place to operate; the protocol supports participation at any level.
 - **[`protocol-as-memory.md`](protocol-as-memory.md)** — the rituals the hat facilitates ARE the team's memory; without the hat, the rituals don't fire and the memory doesn't accumulate.
 - **[`brief-discipline.md`](brief-discipline.md)** — every brief carries an implementer assignment + an expected reviewer; the hat assembles the brief.
 - **[`definition-of-ready.md`](definition-of-ready.md)** — the gate the hat runs before delegating.
