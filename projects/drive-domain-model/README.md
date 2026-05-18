@@ -36,14 +36,24 @@ Read in this order:
    - [`protocol-as-memory.md`](principles/protocol-as-memory.md) — why agent teams must capture lessons in rituals
    - [`decomposition-and-cost.md`](principles/decomposition-and-cost.md) — why smaller dispatches enable cheaper tiers
    - [`spikes.md`](principles/spikes.md) — time-boxed investigations with artefact output (now a brief-type variant)
-   - `roles-and-personas.md` — the three-role + one-persona mapping (upcoming)
-   - `brief-discipline.md` — Example Mapping in every dispatch brief (upcoming)
-   - `definition-of-ready.md` — gate shape at three scopes (upcoming)
-   - `definition-of-done.md` — gate shape at three scopes (upcoming)
-   - `retro.md` — trigger-based retro template (upcoming)
+   - [`roles-and-personas.md`](principles/roles-and-personas.md) — the three-role + one-persona mapping
+   - [`brief-discipline.md`](principles/brief-discipline.md) — Example Mapping in every dispatch brief
+   - [`definition-of-ready.md`](principles/definition-of-ready.md) — gate shape at three scopes
+   - [`definition-of-done.md`](principles/definition-of-done.md) — gate shape at three scopes (includes manual QA per [PR #93](https://github.com/prisma/ignite/pull/93))
+   - [`retro.md`](principles/retro.md) — trigger-based retro template
 6. [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration for the `prisma-next` repo
-7. [`skill-restructure.md`](skill-restructure.md) — the proposed `drive-*` skill set with augmentations (upcoming)
-8. [`plan.md`](plan.md) — execution plan for landing this work (upcoming)
+7. [`skill-restructure.md`](skill-restructure.md) — workflow → skill map + the proposed restructure (stacks on PR #93)
+8. [`plan.md`](plan.md) — execution plan for landing this work
+
+## Base assumption
+
+All canonical-side work proposed here stacks on top of [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93), which ships:
+
+- The **project-context convention** (`drive/<category>/README.md` read by drive-* skills as workflow step 1).
+- The **manual-QA pair** (`drive-qa-plan` + `drive-qa-run`) — the judgement layer on top of CI.
+- Three **meta-skills** (`drive-bootstrap-context`, `drive-reconcile-skills`, `drive-update-skills`).
+
+Several docs in this project reference that surface as already-existing. See `skill-restructure.md` § "Base assumption" for the integration details.
 
 ## How this project relates to others
 
@@ -69,6 +79,7 @@ Today's `drive-*` skill family operates on fuzzy units and skips dispatch-level 
 - **New** `drive-health-check` (project rollup; session-bookended or trigger-fired).
 - **New** `drive-retro-run` (trigger-based retro template).
 - **Retire** "milestone" and "task" as Drive vocabulary; "step" demotes to implementer-internal.
+- **Stack on PR #93**: the manual-QA pair + project-context convention are treated as the canonical baseline; slice and project DoD reference them directly.
 
 ### Eventual home
 

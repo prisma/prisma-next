@@ -1,336 +1,156 @@
 # Skill restructuring plan
 
-Inventory + verdicts for every existing canonical `drive-*` skill under the consolidated domain model, plus charters for the new skills the model introduces. **Option A scope**: this doc carries the *what changes and why* — the actual skill bodies (frontmatter, Workflow, Pitfalls, Checklist) are drafted per-skill in their canonical-side PRs in the `prisma/ignite` repo (Option B, delivered piecemeal).
+This doc maps the consolidated Drive workflow onto skills and shows how the canonical inventory in [`prisma/ignite`](https://github.com/prisma/ignite) needs to change to land the model.
 
-This is the planning artefact reviewers use to evaluate whether the restructuring is sensible. Each upstream PR's body will reference this plan and the relevant `model.md` section.
+It is the **planning artefact** reviewers use to decide whether the restructuring is sensible. Implementing each change is the job of a per-skill PR in `prisma/ignite`, each of which links back to this doc and the relevant `model.md` section. The skill bodies themselves (frontmatter, Workflow, Pitfalls, Checklist) are drafted in those per-skill PRs, not here.
 
-## Framing
+## Base assumption
 
-Three pressures shape the restructure:
+All canonical-side PRs proposed here stack on top of [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) (the drive-context-convention work). PR #93 ships:
 
-1. **Vocabulary alignment.** Every existing canonical skill body uses pre-model words ("milestone," "task," generic "plan") at scopes the new model now pins. Bodies need rewriting to use slice / dispatch / direct change / project at their declared scope.
-2. **Scope declarations.** Every skill must declare a scope: project, slice, dispatch (rare; usually inside `drive-orchestrate-plan`), or cross-cutting. Today the scope is implicit; reviewers and operators each interpret.
-3. **The three workflow gaps.** Triage, project health rollup, and retro running have no dedicated skill. They're load-bearing under the consolidated model; three new skills land.
+- The **project-context convention**: drive-* skills read `drive/<category>/README.md` at the consumer-project root as workflow step 1. Categories include `spec`, `project`, `plan`, `qa`, `code-review`, `pr`, `deployment`, `post-update`.
+- **`drive-qa-plan`** + **`drive-qa-run`**: the manual-QA discipline — author a script that exercises the system the way a real user would (script in `projects/<project>/manual-qa.md`), then execute it and produce a severity-classified run report. Manual QA is the *judgement* layer on top of CI: diagnostic clarity, original-bug re-enactment, end-to-end developer-journey smoke, gate-of-gate sanity, exploratory probing.
+- **`drive-bootstrap-context`**, **`drive-reconcile-skills`**, **`drive-update-skills`**: the meta-skills that scaffold the `drive/` directory, reconcile drifted skill copies against canonical (extracting project-specific deltas into the right `drive/<category>/README.md`), and pull canonical updates.
 
-The restructure ships per-skill in `prisma/ignite`, not as an omnibus PR (per `spec.md` § NFR2). Per-skill PRs are independently reviewable and consumers can adopt skill-by-skill via `drive-reconcile-skills`.
+This work treats PR #93 as in place. All references to "the convention," "the QA pair," and "the meta-skills" below assume the PR #93 surface exists.
 
-## Verdicts table
+## 1. The workflow → skill map (start here)
 
-Eight verdict types. Each existing skill gets one; each new skill carries its rationale.
+For every activity in the consolidated workflow, this table names the skill that drives it, the skill's scope (one of *project*, *slice*, *dispatch*, *trigger-based*, *cross-cutting*), and its status under the restructure.
 
-| Verdict | Meaning |
+| Workflow activity | Scope | Skill | Status under restructure | Bucket |
+|---|---|---|---|---|
+| Triage incoming work / scope shift | cross-cutting | **`drive-triage-work`** | new | `.experimental` |
+| Design discussion (pre-spec / mid-spec / mid-flight) | cross-cutting | `drive-discussion` | promoted to first-class | `.curated` |
+| Author project spec | project | **`drive-project-specify`** | new (split from `drive-create-spec`) | `.curated` |
+| Author project plan | project | **`drive-project-plan`** | new (split from `drive-create-plan`) | `.curated` |
+| Scaffold a project | project | `drive-create-project` | augmented | `.curated` |
+| Project-health rollup | project | **`drive-health-check`** | new | `.experimental` |
+| Status update on project | project | `drive-post-update` | stays (vocabulary refresh) | `.curated` |
+| Author slice spec | slice | **`drive-slice-specify`** | new (split from `drive-create-spec`) | `.curated` |
+| Author slice plan | slice | **`drive-slice-plan`** | new (split from `drive-create-plan`) | `.curated` |
+| Run slice dispatch loop | slice | `drive-orchestrate-plan` | augmented | `.curated` |
+| Code-review a slice | slice | `drive-review-code` | stays (vocabulary refresh) | `.curated` |
+| Author manual-QA script for a slice | slice | `drive-qa-plan` | from PR #93 (stays) | `.experimental` |
+| Run manual-QA script + report findings | slice | `drive-qa-run` | from PR #93 (stays) | `.experimental` |
+| Author PR description (slice or direct change) | slice / direct change | `drive-pr-description` | augmented (direct-change framing) | `.curated` |
+| Author PR walkthrough (slice or direct change) | slice / direct change | `drive-pr-walkthrough` | stays | `.curated` |
+| Reverse-engineer a spec from an existing PR | slice (sometimes project) | `drive-reverse-spec` | stays | `.experimental` |
+| Author a deployment plan | project | `drive-create-deployment-plan` | stays (vocabulary refresh) | `.curated` |
+| Run a retro (triggered) | trigger-based | **`drive-retro-run`** | new | `.experimental` |
+| Close out a project | project | `drive-close-project` | augmented | `.curated` |
+| Bootstrap the `drive/` context directory | cross-cutting (consumer onboarding) | `drive-bootstrap-context` | from PR #93 (stays) | `.experimental` |
+| Reconcile drifted skill copies | cross-cutting (consumer onboarding) | `drive-reconcile-skills` | from PR #93 (stays) | `.experimental` |
+| Update installed skills from canonical | cross-cutting (consumer onboarding) | `drive-update-skills` | from PR #93 (stays) | `.experimental` |
+| Install / discover personas | cross-cutting | `drive-agent-personas` | stays (vocabulary refresh) | `.curated` |
+| List available skills | cross-cutting | `drive-list` | stays | `.system` |
+
+Two activities deliberately have *no* dedicated skill:
+
+- **Direct change** bypasses Drive ceremony by design (single PR, no spec / plan / dispatch). It uses `gh pr create` directly with the intent in the PR body. The direct-change framing lives inside `drive-pr-description`, not in a separate skill — that's why `drive-pr-description` is augmented rather than stayed.
+- **Promote** and **demote** (the mid-flight scope-shift verdicts from triage) are operations that `drive-triage-work` orchestrates, not separate skills. Their Linear patterns live in `model.md` § Linear sync.
+
+## 2. Naming convention recap
+
+Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/main/skills/README.md), the only hard rule is "consistency with existing skills." The dominant shapes:
+
+- **`drive-<verb>-<noun>`** for action skills producing an artefact: `drive-create-spec`, `drive-close-project`, `drive-orchestrate-plan`, `drive-review-code`, `drive-triage-work`, `drive-health-check`.
+- **`drive-<sub-namespace>-<verb>`** for skills under a focused area: `drive-pr-description`, `drive-pr-walkthrough`, `drive-qa-plan`, `drive-qa-run`, `drive-project-specify`, `drive-slice-specify`, `drive-project-plan`, `drive-slice-plan`, `drive-retro-run`.
+- **`drive-<verb>`** or **`drive-<noun>`** for single-name skills: `drive-list`, `drive-discussion`.
+
+The new skill names in § 1 each match one of these shapes. The `project-` / `slice-` sub-namespaces (introduced by the split skills) match the precedent set by `pr-` and `qa-`.
+
+## 3. What changes from current to final
+
+### 3.1 Vocabulary refresh (every existing skill)
+
+Every existing canonical drive-* skill body uses pre-model vocabulary in at least one section. The refresh applies these replacements:
+
+| Old word | New word | Why |
+|---|---|---|
+| milestone (Drive-side) | slice | Linear's "milestone" is unchanged; the Drive-side word for the PR-sized unit becomes "slice." |
+| task (PR-sized unit sense) | slice | Slice is the Drive name; Linear keeps "issue." |
+| task (agent-invocation sense) | dispatch | The agent-team word is "dispatch"; "step" was a plan-side concept that didn't survive. |
+| plan (ambiguous between project / slice) | project plan / slice plan | Mandatory after the spec/plan-skill split lands. |
+
+### 3.2 New skills (seven; two pairs replace two existing skills)
+
+| Skill | What it does | Why it's new |
+|---|---|---|
+| `drive-triage-work` | Routes an incoming ask (or scope-shift signal) to one of the eight triage verdicts: direct change / orphan slice / in-project slice / new project / promote / demote / spike first / defer. | Triage is load-bearing under the consolidated model (`model.md` § Workflows § Triage). Today the routing is implicit; the new skill makes it explicit and runnable. |
+| `drive-project-specify` | Produces a project spec: purpose statement, scope boundary, project-DoD. Often invoked with design-discussion participation. | Split from `drive-create-spec`. Project-spec authoring has meaningfully different inputs, outputs, and templates from slice-spec authoring (decision 17). |
+| `drive-slice-specify` | Produces a slice spec: scope within the parent project's purpose (if any), slice-DoD, Example-Mapping edge cases. Authored by the implementer. | Same split rationale. |
+| `drive-project-plan` | Produces a project plan: composition of slices + direct changes with stack / parallel sequencing. Does not enumerate dispatches inside a slice. | Split from `drive-create-plan`. |
+| `drive-slice-plan` | Produces a slice plan: dispatch sequence with sizing + DoR + DoD + model tier declared per dispatch; refuses to finalize with L/XL. | Same split rationale. |
+| `drive-health-check` | Produces a project-health rollup. Two modes: interactive (session-bookended — opening rollup before pick, closing rollup at session end) and unattended (trigger-fired on slice merges, drift alarms, escalation events). | The rollup is one of the three workflow gaps in the consolidated model (`workflow.md` § Project-health rollup cadence). |
+| `drive-retro-run` | Runs a retro on trigger. Mandatory output: a protocol update *or* calibration update *or* ADR. The retro is not done until the update lands in a memory-strong surface. | The retro is the team's only learning mechanism (`principles/protocol-as-memory.md`). Today retros happen ad hoc; the new skill makes triggers + the mandatory-output discipline explicit. |
+
+### 3.3 Augmented existing skills (five)
+
+| Skill | Augmentation |
 |---|---|
-| **stays** | No body change beyond vocabulary refresh. |
-| **augmented** | Body keeps its shape; gains specific new sections / checks / refusals. |
-| **split** | One skill becomes two (project-scope + slice-scope variants). |
-| **renamed** | Existing skill keeps its body; gets a new name + scope declaration. |
-| **new** | No predecessor; fresh skill body. |
-| **retired** | Predecessor removed; functionality absorbed elsewhere. |
-| **promoted** | Moves between buckets (`.experimental/` → `.curated/`, etc.). |
-| **promoted-to-first-class** | Existing skill (often mode) gains workflow-level standing in the model. |
+| `drive-orchestrate-plan` | Five additions: per-dispatch DoR pre-flight (`principles/definition-of-ready.md` § Dispatch DoR); WIP-inspection cadence as a named loop step (`principles/brief-discipline.md` § Practical implications); per-dispatch DoD post-flight including intent-validation (`principles/definition-of-done.md` § Dispatch DoD); brief assembly per `principles/brief-discipline.md`; L/XL refusal at dispatch time + design-discussion stop-condition on falsified-assumption events (invariant I12). |
+| `drive-close-project` | Three additions: mandatory final retro (calls `drive-retro-run`; project DoD requires the retro per invariant I10); refusal to delete `projects/<x>/` while project DoD is unmet; manual-QA coverage of the project's user-observable surface is part of project DoD (drive-qa-* artefacts checked across the project's slices). |
+| `drive-create-project` | Two additions: project DoR check at entry (`principles/definition-of-ready.md` § Project DoR); seeds the `drive/<category>/README.md` entries the project's slice work will need (via `drive-bootstrap-context`). |
+| `drive-discussion` | Promoted to first-class workflow standing. Body documents trigger points (pre-spec, mid-spec, mid-flight on falsified assumption, mid-flight on obstacle, explicit request) + the agile orchestrator's escalation responsibility + the output contract (spec / plan edit + `design-decisions.md` entry). Stays a mode skill (`disable-model-invocation: true`). |
+| `drive-pr-description` | Extended to handle the direct-change case: the PR description is the *only* persisted intent artefact for a direct change, so the skill carries the appropriate framing + brevity guidance + the "is this really a direct change, or did triage misroute?" sanity check. |
 
-## 1. Existing canonical drive-* skills
+### 3.4 Vocabulary-only refresh
 
-### 1.1 `.curated/`
+Skills whose bodies don't otherwise change:
 
-#### `drive-agent-personas` — stays
+`drive-agent-personas`, `drive-review-code` (the rename already landed), `drive-create-deployment-plan`, `drive-post-update`, `drive-pr-walkthrough`, `drive-reverse-spec`, `drive-list`.
 
-**Scope:** Cross-cutting.
+Plus the five PR #93 skills (`drive-qa-plan`, `drive-qa-run`, `drive-bootstrap-context`, `drive-reconcile-skills`, `drive-update-skills`) which are pre-aligned to the consolidated vocabulary — no body change needed.
 
-**Verdict + Why:** Stays. The persona installation surface (architect, principal-engineer, tech-lead, PM, etc.) is independent of the workflow model; the consolidation doesn't change what a persona is or how it loads. Body needs minor vocabulary updates (replace "Maker" with "agile orchestrator" where the persona-loader runs scope discipline; reference [`principles/roles-and-personas.md`](principles/roles-and-personas.md) for the three-role + one-persona mapping).
+### 3.5 Vocabulary retirements (no skill retirements)
 
-#### `drive-close-project` — augmented
+No skill is retired by the restructure. Two **vocabulary retirements**:
 
-**Scope:** Project.
-
-**Verdict + Why:** Stays as the project-closure skill. Augmented with:
-- Mandatory final retro step (calls `drive-retro-run` per [`principles/retro.md`](principles/retro.md) — project DoD requires the retro per `model.md` invariant I10).
-- Refusal to delete `projects/<x>/` if project DoD's required items (per [`principles/definition-of-done.md`](principles/definition-of-done.md) § Project DoD) are unmet. Specifically: the mandatory retro must have produced a landed update; Linear cleanup must be done; long-lived docs must be migrated.
-- Updated Linear ceremony for promotion-pattern completion (if the project was promoted from a ticket per `model.md` § Linear sync, the originating ticket already reflects completion; the Linear Project transitions to Completed via the close-out PR's merge).
-
-#### `drive-code-review` (renamed `drive-review-code`) — stays
-
-**Scope:** Slice.
-
-**Verdict + Why:** Stays. The rename (per the `skills/README.md` `<scope>-<verb>-<noun>` taxonomy) already landed on `main`. Body needs vocabulary refresh only — references to "the task" become "the slice"; refers to slice DoD per [`principles/definition-of-done.md`](principles/definition-of-done.md) for the reviewer's contract.
-
-#### `drive-create-deployment-plan` — stays
-
-**Scope:** Project.
-
-**Verdict + Why:** Stays. Deployment plans are project-scope; the model doesn't change what a deployment plan is. Vocabulary refresh only (deployment plan composes slice deliverables; per-slice deploy considerations live in slice spec).
-
-#### `drive-create-plan` — split
-
-**Scope before:** Implicit (project or task — author chooses).
-
-**Verdict + Why:** Split into two skills: `drive-project-plan` (project-scope; composes slices + direct changes; stack/parallel sequencing) and `drive-slice-plan` (slice-scope; composes dispatches; sizing discipline + DoR-per-dispatch). The two have meaningfully different inputs / outputs / templates per decision 17. The body of `drive-create-plan` does not survive — its content is split, refactored, and re-authored against the new model.
-
-See § 2.3 and § 2.4 for the new skills' charters.
-
-#### `drive-create-project` — stays
-
-**Scope:** Project.
-
-**Verdict + Why:** Stays. Project scaffolding is unambiguous. Augmented with: project DoR check at entry (per [`principles/definition-of-ready.md`](principles/definition-of-ready.md) § Project DoR — triage verdict must be "project"; purpose statement gets the first-pass draft); seeds placeholders for slice template + calibration links.
-
-#### `drive-create-spec` — split
-
-**Scope before:** Implicit.
-
-**Verdict + Why:** Split into two skills: `drive-project-specify` (project-scope; purpose + scope-boundary + project-DoD, often with design-discussion participation) and `drive-slice-specify` (slice-scope; scope-within-project + slice-DoD + Example-Mapping edge cases, authored by the implementer). Per decision 17 — same rationale as `drive-create-plan` split.
-
-See § 2.5 and § 2.6.
-
-#### `drive-discussion` — promoted-to-first-class
-
-**Scope:** Cross-cutting.
-
-**Verdict + Why:** Stays as a mode skill, but **promoted to first-class** in the model (workflow row in `model.md` § Workflows; row in `workflow.md` lifecycle table). Body documents the trigger points (pre-spec, mid-spec, mid-flight on falsified assumption, mid-flight on obstacle, explicit request) and the agile orchestrator's responsibility to recognise when to escalate. Documents the output contract (spec/plan edit + `design-decisions.md` entry). References [`model.md`](model.md) § Workflows (Design discussion) and [`principles/roles-and-personas.md`](principles/roles-and-personas.md) for the persona's escalation responsibility.
-
-#### `drive-post-update` — stays
-
-**Scope:** Project.
-
-**Verdict + Why:** Stays. Status updates on Linear Projects are project-scope; the consolidation doesn't change what a status update is. Vocabulary refresh only.
-
-#### `drive-pr-description` — stays
-
-**Scope:** Slice (and direct change).
-
-**Verdict + Why:** Stays. PR descriptions are PR-scope, which under the model maps to slice or direct change. Body extended to handle the direct-change case (PR description carries the intent — that's the only artefact for direct changes per `model.md` § Persistence shape). No vocabulary issues — "PR" is the unit.
-
-#### `drive-pr-walkthrough` — stays
-
-**Scope:** Slice (and direct change).
-
-**Verdict + Why:** Stays. Same scope as `drive-pr-description`. Walkthrough's "intent-first narrative" shape works for both slices and direct changes (a direct change has shorter narratives; same shape).
-
-### 1.2 `.experimental/`
-
-#### `drive-orchestrate-plan` — augmented + promoted
-
-**Scope:** Slice.
-
-**Verdict + Why:** Promoted from `.experimental/` to `.curated/` (already happened on `main` per the legacy sibling spec). Augmented with five things per the consolidated model:
-
-1. **Per-dispatch DoR pre-flight.** Before delegating each dispatch, run the dispatch DoR check (per [`principles/definition-of-ready.md`](principles/definition-of-ready.md) § Dispatch DoR). Refuse to dispatch if unmet.
-2. **WIP-inspection cadence as a named loop step.** ≤ 5 min cadence during every dispatch; reads diff of what just landed; promotes drift to a finding (per [`principles/brief-discipline.md`](principles/brief-discipline.md) § Practical implications).
-3. **Per-dispatch DoD post-flight.** After each dispatch, run the dispatch DoD check (per [`principles/definition-of-done.md`](principles/definition-of-done.md) § Dispatch DoD). Includes intent-validation as non-optional.
-4. **Brief template integration.** Brief assembly is done by the orchestrator agent per [`principles/brief-discipline.md`](principles/brief-discipline.md). The skill body references the brief template directly; rejects briefs missing required sections.
-5. **L/XL refusal at dispatch time + design-discussion stop-condition.** Defense in depth on top of slice-plan's sizing — refuse any dispatch whose brief is L/XL. On detected assumption-falsification (per `model.md` invariant I12), fire stop-condition: interactive mode surfaces "I need to think through X with you"; unattended mode halts, logs the trigger for operator return.
-
-The skill stays slice-scope only (one slice, one orchestrate-plan loop, one PR). Multi-slice projects run the orchestrator once per slice.
-
-#### `drive-reverse-spec` — stays
-
-**Scope:** Slice (typically; can be project for archeology).
-
-**Verdict + Why:** Stays. The "reverse-engineer the spec from an existing PR" pattern is independent of the model. Vocabulary refresh only.
-
-### 1.3 `.system/`
-
-#### `drive-list` — stays
-
-**Scope:** Cross-cutting.
-
-**Verdict + Why:** Stays. The skill listing is mechanical and doesn't depend on the model. No changes.
-
-### 1.4 Retirements
-
-No retirements at the skill level. Two **vocabulary retirements**:
-
-- **"Milestone"** retires from Drive vocabulary. Where it appeared in skill bodies, it's replaced with "slice" (the Drive-side word for the PR-sized unit). Linear's "milestone" remains as a Linear-side word — that's the Tracker context's vocabulary per `model.md` § Bounded contexts.
-- **"Task"** retires in its pre-model senses. Where it referred to a PR-sized unit, replace with "slice." Where it referred to an agent dispatch, replace with "dispatch."
-
-## 2. New skills
-
-### 2.1 `drive-triage-work`
-
-**Scope:** Cross-cutting (entry-point + mid-flight).
-
-**Bucket:** `.experimental/` initially (graduates to `.curated/` after at least one consumer adoption).
-
-**Charter:** Runs the triage workflow at any entry point and mid-flight. Decides which of the eight verdicts applies (per `model.md` § Workflows § Triage and `workflow.md` § Triage outputs) and routes to the right downstream workflow / skill. At entry time, the input is a fresh ask (Linear ticket / bug report / customer feedback / "I should do X"); at mid-flight time, the input is a scope-shift signal (slice growing, project shrinking, surfaced scope). Driven by the agile orchestrator persona (per [`principles/roles-and-personas.md`](principles/roles-and-personas.md)).
-
-**Owned outputs (per verdict):**
-
-- Direct change: routes operator straight to `gh pr create` with intent in the PR body. No further Drive skill.
-- Orphan slice: routes to `drive-slice-specify` (orphan mode) + `drive-slice-plan` (orphan mode).
-- In-project slice: routes to `drive-slice-specify` (in-project mode) + `drive-slice-plan` (in-project mode).
-- New project: routes to `drive-create-project` → `drive-project-specify` → `drive-project-plan`.
-- Promote: runs the promotion workflow (Linear pattern 2 per `model.md` § Linear sync — Promotion pattern) + scaffolds the project folder.
-- Demote: runs the demotion workflow (per `model.md` § Linear sync — Demotion pattern). Requires operator authorisation before mass-closing Linear issues.
-- Spike first: dispatches a single-dispatch slice plan with a spike-flavoured brief (per [`principles/spikes.md`](principles/spikes.md)); re-triages on the artefact.
-- Defer: records in `projects/<x>/deferred.md` (in-project) or operator scratch (orphan).
-
-**References:**
-- `model.md` § Workflows (Triage); § Linear sync (Promotion + Demotion patterns)
-- `workflow.md` § Triage outputs
-- `principles/definition-of-ready.md` § Triage gate
-- `principles/roles-and-personas.md` § Agile orchestrator persona
-
-### 2.2 `drive-health-check`
-
-**Scope:** Project.
-
-**Bucket:** `.experimental/` initially.
-
-**Charter:** Produces project health rollups. Two modes:
-
-- **Interactive mode (session-bookended).** Operator sits down to drive the project; orchestrator presents an opening rollup *before* asking what to push on; at session end, writes a closing rollup. Per `workflow.md` § Project-health rollup cadence.
-- **Unattended mode (trigger-fired).** Every slice merge (hooks into slice closure); after N consecutive dispatches without slice progress (drift alarm; default 3; calibrate per project); on any escalation-worthy event (e.g. design-discussion stop-condition firing).
-
-**Rollup content:**
-- Slice progress (delivered / in flight / planned / blocked).
-- Drifted slices (slices that hit a design-discussion stop-condition or whose plan needed adaptation).
-- Dispatch throughput (count, t-shirt sizes, tier mix).
-- Calibration signals (failure modes hit this session; calibration entries added).
-- Recommended next pick (or stop-condition surfaced for operator return).
-
-**References:**
-- `model.md` § Workflows (cross-cutting health rollup)
-- `workflow.md` § Project-health rollup cadence
-- `principles/protocol-as-memory.md` § Calibration as memory
-
-### 2.3 `drive-project-plan` (split from `drive-create-plan`)
-
-**Scope:** Project.
-
-**Bucket:** `.curated/`.
-
-**Charter:** Produces a project plan: the composition of slices and direct changes that delivers the project's purpose. Sequences them (stack / parallel) and notes anticipated-vs-known. Does not enumerate the dispatches inside any slice (that's `drive-slice-plan`'s job).
-
-**Owned outputs:**
-- `projects/<project>/plan.md` listing slices + direct changes with their relationships and sequencing.
-- Linear Issues created for each known slice (linked from the plan).
-
-**References:**
-- `model.md` § Ubiquitous language (Slice, Project plan); § Linear sync
-- `principles/definition-of-ready.md` § Project DoR (plan is part of project DoR)
-
-### 2.4 `drive-slice-plan` (split from `drive-create-plan`)
-
-**Scope:** Slice.
-
-**Bucket:** `.curated/`.
-
-**Charter:** Produces a slice plan: the dispatch sequence that delivers one PR. Every dispatch sized ≤ M; DoR + DoD declared per dispatch; model tier declared per dispatch. Refuses to finalize with any L/XL dispatch — decompose first. Threads relevant calibration entries (failure-mode catalogue, grep library) into each dispatch's brief skeleton so brief assembly at delegation time can pull them in.
-
-**Owned outputs:**
-- For in-project slices: `projects/<project>/slices/<slice>/plan.md`.
-- For orphan slices: inline in the PR description's checklist OR in the implementer's working memory (per `model.md` § Persistence shape).
-
-**References:**
-- `model.md` § Ubiquitous language (Slice plan, Dispatch); § Invariants (I1, I11)
-- `principles/decomposition-and-cost.md` § Dispatch routing under this principle
-- `principles/brief-discipline.md` § Brief contents (the slice plan carries brief skeletons)
-- `principles/definition-of-ready.md` § Dispatch DoR (slice plan declares DoR per dispatch)
-
-### 2.5 `drive-project-specify` (split from `drive-create-spec`)
-
-**Scope:** Project.
-
-**Bucket:** `.curated/`.
-
-**Charter:** Produces a project spec: purpose statement, scope boundary, project-DoD. Often invoked with design-discussion participation (per [`principles/roles-and-personas.md`](principles/roles-and-personas.md), project owner + agile orchestrator collaboratively). Per invariant I7, the purpose statement is declared immutable at first-dispatch-start; the spec captures the immutability explicitly.
-
-**Owned outputs:**
-- `projects/<project>/spec.md`.
-- Linear Project description (or linked doc).
-
-**References:**
-- `model.md` § Ubiquitous language (Project spec, Purpose statement, Scope boundary); § Invariants (I2, I7, I10)
-- `principles/roles-and-personas.md` § Project owner role
-
-### 2.6 `drive-slice-specify` (split from `drive-create-spec`)
-
-**Scope:** Slice.
-
-**Bucket:** `.curated/`.
-
-**Charter:** Produces a slice spec: scope (within parent project's purpose, if any) + slice-DoD + Example-Mapping edge cases. Authored by the implementer. For orphan slices, the spec lives inline in the PR description; for in-project slices, under `projects/<project>/slices/<slice>/spec.md`.
-
-**Owned outputs:**
-- Slice spec at the appropriate path (per `model.md` § Persistence shape).
-- Linear Issue description (or linked doc).
-
-**References:**
-- `model.md` § Ubiquitous language (Slice spec); § Persistence shape
-- `principles/brief-discipline.md` § The brief is per-dispatch; the slice spec is per-slice
-- `principles/definition-of-done.md` § Slice DoD
-
-### 2.7 `drive-retro-run`
-
-**Scope:** Trigger-based (cross-cutting).
-
-**Bucket:** `.experimental/` initially.
-
-**Charter:** Runs the retro template per [`principles/retro.md`](principles/retro.md). Triggered on dispatch failure, drift event, escapee bug, slice close (if a learning surfaced — asked, not required), project close (mandatory), calibration miss, or explicit operator request. Lands the retro's output (protocol update / calibration update / ADR) in a memory-strong surface; the retro is not complete until the update has landed.
-
-**Owned outputs:**
-- Retro artefact in `projects/<project>/retros/<date>-<one-line-name>.md` (in-project) or operator scratch (orphan).
-- The landed update (commit / PR / file) — the retro's actual deliverable.
-
-**References:**
-- `model.md` § Workflows (cross-cutting retro); § Invariants (I10 — project DoD requires the close retro)
-- `principles/retro.md` § The mandatory output
-- `principles/protocol-as-memory.md` § The retro is the team's only learning mechanism
-
-## 3. Augmentations summary
-
-For convenience, the augmentations declared in § 1 collected in one table:
-
-| Skill | Augmentation summary |
-|---|---|
-| `drive-orchestrate-plan` | Per-dispatch DoR pre-flight + WIP-inspection cadence + per-dispatch DoD post-flight + brief template integration + L/XL refusal + design-discussion stop-condition. |
-| `drive-close-project` | Mandatory final retro (calls `drive-retro-run`); refusal to delete `projects/<x>/` with unmet project DoD. |
-| `drive-create-project` | Project DoR check at entry; seeds slice template + calibration links. |
-| `drive-discussion` | Promoted to first-class workflow standing; body documents trigger points + agile orchestrator's escalation responsibility + output contract. |
-| `drive-pr-description` | Extended to handle direct-change case (PR description carries the only artefact). |
+- **"Milestone"** retires from Drive vocabulary. Where it appears in skill bodies, replace with "slice." Linear's "milestone" remains unchanged on the tracker side.
+- **"Task"** retires in its two pre-model senses. Where it referred to a PR-sized unit, replace with "slice." Where it referred to an agent invocation, replace with "dispatch."
 
 ## 4. Implementation sequencing
 
-Per-skill PRs land canonical-side in `prisma/ignite`. Dependency-respecting order:
+Per-skill PRs land canonical-side in `prisma/ignite`, stacked on top of PR #93. Dependency-respecting order:
 
-1. **Foundation PR.** Vocabulary refresh across all unchanged skills (`drive-agent-personas`, `drive-code-review`/`drive-review-code`, `drive-create-deployment-plan`, `drive-post-update`, `drive-pr-description`, `drive-pr-walkthrough`, `drive-reverse-spec`, `drive-list`). Replace "milestone" / "task" / generic "plan" / generic "step" with consolidated vocabulary. Lower-risk; doesn't depend on new skills.
-2. **New principle docs landing.** Optional intermediate PR that pushes copies of the new principle docs into the canonical repo OR (more likely) treats this project's principle docs as the source-of-truth that canonical references by URL. Decision deferred to the PR author.
-3. **drive-triage-work PR.** New skill; depends on nothing else (other than the new principles for reference). Lands first among the new skills because it's the entry point for the other new skills' workflows.
-4. **drive-project-specify + drive-slice-specify PR.** Pair; together they replace `drive-create-spec` (which is deprecated in the same PR with a pointer to the replacements).
-5. **drive-project-plan + drive-slice-plan PR.** Pair; together they replace `drive-create-plan`.
-6. **drive-orchestrate-plan augmentation PR.** Adds the five augmentations; depends on `principles/brief-discipline.md`, `principles/definition-of-ready.md`, `principles/definition-of-done.md`, `principles/retro.md` being landed (or referenceable).
-7. **drive-discussion promotion PR.** Body update; promotes the mode skill to first-class workflow standing. Independent of others.
-8. **drive-retro-run PR.** New skill; depends on `principles/retro.md`.
-9. **drive-health-check PR.** New skill; depends on `principles/protocol-as-memory.md` and the augmented `drive-orchestrate-plan` (for unattended-mode trigger interop).
-10. **drive-close-project augmentation PR.** Adds mandatory retro + project DoD enforcement; depends on `drive-retro-run` existing.
-11. **drive-create-project augmentation PR.** Adds project DoR check + slice template seeding.
-12. **drive-process.md rewrite PR.** Per spec AC14. Lands when all skills above are in place so the doc can reference them.
+1. **Foundation PR.** Vocabulary refresh across the § 3.4 skills (lower-risk; depends only on PR #93).
+2. **`drive-triage-work` PR.** New skill; entry point for the other new skills' workflows.
+3. **Specify-split PR.** `drive-project-specify` + `drive-slice-specify`; together deprecate `drive-create-spec` (pointer left behind for consumer migration via `drive-reconcile-skills`).
+4. **Plan-split PR.** `drive-project-plan` + `drive-slice-plan`; together deprecate `drive-create-plan`.
+5. **`drive-orchestrate-plan` augmentation PR.** Depends on the principle docs being landed (or referenceable by URL).
+6. **`drive-discussion` promotion PR.** Body update; independent of others.
+7. **`drive-retro-run` PR.** New skill; depends on `principles/retro.md`.
+8. **`drive-health-check` PR.** New skill; depends on the augmented `drive-orchestrate-plan` for unattended-mode trigger interop.
+9. **`drive-close-project` augmentation PR.** Depends on `drive-retro-run` existing.
+10. **`drive-create-project` augmentation PR.** Adds project DoR check + `drive-bootstrap-context` integration.
+11. **`drive-pr-description` augmentation PR.** Extends for direct-change framing.
+12. **`docs/engineering/drive-process.md` rewrite PR.** Per spec AC14. Lands when all skills above are in place so the doc can reference them.
 
-Each PR's body references this plan and the relevant `model.md` section. Consumers of `prisma/ignite` adopt skill-by-skill via `drive-reconcile-skills`.
+Consumers of `prisma/ignite` adopt skill-by-skill via `drive-reconcile-skills` (already part of PR #93). No omnibus PRs — spec NFR2 forbids them and reviewers can't validate a multi-skill change.
 
 ## 5. Per-PR scoping rules
 
-For Option B (the per-skill canonical PRs):
-
-- **One PR carries one or two related skills.** Pair splits ship together (specify split + plan split); singletons ship alone (triage, health-check, retro-run).
-- **No omnibus PRs.** Spec NFR2 forbids; reviewers can't validate a multi-skill change.
-- **Each PR carries its own skill body skeleton + Workflow + Pitfalls + Checklist sections.** That's the Option B detail this plan defers to the per-PR work.
-- **Each PR references this plan + `model.md` § <relevant>.** So a canonical reviewer can trace the rationale back.
-- **Consumers don't migrate in the same PR.** Per spec NFR3, consumer migration is per-consumer follow-up via `drive-reconcile-skills`.
+- One PR carries one or two related skills (split pairs ship together; singletons ship alone).
+- Each PR carries its own skill body skeleton + Workflow + Pitfalls + Checklist sections; this plan deliberately doesn't draft them here.
+- Each PR references this plan and `model.md` § `<relevant>` so a canonical reviewer can trace the rationale back.
+- Consumers don't migrate in the same PR (spec NFR3 — per-consumer follow-up via `drive-reconcile-skills`).
+- New `drive/<category>/README.md` categories introduced by new skills (e.g. `drive/triage/`, `drive/retro/`, `drive/health/`) ship in the same PR as their owning skill — the skill knows what context it needs.
 
 ## 6. What this plan does not decide
 
-- The body shape of any individual skill (deferred to per-PR Option B work).
-- The exact frontmatter schema canonical-side. Inherits from current `prisma/ignite` convention.
-- The migration plan for in-flight `prisma/ignite` work. Per `spec.md` § OQ11, retroactively reshape only with clear payoff; let existing artefacts age out.
-- The retirement timeline for `drive-create-spec` / `drive-create-plan` after their splits land. Per consumer adoption schedule via `drive-reconcile-skills`.
+- The body shape of any individual skill — deferred to per-PR work.
+- The exact frontmatter schema canonical-side — inherits from current `prisma/ignite` convention.
+- The retirement timeline for `drive-create-spec` / `drive-create-plan` after their splits land — per consumer adoption schedule via `drive-reconcile-skills`.
+- Whether to add a `drive-direct-change` skill in the future if direct-change framing in `drive-pr-description` proves insufficient (working position: don't until it does).
 
 ## References
 
 - [`model.md`](model.md) — pinned domain model (vocabulary + workflows + invariants the skills enforce)
-- [`workflow.md`](workflow.md) — operational lifecycle layered on model
+- [`workflow.md`](workflow.md) — operational lifecycle layered on the model
 - [`spec.md`](spec.md) — what this project delivers; ACs that mention the skill restructuring
-- [`design-decisions.md`](design-decisions.md) § 17 — the split decision rationale
+- [`design-decisions.md`](design-decisions.md) § 17 — the split-decision rationale
 - [`principles/`](principles/) — the principle docs every augmentation references
-- `prisma/ignite` `skills/README.md` — naming taxonomy (`<scope>-<verb>-<noun>`)
-- `prisma/ignite` `docs/engineering/drive-process.md` — the canonical doc rewritten per spec AC14
+- [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) — the assumed-landed base (project-context convention + QA pair + meta-skills)
+- [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/main/skills/README.md) — naming convention (consistency-preferred; two dominant shapes)
+- `prisma/ignite docs/engineering/drive-process.md` — the canonical doc rewritten per spec AC14
