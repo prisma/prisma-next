@@ -108,11 +108,20 @@ async function executeDbUpdateCommand(
       }
       const targetHash = refResult.value.hash;
       const matchingBundle = bundles.find((p) => p.metadata.to === targetHash);
-      if (matchingBundle) {
-        const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-        const raw = await readFile(endContractPath, 'utf-8');
-        contractJson = JSON.parse(raw) as Record<string, unknown>;
+      if (!matchingBundle) {
+        return notOk(
+          errorUnexpected(
+            `No migration bundle found for --to "${options.to}" (resolved hash: ${targetHash})`,
+            {
+              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${targetHash}.`,
+              fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
+            },
+          ),
+        );
       }
+      const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
+      const raw = await readFile(endContractPath, 'utf-8');
+      contractJson = JSON.parse(raw) as Record<string, unknown>;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));

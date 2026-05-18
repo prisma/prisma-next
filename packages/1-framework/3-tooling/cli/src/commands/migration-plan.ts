@@ -223,10 +223,19 @@ async function executeMigrationPlanCommand(
       }
       fromHash = refResult.value.hash;
       const matchingBundle = bundles.find((p) => p.metadata.to === fromHash);
-      if (matchingBundle) {
-        fromContractSourceDir = matchingBundle.dirPath;
-        fromContract = await readPredecessorEndContract(fromContractSourceDir);
+      if (!matchingBundle) {
+        return notOk(
+          errorUnexpected(
+            `No migration bundle found for --from "${options.from}" (resolved hash: ${fromHash})`,
+            {
+              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${fromHash}.`,
+              fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
+            },
+          ),
+        );
       }
+      fromContractSourceDir = matchingBundle.dirPath;
+      fromContract = await readPredecessorEndContract(fromContractSourceDir);
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {

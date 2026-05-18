@@ -762,6 +762,7 @@ async function executeMigrationStatusCommand(
   if (fromOverrideHash !== undefined) {
     markerHash = fromOverrideHash;
     mode = 'offline';
+    allMarkers = null;
   }
 
   // Build the aggregate enumeration of contract spaces. Lossy on
@@ -958,8 +959,8 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       summary = `${bundles.length} migration(s) on disk`;
-    } else if (activeRefHash && markerHash !== undefined) {
-      const distance = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
+    } else if (activeRefHash && activeRefName && markerHash !== undefined) {
+      const distance = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName);
       summary = hasInvariantWork ? `${distance} — missing invariant(s): ${missingList}` : distance;
     } else if (pendingCount === 0 && !hasInvariantWork) {
       summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;

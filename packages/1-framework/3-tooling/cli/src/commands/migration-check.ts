@@ -94,7 +94,12 @@ function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | n
       };
     }
   } catch {
-    // end-contract.json unparseable — the file existence check covers this
+    return {
+      pnCode: 'PN-MIG-CHECK-006',
+      where: migrationPathRelative(pkg.dirPath),
+      why: `Migration "${pkg.dirName}" has an unparseable end-contract.json.`,
+      fix: 'Re-emit the migration package to repair the snapshot file.',
+    };
   }
   return null;
 }

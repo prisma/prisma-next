@@ -129,7 +129,15 @@ async function executeMigrationLogCommand(
       });
     }
 
-    const appliedPath = findPath(graph, EMPTY_CONTRACT_HASH, markerHash) ?? [];
+    const appliedPath = findPath(graph, EMPTY_CONTRACT_HASH, markerHash);
+    if (appliedPath === null) {
+      return notOk(
+        errorUnexpected('Database marker is not reachable from migration history', {
+          why: `Marker hash ${markerHash} is not reachable from the root of the on-disk migration graph.`,
+          fix: 'The database may have been migrated outside this project. Use `migration status` to inspect the current state.',
+        }),
+      );
+    }
     const pkgByDirName = new Map(bundles.map((p) => [p.dirName, p]));
     const entries: MigrationLogEntry[] = appliedPath.map((edge) => {
       const pkg = pkgByDirName.get(edge.dirName);

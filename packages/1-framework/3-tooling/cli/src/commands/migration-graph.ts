@@ -36,7 +36,7 @@ interface MigrationGraphOptions extends CommonCommandOptions {
 export interface MigrationGraphResult {
   readonly ok: true;
   readonly graph: MigrationGraph;
-  readonly contractHash: string;
+  readonly contractHash: string | null;
   readonly refs: readonly StatusRef[];
   readonly summary: string;
 }
@@ -77,7 +77,7 @@ async function executeMigrationGraphCommand(
     );
   }
 
-  let contractHash: string = EMPTY_CONTRACT_HASH;
+  let contractHash: string | null = null;
   try {
     const envelope = await readContractEnvelope(config);
     contractHash = envelope.storageHash;
@@ -164,7 +164,7 @@ export function createMigrationGraphCommand(): Command {
             graph: graphResult.graph,
             mode: 'offline',
             markerHash: undefined,
-            contractHash: graphResult.contractHash,
+            contractHash: graphResult.contractHash ?? EMPTY_CONTRACT_HASH,
             refs: graphResult.refs,
             activeRefHash: undefined,
             activeRefName: undefined,

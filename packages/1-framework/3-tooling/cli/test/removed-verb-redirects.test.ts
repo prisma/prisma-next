@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
-const CLI_PATH = resolve(__dirname, '../dist/cli.mjs');
+const CLI_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../dist/cli.mjs');
 
 describe('removed verb redirects', () => {
   it('removed `apply` subverb under `migration` redirects to `migrate --to`', async () => {
