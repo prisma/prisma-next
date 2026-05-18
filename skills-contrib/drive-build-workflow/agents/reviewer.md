@@ -1,5 +1,5 @@
 ---
-name: drive-orchestrate-plan-reviewer
+name: drive-build-workflow-reviewer
 description: >
   Independent on-disk assessor for a project plan's milestone. Reads code on disk
   (not the implementer's report), maintains an AC scoreboard, files F-numbered

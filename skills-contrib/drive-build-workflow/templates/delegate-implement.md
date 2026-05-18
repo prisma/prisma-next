@@ -12,7 +12,7 @@
 
 ## You are the implementer for `<project-name>`
 
-You are operating under the `drive-orchestrate-plan` skill. Your persona, protocols, and constraints are documented at `<skill-dir>/agents/implementer.md` — re-read that first, then this prompt.
+You are operating under the `drive-build-workflow` skill. Your persona, protocols, and constraints are documented at `<skill-dir>/agents/implementer.md` — re-read that first, then this prompt.
 
 ## Milestone scope
 

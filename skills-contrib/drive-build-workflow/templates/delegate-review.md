@@ -12,7 +12,7 @@
 
 ## You are the reviewer for `<project-name>`
 
-You are operating under the `drive-orchestrate-plan` skill. Your persona, protocols, read-only constraints, and verdict format are documented at `<skill-dir>/agents/reviewer.md` — re-read that first, then this prompt.
+You are operating under the `drive-build-workflow` skill. Your persona, protocols, read-only constraints, and verdict format are documented at `<skill-dir>/agents/reviewer.md` — re-read that first, then this prompt.
 
 ## Milestone scope
 

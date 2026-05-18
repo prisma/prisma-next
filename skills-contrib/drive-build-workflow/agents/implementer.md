@@ -1,5 +1,5 @@
 ---
-name: drive-orchestrate-plan-implementer
+name: drive-build-workflow-implementer
 description: >
   Tactical executor for a project plan's milestone. Turns plan tasks into code changes,
   runs the project's validation harness, and reports back to the orchestrator with

@@ -1,18 +1,23 @@
 ---
-name: drive-orchestrate-plan
+name: drive-build-workflow
 description: >
-  Use when the user wants to drive a project plan to a review-clean state on the local
-  branch via an iterate-implement-review loop. Delegates implementation to a sub-agent
-  implementer and independent on-disk assessment to a sub-agent reviewer, looping until
-  the reviewer reports SATISFIED on each milestone. Runs after `drive-create-plan` and
-  before the team's PR-opening skill.
+  Workflow skill. Pilots the slice implementation loop: pre-flight DoR (per dispatch) →
+  brief assembly → delegate one dispatch to implementer → WIP inspection (≤ 5 min) →
+  post-flight DoD (per dispatch) → reviewer subagent verdict → loop / escalate / next
+  dispatch / close. Use when a slice spec + slice plan exist and you want the dispatch
+  loop driven to slice DoD. Renamed and augmented from `drive-build-workflow`.
 metadata:
-  version: "2026.5.13"
+  version: "2026.5.18"
+  renamed_from: drive-build-workflow
 ---
 
-# Drive: Orchestrate Plan
+# Drive: Build Workflow
 
-Run the local implement-review iteration loop on a project plan: **delegate one round of implementation → delegate one round of review → triage verdict → loop / escalate / proceed** until the reviewer reports `SATISFIED` on each milestone of the PR.
+Pilots the slice's implementation loop. Workflow skill — invoked top-down and returns when the slice's DoD is met. Calls atomic skills as steps in its loop (drive-slice-specify, drive-slice-plan, drive-review-code, drive-qa-plan, drive-qa-run, drive-pr-description, drive-pr-walkthrough, drive-retro-run on triggers, drive-discussion on stop-condition).
+
+The loop: **pre-flight DoR (per dispatch) → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD (per dispatch) → reviewer verdict → triage verdict → loop / escalate / proceed** until the reviewer reports `SATISFIED` on each milestone of the slice.
+
+> **Note:** Renamed from `drive-build-workflow` in 2026-05. The body still carries pre-rename phrasing in places — the augmentations (per-dispatch DoR pre-flight, WIP-inspection cadence as a named loop step, per-dispatch DoD post-flight with intent-validation, brief template, L/XL refusal, design-discussion stop-condition) land in a follow-on slice. Consumers calling `drive-build-workflow` should migrate to `drive-build-workflow` via `drive-reconcile-skills`.
 
 This skill is an **orchestrator**. It delegates:
 
@@ -84,9 +89,9 @@ Downstream sibling skills:
 ## Subcommands
 
 ```text
-/drive-orchestrate-plan iterate [milestone-id]
-/drive-orchestrate-plan implement [milestone-id]
-/drive-orchestrate-plan review
+/drive-build-workflow iterate [milestone-id]
+/drive-build-workflow implement [milestone-id]
+/drive-build-workflow review
 ```
 
 - **`iterate`** (default): full loop on the named milestone (or the next pending milestone if omitted) until SATISFIED.
@@ -363,10 +368,10 @@ A heartbeat in the subagent's own response message is invisible to the orchestra
 
 `code-review.md` § Findings log is a **work backlog for the implementer's next round**, not a journal of observations. Every entry is something the implementer must address before the milestone reaches `SATISFIED` — across all severities. No severity lets a finding carry across milestones within the same PR.
 
-This is the most important way `drive-orchestrate-plan` differs from `drive-pr-local-review`:
+This is the most important way `drive-build-workflow` differs from `drive-pr-local-review`:
 
 - `drive-pr-local-review` is a **one-shot** branch review. Out-of-scope observations and "consider this for the future" notes are legitimate output — they go in a `Deferred` section, the reader can act on them or not.
-- `drive-orchestrate-plan` operates inside an **iterate-implement loop**. Every finding the reviewer files reaches the implementer as part of the next delegation. Findings that recommend "no action," "defer to a future milestone," or "consider in the future" produce **noise**, dilute the implementer's attention, and obscure the real action items.
+- `drive-build-workflow` operates inside an **iterate-implement loop**. Every finding the reviewer files reaches the implementer as part of the next delegation. Findings that recommend "no action," "defer to a future milestone," or "consider in the future" produce **noise**, dilute the implementer's attention, and obscure the real action items.
 
 **The bar for filing a finding:** the recommended action must be **addressable by the implementer in the current PR**, in either the current milestone or an explicitly named later milestone of this PR. If the recommended action is genuinely "no change in this PR," the observation is not a finding:
 
@@ -622,7 +627,7 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 
 ## Repo customization hooks
 
-Repos and projects can override the canned templates without forking this skill by placing alternative versions in the consuming repo at the equivalent skill location your harness uses (e.g. `<repo>/.cursor/skills/drive-orchestrate-plan/templates/<template-name>.md`, `<repo>/.claude/skills/drive-orchestrate-plan/templates/<template-name>.md`, etc.). When both project-local and skill-harness templates exist, the orchestrator uses the project-local one. This lets a project encode its own validation-gate vocabulary, commit-message conventions, or AC scoreboard structure without touching the user-level skill.
+Repos and projects can override the canned templates without forking this skill by placing alternative versions in the consuming repo at the equivalent skill location your harness uses (e.g. `<repo>/.cursor/skills/drive-build-workflow/templates/<template-name>.md`, `<repo>/.claude/skills/drive-build-workflow/templates/<template-name>.md`, etc.). When both project-local and skill-harness templates exist, the orchestrator uses the project-local one. This lets a project encode its own validation-gate vocabulary, commit-message conventions, or AC scoreboard structure without touching the user-level skill.
 
 Suggested project-local overrides:
 

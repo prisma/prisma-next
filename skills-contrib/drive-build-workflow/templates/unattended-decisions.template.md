@@ -1,6 +1,6 @@
 # Orchestrator unattended decisions — `<project name>`
 
-This file records decisions the orchestrator made on the user's behalf while the user was unavailable for comment, during unattended execution of `{project}`. Each entry is a discrete decision that would normally have been surfaced as an `Escalation` per `drive-orchestrate-plan/SKILL.md § Escalation surface`.
+This file records decisions the orchestrator made on the user's behalf while the user was unavailable for comment, during unattended execution of `{project}`. Each entry is a discrete decision that would normally have been surfaced as an `Escalation` per `drive-build-workflow/SKILL.md § Escalation surface`.
 
 The file lives under the repo's gitignored scratch directory (e.g. `wip/`) so it is never committed. It persists locally for the user's review after the run concludes.
 
