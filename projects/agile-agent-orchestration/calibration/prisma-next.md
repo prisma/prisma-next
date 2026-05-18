@@ -350,6 +350,28 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 
 **Reference incident.** 2026-05-18, TML-2520 M5c Phase 3 — composer-2 dispatch terminated mid-DoD-run without a final report (~T+45). Orchestrator (this calibration's author) ran the DoD typecheck itself "to check state", discovered the implementer's regen pass missed every example app outside the curated `fixtures:emit` filter, and proceeded to: regenerate 7+ example contracts via per-app emit scripts, migrate 8 consumer files (1 source + 7 tests) across 5 packages, fix two strict-index-access TS lints, and update a hand-written `EmittedContract` type — all over ~50 min of orchestrator wall-clock, with zero new dispatches. The user explicitly interrupted with "Why are you doing all this work and not delegating it?" — correctly diagnosing that this was orchestrator drift, not legitimate end-of-round tidying. Recovery: commit the orchestrator's wins as a cleanly-scoped slice and dispatch a finisher subagent for the remaining contract-builder cleanup + final DoD validation.
 
+### 3.15 Backgrounded-subagent completion notifications cannot be relied on
+
+**Symptom.** A subagent dispatched with `run_in_background: true` finishes — commits land, transcript closes — but the orchestrator never receives the completion notification through the tool-result stream. The orchestrator waits past the dispatch's wall-clock budget for a notification that never arrives, eventually starting to suspect the subagent died (it didn't) or dispatching a redundant follow-up (when the original was already done).
+
+**Why this matters.** The Task tool's contract says "you will be automatically sent the subagent's final response upon its completion, so do not wait for it — either end your turn or work on something else" and discourages active polling. § 3.14's mitigation depends on the orchestrator being able to detect subagent termination promptly — if the notification is unreliable, the orchestrator can't tell the difference between "still running" and "finished 20 minutes ago."
+
+**Detection signal.**
+
+- Wall-clock since dispatch is well past the brief's time-box AND past any reasonable buffer for long DoD gates (e.g. > budget + 15 min).
+- `git log --oneline <dispatch-base>..HEAD` shows a sensible terminal commit (e.g. the brief's final commit per its commit-discipline plan) followed by a clean `git status -s`.
+- No new commits / no modified files for several polling cycles.
+- Operator/user steps in to say "it's done" — the strongest signal, but obviously not something to rely on.
+
+**Mitigation.**
+
+- **Don't trust the absence of a notification as evidence the subagent is still running.** When wall-clock + git-log + clean-tree triangulation says "probably done," act on that hypothesis — resume the agent (sending a follow-up triggers an error if it's still running, which is a safe probe) or check its transcript on disk.
+- **Resume-as-probe pattern:** `Task(resume=<id>, prompt=<noop or follow-up>)` will fail with "Sub-agent is currently running" if it's actually still alive. The failure itself is a definitive signal. If it succeeds, the agent was done.
+- **Cap the wait window:** if dispatch wall-clock exceeds budget + 50%, run the resume probe regardless of notification state.
+- **Don't aggressively poll** (the tool docs are right about that for live subagents) — the issue isn't polling cadence, it's that completion can be invisible. Two or three checks past budget is enough to triangulate; beyond that, probe.
+
+**Reference incident.** 2026-05-18, TML-2520 PR2. Composer-2 emitter migration dispatch (`21c9256c`) and opus finisher dispatch (`5f765d98`) both ran to successful completion (5 commits + 2 commits respectively) without ever delivering a completion notification to the orchestrator within the conversation window. In both cases the user had to manually report "the subagent has finished" before the orchestrator stopped waiting. The composer-2 notification eventually arrived hours later via the normal channel — confirming the notification path works asynchronously but is not synchronous-reliable. Operational adjustment: orchestrator now triangulates from git state when wall-clock exceeds budget by 50%, and treats the resume-as-probe pattern as the definitive aliveness check.
+
 ---
 
 ## 4. Grep library
