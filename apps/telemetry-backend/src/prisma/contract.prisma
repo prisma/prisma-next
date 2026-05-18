@@ -1,0 +1,25 @@
+// use prisma-next
+
+model TelemetryEvent {
+  id             BigInt   @id @default(autoincrement())
+  ingestedAt     DateTime @default(now())
+  installationId String
+  version        String
+  command        String
+  flags          String[]
+  runtimeName    String
+  runtimeVersion String
+  os             String
+  arch           String
+  packageManager String?
+  databaseTarget String?
+  tsVersion      String?
+  agent          String?
+  extensions     String[]
+
+  @@index([ingestedAt])
+  @@index([installationId, ingestedAt])
+  @@index([version])
+  @@index([command])
+  @@map("telemetry_event")
+}

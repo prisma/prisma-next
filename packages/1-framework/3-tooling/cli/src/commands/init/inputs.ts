@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
+import { readUserConfig, writeUserConfig } from '@prisma-next/cli-telemetry';
 import { extname, join, normalize } from 'pathe';
 import type { GlobalFlags } from '../../utils/global-flags';
 import {
@@ -68,6 +69,17 @@ export interface ResolvedInitInputs {
    * is added separately via the install step.
    */
   readonly removePreviousFacade: string | null;
+  /**
+   * Telemetry consent answer recorded during this `init` run, or `null`
+   * when no prompt was shown. The prompt fires only on the
+   * canPrompt + !autoAcceptPrompts + `enableTelemetry === undefined`
+   * intersection; outside that window the field is `null` and the
+   * stored preference (if any) stays unchanged. The answer has already
+   * been persisted to `$XDG_CONFIG_HOME/prisma-next/config.json` by
+   * the time `runInit` sees this value — it's surfaced here purely so
+   * the post-init summary can mention what the user chose.
+   */
+  readonly enableTelemetry: boolean | null;
   /**
    * Whether to run `npx skills add prisma/prisma-next#v<version>` at the
    * project level after install + emit. True by default; `--no-skill`
@@ -176,6 +188,11 @@ export async function resolveInitInputs(ctx: {
     autoAcceptPrompts,
   });
 
+  const enableTelemetry = await resolveTelemetryConsent({
+    canPrompt,
+    autoAcceptPrompts,
+  });
+
   // Skill-install gating. `--no-skill` (commander parses
   // `options.skill === false`) is the only escape hatch; otherwise
   // project-level install is unconditional. The skill is always
@@ -193,8 +210,50 @@ export async function resolveInitInputs(ctx: {
     strictProbe: Boolean(options.strictProbe),
     reinit,
     removePreviousFacade,
+    enableTelemetry,
     installProjectSkill,
   };
+}
+
+/**
+ * The interactive telemetry consent prompt. Shown as the last
+ * question of the `init` sequence iff:
+ *   1. `canPrompt === true` (interactive stdin / stdout combo),
+ *   2. `autoAcceptPrompts === false` (the user did not pass `--yes`),
+ *   3. the stored `enableTelemetry` value is `undefined` (the user
+ *      has never been asked, or skipped the prompt previously).
+ *
+ * Outside that intersection the function returns `null` and leaves the
+ * stored preference untouched. Inside it, the user's answer is
+ * persisted via `writeUserConfig({ enableTelemetry })` before this
+ * function returns; on an affirmative answer `writeUserConfig`
+ * generates and stores the v4 `installationId` in the same write.
+ *
+ * The wording matches spec wording (ecosystem precedent: Next.js,
+ * Astro). Default value is `true` to match precedent and to make the
+ * consent answer a single keystroke once it's been disclosed.
+ */
+async function resolveTelemetryConsent(opts: {
+  readonly canPrompt: boolean;
+  readonly autoAcceptPrompts: boolean;
+}): Promise<boolean | null> {
+  if (!opts.canPrompt || opts.autoAcceptPrompts) {
+    return null;
+  }
+  const stored = readUserConfig().enableTelemetry;
+  if (stored !== undefined) {
+    return null;
+  }
+  const result = await clack.confirm({
+    message: 'Help us prioritize features by sharing anonymous usage data?',
+    initialValue: true,
+    output: process.stderr,
+  });
+  if (clack.isCancel(result)) {
+    throw errorInitUserAborted();
+  }
+  writeUserConfig({ enableTelemetry: Boolean(result) });
+  return Boolean(result);
 }
 
 async function resolveWriteEnv(opts: {
