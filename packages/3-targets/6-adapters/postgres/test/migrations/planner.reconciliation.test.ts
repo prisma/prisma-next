@@ -3,6 +3,7 @@ import {
   APP_SPACE_ID,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -171,12 +172,17 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
   });
 });
 
-function createContract(tables: Contract<SqlStorage>['storage']['tables']): Contract<SqlStorage> {
+function createContract(
+  tables: Record<string, import('@prisma-next/sql-contract/types').StorageTableInput>,
+): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({ storageHash: coreHash('sha256:reconciliation-contract'), tables }),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:reconciliation-contract'),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+    }),
     roots: {},
     models: {},
     capabilities: {},

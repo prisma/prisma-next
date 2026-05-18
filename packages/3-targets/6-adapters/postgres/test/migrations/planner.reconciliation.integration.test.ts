@@ -4,6 +4,7 @@ import {
   APP_SPACE_ID,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
@@ -35,7 +36,7 @@ function makeContract(
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
-      tables,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
     }),
     roots: {},
     models: {},
@@ -975,29 +976,34 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       profileHash: profileHash('sha256:test'),
       storage: new SqlStorage({
         storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
-        tables: {
-          item: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: {
-                nativeType: 'status_type',
-                codecId: 'pg/enum@1',
-                nullable: false,
-                typeRef: 'status_type',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              item: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  status: {
+                    nativeType: 'status_type',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'status_type',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            types: {
+              status_type: new PostgresEnumType({
+                name: 'status_type',
+                nativeType: 'status_type',
+                values: ['active', 'inactive'],
+              }),
+            },
           },
-        },
-        types: {
-          status_type: new PostgresEnumType({
-            name: 'status_type',
-            nativeType: 'status_type',
-            values: ['active', 'inactive'],
-          }),
         },
       }),
       roots: {},
@@ -1246,29 +1252,34 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       profileHash: profileHash('sha256:test'),
       storage: new SqlStorage({
         storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
-        tables: {
-          item: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              status: {
-                nativeType: 'StatusType',
-                codecId: 'pg/enum@1',
-                nullable: false,
-                typeRef: 'StatusType',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              item: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  status: {
+                    nativeType: 'StatusType',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'StatusType',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            types: {
+              StatusType: new PostgresEnumType({
+                name: 'StatusType',
+                nativeType: 'StatusType',
+                values: ['active', 'inactive'],
+              }),
+            },
           },
-        },
-        types: {
-          StatusType: new PostgresEnumType({
-            name: 'StatusType',
-            nativeType: 'StatusType',
-            values: ['active', 'inactive'],
-          }),
         },
       }),
       roots: {},

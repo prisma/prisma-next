@@ -2,6 +2,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, type OpFactoryCall } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
@@ -21,7 +22,10 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({ storageHash: coreHash(hash), tables }),
+    storage: new SqlStorage({
+      storageHash: coreHash(hash),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+    }),
     models: {},
     roots: {},
     capabilities: {},

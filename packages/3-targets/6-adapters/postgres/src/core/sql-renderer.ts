@@ -629,7 +629,16 @@ function getInsertColumnOrder(
     return orderedColumns;
   }
 
-  const table = contract.storage.tables[tableName];
+  let table: { columns: Record<string, unknown> } | undefined;
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    // Namespace.tables is Record<string, IRNode> at the interface level;
+    // SQL family namespaces hold StorageTable instances which have .columns.
+    const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;
+    if (found !== undefined) {
+      table = found;
+      break;
+    }
+  }
   if (!table) {
     throw new Error(`INSERT target table not found in contract storage: ${tableName}`);
   }

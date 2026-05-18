@@ -2,8 +2,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -24,29 +23,33 @@ const contractWithEnum: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
   profileHash: profileHash('sha256:test'),
-  storage: {
+  storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),
-    tables: {
-      user: {
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          role: { nativeType: 'role', codecId: 'pg/enum@1', nullable: false, typeRef: 'Role' },
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              role: { nativeType: 'role', codecId: 'pg/enum@1', nullable: false, typeRef: 'Role' },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
         },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
+        types: {
+          Role: new PostgresEnumType({
+            name: 'Role',
+            nativeType: 'role',
+            values: ['USER', 'ADMIN'],
+          }),
+        },
       },
     },
-    types: {
-      Role: new PostgresEnumType({
-        name: 'Role',
-        nativeType: 'role',
-        values: ['USER', 'ADMIN'],
-      }),
-    },
-    namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-  },
+  }),
   roots: {},
   models: {},
   capabilities: {},

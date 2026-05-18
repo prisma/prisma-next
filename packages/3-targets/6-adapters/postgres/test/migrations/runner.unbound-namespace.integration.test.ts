@@ -6,7 +6,6 @@ import {
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -47,20 +46,22 @@ function buildUnboundContract(): Contract<SqlStorage> {
     profileHash: profileHash('sha256:unbound-multi-tenant'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:unbound-multi-tenant'),
-      tables: {
-        tenant: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-      },
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: PostgresSchema.unbound,
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            tenant: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
       },
     }),
     roots: {},

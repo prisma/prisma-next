@@ -5,6 +5,7 @@ import { executeDbInit, executeDbUpdate } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
@@ -49,20 +50,25 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     profileHash: profileHash(`sha256:pg-ext-test-v${version}`),
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
-      tables: {
-        _ext_helper: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            ...(version === 2
-              ? {
-                  note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-                }
-              : {}),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            _ext_helper: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                ...(version === 2
+                  ? {
+                      note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+                    }
+                  : {}),
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     }),
