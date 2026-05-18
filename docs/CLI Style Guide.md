@@ -105,8 +105,8 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - JSON: `--json` for plan output.
 
 ## Interactivity
-- Interactive by default: `init`, `migration apply`, `doctor` (future).
-- Non‑interactive by default: `contract emit`, `migration plan`, `migration preflight`, `db verify`, `db sign`, `status`.
+- Interactive by default: `init`, `migrate`, `doctor` (future).
+- Non‑interactive by default: `contract emit`, `migration plan`, `migration check`, `db verify`, `db sign`, `migration status`.
 - Non‑TTY/CI: never prompt; fail with a structured precondition error if input is required.
 - `--interactive`/`--no-interactive` override the TTY detection.
 - **Every interactive prompt MUST have a flag-driven equivalent.** A command that requires user input without a corresponding flag is broken in non-interactive mode. Adding a new prompt requires adding the matching flag in the same change.
@@ -129,7 +129,7 @@ This is a deliberate divergence from clig.dev §Arguments §Confirmation. AI age
 
 #### Examples
 
-- `migration apply` / `db update`: when the plan includes destructive ops, prompts in interactive mode; requires `--force` to apply without a prompt or in non-interactive mode.
+- `migrate` / `db update`: when the plan includes destructive ops, prompts in interactive mode; requires `--force` to apply without a prompt or in non-interactive mode.
 - `db sign`: requires `--force` to overwrite an existing marker with a different hash (already documented in [Database Commands](#database-commands)).
 - `prisma-next init`: re-running `init` in a directory with a generated `prisma-next.config.ts` requires `--force`; `-y` alone is not sufficient to authorise overwriting generated files.
 
@@ -168,7 +168,7 @@ Codes `4`–`99` are available for command-specific outcome codes. Each command:
 - MUST document each code in its `--help`, package `README.md`, or both.
 - SHOULD pick names that describe an **outcome shape** (`INSTALL_FAILED`, `VERIFY_DRIFT`, `PLAN_HAS_DESTRUCTIVE_OPS`), not a specific cause.
 
-The same numeric value MAY mean different things in different commands (e.g. `init`'s `4 = INSTALL_FAILED` is unrelated to a hypothetical `migration apply 4`). Exit codes are always interpreted in the context of the command that produced them; the PN code disambiguates within the class.
+The same numeric value MAY mean different things in different commands (e.g. `init`'s `4 = INSTALL_FAILED` is unrelated to `migration check`'s `4 = INTEGRITY_FAILED`). Exit codes are always interpreted in the context of the command that produced them; the PN code disambiguates within the class.
 
 Codes `100` and above are reserved for runtime-environment signals (POSIX `128 + N`) and MUST NOT be claimed by a command.
 
@@ -182,13 +182,25 @@ Exit codes are the right tool for shell pipelines: they're a single integer, eve
 
 PN error codes (`PN-CLI-5003`, `PN-MIG-2001`, etc.) are the precise channel — every structured error carries one. Scripts that need to discriminate between two specific failure modes that share an exit code MUST match on the PN code, not the exit code.
 
+## Removed-verb redirects
+
+When a verb or flag is removed from the CLI surface (e.g. during a surface refactor that promotes a subcommand to top-level, or splits a flag-overloaded verb into separate verbs), the CLI MUST emit a **targeted redirect** rather than a generic "unknown command" error. The redirect:
+
+- exits `2` (`PRECONDITION`),
+- prints `Unknown command: <name>` (or `Unknown option: <flag>`) followed by a single `Use \`prisma-next <new-form>\` instead.` line on stderr, and
+- does **not** execute the new verb on the user's behalf (the redirect is a diagnostic, not a backwards-compat alias).
+
+Implementation: a small lookup table keyed by `<parent>:<subcommand>` (for verbs) or `<parent>:<subcommand>:<flag>` (for flags) is consulted during the pre-parse argv scan, before commander parses options. This keeps the redirect tied to a verb-and-flag form that is no longer registered while letting the new form's own help text and error envelopes work normally.
+
+Concrete examples (from the migration CLI verb refactor, TML-2546): `prisma-next migration apply` → `prisma-next migrate --to <contract>`; `prisma-next migration ref` → `prisma-next ref set|list|delete`; `prisma-next migration status --graph` → `prisma-next migration graph`; `prisma-next migration status --all`/`--limit` → `prisma-next migration log`; `prisma-next migration status --ref X` → `prisma-next migration status --to X`. Each entry is one row in the redirect table.
+
 ## JSON Semantics
 - `--json` outputs a single JSON object for the command result to stdout regardless of TTY mode.
 - When piped (`!isTTY`), no decoration is visible — only JSON data on stdout.
 - **Each command's `--json` success shape MUST be defined as a schema** (arktype or equivalent) co-located with the command (e.g. `src/commands/<command>/output.ts`) and exported on the package's public surface, so downstream consumers can validate the output. The error envelope schema is shared (see [Errors](#errors)). Hand-writing JSON without a co-located schema is not allowed.
 - Success and error documents on the same command SHOULD share a discriminator field (typically `ok: boolean`) so consumers can branch without inspecting the structure.
 
-> **Future**: When streaming commands are implemented, NDJSON event streams (`--json=ndjson`) will be supported for commands like `migration preflight` and `migration apply`.
+> **Future**: When streaming commands are implemented, NDJSON event streams (`--json=ndjson`) will be supported for long-running commands like `migrate` and `migration preflight`.
 
 ## Database Commands
 - `db verify` (canonical):
@@ -265,11 +277,12 @@ PN error codes (`PN-CLI-5003`, `PN-MIG-2001`, etc.) are the precise channel — 
 - Global: `--json`, `-q`, `-v`, `--trace`, `--interactive`, `-y`, `--config <path>`, `--db <url>`.
 - Commands:
   - `contract emit --contract prisma/contract.ts --out src/prisma`
-  - `migration plan --out migrations/next`
-  - `migration preflight --show-sql`
-  - `migration apply --yes`
+  - `migration plan --name add-users-table`
+  - `migration check`
+  - `migrate --to production --db $DATABASE_URL`
   - `db verify --db $DATABASE_URL`
-  - `db sign --db $DATABASE_URL --force`
+  - `db sign --db $DATABASE_URL --contract production`
+  - `ref set production sha256:abc123`
 
 ## Internal Architecture
 - **TerminalUI** (`src/utils/terminal-ui.ts`): Composable output abstraction. All decoration goes to stderr via `@clack/prompts`, data goes to stdout. Accepts `color` and `interactive` overrides.
