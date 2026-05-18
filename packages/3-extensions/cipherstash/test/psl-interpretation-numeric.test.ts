@@ -11,6 +11,7 @@
  *     byte-for-byte (PSL/TS parity).
  */
 
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { describe, expect, it } from 'vitest';
@@ -44,18 +45,17 @@ function interpret(schema: string) {
 
 // The interpreter returns `Result<Contract, ContractSourceDiagnostics>` and
 // `Contract.storage` is the opaque `StorageBase<string>`. Tests treat it as
-// the structural shape it actually is (tables / types) — same pattern used
+// the structural shape it actually is (namespaces / types) — same pattern used
 // by `packages/2-sql/2-authoring/contract-psl/test/interpreter.relations.test.ts`.
+type NamespaceView = {
+  readonly tables?: Record<string, { readonly columns: Record<string, Record<string, unknown>> }>;
+};
 type StorageView = {
-  readonly tables: Record<
-    string,
-    {
-      readonly columns: Record<string, Record<string, unknown>>;
-    }
-  >;
+  readonly namespaces: Record<string, NamespaceView>;
   readonly types?: Record<string, Record<string, unknown>>;
 };
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
+const unboundTables = (s: StorageView) => s.namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {};
 
 describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
   it('lowers full args to a column with cipherstash/double@1 codec, eql_v2_encrypted nativeType', () => {
@@ -66,7 +66,9 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['metric']?.columns['value']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['metric']?.columns['value'],
+    ).toMatchObject({
       codecId: 'cipherstash/double@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, orderAndRange: true },
@@ -82,7 +84,9 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['metric']?.columns['value']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['metric']?.columns['value'],
+    ).toMatchObject({
       codecId: 'cipherstash/double@1',
       typeParams: { equality: true, orderAndRange: true },
     });
@@ -114,7 +118,7 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const col = asStorage(result.value.storage).tables['metric']?.columns['value'];
+    const col = unboundTables(asStorage(result.value.storage))['metric']?.columns['value'];
     // Stripping `nullable` (PSL-specific) the column descriptor mirrors
     // the TS factory's lowered shape byte-for-byte (PSL/TS parity).
     expect(col).toMatchObject({
@@ -134,7 +138,9 @@ describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['ledger']?.columns['amount']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['ledger']?.columns['amount'],
+    ).toMatchObject({
       codecId: 'cipherstash/bigint@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, orderAndRange: true },
@@ -149,7 +155,9 @@ describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['ledger']?.columns['amount']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['ledger']?.columns['amount'],
+    ).toMatchObject({
       codecId: 'cipherstash/bigint@1',
       typeParams: { equality: true, orderAndRange: true },
     });

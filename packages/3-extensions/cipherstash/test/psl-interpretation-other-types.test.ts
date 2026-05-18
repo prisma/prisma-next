@@ -12,6 +12,7 @@
  * `true` in every case.
  */
 
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { describe, expect, it } from 'vitest';
@@ -45,18 +46,17 @@ function interpret(schema: string) {
 
 // The interpreter returns `Result<Contract, ContractSourceDiagnostics>` and
 // `Contract.storage` is the opaque `StorageBase<string>`. Tests treat it as
-// the structural shape it actually is (tables / types) — same pattern used
+// the structural shape it actually is (namespaces / types) — same pattern used
 // by `packages/2-sql/2-authoring/contract-psl/test/interpreter.relations.test.ts`.
+type NamespaceView = {
+  readonly tables?: Record<string, { readonly columns: Record<string, Record<string, unknown>> }>;
+};
 type StorageView = {
-  readonly tables: Record<
-    string,
-    {
-      readonly columns: Record<string, Record<string, unknown>>;
-    }
-  >;
+  readonly namespaces: Record<string, NamespaceView>;
   readonly types?: Record<string, Record<string, unknown>>;
 };
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
+const unboundTables = (s: StorageView) => s.namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {};
 
 describe('PSL interpretation: cipherstash.EncryptedDate constructor', () => {
   it('lowers full args to a column with cipherstash/date@1 codec, eql_v2_encrypted nativeType', () => {
@@ -67,7 +67,9 @@ describe('PSL interpretation: cipherstash.EncryptedDate constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['event']?.columns['occurredOn']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['event']?.columns['occurredOn'],
+    ).toMatchObject({
       codecId: 'cipherstash/date@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, orderAndRange: true },
@@ -82,7 +84,9 @@ describe('PSL interpretation: cipherstash.EncryptedDate constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['event']?.columns['occurredOn']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['event']?.columns['occurredOn'],
+    ).toMatchObject({
       codecId: 'cipherstash/date@1',
       typeParams: { equality: true, orderAndRange: true },
     });
@@ -98,7 +102,9 @@ describe('PSL interpretation: cipherstash.EncryptedBoolean constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['feature']?.columns['enabled']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['feature']?.columns['enabled'],
+    ).toMatchObject({
       codecId: 'cipherstash/boolean@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true },
@@ -113,7 +119,9 @@ describe('PSL interpretation: cipherstash.EncryptedBoolean constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['feature']?.columns['enabled']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['feature']?.columns['enabled'],
+    ).toMatchObject({
       codecId: 'cipherstash/boolean@1',
       typeParams: { equality: true },
     });
@@ -147,7 +155,9 @@ describe('PSL interpretation: cipherstash.EncryptedJson constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['audit']?.columns['payload']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['audit']?.columns['payload'],
+    ).toMatchObject({
       codecId: 'cipherstash/json@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { searchableJson: true },
@@ -162,7 +172,9 @@ describe('PSL interpretation: cipherstash.EncryptedJson constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['audit']?.columns['payload']).toMatchObject({
+    expect(
+      unboundTables(asStorage(result.value.storage))['audit']?.columns['payload'],
+    ).toMatchObject({
       codecId: 'cipherstash/json@1',
       typeParams: { searchableJson: true },
     });
