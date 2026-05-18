@@ -62,7 +62,7 @@ The `createIndex` operation is fully specified by the planner — no user interv
 `Migration.run(...)` detects it is the main module, instantiates `M`, reads `operations`, and writes fully-attested `ops.json` + `migration.json` with a fresh content-addressed `migrationId` ([ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md)). When happy, they run:
 
 ```
-prisma-next migration apply
+prisma-next migrate
 ```
 
 The runner reads `ops.json` — never `migration.ts` — verifies the hash, and executes each operation's three-phase loop: precheck, execute, postcheck.
@@ -83,7 +83,7 @@ Each stage of the pipeline is detailed in its own ADR. The end-to-end flow is:
 
 3. **Edit.** The developer opens `migration.ts`, replaces placeholders with real queries, and iterates by running the file directly (`./migration.ts`) — the file is self-emitting, re-writing `ops.json` and re-attesting `migrationId` on each run ([ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md)).
 
-4. **Apply.** `migration apply` reads `ops.json`, verifies the hash, and executes via the runner's three-phase loop ([ADR 198](ADR%20198%20-%20Runner%20decoupled%20from%20driver%20via%20visitor%20SPIs.md)).
+4. **Apply.** `migrate` reads `ops.json`, verifies the hash, and executes via the runner's three-phase loop ([ADR 198](ADR%20198%20-%20Runner%20decoupled%20from%20driver%20via%20visitor%20SPIs.md)).
 
 ## Descriptor-flow deletion catalog
 

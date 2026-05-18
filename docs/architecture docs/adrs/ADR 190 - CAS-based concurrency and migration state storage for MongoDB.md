@@ -2,11 +2,11 @@
 
 ## At a glance
 
-A developer runs `migration apply`. The runner executes the DDL commands (create indexes, drop indexes), and the database is now in a new state. Two questions arise:
+A developer runs `migrate`. The runner executes the DDL commands (create indexes, drop indexes), and the database is now in a new state. Two questions arise:
 
-1. **Where do we record the new state?** The next migration needs to know the database is now at contract version X, not the version before. Without a record, every subsequent `migration apply` would re-run from scratch.
+1. **Where do we record the new state?** The next migration needs to know the database is now at contract version X, not the version before. Without a record, every subsequent `migrate` would re-run from scratch.
 
-2. **What if two developers run `migration apply` at the same time?** On Postgres, the runner acquires an advisory lock (`pg_advisory_lock`) to serialize access. MongoDB has no native advisory lock. If both runners read "database is at version A," both apply the same migration, and both try to record "database is now at version B" — or worse, they apply *different* migrations and the database ends up in an undefined state.
+2. **What if two developers run `migrate` at the same time?** On Postgres, the runner acquires an advisory lock (`pg_advisory_lock`) to serialize access. MongoDB has no native advisory lock. If both runners read "database is at version A," both apply the same migration, and both try to record "database is now at version B" — or worse, they apply *different* migrations and the database ends up in an undefined state.
 
 ## Decision
 
@@ -96,7 +96,7 @@ await db.collection('_prisma_locks').insertOne({
 });
 ```
 
-This adds significant complexity: lock expiry, stale lock cleanup, retry loops with backoff, and a second collection to manage. All of this for a scenario — concurrent `migration apply` — that is rare in practice and easily detected. CAS on the marker is simpler: one atomic operation, no TTL, no cleanup, no retry loop. The losing runner gets a clean error.
+This adds significant complexity: lock expiry, stale lock cleanup, retry loops with backoff, and a second collection to manage. All of this for a scenario — concurrent `migrate` — that is rare in practice and easily detected. CAS on the marker is simpler: one atomic operation, no TTL, no cleanup, no retry loop. The losing runner gets a clean error.
 
 ### Separate marker and ledger collections
 

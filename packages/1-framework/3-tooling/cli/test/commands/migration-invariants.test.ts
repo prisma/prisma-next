@@ -263,7 +263,7 @@ describe('migrate / migration status — invariant-routing pre-checks', {
     expect(envelope.meta?.declared).toEqual(['real-id']);
   });
 
-  it('migration status --ref fails with UNKNOWN_INVARIANT (parity with apply, not a warning)', async () => {
+  it('migration status --to fails with UNKNOWN_INVARIANT (parity with migrate, not a warning)', async () => {
     const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
     const fixture = await setupFixture({
       refInvariants: ['typo-id'],
@@ -318,7 +318,7 @@ describe('migrate / migration status — invariant-routing pre-checks', {
     expect(consoleOutput.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
   });
 
-  it('migration status --ref (online) does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
+  it('migration status --to (online) does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
     cleanupMocks();
     const commandMocks = setupCommandMocks();
     consoleOutput = commandMocks.consoleOutput;
@@ -346,7 +346,7 @@ describe('migrate / migration status — invariant-routing pre-checks', {
     expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
   });
 
-  it('migration status --ref does not emit MIGRATION.UP_TO_DATE when the marker cannot reach the ref', async () => {
+  it('migration status --to does not emit MIGRATION.UP_TO_DATE when the marker cannot reach the ref', async () => {
     // Marker is on a branch that has no forward path to the ref's branch.
     // pendingCount and hasInvariantWork both report 0, but
     // MIGRATION.UP_TO_DATE would mislead — the database simply cannot

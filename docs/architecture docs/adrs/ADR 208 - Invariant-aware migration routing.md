@@ -47,7 +47,7 @@ Production declares which data invariants it requires by listing them on the ref
 { "hash": "sha256:…", "invariants": ["backfill-user-phone"] }
 ```
 
-`migration apply --ref prod` then routes through a path that provides the named invariant — applying the schema change *and* the backfill — and records `backfill-user-phone` on the marker on success. A second `migration apply --ref prod` against the same database short-circuits to a structural BFS, because marker subtraction empties the effective required set.
+`migrate --to prod` then routes through a path that provides the named invariant — applying the schema change *and* the backfill — and records `backfill-user-phone` on the marker on success. A second `migrate --to prod` against the same database short-circuits to a structural BFS, because marker subtraction empties the effective required set.
 
 If the ref names an invariant that no migration in the graph provides *and* the marker has not already recorded it, the CLI fails with `MIGRATION.UNKNOWN_INVARIANT` before invoking the pathfinder. If the invariant exists but no path to the target hash covers it, the CLI fails with `MIGRATION.NO_INVARIANT_PATH` and shows the structural fallback path so the author can see why.
 
@@ -112,7 +112,7 @@ The marker write is atomic per storage family. No client-side compare-and-set lo
 
 ### CLI marker subtraction makes `--ref` idempotent
 
-Before routing, `migration apply --ref` and `migration status --ref` compute:
+Before routing, `migrate --to` and `migration status --to` compute:
 
 ```
 effectiveRequired = ref.invariants − marker.invariants
@@ -122,7 +122,7 @@ The pathfinder receives `effectiveRequired`, not `ref.invariants`. When all of a
 
 ### `MIGRATION.INVARIANTS_PENDING` covers the in-between
 
-A database can be at the ref's structural target hash *and* missing invariants the ref requires (apply was never run with this ref; ref was edited to add a new invariant; etc.). `migration status --ref` surfaces this as an info diagnostic with code `MIGRATION.INVARIANTS_PENDING` rather than reporting "up to date" — the user is not at the desired state.
+A database can be at the ref's structural target hash *and* missing invariants the ref requires (the migration was never run with this ref; ref was edited to add a new invariant; etc.). `migration status --to` surfaces this as an info diagnostic with code `MIGRATION.INVARIANTS_PENDING` rather than reporting "up to date" — the user is not at the desired state.
 
 ### `providedInvariants` flows through the plan envelope
 

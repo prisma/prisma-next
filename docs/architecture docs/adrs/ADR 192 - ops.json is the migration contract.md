@@ -14,7 +14,7 @@ migrations/
     contract.d.ts
 ```
 
-When a developer runs `migration apply`, the runner reads `migration.json` and `ops.json`. It never loads `migration.ts`. The TypeScript file is a development tool — a convenient way to author operations using typed builders and query APIs. It produces `ops.json` when evaluated (either by running the file directly or via `migration emit` / inline from `migration plan`). Once emitted, the JSON is the artifact that gets attested, hash-verified, and replayed.
+When a developer runs `migrate`, the runner reads `migration.json` and `ops.json`. It never loads `migration.ts`. The TypeScript file is a development tool — a convenient way to author operations using typed builders and query APIs. It produces `ops.json` when evaluated (either by running the file directly or via `migration emit` / inline from `migration plan`). Once emitted, the JSON is the artifact that gets attested, hash-verified, and replayed.
 
 ## Decision
 
@@ -45,7 +45,7 @@ Today's symmetric realization of this invariant lives on the Mongo side (`packag
 
 2. **Auditability.** A reviewer reads the JSON to understand exactly what a migration does. The operations are data — inspectable, diffable, greppable. Reviewing `migration.ts` tells you what the author *intended*; reviewing `ops.json` tells you what will *happen*.
 
-3. **Security.** `migration apply` executes structured database commands, not arbitrary code. There is no `eval`, no dynamic `import`, no user-authored function bodies running at deploy time. A compromised `migration.ts` can only affect what gets emitted to `ops.json` — and `ops.json` is reviewed and hash-attested before apply.
+3. **Security.** `migrate` executes structured database commands, not arbitrary code. There is no `eval`, no dynamic `import`, no user-authored function bodies running at deploy time. A compromised `migration.ts` can only affect what gets emitted to `ops.json` — and `ops.json` is reviewed and hash-attested before apply.
 
 4. **Portability.** Any environment that can read JSON and talk to the database can apply migrations — CI runners, edge workers, hosted services. There's no requirement for a TypeScript toolchain, a bundler, or even Node.js at apply time.
 
@@ -53,7 +53,7 @@ Today's symmetric realization of this invariant lives on the Mongo side (`packag
 
 ### Apply-time verification is two-step
 
-`migration apply` must trust two things before executing operations:
+`migrate` must trust two things before executing operations:
 
 1. **The on-disk artifacts are internally consistent.** Recompute `migrationId` from the on-disk manifest + `ops.json` (`verifyMigrationBundle`) and compare against the stored `migrationId`. If they diverge, the artifacts have been tampered with or corrupted; refuse to apply. This check needs nothing beyond the JSON and reuses the same `computeMigrationId` invoked at emit time ([ADR 199](ADR%20199%20-%20Storage-only%20migration%20identity.md)).
 
@@ -67,7 +67,7 @@ Step (2) relies on the emit pipeline being deterministic: instantiating the clas
 
 The developer's workflow is: scaffold the package with `migration plan` (which writes `migration.json`, `ops.json`, `migration.ts`, and the contract snapshot), then iterate by editing `migration.ts` and re-running it directly — `Migration.run(...)` re-emits both `ops.json` and an attested `migration.json` on every invocation ([ADR 196](ADR%20196%20-%20In-process%20emit%20for%20class-flow%20targets.md)). The committed artifacts are `migration.json`, `ops.json`, and `migration.ts` — but only the first two are load-bearing at apply time.
 
-`migration apply` never imports or evaluates `migration.ts`. If the file is missing from the migration directory, apply still succeeds — it needs only the JSON.
+`migrate` never imports or evaluates `migration.ts`. If the file is missing from the migration directory, apply still succeeds — it needs only the JSON.
 
 ### Identity tracks output, not source
 
@@ -81,13 +81,13 @@ Because `migrationId` is computed from the manifest and `ops.json`, two `migrati
 
 ### Execute migration.ts directly at apply time
 
-The simplest model: `migration apply` evaluates `migration.ts` and runs whatever it produces. No intermediate JSON, no serialization step.
+The simplest model: `migrate` evaluates `migration.ts` and runs whatever it produces. No intermediate JSON, no serialization step.
 
 Rejected because it violates all four properties above. A migration that behaves differently depending on installed packages, environment variables, or Node version is not auditable or deterministic. Arbitrary code execution at deploy time is a security boundary we don't want to cross. And it requires a full TypeScript/Node environment wherever migrations are applied.
 
 ### ops.json as a cache, migration.ts as source of truth
 
-`migration apply` would re-evaluate `migration.ts` if present, falling back to `ops.json` if not. This makes `ops.json` advisory rather than authoritative — a performance optimization, not a contract.
+`migrate` would re-evaluate `migration.ts` if present, falling back to `ops.json` if not. This makes `ops.json` advisory rather than authoritative — a performance optimization, not a contract.
 
 Rejected because it reintroduces TypeScript evaluation at apply time (same problems as above) and makes the `migrationId` hash meaningless: the hash covers `ops.json`, but the runner might not use `ops.json`. Reviewers can't trust the JSON because the runner might ignore it.
 

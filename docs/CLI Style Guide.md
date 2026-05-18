@@ -192,7 +192,15 @@ When a verb or flag is removed from the CLI surface (e.g. during a surface refac
 
 Implementation: a small lookup table keyed by `<parent>:<subcommand>` (for verbs) or `<parent>:<subcommand>:<flag>` (for flags) is consulted during the pre-parse argv scan, before commander parses options. This keeps the redirect tied to a verb-and-flag form that is no longer registered while letting the new form's own help text and error envelopes work normally.
 
-Concrete examples (from the migration CLI verb refactor, TML-2546): `prisma-next migration apply` → `prisma-next migrate --to <contract>`; `prisma-next migration ref` → `prisma-next ref set|list|delete`; `prisma-next migration status --graph` → `prisma-next migration graph`; `prisma-next migration status --all`/`--limit` → `prisma-next migration log`; `prisma-next migration status --ref X` → `prisma-next migration status --to X`. Each entry is one row in the redirect table.
+Concrete examples (from the migration CLI verb refactor, TML-2546). Each entry below is one row in the redirect table; the left column is the old form (no longer registered), the right column is the new top-level form:
+
+| Removed form | Redirect target |
+|---|---|
+| `migration` `apply` | `migrate --to <contract>` |
+| `migration` `ref` (`set` / `list` / `delete`) | `ref` (`set` / `list` / `delete`) |
+| `migration status` with `--graph` | `migration graph` |
+| `migration status` with the removed all/limit flags | `migration log` |
+| `migration status` with `--ref X` | `migration status --to X` |
 
 ## JSON Semantics
 - `--json` outputs a single JSON object for the command result to stdout regardless of TTY mode.

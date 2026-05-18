@@ -158,7 +158,7 @@ Port the PDP's database schema management from Prisma 7 migrations to Prisma Nex
 
 Tasks:
 
-1. **Initial migration** — create the initial migration that represents the current PDP schema. Verify `migration apply` produces the correct tables against a fresh database.
+1. **Initial migration** — create the initial migration that represents the current PDP schema. Verify `migrate` produces the correct tables against a fresh database.
 2. **Schema evolution** — make a schema change (add a model, add a field, add a relation), plan and apply the migration. Exercise the planner on common scenarios.
 3. **Escape hatch** — hit a case the planner can't handle (or simulate one). Author a manual migration. Verify it integrates cleanly into the graph.
 4. **Feedback to WS3** — file detailed UX feedback in the gaps log on every rough edge: confusing output, unclear errors, missing information, workflow friction.
@@ -283,7 +283,7 @@ Tasks:
 
 1. **`migration plan` output** — clear, human-readable summary of planned operations. The user can review and approve before applying.
 2. **`migration status` output** — unambiguous answer to "where am I?" and "what will run next?" relative to the migration graph.
-3. **`migration apply` output** — progress indication, success confirmation, and clear error messages on failure.
+3. **`migrate` output** — progress indication, success confirmation, and clear error messages on failure.
 4. **Error diagnostics** — every migration error tells the user what went wrong and suggests a next step. No stack traces without context.
 5. **`db verify` / `db sign` guidance** — ensure the workflow for verifying contracts against live databases and signing them for production is documented and produces clear output. These commands exist but their place in the user workflow needs to be made obvious.
 
@@ -362,7 +362,7 @@ Tasks:
 2. **Manual migrations** — scaffold and apply a manual migration on each target.
 3. **Data migrations** — run a data migration on each target.
 
-Checkpoint: `migration plan`, `migration apply`, and `migration status` work correctly on Postgres, SQLite, and MongoDB for common schema change scenarios. Manual and data migrations integrate into the graph on all targets.
+Checkpoint: `migration plan`, `migrate`, and `migration status` work correctly on Postgres, SQLite, and MongoDB for common schema change scenarios. Manual and data migrations integrate into the graph on all targets.
 
 ---
 

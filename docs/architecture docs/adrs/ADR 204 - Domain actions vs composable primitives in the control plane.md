@@ -17,7 +17,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
 }
 ```
 
-The first three return CLI-shaped result envelopes (`...Result` types with `summary`, `code`, `meta.contractPath`, `timings`). They model **domain actions** — single intents an actor performs (`prisma-next db verify`, `prisma-next db sign`, `migration apply`'s top-level call). Each is the right boundary for one analytics event, one audit record, one CLI render.
+The first three return CLI-shaped result envelopes (`...Result` types with `summary`, `code`, `meta.contractPath`, `timings`). They model **domain actions** — single intents an actor performs (`prisma-next db verify`, `prisma-next db sign`, `migrate`'s top-level call). Each is the right boundary for one analytics event, one audit record, one CLI render.
 
 The second three return raw data — a `Contract`, a `MongoSchemaIR`, a `ContractMarkerRecord | null`. They model **composable primitives** — pure or bounded I/O steps with no actor-intent attached, suitable for composition inside larger work.
 
@@ -93,7 +93,7 @@ When a compound action discovers that it needs an action's internal logic and th
 
 The mistake this ADR was written to prevent: the Mongo migration runner needs post-apply schema verification. `MongoControlFamilyInstance.schemaVerify` already implements introspect-then-diff. The tempting wiring is to inject the family instance into the runner and call `family.schemaVerify(...)` from the runner's `execute()` body.
 
-That's wrong. `migration apply` is itself a compound domain action — one user intent, one audit boundary at the runner's outer entry. Reaching into a peer action mid-flow gives that single user intent two action boundaries with two sets of CLI metadata, only one of which is real. It also imports an action's coupling to CLI rendering into a context that has no CLI to render to.
+That's wrong. `migrate` is itself a compound domain action — one user intent, one audit boundary at the runner's outer entry. Reaching into a peer action mid-flow gives that single user intent two action boundaries with two sets of CLI metadata, only one of which is real. It also imports an action's coupling to CLI rendering into a context that has no CLI to render to.
 
 The correct wiring extracts the primitive first. `verifyMongoSchema(contract, schema, strict, frameworkComponents)` is the pure step that both `db verify --schema-only` and the runner need. Once it exists:
 

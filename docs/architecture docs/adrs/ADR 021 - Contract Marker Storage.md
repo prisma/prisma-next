@@ -56,7 +56,7 @@ Note that ADR 029's shadow-DB preflight is user-DDL-scoped and does not cover `e
 - profile_hash mirrors the contract-pinned capability profile and is used to enforce equality at verification time
 - contract_json is optional complete contract JSON for drift analysis and PPg features
 - canonical_version tracks the canonicalization version used for the contract_json
-- invariants is the set-semantic, monotonic record of `invariantId`s that have been applied to this database at least once in its history. Populated by server-side union on every successful `migration apply`; never shrinks. The reading is "applied-at-least-once," not "currently true of the data" — the data transform's `check` is the authority for the latter. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) for the full semantics.
+- invariants is the set-semantic, monotonic record of `invariantId`s that have been applied to this database at least once in its history. Populated by server-side union on every successful `migrate`; never shrinks. The reading is "applied-at-least-once," not "currently true of the data" — the data transform's `check` is the authority for the latter. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) for the full semantics.
 - app_tag is optional human context (service or deployment name)
 - meta is reserved for forward-compatible fields the platform may add later
 
