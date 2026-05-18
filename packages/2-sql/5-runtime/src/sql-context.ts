@@ -27,6 +27,7 @@ import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
   isPostgresEnumStorageEntry,
   type SqlStorage,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import {
@@ -315,7 +316,10 @@ function collectTypeRefSites(
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
+    for (const [tableName, table] of Object.entries(
+      ns.tables as Readonly<Record<string, StorageTable>>,
+    )) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (typeof column.typeRef !== 'string') continue;
         const list = sites.get(column.typeRef);
@@ -375,7 +379,10 @@ function validateColumnTypeParams(
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
+    for (const [tableName, table] of Object.entries(
+      ns.tables as Readonly<Record<string, StorageTable>>,
+    )) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeParams) {
           const descriptor = codecDescriptors.get(column.codecId);
@@ -404,7 +411,10 @@ function assertColumnCodecIntegrity(
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
   for (const ns of Object.values(storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
+    for (const [tableName, table] of Object.entries(
+      ns.tables as Readonly<Record<string, StorageTable>>,
+    )) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
         if (!ref) continue;
@@ -519,7 +529,10 @@ function buildContractCodecRegistry(
   }
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
+    for (const [tableName, table] of Object.entries(
+      ns.tables as Readonly<Record<string, StorageTable>>,
+    )) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
@@ -551,7 +564,10 @@ function buildContractCodecRegistry(
   });
 
   for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [tableName, table] of Object.entries(ns.tables)) {
+    // SqlStorage guarantees all namespace tables are StorageTable instances; Namespace.tables is wider (object) at the framework type level.
+    for (const [tableName, table] of Object.entries(
+      ns.tables as Readonly<Record<string, StorageTable>>,
+    )) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
         if (!ref) continue;
