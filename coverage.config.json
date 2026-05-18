@@ -91,6 +91,15 @@
       "assignee": null,
       "linear": "TML-2521",
       "notes": "Per-class unit tests tracked as a follow-up before 0.9 release; mirrors the equivalent adapter-postgres/adapter-sqlite warning entries for the same architectural reason."
+    },
+    {
+      "package": "1-framework/3-tooling/cli",
+      "reason": "Migration CLI restructure added src/commands/migration-check.ts (artifact / graph integrity verb). Behaviour is exercised end-to-end through adversarial fixture journey tests in test/integration/test/cli-journeys/migration-check.e2e.test.ts (covering all five PN-MIG-CHECK-001..005 codes) and through per-migration vs graph-wide regression tests, but the per-package coverage report sees 0% because the CLI's unit suite does not import the command directly.",
+      "addedDate": "2026-05-18",
+      "expiryDays": 90,
+      "assignee": null,
+      "linear": "TML-2552",
+      "notes": "Add direct unit tests for migration-check (command-level argument parsing, exit-code mapping, and one happy-path / one PN-code-per-failure-mode assertion) so per-package coverage recovers. Tracked alongside the residual internal-renames work in TML-2552."
     }
   ],
   "excludedPackages": ["1-framework/3-tooling/eslint-plugin"]
