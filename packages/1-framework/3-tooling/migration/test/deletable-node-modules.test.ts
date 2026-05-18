@@ -218,7 +218,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     // value here is the same shape the validator will return.
     const spaceContract = createSqlContract({
       target: 'postgres',
-      storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
+      storage: { tables: { __unbound__: { test_box: { columns: { x: {}, y: {} } } } } },
     });
     await emitContractSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
       contract: spaceContract as unknown as Record<string, unknown>,
@@ -247,7 +247,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
   it('loader → verifier walk to completion with node_modules removed', async () => {
     const appContract = createSqlContract({
       target: 'postgres',
-      storage: { tables: { user: { columns: { id: {} } } } },
+      storage: { tables: { __unbound__: { user: { columns: { id: {} } } } } },
     });
 
     const declaredExtensions: ReadonlyArray<DeclaredExtensionEntry> = [

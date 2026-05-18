@@ -35,7 +35,10 @@ function emptyMigrations(): ContractSpaceMember['migrations'] {
 function makeMember(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
   return {
     spaceId,
-    contract: createSqlContract({ target: 'postgres', storage: { tables } }),
+    contract: createSqlContract({
+      target: 'postgres',
+      storage: { tables: { __unbound__: tables } },
+    }),
     headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
     migrations: emptyMigrations(),
   };

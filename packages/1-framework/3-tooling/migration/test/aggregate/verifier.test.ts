@@ -28,7 +28,10 @@ function makeMember(args: {
   tables?: Record<string, unknown>;
 }): ContractSpaceMember {
   const tables = args.tables ?? {};
-  const contract = createSqlContract({ target: 'postgres', storage: { tables } });
+  const contract = createSqlContract({
+    target: 'postgres',
+    storage: { tables: { __unbound__: tables } },
+  });
   return {
     spaceId: args.spaceId,
     contract: contract as Contract,

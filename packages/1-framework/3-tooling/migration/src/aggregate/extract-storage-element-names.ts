@@ -22,6 +22,11 @@
  *
  * Behavioural notes for the lifetime of this helper:
  *
+ * - `storage.tables` is now nested-by-namespace
+ *   (`Record<namespaceId, Record<tableName, ...>>`); this helper walks
+ *   the inner bucket so the returned set contains the leaf table names,
+ *   not the namespace IDs. `storage.collections` is treated the same way
+ *   for Mongo family contracts.
  * - Both `tables` and `collections` are unioned (a hypothetical
  *   cross-family contract exposing both would contribute both sets).
  * - Unrecognised storage shapes return an empty set, so a future family
@@ -42,8 +47,12 @@ export function extractStorageElementNames(contract: unknown): Set<string> {
   for (const field of ['tables', 'collections'] as const) {
     const value = storageObj[field];
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      for (const name of Object.keys(value as Record<string, unknown>)) {
-        names.add(name);
+      for (const bucket of Object.values(value as Record<string, unknown>)) {
+        if (typeof bucket === 'object' && bucket !== null && !Array.isArray(bucket)) {
+          for (const name of Object.keys(bucket as Record<string, unknown>)) {
+            names.add(name);
+          }
+        }
       }
     }
   }

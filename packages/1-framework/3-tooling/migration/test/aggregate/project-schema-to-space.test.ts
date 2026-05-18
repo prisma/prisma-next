@@ -42,7 +42,7 @@ describe('projectSchemaToSpace', () => {
   function memberWithTables(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
     return {
       spaceId,
-      contract: createContract({ storage: { tables } }),
+      contract: createContract({ storage: { tables: { __unbound__: tables } } }),
       headRef: { hash: 'sha256:test', invariants: [] },
       migrations: emptyMigrations(),
     };
@@ -63,7 +63,7 @@ describe('projectSchemaToSpace', () => {
       contract: createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections },
+        storage: { collections: { __unbound__: collections } },
       }),
       headRef: { hash: 'sha256:test', invariants: [] },
       migrations: emptyMigrations(),

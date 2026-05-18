@@ -293,11 +293,11 @@ describe('loadContractSpaceAggregate', () => {
       // App claims `users`; extension claims `users` as well.
       const appContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { users: {} } },
+        storage: { tables: { __unbound__: { users: {} } } },
       });
       const extContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { users: {} } },
+        storage: { tables: { __unbound__: { users: {} } } },
       });
 
       const cipherJson = { id: 'cipher-collides' };
@@ -346,12 +346,12 @@ describe('loadContractSpaceAggregate', () => {
       const appContract = createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections: { users: {} } },
+        storage: { collections: { __unbound__: { users: {} } } },
       });
       const extContract = createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections: { users: {} } },
+        storage: { collections: { __unbound__: { users: {} } } },
       });
 
       const cipherJson = { id: 'cipher-mongo-collides' };
@@ -425,11 +425,11 @@ describe('loadContractSpaceAggregate', () => {
 
       const cipherContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { cipher_state: {} } },
+        storage: { tables: { __unbound__: { cipher_state: {} } } },
       });
       const pgvectorContract = createSqlContract({
         target: 'postgres',
-        storage: { tables: { pgvector_state: {} } },
+        storage: { tables: { __unbound__: { pgvector_state: {} } } },
       });
       const validator = makeIdentityValidator(
         new Map([
@@ -444,7 +444,7 @@ describe('loadContractSpaceAggregate', () => {
           targetId: 'postgres',
           appContract: createSqlContract({
             target: 'postgres',
-            storage: { tables: { app_user: {} } },
+            storage: { tables: { __unbound__: { app_user: {} } } },
           }),
           validateContract: validator,
           declaredExtensions: [

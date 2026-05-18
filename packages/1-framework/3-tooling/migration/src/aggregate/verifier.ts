@@ -1,5 +1,6 @@
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractMarkerRecordLike } from './marker-types';
 import { projectSchemaToSpace } from './project-schema-to-space';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
@@ -210,11 +211,7 @@ function detectOrphanElements(
 
   const claimedTables = new Set<string>();
   for (const member of members) {
-    const storage = (member.contract as { readonly storage?: unknown }).storage;
-    if (typeof storage !== 'object' || storage === null) continue;
-    const tables = (storage as { readonly tables?: unknown }).tables;
-    if (typeof tables !== 'object' || tables === null) continue;
-    for (const tableName of Object.keys(tables as Record<string, unknown>)) {
+    for (const tableName of extractStorageElementNames(member.contract)) {
       claimedTables.add(tableName);
     }
   }
