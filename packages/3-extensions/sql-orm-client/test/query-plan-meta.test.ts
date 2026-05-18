@@ -12,11 +12,12 @@ import {
   resolveTableColumns,
 } from '../src/query-plan-meta';
 import { baseContract } from './collection-fixtures';
+import { unboundTables } from './unbound-tables';
 
 describe('query plan meta', () => {
   it('resolves table columns and rejects unknown tables', () => {
     expect(resolveTableColumns(baseContract, 'users')).toEqual(
-      Object.keys(baseContract.storage.tables.users.columns),
+      Object.keys(unboundTables(baseContract.storage).users!.columns),
     );
     expect(() => resolveTableColumns(baseContract, 'missing')).toThrow(
       'Unknown table "missing" in SQL ORM query planner',

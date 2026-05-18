@@ -577,6 +577,14 @@ type FieldColumnName<
     : FieldName) &
   string;
 
+type UnboundTables<TContract extends Contract<SqlStorage>> =
+  TContract['storage']['namespaces'] extends Record<
+    '__unbound__',
+    { readonly tables: Record<string, unknown> }
+  >
+    ? TContract['storage']['namespaces']['__unbound__']['tables']
+    : never;
+
 type ResolvedStorageColumn<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
@@ -584,14 +592,14 @@ type ResolvedStorageColumn<
 > =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
     ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
-      ? TContract['storage']['tables'] extends Record<
+      ? UnboundTables<TContract> extends Record<
           string,
           { readonly columns: Record<string, unknown> }
         >
-        ? TableName extends keyof TContract['storage']['tables']
-          ? ColName extends keyof TContract['storage']['tables'][TableName]['columns']
-            ? TContract['storage']['tables'][TableName]['columns'][ColName] extends StorageColumn
-              ? TContract['storage']['tables'][TableName]['columns'][ColName]
+        ? TableName extends keyof UnboundTables<TContract>
+          ? ColName extends keyof UnboundTables<TContract>[TableName]['columns']
+            ? UnboundTables<TContract>[TableName]['columns'][ColName] extends StorageColumn
+              ? UnboundTables<TContract>[TableName]['columns'][ColName]
               : never
             : never
           : never
@@ -787,9 +795,9 @@ export type ResolvedCreateInput<
 
 type ModelStorageTableDef<TContract extends Contract<SqlStorage>, ModelName extends string> =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? TContract['storage']['tables'] extends Record<string, unknown>
-      ? TableName extends keyof TContract['storage']['tables']
-        ? TContract['storage']['tables'][TableName]
+    ? UnboundTables<TContract> extends Record<string, unknown>
+      ? TableName extends keyof UnboundTables<TContract>
+        ? UnboundTables<TContract>[TableName]
         : never
       : never
     : never;
@@ -1130,8 +1138,8 @@ type IsToOneRelationNullable<
   RelName extends string,
 > =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? TableName extends keyof TContract['storage']['tables']
-      ? TContract['storage']['tables'][TableName] extends infer Table extends StorageTable
+    ? TableName extends keyof UnboundTables<TContract>
+      ? UnboundTables<TContract>[TableName] extends infer Table extends StorageTable
         ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
           ? RelName extends keyof Rels
             ? RelationLocalFieldColumns<

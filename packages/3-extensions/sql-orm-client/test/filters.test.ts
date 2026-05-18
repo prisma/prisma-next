@@ -13,13 +13,14 @@ import { describe, expect, it } from 'vitest';
 import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
 import { getTestContext, getTestContract } from './helpers';
+import { unboundTables } from './unbound-tables';
 
 describe('filters', () => {
   const contract = getTestContract();
   const context = getTestContext();
 
   function paramRef(table: string, column: string, value: unknown): ParamRef {
-    const tables = context.contract.storage.tables as Record<
+    const tables = unboundTables(context.contract.storage) as Record<
       string,
       { columns: Record<string, { codecId?: string }> } | undefined
     >;
