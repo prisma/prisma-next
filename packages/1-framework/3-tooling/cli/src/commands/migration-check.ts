@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
 import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
@@ -193,17 +193,23 @@ async function executeMigrationCheckCommand(
       }
     }
 
-    for (const edges of graph.forwardChain.values()) {
-      for (const edge of edges) {
-        for (const nextEdge of graph.forwardChain.get(edge.to) ?? []) {
-          if (nextEdge.from !== edge.to) {
+    for (const pkg of bundles) {
+      const endContractPath = join(pkg.dirPath, 'end-contract.json');
+      if (existsSync(endContractPath)) {
+        try {
+          const raw = JSON.parse(readFileSync(endContractPath, 'utf-8')) as Record<string, unknown>;
+          const storage = raw['storage'] as Record<string, unknown> | undefined;
+          const snapshotHash = storage?.['storageHash'];
+          if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
             failures.push({
               pnCode: 'PN-MIG-CHECK-005',
-              where: `${edge.dirName} → ${nextEdge.dirName}`,
-              why: `Migration "${edge.dirName}" produces contract ${edge.to} but "${nextEdge.dirName}" starts from ${nextEdge.from}`,
-              fix: 'Re-emit the affected migration packages to restore graph consistency.',
+              where: pkg.dirName,
+              why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but end-contract.json has storageHash=${snapshotHash}`,
+              fix: 'Re-emit the migration package so migration.json and end-contract.json agree.',
             });
           }
+        } catch {
+          // end-contract.json unparseable — the file check already covers this
         }
       }
     }

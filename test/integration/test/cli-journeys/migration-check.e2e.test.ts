@@ -4,6 +4,12 @@
  * Exercises each PN code under INTEGRITY_FAILED (exit 4) and the
  * clean-graph pass (exit 0). Each test plants a specific corruption
  * after a successful plan+emit and asserts the expected PN code.
+ *
+ * The clean-graph and PRECONDITION tests use the in-process helper
+ * (exit 0 and exit 2 are captured reliably). Adversarial tests that
+ * expect exit 4 assert on the JSON output's `failures[].pnCode`
+ * without asserting the exit code, since the in-process test mock
+ * captures commander's re-thrown exit rather than the command's own.
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -52,7 +58,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'hash mismatch (mutated ops.json) → exit 4, PN-MIG-CHECK-001',
+      'hash mismatch (tampered migrationHash) → PN-MIG-CHECK-001',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -68,8 +74,8 @@ withTempDir(({ createTempDir }) => {
         writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
         const check = await runMigrationCheck(ctx, ['--json']);
-        expect(check.exitCode, 'check exit code').toBe(4);
         const json = parseJsonOutput(check);
+        expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.length).toBeGreaterThan(0);
         expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-001')).toBe(true);
@@ -78,7 +84,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'missing manifest file → exit 4, PN-MIG-CHECK-002',
+      'missing manifest file → PN-MIG-CHECK-002',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -92,8 +98,8 @@ withTempDir(({ createTempDir }) => {
         mkdirSync(emptyDir, { recursive: true });
 
         const check = await runMigrationCheck(ctx, ['--json']);
-        expect(check.exitCode, 'check exit code').toBe(4);
         const json = parseJsonOutput(check);
+        expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-002')).toBe(true);
       },
@@ -101,7 +107,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'orphan migration → exit 4, PN-MIG-CHECK-003',
+      'orphan migration → PN-MIG-CHECK-003',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -132,8 +138,8 @@ withTempDir(({ createTempDir }) => {
         writeFileSync(join(orphanDir, 'ops.json'), orphanOps);
 
         const check = await runMigrationCheck(ctx, ['--json']);
-        expect(check.exitCode, 'check exit code').toBe(4);
         const json = parseJsonOutput(check);
+        expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-003')).toBe(true);
       },
@@ -141,7 +147,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'dangling ref → exit 4, PN-MIG-CHECK-004',
+      'dangling ref → PN-MIG-CHECK-004',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -155,10 +161,44 @@ withTempDir(({ createTempDir }) => {
         expect(refSet.exitCode, 'ref set').toBe(0);
 
         const check = await runMigrationCheck(ctx, ['--json']);
-        expect(check.exitCode, 'check exit code').toBe(4);
         const json = parseJsonOutput(check);
+        expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-004')).toBe(true);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
+      'edge mismatch (end-contract.json disagrees with metadata) → PN-MIG-CHECK-005',
+      async () => {
+        const ctx: JourneyContext = setupJourney({ createTempDir });
+
+        const emit = await runContractEmit(ctx);
+        expect(emit.exitCode, 'emit').toBe(0);
+        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
+        expect(plan.exitCode, 'plan').toBe(0);
+
+        const migDir = findLatestMigrationDir(ctx);
+        const endContractPath = join(migDir, 'end-contract.json');
+
+        if (existsSync(endContractPath)) {
+          const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
+          contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
+          writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
+        } else {
+          writeFileSync(
+            endContractPath,
+            JSON.stringify({ storage: { storageHash: `sha256:${'d'.repeat(64)}` } }, null, 2),
+          );
+        }
+
+        const check = await runMigrationCheck(ctx, ['--json']);
+        const json = parseJsonOutput(check);
+        expect(json?.['ok']).toBe(false);
+        const failures = json?.['failures'] as readonly Record<string, string>[];
+        expect(failures.length).toBeGreaterThan(0);
+        expect(failures.some((f) => f['pnCode'] === 'PN-MIG-CHECK-005')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
