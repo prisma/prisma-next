@@ -130,6 +130,10 @@
       "types": "./dist/commands/migration-graph.d.mts",
       "import": "./dist/commands/migration-graph.mjs"
     },
+    "./commands/migration-check": {
+      "types": "./dist/commands/migration-check.d.mts",
+      "import": "./dist/commands/migration-check.mjs"
+    },
     "./commands/migrate": {
       "types": "./dist/commands/migrate.d.mts",
       "import": "./dist/commands/migrate.mjs"
