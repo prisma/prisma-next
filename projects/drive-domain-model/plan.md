@@ -6,11 +6,11 @@ The execution plan for landing the work `spec.md` defines. Maps acceptance crite
 
 We're shipping in three phases, in order:
 
-1. **Phase 1 — Shape** (in this repo, this PR). Land the methodology, model, principle docs, calibration, restructure plan, and execution plan. The substrate every subsequent slice builds on. *(In flight; this PR.)*
-2. **Phase 2 — Build + trial locally** (in this repo, follow-up branches under `.agents/skills/drive-*/`). Build the full Drive skill family — three workflow skills + the new atomic skills + augmentations + vocabulary refresh — locally in `prisma-next`. Use them in real work for a couple of weeks. Retros fire on real failures; calibration entries land in `drive/<category>/README.md`; the family gets sanded down by use.
+1. **Phase 1 — Shape** (in this repo, this PR). Land the methodology, model, principle docs, calibration, restructure plan, and execution plan. The substrate every subsequent slice builds on.
+2. **Phase 2 — Build + trial locally** (in this repo, the same PR). Build the full Drive skill family — three workflow skills + the new atomic skills + augmentations + vocabulary refresh — locally in `prisma-next` `.agents/skills/`. Phase-2 slices ride the same PR as Phase 1 (each slice is its own focused commit; the PR grows commit-by-commit). Once the family is in place, use it in real work for a couple of weeks; retros fire on real failures; calibration entries land in `drive/<category>/README.md`.
 3. **Phase 3 — Promote upstream** (in `prisma/ignite`, one PR per skill). Once we know what survived the trial, open the upstream PR series. Each PR carries one or two related skills, stacks on PR #93, independently reviewable.
 
-This replaces the earlier strategy of opening upstream PRs incrementally as each piece was drafted. The trial period catches design problems before they crystallize into canonical bodies that downstream consumers then have to migrate around.
+This replaces the earlier strategy of opening upstream PRs incrementally as each piece was drafted. The trial period catches design problems before they crystallize into canonical bodies that downstream consumers then have to migrate around. Keeping Phase 2 on the same PR lets reviewers see the full family as a coherent whole rather than reviewing pieces in isolation.
 
 ## Status snapshot
 
@@ -60,9 +60,9 @@ The shaping slice (this PR on `tml-2549-agile-agent-orchestration`) is in flight
 
 ## Phase 2 — Build + trial locally
 
-**Repo:** this worktree (`prisma-next`). Skills land in `.agents/skills/drive-<name>/SKILL.md`.
+**Repo:** this worktree (`prisma-next`). Skills land in `.agents/skills/drive-<name>/SKILL.md` (where `.claude/skills` is a symlink to `.agents/skills`).
 
-Sequencing follows [`skill-restructure.md`](skill-restructure.md) § 4. Each slice below is a single PR that lands one or two related skills locally.
+Sequencing follows [`skill-restructure.md`](skill-restructure.md) § 4. Each slice below is a focused commit on this PR. (Earlier draft had each slice as its own PR; on operator instruction we keep Phase 2 on the same PR so reviewers see the full family as a coherent whole.)
 
 | Slice # | Scope | Sizing | Covers |
 |---|---|---|---|
@@ -76,14 +76,14 @@ Sequencing follows [`skill-restructure.md`](skill-restructure.md) § 4. Each sli
 | 9 | Atomic augmentations: `drive-close-project` (mandatory retro), `drive-create-project` (project DoR + bootstrap), `drive-pr-description` (direct-change framing) | M | AC7 |
 | 10 | Vocabulary refresh across the unchanged skills (mechanical; many files) | M | AC7, AC8 |
 
-**Each Phase-2 PR carries:**
+**Each Phase-2 commit carries:**
 
 - The skill body content (frontmatter + Workflow + Pitfalls + Checklist + project-context loading per PR #93 convention).
-- A PR description referencing the project's `model.md` + `skill-restructure.md` + the relevant principle docs.
+- A commit message referencing the project's `model.md` + `skill-restructure.md` + the relevant principle docs.
 - A vocabulary check (no "milestone" / "task" in pre-model senses in the changed files).
 - New `drive/<category>/README.md` categories (`drive/triage/`, `drive/retro/`, `drive/health/`) seeded if the slice introduces them.
 
-**Acceptance per Phase-2 slice:** Operator review pass + merge to `main` in `prisma-next`.
+**Acceptance per Phase-2 commit:** Operator review on the diff before continuing to the next commit. The whole PR ships together once all Phase-2 commits + the trial slice are done.
 
 ### Trial period
 
