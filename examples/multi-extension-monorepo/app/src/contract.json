@@ -39,29 +39,38 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:4e3d7e0d1a316579eddaadc281d1d1da928b1180143fa0f8662b7fd15cf40bdd",
+    "namespaces": {
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "schema"
+      }
+    },
+    "storageHash": "sha256:b593387990d4e7aa5e672a4ea0d1264c9e3b781d2136dc3760af3333fe99e0f5",
     "tables": {
-      "app_user": {
-        "columns": {
-          "email": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+      "__unbound__": {
+        "app_user": {
+          "columns": {
+            "email": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
           },
-          "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
+          "foreignKeys": [],
+          "indexes": [],
+          "namespaceId": "__unbound__",
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        }
       }
     }
   },
