@@ -212,3 +212,9 @@ Ambiguity (a hex-shaped string that's both a hash prefix and a directory name; a
 ## Open questions
 
 *(None. The preflight scope question was settled by deferring preflight to a separate project; the three remaining open questions from the initial draft are settled in FR3 (help-text strategy), FR5 (wrong-grammar errors), and FR6 (exit codes).)*
+
+## Follow-up tasks
+
+These were settled during modelling but did not land in this project's implementation surface. They are recorded here so the gap between the modelling docs and the shipped CLI is explicit; each has a Linear ticket against `[PN] May: Migrations`.
+
+- **`migration plan` advances the named ref atomically.** The modelling decision (see [`domain.md` § Verbs / Authoring](./domain.md) under `migration plan`, and the resolved entry under `ref set`) makes `migration plan --advance <ref>` the "freeze + promise" verb: producing the migration package and writing the ref pointer is one act, committed in one PR. `ref set` is reserved as the rarely-used direct-write escape hatch. **Status:** not implemented in this project; the shipped `migration plan` exposes `--config`, `--name`, `--from` only. **Tracked as:** [TML-2560](https://linear.app/prisma-company/issue/TML-2560) in `[PN] May: Migrations`. **Scope when implemented:** add the `--advance <ref>` flag to `migration-plan.ts`, route the argument through the M1 `parseContractRef` resolver, write the ref file as part of a successful plan, refuse-with-rationale when the ref doesn't already exist (no implicit creation — `ref set` remains the way to create a ref the first time), and add the corresponding journey-test assertion plus a glossary cross-reference.
