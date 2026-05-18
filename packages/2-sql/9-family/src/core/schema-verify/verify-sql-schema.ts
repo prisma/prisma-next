@@ -129,7 +129,21 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
-  const storageTypes = (contract.storage.types ?? {}) as Readonly<
+  const allStorageTypesMap: Record<string, PostgresEnumStorageEntry | StorageTypeInstance> = {
+    ...((contract.storage.types ?? {}) as Record<
+      string,
+      PostgresEnumStorageEntry | StorageTypeInstance
+    >),
+  };
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
+    if (nsTypes) {
+      for (const [k, v] of Object.entries(nsTypes)) {
+        allStorageTypesMap[k] = v;
+      }
+    }
+  }
+  const storageTypes = allStorageTypesMap as Readonly<
     Record<string, PostgresEnumStorageEntry | StorageTypeInstance>
   >;
   const { issues, rootChildren } = verifySchemaTables({

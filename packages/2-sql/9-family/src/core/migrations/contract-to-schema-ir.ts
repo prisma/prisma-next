@@ -291,7 +291,18 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes = (storage.types ?? {}) as ResolvedStorageTypes;
+  const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
+    ...((storage.types ?? {}) as ResolvedStorageTypes),
+  };
+  for (const ns of Object.values(storage.namespaces)) {
+    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
+    if (nsTypes) {
+      for (const [k, v] of Object.entries(nsTypes)) {
+        allTypes[k] = v;
+      }
+    }
+  }
+  const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.tables)) {
@@ -328,8 +339,19 @@ function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
-  const types = storage.types as ResolvedStorageTypes | undefined;
-  if (!types || Object.keys(types).length === 0) return undefined;
+  const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
+    ...((storage.types ?? {}) as ResolvedStorageTypes),
+  };
+  for (const ns of Object.values(storage.namespaces)) {
+    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
+    if (nsTypes) {
+      for (const [k, v] of Object.entries(nsTypes)) {
+        allTypes[k] = v;
+      }
+    }
+  }
+  const types = allTypes as ResolvedStorageTypes;
+  if (Object.keys(types).length === 0) return undefined;
   // Re-key by nativeType, normalising every variant to the codec-typed
   // annotation shape `{codecId, nativeType, typeParams}` produced by the
   // adapter introspector (`introspectPostgresEnumTypes` writes that shape;

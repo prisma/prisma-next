@@ -50,6 +50,7 @@ import {
 } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
+  locateTable,
   type StrategyContext,
   sqlitePlannerStrategies,
 } from './planner-strategies';
@@ -297,7 +298,7 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
       }
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
       if (!contractTable) {
         return notOk(
           issueConflict(
@@ -329,7 +330,8 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
         );
       }
-      const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+      const { table: contractTable2 } = locateTable(ctx.toContract.storage, issue.table) ?? {};
+      const column = contractTable2?.columns[issue.column];
       if (!column) {
         return notOk(
           issueConflict(
@@ -338,7 +340,7 @@ function mapIssueToCall(
           ),
         );
       }
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = contractTable2;
       const columnSpec = toColumnSpec(
         issue.column,
         column,
@@ -362,7 +364,7 @@ function mapIssueToCall(
         );
       }
       const columns = issue.expected.split(', ');
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
       if (!contractTable) {
         return notOk(
           issueConflict(
@@ -371,11 +373,6 @@ function mapIssueToCall(
           ),
         );
       }
-      // Use the explicit-index name if one is declared for these columns;
-      // otherwise fall back to `defaultIndexName` (which is also what
-      // `verifySqlSchema` synthesizes for FK-backing indexes). Whether the
-      // missing index originates from `contractTable.indexes` or from an FK
-      // with `index: true` doesn't change the emitted DDL.
       const explicitIndex = contractTable.indexes.find(
         (idx) => idx.columns.join(',') === columns.join(','),
       );

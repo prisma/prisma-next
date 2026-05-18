@@ -1,21 +1,29 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  type SqlNamespaceTablesInput,
+  SqlStorage,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 
 function makeContract(
-  overrides: Partial<Contract<SqlStorage>['storage']> = {},
+  overrides: { tables?: Record<string, StorageTableInput> } = {},
 ): Contract<SqlStorage> {
+  const unboundNs: SqlNamespaceTablesInput = {
+    id: UNBOUND_NAMESPACE_ID,
+    tables: overrides.tables ?? {},
+  };
   return {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
-      tables: {},
-      ...overrides,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},
     models: {},

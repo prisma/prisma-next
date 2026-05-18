@@ -1,5 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -30,8 +31,10 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
-      tables,
       storageHash: coreHash('sha256:contract'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      },
     }),
     roots: {},
     models: {},

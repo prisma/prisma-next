@@ -24,6 +24,7 @@ import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
   PostgresEnumStorageEntry,
   SqlStorage,
+  StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
@@ -41,6 +42,26 @@ export interface StrategyContext {
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}
+
+/**
+ * Finds a table by name across all namespaces in the storage.
+ * Returns the namespace ID alongside the table so callers always have
+ * the full coordinate (namespace ID + table name), not just the table.
+ */
+export function locateTable(
+  storage: SqlStorage,
+  tableName: string,
+): { nsId: string; table: StorageTable } | undefined {
+  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+    // Namespace.tables is typed as Record<string, IRNode> at the interface level;
+    // SQL family namespaces always hold StorageTable instances.
+    const table = ns.tables[tableName] as StorageTable | undefined;
+    if (table !== undefined) {
+      return { nsId, table };
+    }
+  }
+  return undefined;
 }
 
 export type CallMigrationStrategy = (
@@ -114,7 +135,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
 
   const calls: SqliteOpFactoryCall[] = [];
   for (const [tableName, entry] of byTable) {
-    const contractTable = ctx.toContract.storage.tables[tableName];
+    const contractTable = locateTable(ctx.toContract.storage, tableName)?.table;
     const schemaTable = ctx.schema.tables[tableName];
     if (!contractTable || !schemaTable) continue;
     const operationClass: MigrationOperationClass = entry.hasDestructive
@@ -206,7 +227,7 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
     // needs no backfill.
     if (issue.expected === 'true') continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
     if (!column || column.nullable === true) continue;
 
     calls.push(
