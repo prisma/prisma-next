@@ -1723,4 +1723,83 @@ describe('interpretPslDocumentToMongoContract', () => {
       expect(ir.models['Item']).toBeDefined();
     });
   });
+
+  describe('namespace block rejection', () => {
+    it('rejects explicit namespace blocks with a Mongo-flavoured diagnostic', () => {
+      const document = parsePslDocument({
+        schema: `namespace auth {
+  model User {
+    id String @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToMongoContract({
+        document,
+        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+            message: expect.stringMatching(/[Mm]ongo/),
+          }),
+        ]),
+      );
+      const offending = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+      );
+      expect(offending?.message).toContain('auth');
+    });
+
+    it('rejects `namespace unbound { … }` (Mongo has no late-binding namespace)', () => {
+      const document = parsePslDocument({
+        schema: `namespace unbound {
+  model Tenant {
+    id String @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToMongoContract({
+        document,
+        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK' }),
+        ]),
+      );
+    });
+
+    it('accepts top-level model declarations (no namespace block)', () => {
+      const document = parsePslDocument({
+        schema: `model User {
+  id String @id
+  name String
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToMongoContract({
+        document,
+        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.models['User']).toBeDefined();
+    });
+  });
 });
