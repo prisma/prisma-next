@@ -136,6 +136,7 @@ function normaliseNamespaceEntry(
 // the slot without a class-instance check.
 export type SqlNamespace = Namespace & {
   readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 };
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
