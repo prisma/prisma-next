@@ -3,6 +3,7 @@
 **Status:** Proposed
 **Date:** 2026-05-19
 **Project:** [`contract-ir-planes`](../spec.md)
+**Tracking ticket:** [TML-2584](https://linear.app/prisma-company/issue/TML-2584/restructure-contract-ir-into-two-planes-domain-storage-with-uniform)
 **Predecessor work:** [TML-2520](https://linear.app/prisma-company/issue/TML-2520) (namespace exemplar; PR #534)
 
 > _This ADR lives under the project's `adrs/` while shaping. Migrates to `docs/architecture docs/adrs/` at project close-out per `drive/calibration/dod.md § ADR audit`._

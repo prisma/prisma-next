@@ -1,5 +1,7 @@
 # Contract IR Planes — Project Spec
 
+**Tracking ticket:** [TML-2584](https://linear.app/prisma-company/issue/TML-2584/restructure-contract-ir-into-two-planes-domain-storage-with-uniform)
+
 ## Refs
 
 - **Predecessor:** [TML-2520](https://linear.app/prisma-company/issue/TML-2520) — *Namespace exemplar.* Makes the storage section namespace-aware and ships cross-namespace foreign keys. Must merge before this project starts.
@@ -294,6 +296,6 @@ Rough sketch (refined when the project's plan is drafted via `drive-plan-project
   - `[projects/namespace-exemplar/reviews/pr-534/system-design-review.md](../namespace-exemplar/reviews/pr-534/system-design-review.md)`
   - `[projects/namespace-exemplar/reviews/pr-534/code-review.md](../namespace-exemplar/reviews/pr-534/code-review.md)`
   - `[projects/namespace-exemplar/reviews/pr-534/walkthrough.md](../namespace-exemplar/reviews/pr-534/walkthrough.md)`
-- ADR draft: `[./adrs/0001-contract-planes.md](./adrs/0001-contract-planes.md)`
-- Linear Project: *to be created*
+- ADR draft: [`./adrs/0001-contract-planes.md`](./adrs/0001-contract-planes.md)
+- Tracking ticket: [TML-2584](https://linear.app/prisma-company/issue/TML-2584/restructure-contract-ir-into-two-planes-domain-storage-with-uniform)
 
