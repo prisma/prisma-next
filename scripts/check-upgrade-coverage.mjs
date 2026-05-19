@@ -49,6 +49,23 @@ const USER_SKILL_PKG = 'skills/upgrade/prisma-next-upgrade';
 const EXT_SKILL_PKG = 'skills/extension-author/prisma-next-extension-upgrade';
 
 /**
+ * Substrates covered by the gate. Each entry pairs a diff pathspec
+ * (the file tree whose changes trigger the coverage check) with the
+ * skill package that must host upgrade-instructions directories for
+ * that substrate. The coverage-rule loop iterates this table — adding
+ * a new substrate is a one-line change here, not a new hardcoded
+ * block.
+ */
+const COVERAGE_SUBSTRATES = [
+  { substrate: 'examples/', pathspec: 'examples/', skillPkg: USER_SKILL_PKG },
+  {
+    substrate: 'packages/3-extensions/',
+    pathspec: 'packages/3-extensions/',
+    skillPkg: EXT_SKILL_PKG,
+  },
+];
+
+/**
  * Parse a `<major>.<minor>.<patch>[-<prerelease>]` version string into
  * `{ major, minor, patch }` (all numbers; pre-release suffix discarded).
  * Throws on malformed input.
@@ -282,31 +299,17 @@ export function runCheck({ repoRoot, mode, head, prev }) {
   // One violation per missing directory keeps the diagnostic surface
   // line-oriented and tells the author exactly which directories the
   // gate wants.
-  const examplesDiff = diffPaths(repoRoot, prev, head, ['examples/']);
-  if (examplesDiff.length > 0) {
+  for (const { substrate, pathspec, skillPkg } of COVERAGE_SUBSTRATES) {
+    const substrateDiff = diffPaths(repoRoot, prev, head, [pathspec]);
+    if (substrateDiff.length === 0) continue;
     for (const transition of coverageChain) {
-      const requiredDir = `${USER_SKILL_PKG}/upgrades/${transition}`;
+      const requiredDir = `${skillPkg}/upgrades/${transition}`;
       if (!existsSync(`${repoRoot}/${requiredDir}`)) {
         violations.push({
           rule: 'coverage',
-          substrate: 'examples/',
+          substrate,
           requiredDir,
-          sampleDiffPaths: examplesDiff.slice(0, 5),
-        });
-      }
-    }
-  }
-
-  const extDiff = diffPaths(repoRoot, prev, head, ['packages/3-extensions/']);
-  if (extDiff.length > 0) {
-    for (const transition of coverageChain) {
-      const requiredDir = `${EXT_SKILL_PKG}/upgrades/${transition}`;
-      if (!existsSync(`${repoRoot}/${requiredDir}`)) {
-        violations.push({
-          rule: 'coverage',
-          substrate: 'packages/3-extensions/',
-          requiredDir,
-          sampleDiffPaths: extDiff.slice(0, 5),
+          sampleDiffPaths: substrateDiff.slice(0, 5),
         });
       }
     }
