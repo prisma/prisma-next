@@ -470,9 +470,9 @@ Triggered when triage decides an in-flight project has shrunk to fit one PR (or 
 
 The demotion path is heavier — more Linear state to clean up. The agile orchestrator runs it cautiously: surfaces the cleanup steps explicitly, asks the operator for sign-off before mass-closing issues.
 
-## Implications for existing canonical Drive
+## Skill set
 
-Sketched here; the full skill-restructure plan with sequencing lives in [`skill-conventions.md`](skill-conventions.md).
+The drive-* family is organised in two tiers.
 
 ### Two skill tiers: workflow and atomic
 
@@ -482,6 +482,17 @@ A new structural distinction the restructure introduces:
 - **Atomic skills** (`drive-<verb>-<noun>` or `drive-<sub-namespace>-<verb>`) do one bounded thing. Called either directly by the operator or by a workflow skill as one step in its loop. Most skills are atomic.
 
 The distinction matters because it sets human expectations and supports gradual AI adoption (per [`principles/gradual-ai-adoption.md`](principles/gradual-ai-adoption.md)): a team member at the "zero AI" end of the spectrum invokes atomic skills directly as building blocks; the same team member moving toward "full delegation" hands more of the loop to the workflow skills. The atomic-skill tier is a first-class concern, not internal plumbing for the workflow tier.
+
+### Naming convention
+
+Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/main/skills/README.md), the only hard rule is "consistency with existing skills." Three shapes cover the drive-* family:
+
+- **`drive-<verb>-workflow`** for the workflow tier (e.g. `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`). The `-workflow` suffix is the visible cue.
+- **`drive-<verb>-<noun>`** for atomic action skills producing an artefact (e.g. `drive-create-spec`, `drive-close-project`, `drive-review-code`, `drive-triage-work`, `drive-check-health`).
+- **`drive-<sub-namespace>-<verb>`** for atomic skills under a focused area (e.g. `drive-pr-description` / `drive-pr-walkthrough`; `drive-qa-plan` / `drive-qa-run`; `drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`; `drive-run-retro`).
+- **`drive-<verb>`** or **`drive-<noun>`** for single-name atomic skills (e.g. `drive-list`, `drive-discussion`).
+
+*Scope units* (project / slice) are not sub-namespaces — they show up as the **noun** in `drive-<verb>-<noun>`, not as a leading namespace token. The verb leads so the skill reads as a command (*"drive specify project"*, *"drive plan slice"*, *"drive check health"*).
 
 Workflow skills (three; all new or renamed):
 
@@ -533,11 +544,11 @@ Resolved during consolidation, recorded here as closed for the historical trail:
 - ~~OQ6. Split `drive-create-spec` / `drive-create-plan` or take a scope flag?~~ **Closed.** Split. The two pairs (`drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`) have genuinely different inputs, outputs, audiences, and shape. A scope flag papers over the difference.
 - ~~OQ10. What happens to "milestone" as a word?~~ **Closed.** Retired from Drive vocabulary entirely.
 
-Still open (working positions): the trial period ([`trial.md`](trial.md)) is where these get pressure-tested and resolved.
+Still open (working positions): the team's current trial period is where these get pressure-tested and resolved — see [`drive/trial.md`](../../drive/trial.md) for the active trial framing.
 
 ## What this document does *not* decide
 
-- The bodies of any skills (skill restructuring lives in [`skill-conventions.md`](skill-conventions.md)).
+- The bodies of any skills (those live in [`skills-contrib/drive-*/SKILL.md`](../../skills-contrib/) as their canonical source).
 - The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under [`principles/`](principles/)).
 - The migration plan from canonical to the new model (per-consumer adoption is downstream).
 - The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's project context — for prisma-next, in [`drive/plan/README.md`](../../drive/plan/README.md)).
@@ -547,9 +558,7 @@ All of those are downstream. This document is the input.
 ## Pointers
 
 - [`workflow.md`](workflow.md) — operational layer (the lifecycle map with skills + agile parallels + cadences)
-- [`problem-statement.md`](problem-statement.md) — self-contained problem framing for canonical-side maintainers
 - [`principles/`](principles/) — per-principle deep-dives
 - [`../../drive/`](../../drive/) — prisma-next's project-context overlays (the calibration is part of project context, not long-lived docs)
-- [`skill-conventions.md`](skill-conventions.md) — skill set with augmentations + implementation sequencing
-- [`trial.md`](trial.md) — trial-period framing + synthesis pointer
+- [`../../skills-contrib/`](../../skills-contrib/) — canonical bodies for each `drive-*` skill
 - [PR #522](https://github.com/prisma/prisma-next/pull/522) — the shaping + build PR (closes out the `drive-domain-model` project; commit history contains the full chronological alternatives ledger)

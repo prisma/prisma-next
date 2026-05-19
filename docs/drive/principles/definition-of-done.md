@@ -183,11 +183,7 @@ Each `drive/<category>/README.md` adds team-specific DoD items the matching skil
 | `drive-qa-plan` / `drive-qa-run` | `drive/qa/README.md` | Manual-QA items in slice + project DoD |
 | `drive-build-workflow` (at dispatch closure) | `drive/plan/README.md` | Dispatch-DoD items |
 
-Worked example for `prisma-next`:
-
-- **Project DoD overlay** (`prisma-next/drive/project/README.md` + `drive/qa/README.md`): Linkable summary of project outcomes added to the team's docs index; new architecture docs linked from `docs/architecture docs/`; Linear status update with final retro link; `drive/qa/README.md` updated if the project surfaced new audiences or coverage-gate gaps.
-- **Slice DoD overlay** (`prisma-next/drive/plan/README.md` + `drive/qa/README.md` + `drive/pr/README.md`): Linear issue moved to "Ready to be merged" (team's terminal-before-merge state); PR title carries Linear ticket prefix; PR description follows `drive-pr-description` shape; manual-QA script (when applicable) names the two audiences `prisma-next` typically QAs against — extension authors via `packages/3-extensions/`, end users via `examples/`.
-- **Dispatch DoD overlay** (`prisma-next/drive/plan/README.md`): Brief's referenced failure-mode entries were checked and noted as "avoided" in the dispatch summary; `pnpm test:packages` in the DoD section; `pnpm lint:deps` in the DoD section for any dispatch touching package imports.
+Each team's own overlays live in their `drive/<category>/README.md` files — concrete DoD items shaped around their tracker workflow, validation gates, manual-QA audiences, and merge conventions. Browse [`drive/`](../../../drive/) at the repo root for prisma-next's current set.
 
 Overlay items grow by retro accretion.
 

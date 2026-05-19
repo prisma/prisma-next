@@ -2,7 +2,7 @@
 
 Loaded by `drive-specify-project` and `drive-specify-slice`. Holds prisma-next's spec-authoring conventions, required sections, and common-scope-trap catalogue.
 
-> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`drive/trial.md`](../trial.md).
 
 ## Required sections (beyond template)
 

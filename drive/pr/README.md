@@ -2,7 +2,7 @@
 
 Loaded by `drive-pr-description` and `drive-pr-walkthrough`. Holds prisma-next's PR conventions, scope-statement patterns, commit-style rules.
 
-> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`drive/trial.md`](../trial.md).
 
 ## PR title convention
 

@@ -95,7 +95,7 @@ Per-dispatch is too noisy (polling cadence); per-project alone is too coarse (dr
 
 ## Skill surface (forward look)
 
-The map exposes two new workflow skills and one renamed, three new atomic skills, four split-from-old atomic skills, two atomic augmentations, and a promotion of an existing mode skill. Full detail in [`skill-conventions.md`](skill-conventions.md).
+The map points at three workflow skills and the atomic skills they pilot. Skill bodies live in [`skills-contrib/drive-*/SKILL.md`](../../skills-contrib/) (canonical source); the naming convention is in [`model.md`](model.md#naming-convention).
 
 **Workflow tier:**
 
