@@ -367,9 +367,9 @@ The on-disk artifacts that decouple the three agents:
 
 ```text
 projects/{project}/
-├── spec.md                          # intent, decisions, ACs (drive-specify-slice)
-├── plans/
-│   └── plan.md                      # tasks, milestones, validation gates (drive-plan-slice)
+├── slices/<slice>/
+│   ├── spec.md                      # intent, decisions, ACs (drive-specify-slice)
+│   └── plan.md                      # dispatches + validation gates (drive-plan-slice; or inline in spec.md)
 ├── reviews/
 │   └── code-review.md               # scoreboard + subagent IDs + F-numbered findings + terse round notes (reviewer-maintained)
 └── learnings.md                     # patterns surfaced this run (orchestrator-maintained; see § Project learnings)
