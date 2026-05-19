@@ -1,5 +1,6 @@
+import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { PostgresEnumType } from '../src/core/postgres-enum-type';
 import {
@@ -72,6 +73,44 @@ describe('PostgresUnboundSchema', () => {
 
   it('is a stable singleton — repeated access returns the same instance', () => {
     expect(PostgresSchema.unbound).toBe(PostgresSchema.unbound);
+  });
+});
+
+describe('ddlSchemaName', () => {
+  const storageWithPublic = new SqlStorage({
+    storageHash: coreHash('sha256:test-with-public'),
+    namespaces: {
+      public: new PostgresSchema({ id: 'public' }),
+      [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+    },
+  });
+
+  const storageWithoutPublic = new SqlStorage({
+    storageHash: coreHash('sha256:test-without-public'),
+    namespaces: {
+      auth: new PostgresSchema({ id: 'auth' }),
+      [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+    },
+  });
+
+  it('returns its own id for a named public schema', () => {
+    const schema = new PostgresSchema({ id: 'public' });
+    expect(schema.ddlSchemaName(storageWithPublic)).toBe('public');
+  });
+
+  it('returns its own id for a named non-public schema', () => {
+    const schema = new PostgresSchema({ id: 'auth' });
+    expect(schema.ddlSchemaName(storageWithoutPublic)).toBe('auth');
+  });
+
+  it('projects the unbound singleton to "public" when a sibling public namespace exists', () => {
+    expect(PostgresUnboundSchema.instance.ddlSchemaName(storageWithPublic)).toBe('public');
+  });
+
+  it('projects the unbound singleton to the framework sentinel when no public sibling exists', () => {
+    expect(PostgresUnboundSchema.instance.ddlSchemaName(storageWithoutPublic)).toBe(
+      UNBOUND_NAMESPACE_ID,
+    );
   });
 });
 
