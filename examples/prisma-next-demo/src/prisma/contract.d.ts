@@ -136,7 +136,7 @@ type ContractBase = ContractType<
       readonly __unbound__: {
         readonly id: '__unbound__';
         readonly kind: 'sql-namespace';
-        readonly tables: Record<string, never>;
+        readonly tables: {};
       };
       readonly auth: {
         readonly id: 'auth';

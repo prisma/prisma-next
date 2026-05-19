@@ -511,7 +511,12 @@ function generateTablesMapType(tables: Readonly<Record<string, StorageTable>>): 
     tableEntries.push(`readonly ${tableName}: ${generateTableLiteralType(table)}`);
   }
   if (tableEntries.length === 0) {
-    return 'Record<string, never>';
+    // Empty namespaces must emit `{}` (whose `keyof` is `never`), not
+    // `Record<string, never>` (whose `keyof` is `string`). The latter
+    // collapses `Db<C>` to a string-indexed shape and erases literal
+    // table-name inference at every consumer site that walks all
+    // namespaces (e.g. `db.sql.<tableName>`).
+    return '{}';
   }
   return `{ ${tableEntries.join('; ')} }`;
 }

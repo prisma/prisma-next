@@ -320,7 +320,7 @@ type ContractBase = ContractType<
       readonly public: {
         readonly id: 'public';
         readonly kind: 'sql-namespace';
-        readonly tables: Record<string, never>;
+        readonly tables: {};
       };
     };
     readonly storageHash: StorageHash;
