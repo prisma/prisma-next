@@ -121,6 +121,16 @@ describe('coverageTransitionChain', () => {
       '0.99-to-1.0',
     ]);
   });
+  it('reversed same-major range (head.minor < prev.minor): throws naming both versions instead of silently returning an empty chain', () => {
+    assert.throws(
+      () => coverageTransitionChain(parseVersion('0.7.0'), parseVersion('0.9.0')),
+      (err) =>
+        err instanceof Error &&
+        /0\.7/.test(err.message) &&
+        /0\.9/.test(err.message) &&
+        /reversed|behind|chronological/i.test(err.message),
+    );
+  });
 });
 
 describe('check-upgrade-coverage — coverage rule (publish style: prev.minor < head.minor)', () => {

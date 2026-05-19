@@ -109,6 +109,11 @@ export function coverageTransitionChain(head, prev) {
   if (head.major !== prev.major) {
     return [transitionLabel(prev, head)];
   }
+  if (head.minor < prev.minor) {
+    throw new Error(
+      `check-upgrade-coverage: head ${head.major}.${head.minor} is behind prev ${prev.major}.${prev.minor} (reversed same-major range); rebase or pass refs in chronological order`,
+    );
+  }
   if (head.minor === prev.minor) {
     return [inFlightTransitionLabel(head)];
   }
