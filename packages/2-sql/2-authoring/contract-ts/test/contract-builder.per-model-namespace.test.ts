@@ -37,11 +37,12 @@ const sqliteTargetPack: TargetPackRef<'sql', 'sqlite'> = {
 class StubNamespace extends NamespaceBase {
   readonly kind = 'schema' as const;
   readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
+  readonly tables: Readonly<Record<string, IRNode>>;
 
-  constructor(id: string) {
+  constructor(id: string, tables: Readonly<Record<string, IRNode>> = {}) {
     super();
     this.id = id;
+    this.tables = Object.freeze({ ...tables });
     freezeNode(this);
   }
 
@@ -55,7 +56,7 @@ class StubNamespace extends NamespaceBase {
 }
 
 function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(input.id);
+  return new StubNamespace(input.id, input.tables as Readonly<Record<string, IRNode>> | undefined);
 }
 
 const int4Column = columnDescriptor('pg/int4@1');

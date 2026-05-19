@@ -25,7 +25,10 @@ import {
  * native enum registrations live under
  * `storage.namespaces[namespaceId].types` instead.
  */
-export type SqlStorageTypeEntry = StorageTypeInstance | StorageTypeInstanceInput;
+export type SqlStorageTypeEntry =
+  | StorageTypeInstance
+  | StorageTypeInstanceInput
+  | PostgresEnumStorageEntry;
 
 const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
   [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
@@ -140,7 +143,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
     readonly __unbound__: SqlNamespace;
   };
-  declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
+  declare readonly types?: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();

@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { ContractValidationError } from '@prisma-next/contract/validate-contract';
+import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import {
