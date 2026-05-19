@@ -23,7 +23,7 @@ metadata:
 - **Project plans** (compose slices + direct changes; stack / parallel sequencing) → `drive-plan-project`.
 - **Slice plans** (decompose into M-sized dispatches; per-dispatch DoR; L/XL refusal) → `drive-plan-slice`.
 
-The split is per [`docs/drive/skill-conventions.md`](/docs/drive/skill-conventions.md). The pre-existing "milestone + task" vocabulary is also retired: the two units are now **Slice** (was: milestone) and **Dispatch** (replaces the agent-aggregation sense of "task"). Pre-implementation logical-increment thinking happens inside `drive-plan-slice` as dispatches, not as a separate "step" or "task" layer.
+The split is per [`docs/drive/model.md`](/docs/drive/model.md) § Two skill tiers. The pre-existing "milestone + task" vocabulary is also retired: the two units are now **Slice** (was: milestone) and **Dispatch** (replaces the agent-aggregation sense of "task"). Pre-implementation logical-increment thinking happens inside `drive-plan-slice` as dispatches, not as a separate "step" or "task" layer.
 
 The body below remains as shared reference material — the test-derivation pattern (ACs → test cases → dispatches), the Linear-sync notes, the shipping-strategy framing for backward-compat — that both scope-specific variants link back to.
 

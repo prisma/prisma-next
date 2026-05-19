@@ -211,4 +211,4 @@ _Residual questions that need answering during or before slice execution. Each w
 - [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR
 - [`docs/drive/principles/definition-of-done.md`](/docs/drive/principles/definition-of-done.md) § Slice DoD
 - [`docs/drive/principles/brief-discipline.md`](/docs/drive/principles/brief-discipline.md) — Example-Mapping edge cases
-- [`docs/drive/skill-conventions.md`](/docs/drive/skill-conventions.md) — the project-vs-slice split rationale
+- [`docs/drive/model.md`](/docs/drive/model.md) § Two skill tiers — the project-vs-slice split rationale

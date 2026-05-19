@@ -147,11 +147,7 @@ Each `drive/<category>/README.md` adds team-specific DoR items the matching skil
 | `drive-plan-slice` | `drive/plan/README.md` | Slice-DoR items related to plan structure |
 | `drive-build-workflow` | `drive/plan/README.md` | Dispatch-DoR items (brief assembly conventions, model-tier routing rules) |
 
-Worked example for `prisma-next`:
-
-- **Project DoR overlay** (`prisma-next/drive/project/README.md`): A Linear Project exists; the original ticket has the promotion pattern applied if the project started from a ticket; the project's working branch is named with the Linear Project ID.
-- **Slice DoR overlay** (`prisma-next/drive/spec/README.md` + `drive/plan/README.md`): A Linear issue is created and linked from the slice spec; the slice's PR-to-be will have a `Refs: <issue-id>` line; the slice's parent branch is the project's working branch (or `main` for orphan slices).
-- **Dispatch DoR overlay** (`prisma-next/drive/plan/README.md`): The brief's "Inputs" section references the relevant failure-mode entries (e.g. "Dual-shape support relocated under a new name") and grep library patterns (`'columns' in`, `looksLike`); the brief's tier is one of Opus / Sonnet / composer; the brief specifies a slice plan path under `projects/<x>/slices/<s>/`.
+Each team's own overlays live in their `drive/<category>/README.md` files — concrete DoR items shaped around their tracker, branch conventions, failure-mode catalogue, and model-tier choices. Browse [`drive/`](../../../drive/) at the repo root for prisma-next's current set.
 
 Overlay items grow by retro accretion. The protocol layer (canonical skill body) stays small; the team's overlays grow.
 
