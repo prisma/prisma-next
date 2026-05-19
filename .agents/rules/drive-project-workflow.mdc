@@ -32,7 +32,7 @@ The lifecycle for a project is:
 
 3. **Stakeholder verification**: Verify with the stakeholder (PM / requester) that the objectives and acceptance criteria in the spec were met.
 
-4. **Close-out (final PR)**: Migrate long-lived docs into `docs/`, strip repo-wide references to `projects/<project>/**` (replace with canonical `docs/` links or remove), then delete `projects/<project>/` (the close-out PR removes the transient project directory).
+4. **Close-out (final PR)**: Run `drive-close-project`. It verifies the project DoD (incl. mandatory final retro), classifies files as long-lived methodology vs transient project artefacts, migrates the long-lived side into `docs/`, strips repo-wide references to `projects/<project>/**`, deletes `projects/<project>/`, and opens the close-out PR. The skill body is the source of truth for close-out methodology — this rule no longer enumerates the steps.
 
 ## Keep project docs current during execution
 
@@ -68,14 +68,7 @@ When starting work on a **task** from a project, ensure its spec is recorded und
 
 ## `projects/` is transient (close-out required)
 
-Anything under `projects/` is **temporary** and should be deleted when the work is done.
-
-- The **final task** in a project is to:
-  - Verify all acceptance criteria are met
-  - Finalize ADRs and any long-lived documentation
-  - Migrate finalized ADRs/docs into `docs/` (e.g. `docs/architecture docs/adrs/` or relevant subsystem docs)
-  - Strip repo-wide references to `projects/<project>/**` (replace with canonical `docs/` links or remove)
-  - Delete `projects/<project>/` (specs, plans, notes, assets)
+Anything under `projects/` is **temporary** and should be deleted when the work is done. The final task in a project is to run `drive-close-project` (see `skills-contrib/drive-close-project/SKILL.md`) — the skill body owns the close-out methodology end-to-end (DoD verification, classification, migration, reference-strip, deletion, close-out PR).
 
 ## Collaboration + PR expectations
 
@@ -83,5 +76,5 @@ Anything under `projects/` is **temporary** and should be deleted when the work 
 - Project specs can change without ADRs. ADRs are for changes to the system architecture/behavior and are recorded under `docs/`.
 - During implementation you may update the plan freely, but keep the project spec stable (it should not change often).
 - Open an initial PR containing the project spec. During the project’s lifetime, later task PRs should reference the project spec (and usually should not modify it).
-- The close-out PR may (and usually will) migrate finalized docs into `docs/` and delete `projects/<project>/`.
+- The close-out PR (opened by `drive-close-project`) migrates finalized docs into `docs/` and deletes `projects/<project>/`.
 
