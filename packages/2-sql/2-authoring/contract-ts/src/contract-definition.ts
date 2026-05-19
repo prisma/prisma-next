@@ -44,6 +44,13 @@ export interface ForeignKeyNode {
     readonly model: string;
     readonly table: string;
     readonly columns: readonly string[];
+    /**
+     * Namespace coordinate of the referenced table. When omitted the
+     * assembler resolves the coordinate from the referenced model node's
+     * own `namespaceId`; the field exists so authoring paths that already
+     * know the target namespace can stamp it explicitly.
+     */
+    readonly namespaceId?: string;
   };
   readonly name?: string;
   readonly onDelete?: ReferentialAction;

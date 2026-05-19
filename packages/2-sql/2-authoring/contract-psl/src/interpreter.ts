@@ -572,6 +572,8 @@ interface BuildModelNodeInput {
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
+  /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
+  readonly modelNamespaceIds: ReadonlyMap<string, string>;
 }
 
 interface BuildModelNodeResult {
@@ -1014,12 +1016,14 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         })
       : undefined;
 
+    const targetNamespaceId = input.modelNamespaceIds.get(targetMapping.model.name);
     foreignKeyNodes.push({
       columns: localColumns,
       references: {
         model: targetMapping.model.name,
         table: targetMapping.tableName,
         columns: referencedColumns,
+        ...ifDefined('namespaceId', targetNamespaceId),
       },
       ...ifDefined('name', parsedRelation.constraintName),
       ...ifDefined('onDelete', onDelete),
@@ -1494,6 +1498,7 @@ export function interpretPslDocumentToSqlContract(
       scalarTypeDescriptors: input.scalarTypeDescriptors,
       sourceId,
       diagnostics,
+      modelNamespaceIds,
     });
     const resolvedNamespaceId = modelNamespaceIds.get(model.name);
     modelNodes.push(

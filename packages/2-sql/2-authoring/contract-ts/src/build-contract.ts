@@ -344,9 +344,18 @@ export function buildSqlContractFromDefinition(
         fk.references.table,
         'Foreign key',
       );
+      const targetNamespaceId =
+        fk.references.namespaceId ??
+        (targetModel.namespaceId !== undefined && targetModel.namespaceId.length > 0
+          ? targetModel.namespaceId
+          : UNBOUND_NAMESPACE_ID);
       return {
         source: { namespaceId, tableName, columns: fk.columns },
-        target: { namespaceId, tableName: fk.references.table, columns: fk.references.columns },
+        target: {
+          namespaceId: targetNamespaceId,
+          tableName: fk.references.table,
+          columns: fk.references.columns,
+        },
         ...applyFkDefaults(
           {
             ...ifDefined('constraint', fk.constraint),
