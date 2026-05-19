@@ -90,6 +90,37 @@ The juniors-pulling-small-stories pattern is regarded as one of Agile's biggest 
 - **The brief specifies the expected tier.** Part of DoR is "this brief is sized for tier X." If tier and size disagree, refine.
 - **Cost is measured.** Over time, the orchestrator-implementer pair builds an empirical sense of which dispatch shapes are safe at which tier. That sense lives in the team's project-context model-tier routing rules and grows by retro accretion.
 
+## Sub-agent continuity and role variants
+
+Dispatch shape determines model tier; the closely related question is whether each dispatch spawns a fresh sub-agent or resumes a previously-spawned one. Resumption is cheaper than re-derivation when the sub-agent's accumulated context is non-trivial — and most Drive sub-agents accumulate non-trivial context within the first few dispatches.
+
+**Continuity vs re-derivation cost.** A fresh sub-agent spawned for each atomic-skill call pays the full context tax every time: spec content, plan content, prior decisions, and prior verdicts must be re-pasted into each new prompt. At typical Drive project sizes (3–8k tokens per sub-agent of spec/plan/discussion content), three cold spawns in a setup chain costs 9–24k tokens in re-pasting before any new work begins. Resuming the same sub-agent across the chain skips the re-paste — the sub-agent already holds the spec it just authored, the scope decisions it just made, and the constraints it just surfaced.
+
+The continuity argument has a second leg: prose-discipline degrades past ~100 turns. A fresh spawn that has to re-load and re-orient at each call pays the full context tax *and* the orient tax — it may also slip a role declaration or miss an escape-hatch boundary on the way back up. A resumed sub-agent is past the orient phase; the role declaration is already-anchored and the working context already-grounded.
+
+**Role variants.** Each Executor subtype (Specialist / Implementer / Reviewer; see [`drive/roles/README.md`](../../../drive/roles/README.md)) admits a small number of named variants with documented model tiers and persistence policies:
+
+| Role / variant | Purpose | Model tier (default) | Persistence |
+|---|---|---|---|
+| **scaffolder** | Mechanical work: directory setup, MCP setup, sweep-style edits | fast (composer-class) | one-shot |
+| **setup-specialist** | Authoring: project spec, project plan, spec amendments | thorough (opus-class) | persistent across project-setup phase |
+| **implementer/fast** | Routine code edits within a slice | mid (sonnet-class) | persistent across rounds within a slice |
+| **implementer/thorough** | Escalation for hard problems | thorough (opus-class) | spawned on escalation |
+| **reviewer/fast** | Default per-round review verdicts | mid (sonnet-class) | persistent across rounds within a slice |
+| **reviewer/thorough** | Escalation review for high-leverage rounds | thorough (opus-class) | spawned on escalation |
+
+Variant naming uses the slash form (`role/variant`) consistently across this principles doc, the role anchor doc, and dispatch templates.
+
+Why named variants matter:
+
+- **Context preservation.** Variants persist across the calls where their accumulated context pays off. `setup-specialist` persists across the project-setup chain; `implementer/fast` persists across rounds within a slice; `reviewer/fast` persists across rounds within a slice.
+- **Cost optimization.** Each variant has a documented model tier so dispatch matches problem shape: fast tier for routine work where the gates carry the protection, thorough tier for escalation where capability is doing the carrying.
+- **Reproducible dispatch decisions.** Variant name + role together name the dispatch shape unambiguously across projects. An orchestrator picking up an in-flight project reads the registry, finds the active `implementer/fast` for the current slice, and continues without re-deriving role assignments or paying the cold-spawn context tax.
+
+**Canonical worked example: the project-setup chain.** The three calls `drive-create-project` → `drive-specify-project` → `drive-plan-project` flow through a single resumed `setup-specialist`. The first call spawns the sub-agent and records its ID in `projects/<x>/subagent-registry.md`; the next two calls resume the same ID. The sub-agent holds the project's purpose statement and scope decisions from the first call by the time the third call asks it to lay out the plan — no re-paste of the spec into a fresh thorough-tier sub-agent. Two cold spawns avoided; ~6–16k tokens of re-paste saved at opus-class pricing for the chain.
+
+This principles doc carries the *why* — context preservation, cost arithmetic, named-roles-make-dispatch-reproducible. [`drive/roles/README.md`](../../../drive/roles/README.md) carries the *how*: per-project registry shape, ID-resumption mechanics, the swap-on-variant-change note, and the escape-hatch policy.
+
 ## Related principles
 
 - **[`protocol-as-memory.md`](protocol-as-memory.md)** — the gates and catalogues that make cheap-tier dispatch safe are themselves part of the team's memory.

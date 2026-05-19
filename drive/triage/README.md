@@ -58,3 +58,20 @@ Both ceremonies require operator authorisation per `drive-triage-work`'s authori
 _When triage misroutes work, the retro lands here. Each entry: pattern → consequence → mitigation._
 
 _(Empty at seeding; populated by `drive-run-retro`.)_
+
+## Triage heuristics
+
+Heuristics applied during triage to route work to its right shape. Distinct from `## Failure modes` (which records pattern → consequence → mitigation entries from retros) and from `## Sizing anchors` (which calibrates sizing decisions). Heuristics are meta-level questions to ask during triage itself.
+
+### Problem-statement vs design-to-implement
+
+Triage asks: *"Is this work a **problem to solve** (still needs design work before implementation starts) or a **design to implement** (the spec is settled)?"*
+
+Routing per answer:
+
+- **Problem-statement** → trigger a design discussion or spike first. Cross-link to `drive-triage-work`'s existing "spike first" verdict — the work is not yet ready for a slice or direct change because the *what* hasn't been decided. Treating an unsettled problem as if it were a design-to-implement is how teams end up planning implementation around a design they haven't settled; the plan/spec then has to be rewritten partway through.
+- **Design to implement** → route to slice or direct change per normal sizing (see `## Sizing anchors` and `## Ticket-shape patterns`). The *what* is settled; the work is to execute it.
+
+The diagnostic question: *if you handed this ticket to an Implementer right now, would they need to make design decisions to get started, or just execute?* If "make design decisions", it's a problem-statement and needs a design pass first. If "just execute", it's a design-to-implement.
+
+This heuristic operates at triage, which is Orchestrator-owned (see [`drive/roles/README.md`](../roles/README.md)); the resulting design discussion (when the answer is problem-statement) is dispatched to a Specialist sub-agent following the dispatch-by-default pattern.
