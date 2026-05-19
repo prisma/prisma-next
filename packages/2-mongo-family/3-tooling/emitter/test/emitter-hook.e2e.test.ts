@@ -69,7 +69,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     const types = generateContractDts(blogContract, mongoEmission, [], testHashes);
 
     expect(types).toContain('readonly namespaces:');
-    expect(types).toContain('readonly tables:');
+    expect(types).toContain('readonly collections:');
     expect(types).toContain('readonly users: Record<string, never>');
     expect(types).toContain('readonly posts: Record<string, never>');
   });

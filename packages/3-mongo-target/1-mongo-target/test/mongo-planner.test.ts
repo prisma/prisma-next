@@ -69,7 +69,7 @@ function makeContract(
         __unbound__: {
           id: '__unbound__',
           kind: 'mongo-namespace',
-          tables: builtCollections,
+          collections: builtCollections,
         },
       },
     },

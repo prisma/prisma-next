@@ -10,16 +10,16 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const { storage, ...rest } = validated;
     const namespaces = Object.fromEntries(
       Object.entries(storage.namespaces).map(([nsId, nsData]) => {
-        const tables = nsData.tables;
-        const tableCount = Object.keys(tables).length;
-        if (nsId === UNBOUND_NAMESPACE_ID && tableCount === 0) {
+        const collections = nsData.collections;
+        const collectionCount = Object.keys(collections).length;
+        if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
           return [nsId, MongoTargetUnboundDatabase.instance];
         }
         return [
           nsId,
           new MongoTargetDatabase({
             id: nsData.id,
-            tables,
+            collections,
           }),
         ];
       }),
@@ -35,14 +35,14 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-      const tablesOut: Record<string, JsonObject> = {};
-      for (const [collName, coll] of Object.entries(ns.tables)) {
-        tablesOut[collName] = JSON.parse(JSON.stringify(coll)) as JsonObject;
+      const collectionsOut: Record<string, JsonObject> = {};
+      for (const [collName, coll] of Object.entries(ns.collections)) {
+        collectionsOut[collName] = JSON.parse(JSON.stringify(coll)) as JsonObject;
       }
       namespacesJson[nsId] = {
         id: ns.id,
         kind: 'mongo-database',
-        tables: tablesOut,
+        collections: collectionsOut,
       };
     }
     return {

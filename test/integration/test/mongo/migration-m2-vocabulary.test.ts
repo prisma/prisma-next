@@ -65,7 +65,7 @@ function makeContract(
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          tables: normalized,
+          collections: normalized,
         },
       },
       storageHash: coreHash(`sha256:${hashSeed}`),

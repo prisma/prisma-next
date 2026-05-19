@@ -27,7 +27,7 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
 
   it('contract contains expected index definitions', () => {
     const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
-    const collections = contract.storage.namespaces['__unbound__'].tables;
+    const collections = contract.storage.namespaces['__unbound__'].collections;
 
     expect(collections.products.indexes).toMatchObject([
       {

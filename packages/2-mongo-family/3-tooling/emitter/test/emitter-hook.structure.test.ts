@@ -52,7 +52,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: namespacedMongoStorageFromCollections({}),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'references collection "users" which is not in storage.namespaces[..].tables',
+      `which is not declared under any namespace's collections map`,
     );
   });
 

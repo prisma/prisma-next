@@ -1123,7 +1123,7 @@ export function interpretPslDocumentToMongoContract(
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: collectionsAsClasses,
+        collections: collectionsAsClasses,
       },
     },
   };

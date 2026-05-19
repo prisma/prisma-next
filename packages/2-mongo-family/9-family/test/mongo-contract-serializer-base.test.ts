@@ -10,7 +10,7 @@ function makeValidContractJson() {
     roots: { items: 'Item' },
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { items: {} } },
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: { items: {} } },
       },
     },
     models: {

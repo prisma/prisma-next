@@ -7,7 +7,7 @@ import { MongoCollection, type MongoCollectionInput } from '@prisma-next/mongo-c
 
 export interface MongoTargetDatabaseInput {
   readonly id: string;
-  readonly tables?: Record<string, MongoCollection | MongoCollectionInput>;
+  readonly collections?: Record<string, MongoCollection | MongoCollectionInput>;
 }
 
 /**
@@ -26,14 +26,14 @@ export interface MongoTargetDatabaseInput {
 export class MongoTargetDatabase extends NamespaceBase {
   readonly kind = 'database' as const;
   readonly id: string;
-  readonly tables: Readonly<Record<string, MongoCollection>>;
+  readonly collections: Readonly<Record<string, MongoCollection>>;
 
   constructor(input: MongoTargetDatabaseInput) {
     super();
     this.id = input.id;
-    this.tables = Object.freeze(
+    this.collections = Object.freeze(
       Object.fromEntries(
-        Object.entries(input.tables ?? {}).map(([name, c]) => [
+        Object.entries(input.collections ?? {}).map(([name, c]) => [
           name,
           c instanceof MongoCollection ? c : new MongoCollection(c),
         ]),

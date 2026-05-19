@@ -44,13 +44,13 @@ const mongoCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-function mongoTablesFromIr(ir: {
+function mongoCollectionsFromIr(ir: {
   readonly storage: unknown;
 }): Record<string, Record<string, unknown>> {
   const storage = ir.storage as {
-    namespaces: Record<string, { tables: Record<string, Record<string, unknown>> }>;
+    namespaces: Record<string, { collections: Record<string, Record<string, unknown>> }>;
   };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables;
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
 }
 
 interface MongoModel {
@@ -90,7 +90,7 @@ function getIndexes(
   ir: unknown,
   collectionName: string,
 ): ReadonlyArray<Record<string, unknown>> | undefined {
-  return mongoTablesFromIr(ir as { storage: unknown })[collectionName]?.['indexes'] as
+  return mongoCollectionsFromIr(ir as { storage: unknown })[collectionName]?.['indexes'] as
     | ReadonlyArray<Record<string, unknown>>
     | undefined;
 }
@@ -224,7 +224,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: { userProfile: {} },
+            collections: { userProfile: {} },
           },
         },
       });
@@ -245,7 +245,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: { users: {} },
+            collections: { users: {} },
           },
         },
       });
@@ -588,7 +588,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
-            tables: {
+            collections: {
               user: {},
               post: {},
             },
@@ -804,7 +804,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
-              tables: {
+              collections: {
                 users: new MongoCollection({
                   validator: new MongoValidator({
                     jsonSchema: {
@@ -858,7 +858,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
+      const indexes = mongoCollectionsFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -873,7 +873,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@unique([email])
         }
       `);
-      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
+      const indexes = mongoCollectionsFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -889,7 +889,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email, name])
         }
       `);
-      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
+      const indexes = mongoCollectionsFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -906,7 +906,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           email String   @unique
         }
       `);
-      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
+      const indexes = mongoCollectionsFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -922,7 +922,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([expiresAt], sparse: true, expireAfterSeconds: 3600)
         }
       `);
-      const indexes = mongoTablesFromIr(ir)['session']?.['indexes'] as
+      const indexes = mongoCollectionsFromIr(ir)['session']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes).toHaveLength(1);
@@ -938,7 +938,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const indexes = mongoTablesFromIr(ir)['user']?.['indexes'] as
+      const indexes = mongoCollectionsFromIr(ir)['user']?.['indexes'] as
         | ReadonlyArray<Record<string, unknown>>
         | undefined;
       expect(indexes![0]!['keys']).toEqual([{ field: 'email_address', direction: 1 }]);
@@ -950,7 +950,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           id ObjectId @id @map("_id")
         }
       `);
-      const userColl = mongoTablesFromIr(ir)['user'];
+      const userColl = mongoCollectionsFromIr(ir)['user'];
       expect(userColl?.['indexes']).toBeUndefined();
     });
 
@@ -1516,7 +1516,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
   describe('validator derivation', () => {
     function getValidator(ir: unknown, collectionName: string) {
-      return mongoTablesFromIr(ir as { storage: unknown })[collectionName]?.['validator'] as
+      return mongoCollectionsFromIr(ir as { storage: unknown })[collectionName]?.['validator'] as
         | Record<string, unknown>
         | undefined;
     }
@@ -1605,7 +1605,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           @@index([email])
         }
       `);
-      const userColl = mongoTablesFromIr(ir as { storage: unknown })['user'];
+      const userColl = mongoCollectionsFromIr(ir as { storage: unknown })['user'];
       expect(userColl?.['indexes']).toBeDefined();
       expect(userColl?.['validator']).toBeDefined();
     });

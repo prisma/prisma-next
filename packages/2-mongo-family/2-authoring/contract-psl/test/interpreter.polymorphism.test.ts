@@ -39,11 +39,11 @@ const mongoCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-function mongoTablesOf(ir: { readonly storage: unknown }): Record<string, unknown> {
+function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, unknown> {
   const storage = ir.storage as {
-    namespaces: Record<string, { tables: Record<string, unknown> }>;
+    namespaces: Record<string, { collections: Record<string, unknown> }>;
   };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables;
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
 }
 
 function interpret(schema: string) {
@@ -384,7 +384,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(Object.keys(mongoTablesOf(ir))).toEqual(['tasks']);
+      expect(Object.keys(mongoCollectionsOf(ir))).toEqual(['tasks']);
     });
 
     it('merges variant indexes into base collection', () => {
@@ -408,7 +408,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         {
           indexes?: Array<{
@@ -417,7 +417,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
           }>;
         }
       >;
-      const tasksColl = tables['tasks'];
+      const tasksColl = collections['tasks'];
       expect(tasksColl?.indexes).toBeDefined();
       const titleIdx = tasksColl?.indexes?.find((idx) => idx.keys.some((k) => k.field === 'title'));
       const severityIdx = tasksColl?.indexes?.find((idx) =>
@@ -451,7 +451,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         {
           indexes?: Array<{
@@ -460,7 +460,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
           }>;
         }
       >;
-      const tasksColl = tables['tasks'];
+      const tasksColl = collections['tasks'];
       expect(tasksColl?.indexes).toBeDefined();
       const titleIdx = tasksColl?.indexes?.find((idx) => idx.keys.some((k) => k.field === 'title'));
       const severityIdx = tasksColl?.indexes?.find((idx) =>
@@ -492,7 +492,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         {
           indexes?: Array<{
@@ -501,7 +501,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
           }>;
         }
       >;
-      const severityIdx = tables['tasks']?.indexes?.find((idx) =>
+      const severityIdx = collections['tasks']?.indexes?.find((idx) =>
         idx.keys.some((k) => k.field === 'severity'),
       );
       expect(severityIdx?.partialFilterExpression).toEqual({ active: true, type: 'bug' });
@@ -527,7 +527,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         {
           indexes?: Array<{
@@ -536,7 +536,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
           }>;
         }
       >;
-      const severityIdx = tables['tasks']?.indexes?.find((idx) =>
+      const severityIdx = collections['tasks']?.indexes?.find((idx) =>
         idx.keys.some((k) => k.field === 'severity'),
       );
       expect(severityIdx?.partialFilterExpression).toEqual({ type: 'bug' });
@@ -634,11 +634,11 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         { validator?: { jsonSchema: Record<string, unknown> } }
       >;
-      const validator = tables['tasks']?.validator;
+      const validator = collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
       expect(schema).toHaveProperty('properties._id');
@@ -667,11 +667,11 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         { validator?: { jsonSchema: Record<string, unknown> } }
       >;
-      const validator = tables['tasks']?.validator;
+      const validator = collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
       expect(schema).toHaveProperty('oneOf');
@@ -702,11 +702,11 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const tables = mongoTablesOf(ir) as Record<
+      const collections = mongoCollectionsOf(ir) as Record<
         string,
         { validator?: { jsonSchema: Record<string, unknown> } }
       >;
-      const validator = tables['tasks']?.validator;
+      const validator = collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
       expect(schema).toHaveProperty('properties._type');

@@ -1516,7 +1516,7 @@ function buildContractFromDefinition<
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        tables: collections,
+        collections,
       },
     },
   };

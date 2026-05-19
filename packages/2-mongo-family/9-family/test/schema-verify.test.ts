@@ -49,7 +49,7 @@ function buildContract(
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
-          tables: builtCollections,
+          collections: builtCollections,
         },
       },
     },
@@ -1361,13 +1361,13 @@ describe('verifyMongoSchema', () => {
         storage: {
           storageHash: 'sha256:authoring-test',
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} },
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: {} },
           },
         },
       } as unknown as MongoContract;
     }
 
-    it('does not throw when contract has empty namespaced storage tables', () => {
+    it('does not throw when contract has empty namespaced storage collections', () => {
       expect(() =>
         verifyMongoSchema({
           contract: minimalContract(),

@@ -305,13 +305,13 @@ describe('mongoEmission.generateContractTypes', () => {
   });
 
   describe('storage generation', () => {
-    it('generates storage with namespaces and tables', () => {
+    it('generates storage with namespaces and collections', () => {
       const contract = createMongoContract({
         storage: namespacedMongoStorageFromCollections({ users: {}, posts: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly namespaces:');
-      expect(types).toContain('readonly tables:');
+      expect(types).toContain('readonly collections:');
       expect(types).toContain('readonly users: Record<string, never>');
       expect(types).toContain('readonly posts: Record<string, never>');
     });
@@ -336,10 +336,10 @@ describe('mongoEmission.generateContractTypes', () => {
       );
     });
 
-    it('generates empty tables map under the default namespace', () => {
+    it('generates empty collections map under the default namespace', () => {
       const contract = createMongoContract({ storage: namespacedMongoStorageFromCollections({}) });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
-      expect(types).toContain('readonly tables: Record<string, never>');
+      expect(types).toContain('readonly collections: Record<string, never>');
     });
   });
 

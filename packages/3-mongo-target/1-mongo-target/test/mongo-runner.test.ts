@@ -235,7 +235,7 @@ function makeContract(profileHash: string): MongoContract {
     storage: {
       storageHash: 'sha256:dest',
       namespaces: {
-        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', tables: {} },
+        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', collections: {} },
       },
     },
   } as unknown as MongoContract;

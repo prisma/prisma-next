@@ -101,7 +101,7 @@ export const decodeFixtureContractJson = {
       __unbound__: {
         id: '__unbound__' as const,
         kind: 'mongo-namespace' as const,
-        tables: {
+        collections: {
           users: { kind: 'mongo-collection' as const },
           posts: { kind: 'mongo-collection' as const },
         },

@@ -76,7 +76,7 @@ function appContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          tables: {
+          collections: {
             users: {
               kind: 'mongo-collection' as const,
               indexes: [
@@ -110,7 +110,7 @@ function extContract(): MongoContract {
         __unbound__: {
           id: '__unbound__' as const,
           kind: 'mongo-namespace' as const,
-          tables: {
+          collections: {
             cipherstash_state: {
               kind: 'mongo-collection' as const,
               indexes: [

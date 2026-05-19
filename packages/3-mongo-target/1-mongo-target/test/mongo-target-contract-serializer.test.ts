@@ -23,7 +23,7 @@ function makeSingletonUnboundContractJson() {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
           kind: 'mongo-database',
-          tables: {},
+          collections: {},
         },
       },
     },
@@ -43,7 +43,7 @@ function makeValidContractJson() {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
           kind: 'mongo-database',
-          tables: {
+          collections: {
             items: {},
           },
         },
@@ -78,7 +78,7 @@ describe('MongoTargetContractSerializer', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
 
-    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['items'];
+    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.collections['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
   });
@@ -99,9 +99,9 @@ describe('MongoTargetContractSerializer', () => {
     expect(json.storage).not.toHaveProperty('collections');
     const namespaces = json.storage['namespaces'] as Record<
       string,
-      { tables: Record<string, unknown> }
+      { collections: Record<string, unknown> }
     >;
-    expect(namespaces[UNBOUND_NAMESPACE_ID]?.tables['items']).toMatchObject({
+    expect(namespaces[UNBOUND_NAMESPACE_ID]?.collections['items']).toMatchObject({
       kind: 'mongo-collection',
     });
   });
@@ -119,7 +119,7 @@ describe('MongoTargetContractSerializer', () => {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
               kind: 'mongo-database',
-              tables: {
+              collections: {
                 items: {
                   indexes: [
                     {
@@ -157,7 +157,7 @@ describe('MongoTargetContractSerializer', () => {
       const serializer = new MongoTargetContractSerializer();
       const contract = serializer.deserializeContract(makeFullyPopulatedJson());
 
-      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['items'];
+      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.collections['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
       expect(items?.validator).toBeInstanceOf(MongoValidator);
@@ -172,7 +172,7 @@ describe('MongoTargetContractSerializer', () => {
       const out = serializer.serializeContract(contract);
 
       const reparsed = JSON.parse(JSON.stringify(out));
-      const items = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.items;
+      const items = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].collections.items;
       expect(items.kind).toBe('mongo-collection');
       expect(items.indexes[0].kind).toBe('mongo-index');
       expect(items.validator.kind).toBe('mongo-validator');
@@ -180,9 +180,9 @@ describe('MongoTargetContractSerializer', () => {
       expect(items.options.collation.kind).toBe('mongo-collation-options');
 
       const roundtripped = serializer.deserializeContract(reparsed);
-      expect(roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['items']).toBeInstanceOf(
-        MongoCollection,
-      );
+      expect(
+        roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID]?.collections['items'],
+      ).toBeInstanceOf(MongoCollection);
     });
   });
 });

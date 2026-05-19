@@ -15,7 +15,7 @@ const hash = coreHash('h_0');
 class TestNamespace extends NamespaceBase {
   readonly kind = 'test-namespace' as const;
   readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
+  readonly collections: Readonly<Record<string, IRNode>> = Object.freeze({});
 
   constructor(id: string) {
     super();
@@ -35,13 +35,13 @@ describe('MongoStorage', () => {
     expect(Object.keys(storage)).toEqual(expect.arrayContaining(['storageHash', 'namespaces']));
   });
 
-  it('normalises plain namespace envelopes with collection tables', () => {
+  it('normalises plain namespace envelopes with collection collections', () => {
     const storage = new MongoStorage({
       storageHash: hash,
       namespaces: {
         default: {
           id: 'default',
-          tables: {
+          collections: {
             events: new MongoCollection({
               indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })],
             }),
@@ -49,7 +49,7 @@ describe('MongoStorage', () => {
         },
       },
     });
-    expect(storage.namespaces['default']!.tables['events']).toBeInstanceOf(MongoCollection);
+    expect(storage.namespaces['default']!.collections['events']).toBeInstanceOf(MongoCollection);
   });
 
   it('preserves namespace instances passed in (target supplies)', () => {
