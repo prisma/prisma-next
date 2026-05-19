@@ -10,7 +10,7 @@ description: >
   operator at end-of-project. Replaces the close-out section that used to live in the
   drive-project-workflow Cursor rule.
 metadata:
-  version: "2026.5.19"
+  version: "2026.5.19.1"
 ---
 
 # Drive: Close Project
@@ -103,15 +103,17 @@ Default classification rules (override via `drive/project/README.md`):
 
 | File / pattern | Default | Notes |
 | --- | --- | --- |
-| `principles/**.md` | long-lived | Almost always migrates. |
-| `model.md`, `domain-model.md`, `vocabulary.md`, `glossary.md` | long-lived | Ubiquitous-language artefacts. |
-| `workflow.md`, `process.md` | long-lived | Process / methodology. |
-| `*-conventions.md`, `*-restructure.md` | long-lived | Reference docs about conventions. |
+| `principles/**.md` | long-lived **(prose-audit at step 4.5)** | Usually migrates, but the prose audit catches worked examples that anchor to project-specific incidents / paths / overlays. |
+| `model.md`, `domain-model.md`, `vocabulary.md`, `glossary.md` | long-lived **(prose-audit at step 4.5)** | Ubiquitous-language artefacts. Prose audit catches "what we did / before-after / new-vs-existing" framing. |
+| `workflow.md`, `process.md` | long-lived **(prose-audit at step 4.5)** | Process / methodology. Same prose-audit concern. |
+| `*-conventions.md` | long-lived **(prose-audit at step 4.5)** | Convention reference. Prose audit catches restructure / migration framing. |
+| `*-restructure.md`, `*-restructure-plan.md`, `migration-plan.md`, `*-changes.md` | transient | Execution plans describing project deltas. What survives is the resulting state (which lives in other long-lived docs); the plan itself is project archeology. |
 | `adrs/**.md`, `decisions/**.md` | long-lived | ADRs migrate into the repo's ADR root. |
-| `calibration/**` | transient | Project-specific calibration; surfaces of value get lifted into project-context READMEs first. |
+| `calibration/**` | transient | Project-specific calibration; surfaces of value get **lifted into project-context READMEs** (`drive/<category>/README.md`), not migrated as docs. Same lift-then-delete pattern applies to any per-project worked-example overlays. |
+| `problem-statement.md`, `pitch.md`, `proposal.md`, `motivation.md` | transient | Project-shaping / advocacy artefacts. Their content might feed the PR description but they don't survive close — the project is its own justification once it ships. |
+| `trial.md`, `validation.md`, `rollout.md` | transient | Time-windowed project-execution artefacts tied to specific dates / tickets. If the *concept* is reusable (e.g. "always run a trial period when adopting"), it lifts into project context or a principle; the instance does not. |
 | `spec.md`, `specs/**` | transient | Shaping artefact. |
 | `plan.md`, `plans/**` | transient | Coordination artefact. |
-| `problem-statement.md` | transient | Project motivation; superseded by docs/ index after migration. |
 | `design-decisions.md` | transient (with care) | Decisions worth preserving should already have migrated to ADRs during the project; the bare log is transient. If decisions haven't been ADR'd, surface to operator. |
 | `retros.md` | transient | The *lessons* should already have landed (in skills / READMEs / ADRs per the retro principle). The log itself is project archeology. |
 | `README.md` | transient | Project orientation; the `docs/` index supersedes it for migrated material. |
@@ -126,22 +128,68 @@ For each file produce a classification record:
   rationale (one line)
 ```
 
+### Step 4.5 — Prose-audit long-lived candidates
+
+The default classification at step 4 keys off filenames. That's necessary but not sufficient: a file *named* like long-lived methodology can still *read* as a project-execution artefact, because it was written while the project was in flight and absorbed project-shaping voice. Without this audit, project framing migrates into `docs/` and becomes incoherent the moment the project closes (a fresh reader has no baseline for "before-the-restructure / what's new / what changes").
+
+For every file classified `long-lived` at step 4, read the file and apply the four smell tests below. Each match yields a **per-file disposition**.
+
+**Smell test 1 — Project-shaping voice in headings and prose.** Phrases the audit catches:
+
+- "What we did / what we're proposing / what kept going wrong / what changes / what's new / what we'd like from you"
+- "Before the restructure / after the restructure / new vs existing / migration plan / build sequencing / upstream promotion"
+- Tables with a "Status" column whose values describe project deltas (`new`, `renamed`, `augmented`, `split from X`, `replaces Y`)
+- Legends like "Bold = new (this project adds it); plain = exists today; italic = augmented"
+
+**Smell test 2 — Status blocks tied to the project lifecycle.**
+
+- "Status: stable for the trial"
+- "Updates here are load-bearing for every other doc in this project"
+- "Living document. We'll iterate as the project ships."
+- Trial-window dates, "we're trialling for two weeks", "we'll re-converge when we promote upstream"
+
+**Smell test 3 — Worked-example pollution.** Sections like *"Worked example for `<repo-name>`:"* that enumerate the same overlays already lifted into project-context READMEs (`drive/<category>/README.md`). Same anti-pattern as `calibration/**`: project-context masquerading as methodology illustration.
+
+**Smell test 4 — Worked examples anchored to specific real-world incidents.** Specific dates (`Date: 2026-05-17`), specific project names (`projects/storage-shape-flatten/...`), specific ticket IDs (`TML-2549`), specific PR numbers. A worked example is fine; *anchoring* it to a single repo's history is not (another team has no context).
+
+**Per-file disposition** (record on the classification record from step 4):
+
+| Match | Disposition |
+| --- | --- |
+| Smell test 1 dominates (entire file is project narrative) | **Reclassify as transient.** File's content is project-shaping; methodology survives in other docs. |
+| Smell test 1 / 2 in framing only (methodology core is sound) | **Rewrite-at-migration.** Migrate the file but strip the project framing — replace "new / existing / before-after" with steady-state description; remove project-status blocks; drop "Updates here are load-bearing for this project" footers. |
+| Smell test 3 (worked example duplicates project-context) | **Lift-example-to-context, keep methodology.** Move the "Worked example for `<repo>`:" content into the matching `drive/<category>/README.md` (per the `calibration/**` rule); replace in the migrated file with a one-line pointer ("see your team's `drive/<category>/README.md`"). |
+| Smell test 4 (specific real-world anchors in a worked example) | **Soften-at-migration.** Migrate but generalise — replace specific dates / project names / ticket IDs with placeholders (`<date>`, `<your-project>`, `<ticket-id>`) or anonymised stand-ins. Keep the example shape; lose the archeology. |
+
+**Non-portable conventions** also surface here: references to repo-specific paths (e.g. `wip/`, `examples/`, `packages/3-extensions/`) embedded in methodology prose should be replaced with the universal concept they stand in for ("operator scratchpad", "example apps", "extension worked-examples"). Repo-specific paths belong in project context.
+
+The audit surfaces a per-file disposition; the operator confirms at step 5 (the disposition is part of what they sign off on).
+
 ### Step 5 — Confirm the classification with the operator
 
-Present the classification list. **The operator must confirm before step 6 begins.** This is a hard gate because the cost of mis-classifying long-lived as transient is irrecoverable file loss.
+Present the classification list **with the step-4.5 dispositions attached**. **The operator must confirm before step 6 begins.** This is a hard gate because the cost of mis-classifying long-lived as transient is irrecoverable file loss; the cost of mis-classifying transient as long-lived is project-shaping cruft accumulating in `docs/` (a softer but compounding failure that the prose audit exists to catch).
 
 Allow the operator to:
 
 - Re-classify any individual file.
 - Override the destination path for any long-lived file.
 - Add files to the migration that the rules tagged transient (and vice versa).
+- Override the step-4.5 disposition (e.g. accept project-framing voice for a particular file, or escalate "rewrite-at-migration" to "reclassify-as-transient").
 - Update `drive/project/README.md` with new rules if the override would apply to future projects.
 
 When the operator confirms, lock the classification list and proceed.
 
-### Step 6 — Migrate long-lived files
+### Step 6 — Migrate long-lived files (applying step-4.5 dispositions)
 
-For each `long-lived` record, move the file to its destination (`git mv` to preserve history). If the destination directory doesn't exist, create it. If a destination file already exists, surface the collision to the operator — do not silently overwrite.
+For each `long-lived` record, apply its step-4.5 disposition:
+
+- **No audit match.** `git mv` the file to its destination (preserve history).
+- **Rewrite-at-migration.** Read the file, rewrite to strip the project-shaping framing identified by smell tests 1 / 2, then write the rewritten content at the destination path. Stage the source for deletion (`git rm` the original after the rewritten file is in place; the resulting commit records the move + rewrite as one change).
+- **Lift-example-to-context.** Move the "Worked example for `<repo>`:" content into the matching `drive/<category>/README.md` (per the `calibration/**` rule). Replace the section in the migrated file with a one-line pointer ("see your team's `drive/<category>/README.md`"). Surface to operator if the destination READMEs already contain the content (likely — that's the duplication this audit catches).
+- **Soften-at-migration.** Read the file, replace specific dates / project names / ticket IDs with placeholders, then write at destination. Same shape as rewrite-at-migration but narrower.
+- **Reclassify-as-transient.** No migration; the file moves to the transient pile and deletes at step 8 with the rest of `projects/<project>/`.
+
+If the destination directory doesn't exist, create it. If a destination file already exists, surface the collision to the operator — do not silently overwrite.
 
 Maintain the relative subtree structure within the destination root when it makes sense (e.g., `principles/foo.md` → `docs/<project>/principles/foo.md`). When migrating into a flat root (e.g., `docs/architecture docs/adrs/`), follow that root's existing file-naming conventions.
 
@@ -208,6 +256,9 @@ Push and open the PR.
 5. **Silent overwrite at migration.** Symptom: a destination file already exists and gets clobbered by `git mv`. Fix: surface every collision at step 6; let the operator decide (merge, rename, skip).
 6. **Closing on incomplete deferral records.** Symptom: a slice was "deferred" but no follow-up ticket exists, so the work just disappears. Fix: step 2 verifies every deferral has a follow-up ticket reference; absent that, the DoD check fails.
 7. **Forgetting the close-out PR's Linear reference.** Symptom: PR merges, issues don't auto-transition, operator manually closes them and the Linear activity log gets noisy. Fix: step 9 requires the Linear Project reference in the PR title or description before pushing.
+8. **Migrating project-shaping voice as long-lived methodology.** Symptom: a doc whose *content* is methodology (model, workflow, principles) but whose *voice* is project-shaping ("what we're proposing", "before-after", "what changes") gets `git mv`'d into `docs/` unchanged. A fresh reader has no baseline for "new vs existing"; the framing becomes incoherent the moment the project closes. Fix: step 4.5 runs the prose audit and routes such files to rewrite-at-migration (strip framing, keep methodology) — or reclassifies them as transient if the file *is* fundamentally project narrative. Filename-only classification is necessary but not sufficient.
+9. **Migrating worked-example pollution that duplicates project-context.** Symptom: a principle doc has a "Worked example for `<repo>`:" section enumerating overlays — the same overlays that already live in `drive/<category>/README.md`. After migration the overlay exists in two homes, drifts independently, and ties methodology to a specific repo. Fix: step 4.5's smell test 3 catches this; the disposition is lift-example-to-context (move the worked-example content to the matching READMEs) + replace with a one-line pointer in the migrated file. Same pattern as `calibration/**`.
+10. **Migrating worked examples anchored to specific incidents.** Symptom: a methodology principle uses a real-world example with a specific date, project name, or ticket ID. Useful as the project's living memory; opaque archeology once it migrates to docs other teams will read. Fix: step 4.5's smell test 4 catches this; the disposition is soften-at-migration (placeholders for specifics, keep the example shape).
 
 ## Reference files
 
@@ -224,8 +275,9 @@ Push and open the PR.
 - [ ] Mandatory final retro completion verified (per invariant I10).
 - [ ] External-reference scan run; worklist recorded.
 - [ ] Every file under `projects/<project>/` classified; ambiguous files surfaced to operator.
-- [ ] Operator confirmed the classification list before any deletion.
-- [ ] Long-lived files `git mv`'d to destination; index doc (`docs/<project>/README.md` or equivalent) written.
+- [ ] Prose audit (step 4.5) run on every long-lived candidate; per-file dispositions recorded (none / rewrite-at-migration / lift-example-to-context / soften-at-migration / reclassify-as-transient).
+- [ ] Operator confirmed the classification list **with dispositions attached** before any deletion.
+- [ ] Long-lived files migrated to destination per their disposition (`git mv` for the trivial case; rewrite / lift / soften for the audited cases); index doc (`docs/<project>/README.md` or equivalent) written.
 - [ ] External references re-pointed or removed; re-scan returns empty.
 - [ ] `projects/<project>/` deleted via `git rm -rf`.
 - [ ] Close-out PR opened; Linear Project referenced; commits sliced per `commit-as-you-go`.
