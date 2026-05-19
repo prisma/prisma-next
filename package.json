@@ -49,10 +49,10 @@
     "prepare": "husky && skills add ./skills-contrib --skill '*' --agent universal claude-code -y"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.14",
+    "@biomejs/biome": "2.4.15",
     "@prisma-next/tsconfig": "workspace:0.9.0",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/coverage-v8": "^4.1.6",
     "dependency-cruiser": "^16.3.3",
     "gray-matter": "catalog:",
     "husky": "^9.1.7",
