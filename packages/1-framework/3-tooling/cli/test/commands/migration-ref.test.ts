@@ -1,8 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createSqlContract } from '@prisma-next/contract/testing';
-import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
@@ -24,7 +22,6 @@ import {
 } from '@prisma-next/migration-tools/refs';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
@@ -56,8 +53,6 @@ async function writeAttestedMigration(
   opts: {
     from: string | null;
     to: string;
-    fromContract: Contract | null;
-    toContract: Contract;
     ops: MigrationPlanOperation[];
     timestamp: Date;
     slug: string;
@@ -68,8 +63,6 @@ async function writeAttestedMigration(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
-    fromContract: opts.fromContract,
-    toContract: opts.toContract,
     hints: {
       used: [],
       applied: ['additive_only'],
@@ -92,78 +85,9 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-    const contractB = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-        post: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-    const contractC = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-        post: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-        comment: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: HASH_A,
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
@@ -172,8 +96,6 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await writeAttestedMigration(migrationsDir, {
       from: HASH_A,
       to: HASH_B,
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -182,8 +104,6 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await writeAttestedMigration(migrationsDir, {
       from: HASH_B,
       to: HASH_C,
-      fromContract: contractB,
-      toContract: contractC,
       ops: [createTableOp('comment')],
       timestamp: new Date(2026, 0, 3, 10, 0),
       slug: 'add_comment',
@@ -230,47 +150,9 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-    const contractB = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-        post: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: HASH_A,
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
@@ -279,8 +161,6 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await writeAttestedMigration(migrationsDir, {
       from: HASH_A,
       to: HASH_B,
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -337,47 +217,9 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-    const contractB = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-        post: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: HASH_A,
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
@@ -386,8 +228,6 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await writeAttestedMigration(migrationsDir, {
       from: HASH_A,
       to: HASH_B,
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -424,47 +264,9 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const refsDir = join(migrationsDir, 'refs');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-    const contractB = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-        post: {
-          columns: {
-            id: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-          },
-        },
-      }),
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: HASH_A,
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
@@ -473,8 +275,6 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await writeAttestedMigration(migrationsDir, {
       from: HASH_A,
       to: HASH_B,
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',

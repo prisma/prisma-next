@@ -32,7 +32,7 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationEmit,
   runMigrationNew,
   runMigrationPlanAndEmit,
@@ -70,7 +70,7 @@ withTempDir(({ createTempDir }) => {
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, `plan initial: ${plan0.stderr}`).toBe(0);
 
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, `apply initial: ${apply0.stderr}`).toBe(0);
 
         // Insert seed rows so the later backfill has something to do.
@@ -84,7 +84,7 @@ withTempDir(({ createTempDir }) => {
         // already-up-to-date database must be a no-op (Phase 3 AC,
         // plan.md lines 318-323).
         // -----------------------------------------------------------
-        const reapply0 = await runMigrationApply(ctx);
+        const reapply0 = await runMigrate(ctx);
         expect(reapply0.exitCode, `reapply initial: ${reapply0.stderr}`).toBe(0);
         expect(reapply0.stdout).toContain('Already up to date');
 
@@ -166,7 +166,7 @@ MigrationCLI.run(import.meta.url, M);
         expect(opIds).toContain('data_migration.backfill-user-name');
         expect(opIds.some((id: string) => id.includes('setNotNull.user.name'))).toBe(true);
 
-        const apply1 = await runMigrationApply(ctx);
+        const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, `apply add-required-name: ${apply1.stderr}`).toBe(0);
 
         const result = await sql(
@@ -192,7 +192,7 @@ MigrationCLI.run(import.meta.url, M);
         // idempotency-skipped on re-run (its `check` returns 0 rows
         // because the previous apply backfilled all NULLs).
         // -----------------------------------------------------------
-        const reapply1 = await runMigrationApply(ctx);
+        const reapply1 = await runMigrate(ctx);
         expect(reapply1.exitCode, `reapply second: ${reapply1.stderr}`).toBe(0);
         expect(reapply1.stdout).toContain('Already up to date');
       },

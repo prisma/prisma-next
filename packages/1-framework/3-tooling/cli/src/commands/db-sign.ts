@@ -3,9 +3,12 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { relative, resolve } from 'pathe';
+import { join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
@@ -15,12 +18,17 @@ import {
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
+  errorRuntime,
   errorUnexpected,
+  mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  loadMigrationPackages,
   maskConnectionUrl,
   resolveContractPath,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
@@ -40,6 +48,7 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface DbSignOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
+  readonly contract?: string;
 }
 
 /**
@@ -54,11 +63,11 @@ type DbSignFailure = CliStructuredError | VerifyDatabaseSchemaResult;
  * Failure: CliStructuredError (infra error) or VerifyDatabaseSchemaResult (schema mismatch)
  */
 async function executeDbSignCommand(
+  contractArg: string | undefined,
   options: DbSignOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
 ): Promise<Result<SignDatabaseResult, DbSignFailure>> {
-  // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
@@ -66,11 +75,12 @@ async function executeDbSignCommand(
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
-  // Output header
+  const effectiveContractArg = contractArg ?? options.contract;
+
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
-      { label: 'contract', value: contractPath },
+      { label: 'contract', value: effectiveContractArg ?? contractPath },
     ];
     if (options.db) {
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
@@ -85,36 +95,79 @@ async function executeDbSignCommand(
     ui.stderr(header);
   }
 
-  // Load contract file
-  let contractJsonContent: string;
-  try {
-    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
-  } catch (error) {
-    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+  let contractJson: Record<string, unknown>;
+
+  if (effectiveContractArg) {
+    try {
+      const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
+      const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
+      const refs = await readRefs(refsDir);
+      const refResult = parseContractRef(effectiveContractArg, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      const targetHash = refResult.value.hash;
+      const matchingBundle = bundles.find((p) => p.metadata.to === targetHash);
+      if (matchingBundle) {
+        const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
+        const raw = await readFile(endContractPath, 'utf-8');
+        contractJson = JSON.parse(raw) as Record<string, unknown>;
+      } else {
+        const defaultRaw = await readFile(contractPathAbsolute, 'utf-8');
+        const defaultContract = JSON.parse(defaultRaw) as Record<string, unknown>;
+        const storageHash = (defaultContract['storage'] as Record<string, unknown> | undefined)?.[
+          'storageHash'
+        ];
+        if (storageHash === targetHash) {
+          contractJson = defaultContract;
+        } else {
+          return notOk(
+            errorRuntime(`No contract file found for hash "${targetHash}"`, {
+              why: `Resolved contract reference "${effectiveContractArg}" to hash "${targetHash}" but no migration produces that hash and the emitted contract does not match.`,
+              fix: 'Ensure the target contract exists on disk — either as a migration endpoint or as the emitted contract.json.',
+            }),
+          );
+        }
+      }
+    } catch (error) {
+      if (MigrationToolsError.is(error)) return notOk(mapMigrationToolsError(error));
+      if (error instanceof CliStructuredError) return notOk(error);
       return notOk(
-        errorFileNotFound(contractPathAbsolute, {
-          why: `Contract file not found at ${contractPathAbsolute}`,
-          fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
+        errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Failed to resolve contract reference: ${error instanceof Error ? error.message : String(error)}`,
         }),
       );
     }
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
-  }
+  } else {
+    let contractJsonContent: string;
+    try {
+      contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
+    } catch (error) {
+      if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+        return notOk(
+          errorFileNotFound(contractPathAbsolute, {
+            why: `Contract file not found at ${contractPathAbsolute}`,
+            fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
+          }),
+        );
+      }
+      return notOk(
+        errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+      );
+    }
 
-  let contractJson: Record<string, unknown>;
-  try {
-    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-  } catch (error) {
-    return notOk(
-      errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
-        { where: { path: contractPathAbsolute } },
-      ),
-    );
+    try {
+      contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    } catch (error) {
+      return notOk(
+        errorContractValidationFailed(
+          `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+          { where: { path: contractPathAbsolute } },
+        ),
+      );
+    }
   }
 
   // Resolve database connection (--db flag or config.db.connection)
@@ -203,16 +256,33 @@ export function createDbSignCommand(): Command {
       'in CI/deployment pipelines. The signature records that this database instance is aligned\n' +
       'with a specific contract version.',
   );
-  setCommandExamples(command, ['prisma-next db sign --db $DATABASE_URL']);
+  setCommandExamples(command, [
+    'prisma-next db sign --db $DATABASE_URL',
+    'prisma-next db sign production --db $DATABASE_URL',
+    'prisma-next db sign --contract production --db $DATABASE_URL',
+  ]);
   addGlobalOptions(command)
+    .argument('[contract]', 'Contract reference (hash, prefix, ref name, or migration dir name)')
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .action(async (options: DbSignOptions) => {
+    .option(
+      '--contract <contract>',
+      'Contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
+    )
+    .action(async (positionalContract: string | undefined, options: DbSignOptions) => {
       const flags = parseGlobalFlags(options);
+
+      if (positionalContract && options.contract) {
+        process.stderr.write(
+          'Cannot specify both a positional contract argument and --contract flag.\n',
+        );
+        process.exit(2);
+        return;
+      }
 
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
-      const result = await executeDbSignCommand(options, flags, ui);
+      const result = await executeDbSignCommand(positionalContract, options, flags, ui);
 
       if (result.ok) {
         // Success - format sign output

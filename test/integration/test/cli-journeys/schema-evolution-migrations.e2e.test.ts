@@ -25,7 +25,7 @@ import {
   runDbInit,
   runDbUpdate,
   runDbVerify,
-  runMigrationApply,
+  runMigrate,
   runMigrationEmit,
   runMigrationPlan,
   runMigrationPlanAndEmit,
@@ -57,7 +57,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, 'B.pre: emit base').toBe(0);
         const planInit = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(planInit.exitCode, 'B.pre: plan initial').toBe(0);
-        const applyInit = await runMigrationApply(ctx);
+        const applyInit = await runMigrate(ctx);
         expect(applyInit.exitCode, 'B.pre: apply initial').toBe(0);
 
         // B.01: Swap to contract-additive, contract emit
@@ -86,7 +86,7 @@ withTempDir(({ createTempDir }) => {
         expect(stripAnsi(statusPreApply.stdout), 'B.05: shows pending').toContain('pending');
 
         // B.06: migration apply
-        const apply = await runMigrationApply(ctx);
+        const apply = await runMigrate(ctx);
         expect(apply.exitCode, 'B.06: migration apply').toBe(0);
 
         // B.07: migration status (all applied)
@@ -110,7 +110,7 @@ withTempDir(({ createTempDir }) => {
         // --- Merged from Journey Q: migration apply noop (already up-to-date) ---
 
         // Q.01: migration apply --json (already up-to-date)
-        const applyNoop = await runMigrationApply(ctx, ['--json']);
+        const applyNoop = await runMigrate(ctx, ['--json']);
         expect(applyNoop.exitCode, 'Q.01: migration apply noop').toBe(0);
         const noopApplyData = parseJsonOutput(applyNoop);
         expect(noopApplyData, 'Q.01: 0 applied').toMatchObject({
@@ -185,7 +185,7 @@ withTempDir(({ createTempDir }) => {
         // Z.03: migration apply fails because the db init marker doesn't match
         // the migration chain root (planned from ∅→additive, but marker is at base).
         // Then db update recovers by applying the schema directly.
-        const apply = await runMigrationApply(ctx);
+        const apply = await runMigrate(ctx);
         expect(apply.exitCode, 'Z.03: migration apply rejects marker mismatch').toBe(1);
 
         const update = await runDbUpdate(ctx);

@@ -101,7 +101,7 @@ export async function computeExtensionSpaceApplyPath(
   const graph = reconstructGraph(packages);
 
   // Live-marker layer encodes "no prior state" as EMPTY_CONTRACT_HASH;
-  // mirror the `migration apply` flow so a fresh-marker initial walk
+  // mirror the `migrate` flow so a fresh-marker initial walk
   // hits the baseline migration whose `from` is EMPTY_CONTRACT_HASH.
   const fromHash = currentMarkerHash ?? EMPTY_CONTRACT_HASH;
   const required = new Set(

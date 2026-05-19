@@ -239,8 +239,6 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     await writeTestPackage(join(migrationsDir, TEST_SPACE_ID, '20260225_baseline'), {
       from: null,
       to: HEAD_HASH,
-      fromContract: null,
-      toContract: spaceContract,
     });
 
     await rm(join(projectRoot, 'node_modules'), { recursive: true, force: true });
@@ -274,7 +272,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       migrationsDir,
       appContract,
       declaredExtensions,
-      validateContract: (json: unknown): Contract => json as Contract,
+      deserializeContract: (json: unknown): Contract => json as Contract,
       appMigrationPackages: [],
     });
     expect(loaded.ok).toBe(true);

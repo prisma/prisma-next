@@ -46,7 +46,7 @@ These affect the contract marker — the source of truth for database state.
 
 **marker/hash-mismatch**
 - **Description:** Marker hash doesn't match applied migration edge hash
-- **Detection:** During migration apply; marker says H0 but trying to apply H0 → H1 edge
+- **Detection:** During migrate; marker says H0 but trying to apply H0 → H1 edge
 - **Cause:** Edge was applied but marker wasn't updated; edge wasn't applied but marker was
 - **Recoverability:** Depends on which is true
 - **Recovery:** See transaction/marker-update-failed below
@@ -108,7 +108,7 @@ These affect the migration graph and reachability.
 
 **dag/path-breakage**
 - **Description:** Marker references a state that no longer exists in the migration graph
-- **Detection:** On migration apply; edge file deleted or lost
+- **Detection:** On migrate; edge file deleted or lost
 - **Cause:** Migration file deleted; repository history rewritten; incomplete sync
 - **Recoverability:** Depends on whether edge can be reconstructed
 - **Implications:** Cannot apply next migration; stuck

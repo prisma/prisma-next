@@ -102,10 +102,10 @@ const named = fk(['userId'], 'user', ['id'], {
 Validate contract structures using Arktype validators:
 
 ```typescript
-import { validateSqlContract, validateStorage, validateModel } from '@prisma-next/sql-contract/validators';
+import { validateSqlContractFully, validateStorage, validateModel } from '@prisma-next/sql-contract/validators';
 
 // Validate a complete contract
-const contract = validateSqlContract<Contract>(contractJson);
+const contract = validateSqlContractFully<Contract>(contractJson);
 
 // Validate storage structure
 const storage = validateStorage(storageJson);

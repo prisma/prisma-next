@@ -207,6 +207,91 @@ A unique name that identifies an extension. Namespaces keep extensions from coll
 
 ---
 
+## Migration & Database Lifecycle
+
+Vocabulary that describes how databases move between contracts. The mental-model anchor is **Git**: contracts are like commits, migrations are like patches between them, refs are like branches, and `migrate --to <contract>` is like `git checkout`.
+
+### Migration (noun)
+
+A unit of intent that takes the database from one **contract** to another. On disk, a migration is a directory under `migrations/<space>/` containing `migration.json` (the manifest with `from`/`to` hashes and a content-addressed `migrationHash`), `ops.json` (the operations to execute), `migration.ts` (the editable authoring surface), and bookend contract snapshots (`start-contract.json`, `end-contract.json`).
+
+`migration` is **always a noun** — never a verb. The act of advancing a database is `migrate` (see below).
+
+### Migrate (verb)
+
+The act of advancing a *live database instance* along the migration graph. The canonical command is `prisma-next migrate [--to <contract>]`: walks from the database marker's current contract to the named target contract, executing each migration on the live database. `migrate` is forward-only — it never reverses, never rewinds, never resets.
+
+### Migration Graph
+
+The directed graph of contracts (nodes) connected by migrations (edges). Built by reading every `migration.json` under `migrations/<space>/`. The graph supports path-finding (shortest path from `from` to `to`), divergence detection (multiple reachable leaves), and integrity checks.
+
+### Ref (Contract Ref)
+
+A named pointer at a contract, stored as `migrations/<space>/refs/<name>.json`. Refs are environment-named (`production`, `staging`) and describe *where CD will `migrate --to` next* in that environment. Managed via `prisma-next ref set|list|delete`.
+
+A ref is a specific kind of [contract reference](#contract-reference) — the named, file-backed, persistent kind.
+
+### Ledger
+
+An append-only audit log of executed migrations, per database. The ledger records what migration ran when. The framework reads the [marker](#marker) (not the ledger) for routing decisions; the ledger is for visualization and auditing.
+
+### Drift
+
+Divergence between contract and database. Taxonomy includes marker-level (missing, corrupt, stale, hash mismatch), schema-level (manual DDL, partial execution, concurrent execution), graph-level (orphan database, no path, path breakage, cycle), capability (missing, downgrade, profile mismatch), transactional, cache/replica freshness, and canonicalization drift.
+
+### Storage Hash
+
+The deterministic hash over a contract's storage-affecting parts (`schemaVersion`, `targetFamily`, `target`, `storage`). The identity of a *contract* in the migration graph; when the CLI says "hash" without qualification, this is what it means. Formerly `coreHash`.
+
+### Migration Hash
+
+The content-addressed hash over a migration's `(strippedManifest, ops)`. The identity of a migration as a *physical effect on storage*, independent of cosmetic contract details. Always qualified as "migration hash" in user-facing prose — bare "hash" means the storage hash.
+
+### Contract Reference
+
+The argument grammar for "name a contract" across every flag and positional that accepts one (`migrate --to`, `db update --to`, `db sign [<contract>]`, `migration plan --from`, `migration status --to/--from`, `ref set`'s second argument). All forms resolve to a contract storage hash:
+
+| Form | Meaning |
+|---|---|
+| `<hash>` or `<hash-prefix>` | Bare hex (6+ chars), matched against contract storage hashes |
+| `<ref-name>` | The contract the named ref points at |
+| `<migration-dir-name>` | The migration's `to`-contract |
+| `<migration-dir-name>^` | The migration's `from`-contract |
+| `<filesystem-path>` | The contract file at that path (prefixed with `./`) |
+
+Ambiguity within a namespace (two hashes sharing a short prefix; a hex-named directory colliding with a hash prefix) produces an explicit error with candidate listing — the same rule Git uses for short SHAs.
+
+### Migration Reference
+
+The argument grammar for "name a migration" (used by `migration show <m>`, `migration check <m>`). All forms resolve to a migration package:
+
+| Form | Meaning |
+|---|---|
+| `<hash>` or `<hash-prefix>` | Bare hex, matched against migration hashes |
+| `<migration-dir-name>` | The migration directly |
+
+The CLI distinguishes contract-grammar input where a migration is expected (or vice versa) with a "wrong grammar" diagnostic naming the right verb-grammar pair.
+
+### `db verify`
+
+A read-only live-database operation that verifies the database satisfies the contract. Shape: `db verify [--schema-only|--marker-only|--strict]`. Returns ok / not-ok with a structured envelope. Does not mutate.
+
+### `migration check`
+
+A read-only filesystem operation that verifies on-disk migration packages are internally consistent and the graph is well-formed. Shape: `migration check [<m>]` — per-migration with the argument; graph-wide without. Exit codes: `0` (OK), `2` (PRECONDITION — bad argument or unknown migration), `4` (INTEGRITY_FAILED — one or more checks failed). Fine-grained discrimination uses PN codes:
+
+| PN code | Meaning |
+|---|---|
+| `PN-MIG-CHECK-001 HASH_MISMATCH` | Recomputed migration hash disagrees with stored value |
+| `PN-MIG-CHECK-002 MANIFEST_INCOMPLETE` | `migration.json` or `ops.json` missing on disk |
+| `PN-MIG-CHECK-003 ORPHAN_MIGRATION` | Migration has no graph-connecting predecessor |
+| `PN-MIG-CHECK-004 DANGLING_REF` | Ref points at a contract hash absent from the graph |
+| `PN-MIG-CHECK-005 EDGE_MISMATCH` | Migration's `metadata.to` disagrees with its `end-contract.json` snapshot |
+
+Does not consult the database.
+
+---
+
 ## Terminology Alignment Tracker
 
 Planned refactors to bring internal naming in line with user-facing terminology:

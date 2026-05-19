@@ -21,10 +21,8 @@
  * contract has no tables / models for the planner to diff (only a
  * `storage.types` registration, which the planner doesn't translate
  * into a DDL op). The migration directory + Migration subclass + a
- * seed `migration.json` (preserving the full `toContract` so
- * `MigrationCLI.run` re-attests it without synthesising a stub)
- * were authored by hand; `node migration.ts` then re-emits
- * `ops.json` + `migration.json` deterministically.
+ * seed `migration.json` were authored by hand; `node migration.ts`
+ * then re-emits `ops.json` + `migration.json` deterministically.
  */
 import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { PGVECTOR_INVARIANTS } from '../../src/core/contract-space-constants';

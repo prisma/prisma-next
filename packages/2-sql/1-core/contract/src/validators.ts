@@ -1,5 +1,5 @@
+import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
-import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
@@ -345,16 +345,12 @@ export function validateModel(value: unknown): unknown {
 }
 
 /**
- * Validates the structural shape of an SQL contract using Arktype.
- *
- * Ensures all required fields are present and have the correct types,
- * including SQL-specific storage structure (tables, columns, constraints).
- *
- * @param value - The contract value to validate (typically from a JSON import)
- * @returns The validated contract if structure is valid
- * @throws ContractValidationError if the contract structure is invalid
+ * Structural arktype validation of an SQL contract envelope. Internal
+ * helper for {@link validateSqlContractFully} — exposed only inside
+ * this module, since the family seam-of-record is the
+ * `SqlContractSerializerBase.deserializeContract` SPI.
  */
-export function validateSqlContract<T extends Contract<SqlStorage>>(value: unknown): T {
+function validateSqlContractStructure<T extends Contract<SqlStorage>>(value: unknown): T {
   if (typeof value !== 'object' || value === null) {
     throw new ContractValidationError(
       'Contract structural validation failed: value must be an object',
@@ -702,7 +698,7 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: 
           return rest;
         })()
       : value;
-  const validated = validateSqlContract<T>(stripped);
+  const validated = validateSqlContractStructure<T>(stripped);
   validateContractDomain({
     roots: validated.roots,
     models: validated.models,

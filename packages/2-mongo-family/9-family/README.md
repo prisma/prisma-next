@@ -46,7 +46,7 @@ const stack = createControlStack({
 
 const familyInstance = mongoFamilyDescriptor.create(stack);
 
-const contract = familyInstance.validateContract(contractJson);
+const contract = familyInstance.deserializeContract(contractJson);
 const result = await familyInstance.emitContract({ contract });
 ```
 

@@ -3,7 +3,7 @@
  * `node migration.ts` directly.
  *
  * Naming: this is *not* a "migration runner" in the apply-time sense. The
- * apply-time runner is the thing `prisma-next migration apply` uses to
+ * apply-time runner is the thing `prisma-next migrate` uses to
  * execute migration JSON ops against a database. `MigrationCLI` is the
  * tiny CLI surface owned by an authored `migration.ts` file: parse the
  * file's argv, load the project's `prisma-next.config.ts`, assemble a

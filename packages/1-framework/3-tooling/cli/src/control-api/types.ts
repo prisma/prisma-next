@@ -118,7 +118,7 @@ export type OnControlProgress = (event: ControlProgressEvent) => void;
  * Options for the verify operation.
  */
 export interface VerifyOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.deserializeContract() */
   readonly contract: unknown;
   /**
    * Database connection. If provided, verify will connect before executing.
@@ -134,7 +134,7 @@ export interface VerifyOptions {
  * Options for the schemaVerify operation.
  */
 export interface SchemaVerifyOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.deserializeContract() */
   readonly contract: unknown;
   /**
    * Whether to use strict mode for schema verification.
@@ -156,7 +156,7 @@ export interface SchemaVerifyOptions {
  * Options for the sign operation.
  */
 export interface SignOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.deserializeContract() */
   readonly contract: unknown;
   /**
    * Path to the contract file (for metadata in the result).
@@ -180,7 +180,7 @@ export interface SignOptions {
  * Options for the dbInit operation.
  */
 export interface DbInitOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.deserializeContract() */
   readonly contract: unknown;
   /**
    * Mode for the dbInit operation.
@@ -209,7 +209,7 @@ export interface DbInitOptions {
  * Options for the dbUpdate operation.
  */
 export interface DbUpdateOptions {
-  /** Contract or unvalidated JSON - validated at runtime via familyInstance.validateContract() */
+  /** Contract or unvalidated JSON - validated at runtime via familyInstance.deserializeContract() */
   readonly contract: unknown;
   /**
    * Mode for the dbUpdate operation.
@@ -251,7 +251,13 @@ export interface DbUpdateOptions {
  * portion of the verifier.
  */
 export interface DbVerifyOptions {
-  readonly contract: unknown;
+  /**
+   * Already-deserialized contract. Callers cross the family
+   * `deserializeContract` seam at the read site (TML-2536) and pass the
+   * hydrated value through unchanged; this op no longer re-runs the
+   * SerializerBase pipeline.
+   */
+  readonly contract: Contract;
   readonly migrationsDir: string;
   readonly strict: boolean;
   readonly skipSchema: boolean;
@@ -590,7 +596,6 @@ export interface MigrationApplyStep {
   readonly dirName: string;
   readonly from: string | null;
   readonly to: string;
-  readonly toContract: Contract;
   readonly operations: readonly MigrationPlanOperation[];
   /**
    * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.

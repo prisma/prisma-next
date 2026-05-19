@@ -15,7 +15,7 @@ import {
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   setupJourney,
   swapContract,
@@ -72,7 +72,7 @@ withTempDir(({ createTempDir }) => {
         expect(directResult.to, 'K.04: to C3').toBe(c3Hash);
 
         // K.05: apply from empty DB — pathfinder picks shortest path (∅→C1→C3)
-        const apply = await runMigrationApply(ctx, ['--json']);
+        const apply = await runMigrate(ctx, ['--json']);
         expect(apply.exitCode, 'K.05: apply converging graph').toBe(0);
 
         const applyResult = parseJsonOutput<{

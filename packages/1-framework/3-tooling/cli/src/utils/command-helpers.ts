@@ -17,6 +17,10 @@ import { parseGlobalFlags } from './global-flags';
 
 const longDescriptions = new WeakMap<Command, string>();
 const commandExamples = new WeakMap<Command, readonly string[]>();
+const commandSeeAlso = new WeakMap<
+  Command,
+  readonly { readonly verb: string; readonly oneLiner: string }[]
+>();
 
 /**
  * Sets both short and long descriptions for a command.
@@ -58,6 +62,27 @@ export function getCommandExamples(command: Command): readonly string[] | undefi
 }
 
 /**
+ * Sets cross-references to related commands, rendered in a "See also"
+ * section below the Examples block in help output.
+ */
+export function setCommandSeeAlso(
+  command: Command,
+  refs: readonly { readonly verb: string; readonly oneLiner: string }[],
+): Command {
+  commandSeeAlso.set(command, refs);
+  return command;
+}
+
+/**
+ * Gets the see-also cross-references from a command.
+ */
+export function getCommandSeeAlso(
+  command: Command,
+): readonly { readonly verb: string; readonly oneLiner: string }[] | undefined {
+  return commandSeeAlso.get(command);
+}
+
+/**
  * Shared CLI options interface for migration commands (db init, db update).
  * These are the Commander.js parsed options common to both commands.
  */
@@ -79,13 +104,13 @@ export function resolveContractPath(config: { contract?: { output?: string } }):
 
 /**
  * Resolves the migrations directory and config path from CLI options.
- * Shared by migration-apply, migration-plan, and migration-status.
+ * Shared by migrate, migration-plan, and migration-status.
  *
  * - `migrationsDir` is the project's top-level `migrations/` directory
  *   (the root that the aggregate loader walks for every contract space).
  * - `appMigrationsDir` is the app subspace directory under it
  *   (`<migrationsDir>/<APP_SPACE_ID>/`). Every per-app reader / writer
- *   (`migration new`, `migration plan`, `migration apply`,
+ *   (`migration new`, `migration plan`, `migrate`,
  *   `migration status`, `migration show`, `migration ref`) operates on
  *   this directory. Extensions own their own `migrations/<spaceId>/`.
  * - `refsDir` is the app's refs directory (`<appMigrationsDir>/refs/`).
@@ -159,7 +184,7 @@ export function collectDeclaredInvariants(graph: MigrationGraph): ReadonlySet<st
 /**
  * Maps a `MigrationEdge` to the structural-edge shape used in the
  * `MIGRATION.NO_INVARIANT_PATH` error envelope. Shared between
- * `migration apply` and `migration status` so both commands surface
+ * `migrate` and `migration status` so both commands surface
  * the same JSON wire shape when an invariant-aware route is unsatisfiable.
  */
 export function toStructuralEdge(edge: MigrationEdge): NoInvariantPathStructuralEdge {

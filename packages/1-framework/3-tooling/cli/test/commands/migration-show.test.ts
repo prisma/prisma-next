@@ -1,8 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createContract, createSqlContract } from '@prisma-next/contract/testing';
-import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationClass,
   MigrationPlanOperation,
@@ -26,7 +24,6 @@ import {
 } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
-import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 // Track every temp dir handed out by `createTempDir` so the suite-wide
 // `afterEach` can remove them — even when an assertion fails — keeping
@@ -66,17 +63,10 @@ function createOp(
  * is attested inside `setupMigrationDir`, where the `migrationHash` is
  * computed once we know the full ops list.
  */
-function createMetadata(
-  from: string,
-  to: string,
-  toContract: Contract,
-  fromContract: Contract | null = null,
-): Omit<MigrationMetadata, 'migrationHash'> {
+function createMetadata(from: string, to: string): Omit<MigrationMetadata, 'migrationHash'> {
   return {
     from,
     to,
-    fromContract,
-    toContract,
     hints: { used: [], applied: [], plannerVersion: '1.0.0' },
     labels: [],
     providedInvariants: [],
@@ -108,16 +98,10 @@ describe('resolveByHashPrefix', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
-      }),
-    });
-
     await setupMigrationDir(
       migrationsDir,
       'add-user',
-      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contract),
+      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:hash-a'),
       [createOp('table.user', 'Create table "user"', 'additive')],
     );
 
@@ -137,16 +121,10 @@ describe('resolveByHashPrefix', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: { columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } } },
-      }),
-    });
-
     await setupMigrationDir(
       migrationsDir,
       'add-user',
-      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contract),
+      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:hash-a'),
       [createOp('table.user', 'Create table "user"', 'additive')],
     );
 
@@ -170,8 +148,6 @@ describe('resolveByHashPrefix', () => {
           from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc123',
-          fromContract: null,
-          toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],
@@ -189,7 +165,6 @@ describe('resolveByHashPrefix', () => {
   });
 
   it('returns error for ambiguous prefix', () => {
-    const contract = createContract();
     const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_first',
@@ -198,8 +173,6 @@ describe('resolveByHashPrefix', () => {
           from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc111',
-          fromContract: null,
-          toContract: contract,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],
@@ -214,8 +187,6 @@ describe('resolveByHashPrefix', () => {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
           migrationHash: 'sha256:abc222',
-          fromContract: contract,
-          toContract: contract,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],
@@ -241,8 +212,6 @@ describe('resolveByHashPrefix', () => {
           from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc123def456',
-          fromContract: null,
-          toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],
@@ -272,8 +241,6 @@ describe('resolveByHashPrefix', () => {
           from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc999000000',
-          fromContract: null,
-          toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],
@@ -315,7 +282,7 @@ describe('resolveLatestFromDir', () => {
     await setupMigrationDir(
       migrationsDir,
       'self-loop',
-      createMetadata(EMPTY_CONTRACT_HASH, EMPTY_CONTRACT_HASH, createContract()),
+      createMetadata(EMPTY_CONTRACT_HASH, EMPTY_CONTRACT_HASH),
       [createOp('data.backfill', 'Backfill data', 'data')],
     );
 

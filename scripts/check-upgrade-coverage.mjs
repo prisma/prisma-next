@@ -39,8 +39,8 @@ import { existsSync } from 'node:fs';
 import { argv, cwd, exit, stderr, stdout } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const USER_SKILL_PKG = 'packages/0-shared/upgrade-skill';
-const EXT_SKILL_PKG = 'packages/0-shared/extension-upgrade-skill';
+const USER_SKILL_PKG = 'skills/upgrade/prisma-next-upgrade';
+const EXT_SKILL_PKG = 'skills/extension-author/prisma-next-extension-upgrade';
 
 /**
  * Parse a `<major>.<minor>.<patch>[-<prerelease>]` version string into
@@ -97,15 +97,15 @@ export function coverageTransitionLabel(head, prev) {
 }
 
 /**
- * Parse a path under `<pkg>/upgrades/<transition>/...` and return the
- * transition segment, or null if the path does not match.
+ * Parse a path under `<skill-pkg>/upgrades/<transition>/...` and return
+ * the transition segment, or null if the path does not match.
  *
- * Example: `packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/foo.ts`
+ * Example: `skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/foo.ts`
  *  → `'0.7-to-0.8'`
  */
 export function parseTransitionFromPath(path) {
   const match =
-    /^packages\/0-shared\/(?:upgrade-skill|extension-upgrade-skill)\/upgrades\/([^/]+)\//.exec(
+    /^skills\/(?:upgrade\/prisma-next-upgrade|extension-author\/prisma-next-extension-upgrade)\/upgrades\/([^/]+)\//.exec(
       path,
     );
   return match ? match[1] : null;
@@ -140,10 +140,39 @@ function diffPaths(repoRoot, prev, head, pathspecs) {
 }
 
 function diffAddedPaths(repoRoot, prev, head, pathspecs) {
-  const args = ['diff', '--name-only', '--diff-filter=A', `${prev}..${head}`, '--'];
-  args.push(...pathspecs);
-  const out = git(repoRoot, ...args);
-  return out.split('\n').filter(Boolean);
+  const addArgs = ['diff', '--name-only', '--diff-filter=A', `${prev}..${head}`, '--'];
+  addArgs.push(...pathspecs);
+  const added = git(repoRoot, ...addArgs)
+    .split('\n')
+    .filter(Boolean);
+
+  if (added.length === 0) return added;
+
+  // Rename detection requires seeing both ends of the rename pair, so we must
+  // query the full diff (no pathspec) with -M. Files that appear as rename
+  // destinations (R) in the repo-wide diff are moves, not genuine additions,
+  // and should be excluded.
+  const renameOut = git(
+    repoRoot,
+    'diff',
+    '-M',
+    '--name-status',
+    '--diff-filter=R',
+    `${prev}..${head}`,
+  );
+  const renameDestinations = new Set(
+    renameOut
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        // Each line is "R<score>\t<old-path>\t<new-path>"
+        const parts = line.split('\t');
+        return parts[2];
+      })
+      .filter(Boolean),
+  );
+
+  return added.filter((p) => !renameDestinations.has(p));
 }
 
 function resolveDefaultPrev(repoRoot, mode) {
@@ -298,7 +327,9 @@ function renderViolations(result, write) {
         `  [new-entries-stale-transition] added ${v.path}\n` +
           `              transition is "${v.observedTransition}" but only the following are accepted:\n` +
           `                ${v.allowedTransitions.join(', ')}\n` +
-          '              move the new file under packages/0-shared/<skill>/upgrades/<one-of-the-above>/\n',
+          '              move the new file under one of:\n' +
+          '                skills/upgrade/prisma-next-upgrade/upgrades/<one-of-the-above>/instructions.md\n' +
+          '                skills/extension-author/prisma-next-extension-upgrade/upgrades/<one-of-the-above>/instructions.md\n',
       );
     }
   }

@@ -8,7 +8,7 @@
  * verbatim.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
@@ -32,6 +32,7 @@ import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
+  errorFileNotFound,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -72,11 +73,17 @@ async function executeMigrationNewCommand(
   const config = await loadConfig(options.config);
   const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
 
+  // Construct the family instance up-front so the on-disk contract read
+  // below crosses the serializer seam (`familyInstance.deserializeContract`)
+  // at the read site, not somewhere downstream. See TML-2536.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
   const contractPathAbsolute = resolveContractPath(config);
 
   let contractJsonContent: string;
   try {
-    contractJsonContent = readFileSync(contractPathAbsolute, 'utf-8');
+    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
   } catch (error) {
     if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
       return notOk(
@@ -89,24 +96,20 @@ async function executeMigrationNewCommand(
     throw error;
   }
 
-  let toContractJson: Contract;
+  let toContract: Contract;
   try {
-    toContractJson = JSON.parse(contractJsonContent) as Contract;
+    toContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {
-        why: `Failed to parse ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Failed to deserialize ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
         fix: 'Run `prisma-next contract emit` to regenerate the contract',
       }),
     );
   }
 
-  const toStorageHash = (
-    (toContractJson as unknown as Record<string, unknown>)['storage'] as
-      | Record<string, unknown>
-      | undefined
-  )?.['storageHash'] as string | undefined;
-  if (!toStorageHash) {
+  const toStorageHash = toContract.storage?.storageHash;
+  if (typeof toStorageHash !== 'string') {
     return notOk(
       errorRuntime('Contract is missing storageHash', {
         why: `Contract at ${contractPathAbsolute} has no storageHash`,
@@ -115,7 +118,6 @@ async function executeMigrationNewCommand(
     );
   }
 
-  let fromContract: Contract | null = null;
   let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
 
@@ -136,7 +138,6 @@ async function executeMigrationNewCommand(
           );
         }
         fromHash = match.metadata.to;
-        fromContract = match.metadata.toContract;
         fromContractSourceDir = match.dirPath;
       } else {
         const latestMigration = findLatestMigration(graph);
@@ -146,7 +147,6 @@ async function executeMigrationNewCommand(
             (p) => p.metadata.migrationHash === latestMigration.migrationHash,
           );
           if (leafPkg) {
-            fromContract = leafPkg.metadata.toContract;
             fromContractSourceDir = leafPkg.dirPath;
           }
         }
@@ -180,8 +180,6 @@ async function executeMigrationNewCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
-    fromContract,
-    toContract: toContractJson,
     hints: {
       used: [],
       applied: [],
@@ -222,14 +220,24 @@ async function executeMigrationNewCommand(
       const sourceArtifacts = getEmittedArtifactPaths(
         join(fromContractSourceDir, 'end-contract.json'),
       );
-      await copyFilesWithRename(packageDir, [
-        { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
-        { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
-      ]);
+      try {
+        await copyFilesWithRename(packageDir, [
+          { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
+          { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
+        ]);
+      } catch (error) {
+        if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+          return notOk(
+            errorFileNotFound(sourceArtifacts.jsonPath, {
+              why: `Predecessor migration is missing its destination contract snapshot at ${sourceArtifacts.jsonPath}`,
+              fix: 'Re-emit the predecessor migration (`prisma-next migration plan` from its source) so its sibling `end-contract.json` is restored, then re-run this command.',
+            }),
+          );
+        }
+        throw error;
+      }
     }
 
-    const stack = createControlStack(config);
-    const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
     const emptyPlan = planner.emptyMigration(
       {

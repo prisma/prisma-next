@@ -12,16 +12,43 @@ import { createDbSchemaCommand } from './commands/db-schema';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
-import { createMigrationApplyCommand } from './commands/migration-apply';
+import { createMigrateCommand } from './commands/migrate';
+import { createMigrationCheckCommand } from './commands/migration-check';
+import { createMigrationGraphCommand } from './commands/migration-graph';
+import { createMigrationListCommand } from './commands/migration-list';
+import { createMigrationLogCommand } from './commands/migration-log';
 import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
-import { createMigrationRefCommand } from './commands/migration-ref';
 import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
+import { createRefCommand } from './commands/ref';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
 import { parseGlobalFlags } from './utils/global-flags';
 import { suggestCommands } from './utils/suggest-command';
+
+/**
+ * Lookup table mapping removed subcommands to their replacement verbs.
+ * Keyed by `<parent>:<subcommand>` (e.g. `migration:apply`).
+ * The handler consults this before falling back to the fuzzy suggest engine.
+ */
+const removedVerbRedirects: Record<string, string> = {
+  'migration:apply': 'Use `prisma-next migrate --to <contract>` instead.',
+  'migration:ref': 'Use `prisma-next ref set|list|delete` instead.',
+};
+
+/**
+ * Removed flags on specific subcommands. Keyed by `<parent>:<sub>:<flag>`.
+ * Checked during the pre-parse argv scan before commander sees the flags.
+ */
+const removedFlagRedirects: Record<string, string> = {
+  'migration:status:graph': 'Use `prisma-next migration graph` to view the migration graph.',
+  'migration:status:all':
+    'Use `prisma-next migration log --db <url>` to view the full execution history.',
+  'migration:status:limit':
+    'Use `prisma-next migration log --db <url>` to view the full execution history.',
+  'migration:status:ref': 'Use `--to <contract>` instead of `--ref`.',
+};
 
 /**
  * Formats the "Did you mean ...?" hint for an unknown command.
@@ -177,9 +204,6 @@ contractCommand.addCommand(contractEmitCommand);
 const contractInferCommand = createContractInferCommand();
 contractCommand.addCommand(contractInferCommand);
 
-// Register contract command
-program.addCommand(contractCommand);
-
 // Register db subcommand
 const dbCommand = new Command('db');
 setCommandDescriptions(
@@ -216,9 +240,6 @@ dbCommand.addCommand(dbSchemaCommand);
 const dbSignCommand = createDbSignCommand();
 dbCommand.addCommand(dbSignCommand);
 
-// Register db command
-program.addCommand(dbCommand);
-
 // Register migration subcommand
 const migrationCommand = new Command('migration');
 setCommandDescriptions(
@@ -247,17 +268,38 @@ migrationCommand.addCommand(migrationShowCommand);
 const migrationStatusCommand = createMigrationStatusCommand();
 migrationCommand.addCommand(migrationStatusCommand);
 
-const migrationApplyCommand = createMigrationApplyCommand();
-migrationCommand.addCommand(migrationApplyCommand);
+const migrationLogCommand = createMigrationLogCommand();
+migrationCommand.addCommand(migrationLogCommand);
 
-const migrationRefCommand = createMigrationRefCommand();
-migrationCommand.addCommand(migrationRefCommand);
+const migrationListCommand = createMigrationListCommand();
+migrationCommand.addCommand(migrationListCommand);
 
-program.addCommand(migrationCommand);
+const migrationGraphCommand = createMigrationGraphCommand();
+migrationCommand.addCommand(migrationGraphCommand);
 
-// Register init command (top-level, not nested)
+const migrationCheckCommand = createMigrationCheckCommand();
+migrationCommand.addCommand(migrationCheckCommand);
+
+// Top-level migrate command
+const migrateCommand = createMigrateCommand();
+
+// Top-level ref command (replaces `migration ref`)
+const refCommand = createRefCommand();
+
+// Top-level init command
 const initCommand = createInitCommand();
+
+// Register top-level commands in the order the spec's intended-surface
+// diagram lists them: verbs (init, migrate) first, then subject
+// namespaces (contract, db, migration, ref). The order shows up in
+// `prisma-next --help` and is the first thing a new user sees, so it
+// matches the order spec.md uses to introduce the surface.
 program.addCommand(initCommand);
+program.addCommand(migrateCommand);
+program.addCommand(contractCommand);
+program.addCommand(dbCommand);
+program.addCommand(migrationCommand);
+program.addCommand(refCommand);
 
 // Create help command
 const helpCommand = new Command('help')
@@ -324,7 +366,28 @@ if (args.length > 0) {
       const helpText = formatRootHelp({ program, flags });
       process.stderr.write(`${helpText}\n`);
       process.exit(2);
-    } else if (command.commands.length > 0 && args.length === 1) {
+    } else if (command.commands.length > 0 && args.length >= 2) {
+      const subcommandName = args[1];
+      const redirectKey = `${commandName}:${subcommandName}`;
+      const redirect = removedVerbRedirects[redirectKey];
+      if (redirect) {
+        process.stderr.write(`Unknown command: ${subcommandName}\n${redirect}\n`);
+        process.exit(2);
+      }
+      for (let i = 2; i < args.length; i++) {
+        const arg = args[i]!;
+        if (!arg.startsWith('--')) continue;
+        const flagName = arg.slice(2);
+        const flagKey = `${commandName}:${subcommandName}:${flagName}`;
+        const flagRedirect = removedFlagRedirects[flagKey];
+        if (flagRedirect) {
+          process.stderr.write(`Unknown option: ${arg}\n${flagRedirect}\n`);
+          process.exit(2);
+        }
+      }
+    }
+
+    if (command.commands.length > 0 && args.length === 1) {
       // Parent command called with no subcommand. Same shape as the
       // no-args case above: the user did not request help, we are
       // voluntarily rendering it as decoration around an underspecified

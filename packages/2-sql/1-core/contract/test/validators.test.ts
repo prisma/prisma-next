@@ -1,12 +1,12 @@
+import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import { createContract } from '@prisma-next/contract/testing';
-import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import type { ReferentialAction, SqlStorage } from '../src/types';
 import {
   validateModel,
-  validateSqlContract,
+  validateSqlContractFully,
   validateStorage,
   validateStorageSemantics,
 } from '../src/validators';
@@ -172,10 +172,10 @@ describe('SQL contract validators', () => {
     });
   });
 
-  describe('validateSqlContract', () => {
+  describe('validateSqlContractFully', () => {
     it('throws ContractValidationError when contract value is not an object', () => {
       try {
-        validateSqlContract(null);
+        validateSqlContractFully(null);
         expect.unreachable();
       } catch (e) {
         expect(e).toBeInstanceOf(ContractValidationError);
@@ -199,7 +199,7 @@ describe('SQL contract validators', () => {
           }),
         },
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('throws on missing targetFamily', () => {
@@ -210,7 +210,7 @@ describe('SQL contract validators', () => {
         storage: unboundTables({ user: userTable }),
       });
       const invalid = { ...c, targetFamily: undefined } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/targetFamily/);
+      expect(() => validateSqlContractFully(invalid)).toThrow(/targetFamily/);
     });
 
     it('throws ContractValidationError on wrong targetFamily', () => {
@@ -222,7 +222,7 @@ describe('SQL contract validators', () => {
       });
       const invalid = { ...c, targetFamily: 'document' } as unknown;
       try {
-        validateSqlContract(invalid);
+        validateSqlContractFully(invalid);
         expect.unreachable();
       } catch (e) {
         expect(e).toBeInstanceOf(ContractValidationError);
@@ -240,7 +240,7 @@ describe('SQL contract validators', () => {
       });
       const invalid = { ...c, target: undefined } as unknown;
       try {
-        validateSqlContract(invalid);
+        validateSqlContractFully(invalid);
         expect.unreachable();
       } catch (e) {
         expect(e).toBeInstanceOf(ContractValidationError);
@@ -257,7 +257,7 @@ describe('SQL contract validators', () => {
         storage: unboundTables({ user: userTable }),
       });
       const invalid = { ...c, storage: { ...c.storage, storageHash: undefined } } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/storageHash/);
+      expect(() => validateSqlContractFully(invalid)).toThrow(/storageHash/);
     });
 
     it('throws on missing storage', () => {
@@ -268,7 +268,7 @@ describe('SQL contract validators', () => {
         storage: unboundTables({ user: userTable }),
       });
       const invalid = { ...c, storage: undefined } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/storage/);
+      expect(() => validateSqlContractFully(invalid)).toThrow(/storage/);
     });
 
     it('throws on missing models', () => {
@@ -279,7 +279,7 @@ describe('SQL contract validators', () => {
         storage: unboundTables({ user: userTable }),
       });
       const invalid = { ...c, models: undefined } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/models/);
+      expect(() => validateSqlContractFully(invalid)).toThrow(/models/);
     });
 
     it('accepts contract with profileHash', () => {
@@ -289,7 +289,7 @@ describe('SQL contract validators', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable }),
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('rejects contract without profileHash', () => {
@@ -300,7 +300,7 @@ describe('SQL contract validators', () => {
         storage: unboundTables({ user: userTable }),
       });
       const { profileHash: _, ...withoutProfileHash } = c;
-      expect(() => validateSqlContract(withoutProfileHash)).toThrow(/profileHash/);
+      expect(() => validateSqlContractFully(withoutProfileHash)).toThrow(/profileHash/);
     });
 
     it('accepts optional capabilities', () => {
@@ -315,7 +315,7 @@ describe('SQL contract validators', () => {
           },
         },
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('accepts optional extension packs', () => {
@@ -331,7 +331,7 @@ describe('SQL contract validators', () => {
           },
         },
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('accepts optional meta', () => {
@@ -344,7 +344,7 @@ describe('SQL contract validators', () => {
           generated: true,
         },
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('rejects unknown top-level keys', () => {
@@ -356,7 +356,7 @@ describe('SQL contract validators', () => {
         ...base,
         mappings: { modelToTable: { User: 'user' } },
       };
-      expect(() => validateSqlContract(c)).toThrow('mappings must be removed');
+      expect(() => validateSqlContractFully(c)).toThrow('mappings must be removed');
     });
 
     it('validates FK with per-FK constraint and index fields', () => {
@@ -371,7 +371,7 @@ describe('SQL contract validators', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable, post: postTable }),
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('validates FK with constraint disabled', () => {
@@ -386,7 +386,7 @@ describe('SQL contract validators', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable, post: postTable }),
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('rejects FK missing constraint field', () => {
@@ -421,7 +421,7 @@ describe('SQL contract validators', () => {
           },
         }),
       });
-      expect(() => validateSqlContract(rawContract)).toThrow();
+      expect(() => validateSqlContractFully(rawContract)).toThrow();
     });
 
     it('rejects FK missing index field', () => {
@@ -456,7 +456,7 @@ describe('SQL contract validators', () => {
           },
         }),
       });
-      expect(() => validateSqlContract(rawContract)).toThrow();
+      expect(() => validateSqlContractFully(rawContract)).toThrow();
     });
 
     it('validates storage with FK referential actions', () => {
@@ -551,7 +551,7 @@ describe('SQL contract validators', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable, post: postTable }),
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
   });
 
@@ -857,14 +857,14 @@ describe('SQL contract validators', () => {
     });
   });
 
-  describe('validateSqlContract strict mode', () => {
+  describe('validateSqlContractFully strict mode', () => {
     it('rejects unknown top-level properties', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ users: table({ id: col('int4', 'pg/int4@1') }) }),
         models: { User: model('users', { id: { column: 'id' } }) },
       });
       const withUnknown = { ...c, bogusField: 'unexpected' };
-      expect(() => validateSqlContract(withUnknown)).toThrow();
+      expect(() => validateSqlContractFully(withUnknown)).toThrow();
     });
 
     it('accepts valid contracts without unknown properties', () => {
@@ -872,7 +872,7 @@ describe('SQL contract validators', () => {
         storage: unboundTables({ users: table({ id: col('int4', 'pg/int4@1') }) }),
         models: { User: model('users', { id: { column: 'id' } }) },
       });
-      expect(() => validateSqlContract(c)).not.toThrow();
+      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
   });
 });

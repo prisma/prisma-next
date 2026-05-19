@@ -22,7 +22,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       readAllMarkers: async () => new Map(),
     } as unknown as ControlFamilyInstance<string, unknown>;
 
@@ -99,7 +99,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       readAllMarkers: async () => new Map(),
     } as unknown as ControlFamilyInstance<string, unknown>;
 
@@ -174,7 +174,7 @@ describe('executeDbInit progress emission', () => {
 
     const mockFamilyInstance = {
       introspect: async () => ({}),
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       readAllMarkers: async () => new Map(),
     } as unknown as ControlFamilyInstance<string, unknown>;
 

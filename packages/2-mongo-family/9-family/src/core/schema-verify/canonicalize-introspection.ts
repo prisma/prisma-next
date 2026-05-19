@@ -3,7 +3,7 @@
  * (contract-built) IR before diffing. MongoDB applies server-side defaults
  * to several option/index families that are absent from authored contracts,
  * which would otherwise cause `verifyMongoSchema` to report false-positive
- * drift on a fresh `migration apply`.
+ * drift on a fresh `migrate` run.
  *
  * The normalization is contract-aware where it has to be: server defaults
  * are stripped from the live IR for fields the contract did not specify, so

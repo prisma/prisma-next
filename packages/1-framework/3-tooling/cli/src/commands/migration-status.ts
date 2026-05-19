@@ -19,8 +19,9 @@ import {
   findReachableLeaves,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
-import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { cyan, dim, magenta, yellow } from 'colorette';
@@ -33,6 +34,7 @@ import {
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -43,6 +45,7 @@ import {
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  setCommandSeeAlso,
   toPathDecisionResult,
   toStructuralEdge,
 } from '../utils/command-helpers';
@@ -70,10 +73,8 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly ref?: string;
-  readonly graph?: boolean;
-  readonly limit?: string;
-  readonly all?: boolean;
+  readonly to?: string;
+  readonly from?: string;
 }
 
 export interface MigrationStatusEntry {
@@ -94,7 +95,7 @@ export interface MigrationStatusEntry {
  *
  * - `headHash`: the on-disk head ref's hash (where the space is going).
  * - `markerHash`: the live marker hash for the space, or null if no
- *    marker has been written yet (greenfield, or pre-`migration apply`).
+ *    marker has been written yet (greenfield, or pre-`migrate`).
  * - `pendingCount`: number of migration edges between marker and head.
  *    Computed via {@link graphWalkStrategy}; 0 means the space is
  *    already at head.
@@ -420,23 +421,6 @@ function resolveDisplayChain(
   return toTarget;
 }
 
-const DEFAULT_LIMIT = 10;
-
-function determineLimit(opts: MigrationStatusOptions) {
-  if (opts.all) {
-    // No limit
-    return;
-  }
-  if (!opts.limit) {
-    return DEFAULT_LIMIT;
-  }
-  const parsed = Number.parseInt(opts.limit, 10);
-  if (Number.isNaN(parsed)) {
-    return DEFAULT_LIMIT;
-  }
-  return parsed;
-}
-
 /**
  * Build the aggregate enumeration of contract spaces for the status
  * output. Loads the aggregate from disk (lossy on failure — extension
@@ -453,15 +437,15 @@ export async function loadAggregateStatusSpaces(args: {
   readonly migrationsDir: string;
   readonly appContractRaw: unknown;
   readonly extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'];
-  readonly validateContract: BuildAggregateInputs<string, string>['validateContract'];
+  readonly deserializeContract: BuildAggregateInputs<string, string>['deserializeContract'];
   readonly markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null;
 }): Promise<readonly MigrationStatusSpaceEntry[]> {
   const loadInputs: BuildAggregateInputs<string, string> = {
     targetId: args.targetId,
     migrationsDir: args.migrationsDir,
-    appContract: args.validateContract(args.appContractRaw),
+    appContract: args.deserializeContract(args.appContractRaw),
     extensionPacks: args.extensionPacks,
-    validateContract: args.validateContract,
+    deserializeContract: args.deserializeContract,
   };
 
   const loaded = await buildContractSpaceAggregate(loadInputs);
@@ -581,11 +565,32 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  if (options.ref) {
-    activeRefName = options.ref;
+  let fromOverrideHash: string | undefined;
+
+  if (options.to || options.from) {
     try {
-      activeRefEntry = resolveRef(allRefs, activeRefName);
-      activeRefHash = activeRefEntry.hash;
+      const { graph: earlyGraph } = await loadMigrationPackages(appMigrationsDir);
+
+      if (options.to) {
+        const refResult = parseContractRef(options.to, { graph: earlyGraph, refs: allRefs });
+        if (!refResult.ok) {
+          return notOk(mapRefResolutionError(refResult.failure));
+        }
+        activeRefHash = refResult.value.hash;
+        if (refResult.value.provenance.kind === 'ref') {
+          const resolvedRefName = refResult.value.provenance.refName;
+          activeRefName = resolvedRefName;
+          activeRefEntry = allRefs[resolvedRefName];
+        }
+      }
+
+      if (options.from) {
+        const fromResult = parseContractRef(options.from, { graph: earlyGraph, refs: allRefs });
+        if (!fromResult.ok) {
+          return notOk(mapRefResolutionError(fromResult.failure));
+        }
+        fromOverrideHash = fromResult.value.hash;
+      }
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -612,6 +617,9 @@ async function executeMigrationStatusCommand(
     }
     if (activeRefName) {
       details.push({ label: 'ref', value: activeRefName });
+    }
+    if (options.from) {
+      details.push({ label: 'from', value: options.from });
     }
     if (activeRefEntry && activeRefEntry.invariants.length > 0) {
       details.push({
@@ -696,8 +704,8 @@ async function executeMigrationStatusCommand(
         severity: 'warn',
         message: 'There are multiple valid migration paths — you must select a target',
         hints: [
-          "Use '--ref <name>' to select a target",
-          "Or 'prisma-next migration ref set <name> <hash>' to create one",
+          "Use '--to <contract>' to select a target",
+          "Or 'prisma-next ref set <name> <hash>' to create one",
         ],
       });
     }
@@ -751,6 +759,12 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  if (fromOverrideHash !== undefined) {
+    markerHash = fromOverrideHash;
+    mode = 'offline';
+    allMarkers = null;
+  }
+
   // Build the aggregate enumeration of contract spaces. Lossy on
   // failure (extensions are simply omitted) so the existing
   // single-space app pipeline below still runs even if extensions
@@ -760,7 +774,7 @@ async function executeMigrationStatusCommand(
   let aggregateSpaces: readonly MigrationStatusSpaceEntry[] = [];
   if (contractRawForAggregate !== null) {
     // The aggregate loader needs a typed-Contract producer. Build a
-    // real control stack so `validateContract` runs against a fully
+    // real control stack so `deserializeContract` runs against a fully
     // composed family instance — descriptors that read stack members
     // during construction (e.g. codec lookups) get a consistent view.
     const stack = createControlStack(config);
@@ -771,7 +785,7 @@ async function executeMigrationStatusCommand(
         migrationsDir,
         appContractRaw: contractRawForAggregate,
         extensionPacks: config.extensionPacks ?? [],
-        validateContract: (json: unknown) => familyInstance.validateContract(json),
+        deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
         markersBySpace: allMarkers,
       });
     } catch {
@@ -863,7 +877,7 @@ async function executeMigrationStatusCommand(
       code: 'MIGRATION.NO_MARKER',
       severity: 'warn',
       message: 'Database has not been initialized — no migration marker found',
-      hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+      hints: ["Run 'prisma-next migrate' to apply pending migrations"],
     });
   }
 
@@ -923,7 +937,7 @@ async function executeMigrationStatusCommand(
   let missingInvariants: readonly string[] | undefined;
   let effectiveRequired = new Set<string>();
   if (mode === 'online') {
-    // Mirrors `migration-apply.ts`: compute `effectiveRequired = required −
+    // Mirrors `migrate.ts`: compute `effectiveRequired = required −
     // marker.invariants` directly, then derive the display fields from it.
     // `appliedInvariants` is the intersection (`required ∩ marker`), which
     // is what JSON consumers see for the active ref; the unfiltered set
@@ -945,17 +959,17 @@ async function executeMigrationStatusCommand(
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       summary = `${bundles.length} migration(s) on disk`;
-    } else if (activeRefHash && markerHash !== undefined) {
-      const distance = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
+    } else if (activeRefHash && activeRefName && markerHash !== undefined) {
+      const distance = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName);
       summary = hasInvariantWork ? `${distance} — missing invariant(s): ${missingList}` : distance;
     } else if (pendingCount === 0 && !hasInvariantWork) {
       summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
     } else if (pendingCount === 0 && hasInvariantWork) {
-      summary = `Missing invariant(s): ${missingList} — run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply`;
+      summary = `Missing invariant(s): ${missingList} — run 'prisma-next migrate --to ${activeRefName ?? '<ref>'}' to apply`;
     } else if (markerHash === undefined) {
       summary = `${pendingCount} pending migration(s) — database has no marker`;
     } else {
-      summary = `${pendingCount} pending migration(s) — run 'prisma-next migration apply' to apply`;
+      summary = `${pendingCount} pending migration(s) — run 'prisma-next migrate' to apply`;
     }
   } else {
     summary = `${entries.length} migration(s) on disk`;
@@ -997,8 +1011,7 @@ async function executeMigrationStatusCommand(
       diagnostics.push({
         code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
         severity: 'warn',
-        message:
-          'Database matches the current contract but was updated directly (not via migration apply)',
+        message: 'Database matches the current contract but was updated directly (not via migrate)',
         hints: ["Run 'prisma-next migration plan' to plan a migration to your current contract"],
       });
     } else if (pendingCount > 0) {
@@ -1006,7 +1019,7 @@ async function executeMigrationStatusCommand(
         code: 'MIGRATION.DATABASE_BEHIND',
         severity: 'info',
         message: `${pendingCount} migration(s) pending`,
-        hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+        hints: ["Run 'prisma-next migrate' to apply pending migrations"],
       });
     } else if (hasInvariantWork) {
       diagnostics.push({
@@ -1014,7 +1027,7 @@ async function executeMigrationStatusCommand(
         severity: 'info',
         message: `Missing required invariant(s): ${missingList}`,
         hints: [
-          `Run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply a path that covers the required invariants`,
+          `Run 'prisma-next migrate --to ${activeRefName ?? '<ref>'}' to apply a path that covers the required invariants`,
         ],
       });
     } else if (!routingUnreachable) {
@@ -1056,37 +1069,41 @@ export function createMigrationStatusCommand(): Command {
   const command = new Command('status');
   setCommandDescriptions(
     command,
-    'Show migration history and applied status',
-    'Displays the migration history in order. When a database connection\n' +
-      'is available, shows which migrations are applied and which are pending.\n' +
-      'Without a database connection, shows the history from disk only.',
+    'Show migration path and pending status',
+    'Shows which migrations are pending between the database marker and\n' +
+      'the target contract. Requires a database connection for live status.\n' +
+      'Use `migration graph` for topology, `migration log` for history,\n' +
+      'and `migration list` for on-disk enumeration.',
   );
   setCommandExamples(command, [
-    'prisma-next migration status',
     'prisma-next migration status --db $DATABASE_URL',
+    'prisma-next migration status --to production --db $DATABASE_URL',
+  ]);
+  setCommandSeeAlso(command, [
+    { verb: 'migration log', oneLiner: 'Show executed migration history' },
+    { verb: 'migration list', oneLiner: 'List on-disk migrations' },
+    { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
+    { verb: 'migration show', oneLiner: 'Display migration package contents' },
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs/')
-    .option('--graph', 'Show the full migration graph with all branches')
-    .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
-    .option('--all', 'Show full history (disables truncation)')
+    .option(
+      '--to <contract>',
+      'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
+    )
+    .option(
+      '--from <contract>',
+      'Origin contract reference; same grammar as --to. Supplying --from switches to offline path computation.',
+    )
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
-
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeMigrationStatusCommand(options, flags, ui);
 
       const exitCode = handleResult(result, flags, ui, (statusResult) => {
         if (flags.json) {
-          // Strip non-JSON-shape fields before emitting. These belong to
-          // the in-memory result so the human renderer can avoid
-          // recomputing them, but they would either bloat the wire format
-          // (graph, bundles, edgeStatuses) or expose internals
-          // (activeRefHash, activeRefName, diverged) that consumers should
-          // read off `pathDecision` / `refs` instead.
           const {
             graph: _graph,
             bundles: _bundles,
@@ -1101,7 +1118,6 @@ export function createMigrationStatusCommand(): Command {
           const colorize = flags.color !== false;
 
           if (statusResult.graph) {
-            const limit = determineLimit(options);
             const renderInput = migrationGraphToRenderInput({
               graph: statusResult.graph,
               mode: statusResult.mode,
@@ -1113,16 +1129,13 @@ export function createMigrationStatusCommand(): Command {
               edgeStatuses: statusResult.edgeStatuses,
             });
 
-            const graphToRender =
-              options.graph || statusResult.diverged
-                ? renderInput.graph
-                : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
-            const dagreOptions =
-              !options.graph && isLinearGraph(graphToRender) ? { ranksep: 1 } : undefined;
+            const graphToRender = statusResult.diverged
+              ? renderInput.graph
+              : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
+            const dagreOptions = isLinearGraph(graphToRender) ? { ranksep: 1 } : undefined;
             const renderOptions = {
               ...renderInput.options,
               colorize,
-              ...ifDefined('limit', limit),
               ...ifDefined('dagreOptions', dagreOptions),
             };
             const graphOutput = graphRenderer.render(graphToRender, renderOptions);
@@ -1209,7 +1222,7 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
     if (total > 0) {
       lines.push('');
       lines.push(
-        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migration apply' to apply`,
+        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migrate' to apply`,
       );
     }
   }

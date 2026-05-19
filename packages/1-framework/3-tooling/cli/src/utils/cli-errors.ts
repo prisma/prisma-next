@@ -25,6 +25,7 @@ import {
 } from '@prisma-next/errors/control';
 import { errorRuntime } from '@prisma-next/errors/execution';
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import type { RefResolutionError } from '@prisma-next/migration-tools/ref-resolution';
 
 export {
   ERROR_CODE_DESTRUCTIVE_CHANGES,
@@ -84,4 +85,40 @@ export function mapMigrationToolsError(error: MigrationToolsError): CliStructure
     fix: error.fix,
     meta: { code: error.code, ...(error.details ?? {}) },
   });
+}
+
+/**
+ * Maps a `RefResolutionError` from the contract/migration reference
+ * resolver into a CLI structured error envelope.
+ */
+export function mapRefResolutionError(error: RefResolutionError): CliStructuredError {
+  switch (error.kind) {
+    case 'not-found':
+      return errorRuntime(`Not a known ${error.grammar} reference: "${error.input}"`, {
+        why: `No ${error.grammar} matching "${error.input}" exists in the migration graph or refs index.`,
+        fix:
+          error.grammar === 'contract'
+            ? 'Provide a valid contract hash, ref name, or migration directory name.'
+            : 'Provide a valid migration directory name or migration hash.',
+        meta: { input: error.input, grammar: error.grammar },
+      });
+    case 'ambiguous':
+      return errorRuntime(`Ambiguous ${error.grammar} reference: "${error.input}"`, {
+        why: `"${error.input}" matches multiple ${error.grammar}s: ${error.candidates.join(', ')}`,
+        fix: 'Provide a longer prefix or use the full hash to disambiguate.',
+        meta: { input: error.input, candidates: error.candidates, grammar: error.grammar },
+      });
+    case 'wrong-grammar':
+      return errorRuntime(error.message, {
+        why: error.message,
+        fix: error.fix,
+        meta: { input: error.input, expectedGrammar: error.expectedGrammar },
+      });
+    case 'invalid-format':
+      return errorRuntime(`Invalid reference format: "${error.input}"`, {
+        why: error.reason,
+        fix: 'Provide a valid contract hash, ref name, or migration directory name.',
+        meta: { input: error.input },
+      });
+  }
 }

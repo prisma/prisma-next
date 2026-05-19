@@ -13,6 +13,12 @@ function sha256(content: string): string {
 }
 
 function hashContract(section: Record<string, unknown>): string {
+  // Blind cast: the synthesised object is a hash-only stand-in
+  // — never returned to callers, never executed as a Contract.
+  // `canonicalizeContract` only walks the storage / execution /
+  // capabilities slices, all of which are populated above, so the
+  // missing precise Contract typing on the other slots is
+  // immaterial for the hash result.
   const contract = {
     targetFamily: section['targetFamily'],
     target: section['target'],
@@ -25,7 +31,7 @@ function hashContract(section: Record<string, unknown>): string {
     meta: {},
     profileHash: '',
     ...section,
-  } as Contract;
+  } as unknown as Contract;
   return canonicalizeContract(contract, {
     schemaVersion: SCHEMA_VERSION,
     serializeContract: (c) => JSON.parse(JSON.stringify(c)) as JsonObject,

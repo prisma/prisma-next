@@ -201,7 +201,7 @@ class ControlClientImpl implements ControlClient {
     // Validate contract using family instance
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -254,7 +254,7 @@ class ControlClientImpl implements ControlClient {
     // Validate contract using family instance
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -308,7 +308,7 @@ class ControlClientImpl implements ControlClient {
     // Validate contract using family instance
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -361,7 +361,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -392,7 +392,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -418,18 +418,10 @@ class ControlClientImpl implements ControlClient {
     await this.connectWithProgress(options.connection, 'dbVerify', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
-    let contract: Contract;
-    try {
-      contract = familyInstance.validateContract(options.contract);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new ContractValidationError(message, error);
-    }
-
     return executeDbVerify({
       driver,
       familyInstance,
-      contract,
+      contract: options.contract,
       migrationsDir: options.migrationsDir,
       targetId: this.options.target.targetId,
       extensionPacks: this.options.extensionPacks ?? [],
@@ -466,7 +458,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -641,10 +633,20 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      const enrichedIR = enrichContract(contractRaw as Contract, this.frameworkComponents ?? []);
+      // Blind cast: `contractRaw` is the unverified provider
+      // payload — `enrichContract` only adds capability + extension
+      // metadata onto whatever shape it receives. The structural
+      // check happens immediately afterwards via
+      // `familyInstance.deserializeContract(enrichedIR)`, which is
+      // the seam-of-record and the only thing that may surface
+      // structural errors to the caller.
+      const enrichedIR = enrichContract(
+        contractRaw as unknown as Contract,
+        this.frameworkComponents ?? [],
+      );
 
       try {
-        this.familyInstance.validateContract(enrichedIR);
+        this.familyInstance.deserializeContract(enrichedIR);
       } catch (error) {
         onProgress?.({
           action: 'emit',

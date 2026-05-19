@@ -73,7 +73,7 @@ function createEmitResult(generation: string): EmitResult {
 
 function createSuccessfulConfig(output: string) {
   const familyInstance = {
-    validateContract: vi.fn(),
+    deserializeContract: vi.fn(),
   };
 
   return {

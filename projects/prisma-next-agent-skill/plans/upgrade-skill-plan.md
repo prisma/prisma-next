@@ -1,6 +1,13 @@
 # Plan — Upgrade-skill mechanism (user + extension + pin-check)
 
-This plan implements [`upgrade-skill.spec.md`](../specs/upgrade-skill.spec.md) on the `tml-2519` branch. All work ships in a single PR. The work decomposes into five milestones; each ends in a coherent commit set and a green validation gate.
+This plan implements [`upgrade-skill.spec.md`](../specs/upgrade-skill.spec.md). The original five-milestone decomposition shipped on the `tml-2519` branch under the npm-package distribution model. The distribution-fix follow-on (this branch) moved the skill content to its current home — see the *Amendments (round 2)* block at the top of [`upgrade-skill.spec.md`](../specs/upgrade-skill.spec.md). Path references below are pre-amendment; substitute the new locations:
+
+- `packages/0-shared/upgrade-skill/` → [`skills/upgrade/prisma-next-upgrade/`](../../../skills/upgrade/prisma-next-upgrade/)
+- `packages/0-shared/extension-upgrade-skill/` (skill content) → [`skills/extension-author/prisma-next-extension-upgrade/`](../../../skills/extension-author/prisma-next-extension-upgrade/)
+- `packages/0-shared/extension-upgrade-skill/` (bin + tests) → [`packages/0-shared/extension-author-tools/`](../../../packages/0-shared/extension-author-tools/) (renamed package: `@prisma-next/extension-author-tools`)
+- The npm packages `@prisma-next/upgrade-skill` and `@prisma-next/extension-upgrade-skill` are gone — distribution is via `npx skills add prisma/prisma-next/skills/{upgrade,extension-author} --all` (unpinned).
+
+All work ships in a single PR. The work decomposes into five milestones; each ends in a coherent commit set and a green validation gate.
 
 ## Milestone identifiers
 

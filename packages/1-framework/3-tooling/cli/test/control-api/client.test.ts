@@ -66,7 +66,7 @@ function createMockComponents() {
 
   const mockFamilyInstance = {
     introspect: async () => ({ tables: [] }),
-    validateContract: (ir: unknown) => ir as Contract,
+    deserializeContract: (ir: unknown) => ir as Contract,
     readMarker: async () => null,
     verify: async (): Promise<VerifyDatabaseResult> => ({
       ok: true,
@@ -677,7 +677,7 @@ describe('ControlClient progress emission', () => {
       // Override family instance to return a marker (db update works with or without one)
       const mockFamilyInstance = {
         introspect: async () => ({ tables: {} }),
-        validateContract: (ir: unknown) => ir as Contract,
+        deserializeContract: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
         readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;
@@ -795,7 +795,7 @@ describe('ControlClient progress emission', () => {
       // Override to return null marker — db update no longer requires a marker
       const noMarkerFamilyInstance = {
         introspect: async () => ({ tables: {} }),
-        validateContract: (ir: unknown) => ir as Contract,
+        deserializeContract: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
         readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;

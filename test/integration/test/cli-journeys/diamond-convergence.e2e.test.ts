@@ -24,10 +24,10 @@ import {
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
-  runMigrationRef,
   runMigrationStatus,
+  runRef,
   setupJourney,
   swapContract,
   useDevDatabase,
@@ -64,15 +64,15 @@ withTempDir(({ createTempDir }) => {
         const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
 
         // D.02: apply init to both databases
-        const applyStaging0 = await runMigrationApply(staging);
+        const applyStaging0 = await runMigrate(staging);
         expect(applyStaging0.exitCode, 'D.02: apply init to staging').toBe(0);
-        const applyProd0 = await runMigrationApply(production);
+        const applyProd0 = await runMigrate(production);
         expect(applyProd0.exitCode, 'D.02: apply init to production').toBe(0);
 
         // D.03: set refs — staging and production both at C1
-        const refStaging = await runMigrationRef(staging, ['set', 'staging', c1Hash]);
+        const refStaging = await runRef(staging, ['set', 'staging', c1Hash]);
         expect(refStaging.exitCode, 'D.03: ref set staging=C1').toBe(0);
-        const refProd = await runMigrationRef(staging, ['set', 'production', c1Hash]);
+        const refProd = await runRef(staging, ['set', 'production', c1Hash]);
         expect(refProd.exitCode, 'D.03: ref set production=C1').toBe(0);
 
         // --- Staging branch: C1 → C2 → C3 ---
@@ -83,7 +83,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit1.exitCode, 'D.04: emit C2').toBe(0);
         const plan1 = await runMigrationPlanAndEmit(staging, ['--name', 'add-phone', '--json']);
         expect(plan1.exitCode, 'D.04: plan C1→C2').toBe(0);
-        const applyStaging1 = await runMigrationApply(staging);
+        const applyStaging1 = await runMigrate(staging);
         expect(applyStaging1.exitCode, 'D.04: apply C2 to staging').toBe(0);
 
         // D.05: swap to contract-phone-bio (C3) → emit → plan (C2→C3) → apply staging
@@ -93,11 +93,11 @@ withTempDir(({ createTempDir }) => {
         const plan2 = await runMigrationPlanAndEmit(staging, ['--name', 'add-bio', '--json']);
         expect(plan2.exitCode, 'D.05: plan C2→C3').toBe(0);
         const c3Hash = parseJsonOutput<{ to: string }>(plan2).to;
-        const applyStaging2 = await runMigrationApply(staging);
+        const applyStaging2 = await runMigrate(staging);
         expect(applyStaging2.exitCode, 'D.05: apply C3 to staging').toBe(0);
 
         // Update staging ref
-        const refStaging2 = await runMigrationRef(staging, ['set', 'staging', c3Hash]);
+        const refStaging2 = await runRef(staging, ['set', 'staging', c3Hash]);
         expect(refStaging2.exitCode, 'D.05: ref set staging=C3').toBe(0);
 
         // --- Production branch: C1 → C4 ---
@@ -117,11 +117,11 @@ withTempDir(({ createTempDir }) => {
         const c4Hash = parseJsonOutput<{ to: string }>(plan3).to;
 
         // Update production ref to C4 before applying
-        const refProd2 = await runMigrationRef(staging, ['set', 'production', c4Hash]);
+        const refProd2 = await runRef(staging, ['set', 'production', c4Hash]);
         expect(refProd2.exitCode, 'D.06: ref set production=C4').toBe(0);
 
         // Apply C1→C4 to production DB
-        const applyProd1 = await runMigrationApply(production, ['--ref', 'production', '--json']);
+        const applyProd1 = await runMigrate(production, ['--to', 'production', '--json']);
         expect(applyProd1.exitCode, 'D.06: apply C4 to production').toBe(0);
         const applyProd1Result = parseJsonOutput<{ migrationsApplied: number }>(applyProd1);
         expect(applyProd1Result.migrationsApplied, 'D.06: production applied 1').toBe(1);
@@ -157,13 +157,13 @@ withTempDir(({ createTempDir }) => {
         expect(c5HashFromProd, 'D.07: both merges target same C5').toBe(c5Hash);
 
         // Update refs to C5
-        const refStaging3 = await runMigrationRef(staging, ['set', 'staging', c5Hash]);
+        const refStaging3 = await runRef(staging, ['set', 'staging', c5Hash]);
         expect(refStaging3.exitCode, 'D.07: ref set staging=C5').toBe(0);
-        const refProd3 = await runMigrationRef(staging, ['set', 'production', c5Hash]);
+        const refProd3 = await runRef(staging, ['set', 'production', c5Hash]);
         expect(refProd3.exitCode, 'D.07: ref set production=C5').toBe(0);
 
         // D.08: apply merge to staging DB (C3→C5)
-        const applyStaging3 = await runMigrationApply(staging, ['--ref', 'staging', '--json']);
+        const applyStaging3 = await runMigrate(staging, ['--to', 'staging', '--json']);
         expect(applyStaging3.exitCode, 'D.08: apply merge to staging').toBe(0);
         const stagingResult = parseJsonOutput<{
           ok: boolean;
@@ -175,7 +175,7 @@ withTempDir(({ createTempDir }) => {
         expect(stagingResult.markerHash, 'D.08: staging marker at C5').toBe(c5Hash);
 
         // D.09: apply merge to production DB (C4→C5)
-        const applyProd2 = await runMigrationApply(production, ['--ref', 'production', '--json']);
+        const applyProd2 = await runMigrate(production, ['--to', 'production', '--json']);
         expect(applyProd2.exitCode, 'D.09: apply merge to production').toBe(0);
         const prodResult = parseJsonOutput<{
           ok: boolean;
@@ -187,7 +187,7 @@ withTempDir(({ createTempDir }) => {
         expect(prodResult.markerHash, 'D.09: production marker at C5').toBe(c5Hash);
 
         // D.10: verify status shows distinct paths for each environment
-        const statusStaging = await runMigrationStatus(staging, ['--ref', 'staging', '--json']);
+        const statusStaging = await runMigrationStatus(staging, ['--to', 'staging', '--json']);
         expect(statusStaging.exitCode, 'D.10: staging status').toBe(0);
         const stagingStatusData = parseJsonOutput<{
           migrations: readonly { status: string }[];
@@ -197,7 +197,7 @@ withTempDir(({ createTempDir }) => {
         ).length;
         expect(stagingPending, 'D.10: staging 0 pending').toBe(0);
 
-        const statusProd = await runMigrationStatus(production, ['--ref', 'production', '--json']);
+        const statusProd = await runMigrationStatus(production, ['--to', 'production', '--json']);
         expect(statusProd.exitCode, 'D.10: production status').toBe(0);
         const prodStatusData = parseJsonOutput<{
           migrations: readonly { status: string }[];

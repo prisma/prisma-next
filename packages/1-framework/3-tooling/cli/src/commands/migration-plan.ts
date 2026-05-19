@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
+  type ControlFamilyInstance,
   createControlStack,
   hasOperationPreview,
   type MigrationPlanOperation,
@@ -18,6 +19,8 @@ import {
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
@@ -28,10 +31,10 @@ import {
   errorContractValidationFailed,
   errorFileNotFound,
   errorMigrationPlanningFailed,
-  errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -58,6 +61,55 @@ interface MigrationPlanOptions extends CommonCommandOptions {
   readonly from?: string;
 }
 
+/**
+ * Load a predecessor migration's destination contract from its sibling
+ * `end-contract.json` on disk and route it through the family's
+ * `ContractSerializer` (via `deserializeContract`) so the in-memory shape
+ * is the hydrated `Contract` every other caller sees. Bypassing this
+ * seam was the root cause of TML-2536: a raw `JSON.parse(...) as Contract`
+ * here let polymorphic `storage.types` entries reach the planner without
+ * the `kind` discriminator the planner dispatches on.
+ *
+ * Throws `CliStructuredError` with:
+ *   - `errorFileNotFound` when the sibling file is missing — the user
+ *     has likely deleted or never authored the snapshot, and the
+ *     message names the file and points them at re-emitting from the
+ *     source.
+ *   - `errorContractValidationFailed` when the JSON parses but the
+ *     family deserializer rejects it (legacy untagged shape, structural
+ *     mismatch, etc.) — the message names the predecessor's path so
+ *     the operator can locate the bad snapshot.
+ */
+async function readPredecessorEndContract(
+  migrationDir: string,
+  familyInstance: ControlFamilyInstance<string, unknown>,
+): Promise<Contract> {
+  const path = join(migrationDir, 'end-contract.json');
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf-8');
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      throw errorFileNotFound(path, {
+        why: `Predecessor migration is missing its destination contract snapshot at ${path}`,
+        fix: 'Re-emit the predecessor migration (`prisma-next migration plan` from its source) so its sibling `end-contract.json` is restored, then re-run this command.',
+      });
+    }
+    throw error;
+  }
+  try {
+    return familyInstance.deserializeContract(JSON.parse(raw) as unknown);
+  } catch (error) {
+    if (CliStructuredError.is(error)) {
+      throw error;
+    }
+    throw errorContractValidationFailed(
+      `Predecessor contract at ${path} failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
+      { where: { path } },
+    );
+  }
+}
+
 export interface MigrationPlanResult {
   readonly ok: boolean;
   readonly noOp: boolean;
@@ -74,7 +126,7 @@ export interface MigrationPlanResult {
    * Surfacing these in the result (rather than only via `ui.step` log
    * lines) makes the cross-space side effect explicit to JSON consumers
    * and the success-summary renderer — the same multi-space side effect
-   * that `migration apply` will replay.
+   * that `migrate` will replay.
    */
   readonly emittedExtensionDirs: readonly { readonly spaceId: string; readonly dirName: string }[];
   readonly operations: readonly {
@@ -155,19 +207,26 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  let toContractJson: Contract;
+  // Construct the family instance up-front so on-disk reads (the app
+  // contract here + every `readPredecessorEndContract` below) cross the
+  // serializer seam at the read site, not after the planner has already
+  // started dispatching on raw shapes. See TML-2536.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
+  let toContract: Contract;
   try {
-    toContractJson = JSON.parse(contractJsonContent) as Contract;
+    toContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract at ${contractPathAbsolute} failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );
   }
 
-  const rawStorageHash = toContractJson.storage?.storageHash;
+  const rawStorageHash = toContract.storage?.storageHash;
   if (typeof rawStorageHash !== 'string') {
     return notOk(
       errorContractValidationFailed('Contract is missing storageHash', {
@@ -186,24 +245,26 @@ async function executeMigrationPlanCommand(
     const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
 
     if (options.from) {
-      const resolved = resolveBundleByPrefix(bundles, options.from);
-      if (!resolved.ok) {
-        const f = resolved.failure;
+      const refs = await readRefs(resolveMigrationPaths(options.config, config).refsDir);
+      const refResult = parseContractRef(options.from, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      fromHash = refResult.value.hash;
+      const matchingBundle = bundles.find((p) => p.metadata.to === fromHash);
+      if (!matchingBundle) {
         return notOk(
-          f.reason === 'ambiguous'
-            ? errorRuntime('Multiple matching migrations found', {
-                why: `Prefix "${options.from}" matches ${f.count} migrations in ${appMigrationsRelative}`,
-                fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration target.',
-              })
-            : errorRuntime('Starting contract not found', {
-                why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
-                fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration target.',
-              }),
+          errorUnexpected(
+            `No migration bundle found for --from "${options.from}" (resolved hash: ${fromHash})`,
+            {
+              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${fromHash}.`,
+              fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
+            },
+          ),
         );
       }
-      fromHash = resolved.value.metadata.to;
-      fromContract = resolved.value.metadata.toContract;
-      fromContractSourceDir = resolved.value.dirPath;
+      fromContractSourceDir = matchingBundle.dirPath;
+      fromContract = await readPredecessorEndContract(fromContractSourceDir, familyInstance);
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -212,14 +273,20 @@ async function executeMigrationPlanCommand(
           (p) => p.metadata.migrationHash === latestMigration.migrationHash,
         );
         if (leafPkg) {
-          fromContract = leafPkg.metadata.toContract;
           fromContractSourceDir = leafPkg.dirPath;
+          fromContract = await readPredecessorEndContract(fromContractSourceDir, familyInstance);
         }
       }
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
+    }
+    // `readPredecessorEndContract` raises a `CliStructuredError` directly
+    // for the missing-snapshot case so the operator gets a precise
+    // why/fix; pass it through unchanged rather than re-wrapping.
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
     }
     // Wrap unexpected (non-MigrationToolsError) failures from the migration
     // load phase in a structured CLI envelope. Letting them throw would
@@ -286,26 +353,16 @@ async function executeMigrationPlanCommand(
   // Phase 2 — load: build the aggregate against the now-consistent disk
   // state that phase 1 just seeded. The seed phase guarantees every
   // declared extension has its head ref pinned, so the loader's
-  // declaredButUnmigrated precheck always passes here.
-  const stack = createControlStack(config);
-  const familyInstance = config.family.create(stack);
-  let validatedAppContract: Contract;
-  try {
-    validatedAppContract = familyInstance.validateContract(toContractJson);
-  } catch (error) {
-    return notOk(
-      errorContractValidationFailed(
-        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
-        { where: { path: contractPathAbsolute } },
-      ),
-    );
-  }
+  // declaredButUnmigrated precheck always passes here. The app contract
+  // was already routed through `familyInstance.deserializeContract` at the
+  // read site above (see TML-2536), so it's the hydrated `Contract`
+  // here — no second validation pass needed.
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,
-    appContract: validatedAppContract,
+    appContract: toContract,
     extensionPacks: config.extensionPacks ?? [],
-    validateContract: (json: unknown) => familyInstance.validateContract(json),
+    deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
   });
   if (!aggregateResult.ok) {
     return notOk(aggregateResult.failure);
@@ -327,8 +384,6 @@ async function executeMigrationPlanCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
     from: fromHash,
     to: toStorageHash,
-    fromContract,
-    toContract: toContractJson,
     hints: {
       used: [],
       applied: [],
@@ -491,7 +546,10 @@ export function createMigrationPlanCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
-    .option('--from <hash>', 'Explicit starting contract hash (overrides latest migration target)')
+    .option(
+      '--from <contract>',
+      'Starting contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
+    )
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
@@ -557,7 +615,7 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
     }
     lines.push('');
     lines.push(
-      `Next: review the extension migrations above, then run ${green_('prisma-next migration apply')}.`,
+      `Next: review the extension migrations above, then run ${green_('prisma-next migrate')}.`,
     );
   }
 
@@ -628,11 +686,11 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
 
   lines.push('');
   // The "Next:" hint always points at the canonical apply path
-  // (`prisma-next migration apply`) regardless of how many spaces
-  // were materialised — `db update` is a dev-time convenience, not
-  // the canonical replay step.
+  // (`prisma-next migrate`) regardless of how many spaces were
+  // materialised — `db update` is a dev-time convenience, not the
+  // canonical replay step.
   lines.push(
-    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
+    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migrate')}.`,
   );
 
   if (result.preview && result.preview.statements.length > 0) {

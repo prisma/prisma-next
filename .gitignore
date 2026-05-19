@@ -22,6 +22,17 @@ packages/e2e-tests/.tmp-output
 .claude/worktrees
 CLAUDE.local.md
 
+# Local install target for contributor agent skills.
+# Canonical source of truth lives in `skills-contrib/` (tracked).
+# `pnpm install` populates this directory via `setup:contrib-skills`.
+.agents/skills/
+.claude/skills/
+
+# Per-machine install lockfile written by `skills add`. Local only;
+# our canonical source is `skills-contrib/` (for contributors) and the
+# git-pinned tag (for external consumers via `prisma-next init`).
+skills-lock.json
+
 # Review artifacts (transient, local-only)
 **/specs/reviews/
 **/reviews/system-design-review.md
@@ -39,3 +50,11 @@ test/**/fixtures/generated/
 !test/e2e/framework/test/sqlite/fixtures/generated/**
 !test/integration/test/mongo/fixtures/generated/
 !test/integration/test/mongo/fixtures/generated/**
+
+.agents/
+.claude/
+.devin/
+.windsurf/
+
+# Reference clones inside transient projects (browsing aids, not committed)
+projects/*/reference/

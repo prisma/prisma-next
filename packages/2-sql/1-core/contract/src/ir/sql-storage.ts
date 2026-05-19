@@ -6,7 +6,10 @@ import {
   type Storage,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { PostgresEnumStorageEntry } from './postgres-enum-storage-entry';
+import {
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
+} from './postgres-enum-storage-entry';
 import { SqlNode } from './sql-node';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
@@ -14,7 +17,6 @@ import {
   isStorageTypeInstance,
   type StorageTypeInstance,
   type StorageTypeInstanceInput,
-  toStorageTypeInstance,
 } from './storage-type-instance';
 
 /**
@@ -159,7 +161,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(
-          Object.entries(input.types).map(([name, ti]) => [name, normaliseTypeEntry(ti)]),
+          Object.entries(input.types).map(([name, ti]) => [name, normaliseTypeEntry(name, ti)]),
         ),
       );
     }
@@ -167,9 +169,48 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   }
 }
 
-function normaliseTypeEntry(entry: SqlStorageTypeEntry): StorageTypeInstance {
+/**
+ * Strict polymorphic-slot dispatch for `SqlStorage.types` entries.
+ * Every entry must carry a recognised `kind` discriminator — either
+ * `'codec-instance'` (codec triple, family-shared) or
+ * `'postgres-enum'` (target-specific IR class). Untagged or
+ * unrecognised inputs throw a diagnostic naming the entry and its
+ * `kind`, so format drift surfaces loudly at the deserializer
+ * boundary instead of slipping past the seam and corrupting
+ * downstream IR walks.
+ *
+ * Codec-triple authors that have an untagged shape on hand can call
+ * `toStorageTypeInstance(...)` (which stamps the `'codec-instance'`
+ * discriminator) before constructing `SqlStorage`. On-disk reads
+ * cross `familyInstance.deserializeContract` first; the structural
+ * arktype schema rejects untagged entries earlier, so this throw
+ * only fires for in-memory authoring bugs.
+ */
+function normaliseTypeEntry(
+  name: string,
+  entry: SqlStorageTypeEntry,
+): StorageTypeInstance | PostgresEnumStorageEntry {
+  if (isPostgresEnumStorageEntry(entry)) {
+    // Live class instances pass through unchanged; raw JSON envelopes
+    // (e.g. `kind: 'postgres-enum'` without the class identity) are
+    // rejected so the target serializer's hydration path is the only
+    // way IR class instances enter the slot.
+    if (entry instanceof SqlNode) {
+      return entry;
+    }
+    throw new Error(
+      `Encountered raw postgres-enum JSON in storage.types[${JSON.stringify(name)}] without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.`,
+    );
+  }
   if (isStorageTypeInstance(entry)) {
     return entry;
   }
-  return toStorageTypeInstance(entry as StorageTypeInstanceInput);
+  const rawKind = (entry as { kind?: unknown }).kind;
+  const kindDescription =
+    rawKind === undefined
+      ? 'missing `kind` discriminator'
+      : `unrecognised \`kind\` discriminator ${JSON.stringify(rawKind)}`;
+  throw new Error(
+    `storage.types[${JSON.stringify(name)}] has ${kindDescription}; expected ${JSON.stringify('codec-instance')} or ${JSON.stringify('postgres-enum')}. Untagged codec triples should be wrapped with toStorageTypeInstance(...) before construction.`,
+  );
 }

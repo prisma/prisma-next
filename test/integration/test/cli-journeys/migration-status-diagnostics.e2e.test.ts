@@ -21,10 +21,10 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbUpdate,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
-  runMigrationRef,
   runMigrationStatus,
+  runRef,
   setupJourney,
   swapContract,
   timeouts,
@@ -102,7 +102,7 @@ withTempDir(({ createTempDir }) => {
      *
      * This happens when a developer clones a repo with existing migrations
      * and connects to a fresh database. The key signal is the missing
-     * marker — the user needs to run `migration apply` to bring the DB
+     * marker — the user needs to run `migrate` to bring the DB
      * up to date.
      */
     describe('fresh DB, migrations exist — MIGRATION.NO_MARKER', () => {
@@ -126,7 +126,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('Database has not been initialized');
-          expect(out).toContain('migration apply');
+          expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
       );
@@ -153,7 +153,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit.exitCode, 'emit').toBe(0);
           const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
-          const apply = await runMigrationApply(ctx);
+          const apply = await runMigrate(ctx);
           expect(apply.exitCode, 'apply').toBe(0);
 
           const status = await runMigrationStatus(ctx);
@@ -173,7 +173,7 @@ withTempDir(({ createTempDir }) => {
      * This is the standard deployment scenario: a new migration was planned
      * (e.g. by a teammate) but hasn't been applied to this database. The
      * user needs to know how many migrations are pending and be told to
-     * run `migration apply`.
+     * run `migrate`.
      */
     describe('some pending — DATABASE_BEHIND', () => {
       const db = useDevDatabase();
@@ -190,7 +190,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit base').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan init').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           swapContract(ctx, 'contract-additive');
@@ -204,7 +204,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toMatch(/1 pending migration/);
-          expect(out).toContain('migration apply');
+          expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
       );
@@ -234,7 +234,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
 
           swapContract(ctx, 'contract-additive');
@@ -277,7 +277,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
 
           swapContract(ctx, 'contract-additive');
@@ -325,7 +325,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
 
           // Push marker off-graph via db update to contract-additive
@@ -378,7 +378,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit.exitCode, 'emit').toBe(0);
           const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
-          const apply = await runMigrationApply(ctx);
+          const apply = await runMigrate(ctx);
           expect(apply.exitCode, 'apply').toBe(0);
 
           const status = await runMigrationStatus(ctx, ['--json']);
@@ -433,7 +433,7 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           swapContract(ctx, 'contract-phone');
@@ -469,7 +469,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('multiple valid migration paths');
-          expect(out).toContain('--ref');
+          expect(out).toContain('--to');
         },
         timeouts.spinUpPpgDev,
       );
@@ -502,7 +502,7 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           // Branch A: plan + apply
@@ -516,7 +516,7 @@ withTempDir(({ createTempDir }) => {
             baseHash,
           ]);
           expect(planA.exitCode, 'plan A').toBe(0);
-          const applyA = await runMigrationApply(ctx);
+          const applyA = await runMigrate(ctx);
           expect(applyA.exitCode, 'apply A').toBe(0);
 
           // Branch B: plan (don't apply) + set ref to B's target
@@ -533,10 +533,10 @@ withTempDir(({ createTempDir }) => {
           expect(planB.exitCode, 'plan B').toBe(0);
           const hashB = parseJsonOutput<{ to: string }>(planB).to;
 
-          const setRef = await runMigrationRef(ctx, ['set', 'production', hashB]);
+          const setRef = await runRef(ctx, ['set', 'production', hashB]);
           expect(setRef.exitCode, 'ref set').toBe(0);
 
-          const status = await runMigrationStatus(ctx, ['--ref', 'production']);
+          const status = await runMigrationStatus(ctx, ['--to', 'production']);
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
@@ -572,7 +572,7 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           swapContract(ctx, 'contract-phone');
@@ -599,15 +599,50 @@ withTempDir(({ createTempDir }) => {
           ]);
           expect(planB.exitCode, 'plan B').toBe(0);
 
-          const setRef = await runMigrationRef(ctx, ['set', 'production', hashA]);
+          const setRef = await runRef(ctx, ['set', 'production', hashA]);
           expect(setRef.exitCode, 'ref set').toBe(0);
 
-          const status = await runMigrationStatus(ctx, ['--ref', 'production']);
+          const status = await runMigrationStatus(ctx, ['--to', 'production']);
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
           expect(out).not.toContain('multiple valid migration paths');
           expect(out).toContain('1 migration(s) behind ref "production"');
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+
+    describe('--from constrains the path origin', () => {
+      const db = useDevDatabase();
+
+      it(
+        'emit → plan twice → status --from <hash> computes path from that contract',
+        async () => {
+          const ctx: JourneyContext = setupJourney({
+            connectionString: db.connectionString,
+            createTempDir,
+          });
+
+          const emit0 = await runContractEmit(ctx);
+          expect(emit0.exitCode, 'emit0').toBe(0);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
+          expect(plan0.exitCode, 'plan0').toBe(0);
+
+          await swapContract(ctx, 'contract-additive');
+          const emit1 = await runContractEmit(ctx);
+          expect(emit1.exitCode, 'emit1').toBe(0);
+          const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'additive']);
+          expect(plan1.exitCode, 'plan1').toBe(0);
+
+          const hashA = parseJsonOutput(plan0)?.['to'] as string;
+          expect(hashA, 'plan0 must produce a target hash').toBeTruthy();
+
+          const status = await runMigrationStatus(ctx, ['--from', hashA, '--json']);
+          expect(status.exitCode).toBe(0);
+          const json = parseJsonOutput(status);
+          const migrations = json?.['migrations'] as readonly unknown[];
+          expect(migrations.length).toBeGreaterThan(0);
         },
         timeouts.spinUpPpgDev,
       );

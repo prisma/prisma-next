@@ -111,27 +111,6 @@ export function errorInvalidOperationEntry(index: number, reason: string): Migra
   );
 }
 
-export function errorStaleContractBookends(args: {
-  readonly side: 'from' | 'to';
-  readonly metaHash: string | null;
-  readonly contractHash: string;
-}): MigrationToolsError {
-  const { side, metaHash, contractHash } = args;
-  // `meta.from` is `string | null` (null = baseline). Render `null` as a
-  // human-readable token in the diagnostic so the message stays clear when
-  // the mismatch is a baseline-vs-non-baseline disagreement.
-  const renderedMetaHash = metaHash === null ? 'null (baseline)' : `"${metaHash}"`;
-  return new MigrationToolsError(
-    'MIGRATION.STALE_CONTRACT_BOOKENDS',
-    'Migration manifest contract bookends disagree with describe()',
-    {
-      why: `migration.json stores ${side}Contract.storage.storageHash "${contractHash}", but describe() returned meta.${side} = ${renderedMetaHash}. The bookend is stale — most likely the migration's describe() was edited after the package was scaffolded by \`migration plan\`.`,
-      fix: 'Re-run `migration plan` to regenerate the package with fresh contract bookends, or restore the directory from version control.',
-      details: { side, metaHash, contractHash },
-    },
-  );
-}
-
 export function errorInvalidSlug(slug: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_NAME', 'Invalid migration name', {
     why: `The slug "${slug}" contains no valid characters after sanitization (only a-z, 0-9 are kept).`,
@@ -220,7 +199,7 @@ export function errorAmbiguousTarget(
     : '';
   return new MigrationToolsError('MIGRATION.AMBIGUOUS_TARGET', 'Ambiguous migration target', {
     why: `The migration history has diverged into multiple branches: ${branchTips.join(', ')}. This typically happens when two developers plan migrations from the same starting point.${divergenceInfo}`,
-    fix: 'Use `migration ref set <name> <hash>` to target a specific branch, delete one of the conflicting migration directories and re-run `migration plan`, or use --from <hash> to explicitly select a starting point.',
+    fix: 'Use `ref set <name> <hash>` to target a specific branch, delete one of the conflicting migration directories and re-run `migration plan`, or use --from <hash> to explicitly select a starting point.',
     details: {
       branchTips,
       ...(context ? { divergencePoint: context.divergencePoint, branches: context.branches } : {}),

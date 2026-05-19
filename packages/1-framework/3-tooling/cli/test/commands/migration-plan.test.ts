@@ -1,7 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -15,7 +14,6 @@ import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/migrati
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
-import { sqlTestStorageWithTables } from '../sql-storage-fixture';
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {
@@ -73,16 +71,6 @@ describe('migration plan — core flow', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const toContract = createSqlContract({
-      storage: sqlTestStorageWithTables({
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          },
-        },
-      }),
-    });
-
     const ops: MigrationPlanOperation[] = [createTableOp('user')];
 
     const dirName = formatMigrationDirName(new Date(), 'initial');
@@ -93,8 +81,6 @@ describe('migration plan — core flow', () => {
       {
         from: null,
         to: 'sha256:test-hash',
-        fromContract: null,
-        toContract,
         hints: {
           used: [],
           applied: ['additive_only'],
@@ -112,7 +98,6 @@ describe('migration plan — core flow', () => {
     expect(pkg.metadata.from).toBeNull();
     expect(pkg.metadata.to).toBe('sha256:test-hash');
     expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
-    expect(pkg.metadata.fromContract).toBeNull();
     expect(pkg.ops).toHaveLength(1);
     expect(pkg.ops[0]!.id).toBe('table.user');
   });
@@ -122,7 +107,6 @@ describe('migration plan — core flow', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createContract();
     const dirName = formatMigrationDirName(new Date(), 'first');
     const packageDir = join(migrationsDir, dirName);
     await writeTestPackage(
@@ -130,8 +114,6 @@ describe('migration plan — core flow', () => {
       {
         from: null,
         to: 'sha256:same-hash',
-        fromContract: null,
-        toContract: contract,
         hints: {
           used: [],
           applied: ['additive_only'],
@@ -163,24 +145,6 @@ describe('migration plan — core flow', () => {
       const migrationsDir = join(tempDir, 'migrations');
       await mkdir(migrationsDir, { recursive: true });
 
-      const contractA = createSqlContract({
-        storage: sqlTestStorageWithTables({
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        }),
-      });
-      const contractB = createSqlContract({
-        storage: sqlTestStorageWithTables({
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        }),
-      });
-
       // First migration: empty -> A
       const dir1 = formatMigrationDirName(new Date(2026, 0, 1, 10, 0), 'add_user');
       const path1 = join(migrationsDir, dir1);
@@ -190,8 +154,6 @@ describe('migration plan — core flow', () => {
         {
           from: null,
           to: 'sha256:hash-a',
-          fromContract: null,
-          toContract: contractA,
           hints: {
             used: [],
             applied: ['additive_only'],
@@ -213,8 +175,6 @@ describe('migration plan — core flow', () => {
         {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
-          fromContract: contractA,
-          toContract: contractB,
           hints: {
             used: [],
             applied: ['additive_only'],
@@ -271,8 +231,6 @@ describe('--from hash lookup', () => {
       {
         from: null,
         to: 'sha256:known-hash',
-        fromContract: null,
-        toContract: createContract(),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
         providedInvariants: [],
@@ -291,7 +249,6 @@ describe('--from hash lookup', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createContract();
     const dirName = formatMigrationDirName(new Date(), 'test');
     const packageDir = join(migrationsDir, dirName);
     await writeTestPackage(
@@ -299,8 +256,6 @@ describe('--from hash lookup', () => {
       {
         from: null,
         to: 'sha256:abcdef1234567890',
-        fromContract: null,
-        toContract: contract,
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
         providedInvariants: [],
@@ -322,7 +277,6 @@ describe('--from hash lookup', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contract = createContract();
     const dirName = formatMigrationDirName(new Date(), 'test');
     const packageDir = join(migrationsDir, dirName);
     await writeTestPackage(
@@ -330,8 +284,6 @@ describe('--from hash lookup', () => {
       {
         from: null,
         to: 'sha256:abcdef1234567890',
-        fromContract: null,
-        toContract: contract,
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
         providedInvariants: [],
@@ -355,9 +307,6 @@ describe('--from hash lookup', () => {
       const migrationsDir = join(tempDir, 'migrations');
       await mkdir(migrationsDir, { recursive: true });
 
-      const contractA = createContract();
-      const contractB = createContract();
-
       // Two migrations whose `to` hashes share a prefix
       const dir1 = formatMigrationDirName(new Date(2026, 0, 1), 'first');
       await writeTestPackage(
@@ -365,8 +314,6 @@ describe('--from hash lookup', () => {
         {
           from: null,
           to: 'sha256:abc111',
-          fromContract: null,
-          toContract: contractA,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],
@@ -381,8 +328,6 @@ describe('--from hash lookup', () => {
         {
           from: 'sha256:abc111',
           to: 'sha256:abc222',
-          fromContract: contractA,
-          toContract: contractB,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           providedInvariants: [],

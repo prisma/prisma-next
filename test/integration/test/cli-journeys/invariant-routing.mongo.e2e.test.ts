@@ -25,7 +25,7 @@ import { rm } from 'node:fs/promises';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
-import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
+import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
@@ -126,7 +126,7 @@ async function migrationNew(ctx: JourneyCtx, args: readonly string[] = []): Prom
 }
 
 async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
-  return runCli(createMigrationApplyCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+  return runCli(createMigrateCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
 }
 
 async function migrationStatus(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
@@ -423,7 +423,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     writeRefFile(ctx, 'prod', c2Hash, [INVARIANT_ID]);
 
     // Mongo-O.07: apply --ref prod — routes through the invariant edge.
-    const applyRef = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    const applyRef = await migrationApply(ctx, ['--to', 'prod', '--json']);
     expect(
       applyRef.exitCode,
       `Mongo-O.07: apply --ref prod: ${applyRef.stdout}\n${applyRef.stderr}`,
@@ -465,7 +465,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
 
     // Mongo-O.09: status --ref prod surfaces the three invariant sets and
     // proves the marker doc accumulated the invariant via $setUnion.
-    const statusRef = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
+    const statusRef = await migrationStatus(ctx, ['--to', 'prod', '--json']);
     expect(statusRef.exitCode, 'Mongo-O.09: status --ref prod').toBe(0);
     const statusResult = parseJsonOutput<{
       requiredInvariants?: readonly string[];
@@ -482,7 +482,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     // Mongo-O.10: re-apply is a noop. The CLI's marker subtraction empties
     // the required set; the Mongo runner additionally short-circuits via
     // its own `incomingIsSubsetOfExisting` guard.
-    const reapply = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    const reapply = await migrationApply(ctx, ['--to', 'prod', '--json']);
     expect(reapply.exitCode, 'Mongo-O.10: re-apply').toBe(0);
     const reapplyResult = parseJsonOutput<{
       ok: boolean;
@@ -533,7 +533,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     writeRefFile(ctx, 'prod', c2Hash, ['typo-no-migration-declares-this']);
 
     // Mongo-P.04: apply fails with UNKNOWN_INVARIANT.
-    const applyFail = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    const applyFail = await migrationApply(ctx, ['--to', 'prod', '--json']);
     expect(applyFail.exitCode, 'Mongo-P.04: apply exits 1').toBe(1);
     const applyEnvelope = parseJsonOutput<{
       meta?: { code?: string; unknown?: readonly string[]; declared?: readonly string[] };
@@ -552,7 +552,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
 
     // Mongo-P.06: status --ref also fatal (parity with apply).
-    const statusFail = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
+    const statusFail = await migrationStatus(ctx, ['--to', 'prod', '--json']);
     expect(statusFail.exitCode, 'Mongo-P.06: status exits 1').toBe(1);
     const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
     expect(statusEnvelope.meta?.code, 'Mongo-P.06: status error code').toBe(
@@ -640,7 +640,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     writeRefFile(ctx, 'prod', cbHash, [INVARIANT_ID]);
 
     // Mongo-Q.05: apply --ref prod fails with NO_INVARIANT_PATH.
-    const applyFail = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    const applyFail = await migrationApply(ctx, ['--to', 'prod', '--json']);
     expect(applyFail.exitCode, 'Mongo-Q.05: apply exits 1').toBe(1);
     const envelope = parseJsonOutput<{
       meta?: {

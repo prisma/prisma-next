@@ -316,9 +316,10 @@ export interface SqlMigrationPlannerPlanOptions {
    * or `null` for reconciliation flows that have no prior contract.
    *
    * Required at every call site so the structural fact "I have a prior
-   * contract / I don't" is visible in the type. `migration plan` supplies
-   * the previous bundle's `metadata.toContract`; `db update` / `db init`
-   * reconcile against the live schema and pass `null`. Strategies that
+   * contract / I don't" is visible in the type. `migration plan` reads
+   * the predecessor bundle's `end-contract.json` from disk and passes
+   * the parsed value; `db update` / `db init` reconcile against the
+   * live schema and pass `null`. Strategies that
    * need from/to column-shape comparisons (unsafe type change, nullability
    * tightening) use this to decide whether to emit `dataTransform`
    * placeholders; they short-circuit when it is `null`.
@@ -476,7 +477,7 @@ export interface SqlControlTargetDescriptor<
    * JSON ⇄ class boundary for the SQL target's contract. The descriptor
    * composes a concrete `SqlContractSerializerBase` subclass; the rest
    * of the control stack reaches `descriptor.contractSerializer` rather
-   * than importing a per-target `validateContract` function.
+   * than importing a per-target deserialization function.
    */
   readonly contractSerializer: ContractSerializer<TContract>;
   /**

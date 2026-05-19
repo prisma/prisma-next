@@ -20,7 +20,7 @@ const SYNTHETIC_AST: PslDocumentAst = {
 
 const baseInstance: ControlFamilyInstance<'sql', unknown> = {
   familyId: 'sql',
-  validateContract: (raw: unknown) => raw as never,
+  deserializeContract: (raw: unknown) => raw as never,
   introspect: async () => ({}) as unknown,
 } as unknown as ControlFamilyInstance<'sql', unknown>;
 

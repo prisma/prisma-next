@@ -36,7 +36,7 @@ export interface CodecCallContext {
 /**
  * Codec-id-keyed read surface threaded into emit and authoring paths.
  *
- * - `get(id)` returns the runtime {@link Codec} instance for the codec id (used by `validateContract` for `decodeJson` of literal column defaults).
+ * - `get(id)` returns the runtime {@link Codec} instance for the codec id (used by `family.deserializeContract` for `decodeJson` of literal column defaults).
  * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes` metadata the runtime instance no longer carries (TML-2357). Returns the same array `CodecDescriptor.targetTypes` would; for Mongo (whose registration doesn't yet resolve through the unified descriptor map — TML-2324) the family-side assembly populates this directly from the contributor's codec metadata.
  * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side `db.sql.postgres.nativeType`) the runtime instance no longer carries.
  * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed `renderOutputType` renderer the runtime instance no longer carries. Returns `undefined` when the codec doesn't render a custom type or when the codec id is unknown.

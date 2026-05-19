@@ -19,7 +19,7 @@ function createMockFamilyInstance() {
     familyId: 'sql',
     readAllMarkers: async () => new Map(),
     introspect: async () => ({ tables: {} }),
-    validateContract: (ir: unknown) => ir as Contract,
+    deserializeContract: (ir: unknown) => ir as Contract,
     toOperationPreview: () => ({ statements: [] }),
   } as unknown as ControlFamilyInstance<'sql', unknown>;
 }
@@ -73,9 +73,7 @@ describe('executeDbInit', () => {
     expect(planFn).toHaveBeenCalledWith(
       expect.objectContaining({
         // `db init` reconciles against the live introspected schema and has
-        // no prior contract; the required `fromContract: null` is the
         // structural representation of "no origin contract" (AC-5).
-        fromContract: null,
       }),
     );
   });

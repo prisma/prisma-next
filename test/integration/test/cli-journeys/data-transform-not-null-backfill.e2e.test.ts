@@ -23,7 +23,7 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationEmit,
   runMigrationPlan,
   runMigrationPlanAndEmit,
@@ -52,7 +52,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, `emit base: ${emit0.stderr}`).toBe(0);
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, `plan initial: ${plan0.stderr}`).toBe(0);
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, `apply initial: ${apply0.stderr}`).toBe(0);
 
         await sql(
@@ -143,7 +143,7 @@ withTempDir(({ createTempDir }) => {
         );
         expect(manifestAfter.migrationHash).toMatch(/^sha256:/);
 
-        const apply1 = await runMigrationApply(ctx);
+        const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, `apply: ${apply1.stdout}\n${apply1.stderr}`).toBe(0);
 
         const result = await sql(
@@ -170,7 +170,7 @@ withTempDir(({ createTempDir }) => {
         // were backfilled by the first apply). Pins both the
         // runner's marker-CAS ledger advance and the data-transform
         // check-driven skip path (spec AC4.2 idempotency half).
-        const reapply = await runMigrationApply(ctx);
+        const reapply = await runMigrate(ctx);
         expect(reapply.exitCode, `reapply: ${reapply.stdout}\n${reapply.stderr}`).toBe(0);
         expect(reapply.stdout).toContain('Already up to date');
       },

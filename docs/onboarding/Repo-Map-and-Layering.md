@@ -10,7 +10,7 @@ Planes (`migration` / `runtime` / `shared`) cut across the directory hierarchy a
 
 Target packages (`@prisma-next/target-*`) split their `src/core/` along this boundary:
 
-- `src/core/migrations/**` — migration plane. Planner, emitter, operation factories, resolver, TS rendering. Executed at `node migration.ts` time and at `migration plan` / `migration apply`.
+- `src/core/migrations/**` — migration plane. Planner, emitter, operation factories, resolver, TS rendering. Executed at `node migration.ts` time and at `migration plan` / `migrate`.
 - `src/core/**` (everything else) — shared plane. Files used from both migration and runtime entrypoints (`authoring.ts`, `descriptor-meta.ts`, `types.ts`, …).
 - `src/exports/control.ts` — migration-plane export.
 - `src/exports/runtime.ts` — runtime-plane export.

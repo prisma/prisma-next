@@ -1,0 +1,237 @@
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
+import type { RefEntry } from '@prisma-next/migration-tools/refs';
+import {
+  deleteRef,
+  readRefs,
+  validateRefName,
+  validateRefValue,
+  writeRef,
+} from '@prisma-next/migration-tools/refs';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { Command } from 'commander';
+import { loadConfig } from '../config-loader';
+import {
+  CliStructuredError,
+  errorRuntime,
+  errorUnexpected,
+  mapMigrationToolsError,
+  mapRefResolutionError,
+} from '../utils/cli-errors';
+import {
+  addGlobalOptions,
+  loadMigrationPackages,
+  resolveMigrationPaths,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
+import { formatCommandHelp } from '../utils/formatters/help';
+import { parseGlobalFlags } from '../utils/global-flags';
+import { handleResult } from '../utils/result-handler';
+import { TerminalUI } from '../utils/terminal-ui';
+
+interface RefSetResult {
+  readonly ok: true;
+  readonly ref: string;
+  readonly hash: string;
+  readonly invariants: readonly string[];
+}
+
+interface RefDeleteResult {
+  readonly ok: true;
+  readonly ref: string;
+  readonly deleted: true;
+}
+
+interface RefListResult {
+  readonly ok: true;
+  readonly refs: Record<string, RefEntry>;
+}
+
+function mapError(error: unknown): CliStructuredError {
+  if (MigrationToolsError.is(error)) {
+    return mapMigrationToolsError(error);
+  }
+  return errorUnexpected(error instanceof Error ? error.message : String(error));
+}
+
+function cliErrorInvalidRefName(name: string): CliStructuredError {
+  return errorRuntime(`Invalid ref name "${name}"`, {
+    why: `Ref name "${name}" does not match the required format`,
+    fix: 'Ref names must be lowercase alphanumeric with hyphens or forward slashes, no `.` or `..` segments',
+  });
+}
+
+export async function executeRefSetCommand(
+  name: string,
+  contractInput: string,
+  options: { config?: string },
+): Promise<Result<RefSetResult, CliStructuredError>> {
+  if (!validateRefName(name)) {
+    return notOk(cliErrorInvalidRefName(name));
+  }
+
+  try {
+    const config = await loadConfig(options.config);
+    const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
+
+    let resolvedHash: string;
+    if (validateRefValue(contractInput)) {
+      resolvedHash = contractInput;
+    } else {
+      const { graph } = await loadMigrationPackages(appMigrationsDir);
+      const refs = await readRefs(refsDir);
+      const refResult = parseContractRef(contractInput, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      resolvedHash = refResult.value.hash;
+    }
+
+    const entry: RefEntry = { hash: resolvedHash, invariants: [] };
+    await writeRef(refsDir, name, entry);
+    return ok({ ok: true as const, ref: name, hash: resolvedHash, invariants: [] });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
+}
+
+export async function executeRefDeleteCommand(
+  name: string,
+  options: { config?: string },
+): Promise<Result<RefDeleteResult, CliStructuredError>> {
+  try {
+    const config = await loadConfig(options.config);
+    const { refsDir } = resolveMigrationPaths(options.config, config);
+    await deleteRef(refsDir, name);
+    return ok({ ok: true as const, ref: name, deleted: true as const });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
+}
+
+export async function executeRefListCommand(options: {
+  config?: string;
+}): Promise<Result<RefListResult, CliStructuredError>> {
+  try {
+    const config = await loadConfig(options.config);
+    const { refsDir } = resolveMigrationPaths(options.config, config);
+    const refs = await readRefs(refsDir);
+    return ok({ ok: true as const, refs });
+  } catch (error) {
+    if (error instanceof CliStructuredError) return notOk(error);
+    return notOk(mapError(error));
+  }
+}
+
+function createRefSetCommand(): Command {
+  const command = new Command('set');
+  setCommandDescriptions(
+    command,
+    'Set a ref to a contract reference',
+    'Sets a named ref to point to a resolved contract reference (hash, alias, or path) in migrations/refs/.',
+  );
+  addGlobalOptions(command)
+    .argument('<name>', 'Ref name (e.g., staging, production)')
+    .argument(
+      '<contract>',
+      'Contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
+    )
+    .option('--config <path>', 'Path to prisma-next.config.ts')
+    .action(
+      async (
+        name: string,
+        hash: string,
+        options: { config?: string; json?: string | boolean; quiet?: boolean },
+      ) => {
+        const flags = parseGlobalFlags(options);
+        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const result = await executeRefSetCommand(name, hash, options);
+        const exitCode = handleResult(result, flags, ui, (value) => {
+          if (flags.json) {
+            ui.output(JSON.stringify(value));
+          } else if (!flags.quiet) {
+            ui.output(`Set ref "${value.ref}" → ${value.hash}`);
+          }
+        });
+        process.exit(exitCode);
+      },
+    );
+  return command;
+}
+
+function createRefDeleteCommand(): Command {
+  const command = new Command('delete');
+  setCommandDescriptions(command, 'Delete a ref', 'Removes a named ref from migrations/refs/.');
+  addGlobalOptions(command)
+    .argument('<name>', 'Ref name to delete')
+    .option('--config <path>', 'Path to prisma-next.config.ts')
+    .action(
+      async (
+        name: string,
+        options: { config?: string; json?: string | boolean; quiet?: boolean },
+      ) => {
+        const flags = parseGlobalFlags(options);
+        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const result = await executeRefDeleteCommand(name, options);
+        const exitCode = handleResult(result, flags, ui, (value) => {
+          if (flags.json) {
+            ui.output(JSON.stringify(value));
+          } else if (!flags.quiet) {
+            ui.output(`Deleted ref "${value.ref}"`);
+          }
+        });
+        process.exit(exitCode);
+      },
+    );
+  return command;
+}
+
+function createRefListCommand(): Command {
+  const command = new Command('list');
+  setCommandDescriptions(command, 'List all refs', 'Lists all named refs from migrations/refs/.');
+  addGlobalOptions(command)
+    .option('--config <path>', 'Path to prisma-next.config.ts')
+    .action(async (options: { config?: string; json?: string | boolean; quiet?: boolean }) => {
+      const flags = parseGlobalFlags(options);
+      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const result = await executeRefListCommand(options);
+      const exitCode = handleResult(result, flags, ui, (value) => {
+        if (flags.json) {
+          ui.output(JSON.stringify(value));
+        } else if (!flags.quiet) {
+          const entries = Object.entries(value.refs);
+          if (entries.length === 0) {
+            ui.output('No refs defined');
+          } else {
+            for (const [refName, entry] of entries) {
+              const invariantsSuffix =
+                entry.invariants.length > 0 ? ` [invariants: ${entry.invariants.join(', ')}]` : '';
+              ui.output(`${refName} → ${entry.hash}${invariantsSuffix}`);
+            }
+          }
+        }
+      });
+      process.exit(exitCode);
+    });
+  return command;
+}
+
+export function createRefCommand(): Command {
+  const command = new Command('ref');
+  setCommandDescriptions(
+    command,
+    'Manage contract refs',
+    'Manage named refs in migrations/refs/. Refs map logical environment\n' +
+      'names (e.g., staging, production) to contract hashes.',
+  );
+  addGlobalOptions(command).configureHelp({
+    formatHelp: (cmd) => formatCommandHelp({ command: cmd, flags: parseGlobalFlags({}) }),
+    subcommandDescription: () => '',
+  });
+  command.addCommand(createRefSetCommand());
+  command.addCommand(createRefDeleteCommand());
+  command.addCommand(createRefListCommand());
+  return command;
+}

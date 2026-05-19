@@ -98,7 +98,7 @@ export interface AggregatePlannerInput<TFamilyId extends string, TTargetId exten
  */
 /**
  * Per-edge metadata for the chain assembled by the graph-walk
- * strategy. Lets `migration apply` surface a per-migration `applied[]`
+ * strategy. Lets `migrate` surface a per-migration `applied[]`
  * entry (preserving the single-space `migrationsApplied` count
  * semantics) without re-walking the graph.
  *
@@ -129,7 +129,7 @@ export interface AggregatePerSpacePlan {
    * invariants, per-edge invariants). Populated by the graph-walk
    * strategy; absent for synth-produced plans.
    *
-   * `migration apply` surfaces this for the app member as
+   * `migrate` surfaces this for the app member as
    * `MigrationApplySuccess.pathDecision` (back-compat with single-
    * space callers).
    */

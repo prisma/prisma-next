@@ -198,6 +198,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
               Object.entries(types).map(([name, params]) => [
                 name,
                 {
+                  kind: 'codec-instance' as const,
                   codecId: 'pgvector/vector@1',
                   nativeType: 'vector',
                   typeParams: params as Record<string, unknown>,

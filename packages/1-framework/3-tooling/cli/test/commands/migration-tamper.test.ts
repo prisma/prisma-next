@@ -1,6 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { createContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
@@ -83,8 +82,22 @@ async function writeTestPackage(
 }
 
 function setupConfigMock(): void {
+  // The mocked family.create() returns a stub family instance whose
+  // `deserializeContract` is a pass-through. The tamper tests construct
+  // an intentionally-skeletal contract (just `storage.storageHash`) to
+  // get past the read-and-validate step in commands like `migrate` /
+  // `migration plan` / `migration new` — the bug under test is about
+  // **migration tamper detection**, not contract validation. The
+  // pass-through stub keeps the contract read crossing the seam
+  // (TML-2536's invariant) while letting the test drive at the
+  // post-read tamper code path.
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue({}) },
+    family: {
+      familyId: TARGET_FAMILY,
+      create: vi.fn().mockReturnValue({
+        deserializeContract: (json: unknown) => json,
+      }),
+    },
     target: {
       id: TARGET,
       familyId: TARGET_FAMILY,
@@ -116,8 +129,6 @@ async function setupTamperFixture(): Promise<TamperFixture> {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],
@@ -244,16 +255,16 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   });
 
   it(
-    'migration apply surfaces MIGRATION.HASH_MISMATCH before connecting (T3.1)',
+    'migrate surfaces MIGRATION.HASH_MISMATCH before connecting',
     async () => {
-      const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+      const { createMigrateCommand } = await import('../../src/commands/migrate');
       const fixture = await setupTamperFixture();
       tempDirs.push(fixture.cwd);
       process.chdir(fixture.cwd);
 
       const captured = await captureDiagnostic(
-        () => executeCommand(createMigrationApplyCommand(), ['--json']),
-        () => executeCommand(createMigrationApplyCommand(), ['--no-color', '--quiet']),
+        () => executeCommand(createMigrateCommand(), ['--json']),
+        () => executeCommand(createMigrateCommand(), ['--no-color', '--quiet']),
         consoleOutput,
         consoleErrors,
         fixture.cwd,

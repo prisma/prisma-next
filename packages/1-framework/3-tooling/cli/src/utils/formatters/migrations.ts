@@ -90,7 +90,7 @@ export interface MigrationCommandResult {
 
 /**
  * Render the shared per-space execution block consumed by the `db init`
- * / `db update` / `migration apply` summaries. Always shows: space
+ * / `db update` / `migrate` summaries. Always shows: space
  * label (`Extension space: <id>` or `App space`) → per-op lines under
  * each space → per-space marker hash (when known).
  *
@@ -254,7 +254,7 @@ export interface MigrationApplyCommandOutputResult {
   /**
    * Per-space breakdown in canonical schedule order (extensions
    * alphabetically, then app). Always present for the aggregate-walking
-   * `migration apply` command.
+   * `migrate` command.
    */
   readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
   readonly timings?: {

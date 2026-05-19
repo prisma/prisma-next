@@ -1,0 +1,104 @@
+# Definition of Done — overlays + validation gates
+
+Canonical DoD (the shape) lives in [`docs/drive/principles/definition-of-done.md`](../../docs/drive/principles/definition-of-done.md). This file holds the **team's overlays + validation gates** — the concrete items the agile orchestrator checks at handoff time, in addition to the canonical items each scope already requires.
+
+Overlays grow by retro accretion (per [`README.md § Maintenance discipline`](./README.md#maintenance-discipline)): a retro reveals a handoff-time gap, the matching scope's overlay grows by one item. Never delete — overlay items become baseline.
+
+## Dispatch-DoD validation gates
+
+### Always-run
+
+```bash
+pnpm typecheck    # catches the bulk of consumer-site issues
+```
+
+### Conditional
+
+```bash
+pnpm lint:deps              # when imports/exports/architectural structure changes
+pnpm test:packages          # when source or test code changes (almost always)
+pnpm test:integration       # when changes affect PGlite / PG / mongo paths
+pnpm test:e2e               # when changes affect emit / migrate / run cycle
+pnpm fixtures:check         # when IR / emitter / serialiser changes
+```
+
+### Brief-specified
+
+A brief may add gates specific to the work:
+
+- Specific test files that must pass (e.g. a known regression after a substrate change).
+- Specific PGlite tests (e.g. cross-namespace-fk, unbound-namespace integration tests).
+- Grep gates from [`grep-library.md`](./grep-library.md).
+- Diff-stat sanity checks ("no demo migration snapshot should change unless intentional").
+
+### Cadence
+
+- **Per-commit** (during the dispatch): typecheck and any grep gates the brief specifies.
+- **End-of-dispatch**: full conditional set + brief-specified gates.
+- **Orchestrator-side post-dispatch**: re-run the grep gates independently; spot-check the diff for spec compliance; run intent-validation.
+
+## Dispatch-DoD overlay (beyond validation gates)
+
+- [ ] Brief's referenced [`failure-modes.md`](./failure-modes.md) entries were checked during execution and noted as "avoided" in the dispatch summary.
+- [ ] No new TODOs left behind by this dispatch.
+- [ ] Per-commit messages reference the source spike artefact / slice spec where appropriate.
+- [ ] If the dispatch touched test fixtures: `fixtures:check` passes; drift in unrelated fixture files is investigated, not committed.
+
+## Slice-DoD overlay
+
+In addition to the canonical slice DoD:
+
+### Plan-side items
+
+- If the slice touches `packages/3-*-extensions/**`, the slice plan must include a `pnpm fixtures:check` dispatch step.
+- If the slice touches package boundaries / imports, the slice plan must include `pnpm lint:deps`.
+- If the slice changes typed surfaces consumed elsewhere, the slice plan must include a downstream `pnpm typecheck` after the producing package's `pnpm build`.
+
+### PR-side items
+
+- [ ] Linear issue moved to `Ready to be merged` (the team's terminal-before-merge state).
+- [ ] PR title carries Linear ticket prefix (e.g. `tml-XXXX:`).
+- [ ] PR description follows `drive-pr-description` shape (decision-led, narrative).
+- [ ] PR linked to its Linear issue via GitHub integration (auto-close on merge works).
+- [ ] No `projects/` references in long-lived files added by the slice (per the doc-maintenance rule; grep gate in [`grep-library.md`](./grep-library.md)).
+
+### QA-side items
+
+- [ ] `drive-qa-plan` script exists + ≥1 `drive-qa-run` report exists.
+- [ ] No unresolved 🛑 Blocker findings.
+- [ ] Script names **both** consumer audiences (see [`patterns.md § Consumer audiences`](./patterns.md#consumer-audiences)) where relevant — OR explicit "N/A — no user-observable change" with a one-line rationale.
+
+## Project-DoD overlay
+
+Beyond the canonical project DoD items:
+
+### Repo-wide gates
+
+- [ ] `pnpm lint:deps` clean.
+- [ ] `pnpm build` clean (turbo cache OK).
+- [ ] `pnpm fixtures:check` clean.
+- [ ] If the project introduces a new package: `architecture.config.json` updated; `pnpm lint:deps` passes the new layering.
+- [ ] If the project ships a feature that changes the demo or examples: demo runs end-to-end against the new feature.
+
+### Documentation & migration
+
+- [ ] Long-lived docs migrated to `docs/` (per the doc-maintenance rule); subsystem / patterns docs updated if the project affects them.
+- [ ] Any new architecture docs are linked from `docs/architecture docs/`.
+- [ ] References to `projects/<project>/**` removed from the codebase (per the doc-maintenance rule).
+- [ ] `projects/<project>/` deleted from the repo.
+
+### Linear close-out
+
+- [ ] Linear Project marked Completed (or Cancelled with rationale in final status update).
+- [ ] Original promoted ticket (if applicable) reflects project completion (comment or status update).
+- [ ] Final status update on Linear Project links the close-out retro.
+
+### Manual-QA roll-up
+
+- [ ] Every slice that touched user-observable surface has a `drive-qa-plan` script + ≥1 `drive-qa-run` report; no unresolved 🛑 Blocker findings; [`drive/qa/README.md`](../qa/README.md) updated if the project surfaced new audiences or coverage-gate gaps.
+
+### ADR audit (final-retro item)
+
+Walk `design-decisions.md` for any decision that hasn't migrated to an ADR. If unmigrated decisions exist that are architecturally durable (cross-cutting, hard to reverse, affect future work), block close-out until they have ADRs — closing with un-ADR'd architectural decisions is a known close-out failure mode.
+
+_(Living; add overlays as the team discovers them.)_

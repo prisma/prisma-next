@@ -72,10 +72,11 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         );
         // The framework `MigrationRunner` interface types `destinationContract`
         // as `unknown`; the Mongo runner narrows to `MongoContract`. Validation
-        // happens upstream — `migration apply` calls
-        // `familyInstance.validateContract(migration.toContract)` before
-        // routing the contract here, so this cast preserves the framework
-        // signature without weakening the runner's typed surface.
+        // happens upstream — `migrate` calls
+        // `familyInstance.deserializeContract(contract)` on the project-root
+        // contract loaded from disk before routing it here, so this cast
+        // preserves the framework signature without weakening the runner's
+        // typed surface.
         return new MongoMigrationRunner(cachedDeps).execute({
           ...runnerOptions,
           destinationContract: runnerOptions.destinationContract as MongoContract,
@@ -170,7 +171,13 @@ function toSpaceMember(
 ): ContractSpaceMember {
   return {
     spaceId: opts.space,
-    contract: opts.destinationContract as Contract,
+    // Blind cast: `MultiSpaceRunnerPerSpaceOptions.destinationContract`
+    // is intentionally typed `unknown` at the framework boundary
+    // (the framework does not know which family's `Contract` shape
+    // a runner consumes). The caller is the aggregate runner,
+    // which only forwards a value already validated through the
+    // family `deserializeContract` seam at the aggregate boundary.
+    contract: opts.destinationContract as unknown as Contract,
     headRef: { hash: '', invariants: [] },
     migrations: {
       graph: {

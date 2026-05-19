@@ -120,7 +120,7 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
   readonly migrationsDir: string;
   readonly appContract: Contract;
   readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
-  readonly validateContract: (contractJson: unknown) => Contract;
+  readonly deserializeContract: (contractJson: unknown) => Contract;
   /**
    * App-space migration packages to hydrate the app member's
    * migration graph with. Defaults to `[]` (matches the `db init` /
@@ -128,7 +128,7 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
    * `migrations/` graph is not walked — the planner uses the synth
    * strategy for the app member instead).
    *
-   * `migration apply` callers thread the user's authored app-space
+   * `migrate` callers thread the user's authored app-space
    * packages (loaded via `loadMigrationPackages(appMigrationsDir)`)
    * through here so the graph-walk strategy can plot a path through
    * them — the prod-time replay path explicitly forbids synth.
@@ -144,7 +144,7 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
  * (defaulting to `[]`). `db init` / `db update` leave it empty: the
  * planner's `synth` strategy is used for the app member (driven by
  * `callerPolicy.ignoreGraphFor`), so the app's authored `migrations/`
- * graph does not need to be walked. `migration apply` threads the
+ * graph does not need to be walked. `migrate` threads the
  * already-loaded app-space packages through so the graph-walk strategy
  * can plot a path through them — replay forbids synth.
  *
@@ -165,7 +165,7 @@ export async function buildContractSpaceAggregate<
     migrationsDir: inputs.migrationsDir,
     appContract: inputs.appContract,
     declaredExtensions,
-    validateContract: inputs.validateContract,
+    deserializeContract: inputs.deserializeContract,
     appMigrationPackages: inputs.appMigrationPackages ?? [],
   };
 

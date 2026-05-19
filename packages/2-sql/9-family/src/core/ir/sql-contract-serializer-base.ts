@@ -19,7 +19,7 @@ export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
  * deserialization pipeline:
  *
  * 1. `parseSqlContractStructure` validates the on-disk JSON envelope
- *    against the SQL contract arktype schema (`validateSqlContract`)
+ *    against the SQL contract arktype schema (`validateSqlContractFully`)
  *    and returns the validated flat-data shape.
  * 2. `hydrateSqlStorage` walks the validated `storage` subtree and
  *    constructs the family-shared SQL Contract IR class hierarchy

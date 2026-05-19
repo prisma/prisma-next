@@ -45,9 +45,9 @@ describe('migration-ref MigrationToolsError envelope mapping', () => {
   it(
     'forwards MigrationToolsError details into the CliStructuredError meta payload',
     async () => {
-      const { executeRefGetCommand } = await import('../../src/commands/migration-ref');
+      const { executeRefDeleteCommand } = await import('../../src/commands/ref');
 
-      const result = await executeRefGetCommand('does-not-exist', { config: configPath });
+      const result = await executeRefDeleteCommand('does-not-exist', { config: configPath });
 
       expect(result.ok).toBe(false);
       if (result.ok) return;

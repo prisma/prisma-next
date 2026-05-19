@@ -2,7 +2,7 @@ import { blue, bold, cyan, dim, green, magenta } from 'colorette';
 import type { Command } from 'commander';
 import wrapAnsi from 'wrap-ansi';
 
-import { getCommandExamples, getLongDescription } from '../command-helpers';
+import { getCommandExamples, getCommandSeeAlso, getLongDescription } from '../command-helpers';
 import type { GlobalFlags } from '../global-flags';
 import { formatDim } from './helpers';
 import { padToFixedWidth, renderCommandTree } from './styled';
@@ -134,7 +134,7 @@ function getCommandDocsUrl(commandPath: string): string | undefined {
     'db verify': 'https://pris.ly/db-verify',
     'db update': 'https://pris.ly/db-update',
     'migration plan': 'https://pris.ly/migration-plan',
-    'migration apply': 'https://pris.ly/migration-apply',
+    migrate: 'https://pris.ly/migrate',
     'migration show': 'https://pris.ly/migration-show',
     'migration status': 'https://pris.ly/migration-status',
   };
@@ -265,6 +265,16 @@ export function formatCommandHelp(options: {
     lines.push(`${formatDimText('│')} ${formatDimText('Examples:')}`);
     for (const example of examples) {
       lines.push(`${formatDimText('│')}   ${useColor ? dim('$') : '$'} ${example}`);
+    }
+  }
+
+  // See also (cross-references to related commands)
+  const seeAlso = getCommandSeeAlso(command);
+  if (seeAlso && seeAlso.length > 0) {
+    lines.push(formatDimText('│'));
+    lines.push(`${formatDimText('│')} ${formatDimText('See also:')}`);
+    for (const ref of seeAlso) {
+      lines.push(`${formatDimText('│')}   ${ref.verb}  ${formatDimText(ref.oneLiner)}`);
     }
   }
 

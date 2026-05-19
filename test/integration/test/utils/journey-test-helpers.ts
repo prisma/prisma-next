@@ -24,12 +24,16 @@ import { createDbSchemaCommand } from '@prisma-next/cli/commands/db-schema';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
-import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
+import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
+import { createMigrationCheckCommand } from '@prisma-next/cli/commands/migration-check';
+import { createMigrationGraphCommand } from '@prisma-next/cli/commands/migration-graph';
+import { createMigrationListCommand } from '@prisma-next/cli/commands/migration-list';
+import { createMigrationLogCommand } from '@prisma-next/cli/commands/migration-log';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
-import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
+import { createRefCommand } from '@prisma-next/cli/commands/ref';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
 import { isAbsolute, join, resolve } from 'pathe';
@@ -373,11 +377,11 @@ export async function runMigrationNew(
   return runCommand(createMigrationNewCommand(), ctx, extraArgs);
 }
 
-export async function runMigrationApply(
+export async function runMigrate(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  return runCommand(createMigrationApplyCommand(), ctx, extraArgs);
+  return runCommand(createMigrateCommand(), ctx, extraArgs);
 }
 
 export async function runMigrationStatus(
@@ -392,6 +396,35 @@ export async function runMigrationShow(
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
   return runCommand(createMigrationShowCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationLog(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationLogCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationList(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationListCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationGraph(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+  options?: RunCommandOptions,
+): Promise<CommandResult> {
+  return runCommand(createMigrationGraphCommand(), ctx, extraArgs, options);
+}
+
+export async function runMigrationCheck(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationCheckCommand(), ctx, extraArgs);
 }
 
 /**
@@ -461,12 +494,12 @@ export async function runMigrationPlanAndEmit(
   return planResult;
 }
 
-export async function runMigrationRef(
+export async function runRef(
   ctx: JourneyContext,
   subcommandArgs: readonly string[],
 ): Promise<CommandResult> {
   const [subcommand, ...rest] = subcommandArgs;
-  return runCommandRaw(createMigrationRefCommand(), ctx.testDir, [
+  return runCommandRaw(createRefCommand(), ctx.testDir, [
     subcommand!,
     '--config',
     ctx.configPath,

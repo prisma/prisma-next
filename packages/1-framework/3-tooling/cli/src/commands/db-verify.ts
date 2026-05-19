@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  createControlStack,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
@@ -236,7 +238,7 @@ async function resolveVerifyPaths(options: DbVerifyOptions) {
 type VerifyPaths = Awaited<ReturnType<typeof resolveVerifyPaths>>;
 
 interface VerifySetup extends VerifyPaths {
-  readonly contractJson: Record<string, unknown>;
+  readonly contractJson: Contract;
   readonly dbConnection: string;
 }
 
@@ -266,10 +268,24 @@ async function resolveVerifySetup(
     );
   }
 
-  let contractJson: Record<string, unknown>;
+  // Cross the family `deserializeContract` seam at the read site, just
+  // like every other CLI on-disk read (TML-2536). The downstream
+  // `dbVerify` op accepts the hydrated `Contract` directly and no
+  // longer re-deserializes.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
+  let contractJson: Contract;
   try {
-    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    contractJson = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
+    if (error instanceof ContractValidationError) {
+      return notOk(
+        errorContractValidationFailed(`Contract validation failed: ${error.message}`, {
+          where: { path: contractPathAbsolute },
+        }),
+      );
+    }
     return notOk(
       errorContractValidationFailed(
         `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,

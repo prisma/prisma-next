@@ -165,6 +165,63 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
+  it('rejects manifest carrying a legacy inlined `toContract` field', async () => {
+    const dir = join(tmpDir, '20260225T1430_carries_to_contract');
+    const metadata = {
+      ...createTestMetadata({}, []),
+      toContract: { storage: { storageHash: 'x' } },
+    };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify([]));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('rejects manifest carrying a legacy inlined `fromContract` field', async () => {
+    const dir = join(tmpDir, '20260225T1430_carries_from_contract');
+    const metadata = { ...createTestMetadata({}, []), fromContract: null };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify([]));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('loads a package whose directory holds only migration.json + ops.json', async () => {
+    // Runner-side independence: the migration loader must not require
+    // sibling `start-contract.json` / `end-contract.json` files to be
+    // present on disk. Contracts are author-time conveniences, not
+    // structural inputs to the runner. The stored manifest carries the
+    // storage-hash bookends (`from`, `to`) which is all the runner needs
+    // to walk the migration graph.
+    const { readdir } = await import('node:fs/promises');
+    const dir = join(tmpDir, '20260225T1430_runner_independent');
+    await writeTestPackage(dir);
+
+    expect((await readdir(dir)).sort()).toEqual(['migration.json', 'ops.json']);
+
+    const pkg = await readMigrationPackage(dir);
+    expect(pkg.dirName).toBe('20260225T1430_runner_independent');
+    expect(pkg.metadata.migrationHash).toBeDefined();
+  });
+
+  it('readMigrationsDir loads packages whose directories hold only migration.json + ops.json', async () => {
+    const baselineDir = join(tmpDir, '20260225T1430_a');
+    const followupDir = join(tmpDir, '20260225T1500_b');
+    await writeTestPackage(baselineDir);
+    await writeTestPackage(followupDir);
+
+    const packages = await readMigrationsDir(tmpDir);
+    expect(packages.map((p) => p.dirName).sort()).toEqual(['20260225T1430_a', '20260225T1500_b']);
+  });
+
   it('accepts `from: null` (baseline manifest)', async () => {
     const dir = join(tmpDir, '20260225T1430_baseline');
     await writeTestPackage(dir, { from: null });
@@ -178,19 +235,6 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     const metadata = { ...createTestMetadata(), from: '' };
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
-    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
-
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
-      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
-      return true;
-    });
-  });
-
-  it('errors when "toContract" is missing', async () => {
-    const dir = join(tmpDir, '20260225T1430_no_contract');
-    const { toContract: _, ...metadataWithout } = createTestMetadata();
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {

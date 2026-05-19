@@ -1,52 +1,6 @@
 {
   "from": null,
   "to": "sha256:ef9de2767997cc2d57d1a4b6b0a4907d54b94793afd5309225803b14be0463bc",
-  "fromContract": null,
-  "toContract": {
-    "schemaVersion": "1",
-    "target": "postgres",
-    "targetFamily": "sql",
-    "storageHash": "sha256:ef9de2767997cc2d57d1a4b6b0a4907d54b94793afd5309225803b14be0463bc",
-    "profileHash": "sha256:eabaea6945e6a6a87458b5bf92907c59bbad2561ccb16fb6c0331b6c1d49ab82",
-    "storage": {
-      "tables": {
-        "user": {
-          "columns": {
-            "id": {
-              "nativeType": "uuid",
-              "codecId": "pg/uuid@1",
-              "nullable": false
-            },
-            "email": {
-              "nativeType": "text",
-              "codecId": "pg/text@1",
-              "nullable": false
-            },
-            "createdAt": {
-              "nativeType": "timestamptz",
-              "codecId": "pg/timestamptz@1",
-              "nullable": false,
-              "default": {
-                "kind": "function",
-                "expression": "now()"
-              }
-            }
-          },
-          "primaryKey": {
-            "columns": ["id"]
-          },
-          "uniques": [],
-          "indexes": [],
-          "foreignKeys": []
-        }
-      }
-    },
-    "models": {},
-    "capabilities": {},
-    "extensionPacks": {},
-    "meta": {},
-    "sources": {}
-  },
   "hints": {
     "used": [],
     "applied": [],

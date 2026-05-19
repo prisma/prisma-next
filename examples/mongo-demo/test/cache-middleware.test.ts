@@ -1,8 +1,8 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import type { CachePayload } from '@prisma-next/middleware-cache';
 import { cacheAnnotation, createCacheMiddleware } from '@prisma-next/middleware-cache';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
@@ -20,7 +20,7 @@ import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { seed } from '../src/seed';
 
-const { contract } = validateMongoContract<Contract>(contractJson);
+const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
 
 /**
  * End-to-end check that a real Mongo runtime + the cross-family

@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/monorepo",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
@@ -26,6 +26,8 @@
     "lint:packages": "turbo run lint --filter='!./examples/**'",
     "lint:examples": "turbo run lint --filter='./examples/**'",
     "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages && node scripts/lint-framework-target-imports.mjs && node scripts/lint-app-space-id.mjs",
+    "lint:code": "node scripts/lint-no-contract-cast.mjs",
+    "lint:no-contract-cast": "node scripts/lint-no-contract-cast.mjs",
     "lint:rules": "node scripts/validate-rules.mjs",
     "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
     "rules:footprint": "node scripts/rules-footprint.mjs",
@@ -44,11 +46,11 @@
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "record": "turbo run record --filter=@prisma-next/cli --",
     "clean": "turbo run clean",
-    "prepare": "husky"
+    "prepare": "husky && skills add ./skills-contrib --skill '*' --agent universal claude-code -y"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
-    "@prisma-next/tsconfig": "workspace:0.8.0",
+    "@prisma-next/tsconfig": "workspace:0.9.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "^4.0.17",
     "dependency-cruiser": "^16.3.3",
@@ -57,6 +59,7 @@
     "lint-staged": "^16.2.6",
     "pathe": "^2.0.3",
     "pkg-pr-new": "0.0.71",
+    "skills": "^1.5.7",
     "tslib": "^2.8.1",
     "tsx": "^4.20.6",
     "turbo": "^2.6.1",

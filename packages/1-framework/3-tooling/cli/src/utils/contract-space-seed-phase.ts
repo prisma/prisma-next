@@ -91,7 +91,7 @@ export interface ContractSpaceSeedPhaseResult {
  * Output ordering is deterministic and alphabetical by spaceId (via
  * {@link planAllSpaces}, which also detects duplicate spaceIds). This
  * matches the canonical sort order used by every other aggregate
- * surface (`migration apply`, `migration status`, the runner).
+ * surface (`migrate`, `migration status`, the runner).
  */
 export async function runContractSpaceSeedPhase(
   inputs: ContractSpaceSeedPhaseInputs,

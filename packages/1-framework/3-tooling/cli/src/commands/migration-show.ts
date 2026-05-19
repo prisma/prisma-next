@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import {
+  APP_SPACE_ID,
   createControlStack,
   type MigrationPlanOperation,
   type OperationPreview,
@@ -12,6 +13,8 @@ import {
   reconstructGraph,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -26,6 +29,7 @@ import {
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -33,6 +37,7 @@ import {
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatMigrationShowOutput } from '../utils/formatters/migrations';
@@ -237,7 +242,7 @@ async function executeMigrationShowCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationShowResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative } =
+  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative, refsDir } =
     resolveMigrationPaths(options.config, config);
 
   const contractPathAbsolute = resolveContractPath(config);
@@ -261,7 +266,91 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  // Load the app contract so the aggregate loader can validate it.
+  // `migration show` is an offline command; the control client is constructed
+  // purely to dispatch the family-specific `toOperationPreview` capability and
+  // is not connected to a database.
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    ...ifDefined('driver', config.driver),
+    extensionPacks: config.extensionPacks ?? [],
+  });
+
+  // Explicit-target path. Read the app-space migrations directory directly
+  // and resolve `target` against the app graph. We deliberately skip
+  // `buildContractSpaceAggregate` here for two reasons:
+  //
+  // 1. Functional: the user asked about ONE specific migration. They don't
+  //    need extension-space enumeration; resolving + rendering the named
+  //    package is enough.
+  // 2. UX: the aggregate's layout-integrity check (PN-MIG-5001) fires when
+  //    an extension is declared but its migrations directory hasn't been
+  //    materialised. Gating an offline read-only inspect command on that
+  //    check forces users to run `migrate` against a database before they
+  //    can see what a migration contains — which contradicts what an
+  //    offline read-only verb should require.
+  //
+  // Same pattern as `migration list`, `migration graph`, `migration check`:
+  // those verbs read `appMigrationsDir` directly without ever consulting
+  // the aggregate.
+  if (target) {
+    try {
+      let appPkg: OnDiskMigrationPackage;
+      if (looksLikePath(target)) {
+        const resolved = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
+        if (!resolved.ok) return resolved;
+        appPkg = await readMigrationPackage(resolved.value);
+      } else {
+        const allPackages = await readMigrationsDir(appMigrationsDir);
+        if (allPackages.length === 0) {
+          return notOk(
+            errorRuntime('No migrations found', {
+              why: `No migration packages found in ${appMigrationsRelative}`,
+              fix: 'Run `prisma-next migration plan` to create a migration first.',
+            }),
+          );
+        }
+        const graph = reconstructGraph(allPackages);
+        const refs = await readRefs(refsDir);
+        const migResult = parseMigrationRef(target, { graph, refs });
+        if (!migResult.ok) {
+          return notOk(mapRefResolutionError(migResult.failure));
+        }
+        const matchedPkg = allPackages.find(
+          (p) => p.metadata.migrationHash === migResult.value.migrationHash,
+        );
+        if (!matchedPkg) {
+          return notOk(
+            errorRuntime('Migration package not found', {
+              why: `Resolved migration "${migResult.value.dirName}" but the package was not loaded`,
+              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+            }),
+          );
+        }
+        appPkg = matchedPkg;
+      }
+      return ok({
+        ok: true,
+        spaces: [pkgToSpaceResult(APP_SPACE_ID, appPkg, client)],
+      });
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
+      }
+      return notOk(
+        errorUnexpected(error instanceof Error ? error.message : String(error), {
+          why: `Failed to read app-space migration: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+      );
+    }
+  }
+
+  // No-target path. Enumerate the latest migration per space (app +
+  // extensions). The aggregate-loader is needed here because we need to
+  // know which extension spaces are declared; its layout-integrity check
+  // is appropriate at this entry point because the user is asking the
+  // system to report on every loaded space.
   let contractJsonContent: string;
   try {
     contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
@@ -281,93 +370,71 @@ async function executeMigrationShowCommand(
     );
   }
 
+  // Construct the family instance up-front so the on-disk app contract
+  // read crosses the serializer seam (`familyInstance.deserializeContract`)
+  // at the read site. See TML-2536.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
   let appContract: Contract;
   try {
-    appContract = JSON.parse(contractJsonContent) as Contract;
+    appContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract at ${contractPathAbsolute} failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );
   }
 
-  // Build the aggregate against current disk state to enumerate all spaces.
-  const stack = createControlStack(config);
-  const familyInstance = config.family.create(stack);
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,
     appContract,
     extensionPacks: config.extensionPacks ?? [],
-    validateContract: (json: unknown) => familyInstance.validateContract(json),
+    deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
   });
   if (!aggregateResult.ok) {
     return notOk(aggregateResult.failure);
   }
   const aggregate = aggregateResult.value;
 
-  // `migration show` is an offline command; the control client is constructed
-  // purely to dispatch the family-specific `toOperationPreview` capability and
-  // is not connected to a database.
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    ...ifDefined('driver', config.driver),
-    extensionPacks: config.extensionPacks ?? [],
-  });
-
   const spaces: MigrationShowSpaceResult[] = [];
 
-  // App space: honour the `target` argument (path or hash prefix) when provided.
+  // App space: latest leaf.
   try {
-    let appPkg: OnDiskMigrationPackage;
-    if (target && looksLikePath(target)) {
-      const resolved = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
-      if (!resolved.ok) return resolved;
-      appPkg = await readMigrationPackage(resolved.value);
-    } else {
-      const allPackages = await readMigrationsDir(appMigrationsDir);
-      if (allPackages.length === 0) {
-        return notOk(
-          errorRuntime('No migrations found', {
-            why: `No migration packages found in ${appMigrationsRelative}`,
-            fix: 'Run `prisma-next migration plan` to create a migration first.',
-          }),
-        );
-      }
-      if (target) {
-        const resolved = resolveByHashPrefix(allPackages, target);
-        if (!resolved.ok) return resolved;
-        appPkg = resolved.value;
-      } else {
-        const graph = reconstructGraph(allPackages);
-        const latestMigration = findLatestMigration(graph);
-        if (!latestMigration) {
-          return notOk(
-            errorRuntime('Could not resolve latest migration', {
-              why: 'No latest migration found in the migration history',
-              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
-            }),
-          );
-        }
-        const leafPkg = allPackages.find(
-          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
-        );
-        if (!leafPkg) {
-          return notOk(
-            errorRuntime('Could not resolve latest migration', {
-              why: `Latest migration ${latestMigration.dirName} does not match any package`,
-              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
-            }),
-          );
-        }
-        appPkg = leafPkg;
-      }
+    const allPackages = await readMigrationsDir(appMigrationsDir);
+    if (allPackages.length === 0) {
+      return notOk(
+        errorRuntime('No migrations found', {
+          why: `No migration packages found in ${appMigrationsRelative}`,
+          fix: 'Run `prisma-next migration plan` to create a migration first.',
+        }),
+      );
     }
-    spaces.push(pkgToSpaceResult(aggregate.app.spaceId, appPkg, client));
+    const graph = reconstructGraph(allPackages);
+    const latestMigration = findLatestMigration(graph);
+    if (!latestMigration) {
+      return notOk(
+        errorRuntime('Could not resolve latest migration', {
+          why: 'No latest migration found in the migration history',
+          fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+        }),
+      );
+    }
+    const leafPkg = allPackages.find(
+      (p) => p.metadata.migrationHash === latestMigration.migrationHash,
+    );
+    if (!leafPkg) {
+      return notOk(
+        errorRuntime('Could not resolve latest migration', {
+          why: `Latest migration ${latestMigration.dirName} does not match any package`,
+          fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+        }),
+      );
+    }
+    spaces.push(pkgToSpaceResult(aggregate.app.spaceId, leafPkg, client));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -415,8 +482,17 @@ export function createMigrationShowCommand(): Command {
     'prisma-next migration show',
     'prisma-next migration show sha256:a1b2c3',
   ]);
+  setCommandSeeAlso(command, [
+    { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
+    { verb: 'migration log', oneLiner: 'Show executed migration history' },
+    { verb: 'migration list', oneLiner: 'List on-disk migrations' },
+    { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
+  ]);
   addGlobalOptions(command)
-    .argument('[target]', 'App-space migration path or migrationHash prefix (defaults to latest)')
+    .argument(
+      '[target]',
+      'Migration reference: directory name, hash/prefix, or path (defaults to latest)',
+    )
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);

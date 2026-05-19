@@ -58,11 +58,11 @@ export default defineConfig({
         'src/commands/db-sign.ts',
         'src/commands/db-update.ts',
         'src/commands/db-verify.ts',
-        'src/commands/migration-apply.ts',
+        'src/commands/migrate.ts',
         'src/commands/migration-plan.ts',
         'src/commands/migration-show.ts',
         'src/commands/migration-status.ts',
-        'src/commands/migration-ref.ts',
+        'src/commands/ref.ts',
         // Error factory functions — just constructors
         'src/utils/cli-errors.ts',
         // Config loader — mostly file I/O and error handling, tested via e2e tests

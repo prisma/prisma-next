@@ -1,6 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { createContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
@@ -13,7 +12,7 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
 
 /**
  * Integration coverage for the UNKNOWN_INVARIANT pre-check in
- * `migration apply --ref` and `migration status --ref` — the only
+ * `migrate --to` and `migration status --to` — the only
  * invariant-routing diagnostic reachable without a real DB connection.
  * Marker-subtraction and NO_INVARIANT_PATH live in the journey suite.
  */
@@ -77,6 +76,12 @@ function setupConfigMock(
     readAllMarkers: vi
       .fn()
       .mockResolvedValue(markerRecord ? new Map([['app', markerRecord]]) : new Map()),
+    // Pass-through `deserializeContract` stub: the invariant tests construct
+    // a skeletal contract for the read site (TML-2536 routes every on-disk
+    // contract read through this seam), but the bugs under test are about
+    // invariant routing, not contract validation. The stub keeps the seam
+    // crossing in place without requiring a full hydrated contract fixture.
+    deserializeContract: (json: unknown) => json,
   };
   mocks.loadConfig.mockResolvedValue({
     family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue(familyInstance) },
@@ -109,8 +114,6 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
     {
       from: FROM_HASH,
       to: TO_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],
@@ -126,8 +129,6 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
     {
       from: FROM_HASH,
       to: REF_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],
@@ -171,8 +172,6 @@ async function setupFixture(opts: {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: edgeInvariants,
@@ -213,7 +212,7 @@ async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number>
   }
 }
 
-describe('migration apply / status — invariant-routing pre-checks', {
+describe('migrate / migration status — invariant-routing pre-checks', {
   timeout: timeouts.typeScriptCompilation,
 }, () => {
   let consoleOutput: string[];
@@ -246,8 +245,8 @@ describe('migration apply / status — invariant-routing pre-checks', {
     vi.resetModules();
   });
 
-  it('migration apply --ref fails with UNKNOWN_INVARIANT when ref names an undeclared invariant', async () => {
-    const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+  it('migrate --to fails with UNKNOWN_INVARIANT when ref names an undeclared invariant', async () => {
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: ['typo-id'],
       edgeInvariants: ['real-id'],
@@ -256,7 +255,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--to', 'prod', '--json']),
     );
 
     expect(exitCode).not.toBe(0);
@@ -270,7 +269,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(envelope.meta?.declared).toEqual(['real-id']);
   });
 
-  it('migration status --ref fails with UNKNOWN_INVARIANT (parity with apply, not a warning)', async () => {
+  it('migration status --to fails with UNKNOWN_INVARIANT (parity with migrate, not a warning)', async () => {
     const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
     const fixture = await setupFixture({
       refInvariants: ['typo-id'],
@@ -280,7 +279,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrationStatusCommand(), ['--to', 'prod', '--json']),
     );
 
     expect(exitCode).not.toBe(0);
@@ -290,7 +289,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(envelope.meta?.code).toBe('MIGRATION.UNKNOWN_INVARIANT');
   });
 
-  it('migration apply --ref does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
+  it('migrate --to does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
     // Ref carries `retired-id`. No on-disk migration declares it any more
     // (history was rewritten). The marker still records it as applied.
     // Apply should treat the requirement as already satisfied — not
@@ -302,7 +301,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     cleanupMocks = commandMocks.cleanup;
     setupConfigMock({ markerHash: TO_HASH, markerInvariants: ['retired-id'] });
 
-    const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: ['retired-id'],
       edgeInvariants: [],
@@ -311,7 +310,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     await runAndCaptureExit(() =>
-      executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--to', 'prod', '--json']),
     );
 
     // The contract under test is the pre-check: an invariant that
@@ -325,7 +324,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(consoleOutput.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
   });
 
-  it('migration status --ref (online) does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
+  it('migration status --to (online) does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
     cleanupMocks();
     const commandMocks = setupCommandMocks();
     consoleOutput = commandMocks.consoleOutput;
@@ -342,7 +341,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrationStatusCommand(), ['--to', 'prod', '--json']),
     );
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
@@ -353,7 +352,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
   });
 
-  it('migration status --ref does not emit MIGRATION.UP_TO_DATE when the marker cannot reach the ref', async () => {
+  it('migration status --to does not emit MIGRATION.UP_TO_DATE when the marker cannot reach the ref', async () => {
     // Marker is on a branch that has no forward path to the ref's branch.
     // pendingCount and hasInvariantWork both report 0, but
     // MIGRATION.UP_TO_DATE would mislead — the database simply cannot
@@ -371,7 +370,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrationStatusCommand(), ['--to', 'prod', '--json']),
     );
     expect(exitCode).toBe(0);
 
@@ -384,11 +383,11 @@ describe('migration apply / status — invariant-routing pre-checks', {
     expect(codes).not.toContain('MIGRATION.UP_TO_DATE');
   });
 
-  it('migration apply --ref does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {
+  it('migrate --to does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {
     // A ref with no invariants must not trip the pre-check. The command
     // continues to its next failure mode (driver no-op connect in this
     // mock setup); we just assert the error code is NOT UNKNOWN_INVARIANT.
-    const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: [],
       edgeInvariants: ['real-id'],
@@ -397,7 +396,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--to', 'prod', '--json']),
     );
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));

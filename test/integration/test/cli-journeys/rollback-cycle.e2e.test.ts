@@ -14,7 +14,7 @@ import {
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlan,
   runMigrationPlanAndEmit,
   runMigrationStatus,
@@ -43,7 +43,7 @@ withTempDir(({ createTempDir }) => {
         expect(plan0.exitCode, 'J.01: plan init').toBe(0);
         const planResult0 = parseJsonOutput<{ to: string }>(plan0);
         const c1Hash = planResult0.to;
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, 'J.01: apply init').toBe(0);
 
         // J.02: swap to contract-phone (C2) → emit → plan + apply add-phone
@@ -55,7 +55,7 @@ withTempDir(({ createTempDir }) => {
         const planResult1 = parseJsonOutput<{ to: string }>(plan1);
         const c2Hash = planResult1.to;
         expect(c2Hash, 'J.02: C2 differs from C1').not.toBe(c1Hash);
-        const apply1 = await runMigrationApply(ctx);
+        const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, 'J.02: apply add-phone').toBe(0);
 
         // J.03: swap back to base contract (C1) → emit → plan rollback (C2→C1 cycle edge)
@@ -68,7 +68,7 @@ withTempDir(({ createTempDir }) => {
           '--json',
         ]);
         expect(planRollback.exitCode, 'J.03: plan rollback').toBe(0);
-        const apply2 = await runMigrationApply(ctx);
+        const apply2 = await runMigrate(ctx);
         expect(apply2.exitCode, 'J.03: apply rollback').toBe(0);
 
         // J.04: graph now has cycle (C1→C2→C1). plan without --from errors
@@ -98,7 +98,7 @@ withTempDir(({ createTempDir }) => {
         expect(planFromResult.from, 'J.05: from is C1').toBe(c1Hash);
 
         // J.06: apply and verify status
-        const apply3 = await runMigrationApply(ctx, ['--json']);
+        const apply3 = await runMigrate(ctx, ['--json']);
         expect(apply3.exitCode, 'J.06: apply add-bio').toBe(0);
         const applyResult = parseJsonOutput<{ ok: boolean; migrationsApplied: number }>(apply3);
         expect(applyResult.ok, 'J.06: ok').toBe(true);
