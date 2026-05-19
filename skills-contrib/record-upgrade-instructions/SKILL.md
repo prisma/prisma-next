@@ -113,6 +113,10 @@ When a breaking change affects both substrates, the same on-disk transformation 
 
 Bug fixes to either copy land via normal PRs. Yes, duplication carries small ongoing maintenance cost. The trade-off is deliberate — the two skill clusters must remain independent so a consumer can install either, both, or neither without one transitively pulling in the other.
 
+## Skipped publishes
+
+If a minor was bumped in-tree but never actually shipped to npm — `package.json` advanced from `M` to `M+1` on `main` but no `vM+1.0` tag landed, so the next publish crosses two minor steps in one release — keep authoring per single-step transition. The coverage gate accepts the **chain** of consecutive transition directories spanning the unreleased range: a 0.7 → 0.9 publish is satisfied by both `upgrades/0.7-to-0.8/` and `upgrades/0.8-to-0.9/` existing, not by a synthetic `upgrades/0.7-to-0.9/`. New entries added on a branch that publishes across a skip may land in any chain step (or the in-flight directory for the cycle after head); the per-version-step authoring model is the source of truth, the gate aggregates.
+
 ## Rebase scenario
 
 If a release PR lands on `main` mid-flight (advancing the currently-published minor from `M` to `M+1`), your topic branch's next rebase brings the new `package.json` value with it:
