@@ -1,52 +1,20 @@
-import {
-  freezeNode,
-  type IRNode,
-  type Namespace,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
-import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
-import { unboundTables } from './unbound-tables';
-
-class StubNamespace extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
-
-  constructor(id: string) {
-    super();
-    this.id = id;
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(input.id);
-}
-
 import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
+import { unboundTables } from './unbound-tables';
 
 const testIndexPack = {
   kind: 'extension',
@@ -901,7 +869,6 @@ model OrderItem {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
-        createNamespace: createStubNamespace,
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -936,7 +903,6 @@ namespace unbound {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
-        createNamespace: createStubNamespace,
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;

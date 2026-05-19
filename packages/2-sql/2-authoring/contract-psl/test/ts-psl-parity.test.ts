@@ -5,7 +5,6 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import { freezeNode, type IRNode, NamespaceBase } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -477,26 +476,6 @@ describe('TS and PSL authoring parity', () => {
   });
 
   it('PSL and TS lower the same cross-namespace FK shape to identical contract IR', () => {
-    class StubNamespace extends NamespaceBase {
-      readonly kind = 'schema' as const;
-      readonly id: string;
-      readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
-
-      constructor(id: string) {
-        super();
-        this.id = id;
-        freezeNode(this);
-      }
-
-      qualifier(): string {
-        return `"${this.id}"`;
-      }
-
-      qualifyTable(name: string): string {
-        return `"${this.id}"."${name}"`;
-      }
-    }
-
     const pslDocument = parsePslDocument({
       schema: `namespace auth {
   model User {
@@ -520,7 +499,6 @@ model Post {
       scalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
-      createNamespace: (input) => new StubNamespace(input.id),
     });
 
     expect(pslContract.ok).toBe(true);
@@ -552,7 +530,6 @@ model Post {
       family: sqlFamilyPack,
       target: portablePostgresTargetPack,
       namespaces: ['auth'],
-      createNamespace: (input) => new StubNamespace(input.id),
       models: { User, Post },
     });
 
@@ -573,8 +550,6 @@ model Post {
       source: { namespaceId: '__unbound__', tableName: 'post' },
       target: { namespaceId: 'auth', tableName: 'user' },
     });
-    // Both authoring paths must lower to the same FK IR — that's the
-    // whole point of the parity test.
     expect(tsFks).toEqual(pslFks);
   });
 });

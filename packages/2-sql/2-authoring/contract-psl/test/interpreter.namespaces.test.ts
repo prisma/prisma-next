@@ -1,15 +1,5 @@
-import {
-  freezeNode,
-  type IRNode,
-  type Namespace,
-  NamespaceBase,
-} from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type {
-  ForeignKey,
-  SqlNamespaceTablesInput,
-  SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -18,34 +8,9 @@ import {
   postgresTarget,
 } from './fixtures';
 
-class StubNamespace extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
-
-  constructor(id: string) {
-    super();
-    this.id = id;
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(input.id);
-}
-
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
-  createNamespace: createStubNamespace,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
 } as const;
 
