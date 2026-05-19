@@ -237,14 +237,14 @@ export async function executeContractEmit(
       // `Contract` envelope, but the local `Contract` type at this
       // call site is the precise structural interface. Re-narrowing
       // the envelope into the precise type is exactly what the
-      // `familyInstance.validateContract(enrichedIR)` call on the
+      // `familyInstance.deserializeContract(enrichedIR)` call on the
       // next line does — the cast just defers the structural check
       // by one statement so `enrichContract` can decorate first.
       const enrichedIR = enrichContract(
         validatedContract.value as unknown as Contract,
         frameworkComponents,
       );
-      familyInstance.validateContract(enrichedIR);
+      familyInstance.deserializeContract(enrichedIR);
       // Each target's descriptor ships a `contractSerializer` SPI; the
       // framework canonicalizer threads its `serializeContract` so the
       // on-disk JSON envelope is constructed by target-owned code

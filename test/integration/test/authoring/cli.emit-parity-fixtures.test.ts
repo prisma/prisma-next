@@ -135,8 +135,8 @@ describe('emit parity fixtures', () => {
         const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
         const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);
 
-        const normalizedTs = familyInstance.validateContract(enrichedTs);
-        const normalizedPsl = familyInstance.validateContract(enrichedPsl);
+        const normalizedTs = familyInstance.deserializeContract(enrichedTs);
+        const normalizedPsl = familyInstance.deserializeContract(enrichedPsl);
         expect(normalizedTs).toEqual(normalizedPsl);
 
         const tsEmitFirst = await emit(normalizedTs, stack, sqlEmission);

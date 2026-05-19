@@ -194,7 +194,7 @@ describe('config loader', () => {
             version: '0.0.1',
             manifest: { packageName: '@prisma-next/sql-family', version: '0.0.1' },
             emission: mockHook,
-            validateContract: (contract: unknown) => contract,
+            deserializeContract: (contract: unknown) => contract,
             create: () => ({
               familyId: 'sql',
               verify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),

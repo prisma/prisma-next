@@ -15,7 +15,15 @@ import type {
 
 export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
   extends FamilyInstance<TFamilyId> {
-  validateContract(contractJson: unknown): Contract;
+  /**
+   * The family seam-of-record for on-disk contract reads. Structurally
+   * validates the JSON envelope and hydrates IR-class instances via the
+   * per-target ContractSerializer. The single named entry point every
+   * CLI on-disk read crosses (TML-2536) — `as Contract` casts in
+   * production package sources are a serializer-bypass smell guarded by
+   * `pnpm lint:no-contract-cast`.
+   */
+  deserializeContract(contractJson: unknown): Contract;
 
   verify(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;

@@ -11,7 +11,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 ## Responsibilities
 
 - **Family Descriptor Export**: Exports the SQL `ControlFamilyDescriptor` for use in CLI configuration files
-- **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `validateContract`)
+- **Family Instance Creation**: Creates `SqlFamilyInstance` objects that implement control-plane domain actions (`verify`, `schemaVerify`, `introspect`, `emitContract`, `deserializeContract`)
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlEmission`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
@@ -51,7 +51,7 @@ const stack = createControlStack({
 const familyInstance = sql.create(stack);
 
 // Use instance methods for domain actions
-const contract = familyInstance.validateContract(contractJson);
+const contract = familyInstance.deserializeContract(contractJson);
 const verifyResult = await familyInstance.verify({ driver, contract, ... });
 
 // Targets that implement SqlControlTargetDescriptor can build planners
@@ -96,7 +96,7 @@ The framework CLI uses this descriptor to:
 1. Create family instances for control-plane operations (via `create()`)
 
 Family instances implement domain actions:
-- **`validateContract(contractJson)`**: Validates and normalizes contract, returns `Contract` without mappings
+- **`deserializeContract(contractJson)`**: Validates and normalizes contract, returns `Contract` without mappings
 - **`verify()`**: Verifies database marker against contract (compares target, storageHash, profileHash)
 - **`schemaVerify()`**: Verifies database schema against contract (compares contract requirements vs live schema)
 - **`introspect()`**: Introspects database schema and returns `SqlSchemaIR`
@@ -108,7 +108,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 ## Package Structure
 
 - **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
-- **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContract`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
+- **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`deserializeContract`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
 - **`src/core/assembly.ts`**: Assembly helpers for extracting type imports, collecting codec-owned storage type control hooks, and composing mutation-default registries with duplicate detection.
 - **`src/core/verify.ts`**: Verification helpers (`parseContractMarkerRow`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations

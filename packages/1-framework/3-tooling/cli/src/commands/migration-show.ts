@@ -371,14 +371,14 @@ async function executeMigrationShowCommand(
   }
 
   // Construct the family instance up-front so the on-disk app contract
-  // read crosses the serializer seam (`familyInstance.validateContract`)
+  // read crosses the serializer seam (`familyInstance.deserializeContract`)
   // at the read site. See TML-2536.
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
 
   let appContract: Contract;
   try {
-    appContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
+    appContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
@@ -393,7 +393,7 @@ async function executeMigrationShowCommand(
     migrationsDir,
     appContract,
     extensionPacks: config.extensionPacks ?? [],
-    validateContract: (json: unknown) => familyInstance.validateContract(json),
+    deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
   });
   if (!aggregateResult.ok) {
     return notOk(aggregateResult.failure);

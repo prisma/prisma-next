@@ -29,9 +29,9 @@ import type { MigrationMetadata } from './metadata';
  * canonical emit pipeline".
  *
  * The helper does not introspect or schema-validate the inputs; runtime
- * validation is the responsibility of `validateContract` (codec-aware,
- * called by `family.validateContract` at control-stack construction)
- * and the per-migration `readMigrationPackage` reader used when loading
+ * validation is the responsibility of `family.deserializeContract`
+ * (codec-aware, invoked at control-stack construction) and the
+ * per-migration `readMigrationPackage` reader used when loading
  * from disk. JSON-imported packages flow through the descriptor without
  * a disk read, so the equivalent runtime guarantee comes from the emit
  * pipeline that produced the JSON in the first place.

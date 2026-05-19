@@ -31,7 +31,7 @@ describe('defineConfig', () => {
       emission: mockHook,
       create: () => ({
         familyId: 'sql',
-        validateContract: (contract: unknown) => contract as Contract,
+        deserializeContract: (contract: unknown) => contract as Contract,
         verify: async () => ({
           ok: true,
           summary: 'test',

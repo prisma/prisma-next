@@ -137,7 +137,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     migrationsDir,
     appContract: contract,
     extensionPacks,
-    validateContract: (json) => familyInstance.validateContract(json),
+    deserializeContract: (json) => familyInstance.deserializeContract(json),
     appMigrationPackages,
   };
   const loaded = await buildContractSpaceAggregate(loadInputs);

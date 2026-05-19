@@ -120,7 +120,7 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
   readonly migrationsDir: string;
   readonly appContract: Contract;
   readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
-  readonly validateContract: (contractJson: unknown) => Contract;
+  readonly deserializeContract: (contractJson: unknown) => Contract;
   /**
    * App-space migration packages to hydrate the app member's
    * migration graph with. Defaults to `[]` (matches the `db init` /
@@ -165,7 +165,7 @@ export async function buildContractSpaceAggregate<
     migrationsDir: inputs.migrationsDir,
     appContract: inputs.appContract,
     declaredExtensions,
-    validateContract: inputs.validateContract,
+    deserializeContract: inputs.deserializeContract,
     appMigrationPackages: inputs.appMigrationPackages ?? [],
   };
 

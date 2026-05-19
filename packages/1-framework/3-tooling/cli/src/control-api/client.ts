@@ -201,7 +201,7 @@ class ControlClientImpl implements ControlClient {
     // Validate contract using family instance
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -254,7 +254,7 @@ class ControlClientImpl implements ControlClient {
     // Validate contract using family instance
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -308,7 +308,7 @@ class ControlClientImpl implements ControlClient {
     // Validate contract using family instance
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -361,7 +361,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -392,7 +392,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -420,7 +420,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -466,7 +466,7 @@ class ControlClientImpl implements ControlClient {
 
     let contract: Contract;
     try {
-      contract = familyInstance.validateContract(options.contract);
+      contract = familyInstance.deserializeContract(options.contract);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ContractValidationError(message, error);
@@ -645,7 +645,7 @@ class ControlClientImpl implements ControlClient {
       // payload — `enrichContract` only adds capability + extension
       // metadata onto whatever shape it receives. The structural
       // check happens immediately afterwards via
-      // `familyInstance.validateContract(enrichedIR)`, which is
+      // `familyInstance.deserializeContract(enrichedIR)`, which is
       // the seam-of-record and the only thing that may surface
       // structural errors to the caller.
       const enrichedIR = enrichContract(
@@ -654,7 +654,7 @@ class ControlClientImpl implements ControlClient {
       );
 
       try {
-        this.familyInstance.validateContract(enrichedIR);
+        this.familyInstance.deserializeContract(enrichedIR);
       } catch (error) {
         onProgress?.({
           action: 'emit',

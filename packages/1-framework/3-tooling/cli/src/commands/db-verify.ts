@@ -271,7 +271,7 @@ async function resolveVerifySetup(
   // every other CLI on-disk read. The seam crossing for `db-verify`
   // happens downstream inside the family's `verify` operation
   // (`packages/1-framework/3-tooling/cli/src/control-api/operations/db-verify.ts`
-  // routes through `familyInstance.validateContract` before calling
+  // routes through `familyInstance.deserializeContract` before calling
   // into the family). Keeping the read here as raw JSON keeps the
   // boundary explicit and the seam-of-record in one place; the
   // `lint:no-contract-cast` guard intentionally does not flag this

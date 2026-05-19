@@ -120,7 +120,7 @@ function buildLoadInputs<TFamilyId extends string, TTargetId extends string>(
     migrationsDir: options.migrationsDir,
     appContract: options.contract,
     extensionPacks: options.extensionPacks,
-    validateContract: (json) => options.familyInstance.validateContract(json),
+    deserializeContract: (json) => options.familyInstance.deserializeContract(json),
   };
 }
 

@@ -161,10 +161,10 @@ describe('side-by-side contract examples', () => {
       const familyInstance = sql.create(sqlStack);
       const frameworkComponents = [postgres, postgresAdapter];
 
-      const normalizedTs = familyInstance.validateContract(
+      const normalizedTs = familyInstance.deserializeContract(
         enrichContract(fixture.tsContract, frameworkComponents),
       );
-      const normalizedPsl = familyInstance.validateContract(
+      const normalizedPsl = familyInstance.deserializeContract(
         enrichContract(providerResult.value, frameworkComponents),
       );
 
@@ -234,10 +234,10 @@ describe('side-by-side contract examples', () => {
       const familyInstance = mongoFamilyDescriptor.create(mongoStack);
       const frameworkComponents = [mongoTargetDescriptor, mongoAdapter];
 
-      const normalizedTs = familyInstance.validateContract(
+      const normalizedTs = familyInstance.deserializeContract(
         enrichContract(fixture.tsContract, frameworkComponents),
       );
-      const normalizedPsl = familyInstance.validateContract(
+      const normalizedPsl = familyInstance.deserializeContract(
         enrichContract(providerResult.value, frameworkComponents),
       );
 

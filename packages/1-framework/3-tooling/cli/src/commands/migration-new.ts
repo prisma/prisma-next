@@ -74,7 +74,7 @@ async function executeMigrationNewCommand(
   const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
 
   // Construct the family instance up-front so the on-disk contract read
-  // below crosses the serializer seam (`familyInstance.validateContract`)
+  // below crosses the serializer seam (`familyInstance.deserializeContract`)
   // at the read site, not somewhere downstream. See TML-2536.
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
@@ -98,7 +98,7 @@ async function executeMigrationNewCommand(
 
   let toContract: Contract;
   try {
-    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
+    toContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {

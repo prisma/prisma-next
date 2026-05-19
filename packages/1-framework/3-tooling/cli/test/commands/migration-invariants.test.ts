@@ -76,12 +76,12 @@ function setupConfigMock(
     readAllMarkers: vi
       .fn()
       .mockResolvedValue(markerRecord ? new Map([['app', markerRecord]]) : new Map()),
-    // Pass-through `validateContract` stub: the invariant tests construct
+    // Pass-through `deserializeContract` stub: the invariant tests construct
     // a skeletal contract for the read site (TML-2536 routes every on-disk
     // contract read through this seam), but the bugs under test are about
     // invariant routing, not contract validation. The stub keeps the seam
     // crossing in place without requiring a full hydrated contract fixture.
-    validateContract: (json: unknown) => json,
+    deserializeContract: (json: unknown) => json,
   };
   mocks.loadConfig.mockResolvedValue({
     family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue(familyInstance) },

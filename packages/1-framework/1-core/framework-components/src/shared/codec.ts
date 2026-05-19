@@ -47,7 +47,7 @@ export interface Codec<
   decode(wire: TWire, ctx: CodecCallContext): Promise<TInput>;
   /** Converts a JS value to a JSON-safe representation for contract serialization. Synchronous; called during contract emission. */
   encodeJson(value: TInput): JsonValue;
-  /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `validateContract`. */
+  /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `family.deserializeContract`. */
   decodeJson(json: JsonValue): TInput;
 }
 

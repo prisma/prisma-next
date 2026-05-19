@@ -35,12 +35,16 @@ export interface MongoControlFamilyInstance
     SchemaViewCapable<MongoSchemaIR>,
     OperationPreviewCapable {
   /**
-   * Validates the JSON contract envelope structurally and returns it
-   * cast to the framework `Contract` shape. The per-target serializer
-   * (held on the Mongo target descriptor) does the class-form wrap for
-   * downstream consumers; the family only needs the validated data.
+   * The family seam-of-record for on-disk contract reads. Structurally
+   * validates the JSON envelope, then casts to the framework `Contract`
+   * shape; the per-target serializer (held on the Mongo target
+   * descriptor) does the class-form wrap for downstream consumers, so
+   * the family only needs the validated data. The single named entry
+   * point every CLI on-disk read crosses (TML-2536) — `as Contract`
+   * casts in production package sources are a serializer-bypass smell
+   * guarded by `pnpm lint:no-contract-cast`.
    */
-  validateContract(contractJson: unknown): Contract;
+  deserializeContract(contractJson: unknown): Contract;
 }
 
 function deserializeMongoContract(contractJson: unknown): MongoContract {
@@ -57,7 +61,7 @@ function deserializeMongoContract(contractJson: unknown): MongoContract {
  * Family-method contract input. By the time control-plane methods
  * (`verify`, `verifySchema`, `sign`, …) are invoked through the CLI
  * control client (`client.ts`), the input has already been threaded
- * through `familyInstance.validateContract`. The value is therefore a
+ * through `familyInstance.deserializeContract`. The value is therefore a
  * class-form `MongoTargetContract` (or a structurally-equivalent
  * envelope post-deserialization) and must NOT be re-fed through
  * structural validation (arktype rejects extra keys like `namespaces`).
@@ -178,7 +182,7 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
   return {
     familyId: 'mongo' as const,
 
-    validateContract(contractJson: unknown): Contract {
+    deserializeContract(contractJson: unknown): Contract {
       // The deserialized class form (MongoTargetContract, owned by
       // target-mongo) and the framework Contract are structurally
       // compatible — same fields, just a class instance on the storage
