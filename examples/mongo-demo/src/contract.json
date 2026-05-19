@@ -215,9 +215,7 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__",
-        "kind": "mongo-database",
-        "tables": {
+        "collections": {
           "posts": {
             "indexes": [
               {
@@ -375,10 +373,12 @@
               "validationLevel": "strict"
             }
           }
-        }
+        },
+        "id": "__unbound__",
+        "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:c8e29b87d14615a493f5b9499e576b7c227ca470115a1a76051485352d780964"
+    "storageHash": "sha256:11b03abf36bced8a0310477fa203f41d2ec5fbc9cba0aebc6c85167c69483870"
   },
   "capabilities": {},
   "extensionPacks": {},
