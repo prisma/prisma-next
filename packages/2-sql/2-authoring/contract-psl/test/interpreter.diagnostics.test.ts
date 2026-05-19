@@ -1201,10 +1201,8 @@ namespace auth {
         controlMutationDefaults: builtinControlMutationDefaults,
       });
 
-      const reservedDiagnostics = result.ok
-        ? []
-        : result.failure.diagnostics.filter((d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME');
-      expect(reservedDiagnostics).toEqual([]);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
     });
   });
 });

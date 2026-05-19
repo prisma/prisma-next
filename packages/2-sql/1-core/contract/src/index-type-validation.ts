@@ -8,13 +8,13 @@ export function validateIndexTypes(
   contract: Contract<SqlStorage>,
   indexTypeRegistry: IndexTypeRegistry,
 ): void {
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
     for (const [tableName, rawTable] of Object.entries(ns.tables)) {
       const table = rawTable as StorageTable;
       for (const index of table.indexes) {
         if (index.type === undefined && index.options !== undefined) {
           throw new ContractValidationError(
-            `Table "${tableName}" index on columns [${index.columns.join(', ')}] has options without a type`,
+            `Namespace "${namespaceId}" table "${tableName}" index on columns [${index.columns.join(', ')}] has options without a type`,
             'storage',
           );
         }
@@ -22,7 +22,7 @@ export function validateIndexTypes(
         const entry = indexTypeRegistry.get(index.type);
         if (entry === undefined) {
           throw new ContractValidationError(
-            `Table "${tableName}" index on columns [${index.columns.join(', ')}] uses unregistered index type "${index.type}"`,
+            `Namespace "${namespaceId}" table "${tableName}" index on columns [${index.columns.join(', ')}] uses unregistered index type "${index.type}"`,
             'storage',
           );
         }
@@ -30,7 +30,7 @@ export function validateIndexTypes(
         const result = entry.options(optionsValue);
         if (result instanceof type.errors) {
           throw new ContractValidationError(
-            `Table "${tableName}" index on columns [${index.columns.join(', ')}] has invalid options for type "${index.type}": ${result.summary}`,
+            `Namespace "${namespaceId}" table "${tableName}" index on columns [${index.columns.join(', ')}] has invalid options for type "${index.type}": ${result.summary}`,
             'storage',
           );
         }

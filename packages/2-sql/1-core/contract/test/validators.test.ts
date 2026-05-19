@@ -659,7 +659,7 @@ describe('SQL contract validators', () => {
                 nativeType: 'int4',
                 codecId: 'pg/int4@1',
                 nullable: false,
-                default: { kind: 'literal', expression: '0' },
+                default: { kind: 'literal', value: 0 },
               },
             },
             { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
