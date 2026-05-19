@@ -2,6 +2,8 @@
 
 Loaded by `drive-check-health` and (via it) `drive-deliver-workflow`. Holds prisma-next's drift-signal thresholds, pick-next heuristics, throughput baselines.
 
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
+
 ## Drift-signal thresholds
 
 Threshold values for the canonical drift signals (calibrate as the team gathers data):

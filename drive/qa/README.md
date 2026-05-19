@@ -2,6 +2,8 @@
 
 > **Orchestrator-authored scaffold.** This file was created during an unattended run of `drive-orchestrate-plan` to satisfy the hard-error contract in `drive-qa-plan` / `drive-qa-run`. The `drive-bootstrap-context` skill is not installed here yet; refine this scaffold once a human is back in the loop.
 
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
+
 Project-context bootstrap used by the `drive-qa-plan` and `drive-qa-run` skills when authoring manual-QA scripts and running them against this repo.
 
 ## Consumer audiences
