@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  createControlStack,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
@@ -236,7 +238,7 @@ async function resolveVerifyPaths(options: DbVerifyOptions) {
 type VerifyPaths = Awaited<ReturnType<typeof resolveVerifyPaths>>;
 
 interface VerifySetup extends VerifyPaths {
-  readonly contractJson: Record<string, unknown>;
+  readonly contractJson: Contract;
   readonly dbConnection: string;
 }
 
@@ -266,20 +268,24 @@ async function resolveVerifySetup(
     );
   }
 
-  // The cast here is the unstructured-shape one (`as Record<string,
-  // unknown>`), not the `as Contract` bypass pattern TML-2536 closed in
-  // every other CLI on-disk read. The seam crossing for `db-verify`
-  // happens downstream inside the family's `verify` operation
-  // (`packages/1-framework/3-tooling/cli/src/control-api/operations/db-verify.ts`
-  // routes through `familyInstance.deserializeContract` before calling
-  // into the family). Keeping the read here as raw JSON keeps the
-  // boundary explicit and the seam-of-record in one place; the
-  // `lint:no-contract-cast` guard intentionally does not flag this
-  // pattern.
-  let contractJson: Record<string, unknown>;
+  // Cross the family `deserializeContract` seam at the read site, just
+  // like every other CLI on-disk read (TML-2536). The downstream
+  // `dbVerify` op accepts the hydrated `Contract` directly and no
+  // longer re-deserializes.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
+  let contractJson: Contract;
   try {
-    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    contractJson = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
+    if (error instanceof ContractValidationError) {
+      return notOk(
+        errorContractValidationFailed(`Contract validation failed: ${error.message}`, {
+          where: { path: contractPathAbsolute },
+        }),
+      );
+    }
     return notOk(
       errorContractValidationFailed(
         `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,

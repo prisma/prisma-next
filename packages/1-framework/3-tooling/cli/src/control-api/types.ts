@@ -2,7 +2,7 @@ import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -251,7 +251,13 @@ export interface DbUpdateOptions {
  * portion of the verifier.
  */
 export interface DbVerifyOptions {
-  readonly contract: unknown;
+  /**
+   * Already-deserialized contract. Callers cross the family
+   * `deserializeContract` seam at the read site (TML-2536) and pass the
+   * hydrated value through unchanged; this op no longer re-runs the
+   * SerializerBase pipeline.
+   */
+  readonly contract: Contract;
   readonly migrationsDir: string;
   readonly strict: boolean;
   readonly skipSchema: boolean;

@@ -418,18 +418,10 @@ class ControlClientImpl implements ControlClient {
     await this.connectWithProgress(options.connection, 'dbVerify', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
-    let contract: Contract;
-    try {
-      contract = familyInstance.deserializeContract(options.contract);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new ContractValidationError(message, error);
-    }
-
     return executeDbVerify({
       driver,
       familyInstance,
-      contract,
+      contract: options.contract,
       migrationsDir: options.migrationsDir,
       targetId: this.options.target.targetId,
       extensionPacks: this.options.extensionPacks ?? [],
