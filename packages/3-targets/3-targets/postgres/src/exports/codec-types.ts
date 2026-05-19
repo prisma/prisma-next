@@ -18,6 +18,7 @@ type Branded<T, Shape extends Record<string, unknown>> = T & {
 };
 
 type BrandedString<Shape extends Record<string, unknown>> = Branded<string, Shape>;
+type BrandedDate<Shape extends Record<string, unknown>> = Branded<Date, Shape>;
 
 export type Char<N extends number> = BrandedString<{ __charLength: N }>;
 export type Varchar<N extends number> = BrandedString<{ __varcharLength: N }>;
@@ -27,10 +28,14 @@ export type Numeric<P extends number, S extends number | undefined = undefined> 
 }>;
 export type Bit<N extends number> = BrandedString<{ __bitLength: N }>;
 export type VarBit<N extends number> = BrandedString<{ __varbitLength: N }>;
-export type Timestamp<P extends number | undefined = undefined> = BrandedString<{
+// `Timestamp` / `Timestamptz` brand `Date` — the `pg/timestamp@1` and
+// `pg/timestamptz@1` codecs decode to `Date`. Branding `string` here would
+// contradict the codec's declared input/output and force consumers to cast
+// before calling Date methods on a projected column.
+export type Timestamp<P extends number | undefined = undefined> = BrandedDate<{
   __timestampPrecision: P;
 }>;
-export type Timestamptz<P extends number | undefined = undefined> = BrandedString<{
+export type Timestamptz<P extends number | undefined = undefined> = BrandedDate<{
   __timestamptzPrecision: P;
 }>;
 export type Time<P extends number | undefined = undefined> = BrandedString<{ __timePrecision: P }>;
