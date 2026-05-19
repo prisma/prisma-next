@@ -1,4 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 
@@ -180,8 +181,8 @@ describe('contract DSL authoring surface', () => {
     expect(appUserColumns?.['role']?.typeRef).toBe('Role');
     expect(storageTables['blog_post']?.foreignKeys).toEqual([
       {
-        columns: ['user_id'],
-        references: { table: 'app_user', columns: ['id'] },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'blog_post', columns: ['user_id'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_user_id_fkey',
         onDelete: 'cascade',
         constraint: true,
@@ -289,8 +290,12 @@ describe('contract DSL authoring surface', () => {
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.foreignKeys).toEqual([
       {
-        columns: ['author_id'],
-        references: { table: 'app_user', columns: ['id'] },
+        source: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          tableName: 'blog_post',
+          columns: ['author_id'],
+        },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_author_id_fkey',
         onDelete: 'cascade',
         constraint: true,

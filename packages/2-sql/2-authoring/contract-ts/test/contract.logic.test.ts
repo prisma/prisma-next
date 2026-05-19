@@ -58,8 +58,8 @@ describe('SqlContractSerializer logic validation', () => {
         indexes: [],
         foreignKeys: [
           {
-            columns: ['userId'],
-            references: { table: 'User', columns: ['id'] },
+            source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+            target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
             constraint: true,
             index: true,
           },
@@ -165,8 +165,12 @@ describe('SqlContractSerializer logic validation', () => {
           ...unboundTables(validContractInput.storage)['Post'],
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'NonExistent', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+              target: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'NonExistent',
+                columns: ['id'],
+              },
               constraint: true,
               index: true,
             },
@@ -225,8 +229,16 @@ describe('SqlContractSerializer logic validation', () => {
           indexes: [],
           foreignKeys: [
             {
-              columns: ['userId', 'tenantId'],
-              references: { table: 'User', columns: ['id', 'tenantId'] },
+              source: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'Post',
+                columns: ['userId', 'tenantId'],
+              },
+              target: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'User',
+                columns: ['id', 'tenantId'],
+              },
               constraint: true,
               index: true,
             },
@@ -342,8 +354,8 @@ describe('SqlContractSerializer logic validation', () => {
       };
       (contractTablesRecord(contract)['Post'] as Record<string, unknown>)['foreignKeys'] = [
         {
-          columns: ['userId'],
-          references: { table: 'User', columns: ['id'] },
+          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -384,8 +396,8 @@ describe('SqlContractSerializer logic validation', () => {
       };
       (contractTablesRecord(contract)['Post'] as Record<string, unknown>)['foreignKeys'] = [
         {
-          columns: ['userId'],
-          references: { table: 'User', columns: ['id'] },
+          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
           constraint: true,
           index: true,
         },

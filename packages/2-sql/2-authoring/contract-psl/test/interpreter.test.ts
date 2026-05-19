@@ -448,11 +448,12 @@ model Post {
               indexes: [{ columns: ['userId'] }],
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: {
-                    table: 'user',
-                    columns: ['id'],
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'post',
+                    columns: ['userId'],
                   },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                   onDelete: 'cascade',
                   onUpdate: 'cascade',
                 },
@@ -523,8 +524,16 @@ model Member {
               uniques: [{ columns: ['team_ref', 'member_id'] }],
               foreignKeys: [
                 {
-                  columns: ['team_ref'],
-                  references: { table: 'org_team', columns: ['team_id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'team_member',
+                    columns: ['team_ref'],
+                  },
+                  target: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'org_team',
+                    columns: ['team_id'],
+                  },
                 },
               ],
             },

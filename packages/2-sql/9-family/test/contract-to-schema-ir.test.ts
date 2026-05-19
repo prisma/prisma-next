@@ -483,8 +483,12 @@ describe('contractToSchemaIR', () => {
               },
               foreignKeys: [
                 {
-                  columns: ['authorId'],
-                  references: { table: 'User', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['authorId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   name: 'Post_authorId_fkey',
                   constraint: true,
                   index: true,
@@ -642,8 +646,12 @@ describe('contractToSchemaIR', () => {
               columns: { authorId: col({ nativeType: 'text' }) },
               foreignKeys: [
                 {
-                  columns: ['authorId'],
-                  references: { table: 'User', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['authorId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   constraint: true,
                   index: true,
                 },
@@ -678,8 +686,12 @@ describe('contractToSchemaIR', () => {
               primaryKey: { columns: ['userId'] },
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: { table: 'User', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   constraint: true,
                   index: true,
                 },
@@ -710,8 +722,12 @@ describe('contractToSchemaIR', () => {
               uniques: [{ columns: ['userId'] }],
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: { table: 'User', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   constraint: true,
                   index: true,
                 },
@@ -741,14 +757,22 @@ describe('contractToSchemaIR', () => {
               columns: { userId: col({ nativeType: 'text' }) },
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: { table: 'User', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   constraint: true,
                   index: true,
                 },
                 {
-                  columns: ['userId'],
-                  references: { table: 'User', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   constraint: true,
                   index: true,
                 },

@@ -43,8 +43,12 @@ function createFkTestContract(fkConfig: {
               indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: { table: 'user', columns: ['id'] },
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                   constraint: fkConfig.constraint,
                   index: fkConfig.index,
                 },

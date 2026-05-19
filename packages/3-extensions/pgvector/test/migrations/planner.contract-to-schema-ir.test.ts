@@ -751,8 +751,8 @@ const DEMO_BASE_TABLES = {
     primaryKey: { columns: ['id'] },
     foreignKeys: [
       {
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         constraint: true,
         index: true,
       },

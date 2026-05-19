@@ -418,8 +418,13 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['nonexistent'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['nonexistent'],
+                },
+
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               },
             ],
           },
@@ -455,8 +460,17 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'nonexistent', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'nonexistent',
+                  columns: ['id'],
+                },
               },
             ],
           },
@@ -492,8 +506,17 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['nonexistent'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'user',
+                  columns: ['nonexistent'],
+                },
               },
             ],
           },
@@ -529,8 +552,17 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id', 'id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'user',
+                  columns: ['id', 'id'],
+                },
               },
             ],
           },
@@ -733,8 +765,13 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               },
             ],
           },
@@ -906,8 +943,13 @@ describe('sql-target-family-hook', () => {
             indexes: [{ columns: ['userId'] }],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               },
             ],
           },

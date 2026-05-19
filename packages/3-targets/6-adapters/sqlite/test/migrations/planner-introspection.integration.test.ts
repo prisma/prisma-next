@@ -216,8 +216,12 @@ describe('SQLite planner + introspection round-trip', () => {
           primaryKey: { columns: ['id'] },
           foreignKeys: [
             {
-              columns: ['author_id'],
-              references: { table: 'authors', columns: ['id'] },
+              source: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'posts',
+                columns: ['author_id'],
+              },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'authors', columns: ['id'] },
               onDelete: 'cascade',
               constraint: true,
               index: true,

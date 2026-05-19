@@ -172,8 +172,12 @@ describe('SqlContractSerializer', () => {
           indexes: [],
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'NonExistent', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+              target: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'NonExistent',
+                columns: ['id'],
+              },
               constraint: true,
               index: true,
             },

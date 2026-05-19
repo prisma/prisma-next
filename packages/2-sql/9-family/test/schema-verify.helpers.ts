@@ -81,8 +81,8 @@ export function createContractTable(
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
-      columns: readonly string[];
-      references: { table: string; columns: readonly string[] };
+      source: { namespaceId: string; tableName: string; columns: readonly string[] };
+      target: { namespaceId: string; tableName: string; columns: readonly string[] };
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;

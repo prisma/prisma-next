@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
@@ -300,8 +301,12 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'User', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'Post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -365,8 +370,12 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'User', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'Post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -407,8 +416,12 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -445,8 +458,12 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: false,
                 index: true,
               },

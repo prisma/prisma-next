@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { StorageTable } from '../src/ir/storage-table';
@@ -90,26 +91,20 @@ describe('SQL contract factories', () => {
 
   describe('fk', () => {
     it('creates a ForeignKey', () => {
-      const foreignKey = fk(['userId'], 'user', ['id']);
+      const foreignKey = fk('post', ['userId'], 'user', ['id']);
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: {
-          table: 'user',
-          columns: ['id'],
-        },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         constraint: true,
         index: true,
       });
     });
 
     it('creates foreign key with name', () => {
-      const foreignKey = fk(['userId'], 'user', ['id'], { name: 'user_posts_fkey' });
+      const foreignKey = fk('post', ['userId'], 'user', ['id'], { name: 'user_posts_fkey' });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: {
-          table: 'user',
-          columns: ['id'],
-        },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         constraint: true,
         index: true,
         name: 'user_posts_fkey',
@@ -117,11 +112,16 @@ describe('SQL contract factories', () => {
     });
 
     it('creates composite foreign key', () => {
-      const foreignKey = fk(['tenantId', 'userId'], 'user', ['tenantId', 'id']);
+      const foreignKey = fk('post', ['tenantId', 'userId'], 'user', ['tenantId', 'id']);
       expect(foreignKey).toEqual({
-        columns: ['tenantId', 'userId'],
-        references: {
-          table: 'user',
+        source: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          tableName: 'post',
+          columns: ['tenantId', 'userId'],
+        },
+        target: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          tableName: 'user',
           columns: ['tenantId', 'id'],
         },
         constraint: true,
@@ -130,10 +130,10 @@ describe('SQL contract factories', () => {
     });
 
     it('creates foreign key with onDelete via options object', () => {
-      const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
+      const foreignKey = fk('post', ['userId'], 'user', ['id'], { onDelete: 'cascade' });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         onDelete: 'cascade',
         constraint: true,
         index: true,
@@ -141,13 +141,13 @@ describe('SQL contract factories', () => {
     });
 
     it('creates foreign key with onDelete and onUpdate', () => {
-      const foreignKey = fk(['userId'], 'user', ['id'], {
+      const foreignKey = fk('post', ['userId'], 'user', ['id'], {
         onDelete: 'cascade',
         onUpdate: 'noAction',
       });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'noAction',
         constraint: true,
@@ -156,14 +156,14 @@ describe('SQL contract factories', () => {
     });
 
     it('creates foreign key with name and referential actions via options', () => {
-      const foreignKey = fk(['userId'], 'user', ['id'], {
+      const foreignKey = fk('post', ['userId'], 'user', ['id'], {
         name: 'post_userId_fkey',
         onDelete: 'setNull',
         onUpdate: 'cascade',
       });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         name: 'post_userId_fkey',
         onDelete: 'setNull',
         onUpdate: 'cascade',
@@ -179,12 +179,12 @@ describe('SQL contract factories', () => {
       'setNull',
       'setDefault',
     ] as const)('accepts %s as a referential action', (action) => {
-      const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: action });
+      const foreignKey = fk('post', ['userId'], 'user', ['id'], { onDelete: action });
       expect(foreignKey.onDelete).toBe(action);
     });
 
     it('omits undefined referential actions from output', () => {
-      const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
+      const foreignKey = fk('post', ['userId'], 'user', ['id'], { onDelete: 'cascade' });
       expect(foreignKey).not.toHaveProperty('onUpdate');
     });
   });
@@ -243,12 +243,12 @@ describe('SQL contract factories', () => {
           id: col('int4', 'pg/int4@1'),
           userId: col('int4', 'pg/int4@1'),
         },
-        { fks: [fk(['userId'], 'user', ['id'])] },
+        { fks: [fk('post', ['userId'], 'user', ['id'])] },
       );
       expect(postTable.foreignKeys).toEqual([
         {
-          columns: ['userId'],
-          references: { table: 'user', columns: ['id'] },
+          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -266,7 +266,7 @@ describe('SQL contract factories', () => {
           pk: pk('id'),
           uniques: [unique('title')],
           indexes: [index('userId')],
-          fks: [fk(['userId'], 'user', ['id'])],
+          fks: [fk('post', ['userId'], 'user', ['id'])],
         },
       );
       expect(postTable.primaryKey).toEqual({ columns: ['id'] });
@@ -274,8 +274,8 @@ describe('SQL contract factories', () => {
       expect(postTable.indexes).toEqual([{ columns: ['userId'] }]);
       expect(postTable.foreignKeys).toEqual([
         {
-          columns: ['userId'],
-          references: { table: 'user', columns: ['id'] },
+          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },

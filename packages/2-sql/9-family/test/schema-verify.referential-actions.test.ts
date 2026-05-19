@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -20,8 +21,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               onDelete: 'cascade',
               index: false,
             },
@@ -74,8 +75,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               onDelete: 'cascade',
               index: false,
             },
@@ -133,8 +134,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               onUpdate: 'cascade',
               index: false,
             },
@@ -192,8 +193,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               onDelete: 'noAction',
               onUpdate: 'noAction',
               index: false,
@@ -247,8 +248,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               index: false,
             },
           ],

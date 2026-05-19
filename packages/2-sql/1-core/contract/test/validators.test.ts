@@ -365,7 +365,7 @@ describe('SQL contract validators', () => {
         { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
         {
           pk: pk('id'),
-          fks: [fk(['userId'], 'user', ['id'], { constraint: true, index: true })],
+          fks: [fk('post', ['userId'], 'user', ['id'], { constraint: true, index: true })],
         },
       );
       const c = createContract<SqlStorage>({
@@ -380,7 +380,7 @@ describe('SQL contract validators', () => {
         { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
         {
           pk: pk('id'),
-          fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: true })],
+          fks: [fk('post', ['userId'], 'user', ['id'], { constraint: false, index: true })],
         },
       );
       const c = createContract<SqlStorage>({
@@ -409,8 +409,12 @@ describe('SQL contract validators', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 index: true,
               },
             ],
@@ -440,8 +444,12 @@ describe('SQL contract validators', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: true,
               },
             ],
@@ -465,7 +473,7 @@ describe('SQL contract validators', () => {
             id: col('int4', 'pg/int4@1'),
             userId: col('int4', 'pg/int4@1'),
           },
-          { fks: [fk(['userId'], 'user', ['id'], { onDelete: action })] },
+          { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: action })] },
         );
         const s = createContract<SqlStorage>({
           storage: unboundTables({ post: postTable }),
@@ -480,7 +488,11 @@ describe('SQL contract validators', () => {
           id: col('int4', 'pg/int4@1'),
           userId: col('int4', 'pg/int4@1'),
         },
-        { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade', onUpdate: 'noAction' })] },
+        {
+          fks: [
+            fk('post', ['userId'], 'user', ['id'], { onDelete: 'cascade', onUpdate: 'noAction' }),
+          ],
+        },
       );
       const s = createContract<SqlStorage>({
         storage: unboundTables({ post: postTable }),
@@ -504,8 +516,16 @@ describe('SQL contract validators', () => {
                 indexes: [],
                 foreignKeys: [
                   {
-                    columns: ['userId'],
-                    references: { table: 'user', columns: ['id'] },
+                    source: {
+                      namespaceId: UNBOUND_NAMESPACE_ID,
+                      tableName: 'post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: UNBOUND_NAMESPACE_ID,
+                      tableName: 'user',
+                      columns: ['id'],
+                    },
                     onDelete: 'invalidAction',
                     constraint: true,
                     index: true,
@@ -525,7 +545,7 @@ describe('SQL contract validators', () => {
         { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
         {
           pk: pk('id'),
-          fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: false })],
+          fks: [fk('post', ['userId'], 'user', ['id'], { constraint: false, index: false })],
         },
       );
       const c = createContract<SqlStorage>({
@@ -545,7 +565,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', false),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
           ),
         }),
       }).storage;
@@ -564,7 +584,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', true),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
           ),
         }),
       }).storage;
@@ -581,7 +601,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', false),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'cascade' })] },
           ),
         }),
       }).storage;
@@ -598,7 +618,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', false),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setNull' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onUpdate: 'setNull' })] },
           ),
         }),
       }).storage;
@@ -616,7 +636,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', false),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
           ),
         }),
       }).storage;
@@ -642,7 +662,7 @@ describe('SQL contract validators', () => {
                 default: { kind: 'literal', expression: '0' },
               },
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
           ),
         }),
       }).storage;
@@ -659,7 +679,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', true),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
           ),
         }),
       }).storage;
@@ -676,7 +696,7 @@ describe('SQL contract validators', () => {
               id: col('int4', 'pg/int4@1'),
               userId: col('int4', 'pg/int4@1', false),
             },
-            { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setDefault' })] },
+            { fks: [fk('post', ['userId'], 'user', ['id'], { onUpdate: 'setDefault' })] },
           ),
         }),
       }).storage;
@@ -810,8 +830,8 @@ describe('SQL contract validators', () => {
             },
             {
               fks: [
-                fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
-                fk(['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
+                fk('user', ['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
+                fk('user', ['orgId'], 'org', ['id'], { onDelete: 'cascade' }),
               ],
             },
           ),

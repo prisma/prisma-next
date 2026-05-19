@@ -397,8 +397,8 @@ describe('NOT NULL column without default uses temporary default', () => {
         indexes: [],
         foreignKeys: [
           {
-            columns: ['orgId'],
-            references: { table: 'org', columns: ['id'] },
+            source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['orgId'] },
+            target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'org', columns: ['id'] },
             constraint: true,
             index: true,
           },
@@ -552,8 +552,12 @@ function createTestContract(
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
