@@ -19,18 +19,16 @@ import {
 } from './fixtures/runner-fixtures';
 
 /**
- * AC6 — multi-tenancy on Postgres via the late-bound `__unbound__`
- * namespace.
+ * Multi-tenancy on Postgres via the late-bound `__unbound__` namespace.
  *
- * A single contract authored with `namespaces: { __unbound__:
- * PostgresSchema.unbound }` is applied against two distinct tenant
- * schemas on the same Postgres instance, each addressed through the
- * connection's `search_path`. The planner must emit unqualified DDL
+ * A single contract authored with an unbound namespace is applied against
+ * two distinct tenant schemas on the same Postgres instance, each addressed
+ * through the connection's `search_path`. The planner must emit unqualified DDL
  * (no `"public"."tenant"` prefix) so each tenant ends up with its own
  * physical table. Insert / select round-trips on each tenant must
  * remain isolated.
  *
- * The R5 qualifier-routing test
+ * The qualifier-routing test
  * (`packages/3-extensions/postgres/test/psl-namespace-qualifier-routing.test.ts`)
  * proves the contract-side substrate; this test proves the runtime
  * side end-to-end with PGlite-backed Postgres.
@@ -85,7 +83,7 @@ async function executeStepsAgainst(
   }
 }
 
-describe.sequential('AC6 — `namespace unbound` multi-tenancy via search_path', () => {
+describe.sequential('`namespace unbound` multi-tenancy via search_path', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;
   let driver: PostgresControlDriver;
 
