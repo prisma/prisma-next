@@ -7,8 +7,7 @@ description: >
   projects/<project>/**, delete projects/<project>/, and open the close-out PR. Refuses
   to delete if DoD unmet or operator hasn't confirmed the classification. Atomic skill;
   invoked by drive-deliver-workflow once all slices are merged, or directly by the
-  operator at end-of-project. Replaces the close-out section that used to live in the
-  drive-project-workflow Cursor rule.
+  operator at end-of-project.
 metadata:
   version: "2026.5.19.2"
 ---
