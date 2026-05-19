@@ -8,6 +8,7 @@ import type {
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
+  SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { buildSqlContractFromDefinition } from './build-contract';
@@ -66,7 +67,7 @@ type ContractDefinition<
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
   readonly namespaces?: Namespaces;
-  readonly createNamespace?: (id: string) => Namespace;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
@@ -90,7 +91,7 @@ type ContractScaffold<
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
   readonly namespaces?: Namespaces;
-  readonly createNamespace?: (id: string) => Namespace;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
 };
 

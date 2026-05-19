@@ -3,7 +3,11 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import { StorageTable, type StorageTableInput } from '@prisma-next/sql-contract/types';
+import {
+  type SqlNamespaceTablesInput,
+  StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { escapeLiteral } from './sql-utils';
 
@@ -122,8 +126,8 @@ export class PostgresSchema extends NamespaceBase {
 export class PostgresUnboundSchema extends PostgresSchema {
   static readonly instance: PostgresUnboundSchema = new PostgresUnboundSchema();
 
-  private constructor() {
-    super({ id: UNBOUND_NAMESPACE_ID });
+  constructor(input?: PostgresSchemaInput) {
+    super(input ?? { id: UNBOUND_NAMESPACE_ID });
   }
 
   override qualifier(): string {
@@ -152,9 +156,9 @@ PostgresSchema.unbound = PostgresUnboundSchema.instance;
  * by reference and trust the resulting `SqlStorage.namespaces` map to
  * be value-stable for a given input set.
  */
-export function postgresCreateNamespace(id: string): PostgresSchema {
-  if (id === UNBOUND_NAMESPACE_ID) {
-    return PostgresSchema.unbound;
+export function postgresCreateNamespace(input: SqlNamespaceTablesInput): PostgresSchema {
+  if (input.id === UNBOUND_NAMESPACE_ID) {
+    return new PostgresUnboundSchema(input);
   }
-  return new PostgresSchema({ id });
+  return new PostgresSchema(input);
 }

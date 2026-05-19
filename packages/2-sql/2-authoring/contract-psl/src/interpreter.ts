@@ -35,6 +35,7 @@ import type {
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
+  type SqlNamespaceTablesInput,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import {
@@ -103,7 +104,7 @@ export interface InterpretPslDocumentToSqlContractInput {
    * without the factory and falls back to the family
    * `SqlUnboundNamespace` singleton.
    */
-  readonly createNamespace?: (id: string) => Namespace;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
 }
 
 function buildComposedExtensionPackRefs(

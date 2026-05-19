@@ -6,6 +6,7 @@ import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   ReferentialAction,
+  SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 
@@ -140,7 +141,7 @@ export interface ContractDefinition {
    * for a declared namespace coordinate. Mirrors
    * `ContractInput.createNamespace`.
    */
-  readonly createNamespace?: (id: string) => Namespace;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
 }

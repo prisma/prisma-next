@@ -17,6 +17,7 @@ import type {
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
+  SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -1261,7 +1262,7 @@ export type ContractInput<
    * before targets ship their factory stay byte-stable; multi-namespace
    * contracts must pass the factory through.
    */
-  readonly createNamespace?: (id: string) => Namespace;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

@@ -17,7 +17,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -525,17 +525,16 @@ export function buildSqlContractFromDefinition(
   for (const id of Object.keys(namespaceEnumTypesById)) {
     namespaceCoordinateIds.add(id);
   }
-  const namespaces: Record<string, SqlNamespaceTablesInput> = Object.fromEntries(
+  const { createNamespace } = definition;
+  const namespaces: Record<string, SqlNamespaceTablesInput | Namespace> = Object.fromEntries(
     [...namespaceCoordinateIds].sort().map((id) => {
       const enumTypes = namespaceEnumTypesById[id];
-      return [
+      const nsInput: SqlNamespaceTablesInput = {
         id,
-        {
-          id,
-          tables: tablesByNamespace[id] ?? {},
-          ...ifDefined('types', enumTypes),
-        } satisfies SqlNamespaceTablesInput,
-      ];
+        tables: tablesByNamespace[id] ?? {},
+        ...ifDefined('types', enumTypes),
+      };
+      return [id, createNamespace ? createNamespace(nsInput) : nsInput];
     }),
   );
   const storageWithoutHash = {
