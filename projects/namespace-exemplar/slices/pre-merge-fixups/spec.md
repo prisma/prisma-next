@@ -15,7 +15,7 @@ Items not in this slice were deferred. They belong to TML-2584 because they're s
 
 ## Items in scope (must land before PR #534 merges)
 
-### Item 1 — Schema verifier issues carry namespace coordinates; delete `effectiveSchemaForTable` / `locateTable` / `findSqlTable`
+### Item 1 — Schema verifier propagates namespace coordinate on issues; delete `effectiveSchemaForTable` / `locateTable` / `findSqlTable`
 
 **Problem.** The SQL family schema verifier walks `storage.namespaces[nsId].tables[name]` to find drift, but writes only `name` into the `SchemaIssue` it produces — destroying the namespace coordinate it already knew. The Postgres planner then has to re-derive the coordinate by walking `storage.namespaces` again via `locateTable`. This is the structural cause of:
 
@@ -23,27 +23,26 @@ Items not in this slice were deferred. They belong to TML-2584 because they're s
 - F06 — four independent reimplementations of the same "walk namespaces, find table by name" loop across planner-strategies, sql-renderer, issue-planner, emitter.
 - F03 partial — the planner needs `instanceof PostgresSchema` checks to decide where the unbound bucket projects, because the issue doesn't carry enough context to make that decision intrinsically.
 
-**Architectural insight surfaced during scoping.** `BaseSchemaIssue.table?: string` lives in `packages/1-framework/1-core/framework-components/src/control/control-result-types.ts` — i.e. at the **framework layer**. Mongo schema issues don't have a `table` (they have collections); their issue shape happens to share the same type by coincidence of vocabulary, not by structural alignment. The framework-level shape is a layering smell on its own. **Decision:** the table coordinate is family-specific (SQL); the SchemaIssue shape needs to split between framework-shared fields (kind, message, severity, etc.) and family-specific fields (SQL's table-coordinate, Mongo's collection-coordinate). This slice does that split.
+**Scope cut.** The minimal fix in this slice is to **add `namespaceId?: string` as a sibling field on the existing framework-layer `BaseSchemaIssue`**. The verifier populates it; the planner reads it. No type restructuring, no layering reshape. This is enough to fix F01 and to delete the four walks, which is what TML-2520 needs to ship cleanly.
+
+The deeper architectural cleanup — splitting `BaseSchemaIssue` between framework-shared fields and family-specific extensions (`SqlSchemaIssue` with a structured `table: { namespaceId, name }` pair, `MongoSchemaIssue` with its collection-coordinate shape) — is **not** in this slice. Tracked separately as [TML-2585](https://linear.app/prisma-company/issue/TML-2585/split-schemaissue-into-framework-shared-base-family-specific) because it's cross-cutting refactor that bloats PR #534's review surface without adding behavioural value the namespace exemplar needs.
 
 **Fix shape.**
 
-1. Split `BaseSchemaIssue` into:
-   - A framework-shared base carrying `kind`, `message`, and any other genuinely target-agnostic fields.
-   - A family-shaped extension per family — `SqlSchemaIssue` (in the SQL family) with `{ table: { namespaceId, name }, column, … }`; `MongoSchemaIssue` (in the Mongo family) with its own collection-coordinate shape.
-2. Update the SQL family schema verifier (`packages/2-sql/9-family/src/core/schema-verify/`) to populate `{ namespaceId, name }` at every issue construction site. The verifier already has the `nsId` in scope from its outer walk — change is one-line per construction site.
-3. Update the Mongo family schema verifier analogously for its coordinate shape.
-4. Update Postgres planner consumers (`planner-strategies.ts`, `issue-planner.ts`) to read `issue.table.namespaceId` directly. Replace every `locateTable(...)?.table` pattern with the direct lookup `storage.namespaces[issue.table.namespaceId].tables[issue.table.name]`.
-5. Update SQLite planner consumers analogously.
-6. Delete `effectiveSchemaForTable`. Layer 3 (the FR16c "where does the unbound bucket project?" logic) promotes to a polymorphic method on the namespace concretion (`PostgresSchema#ddlSchemaName(): string` / `PostgresUnboundSchema#ddlSchemaName(): string`), called by the planner once per namespace it touches. No more `instanceof PostgresSchema` in planner code.
-7. Delete `locateTable` (planner-strategies.ts), the inline equivalents in `sql-renderer.ts` and `issue-planner.ts`, and `findSqlTable` (emitter). All four were F06's "same walk reinvented four times."
-8. Update tests (Mongo schema-diff, schema-verify; Postgres planner tests).
+1. Add `readonly namespaceId?: string` to `BaseSchemaIssue` in `packages/1-framework/1-core/framework-components/src/control/control-result-types.ts`. Sibling field; optional (Mongo just doesn't populate it).
+2. Update the SQL family schema verifier (`packages/2-sql/9-family/src/core/schema-verify/`) to populate `namespaceId` at every issue construction site. The verifier already has `nsId` in scope from its outer walk — change is one assignment per construction site.
+3. Update Postgres planner consumers (`planner-strategies.ts`, `issue-planner.ts`) to read `issue.namespaceId` directly. Replace every `locateTable(...)?.table` pattern with the direct lookup `storage.namespaces[issue.namespaceId].tables[issue.table]`.
+4. Update SQLite planner consumers analogously.
+5. Delete `effectiveSchemaForTable`. Layer 3 (the FR16c "where does the unbound bucket project?" logic) promotes to a polymorphic method on the namespace concretion (`PostgresSchema#ddlSchemaName(): string` / `PostgresUnboundSchema#ddlSchemaName(): string`), called by the planner once per namespace it touches. No more `instanceof PostgresSchema` in planner code.
+6. Delete `locateTable` (planner-strategies.ts), the inline equivalents in `sql-renderer.ts` and `issue-planner.ts`, and `findSqlTable` (emitter). All four were F06's "same walk reinvented four times."
+7. Update tests (Postgres planner tests, SQLite planner tests, SQL family schema-verify tests). Mongo verifier tests don't need changes (they don't populate `namespaceId`; the field stays absent).
 
 **Acceptance criteria.**
 
-- **AC1.1.** `SchemaIssue` lives at the framework layer as a shape that contains only target-agnostic fields. `SqlSchemaIssue` (SQL family) and `MongoSchemaIssue` (Mongo family) carry the family-specific coordinate fields.
-- **AC1.2.** Every SQL schema-issue construction site populates `{ namespaceId, name }` for the table coordinate. Grep gate: no `issue.table: '...'` (bare-string) construction sites remain in the SQL family.
-- **AC1.3.** Every Postgres planner site that previously called `locateTable(...)?.table` reads from the issue's coordinate directly. Same for SQLite. Grep gate: zero references to `locateTable` / `effectiveSchemaForTable` / `findSqlTable` in `packages/**`.
-- **AC1.4.** Layer 3 of the old `effectiveSchemaForTable` is preserved behaviour-equivalently as a polymorphic method on `PostgresSchema` / `PostgresUnboundSchema`. No `instanceof PostgresSchema` in planner-strategies.ts.
+- **AC1.1.** `BaseSchemaIssue` carries a `readonly namespaceId?: string` sibling field. Optional; populated by the SQL family verifier, absent in Mongo issues.
+- **AC1.2.** Every SQL schema-issue construction site (in `packages/2-sql/9-family/src/core/schema-verify/`) populates `namespaceId` with the `nsId` from the verifier's outer walk. Grep gate: every place that builds an issue with `table:` also sets `namespaceId:`.
+- **AC1.3.** Every Postgres planner site that previously called `locateTable(...)?.table` or `effectiveSchemaForTable(ctx, issue.table)` reads from `issue.namespaceId` / `issue.table` directly. Same for SQLite. Grep gate: zero references to `locateTable` / `effectiveSchemaForTable` / `findSqlTable` in `packages/**`.
+- **AC1.4.** Layer 3 of the old `effectiveSchemaForTable` is preserved behaviour-equivalently as a polymorphic method on `PostgresSchema` / `PostgresUnboundSchema`. No `instanceof PostgresSchema` in `planner-strategies.ts`.
 - **AC1.5.** Regression test for the previously-silent F01 path: an issue naming a table that isn't in any namespace of `toContract.storage` returns an explicit error (not silent wrong-schema DDL). Same multi-namespace setup that would have exhibited the bug.
 - **AC1.6.** All existing tests pass: `pnpm typecheck`, `pnpm test:packages`, `pnpm fixtures:check`, `pnpm lint:deps` clean.
 
@@ -75,15 +74,21 @@ Items not in this slice were deferred. They belong to TML-2584 because they're s
 
 These don't change the slice's scope; they're recorded here so they don't get lost in chat:
 
-1. **`SchemaIssue` is mis-located at the framework layer.** The `table?: string` field assumes a SQL vocabulary that Mongo doesn't share. Item 1 splits this between framework-shared base + family-specific extension. The instinct that *cross-cutting type shapes should be family-aware* is a recurring theme — it's the same insight that drives TML-2584's framework `Namespace` narrowing (`{ id, kind }` only at the framework layer; `tables` / `collections` at the family layer).
+1. **`SchemaIssue` is mis-located at the framework layer.** The `table?: string` field assumes a SQL vocabulary that Mongo doesn't share. This slice ships the minimum viable fix (sibling `namespaceId?: string`) without restructuring the type; the proper layering split (`SqlSchemaIssue` / `MongoSchemaIssue` peer families over a narrowed framework base) is tracked as [TML-2585](https://linear.app/prisma-company/issue/TML-2585/split-schemaissue-into-framework-shared-base-family-specific). Same layering pattern TML-2584 applies to the framework `Namespace` interface (`{ id, kind }` only at framework; `tables` / `collections` at the family layer).
 
-2. **The "find by name across namespaces" walk has been reimplemented four times** (F06). The proliferation happened because every consumer was given the choice of *"do I look it up by name, or by coordinate?"* and the SchemaIssue API gave them only the name. Item 1 removes the choice — the coordinate is intrinsic to the issue — and the four reimplementations disappear with `effectiveSchemaForTable`.
+2. **The "find by name across namespaces" walk has been reimplemented four times** (F06). The proliferation happened because every consumer was given the choice of *"do I look it up by name, or by coordinate?"* and the SchemaIssue API gave them only the name. Item 1 removes the choice — the coordinate is intrinsic to the issue (as an optional sibling field for now; structurally required after TML-2585) — and the four reimplementations disappear with `effectiveSchemaForTable`.
 
 3. **Layer 3 of `effectiveSchemaForTable` is polymorphism deferred.** The `instanceof PostgresSchema` check is a missing method on the namespace concretion. Promoting it is mechanical given the existing polymorphic qualifier-dispatch pattern (`PostgresSchema#qualifyTable`, `PostgresUnboundSchema#qualifyTable`, etc., which PR #534's review § 2 already praised as clean). This is the only Layer-3-specific work; everything else collapses to direct lookups.
 
-## Deferred to TML-2584 (contract-ir-planes)
+## Deferred to follow-up tickets
 
-These items came up during the same scoping discussion but **do not** belong in this slice:
+These items came up during the same scoping discussion but **do not** belong in this slice. They're tracked separately so the layering doesn't get lost:
+
+### [TML-2585](https://linear.app/prisma-company/issue/TML-2585/split-schemaissue-into-framework-shared-base-family-specific) — Split `SchemaIssue` into framework base + family extensions
+
+The minimal `namespaceId?: string` sibling added in Item 1 is a stopgap. The honest layering shape (`SqlSchemaIssue` with structured `table: { namespaceId, name }`, `MongoSchemaIssue` with its collection coordinate, framework base with only target-agnostic fields) is cross-cutting type refactor that would bloat PR #534's review surface. Tracked as TML-2585 to land in its own focused PR or fold into TML-2584's blast radius.
+
+### [TML-2584](https://linear.app/prisma-company/issue/TML-2584/restructure-contract-ir-into-two-planes-domain-storage-with-uniform) — Contract IR planes
 
 - **Two-plane IR reshape** (`contract.domain[ns].models` + `contract.storage[ns].tables`) — structural reshape of the contract IR itself; ripples through 93+ index sites. See [`projects/contract-ir-planes/spec.md`](../../../contract-ir-planes/spec.md).
 - **Cross-model reference object-pair encoding** (`relation.to: { namespace, model }`, `model.base: { namespace, model }`, `roots[*]: { namespace, model }`) — generalises the FK reference shape; coordinated rename across emitter, serializer, validator, DSL.
