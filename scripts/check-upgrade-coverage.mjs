@@ -9,21 +9,27 @@
 // entries authored on the current commit graph belong.
 //
 //   1. Coverage. If the diff between prev and head touches `examples/`,
-//      the user-skill package must carry a matching upgrade-instructions
-//      directory. Same for `packages/3-extensions/` and the
-//      extension-upgrade-skill package. Two cases:
+//      the user-skill package must carry an upgrade-instructions
+//      directory for every consecutive minor step from prev to head.
+//      Same for `packages/3-extensions/` and the extension-upgrade-skill
+//      package. Two cases:
 //        - PR mode (head.minor === prev.minor, no bump on the branch):
-//          the diff is in-flight work; required directory is
-//          `upgrades/<head.minor>-to-<head.minor + 1>/`.
+//          the diff is in-flight work; the required chain is the
+//          single in-flight directory `upgrades/<head.minor>-to-<head.minor + 1>/`.
 //        - Publish mode (head.minor > prev.minor, bump landed): the
-//          diff describes everything shipping in this release;
-//          required directory is `upgrades/<prev.minor>-to-<head.minor>/`.
+//          diff describes everything shipping in this release; the
+//          required chain is every consecutive directory from
+//          `<prev.minor>-to-<prev.minor + 1>` through `<head.minor - 1>-to-<head.minor>`.
+//          When a minor was bumped in-tree but never actually published,
+//          the chain spans more than one step (e.g. 0.7-to-0.8 + 0.8-to-0.9
+//          for a 0.7 → 0.9 publish); each directory must exist.
 //
-//   2. New-entries-go-in-the-current-or-in-flight-directory. File
+//   2. New-entries-go-in-the-chain-or-in-flight-directory. File
 //      *adds* under either skill package's `upgrades/` tree must land
-//      in either the coverage directory (above) or the in-flight
-//      directory keyed to head alone. Modifications and removals are
-//      unrestricted, so old entries can be bug-fixed in place.
+//      in either one of the coverage-chain directories (above) or the
+//      in-flight directory keyed to head alone. Modifications and
+//      removals are unrestricted, so old entries can be bug-fixed in
+//      place.
 //
 // Usage:
 //   node scripts/check-upgrade-coverage.mjs [--mode pr|publish]
@@ -83,17 +89,34 @@ export function inFlightTransitionLabel(head) {
 }
 
 /**
- * The directory the coverage sub-check expects to find for a
- * (prev, head) pair. In PR-mode steady-state (prev.minor === head.minor)
- * the substrate diff is in-flight work and belongs in the in-flight
- * directory. In publish mode (head.minor > prev.minor) the diff
- * describes the release being shipped and belongs in `prev → head`.
+ * The ordered chain of consecutive transition directories the coverage
+ * sub-check expects to find for a (prev, head) pair.
+ *
+ * - PR-mode steady-state (prev.minor === head.minor): single-element
+ *   chain naming the in-flight directory; the substrate diff is in-flight
+ *   work.
+ * - Publish mode (head.minor > prev.minor, same major): one element per
+ *   consecutive minor step from prev.minor to head.minor. When a minor
+ *   was bumped in-tree but never actually published, the chain has
+ *   more than one element (e.g. 0.7-to-0.8 + 0.8-to-0.9 for a 0.7 → 0.9
+ *   publish); every directory in the chain must exist.
+ * - Major boundary (prev.major !== head.major): the minor counter
+ *   resets, so a literal minor-chain doesn't compose. Falls back to
+ *   the single-step prev → head label; chain semantics across a major
+ *   bump are deliberately out of scope.
  */
-export function coverageTransitionLabel(head, prev) {
-  if (head.minor === prev.minor) {
-    return inFlightTransitionLabel(head);
+export function coverageTransitionChain(head, prev) {
+  if (head.major !== prev.major) {
+    return [transitionLabel(prev, head)];
   }
-  return transitionLabel(prev, head);
+  if (head.minor === prev.minor) {
+    return [inFlightTransitionLabel(head)];
+  }
+  const labels = [];
+  for (let m = prev.minor; m < head.minor; m++) {
+    labels.push(`${head.major}.${m}-to-${head.major}.${m + 1}`);
+  }
+  return labels;
 }
 
 /**
@@ -235,7 +258,7 @@ export function runCheck({ repoRoot, mode, head, prev }) {
 
   const headMinor = `${headVersion.major}.${headVersion.minor}`;
   const prevMinor = `${prevVersion.major}.${prevVersion.minor}`;
-  const coverageTransition = coverageTransitionLabel(headVersion, prevVersion);
+  const coverageChain = coverageTransitionChain(headVersion, prevVersion);
   const inflightTransition = inFlightTransitionLabel(headVersion);
 
   const violations = [];
@@ -247,38 +270,49 @@ export function runCheck({ repoRoot, mode, head, prev }) {
   // action (e.g. internal-only change with incidental example
   // regeneration), the entry's `changes: []` placeholder shape says
   // exactly that and is cheap to ship.
+  //
+  // The chain spans every consecutive minor step from prev to head; a
+  // skip-publish (a minor bumped in-tree but never actually shipped)
+  // produces a multi-element chain and each directory must exist.
+  // One violation per missing directory keeps the diagnostic surface
+  // line-oriented and tells the author exactly which directories the
+  // gate wants.
   const examplesDiff = diffPaths(repoRoot, prev, head, ['examples/']);
   if (examplesDiff.length > 0) {
-    const requiredDir = `${USER_SKILL_PKG}/upgrades/${coverageTransition}`;
-    if (!existsSync(`${repoRoot}/${requiredDir}`)) {
-      violations.push({
-        rule: 'coverage',
-        substrate: 'examples/',
-        requiredDir,
-        sampleDiffPaths: examplesDiff.slice(0, 5),
-      });
+    for (const transition of coverageChain) {
+      const requiredDir = `${USER_SKILL_PKG}/upgrades/${transition}`;
+      if (!existsSync(`${repoRoot}/${requiredDir}`)) {
+        violations.push({
+          rule: 'coverage',
+          substrate: 'examples/',
+          requiredDir,
+          sampleDiffPaths: examplesDiff.slice(0, 5),
+        });
+      }
     }
   }
 
   const extDiff = diffPaths(repoRoot, prev, head, ['packages/3-extensions/']);
   if (extDiff.length > 0) {
-    const requiredDir = `${EXT_SKILL_PKG}/upgrades/${coverageTransition}`;
-    if (!existsSync(`${repoRoot}/${requiredDir}`)) {
-      violations.push({
-        rule: 'coverage',
-        substrate: 'packages/3-extensions/',
-        requiredDir,
-        sampleDiffPaths: extDiff.slice(0, 5),
-      });
+    for (const transition of coverageChain) {
+      const requiredDir = `${EXT_SKILL_PKG}/upgrades/${transition}`;
+      if (!existsSync(`${repoRoot}/${requiredDir}`)) {
+        violations.push({
+          rule: 'coverage',
+          substrate: 'packages/3-extensions/',
+          requiredDir,
+          sampleDiffPaths: extDiff.slice(0, 5),
+        });
+      }
     }
   }
 
-  // New-entries rule: an added file may live in either the coverage
-  // directory (the release this commit graph is preparing for, or the
-  // release just shipped in publish mode) or the in-flight directory
+  // New-entries rule: an added file may live in any directory in the
+  // coverage chain (the release this commit graph is preparing for, or
+  // each step of a skip-publish release) or the in-flight directory
   // (the next release after head). Anything in an older transition
   // directory is stale.
-  const allowedTransitions = new Set([coverageTransition, inflightTransition]);
+  const allowedTransitions = new Set([...coverageChain, inflightTransition]);
   const adds = diffAddedPaths(repoRoot, prev, head, [
     `${USER_SKILL_PKG}/upgrades/`,
     `${EXT_SKILL_PKG}/upgrades/`,
@@ -300,7 +334,7 @@ export function runCheck({ repoRoot, mode, head, prev }) {
     ok: violations.length === 0,
     headMinor,
     prevMinor,
-    coverageTransition,
+    coverageChain,
     inflightTransition,
     violations,
   };
