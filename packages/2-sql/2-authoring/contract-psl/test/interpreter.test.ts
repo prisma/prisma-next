@@ -811,7 +811,7 @@ model OrderItem {
     });
   });
 
-  describe('per-target namespace resolution (FR15 slice 2 / FR16c)', () => {
+  describe('per-target namespace resolution', () => {
     it('Postgres leaves implicit top-level declarations on the late-bound default slot (TS/PSL byte parity for single-namespace contracts)', () => {
       const document = parsePslDocument({
         schema: `model User {

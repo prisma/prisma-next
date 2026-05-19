@@ -185,7 +185,7 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
 const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
 
 /**
- * Per-target FR16c validation: walk the AST's namespace buckets and
+ * Per-target namespace-block validation: walk the AST's namespace buckets and
  * emit diagnostics for syntactic constructs the target does not accept.
  *
  * - **SQLite** has no schema concept and rejects every explicit
@@ -201,7 +201,7 @@ const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
  * yet wired; this helper closes only the diagnostic surface.
  */
 /**
- * Per-target FR15 lowering: map a PSL AST namespace bucket name to the
+ * Per-target namespace lowering: map a PSL AST namespace bucket name to the
  * resolved IR namespace id (the key downstream consumers use against
  * `SqlStorage.namespaces`).
  *
@@ -217,10 +217,10 @@ const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
  *   target-default-namespace surface so `__unspecified__` lowers to
  *   `public` consistently on both authoring paths.)
  * - **SQLite**: SQLite has no schema concept; every namespace
- *   collapses to the late-bound default. The FR16c validation step
- *   has already rejected any explicit `namespace { … }` block on
- *   SQLite, so the only bucket the lowering ever sees there is
- *   `__unspecified__`.
+ *   collapses to the late-bound default. The namespace-block
+ *   validation step (above) has already rejected any explicit
+ *   `namespace { … }` block on SQLite, so the only bucket the
+ *   lowering ever sees there is `__unspecified__`.
  *
  * Returns `undefined` for targets / bucket names with no explicit
  * namespaceId to assign — callers leave the model's `namespaceId`

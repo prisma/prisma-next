@@ -1084,7 +1084,7 @@ model User {
     );
   });
 
-  describe('per-target namespace dispatch (FR16c)', () => {
+  describe('per-target namespace dispatch', () => {
     it('SQLite rejects every explicit `namespace { … }` block with a SQLite-flavoured diagnostic', () => {
       const document = parsePslDocument({
         schema: `namespace auth {
