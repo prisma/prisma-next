@@ -58,11 +58,16 @@ function normaliseNamespaceEntry(
   if (ns instanceof NamespaceBase) {
     return ns;
   }
-  const collectionCount = Object.keys(ns.collections ?? {}).length;
+  // The framework `Namespace` interface only promises `id`; the remaining
+  // arm of this union — plain-object inputs accepted by `MongoStorageInput`
+  // — is `MongoNamespaceCollectionsInput`. The `instanceof` guard above
+  // discriminates the two; TypeScript can't narrow further without a hint.
+  const input = ns as MongoNamespaceCollectionsInput;
+  const collectionCount = Object.keys(input.collections ?? {}).length;
   if (nsKey === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
     return MongoUnboundNamespace.instance;
   }
-  return new MongoNamespacePayload(ns as MongoNamespaceCollectionsInput);
+  return new MongoNamespacePayload(input);
 }
 
 // Mongo concretions always store `MongoCollection` instances in
