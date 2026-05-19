@@ -23,7 +23,7 @@
     "@prisma-next/sql-operations": "workspace:0.9.0",
     "@prisma-next/sql-relational-core": "workspace:0.9.0",
     "@prisma-next/utils": "workspace:0.9.0",
-    "arktype": "^2.1.29",
+    "arktype": "^2.2.0",
     "pg": "catalog:",
     "pg-cursor": "^2.19.0"
   },
