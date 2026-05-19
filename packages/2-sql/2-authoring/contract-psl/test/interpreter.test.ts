@@ -880,6 +880,36 @@ model OrderItem {
       expect(json).not.toHaveProperty('namespaceId');
     });
 
+    it('Postgres accumulates enums declared across two namespace blocks with the same name', () => {
+      const document = parsePslDocument({
+        schema: `namespace tenant_a {
+  enum Status {
+    ACTIVE
+    INACTIVE
+  }
+}
+
+namespace tenant_a {
+  enum Tier {
+    FREE
+    PRO
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      const types = storage.namespaces['tenant_a']?.types ?? {};
+      expect(types).toHaveProperty('Status');
+      expect(types).toHaveProperty('Tier');
+    });
+
     it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {
       const document = parsePslDocument({
         schema: `model Post {

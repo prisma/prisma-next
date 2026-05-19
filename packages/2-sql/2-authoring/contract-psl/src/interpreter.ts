@@ -1488,7 +1488,15 @@ export function interpretPslDocumentToSqlContract(
     if (resolvedId === undefined) {
       continue;
     }
-    namedNamespaceEnumsByNsId.set(resolvedId, ns.enums);
+    // Read-then-merge so that any future change to the PSL parser (or to
+    // `resolveNamespaceIdForSqlTarget`) that produces two AST entries
+    // resolving to the same `resolvedId` would accumulate their enums
+    // rather than silently dropping the earlier set. Today the parser
+    // already merges duplicate `namespace <name> { … }` blocks into a
+    // single AST entry per name, so this loop sees one `ns` per
+    // resolvedId and the merge degrades to a plain set.
+    const existing = namedNamespaceEnumsByNsId.get(resolvedId) ?? [];
+    namedNamespaceEnumsByNsId.set(resolvedId, [...existing, ...ns.enums]);
   }
 
   const compositeTypes = input.document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
