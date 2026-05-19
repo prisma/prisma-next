@@ -18,7 +18,7 @@ Pilots a project from project-spec-exists state to project-DoD-met state. Workfl
 
 The loop:
 
-```
+```text
 project spec + plan exist
         │
         ▼
@@ -60,7 +60,7 @@ Use **when a project has a spec + plan and you want it driven to delivery**:
 
 - `projects/<project>/spec.md` exists with: purpose statement, scope boundary, project-DoD.
 - `projects/<project>/plan.md` exists with: slice + direct-change composition; stack / parallel sequencing.
-- Project DoR has been met (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Project DoR).
+- Project DoR has been met (per `drive/spec/README.md` overlays and § Project DoR in `drive-specify-project`).
 - An associated Linear Project exists (per `drive-start-workflow`'s new-project / promote setup) — for status tracking.
 
 ## Post-conditions
@@ -141,7 +141,7 @@ If invoked without an operator session:
 ## Pitfalls
 
 1. **Slice picked while its dependencies in the stack haven't merged.** Symptom: the slice's brief references "the foo helper introduced in slice 3" which doesn't exist yet. Always check stack dependencies before picking.
-2. **Health check skipped between slices.** Drift compounds invisibly. The cadence (per [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Project-health rollup cadence) is per-slice-merge in interactive mode, on-trigger in unattended.
+2. **Health check skipped between slices.** Drift compounds invisibly. The cadence (per `drive/health/README.md` overlays) is per-slice-merge in interactive mode, on-trigger in unattended.
 3. **Retro deferred to "later" rather than fired on trigger.** The trigger is the signal; deferring means the next slice runs with the lesson unrecorded.
 4. **Mandatory final retro skipped at project close.** Per invariant I10, the retro is part of project DoD. `drive-close-project` refuses to close without it; bypassing the gate breaks the protocol-as-memory loop.
 5. **Project close-out that deletes `projects/<project>/` without migrating long-lived docs.** Migration is mandatory; the `docs/`-landing is part of close-out per `drive-close-project`'s checklist.
@@ -172,9 +172,8 @@ If invoked without an operator session:
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 2 — Project initiation + Project closure workflows
-- [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Project-health rollup cadence; § Per-project cadence
-- [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Project DoR
-- [`projects/drive-domain-model/principles/definition-of-done.md`](/projects/drive-domain-model/principles/definition-of-done.md) § Project DoD
-- [`projects/drive-domain-model/principles/retro.md`](/projects/drive-domain-model/principles/retro.md) — mandatory-final-retro mechanics
-- [`projects/drive-domain-model/principles/gradual-ai-adoption.md`](/projects/drive-domain-model/principles/gradual-ai-adoption.md) — operators at lower delegation levels can run this loop manually by invoking the atomic skills directly
+- [`drive/project/README.md`](../../drive/project/README.md) — project-level conventions, slice-composition patterns
+- [`drive/health/README.md`](../../drive/health/README.md) — project-health rollup cadence overlays
+- [`drive/spec/README.md`](../../drive/spec/README.md) — project DoR / DoD authoring overlays
+- [`drive/retro/README.md`](../../drive/retro/README.md) — mandatory-final-retro mechanics and landing surfaces
+- [`drive/README.md`](../../drive/README.md) — protocol-as-memory; operators can run atomic skills manually without this workflow
