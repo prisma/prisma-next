@@ -1,6 +1,6 @@
 # Drive trial — framing + recording protocol
 
-> **Trial window:** 2026-05-19 → 2026-06-02 (two weeks). Linear synthesis ticket: _filed alongside this doc; ID stamped in here once it exists._
+> **Trial window:** 2026-05-19 → 2026-06-02 (two weeks). Linear synthesis ticket: [TML-2567](https://linear.app/prisma-company/issue/TML-2567/drive-trial-synthesise-findings-and-prepare-upstream-pr-to-ignite).
 
 ## Why we're trialling
 
@@ -86,7 +86,7 @@ Each file starts empty (with the header skeleton) and accumulates entries throug
 
 ## End-of-trial synthesis
 
-The Linear synthesis ticket fires on or after 2026-06-02. An agent picks it up and:
+The Linear synthesis ticket ([TML-2567](https://linear.app/prisma-company/issue/TML-2567/drive-trial-synthesise-findings-and-prepare-upstream-pr-to-ignite)) fires on or after 2026-06-02. The ticket body contains the full agent prompt; the high-level shape is:
 
 1. Reads every `drive/*/findings.md`.
 2. Synthesises the entries into a report under `wip/drive-trial-report.md` covering: did-it-work / did-it-provide-value / did-it-solve-the-problems, by skill family, with concrete problems and suggested actions.
