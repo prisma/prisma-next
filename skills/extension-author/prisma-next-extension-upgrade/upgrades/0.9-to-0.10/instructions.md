@@ -102,7 +102,7 @@ There is no codemod for this — extensions construct `SqlStorage` via too many 
 
   The helper is idempotent — input already carrying the `kind` field passes through unchanged.
 
-- **Postgres-enum literal** (e.g. `types: { user_type: { codecId: 'pg/enum@1', nativeType: 'user_type', typeParams: { values: ['admin', 'user'] } } }`): replace with a `PostgresEnumType` class instance from `@prisma-next/postgres`:
+- **Postgres-enum literal** (e.g. `types: { user_type: { codecId: 'pg/enum@1', nativeType: 'user_type', typeParams: { values: ['admin', 'user'] } } }`): the canonical fix is to replace with a `PostgresEnumType` class instance from `@prisma-next/postgres`:
 
   ```ts
   import { PostgresEnumType } from '@prisma-next/postgres';
@@ -120,6 +120,24 @@ There is no codemod for this — extensions construct `SqlStorage` via too many 
   ```
 
   The class instance carries `kind: 'postgres-enum'` and the structural shape the family discriminates on. Plain object literals with `kind: 'postgres-enum'` are rejected — the constructor route is mandatory because hydration of raw JSON envelopes is the target-specific serializer's job (cross-domain layering: the SQL family doesn't know about Postgres-enum's concrete class).
+
+  **Minimal-fix alternative for fixtures / round-trip tests.** If the code in question only round-trips the codec triple as a plain envelope (no target-specific enum behaviour — e.g. a planner test fixture that never reaches Postgres-enum planning hooks), stamping `kind: 'codec-instance'` on the existing literal is a sufficient and idempotent fix:
+
+  ```ts
+  const fixtureStorage: SqlStorageInput = {
+    types: {
+      user_type: {
+        kind: 'codec-instance',
+        codecId: 'pg/enum@1',
+        nativeType: 'user_type',
+        typeParams: { values: ['admin', 'user'] },
+      },
+    },
+    // …
+  };
+  ```
+
+  The SQL family treats the entry as an opaque codec triple and round-trips it unchanged. Use this form only when you do not need `PostgresEnumType`'s enum-specific structural fields (`name`, `values` lifted out of `typeParams`) or its enum-planning behaviour — otherwise prefer the `PostgresEnumType` constructor above.
 
 - **Test fixtures that round-trip a contract through JSON** (e.g. `JSON.parse(JSON.stringify(contract))`): ensure the source-side contract is constructed with stamped entries before the round-trip; the deserializer now refuses to silently re-stamp on the read.
 
