@@ -96,7 +96,12 @@ interface Result {
 async function findContractSnapshots(root: string): Promise<string[]> {
   const out: string[] = [];
 
-  async function walk(dir: string): Promise<void> {
+  // The `inMigrations` flag confines snapshot rewrites to the
+  // `migrations/` subtree the doc promises. Without the flag the walk
+  // would happily stamp any `start-contract.json` / `end-contract.json`
+  // found anywhere under the project root, including non-migration
+  // fixtures (e.g. inline contract test snapshots).
+  async function walk(dir: string, inMigrations: boolean): Promise<void> {
     let entries: Awaited<ReturnType<typeof readdir>>;
     try {
       entries = await readdir(dir, { withFileTypes: true });
@@ -109,14 +114,14 @@ async function findContractSnapshots(root: string): Promise<string[]> {
     for (const entry of entries) {
       if (entry.isDirectory()) {
         if (SKIP_DIRS.has(entry.name)) continue;
-        await walk(join(dir, entry.name));
-      } else if (entry.isFile() && CONTRACT_FILES.has(entry.name)) {
+        await walk(join(dir, entry.name), inMigrations || entry.name === 'migrations');
+      } else if (inMigrations && entry.isFile() && CONTRACT_FILES.has(entry.name)) {
         out.push(join(dir, entry.name));
       }
     }
   }
 
-  await walk(root);
+  await walk(root, false);
   return out.sort();
 }
 
