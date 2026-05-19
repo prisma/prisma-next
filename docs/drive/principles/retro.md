@@ -92,7 +92,7 @@ If a retro produces none of these, **the retro failed.** The lesson exists only 
 
 The orchestrator's job is to name the output explicitly: "this retro produced [canonical / team-context / ADR / none — and here's why], landing at [path]." "None — but here's why" must explain *why the lesson doesn't generalise* (one-off, environmental, non-recurring). The default suspicion is that any lesson worth running a retro for is worth landing somewhere; "none — but here's why" is the exception.
 
-Transient retros — drafts during a project's lifetime — may land first in `projects/<x>/retros/<date>.md` while the operator decides whether they're team-context-worthy or canonical-worthy. The transient surface is not memory (per [`protocol-as-memory.md`](protocol-as-memory.md)'s tier table); the retro is not done until the final home is committed.
+A retro draft may be written in a temporary location while the operator decides whether it's team-context-worthy or canonical-worthy. That temporary surface is not memory (per [`protocol-as-memory.md`](protocol-as-memory.md)'s tier table); the retro is not done until the final home is committed.
 
 ## Which output to pick
 

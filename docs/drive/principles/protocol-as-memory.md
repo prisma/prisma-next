@@ -4,13 +4,13 @@
 
 Two places. One you share with everyone else using Drive; one is just for your team.
 
-```
+```text
 your-repo/
 ├── drive/                                ← your team's notes (this repo only)
 │   ├── spec/README.md                    ← read by drive-specify-slice
 │   ├── plan/README.md                    ← read by drive-plan-slice + drive-build-workflow
 │   ├── qa/README.md                      ← read by drive-qa-plan + drive-qa-run
-│   ├── code-review/README.md             ← read by drive-review-code
+│   ├── code-review/README.md             ← read by drive-code-review
 │   ├── pr/README.md                      ← read by drive-pr-description + drive-pr-walkthrough
 │   ├── project/README.md                 ← read by drive-create-project + drive-close-project
 │   ├── deployment/README.md              ← read by drive-create-deployment-plan

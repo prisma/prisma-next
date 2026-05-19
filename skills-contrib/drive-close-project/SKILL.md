@@ -70,6 +70,7 @@ Walk `projects/<project>/spec.md` § Acceptance Criteria. For each AC item:
 
 - **Met:** evidence (PR link, merged commit, test reference, doc location).
 - **Deferred:** explicit deferral with a follow-up Linear ticket reference.
+- **Cancelled-with-rationale:** AC explicitly dropped with documented reason.
 - **Unmet:** halt. Surface to the operator. Do **not** proceed.
 
 Also walk the canonical Project DoD (per `principles/definition-of-done.md`):
@@ -122,7 +123,7 @@ Default classification rules (override via `drive/project/README.md`):
 
 For each file produce a classification record:
 
-```
+```text
 <path>  →  long-lived | transient | ambiguous
   destination (if long-lived): docs/<project>/<sub-path>
   rationale (one line)

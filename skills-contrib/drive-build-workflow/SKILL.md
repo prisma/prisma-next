@@ -367,9 +367,9 @@ The on-disk artifacts that decouple the three agents:
 
 ```text
 projects/{project}/
-├── spec.md                          # intent, decisions, ACs (drive-create-spec)
+├── spec.md                          # intent, decisions, ACs (drive-specify-slice)
 ├── plans/
-│   └── plan.md                      # tasks, milestones, validation gates (drive-create-plan)
+│   └── plan.md                      # tasks, milestones, validation gates (drive-plan-slice)
 ├── reviews/
 │   └── code-review.md               # scoreboard + subagent IDs + F-numbered findings + terse round notes (reviewer-maintained)
 └── learnings.md                     # patterns surfaced this run (orchestrator-maintained; see § Project learnings)
@@ -599,7 +599,7 @@ Triggered replan steps:
    - `accept-and-add-tasks` → new tasks under the appropriate milestone, validation-gate amendments where needed.
    - `file-as-follow-up-ticket` → a new ticket in the team's tracker (e.g. Linear) with cross-link from `spec.md § Out of scope`.
    - `accept-as-out-of-scope` → an entry in `plan.md § Open items` with rationale.
-   - `restructure-the-plan` → a delta-plan; consider invoking `drive-create-plan` for a fresh take rather than open-heart-surgery on the current plan.
+   - `restructure-the-plan` → a delta-plan; consider invoking `drive-plan-slice` for a fresh take rather than open-heart-surgery on the current plan.
 4. After plan/spec edits land, orchestrator may re-delegate.
 
 The orchestrator should **never** delegate to the implementer with the new scope baked into a delegation prompt without the plan recording it. That hides scope from future rounds, defeats the artifact contract, and makes audit-trail reconstruction painful.

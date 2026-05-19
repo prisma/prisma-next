@@ -35,7 +35,7 @@ Result: feature-sized dispatches are locked to the orchestrator's tier throughou
 When a dispatch is M-sized with a sharp "Done when," the situation inverts:
 
 - **Narrow interpretation latitude.** A focused brief with pre-named edge cases gives the implementer few real decisions to make. Closer to "execute this specification" than "design and execute."
-- **Bounded recovery cost.** Drift in a 1-commit dispatch is trivially revertable. The protection against drift is verification + revert, not capability.
+- **Bounded recovery cost.** Drift in a 1-commit dispatch is trivially reversible. The protection against drift is verification + revert, not capability.
 - **Sharp verification.** Small scope is amenable to grep gates, test gates, fixture gates. The orchestrator verifies cheaply.
 - **Fits the implementer's context budget.** Smaller models absorb a focused brief and its referenced files without overflow.
 

@@ -4,7 +4,7 @@
 
 Drive's domain model has three sized **units of work** (Direct change, Slice, Project), one **delegation unit** (Dispatch), eight **workflows** (seven lifecycle-stage + one cross-cutting), three **aggregate roots** that the workflows mutate, and twelve **invariants** that hold across everything. Two forcing constraints — the PR cap (units of work) and the M-cap (dispatches) — keep work appropriately sized; an anti-corruption layer maps Drive's units to the team's tracker.
 
-```
+```text
 Sized units (smallest → largest):
   Direct change  →  Slice  →  Project
       (no spec)     (one PR)   (composes slices)

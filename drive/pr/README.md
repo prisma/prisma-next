@@ -56,7 +56,7 @@ For PRs routed as **direct change** by `drive-start-workflow`:
 
 - Each slice maps to a Linear Issue.
 - Issue description links back to `projects/<project>/slices/<slice>/` (in-project) or to the orphan-slice PR description path (orphan).
-- PR title prefix: `<tml-id>:` (Linear ticket). Example: `tml-2549: drive-domain-model consolidation`.
+- PR title follows the convention above: conventional-commit prefix + one-line summary + `(TML-NNNN)` suffix.
 - PR description references the Linear issue (`Refs: TML-XXXX` line OR included in the title — either is enough for auto-close).
 
 ## Linear state conventions

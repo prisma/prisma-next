@@ -4,7 +4,7 @@
 
 A team's use of Drive sits on a spectrum, not at a destination:
 
-```
+```text
        Zero AI                                                  Full delegation
   ───────────────────────────────────────────────────────────────────────────────
   Human reads, writes,    Human invokes atomic        Human invokes workflow   Agent runs the
