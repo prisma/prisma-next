@@ -13,7 +13,6 @@
     "emit:ts": "prisma-next contract emit --config prisma-next.config.ts-contract.ts",
     "db:init": "prisma-next db init",
     "db:drop": "tsx scripts/drop-db.ts",
-    "migration:plan:check": "tsx scripts/check-migration-plan.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",
     "start:no-emit": "tsx src/main-no-emit.ts",
