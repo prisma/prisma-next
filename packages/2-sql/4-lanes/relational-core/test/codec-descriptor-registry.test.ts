@@ -1,7 +1,10 @@
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage, SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  SqlStorage,
+  type SqlStorageTypeEntry,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { AnyCodecDescriptor } from '../src/ast/codec-types';
@@ -68,15 +71,14 @@ describe('buildCodecDescriptorRegistry', () => {
 
 describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
   function storageWith(parts: {
-    tables: SqlStorage['tables'];
+    tables: Record<string, StorageTableInput>;
     types?: Record<string, SqlStorageTypeEntry>;
   }): SqlStorage {
-    return {
+    return new SqlStorage({
       storageHash: 'sha256:test' as SqlStorage['storageHash'],
-      tables: parts.tables,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: parts.tables } },
       ...ifDefined('types', parts.types),
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    } as unknown as SqlStorage;
+    });
   }
 
   const descriptors = [stub('pg/vector@1', ['vector']), stub('pg/text@1', ['text'])];

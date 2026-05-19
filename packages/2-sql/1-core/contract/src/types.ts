@@ -7,9 +7,9 @@ export {
   type ReferentialAction,
 } from './ir/foreign-key';
 export {
-  ForeignKeyReferences,
-  type ForeignKeyReferencesInput,
-} from './ir/foreign-key-references';
+  ForeignKeyReference,
+  type ForeignKeyReferenceInput,
+} from './ir/foreign-key-reference';
 export {
   isPostgresEnumStorageEntry,
   POSTGRES_ENUM_KIND,
@@ -19,11 +19,12 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
-export { SqlUnspecifiedNamespace } from './ir/sql-unspecified-namespace';
+export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
 export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {

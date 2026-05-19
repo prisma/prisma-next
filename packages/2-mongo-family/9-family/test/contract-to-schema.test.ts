@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollection,
   type MongoCollectionOptions,
@@ -37,7 +38,12 @@ function makeContract(collections: Record<string, MongoCollectionData>): MongoCo
     models: {},
     storage: {
       storageHash: 'sha256:test-storage',
-      collections: builtCollections,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          collections: builtCollections,
+        },
+      },
     },
   } as unknown as MongoContract;
 }

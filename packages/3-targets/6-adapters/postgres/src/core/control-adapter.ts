@@ -3,6 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
@@ -193,17 +194,87 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * Uses batched queries to minimize database round trips (6 queries instead of 5T+1).
+   * When `contract` is provided and its storage declares more than one
+   * namespace (or any explicit bound namespace), the adapter walks every
+   * declared namespace and merges the per-schema introspection results
+   * into a single `SqlSchemaIR`. `UNBOUND_NAMESPACE_ID` resolves to the
+   * connection's `current_schema()` so late-bound tables follow the
+   * runtime `search_path`. When no contract is passed, the adapter falls
+   * back to introspecting the single `schema` argument (defaulting to
+   * `'public'`).
+   *
+   * Uses batched queries to minimize database round trips (6 queries per
+   * schema walked).
    *
    * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
-   * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
-   * @param schema - Schema name to introspect (defaults to 'public')
+   * @param contract - Optional contract for contract-guided introspection (multi-namespace walk, filtering)
+   * @param schema - Schema name to introspect when no contract is provided (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   async introspect(
     driver: ControlDriverInstance<'sql', 'postgres'>,
-    _contract?: unknown,
+    contract?: unknown,
     schema = 'public',
+  ): Promise<SqlSchemaIR> {
+    const declaredNamespaces = extractContractNamespaceIds(contract);
+    if (declaredNamespaces.length > 0) {
+      return this.introspectNamespaces(driver, declaredNamespaces);
+    }
+    return this.introspectSchema(driver, schema);
+  }
+
+  /**
+   * Walks every declared namespace, resolving `UNBOUND_NAMESPACE_ID` to
+   * the connection's `current_schema()`, and merges the per-schema results
+   * into a single `SqlSchemaIR`. The merged `tables` map is flat (keyed by
+   * table name) so callers that look up by `tableName` see every contract
+   * table regardless of which namespace it lives in.
+   */
+  private async introspectNamespaces(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    namespaceIds: readonly string[],
+  ): Promise<SqlSchemaIR> {
+    const resolvedSchemas = await Promise.all(
+      namespaceIds.map(async (id) => {
+        if (id === UNBOUND_NAMESPACE_ID) {
+          const { rows } = await driver.query<{ current_schema: string }>(
+            'SELECT current_schema() AS current_schema',
+          );
+          return rows[0]?.current_schema ?? 'public';
+        }
+        return id;
+      }),
+    );
+    const uniqueSchemas = Array.from(new Set(resolvedSchemas));
+
+    const perSchema = await Promise.all(uniqueSchemas.map((s) => this.introspectSchema(driver, s)));
+
+    const mergedTables: Record<string, SqlTableIR> = {};
+    for (const ir of perSchema) {
+      for (const [tableName, table] of Object.entries(ir.tables)) {
+        mergedTables[tableName] = table;
+      }
+    }
+
+    // Annotations carry the first schema's metadata (Postgres version,
+    // enum storage types). Multi-namespace storage types are introspected
+    // per schema; merging them is deferred until a contract actually
+    // declares enum types on more than one namespace.
+    const firstAnnotations = perSchema[0]?.annotations;
+    return {
+      tables: mergedTables,
+      ...ifDefined('annotations', firstAnnotations),
+    };
+  }
+
+  /**
+   * Introspects a single Postgres schema and returns a raw SqlSchemaIR
+   * containing only the tables in that schema. Used by `introspect` as
+   * the per-namespace walk.
+   */
+  private async introspectSchema(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    schema: string,
   ): Promise<SqlSchemaIR> {
     // Execute all queries in parallel for efficiency (6 queries instead of 5T+1)
     const [tablesResult, columnsResult, pkResult, fkResult, uniqueResult, indexResult] =
@@ -479,6 +550,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         {
           columns: string[];
           referencedTable: string;
+          referencedSchema: string;
           referencedColumns: string[];
           name: string;
           deleteRule: string;
@@ -494,6 +566,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           foreignKeysMap.set(fkRow.constraint_name, {
             columns: [fkRow.column_name],
             referencedTable: fkRow.referenced_table_name,
+            referencedSchema: fkRow.referenced_table_schema,
             referencedColumns: [fkRow.referenced_column_name],
             name: fkRow.constraint_name,
             deleteRule: fkRow.delete_rule,
@@ -505,6 +578,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         (fk) => ({
           columns: Object.freeze([...fk.columns]) as readonly string[],
           referencedTable: fk.referencedTable,
+          referencedSchema: fk.referencedSchema,
           referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
           name: fk.name,
           ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
@@ -617,6 +691,21 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const match = versionString.match(/PostgreSQL (\d+\.\d+)/);
     return match?.[1] ?? 'unknown';
   }
+}
+
+/**
+ * Extracts the namespace coordinate ids declared on a contract's storage,
+ * or returns an empty array when no contract (or no storage / namespaces)
+ * is present. Used by `PostgresControlAdapter.introspect` to decide
+ * between the multi-namespace walk and the single-schema fallback.
+ */
+function extractContractNamespaceIds(contract: unknown): readonly string[] {
+  if (contract === null || typeof contract !== 'object') return [];
+  const storage = (contract as { storage?: unknown }).storage;
+  if (storage === null || typeof storage !== 'object') return [];
+  const namespaces = (storage as { namespaces?: unknown }).namespaces;
+  if (namespaces === null || typeof namespaces !== 'object') return [];
+  return Object.keys(namespaces as Record<string, unknown>);
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {

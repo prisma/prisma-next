@@ -2,12 +2,15 @@ import pgvector from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 
 export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
     extensionPacks: { pgvector },
+    namespaces: ['public', 'auth'] as const,
+    createNamespace: postgresCreateNamespace,
     capabilities: {
       postgres: {
         lateral: true,
@@ -26,6 +29,7 @@ export const contract = defineContract(
     } as const;
 
     const User = model('User', {
+      namespace: 'auth',
       fields: {
         id: field.id.uuidv4(),
         email: field.text(),
@@ -37,6 +41,7 @@ export const contract = defineContract(
     });
 
     const Post = model('Post', {
+      namespace: 'public',
       fields: {
         id: field.id.uuidv4(),
         title: field.text(),

@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:15823d3626844985b4031c96aa28f09c9a50b00c88b0afa1f13a2543c4de7e4e'>;
+  StorageHashBase<'sha256:17efb9380d28aece136dac05fd18e62d63d164332bae788d13e3e4339b486839'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -80,7 +80,7 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: 'admin' | 'user';
+    readonly kind: CodecTypes['pg/enum@1']['output'];
     readonly address: AddressOutput | null;
   };
 };
@@ -126,185 +126,203 @@ export type TypeMaps = TypeMapsType<
 
 type ContractBase = ContractType<
   {
-    readonly tables: {
-      readonly bug: {
-        columns: {
-          readonly severity: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly stepsToRepro: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: true;
-          };
-        };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
-      readonly feature: {
-        columns: {
-          readonly priority: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly targetRelease: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: true;
-          };
-        };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
-      readonly post: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly userId: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [
-          {
-            readonly columns: readonly ['userId'];
-            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
-            readonly constraint: true;
-            readonly index: true;
-          },
-        ];
-      };
-      readonly task: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
-          };
-          readonly title: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly description: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: true;
-          };
-          readonly status: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-            readonly default: {
-              readonly kind: 'literal';
-              readonly value: DefaultLiteralValue<'pg/text@1', 'open'>;
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {
+          readonly bug: {
+            columns: {
+              readonly severity: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly stepsToRepro: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: true;
+              };
             };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
-          readonly type: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
+          readonly feature: {
+            columns: {
+              readonly priority: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly targetRelease: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: true;
+              };
+            };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
-          readonly userId: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
+          readonly post: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'character';
+                readonly codecId: 'sql/char@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly length: 36 };
+              };
+              readonly title: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly userId: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly createdAt: {
+                readonly nativeType: 'timestamptz';
+                readonly codecId: 'pg/timestamptz@1';
+                readonly nullable: false;
+                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+              };
+            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [
+              {
+                readonly source: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'post';
+                  readonly columns: readonly ['userId'];
+                };
+                readonly target: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'user';
+                  readonly columns: readonly ['id'];
+                };
+                readonly constraint: true;
+                readonly index: true;
+              },
+            ];
           };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+          readonly task: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'character';
+                readonly codecId: 'sql/char@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly length: 36 };
+              };
+              readonly title: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly description: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: true;
+              };
+              readonly status: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+                readonly default: {
+                  readonly kind: 'literal';
+                  readonly value: DefaultLiteralValue<'pg/text@1', 'open'>;
+                };
+              };
+              readonly type: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly userId: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly createdAt: {
+                readonly nativeType: 'timestamptz';
+                readonly codecId: 'pg/timestamptz@1';
+                readonly nullable: false;
+                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+              };
+            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [
+              {
+                readonly source: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'task';
+                  readonly columns: readonly ['userId'];
+                };
+                readonly target: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'user';
+                  readonly columns: readonly ['id'];
+                };
+                readonly constraint: true;
+                readonly index: true;
+              },
+            ];
+          };
+          readonly user: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'character';
+                readonly codecId: 'sql/char@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly length: 36 };
+              };
+              readonly email: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly displayName: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly createdAt: {
+                readonly nativeType: 'timestamptz';
+                readonly codecId: 'pg/timestamptz@1';
+                readonly nullable: false;
+                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+              };
+              readonly kind: {
+                readonly nativeType: 'user_type';
+                readonly codecId: 'pg/enum@1';
+                readonly nullable: false;
+                readonly typeRef: 'user_type';
+              };
+              readonly address: {
+                readonly nativeType: 'jsonb';
+                readonly codecId: 'pg/jsonb@1';
+                readonly nullable: true;
+              };
+            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [
-          {
-            readonly columns: readonly ['userId'];
-            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
-            readonly constraint: true;
-            readonly index: true;
-          },
-        ];
       };
-      readonly user: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
-            readonly nullable: false;
-            readonly typeParams: { readonly length: 36 };
-          };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly displayName: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly createdAt: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-          };
-          readonly kind: {
-            readonly nativeType: 'user_type';
-            readonly codecId: 'pg/enum@1';
-            readonly nullable: false;
-            readonly typeRef: 'user_type';
-          };
-          readonly address: {
-            readonly nativeType: 'jsonb';
-            readonly codecId: 'pg/jsonb@1';
-            readonly nullable: true;
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'sql-namespace';
+        readonly tables: {};
       };
     };
-    readonly types: {
-      readonly user_type: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/enum@1';
-        readonly nativeType: 'user_type';
-        readonly typeParams: { readonly values: readonly ['admin', 'user'] };
-      };
-    };
-    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
     readonly storageHash: StorageHash;
   },
   {
@@ -584,5 +602,5 @@ type ContractBase = ContractType<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Tables = Contract['storage']['tables'];
+export type Namespaces = Contract['storage']['namespaces'];
 export type Models = Contract['models'];

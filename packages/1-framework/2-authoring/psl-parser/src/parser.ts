@@ -15,11 +15,13 @@ import type {
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
+  PslNamespace,
   PslPosition,
   PslSpan,
   PslTypeConstructorCall,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
+import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 const SCALAR_TYPES = new Set([
@@ -61,92 +63,184 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     diagnostics,
   };
 
-  const models: PslModel[] = [];
-  const enums: PslEnum[] = [];
-  const compositeTypes: PslCompositeType[] = [];
+  interface NamespaceAccumulator {
+    name: string;
+    models: PslModel[];
+    enums: PslEnum[];
+    compositeTypes: PslCompositeType[];
+    span: PslSpan | undefined;
+  }
+
+  const namespaceOrder: string[] = [];
+  const namespacesByName = new Map<string, NamespaceAccumulator>();
+  const getOrCreateNamespace = (
+    name: string,
+    spanIfNew: PslSpan | undefined,
+  ): NamespaceAccumulator => {
+    let acc = namespacesByName.get(name);
+    if (!acc) {
+      acc = { name, models: [], enums: [], compositeTypes: [], span: spanIfNew };
+      namespacesByName.set(name, acc);
+      namespaceOrder.push(name);
+    }
+    return acc;
+  };
+
   let typesBlock: PslTypesBlock | undefined;
 
-  let lineIndex = 0;
-  while (lineIndex < lines.length) {
-    const rawLine = lines[lineIndex] ?? '';
-    const line = stripInlineComment(rawLine).trim();
-    if (line.length === 0) {
-      lineIndex += 1;
-      continue;
-    }
+  // Walk a contiguous range of lines, routing top-level declarations into the
+  // active namespace bucket. Called once for the whole document and once per
+  // `namespace { … }` block body; nested `namespace { … }` or `types { … }`
+  // blocks inside a namespace body are rejected with a diagnostic.
+  const parseBody = (
+    startLine: number,
+    endLineExclusive: number,
+    currentNamespaceName: string,
+    isInsideNamespace: boolean,
+  ): void => {
+    let lineIndex = startLine;
+    while (lineIndex < endLineExclusive) {
+      const rawLine = context.lines[lineIndex] ?? '';
+      const line = stripInlineComment(rawLine).trim();
+      if (line.length === 0) {
+        lineIndex += 1;
+        continue;
+      }
 
-    const modelMatch = line.match(/^model\s+([A-Za-z_]\w*)\s*\{$/);
-    if (modelMatch) {
-      const bounds = findBlockBounds(context, lineIndex);
-      const name = modelMatch[1] ?? '';
-      if (name.length === 0) {
+      const modelMatch = line.match(/^model\s+([A-Za-z_]\w*)\s*\{$/);
+      if (modelMatch) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const name = modelMatch[1] ?? '';
+        if (name.length > 0) {
+          const acc = getOrCreateNamespace(
+            currentNamespaceName,
+            createTrimmedLineSpan(context, lineIndex),
+          );
+          acc.models.push(parseModelBlock(context, name, bounds));
+        }
         lineIndex = bounds.endLine + 1;
         continue;
       }
-      models.push(parseModelBlock(context, name, bounds));
-      lineIndex = bounds.endLine + 1;
-      continue;
-    }
 
-    const enumMatch = line.match(/^enum\s+([A-Za-z_]\w*)\s*\{$/);
-    if (enumMatch) {
-      const bounds = findBlockBounds(context, lineIndex);
-      const name = enumMatch[1] ?? '';
-      if (name.length === 0) {
+      const enumMatch = line.match(/^enum\s+([A-Za-z_]\w*)\s*\{$/);
+      if (enumMatch) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const name = enumMatch[1] ?? '';
+        if (name.length > 0) {
+          const acc = getOrCreateNamespace(
+            currentNamespaceName,
+            createTrimmedLineSpan(context, lineIndex),
+          );
+          acc.enums.push(parseEnumBlock(context, name, bounds));
+        }
         lineIndex = bounds.endLine + 1;
         continue;
       }
-      enums.push(parseEnumBlock(context, name, bounds));
-      lineIndex = bounds.endLine + 1;
-      continue;
-    }
 
-    const compositeTypeMatch = line.match(/^type\s+([A-Za-z_]\w*)\s*\{$/);
-    if (compositeTypeMatch) {
-      const bounds = findBlockBounds(context, lineIndex);
-      const name = compositeTypeMatch[1] ?? '';
-      if (name.length === 0) {
+      const compositeTypeMatch = line.match(/^type\s+([A-Za-z_]\w*)\s*\{$/);
+      if (compositeTypeMatch) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const name = compositeTypeMatch[1] ?? '';
+        if (name.length > 0) {
+          const acc = getOrCreateNamespace(
+            currentNamespaceName,
+            createTrimmedLineSpan(context, lineIndex),
+          );
+          acc.compositeTypes.push(parseCompositeTypeBlock(context, name, bounds));
+        }
         lineIndex = bounds.endLine + 1;
         continue;
       }
-      compositeTypes.push(parseCompositeTypeBlock(context, name, bounds));
-      lineIndex = bounds.endLine + 1;
-      continue;
-    }
 
-    if (/^types\s*\{$/.test(line)) {
-      const bounds = findBlockBounds(context, lineIndex);
-      typesBlock = parseTypesBlock(context, bounds);
-      lineIndex = bounds.endLine + 1;
-      continue;
-    }
+      const namespaceMatch = line.match(/^namespace\s+([A-Za-z_]\w*)\s*\{$/);
+      if (namespaceMatch) {
+        const bounds = findBlockBounds(context, lineIndex);
+        const name = namespaceMatch[1] ?? '';
+        if (isInsideNamespace) {
+          pushDiagnostic(context, {
+            code: 'PSL_INVALID_NAMESPACE_BLOCK',
+            message: `Recursive "namespace ${name}" block is not allowed; namespace blocks may not nest`,
+            span: createTrimmedLineSpan(context, lineIndex),
+          });
+        } else if (name === UNSPECIFIED_PSL_NAMESPACE_ID) {
+          pushDiagnostic(context, {
+            code: 'PSL_INVALID_NAMESPACE_BLOCK',
+            message: `Namespace name "${UNSPECIFIED_PSL_NAMESPACE_ID}" is reserved for the parser-synthesised bucket for top-level declarations`,
+            span: createTrimmedLineSpan(context, lineIndex),
+          });
+        } else if (name.length > 0) {
+          getOrCreateNamespace(name, createTrimmedLineSpan(context, lineIndex));
+          parseBody(bounds.startLine + 1, bounds.endLine, name, true);
+        }
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
 
-    if (line.includes('{')) {
-      const blockName = line.split(/\s+/)[0] ?? 'block';
+      if (/^types\s*\{$/.test(line)) {
+        const bounds = findBlockBounds(context, lineIndex);
+        if (isInsideNamespace) {
+          pushDiagnostic(context, {
+            code: 'PSL_INVALID_NAMESPACE_BLOCK',
+            message:
+              '`types` blocks must be declared at the document top level, not inside a namespace block',
+            span: createTrimmedLineSpan(context, lineIndex),
+          });
+        } else if (typesBlock !== undefined) {
+          pushDiagnostic(context, {
+            code: 'PSL_INVALID_TYPES_MEMBER',
+            message: 'Only one top-level `types` block is allowed per document',
+            span: createTrimmedLineSpan(context, lineIndex),
+          });
+        } else {
+          typesBlock = parseTypesBlock(context, bounds);
+        }
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
+
+      if (line.includes('{')) {
+        const blockName = line.split(/\s+/)[0] ?? 'block';
+        pushDiagnostic(context, {
+          code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
+          message: `Unsupported top-level block "${blockName}"`,
+          span: createTrimmedLineSpan(context, lineIndex),
+        });
+        const bounds = findBlockBounds(context, lineIndex);
+        lineIndex = bounds.endLine + 1;
+        continue;
+      }
+
       pushDiagnostic(context, {
         code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
-        message: `Unsupported top-level block "${blockName}"`,
+        message: `Unsupported top-level declaration "${line}"`,
         span: createTrimmedLineSpan(context, lineIndex),
       });
-      const bounds = findBlockBounds(context, lineIndex);
-      lineIndex = bounds.endLine + 1;
-      continue;
+      lineIndex += 1;
     }
+  };
 
-    pushDiagnostic(context, {
-      code: 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK',
-      message: `Unsupported top-level declaration "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    lineIndex += 1;
+  parseBody(0, lines.length, UNSPECIFIED_PSL_NAMESPACE_ID, false);
+
+  // Named-type validation: types are document-scoped (one block, outside any
+  // namespace), so collision checks compare named-type names against every
+  // model/enum/composite-type in every namespace.
+  const allModels: PslModel[] = [];
+  const allEnums: PslEnum[] = [];
+  const allCompositeTypes: PslCompositeType[] = [];
+  for (const name of namespaceOrder) {
+    const acc = namespacesByName.get(name);
+    if (!acc) continue;
+    allModels.push(...acc.models);
+    allEnums.push(...acc.enums);
+    allCompositeTypes.push(...acc.compositeTypes);
   }
 
   const namedTypeNames = new Set(
     (typesBlock?.declarations ?? []).map((declaration) => declaration.name),
   );
-  const modelNames = new Set(models.map((model) => model.name));
-  const enumNames = new Set(enums.map((enumBlock) => enumBlock.name));
-  const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
+  const modelNames = new Set(allModels.map((model) => model.name));
+  const enumNames = new Set(allEnums.map((enumBlock) => enumBlock.name));
+  const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
   for (const declaration of typesBlock?.declarations ?? []) {
     if (SCALAR_TYPES.has(declaration.name)) {
       pushDiagnostic(context, {
@@ -172,46 +266,72 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
       });
     }
   }
-  const normalizedModels = models.map((model) => ({
-    ...model,
-    fields: model.fields.map((field) => {
-      if (!namedTypeNames.has(field.typeName)) {
-        return field;
-      }
-      const hasRelationAttribute = field.attributes.some(
-        (attribute) => attribute.name === 'relation',
-      );
-      if (
-        hasRelationAttribute ||
-        modelNames.has(field.typeName) ||
-        enumNames.has(field.typeName) ||
-        compositeTypeNames.has(field.typeName) ||
-        SCALAR_TYPES.has(field.typeName)
-      ) {
-        return field;
-      }
-      return {
-        ...field,
-        typeRef: field.typeName,
-      };
-    }),
-  }));
+
+  const documentSpan: PslSpan = {
+    start: createPosition(context, 0, 0),
+    end: createPosition(
+      context,
+      Math.max(lines.length - 1, 0),
+      (lines[Math.max(lines.length - 1, 0)] ?? '').length,
+    ),
+  };
+
+  const namespaces: PslNamespace[] = [];
+  for (const name of namespaceOrder) {
+    const acc = namespacesByName.get(name);
+    if (!acc) continue;
+    // Drop the synthesised __unspecified__ entry when it ended up empty (e.g.
+    // every declaration in the document lived inside an explicit
+    // `namespace { … }` block). Keeping a phantom bucket would force every
+    // downstream consumer to special-case "namespace with no members".
+    if (
+      name === UNSPECIFIED_PSL_NAMESPACE_ID &&
+      acc.models.length === 0 &&
+      acc.enums.length === 0 &&
+      acc.compositeTypes.length === 0
+    ) {
+      continue;
+    }
+    const normalizedModels = acc.models.map((model) => ({
+      ...model,
+      fields: model.fields.map((field) => {
+        if (!namedTypeNames.has(field.typeName)) {
+          return field;
+        }
+        const hasRelationAttribute = field.attributes.some(
+          (attribute) => attribute.name === 'relation',
+        );
+        if (
+          hasRelationAttribute ||
+          modelNames.has(field.typeName) ||
+          enumNames.has(field.typeName) ||
+          compositeTypeNames.has(field.typeName) ||
+          SCALAR_TYPES.has(field.typeName)
+        ) {
+          return field;
+        }
+        return {
+          ...field,
+          typeRef: field.typeName,
+        };
+      }),
+    }));
+    namespaces.push({
+      kind: 'namespace',
+      name,
+      models: normalizedModels,
+      enums: acc.enums,
+      compositeTypes: acc.compositeTypes,
+      span: acc.span ?? documentSpan,
+    });
+  }
 
   const ast: PslDocumentAst = {
     kind: 'document',
     sourceId: input.sourceId,
-    models: normalizedModels,
-    enums,
-    compositeTypes,
+    namespaces,
     ...ifDefined('types', typesBlock),
-    span: {
-      start: createPosition(context, 0, 0),
-      end: createPosition(
-        context,
-        Math.max(lines.length - 1, 0),
-        (lines[Math.max(lines.length - 1, 0)] ?? '').length,
-      ),
-    },
+    span: documentSpan,
   };
 
   return {
@@ -665,15 +785,41 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     return undefined;
   }
 
-  const simpleTypeMatch = baseTypeSource.match(/^([A-Za-z_]\w*)$/);
-  const typeName = typeConstructor?.path.join('.') ?? simpleTypeMatch?.[1];
-  if (!typeName) {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_MODEL_MEMBER',
-      message: `Invalid model member declaration "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
+  let typeName: string;
+  let typeNamespaceId: string | undefined;
+
+  if (typeConstructor) {
+    typeName = typeConstructor.path.join('.');
+  } else {
+    const dotCount = (baseTypeSource.match(/\./g) ?? []).length;
+    if (dotCount > 1) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_QUALIFIED_TYPE',
+        message: `Nested dot-qualified type "${baseTypeSource}" is not supported; use exactly one qualifier segment (e.g. "ns.TypeName")`,
+        span: createInlineSpan(
+          context,
+          lineIndex,
+          typeStartColumn,
+          typeStartColumn + baseTypeSource.length,
+        ),
+      });
+      return undefined;
+    }
+    const singleMatch = baseTypeSource.match(/^([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?$/);
+    if (!singleMatch) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_MODEL_MEMBER',
+        message: `Invalid model member declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      return undefined;
+    }
+    if (singleMatch[2] !== undefined) {
+      typeNamespaceId = singleMatch[1];
+      typeName = singleMatch[2];
+    } else {
+      typeName = singleMatch[1] ?? '';
+    }
   }
 
   const attributes: PslFieldAttribute[] = [];
@@ -694,6 +840,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
       kind: 'field',
       name: fieldName,
       typeName,
+      ...ifDefined('typeNamespaceId', typeNamespaceId),
       ...ifDefined('typeConstructor', typeConstructor),
       optional,
       list,
@@ -718,6 +865,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     kind: 'field',
     name: fieldName,
     typeName,
+    ...ifDefined('typeNamespaceId', typeNamespaceId),
     ...ifDefined('typeConstructor', typeConstructor),
     optional,
     list,

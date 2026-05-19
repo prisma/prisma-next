@@ -15,7 +15,8 @@ export interface StorageTableInput {
 }
 
 /**
- * SQL Contract IR node for a single table entry in `SqlStorage.tables`.
+ * SQL Contract IR node for a single table entry in a namespace's
+ * `tables` map.
  *
  * The constructor normalises nested IR-class fields (columns, primary
  * key, uniques, indexes, foreign keys) into the appropriate class
@@ -23,10 +24,7 @@ export interface StorageTableInput {
  * the input was a JSON literal or an already-constructed class.
  *
  * The table's `name` is not on the class — tables are keyed by name in
- * the parent `SqlStorage.tables: Record<string, StorageTable>` map.
- * A future namespace-aware milestone will add a `namespaceId` field
- * when namespace-keyed storage lands; today's single-namespace shape
- * needs neither field.
+ * the parent namespace's `tables: Record<string, StorageTable>` map.
  */
 export class StorageTable extends SqlNode {
   readonly columns: Readonly<Record<string, StorageColumn>>;

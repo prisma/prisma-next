@@ -76,7 +76,7 @@ State both principles explicitly in the architecture docs.
 **What this looks like in practice.**
 
 - A developer who learns to read a Postgres contract.json — `storage.tables.<name>.columns.<name>` — reads a SQLite contract.json the same way. The SQLite column carries different `nativeType` values, no fancy defaults, but the *walk* is identical.
-- A developer who learns the namespace concept on Postgres — top-level `namespace { … }`, dot-qualified `auth.User` in `@relation`, `__unspecified__` for connection-bound binding — reads the Mongo equivalent the same way. Mongo's namespace IS the database; the singleton `MongoTargetUnspecifiedDatabase` elides the database prefix when rendering. The mental model carries; the rendering details differ.
+- A developer who learns the namespace concept on Postgres — top-level `namespace { … }`, dot-qualified `auth.User` in `@relation`, `__unbound__` for the late-bound IR slot the connection resolves at runtime — reads the Mongo equivalent the same way. Mongo's namespace IS the database; the singleton `MongoTargetUnboundDatabase` elides the database prefix when rendering. The mental model carries; the rendering details differ.
 - A developer who writes a verifier for a new target reads the existing verifiers — `PostgresSchemaVerifier`, `MongoTargetSchemaVerifier` — and finds the same shape: `extends <family>SchemaVerifierBase`, override `verifyTargetExtensions`. The new target slots into a known recipe rather than inventing a new one.
 
 **What this rules out.**

@@ -2,10 +2,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 function createContract(overrides: Partial<Contract>): Contract {
-  return {
-    targetFamily: 'sql',
+  const merged = {
+    targetFamily: 'sql' as const,
     target: 'test-db',
     models: {},
     roots: {},
@@ -13,9 +14,11 @@ function createContract(overrides: Partial<Contract>): Contract {
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:test',
+    profileHash: 'sha256:test' as const,
     ...overrides,
   };
+  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
+  return merged as Contract;
 }
 
 describe('sql-target-family-hook', () => {

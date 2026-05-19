@@ -44,12 +44,27 @@ function minimal(overrides?: Record<string, unknown>): Contract {
   };
 }
 
+const UNBOUND = '__unbound__';
+
+function unboundStorage(tables: Record<string, unknown>): Record<string, unknown> {
+  return {
+    storageHash: 'sha256:stub',
+    namespaces: {
+      [UNBOUND]: { id: UNBOUND, tables },
+    },
+  };
+}
+
 function drill(obj: Record<string, unknown>, ...keys: string[]): Record<string, unknown> {
   let current: unknown = obj;
   for (const key of keys) {
     current = (current as Record<string, unknown>)[key];
   }
   return current as Record<string, unknown>;
+}
+
+function unboundTables(result: Record<string, unknown>): Record<string, unknown> {
+  return drill(result, 'storage', 'namespaces', UNBOUND, 'tables');
 }
 
 describe('canonicalizeContractToObject', () => {
@@ -201,19 +216,16 @@ describe('default omission', () => {
   it('strips onDelete: noAction and onUpdate: noAction', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            posts: {
-              foreignKeys: {
-                fk_user: { onDelete: 'noAction', onUpdate: 'noAction', columns: ['user_id'] },
-              },
+        storage: unboundStorage({
+          posts: {
+            foreignKeys: {
+              fk_user: { onDelete: 'noAction', onUpdate: 'noAction', columns: ['user_id'] },
             },
           },
-        },
+        }),
       }),
     );
-    const fk = drill(result, 'storage', 'tables', 'posts', 'foreignKeys', 'fk_user');
+    const fk = drill(unboundTables(result), 'posts', 'foreignKeys', 'fk_user');
     expect(fk).not.toHaveProperty('onDelete');
     expect(fk).not.toHaveProperty('onUpdate');
   });
@@ -226,11 +238,9 @@ describe('default omission', () => {
     expect(result['meta']).toEqual({});
   });
 
-  it('preserves empty storage.tables', () => {
-    const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:stub', tables: {} } }),
-    );
-    expect(drill(result, 'storage')['tables']).toEqual({});
+  it('preserves empty storage.namespaces[].tables', () => {
+    const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }));
+    expect(unboundTables(result)).toEqual({});
   });
 
   it('preserves empty roots', () => {
@@ -257,15 +267,12 @@ describe('default omission', () => {
   it('preserves empty table uniques, indexes, and foreignKeys', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            users: { columns: {}, uniques: [], indexes: [], foreignKeys: {} },
-          },
-        },
+        storage: unboundStorage({
+          users: { columns: {}, uniques: [], indexes: [], foreignKeys: {} },
+        }),
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(unboundTables(result), 'users');
     expect(table['uniques']).toEqual([]);
     expect(table['indexes']).toEqual([]);
     expect(table['foreignKeys']).toEqual({});
@@ -274,19 +281,16 @@ describe('default omission', () => {
   it('strips false-valued FK boolean fields (constraint, index)', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            posts: {
-              foreignKeys: {
-                fk_user: { columns: ['user_id'], constraint: false, index: false },
-              },
+        storage: unboundStorage({
+          posts: {
+            foreignKeys: {
+              fk_user: { columns: ['user_id'], constraint: false, index: false },
             },
           },
-        },
+        }),
       }),
     );
-    const fk = drill(result, 'storage', 'tables', 'posts', 'foreignKeys', 'fk_user');
+    const fk = drill(unboundTables(result), 'posts', 'foreignKeys', 'fk_user');
     expect(fk).not.toHaveProperty('constraint');
     expect(fk).not.toHaveProperty('index');
   });
@@ -306,14 +310,13 @@ describe('default omission', () => {
     expect(drill(result, 'extensionPacks')['paradedb']).toEqual({});
   });
 
-  it('preserves empty storage.collections and collection entries', () => {
+  it('preserves empty per-namespace table entries (e.g. Mongo collections with no schema)', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: { storageHash: 'sha256:stub', collections: { tasks: {} } },
+        storage: unboundStorage({ tasks: {} }),
       }),
     );
-    const storage = drill(result, 'storage');
-    expect(storage['collections']).toEqual({ tasks: {} });
+    expect(unboundTables(result)['tasks']).toEqual({});
   });
 
   it('preserves empty model storage (embedded documents)', () => {
@@ -384,18 +387,15 @@ describe('index and unique sorting', () => {
   it('sorts indexes by name', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            users: {
-              columns: {},
-              indexes: [{ name: 'idx_z' }, { name: 'idx_a' }, { name: 'idx_m' }],
-            },
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            indexes: [{ name: 'idx_z' }, { name: 'idx_a' }, { name: 'idx_m' }],
           },
-        },
+        }),
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(unboundTables(result), 'users');
     const indexes = table['indexes'] as Array<{ name: string }>;
     expect(indexes.map((i) => i.name)).toEqual(['idx_a', 'idx_m', 'idx_z']);
   });
@@ -403,27 +403,22 @@ describe('index and unique sorting', () => {
   it('sorts uniques by name', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            users: {
-              columns: {},
-              uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
-            },
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
           },
-        },
+        }),
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(unboundTables(result), 'users');
     const uniques = table['uniques'] as Array<{ name: string }>;
     expect(uniques.map((u) => u.name)).toEqual(['uq_a', 'uq_z']);
   });
 
-  it('handles storage without tables (no-op)', () => {
+  it('handles storage without namespaces (no-op)', () => {
     const result = canonicalizeContractToObject(
-      minimal({
-        storage: { storageHash: 'sha256:stub', collections: { tasks: {} } },
-      }),
+      minimal({ storage: { storageHash: 'sha256:stub' } }),
     );
     expect(result['storage']).toBeDefined();
   });
@@ -454,18 +449,15 @@ describe('index and unique sorting', () => {
   it('sorts indexes without name using empty-string fallback', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            users: {
-              columns: {},
-              indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
-            },
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
           },
-        },
+        }),
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(unboundTables(result), 'users');
     const indexes = table['indexes'] as Array<{ name?: string }>;
     expect(indexes[0]?.['name']).toBeUndefined();
     expect(indexes[1]?.['name']).toBe('idx_a');
@@ -474,18 +466,15 @@ describe('index and unique sorting', () => {
   it('sorts uniques without name using empty-string fallback', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: {
-            users: {
-              columns: {},
-              uniques: [{ columns: ['b'] }, { name: 'uq_a', columns: ['a'] }],
-            },
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            uniques: [{ columns: ['b'] }, { name: 'uq_a', columns: ['a'] }],
           },
-        },
+        }),
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(unboundTables(result), 'users');
     const uniques = table['uniques'] as Array<{ name?: string }>;
     expect(uniques[0]?.['name']).toBeUndefined();
     expect(uniques[1]?.['name']).toBe('uq_a');
@@ -494,14 +483,10 @@ describe('index and unique sorting', () => {
   it('handles non-object table entries gracefully', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: {
-          storageHash: 'sha256:stub',
-          tables: { bad: null as unknown as Record<string, unknown> },
-        },
+        storage: unboundStorage({ bad: null as unknown as Record<string, unknown> }),
       }),
     );
-    const tables = drill(result, 'storage', 'tables');
-    expect(tables['bad']).toBeNull();
+    expect(unboundTables(result)['bad']).toBeNull();
   });
 });
 

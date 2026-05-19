@@ -317,6 +317,13 @@ const StorageCollectionSchema = type({
   'options?': MongoCollectionOptionsSchema,
 });
 
+const MongoNamespaceEnvelopeSchema = type({
+  '+': 'reject',
+  id: 'string',
+  'kind?': 'string',
+  'collections?': type({ '[string]': StorageCollectionSchema }),
+});
+
 export const MongoContractSchema = type({
   '+': 'reject',
   targetFamily: "'mongo'",
@@ -332,7 +339,7 @@ export const MongoContractSchema = type({
   '_generated?': 'Record<string, unknown>',
   storage: type({
     '+': 'reject',
-    collections: type({ '[string]': StorageCollectionSchema }),
+    namespaces: type({ '[string]': MongoNamespaceEnvelopeSchema }),
     'storageHash?': 'string',
   }),
   models: type({ '[string]': ModelDefinitionSchema }),

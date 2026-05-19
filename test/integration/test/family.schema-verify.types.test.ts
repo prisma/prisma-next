@@ -223,15 +223,21 @@ describe('family instance schemaVerify - types', () => {
           ...contract,
           storage: {
             ...contract.storage,
-            tables: {
-              ...contract.storage.tables,
-              user: {
-                ...contract.storage.tables.user,
-                columns: {
-                  ...contract.storage.tables.user.columns,
-                  email: {
-                    ...contract.storage.tables.user.columns.email,
-                    codecId: 'pg/unknown-type@1' as const, // Type not in registry
+            namespaces: {
+              ...contract.storage.namespaces,
+              __unbound__: {
+                ...contract.storage.namespaces.__unbound__,
+                tables: {
+                  ...contract.storage.namespaces.__unbound__.tables,
+                  user: {
+                    ...contract.storage.namespaces.__unbound__.tables.user,
+                    columns: {
+                      ...contract.storage.namespaces.__unbound__.tables.user.columns,
+                      email: {
+                        ...contract.storage.namespaces.__unbound__.tables.user.columns.email,
+                        codecId: 'pg/unknown-type@1' as const,
+                      },
+                    },
                   },
                 },
               },

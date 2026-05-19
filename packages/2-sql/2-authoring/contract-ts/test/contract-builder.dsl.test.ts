@@ -1,8 +1,10 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
+import { unboundTables } from './unbound-tables';
 
 const typecheckOnly = process.env['PN_TYPECHECK_ONLY'] === 'true';
 
@@ -146,7 +148,7 @@ describe('contract DSL authoring surface', () => {
         Post,
       },
     });
-    const storageTables = contract.storage.tables as Record<
+    const storageTables = unboundTables(contract.storage) as Record<
       string,
       {
         readonly primaryKey?: unknown;
@@ -179,8 +181,8 @@ describe('contract DSL authoring surface', () => {
     expect(appUserColumns?.['role']?.typeRef).toBe('Role');
     expect(storageTables['blog_post']?.foreignKeys).toEqual([
       {
-        columns: ['user_id'],
-        references: { table: 'app_user', columns: ['id'] },
+        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'blog_post', columns: ['user_id'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_user_id_fkey',
         onDelete: 'cascade',
         constraint: true,
@@ -264,7 +266,7 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const tables = contract.storage.tables as Record<
+    const tables = unboundTables(contract.storage) as Record<
       string,
       {
         primaryKey?: unknown;
@@ -288,8 +290,12 @@ describe('contract DSL authoring surface', () => {
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.foreignKeys).toEqual([
       {
-        columns: ['author_id'],
-        references: { table: 'app_user', columns: ['id'] },
+        source: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          tableName: 'blog_post',
+          columns: ['author_id'],
+        },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_author_id_fkey',
         onDelete: 'cascade',
         constraint: true,
@@ -437,7 +443,9 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    expect((contract.storage.tables as Record<string, unknown>)['membership']).toMatchObject({
+    expect(
+      (unboundTables(contract.storage) as Record<string, unknown>)['membership'],
+    ).toMatchObject({
       primaryKey: {
         columns: ['org_id', 'user_id'],
         name: 'membership_pkey',
@@ -571,7 +579,10 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const tables = contract.storage.tables as Record<string, { columns: Record<string, unknown> }>;
+    const tables = unboundTables(contract.storage) as Record<
+      string,
+      { columns: Record<string, unknown> }
+    >;
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();

@@ -49,36 +49,42 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:998b6036c01edd2f370b78adb2c2ab2d5130e6b701c680621c2d8a866f7ffca5",
-    "tables": {
-      "audit_event": {
-        "columns": {
-          "action": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "actor": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+    "namespaces": {
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
+        "tables": {
+          "audit_event": {
+            "columns": {
+              "action": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "actor": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "id": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
           }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
+        }
       }
-    }
+    },
+    "storageHash": "sha256:8443ccb2248a9ec206413fc3555bbe615d78bbabebc71aa8bdab00c025f78fbb"
   },
   "capabilities": {
     "postgres": {

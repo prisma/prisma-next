@@ -143,10 +143,10 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     );
     expect(addEmailOperation).toBeDefined();
     expect(addEmailOperation?.precheck.map((step) => step.sql)).toContain(
-      'SELECT NOT EXISTS (SELECT 1 FROM "public"."user" LIMIT 1)',
+      'SELECT NOT EXISTS (SELECT 1 FROM "user" LIMIT 1)',
     );
     expect(addEmailOperation?.execute.map((step) => step.sql)).toEqual([
-      'ALTER TABLE "public"."user" ADD COLUMN "email" text NOT NULL',
+      'ALTER TABLE "user" ADD COLUMN "email" text NOT NULL',
     ]);
     expect(planResult.plan.operations.map((op) => op.id)).toEqual([
       'column.user.email',

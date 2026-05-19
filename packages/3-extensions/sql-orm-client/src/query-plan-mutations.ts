@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   ColumnRef,
@@ -17,6 +18,12 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { combineWhereExprs } from './where-utils';
+
+function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
+  return contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[tableName] as
+    | StorageTable
+    | undefined;
+}
 
 function buildReturningColumns(
   contract: Contract<SqlStorage>,
@@ -46,7 +53,7 @@ function toParamAssignments(
 } {
   const assignments: Record<string, ParamRef> = {};
 
-  const table = contract.storage.tables[tableName];
+  const table = unboundTable(contract, tableName);
   if (!table) {
     throw new Error(`Unknown table "${tableName}"`);
   }
@@ -89,7 +96,7 @@ function normalizeInsertRows(
     }
   }
 
-  const table = contract.storage.tables[tableName];
+  const table = unboundTable(contract, tableName);
   if (!table) {
     throw new Error(`Unknown table "${tableName}"`);
   }

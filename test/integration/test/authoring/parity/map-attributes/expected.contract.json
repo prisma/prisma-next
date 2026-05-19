@@ -70,11 +70,11 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:0b1b00b081d25a35e80e03b23b2e79c0d1a2f12ebf6e0a8be4f56c1f77c83825",
+    "storageHash": "sha256:2183798067f22121a54305ca6e8749f0a3797c4d530613d49117f89330fcaa0d",
     "tables": {
       "org_team": {
         "columns": {

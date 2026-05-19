@@ -10,13 +10,20 @@ import type {
   ContractValueObject,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
   MongoCollection,
   MongoIndex,
   type MongoIndexKeyDirection,
 } from '@prisma-next/mongo-contract';
-import type { ParsePslDocumentResult, PslField, PslModel, PslSpan } from '@prisma-next/psl-parser';
+import type {
+  ParsePslDocumentResult,
+  PslField,
+  PslModel,
+  PslNamespace,
+  PslSpan,
+} from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
@@ -34,6 +41,40 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly document: ParsePslDocumentResult;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
+}
+
+/**
+ * Name of the framework-parser synthesised bucket for top-level
+ * declarations. Re-declared locally so the interpreter does not have to
+ * import from `@prisma-next/framework-components/psl-ast`.
+ */
+const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
+
+/**
+ * Mongo FR16c validation: Mongo's authoring DSL exposes the connection's
+ * database as the only namespace surface today, so the PSL interpreter
+ * rejects every explicit `namespace { … }` block. The implicit
+ * `__unspecified__` bucket (top-level declarations) is the only
+ * namespace Mongo accepts. `namespace unbound { … }` is rejected too —
+ * Mongo has no late-binding namespace concept on the PSL surface (the
+ * database name comes from the connection string, not from PSL).
+ */
+function validateNamespaceBlocksForMongoTarget(input: {
+  readonly namespaces: readonly PslNamespace[];
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  for (const namespace of input.namespaces) {
+    if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
+      continue;
+    }
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+      message: `Mongo does not support \`namespace ${namespace.name} { … }\` blocks (the database is bound by the connection string; declare models at the document top level instead).`,
+      sourceId: input.sourceId,
+      span: namespace.span,
+    });
+  }
 }
 
 interface FieldMappings {
@@ -93,8 +134,9 @@ function collectPolymorphismDeclarations(
 } {
   const discriminatorDeclarations = new Map<string, DiscriminatorDeclaration>();
   const baseDeclarations = new Map<string, BaseDeclaration>();
+  const allPslModels = document.ast.namespaces.flatMap((ns) => ns.models);
 
-  for (const pslModel of document.ast.models) {
+  for (const pslModel of allPslModels) {
     for (const attr of pslModel.attributes) {
       if (attr.name === 'discriminator') {
         const fieldName = getPositionalArgument(attr);
@@ -176,6 +218,7 @@ function resolvePolymorphism(input: {
     indexSpans,
     modelIndexesByName,
   } = input;
+  const allPslModels = document.ast.namespaces.flatMap((ns) => ns.models);
   let patched = input.models;
   let roots = input.roots;
   let collections = input.collections;
@@ -195,7 +238,7 @@ function resolvePolymorphism(input: {
     const model = patched[modelName];
     if (!model) continue;
 
-    const pslModel = document.ast.models.find((m) => m.name === modelName);
+    const pslModel = allPslModels.find((m) => m.name === modelName);
     const mappedDiscriminatorField = pslModel
       ? (resolveFieldMappings(pslModel).pslNameToMapped.get(decl.fieldName) ?? decl.fieldName)
       : decl.fieldName;
@@ -258,7 +301,7 @@ function resolvePolymorphism(input: {
     }
 
     const baseModel = patched[baseDecl.baseName];
-    const variantPslModel = document.ast.models.find((m) => m.name === variantName);
+    const variantPslModel = allPslModels.find((m) => m.name === variantName);
     if (!variantPslModel) continue;
     const hasExplicitMap = getMapName(variantPslModel.attributes) !== undefined;
 
@@ -797,8 +840,20 @@ export function interpretPslDocumentToMongoContract(
   const { document, scalarTypeDescriptors, codecLookup } = input;
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
-  const modelNames = new Set(document.ast.models.map((m) => m.name));
-  const compositeTypeNames = new Set(document.ast.compositeTypes.map((ct) => ct.name));
+  validateNamespaceBlocksForMongoTarget({
+    namespaces: document.ast.namespaces,
+    sourceId,
+    diagnostics,
+  });
+  // Mongo lowers only the implicit `__unspecified__` bucket today —
+  // explicit `namespace { … }` blocks were rejected above. The IR
+  // collection map remains flat (and the Mongo target represents
+  // databases via `MongoTargetDatabase`, populated at compose time by
+  // the connection string rather than authoring-time PSL).
+  const allModels = document.ast.namespaces.flatMap((ns) => ns.models);
+  const allCompositeTypes = document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
+  const modelNames = new Set(allModels.map((m) => m.name));
+  const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
 
   const models: Record<string, MongoModelEntry> = {};
   const collections: Record<string, Record<string, unknown>> = {};
@@ -817,7 +872,7 @@ export function interpretPslDocumentToMongoContract(
   }
   const backrelationCandidates: BackrelationCandidate[] = [];
 
-  for (const pslModel of document.ast.models) {
+  for (const pslModel of allModels) {
     const collectionName = resolveCollectionName(pslModel);
     const fieldMappings = resolveFieldMappings(pslModel);
 
@@ -845,7 +900,7 @@ export function interpretPslDocumentToMongoContract(
         if (relation?.fields && relation?.references) {
           const localMapped = relation.fields.map((f) => fieldMappings.pslNameToMapped.get(f) ?? f);
 
-          const targetModel = document.ast.models.find((m) => m.name === field.typeName);
+          const targetModel = allModels.find((m) => m.name === field.typeName);
           const targetFieldMappings = targetModel ? resolveFieldMappings(targetModel) : undefined;
           const targetMapped = relation.references.map(
             (f) => targetFieldMappings?.pslNameToMapped.get(f) ?? f,
@@ -917,7 +972,7 @@ export function interpretPslDocumentToMongoContract(
   }
 
   const valueObjects: Record<string, ContractValueObject> = {};
-  for (const compositeType of document.ast.compositeTypes) {
+  for (const compositeType of allCompositeTypes) {
     const fields: Record<string, ContractField> = {};
     for (const field of compositeType.fields) {
       const resolved = resolveNonRelationField(
@@ -1064,7 +1119,14 @@ export function interpretPslDocumentToMongoContract(
       input as ConstructorParameters<typeof MongoCollection>[0],
     );
   }
-  const storageWithoutHash = { collections: collectionsAsClasses };
+  const storageWithoutHash = {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        collections: collectionsAsClasses,
+      },
+    },
+  };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
   const capabilities: Record<string, Record<string, boolean>> = {};
 

@@ -81,7 +81,10 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables }),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:test'),
+        namespaces: { __unbound__: { id: '__unbound__', tables } },
+      }),
       extensionPacks: {},
       capabilities: {},
       meta: {},
@@ -187,7 +190,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
 
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables,
+      namespaces: { __unbound__: { id: '__unbound__', tables } },
       ...ifDefined(
         'types',
         types
@@ -432,7 +435,10 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables }),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:test'),
+        namespaces: { __unbound__: { id: '__unbound__', tables } },
+      }),
       extensionPacks: {},
       capabilities: {},
       meta: {},

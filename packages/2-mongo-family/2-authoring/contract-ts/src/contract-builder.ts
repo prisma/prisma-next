@@ -25,6 +25,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
   MongoCollection,
@@ -1512,7 +1513,12 @@ function buildContractFromDefinition<
   const capabilities = definition.capabilities ?? {};
   const collections = buildCollections(definition.models);
   const storageBody = {
-    collections,
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        collections,
+      },
+    },
   };
 
   const builtContract = {

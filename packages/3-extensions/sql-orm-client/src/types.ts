@@ -577,6 +577,16 @@ type FieldColumnName<
     : FieldName) &
   string;
 
+type NamespaceTableDef<TContract extends Contract<SqlStorage>, TableName extends string> = {
+  [K in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][K] extends {
+    readonly tables: infer Tables;
+  }
+    ? TableName extends keyof Tables
+      ? Tables[TableName]
+      : never
+    : never;
+}[keyof TContract['storage']['namespaces']];
+
 type ResolvedStorageColumn<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
@@ -584,15 +594,10 @@ type ResolvedStorageColumn<
 > =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
     ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
-      ? TContract['storage']['tables'] extends Record<
-          string,
-          { readonly columns: Record<string, unknown> }
-        >
-        ? TableName extends keyof TContract['storage']['tables']
-          ? ColName extends keyof TContract['storage']['tables'][TableName]['columns']
-            ? TContract['storage']['tables'][TableName]['columns'][ColName] extends StorageColumn
-              ? TContract['storage']['tables'][TableName]['columns'][ColName]
-              : never
+      ? NamespaceTableDef<TContract, TableName> extends { readonly columns: infer Columns }
+        ? ColName extends keyof Columns
+          ? Columns[ColName] extends StorageColumn
+            ? Columns[ColName]
             : never
           : never
         : never
@@ -787,11 +792,7 @@ export type ResolvedCreateInput<
 
 type ModelStorageTableDef<TContract extends Contract<SqlStorage>, ModelName extends string> =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? TContract['storage']['tables'] extends Record<string, unknown>
-      ? TableName extends keyof TContract['storage']['tables']
-        ? TContract['storage']['tables'][TableName]
-        : never
-      : never
+    ? NamespaceTableDef<TContract, TableName>
     : never;
 
 type PrimaryKeyConstraintColumns<TContract extends Contract<SqlStorage>, ModelName extends string> =
@@ -1112,7 +1113,7 @@ type HasForeignKeyForCols<
   FKs extends readonly unknown[],
   Cols extends readonly string[],
 > = FKs extends readonly [infer Head, ...infer Tail extends unknown[]]
-  ? Head extends { readonly columns: Cols }
+  ? Head extends { readonly source: { readonly columns: Cols } }
     ? true
     : HasForeignKeyForCols<Tail, Cols>
   : false;
@@ -1130,18 +1131,16 @@ type IsToOneRelationNullable<
   RelName extends string,
 > =
   ModelTableName<TContract, ModelName> extends infer TableName extends string
-    ? TableName extends keyof TContract['storage']['tables']
-      ? TContract['storage']['tables'][TableName] extends infer Table extends StorageTable
-        ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
-          ? RelName extends keyof Rels
-            ? RelationLocalFieldColumns<
-                TContract,
-                ModelName,
-                Rels[RelName]
-              > extends infer Cols extends readonly string[]
-              ? IsFkSideOfRelation<Table, Cols> extends true
-                ? AnyColumnNullable<Table['columns'], Cols>
-                : true
+    ? NamespaceTableDef<TContract, TableName> extends infer Table extends StorageTable
+      ? RelationsOf<TContract, ModelName> extends infer Rels extends Record<string, unknown>
+        ? RelName extends keyof Rels
+          ? RelationLocalFieldColumns<
+              TContract,
+              ModelName,
+              Rels[RelName]
+            > extends infer Cols extends readonly string[]
+            ? IsFkSideOfRelation<Table, Cols> extends true
+              ? AnyColumnNullable<Table['columns'], Cols>
               : true
             : true
           : true

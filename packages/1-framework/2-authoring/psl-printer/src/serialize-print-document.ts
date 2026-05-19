@@ -1,4 +1,5 @@
-import type { PrintDocument } from './print-document';
+import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import type { PrintDocument, PrintNamespaceSection } from './print-document';
 import type { PrinterEnumValue, PrinterField, PrinterNamedType } from './types';
 
 const PSL_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
@@ -30,16 +31,46 @@ export function serializePrintDocument(doc: PrintDocument): string {
     sections.push(serializeTypesBlock(namedTypeEntries));
   }
 
-  const enumsSorted = [...doc.enums].sort((a, b) => a.name.localeCompare(b.name));
-  for (const e of enumsSorted) {
-    sections.push(serializeEnum(e));
-  }
-
-  for (const model of doc.models) {
-    sections.push(serializeModel(model));
+  for (const namespace of doc.namespaces) {
+    const namespaceSections = serializeNamespaceContents(namespace);
+    if (namespaceSections.length === 0) {
+      continue;
+    }
+    if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_ID) {
+      // The parser-synthesised bucket exists for AST symmetry; printing it as
+      // `namespace __unspecified__ { … }` would invent syntax the user never
+      // wrote. Top-level declarations round-trip back to top-level output.
+      sections.push(...namespaceSections);
+    } else {
+      sections.push(wrapNamespaceBlock(namespace.name, namespaceSections));
+    }
   }
 
   return `${sections.join('\n\n')}\n`;
+}
+
+function serializeNamespaceContents(namespace: PrintNamespaceSection): string[] {
+  const sections: string[] = [];
+  const enumsSorted = [...namespace.enums].sort((a, b) => a.name.localeCompare(b.name));
+  for (const e of enumsSorted) {
+    sections.push(serializeEnum(e));
+  }
+  for (const model of namespace.models) {
+    sections.push(serializeModel(model));
+  }
+  return sections;
+}
+
+function wrapNamespaceBlock(name: string, innerSections: readonly string[]): string {
+  const indented = innerSections
+    .map((section) =>
+      section
+        .split('\n')
+        .map((line) => (line.length > 0 ? `  ${line}` : line))
+        .join('\n'),
+    )
+    .join('\n\n');
+  return `namespace ${name} {\n${indented}\n}`;
 }
 
 function serializeTypesBlock(namedTypes: readonly PrinterNamedType[]): string {

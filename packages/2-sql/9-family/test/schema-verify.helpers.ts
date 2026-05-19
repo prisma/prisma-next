@@ -9,11 +9,13 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   type ReferentialAction,
   SqlStorage,
-  type StorageTable,
+  StorageTable,
+  type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type {
   SqlReferentialAction,
@@ -43,7 +45,9 @@ export function createTestContract(
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      },
       ...ifDefined('types', storageTypes),
     }),
     models: {},
@@ -66,13 +70,19 @@ export function createTestSchemaIR(tables: Record<string, SqlTableIR>): SqlSchem
 export function createContractTable(
   columns: Record<
     string,
-    { nativeType: string; codecId?: string; nullable: boolean; default?: ColumnDefault }
+    {
+      nativeType: string;
+      codecId?: string;
+      nullable: boolean;
+      default?: ColumnDefault;
+      typeParams?: Record<string, unknown>;
+    }
   >,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
-      columns: readonly string[];
-      references: { table: string; columns: readonly string[] };
+      source: { namespaceId: string; tableName: string; columns: readonly string[] };
+      target: { namespaceId: string; tableName: string; columns: readonly string[] };
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;
@@ -88,7 +98,7 @@ export function createContractTable(
     }>;
   },
 ): StorageTable {
-  const result: StorageTable = {
+  const input = {
     columns: Object.fromEntries(
       Object.entries(columns).map(([name, col]) => [
         name,
@@ -97,6 +107,7 @@ export function createContractTable(
           codecId: col.codecId ?? `pg/${col.nativeType}@1`,
           nullable: col.nullable,
           ...ifDefined('default', col.default),
+          ...ifDefined('typeParams', col.typeParams),
         },
       ]),
     ),
@@ -106,11 +117,9 @@ export function createContractTable(
     })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
-  };
-  if (options?.primaryKey) {
-    return { ...result, primaryKey: options.primaryKey };
-  }
-  return result;
+    ...ifDefined('primaryKey', options?.primaryKey),
+  } satisfies StorageTableInput;
+  return new StorageTable(input);
 }
 
 /**

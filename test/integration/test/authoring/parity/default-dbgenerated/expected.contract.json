@@ -30,11 +30,11 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:119a5e8a428d787a68352cd242a4597513a20658f6081e2a35038f44e3dd6d19",
+    "storageHash": "sha256:bba7ac32190afede61dbef04946b269013611c2566cb51b2bfac3a75f9b0bba0",
     "tables": {
       "user": {
         "columns": {

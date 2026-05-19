@@ -6,6 +6,7 @@ import type {
   MigrationPlanWithAuthoringSurface,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { synthStrategy } from '../../../src/aggregate/strategies/synth';
 import type { ContractSpaceMember } from '../../../src/aggregate/types';
@@ -35,7 +36,14 @@ function emptyMigrations(): ContractSpaceMember['migrations'] {
 function makeMember(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
   return {
     spaceId,
-    contract: createSqlContract({ target: 'postgres', storage: { tables } }),
+    contract: createSqlContract({
+      target: 'postgres',
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+        },
+      },
+    }),
     headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
     migrations: emptyMigrations(),
   };

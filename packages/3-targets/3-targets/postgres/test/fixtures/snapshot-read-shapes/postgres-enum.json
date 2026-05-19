@@ -7,29 +7,38 @@
   "models": {},
   "storage": {
     "storageHash": "sha256:fixture-postgres-enum",
-    "tables": {
-      "user": {
-        "columns": {
-          "role": {
-            "codecId": "pg/enum@1",
-            "nativeType": "user_role",
-            "nullable": false,
-            "typeRef": "user_role"
+    "namespaces": {
+      "__unbound__": {
+        "id": "__unbound__",
+        "tables": {
+          "user": {
+            "columns": {
+              "role": {
+                "codecId": "pg/enum@1",
+                "nativeType": "user_role",
+                "nullable": false,
+                "typeRef": "user_role"
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": { "columns": ["role"] },
+            "uniques": []
           }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": { "columns": ["role"] },
-        "uniques": []
-      }
-    },
-    "types": {
-      "user_role": {
-        "kind": "postgres-enum",
-        "name": "user_role",
-        "nativeType": "user_role",
-        "values": ["admin", "user"],
-        "codecId": "pg/enum@1"
+        }
+      },
+      "public": {
+        "id": "public",
+        "tables": {},
+        "types": {
+          "user_role": {
+            "kind": "postgres-enum",
+            "name": "user_role",
+            "nativeType": "user_role",
+            "values": ["admin", "user"],
+            "codecId": "pg/enum@1"
+          }
+        }
       }
     }
   },

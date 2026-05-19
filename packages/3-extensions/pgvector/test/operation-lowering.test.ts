@@ -1,5 +1,6 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   BinaryExpr,
   ColumnRef,
@@ -25,17 +26,22 @@ const contract = new SqlContractSerializer().deserializeContract({
   meta: {},
   storage: {
     storageHash: 'test-hash',
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-          otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+              otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
   },

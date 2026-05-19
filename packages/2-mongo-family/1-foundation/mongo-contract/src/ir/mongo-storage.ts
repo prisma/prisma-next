@@ -3,53 +3,99 @@ import {
   freezeNode,
   IRNodeBase,
   type Namespace,
+  NamespaceBase,
   type Storage,
+  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { MongoCollection } from './mongo-collection';
+import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
+import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
-/**
- * Construction input shape for {@link MongoStorage}. Mirrors the
- * required runtime fields explicitly so the family-base serializer's
- * hydration walker can hand the class a typed literal.
- */
-export interface MongoStorageInput<THash extends string = string> {
-  readonly storageHash: StorageHashBase<THash>;
-  readonly collections: Readonly<Record<string, MongoCollection>>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+export interface MongoNamespaceCollectionsInput {
+  readonly id: string;
+  readonly collections?: Record<string, MongoCollection | MongoCollectionInput>;
 }
 
-/**
- * Mongo family storage IR class. Carries the family-shared
- * `storage.collections` map alongside the framework-promised
- * `namespaces` map — single concrete class at the family layer (the
- * Mongo family has one target today, and the data shape is uniform
- * across the family; no abstract base earns its existence yet).
- *
- * `namespaces` is supplied by the caller. The Mongo target wraps a
- * deserialized `MongoContract` envelope at
- * `MongoTargetContractSerializer.constructTargetContract`, providing
- * the default `{ [UNSPECIFIED_NAMESPACE_ID]:
- * MongoTargetUnspecifiedDatabase.instance }` map at that target-layer
- * site. The foundation-layer class stays target-agnostic.
- *
- * Constructed instances are frozen via `freezeNode(this)`; instance
- * fields are JSON-clean by construction (`storageHash`, `collections`,
- * `namespaces` all enumerable own properties). The persisted on-disk
- * envelope shape is target-owned: `MongoTargetContractSerializer.serializeContract`
- * decides whether `namespaces` round-trips through JSON or is stripped
- * for the JSON envelope.
- */
+export interface MongoStorageInput<THash extends string = string> {
+  readonly storageHash: StorageHashBase<THash>;
+  readonly namespaces?: Readonly<Record<string, Namespace | MongoNamespaceCollectionsInput>>;
+}
+
+const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
+  [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance,
+});
+
+class MongoNamespacePayload extends NamespaceBase {
+  declare readonly kind?: string;
+
+  readonly id: string;
+  readonly collections: Readonly<Record<string, MongoCollection>>;
+
+  constructor(input: MongoNamespaceCollectionsInput) {
+    super();
+    this.id = input.id;
+    this.collections = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.collections ?? {}).map(([name, c]) => [
+          name,
+          c instanceof MongoCollection ? c : new MongoCollection(c),
+        ]),
+      ),
+    );
+    Object.defineProperty(this, 'kind', {
+      value: 'mongo-namespace',
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    freezeNode(this);
+  }
+}
+
+function normaliseNamespaceEntry(
+  nsKey: string,
+  ns: Namespace | MongoNamespaceCollectionsInput,
+): Namespace {
+  if (ns instanceof NamespaceBase) {
+    return ns;
+  }
+  // The framework `Namespace` interface only promises `id`; the remaining
+  // arm of this union — plain-object inputs accepted by `MongoStorageInput`
+  // — is `MongoNamespaceCollectionsInput`. The `instanceof` guard above
+  // discriminates the two; TypeScript can't narrow further without a hint.
+  const input = ns as MongoNamespaceCollectionsInput;
+  const collectionCount = Object.keys(input.collections ?? {}).length;
+  if (nsKey === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
+    return MongoUnboundNamespace.instance;
+  }
+  return new MongoNamespacePayload(input);
+}
+
+// Mongo concretions always store `MongoCollection` instances in
+// `collections` (Mongo idiom — distinct from the SQL family's `tables`).
+// Narrowing the namespace map here lets target/family-level consumers
+// iterate `namespaces[*].collections[*]` and recover the concrete
+// collection type without the framework's wider `Namespace` tripping
+// them up.
+export type MongoNamespace = Namespace & {
+  readonly collections: Readonly<Record<string, MongoCollection>>;
+};
+
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {
   readonly kind = 'mongo-storage' as const;
   readonly storageHash: StorageHashBase<THash>;
-  readonly collections: Readonly<Record<string, MongoCollection>>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  readonly namespaces: Readonly<Record<string, MongoNamespace>>;
 
   constructor(input: MongoStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.collections = input.collections;
-    this.namespaces = input.namespaces;
+    this.namespaces = Object.freeze(
+      Object.fromEntries(
+        Object.entries(input.namespaces ?? DEFAULT_NAMESPACES).map(([nsKey, ns]) => [
+          nsKey,
+          normaliseNamespaceEntry(nsKey, ns) as MongoNamespace,
+        ]),
+      ),
+    );
     freezeNode(this);
   }
 }

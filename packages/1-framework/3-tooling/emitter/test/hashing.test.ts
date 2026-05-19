@@ -1,12 +1,18 @@
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
 import { describe, expect, it } from 'vitest';
 
+const emptyNamespacedStorage = () => ({
+  namespaces: {
+    __unbound__: { id: '__unbound__' as const, tables: {} },
+  },
+});
+
 describe('hashing', () => {
   it('computes storage hash', () => {
     const hash = computeStorageHash({
       targetFamily: 'sql',
       target: 'postgres',
-      storage: { tables: {} },
+      storage: emptyNamespacedStorage(),
     });
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
@@ -24,7 +30,7 @@ describe('hashing', () => {
     const args = {
       targetFamily: 'sql',
       target: 'postgres',
-      storage: { tables: {} },
+      storage: emptyNamespacedStorage(),
     };
 
     const hash1 = computeStorageHash(args);

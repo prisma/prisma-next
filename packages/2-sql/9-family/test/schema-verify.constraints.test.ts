@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -54,7 +55,14 @@ describe('verifySqlSchema - constraints', () => {
           },
           {
             foreignKeys: [
-              { columns: ['author_id'], references: { table: 'user', columns: ['id'] } },
+              {
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['author_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+              },
             ],
           },
         ),
@@ -210,8 +218,12 @@ describe('verifySqlSchema - constraints', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['author_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: false,
                 index: false,
               },
@@ -252,8 +264,12 @@ describe('verifySqlSchema - constraints', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['author_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: true,
                 index: false,
               },
@@ -298,8 +314,12 @@ describe('verifySqlSchema - constraints', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['author_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 constraint: false,
                 index: false,
               },

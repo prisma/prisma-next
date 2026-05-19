@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
@@ -99,7 +100,11 @@ describe('integration/upsert', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const contract = withReturningCapability(getTestContract());
-        delete (contract.storage.tables.users as { primaryKey?: unknown }).primaryKey;
+        delete (
+          contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables.users as {
+            primaryKey?: unknown;
+          }
+        ).primaryKey;
         const context = { ...getTestContext(), contract };
         const users = new Collection({ runtime, context }, 'User');
 

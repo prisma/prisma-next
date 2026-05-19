@@ -119,7 +119,7 @@ type PackAwareModel<IndexTypes extends IndexTypeMap> = {
     Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
   >(
     modelName: ModelName,
-    input: { readonly fields: Fields; readonly relations?: Relations },
+    input: { readonly fields: Fields; readonly relations?: Relations; readonly namespace?: string },
   ): ContractModelBuilder<ModelName, Fields, Relations, undefined, undefined, IndexTypes>;
   <
     Fields extends Record<string, ScalarFieldBuilder>,
@@ -127,6 +127,7 @@ type PackAwareModel<IndexTypes extends IndexTypeMap> = {
   >(input: {
     readonly fields: Fields;
     readonly relations?: Relations;
+    readonly namespace?: string;
   }): ContractModelBuilder<undefined, Fields, Relations, undefined, undefined, IndexTypes>;
 };
 

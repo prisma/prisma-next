@@ -6,6 +6,8 @@ import {
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
+import { unboundTables } from './unbound-tables';
 
 const baseInput = {
   target: postgresTarget,
@@ -250,10 +252,8 @@ model Member {
 
     expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
 
-    const storage = result.value.storage as unknown as {
-      readonly tables: Record<string, { readonly foreignKeys?: readonly unknown[] }>;
-    };
-    const memberTable = storage.tables['team_member'];
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const memberTable = unboundTables(storage)['team_member'];
     expect(memberTable).toBeDefined();
     const fks = memberTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);

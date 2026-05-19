@@ -1,5 +1,6 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prismaContract } from '../src/exports/provider';
@@ -9,6 +10,8 @@ import {
   pgvectorExtensionPack,
   postgresTarget,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
+import { unboundTables } from './unbound-tables';
 
 describe('prismaContract provider helper', () => {
   const originalCwd = process.cwd();
@@ -83,8 +86,12 @@ describe('prismaContract provider helper', () => {
         targetFamily: 'sql',
         target: 'postgres',
         storage: {
-          tables: {
-            user: expect.any(Object),
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              tables: {
+                user: expect.any(Object),
+              },
+            },
           },
         },
       });
@@ -116,8 +123,12 @@ describe('prismaContract provider helper', () => {
 
       expect(result.value).toMatchObject({
         storage: {
-          tables: {
-            user: expect.any(Object),
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              tables: {
+                user: expect.any(Object),
+              },
+            },
           },
         },
       });
@@ -324,23 +335,8 @@ model Post {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      const storage = result.value.storage as unknown as {
-        readonly tables: Record<
-          string,
-          {
-            readonly columns: Record<
-              string,
-              {
-                readonly codecId: string;
-                readonly nativeType: string;
-                readonly typeParams?: Record<string, unknown>;
-              }
-            >;
-          }
-        >;
-      };
-
-      expect(storage.tables).toMatchObject({
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(unboundTables(storage)).toMatchObject({
         document: {
           columns: {
             embedding: {
@@ -453,13 +449,17 @@ model Document {
         },
       });
       expect(result.value.storage).toMatchObject({
-        tables: {
-          user: {
-            columns: {
-              dbExpr: {
-                default: {
-                  kind: 'function',
-                  expression: 'gen_random_uuid()',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            tables: {
+              user: {
+                columns: {
+                  dbExpr: {
+                    default: {
+                      kind: 'function',
+                      expression: 'gen_random_uuid()',
+                    },
+                  },
                 },
               },
             },

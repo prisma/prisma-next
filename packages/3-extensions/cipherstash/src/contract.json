@@ -50,40 +50,41 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
+        "tables": {
+          "eql_v2_configuration": {
+            "columns": {
+              "data": {
+                "codecId": "pg/jsonb@1",
+                "nativeType": "jsonb",
+                "nullable": false
+              },
+              "id": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "state": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
+          }
+        }
       }
     },
-    "storageHash": "sha256:850e136dcb5371712f81b3296a31e4e502fd8ebb9e9ff8a7cdec72f93fc50fe5",
-    "tables": {
-      "eql_v2_configuration": {
-        "columns": {
-          "data": {
-            "codecId": "pg/jsonb@1",
-            "nativeType": "jsonb",
-            "nullable": false
-          },
-          "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "state": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
-      }
-    }
+    "storageHash": "sha256:5fde95fc595b8f1a040f5e6dd986cd913d07c018319d6fa18fdbeb6d507489ec"
   },
   "capabilities": {
     "postgres": {

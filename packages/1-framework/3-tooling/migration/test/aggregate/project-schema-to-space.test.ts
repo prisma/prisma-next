@@ -1,5 +1,6 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { StorageBase } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-space';
 import type { ContractSpaceMember } from '../../src/aggregate/types';
@@ -23,7 +24,7 @@ type MongoStorageLike = StorageBase & { readonly collections: Record<string, unk
 describe('projectSchemaToSpace', () => {
   /**
    * Build a synthetic member with only the fields `projectSchemaToSpace`
-   * inspects (`spaceId`, `contract.storage.tables`). The rest is filled
+   * inspects (`spaceId`, `contract.storage.namespaces[…].tables`). The rest is filled
    * with empty / sentinel values to satisfy the type without committing
    * to a particular family.
    */
@@ -42,7 +43,13 @@ describe('projectSchemaToSpace', () => {
   function memberWithTables(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
     return {
       spaceId,
-      contract: createContract({ storage: { tables } }),
+      contract: createContract({
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+          },
+        },
+      }),
       headRef: { hash: 'sha256:test', invariants: [] },
       migrations: emptyMigrations(),
     };

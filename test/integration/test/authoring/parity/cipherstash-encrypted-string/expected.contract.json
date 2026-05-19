@@ -45,11 +45,11 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:523babe4b7011b1f1d27247fbc267086ba3e5429d63add3b2c180bbb7ddbbc80",
+    "storageHash": "sha256:32e3106e186e5c7dfba4ba09d2fe8d664d2b43ea6aaebcade8bb434af9316f7d",
     "tables": {
       "user": {
         "columns": {

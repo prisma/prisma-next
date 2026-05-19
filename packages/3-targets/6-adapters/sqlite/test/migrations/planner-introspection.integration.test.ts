@@ -10,6 +10,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
@@ -58,8 +59,8 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
-      tables,
       storageHash: coreHash(`sha256:test-${Date.now()}`),
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
     }),
     roots: {},
     models: {},
@@ -215,8 +216,12 @@ describe('SQLite planner + introspection round-trip', () => {
           primaryKey: { columns: ['id'] },
           foreignKeys: [
             {
-              columns: ['author_id'],
-              references: { table: 'authors', columns: ['id'] },
+              source: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'posts',
+                columns: ['author_id'],
+              },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'authors', columns: ['id'] },
               onDelete: 'cascade',
               constraint: true,
               index: true,

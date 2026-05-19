@@ -16,7 +16,7 @@ export type { MongoTargetContract } from '../core/mongo-target-contract';
 export { MongoTargetContractSerializer } from '../core/mongo-target-contract-serializer';
 export {
   MongoTargetDatabase,
-  MongoTargetUnspecifiedDatabase,
+  MongoTargetUnboundDatabase,
 } from '../core/mongo-target-database';
 export { MongoTargetSchemaVerifier } from '../core/mongo-target-schema-verifier';
 export type { CollModMeta, OpFactoryCall } from '../core/op-factory-call';

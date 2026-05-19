@@ -697,6 +697,7 @@ describe('PostgresControlAdapter', () => {
         {
           columns: ['user_id'],
           referencedTable: 'user',
+          referencedSchema: 'public',
           referencedColumns: ['id'],
           name: 'post_user_id_fkey',
         },
@@ -782,6 +783,7 @@ describe('PostgresControlAdapter', () => {
         {
           columns: ['user_id', 'account_id'],
           referencedTable: 'account',
+          referencedSchema: 'public',
           referencedColumns: ['user_id', 'id'],
           name: 'order_account_fkey',
           onDelete: 'cascade',

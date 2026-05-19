@@ -1,7 +1,28 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { unboundTables } from './unbound-tables';
+
+function sqlStorageFixture(tables: Record<string, unknown>) {
+  return {
+    storageHash: 'sha256:test',
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables,
+      },
+    },
+  };
+}
+
+function contractTablesRecord(contract: Record<string, unknown>): Record<string, unknown> {
+  const storage = contract['storage'] as Record<string, unknown>;
+  const namespaces = storage['namespaces'] as Record<string, unknown>;
+  const slot = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+  return slot['tables'] as Record<string, unknown>;
+}
 
 describe('SqlContractSerializer logic validation', () => {
   const validContractInput = {
@@ -14,40 +35,37 @@ describe('SqlContractSerializer logic validation', () => {
     meta: {},
     roots: {},
     models: {},
-    storage: {
-      storageHash: 'sha256:test',
-      tables: {
-        User: {
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [{ columns: ['email'] }],
-          indexes: [{ columns: ['name'] }],
-          foreignKeys: [],
+    storage: sqlStorageFixture({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
         },
-        Post: {
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [
-            {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-          ],
-        },
+        primaryKey: { columns: ['id'] },
+        uniques: [{ columns: ['email'] }],
+        indexes: [{ columns: ['name'] }],
+        foreignKeys: [],
       },
-    },
+      Post: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [
+          {
+            source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+            target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+            constraint: true,
+            index: true,
+          },
+        ],
+      },
+    }),
   };
 
   it('accepts valid contract logic', () => {
@@ -84,18 +102,15 @@ describe('SqlContractSerializer logic validation', () => {
   it('rejects primaryKey referencing non-existent column', () => {
     const contract = {
       ...validContractInput,
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            ...validContractInput.storage.tables.User,
-            primaryKey: { columns: ['nonExistent'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
+      storage: sqlStorageFixture({
+        User: {
+          ...unboundTables(validContractInput.storage)['User'],
+          primaryKey: { columns: ['nonExistent'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
       /primaryKey references non-existent column "nonExistent"/,
@@ -105,17 +120,14 @@ describe('SqlContractSerializer logic validation', () => {
   it('rejects unique referencing non-existent column', () => {
     const contract = {
       ...validContractInput,
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            ...validContractInput.storage.tables.User,
-            uniques: [{ columns: ['nonExistent'] }],
-            indexes: [],
-            foreignKeys: [],
-          },
+      storage: sqlStorageFixture({
+        User: {
+          ...unboundTables(validContractInput.storage)['User'],
+          uniques: [{ columns: ['nonExistent'] }],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
       /unique constraint references non-existent column "nonExistent"/,
@@ -125,17 +137,14 @@ describe('SqlContractSerializer logic validation', () => {
   it('rejects index referencing non-existent column', () => {
     const contract = {
       ...validContractInput,
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            ...validContractInput.storage.tables.User,
-            indexes: [{ columns: ['nonExistent'] }],
-            uniques: [],
-            foreignKeys: [],
-          },
+      storage: sqlStorageFixture({
+        User: {
+          ...unboundTables(validContractInput.storage)['User'],
+          indexes: [{ columns: ['nonExistent'] }],
+          uniques: [],
+          foreignKeys: [],
         },
-      },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
       /index references non-existent column "nonExistent"/,
@@ -145,30 +154,31 @@ describe('SqlContractSerializer logic validation', () => {
   it('rejects foreignKey referencing non-existent table', () => {
     const contract = {
       ...validContractInput,
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            ...validContractInput.storage.tables.User,
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            ...validContractInput.storage.tables.Post,
-            foreignKeys: [
-              {
-                columns: ['userId'],
-                references: { table: 'NonExistent', columns: ['id'] },
-                constraint: true,
-                index: true,
-              },
-            ],
-            uniques: [],
-            indexes: [],
-          },
+      storage: sqlStorageFixture({
+        User: {
+          ...unboundTables(validContractInput.storage)['User'],
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+        Post: {
+          ...unboundTables(validContractInput.storage)['Post'],
+          foreignKeys: [
+            {
+              source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+              target: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'NonExistent',
+                columns: ['id'],
+              },
+              constraint: true,
+              index: true,
+            },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
       /foreignKey references non-existent table "NonExistent"/,
@@ -178,21 +188,18 @@ describe('SqlContractSerializer logic validation', () => {
   it('validates composite primary keys', () => {
     const contractInput = {
       ...validContractInput,
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          UserRole: {
-            columns: {
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              roleId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['userId', 'roleId'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: sqlStorageFixture({
+        UserRole: {
+          columns: {
+            userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            roleId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
+          primaryKey: { columns: ['userId', 'roleId'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
@@ -200,39 +207,44 @@ describe('SqlContractSerializer logic validation', () => {
   it('validates composite foreign keys', () => {
     const contractInput = {
       ...validContractInput,
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              tenantId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id', 'tenantId'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: sqlStorageFixture({
+        User: {
+          columns: {
+            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            tenantId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              tenantId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                columns: ['userId', 'tenantId'],
-                references: { table: 'User', columns: ['id', 'tenantId'] },
-                constraint: true,
-                index: true,
-              },
-            ],
-          },
+          primaryKey: { columns: ['id', 'tenantId'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+        Post: {
+          columns: {
+            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            tenantId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [
+            {
+              source: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'Post',
+                columns: ['userId', 'tenantId'],
+              },
+              target: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                tableName: 'User',
+                columns: ['id', 'tenantId'],
+              },
+              constraint: true,
+              index: true,
+            },
+          ],
+        },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
@@ -257,20 +269,17 @@ describe('SqlContractSerializer logic validation', () => {
             relations: {},
           },
         },
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            User: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+        storage: sqlStorageFixture({
+          User: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
       }) as Record<string, unknown>;
 
     const addPostModel = (contract: Record<string, unknown>) => {
@@ -285,12 +294,7 @@ describe('SqlContractSerializer logic validation', () => {
         },
         relations: {},
       };
-      (
-        (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
-          string,
-          Record<string, unknown>
-        >
-      )['Post'] = {
+      contractTablesRecord(contract)['Post'] = {
         columns: {
           id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
@@ -316,12 +320,8 @@ describe('SqlContractSerializer logic validation', () => {
 
     it('accepts model table without primary key', () => {
       const contract = createModelContract();
-      delete (
-        (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
-          string,
-          Record<string, unknown>
-        >
-      )?.['User']?.['primaryKey'];
+      const userTable = contractTablesRecord(contract)['User'] as Record<string, unknown>;
+      delete userTable['primaryKey'];
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
@@ -352,17 +352,10 @@ describe('SqlContractSerializer logic validation', () => {
           cardinality: '1:N',
         },
       };
-      (
-        (
-          (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
-            string,
-            Record<string, unknown>
-          >
-        )?.['Post'] as Record<string, unknown>
-      )['foreignKeys'] = [
+      (contractTablesRecord(contract)['Post'] as Record<string, unknown>)['foreignKeys'] = [
         {
-          columns: ['userId'],
-          references: { table: 'User', columns: ['id'] },
+          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -401,17 +394,10 @@ describe('SqlContractSerializer logic validation', () => {
           cardinality: 'N:1',
         },
       };
-      (
-        (
-          (contract['storage'] as Record<string, Record<string, unknown>>)?.['tables'] as Record<
-            string,
-            Record<string, unknown>
-          >
-        )?.['Post'] as Record<string, unknown>
-      )['foreignKeys'] = [
+      (contractTablesRecord(contract)['Post'] as Record<string, unknown>)['foreignKeys'] = [
         {
-          columns: ['userId'],
-          references: { table: 'User', columns: ['id'] },
+          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -431,12 +417,48 @@ describe('SqlContractSerializer logic validation', () => {
       meta: {},
       roots: {},
       models: {},
-      storage: {
-        storageHash: 'sha256:test',
-        tables: {
+      storage: sqlStorageFixture({
+        Post: {
+          columns: {
+            id: {
+              codecId: 'pg/text@1',
+              nativeType: 'text',
+              nullable: false,
+              default: { kind: 'function', expression: 'gen_random_uuid()' },
+            },
+            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      }),
+    };
+
+    it('accepts function defaults without capability gating', () => {
+      expect(() => validateSqlContractFully<Contract<SqlStorage>>(baseContract)).not.toThrow();
+    });
+
+    it('accepts multiple function defaults without capability gating', () => {
+      const contract = {
+        ...baseContract,
+        storage: sqlStorageFixture({
           Post: {
             columns: {
               id: {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+                default: { kind: 'function', expression: 'autoincrement()' },
+              },
+              createdAt: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+                nullable: false,
+                default: { kind: 'function', expression: 'now()' },
+              },
+              externalId: {
                 codecId: 'pg/text@1',
                 nativeType: 'text',
                 nullable: false,
@@ -449,49 +471,7 @@ describe('SqlContractSerializer logic validation', () => {
             indexes: [],
             foreignKeys: [],
           },
-        },
-      },
-    };
-
-    it('accepts function defaults without capability gating', () => {
-      expect(() => validateSqlContractFully<Contract<SqlStorage>>(baseContract)).not.toThrow();
-    });
-
-    it('accepts multiple function defaults without capability gating', () => {
-      const contract = {
-        ...baseContract,
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            Post: {
-              columns: {
-                id: {
-                  codecId: 'pg/int4@1',
-                  nativeType: 'int4',
-                  nullable: false,
-                  default: { kind: 'function', expression: 'autoincrement()' },
-                },
-                createdAt: {
-                  codecId: 'pg/timestamptz@1',
-                  nativeType: 'timestamptz',
-                  nullable: false,
-                  default: { kind: 'function', expression: 'now()' },
-                },
-                externalId: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'function', expression: 'gen_random_uuid()' },
-                },
-                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
+        }),
       };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
     });
@@ -499,26 +479,23 @@ describe('SqlContractSerializer logic validation', () => {
     it('ignores non-function defaults (literal)', () => {
       const contract = {
         ...baseContract,
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            Post: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                status: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'literal', value: 'draft' },
-                },
+        storage: sqlStorageFixture({
+          Post: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              status: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: false,
+                default: { kind: 'literal', value: 'draft' },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
         // No capabilities needed for non-function defaults
       };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
@@ -527,30 +504,27 @@ describe('SqlContractSerializer logic validation', () => {
     it('keeps ISO string defaults as strings for timestamp columns', () => {
       const contract = {
         ...baseContract,
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            Post: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                createdAt: {
-                  codecId: 'pg/timestamptz@1',
-                  nativeType: 'timestamptz',
-                  nullable: false,
-                  default: { kind: 'literal', value: '2024-01-01T00:00:00.000Z' },
-                },
+        storage: sqlStorageFixture({
+          Post: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              createdAt: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+                nullable: false,
+                default: { kind: 'literal', value: '2024-01-01T00:00:00.000Z' },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
       };
 
       const validated = validateSqlContractFully<Contract<SqlStorage>>(contract);
-      const defaultValue = validated.storage.tables['Post']!.columns['createdAt']!.default;
+      const defaultValue = unboundTables(validated.storage)['Post']!.columns['createdAt']!.default;
       if (defaultValue?.kind !== 'literal') {
         throw new Error('Expected literal default');
       }
@@ -560,26 +534,23 @@ describe('SqlContractSerializer logic validation', () => {
     it('throws for default with unsupported kind', () => {
       const contract = {
         ...baseContract,
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            Post: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                status: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'now', expression: 'now()' },
-                },
+        storage: sqlStorageFixture({
+          Post: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              status: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: false,
+                default: { kind: 'now', expression: 'now()' },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
       };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
@@ -587,26 +558,23 @@ describe('SqlContractSerializer logic validation', () => {
     it('throws for default missing value', () => {
       const contract = {
         ...baseContract,
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            Post: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                status: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'literal' },
-                },
+        storage: sqlStorageFixture({
+          Post: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              status: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: false,
+                default: { kind: 'literal' },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
       };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
@@ -614,26 +582,23 @@ describe('SqlContractSerializer logic validation', () => {
     it('throws for default expression with non-string type', () => {
       const contract = {
         ...baseContract,
-        storage: {
-          storageHash: 'sha256:test',
-          tables: {
-            Post: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                status: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'function', expression: 123 },
-                },
+        storage: sqlStorageFixture({
+          Post: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              status: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: false,
+                default: { kind: 'function', expression: 123 },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
       };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });

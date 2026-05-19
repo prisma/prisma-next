@@ -1,15 +1,25 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+
+// Framework `Namespace.tables` is widened to `Record<string, object>` so
+// emitted `contract.d.ts` table literals (which omit the optional `kind`
+// discriminator) satisfy it structurally. At runtime, every `SqlStorage`
+// namespace holds `StorageTable` instances — the constructor enforces it.
+// Narrowing per-iteration via a single-step cast (not `as unknown as`)
+// keeps Pattern C walks readable without weakening the substrate type.
+type SqlNamespaceTables = Readonly<Record<string, StorageTable>>;
 
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
-  for (const table of Object.values(contract.storage.tables)) {
-    for (const column of Object.values(table.columns)) {
-      const codecId = column.codecId;
-      codecIds.add(codecId);
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    for (const table of Object.values(ns.tables as SqlNamespaceTables)) {
+      for (const column of Object.values(table.columns)) {
+        const codecId = column.codecId;
+        codecIds.add(codecId);
+      }
     }
   }
 
@@ -19,11 +29,13 @@ export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
 function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string, string> {
   const codecIds = new Map<string, string>();
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      const codecId = column.codecId;
-      const key = `${tableName}.${columnName}`;
-      codecIds.set(key, codecId);
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        const codecId = column.codecId;
+        const key = `${tableName}.${columnName}`;
+        codecIds.set(key, codecId);
+      }
     }
   }
 

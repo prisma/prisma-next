@@ -1,6 +1,7 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { planFieldEventOperations } from '../src/core/migrations/field-event-planner';
@@ -32,7 +33,9 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
 function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   const storage = new SqlStorage({
     storageHash: 'sha256:test' as StorageHashBase<string>,
-    tables,
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
   });
   return {
     target: 'postgres',
@@ -70,6 +73,7 @@ function makeOp(id: string, label = id): OpFactoryCall {
 
 interface RecordedCall {
   readonly event: 'added' | 'dropped' | 'altered';
+  readonly namespaceId: string;
   readonly tableName: string;
   readonly fieldName: string;
   readonly priorCodecId: string | undefined;
@@ -89,6 +93,7 @@ function recordingHook(
     onFieldEvent: (event, ctx: FieldEventContext) => {
       const recorded: RecordedCall = {
         event,
+        namespaceId: ctx.namespaceId,
         tableName: ctx.tableName,
         fieldName: ctx.fieldName,
         priorCodecId: ctx.priorField?.codecId,
@@ -127,6 +132,7 @@ describe('planFieldEventOperations', () => {
     expect(cs.calls).toEqual([
       {
         event: 'added',
+        namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'User',
         fieldName: 'email',
         priorCodecId: undefined,
@@ -161,6 +167,7 @@ describe('planFieldEventOperations', () => {
     expect(cs.calls).toEqual([
       {
         event: 'dropped',
+        namespaceId: UNBOUND_NAMESPACE_ID,
         tableName: 'User',
         fieldName: 'email',
         priorCodecId: 'cs/string@1',
@@ -417,7 +424,7 @@ describe('planFieldEventOperations', () => {
     ]);
   });
 
-  it('orders events within a group alphabetically by (tableName, fieldName)', () => {
+  it('orders events within a group alphabetically by (namespaceId, tableName, fieldName)', () => {
     const fromContract = contract({});
     const newContract = contract({
       Beta: table({

@@ -13,7 +13,7 @@
  *
  * - Events are grouped by phase: `'added'` → `'dropped'` → `'altered'`.
  * - Within each phase, entries are sorted alphabetically by
- *   `(tableName, fieldName)`.
+ *   `(namespaceId, tableName, fieldName)`.
  * - The hook's returned ops are appended in the order the hook returned them.
  *
  * `'altered'` is suppressed when only `codecId` differs (codec rotation is a
@@ -24,7 +24,7 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { type SqlStorage, type StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
@@ -50,6 +50,7 @@ export interface PlanFieldEventOperationsOptions {
 }
 
 interface FieldEntry {
+  readonly namespaceId: string;
   readonly tableName: string;
   readonly fieldName: string;
   readonly priorTable: StorageTable | undefined;
@@ -61,38 +62,57 @@ interface FieldEntry {
 export function planFieldEventOperations(
   options: PlanFieldEventOperationsOptions,
 ): readonly OpFactoryCall[] {
-  const priorTables = options.priorContract?.storage.tables ?? {};
-  const newTables = options.newContract.storage.tables;
+  const priorContract = options.priorContract;
+  const newContract = options.newContract;
 
   const added: FieldEntry[] = [];
   const dropped: FieldEntry[] = [];
   const altered: FieldEntry[] = [];
 
-  const tableNames = unionSorted(Object.keys(priorTables), Object.keys(newTables));
-  for (const tableName of tableNames) {
-    const priorTable = priorTables[tableName];
-    const newTable = newTables[tableName];
-    const fieldNames = unionSorted(
-      priorTable ? Object.keys(priorTable.columns) : [],
-      newTable ? Object.keys(newTable.columns) : [],
+  const namespaceIds = unionSorted(
+    priorContract ? Object.keys(priorContract.storage.namespaces) : [],
+    Object.keys(newContract.storage.namespaces),
+  );
+
+  for (const namespaceId of namespaceIds) {
+    const priorNs = priorContract?.storage.namespaces[namespaceId];
+    const newNs = newContract.storage.namespaces[namespaceId];
+    const priorTables = priorNs?.tables;
+    const newTables = newNs?.tables;
+
+    const tableNames = unionSorted(
+      priorTables ? Object.keys(priorTables) : [],
+      newTables ? Object.keys(newTables) : [],
     );
-    for (const fieldName of fieldNames) {
-      const priorField = priorTable?.columns[fieldName];
-      const newField = newTable?.columns[fieldName];
-      const entry: FieldEntry = {
-        tableName,
-        fieldName,
-        priorTable,
-        newTable,
-        priorField,
-        newField,
-      };
-      if (priorField === undefined && newField !== undefined) {
-        added.push(entry);
-      } else if (priorField !== undefined && newField === undefined) {
-        dropped.push(entry);
-      } else if (priorField !== undefined && newField !== undefined) {
-        if (isAlteration(priorField, newField)) altered.push(entry);
+
+    for (const tableName of tableNames) {
+      const priorTableRaw = priorTables?.[tableName];
+      const newTableRaw = newTables?.[tableName];
+      const priorTable = priorTableRaw instanceof StorageTable ? priorTableRaw : undefined;
+      const newTable = newTableRaw instanceof StorageTable ? newTableRaw : undefined;
+      const fieldNames = unionSorted(
+        priorTable ? Object.keys(priorTable.columns) : [],
+        newTable ? Object.keys(newTable.columns) : [],
+      );
+      for (const fieldName of fieldNames) {
+        const priorField = priorTable?.columns[fieldName];
+        const newField = newTable?.columns[fieldName];
+        const entry: FieldEntry = {
+          namespaceId,
+          tableName,
+          fieldName,
+          priorTable,
+          newTable,
+          priorField,
+          newField,
+        };
+        if (priorField === undefined && newField !== undefined) {
+          added.push(entry);
+        } else if (priorField !== undefined && newField === undefined) {
+          dropped.push(entry);
+        } else if (priorField !== undefined && newField !== undefined) {
+          if (isAlteration(priorField, newField)) altered.push(entry);
+        }
       }
     }
   }
@@ -130,7 +150,11 @@ function appendCalls(
  * - `'altered'` — both sides populated.
  */
 function buildContext(event: FieldEvent, entry: FieldEntry): FieldEventContext {
-  const base = { tableName: entry.tableName, fieldName: entry.fieldName };
+  const base = {
+    namespaceId: entry.namespaceId,
+    tableName: entry.tableName,
+    fieldName: entry.fieldName,
+  };
   if (event === 'added') {
     return {
       ...base,

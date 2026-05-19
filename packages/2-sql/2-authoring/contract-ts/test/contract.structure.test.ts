@@ -2,6 +2,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
+import { unboundTables } from './unbound-tables';
 
 describe('SqlContractSerializer structure validation', () => {
   const validContractInput = {
@@ -14,7 +16,7 @@ describe('SqlContractSerializer structure validation', () => {
     meta: {},
     roots: {},
     models: {},
-    storage: {
+    storage: storageWithNamespacedTables({
       storageHash: 'sha256:test',
       tables: {
         User: {
@@ -28,12 +30,12 @@ describe('SqlContractSerializer structure validation', () => {
           foreignKeys: [],
         },
       },
-    },
+    }),
   };
 
   it('accepts valid contract structure', () => {
     const result = validateSqlContractFully<Contract<SqlStorage>>(validContractInput);
-    expect(result.storage.tables).toHaveProperty('User');
+    expect(unboundTables(result.storage)).toHaveProperty('User');
   });
 
   it('throws on missing targetFamily', () => {
@@ -76,7 +78,7 @@ describe('SqlContractSerializer structure validation', () => {
   it('throws on invalid column type', () => {
     const invalid = {
       ...validContractInput,
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -85,7 +87,7 @@ describe('SqlContractSerializer structure validation', () => {
             },
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(invalid)).toThrow(
@@ -96,7 +98,7 @@ describe('SqlContractSerializer structure validation', () => {
   it('throws on invalid nullable type', () => {
     const invalid = {
       ...validContractInput,
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -109,7 +111,7 @@ describe('SqlContractSerializer structure validation', () => {
             },
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(invalid)).toThrow(

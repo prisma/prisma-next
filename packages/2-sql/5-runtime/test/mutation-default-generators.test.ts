@@ -20,14 +20,19 @@ const testContract: Contract<SqlStorage> = {
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),
-    tables: {
-      user: {
-        columns: {
-          id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__',
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
   }),

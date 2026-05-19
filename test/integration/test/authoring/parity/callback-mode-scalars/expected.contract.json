@@ -160,11 +160,11 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:e151326d1cfdbe3ee67aad3c07746c9c70e809c8b7ba8d25424623bcafe8667d",
+    "storageHash": "sha256:429dd73e7fd80824a53e32d604c186173ab4ec29bef73d74935e0d106a6167b8",
     "tables": {
       "post": {
         "columns": {

@@ -1,5 +1,6 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AnyQueryAst,
   BinaryExpr,
@@ -27,15 +28,20 @@ const contract = new SqlContractSerializer().deserializeContract({
   meta: {},
   storage: {
     storageHash: 'sha256:test-core',
-    tables: {
-      user: {
-        columns: {
-          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
   },

@@ -26,13 +26,15 @@ export interface ColumnSpec {
 }
 
 /**
- * Literal-args shape for a foreign key definition. The referenced table is
- * assumed to live in the same schema as the constrained table.
+ * Literal-args shape for a foreign key definition. `references.schema`
+ * carries the target table's namespace (schema) coordinate so the rendered
+ * DDL qualifies the REFERENCES clause correctly for cross-schema FKs.
  */
 export interface ForeignKeySpec {
   readonly name: string;
   readonly columns: readonly string[];
   readonly references: {
+    readonly schema: string;
     readonly table: string;
     readonly columns: readonly string[];
   };

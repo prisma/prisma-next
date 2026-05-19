@@ -62,11 +62,18 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
     'storage' in contract &&
     typeof contract.storage === 'object' &&
     contract.storage !== null &&
-    'tables' in contract.storage
+    'namespaces' in contract.storage &&
+    typeof contract.storage.namespaces === 'object' &&
+    contract.storage.namespaces !== null
   ) {
-    const storage = contract.storage as { tables?: Record<string, unknown> };
-    if (storage.tables && typeof storage.tables === 'object') {
-      for (const table of Object.values(storage.tables)) {
+    const namespaces = contract.storage.namespaces as Record<
+      string,
+      { readonly tables?: Readonly<Record<string, unknown>> }
+    >;
+    for (const ns of Object.values(namespaces)) {
+      const tbls = ns.tables;
+      if (typeof tbls !== 'object' || tbls === null) continue;
+      for (const table of Object.values(tbls)) {
         if (
           typeof table === 'object' &&
           table !== null &&

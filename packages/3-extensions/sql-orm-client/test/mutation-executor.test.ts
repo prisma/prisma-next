@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -143,16 +144,21 @@ describe('mutation-executor', () => {
   it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
     const contract = getTestContract();
 
+    const unboundNs = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
     const withCustomPk = {
       ...contract,
       storage: {
         ...contract.storage,
-        tables: {
-          ...contract.storage.tables,
-          users: {
-            ...contract.storage.tables.users,
-            primaryKey: {
-              columns: ['pk_id'],
+        namespaces: {
+          ...contract.storage.namespaces,
+          [UNBOUND_NAMESPACE_ID]: {
+            ...unboundNs,
+            tables: {
+              ...unboundNs.tables,
+              users: {
+                ...unboundNs.tables.users,
+                primaryKey: { columns: ['pk_id'] },
+              },
             },
           },
         },

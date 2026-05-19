@@ -33,7 +33,7 @@ import type { Namespace } from './namespace';
  * envelope-shape assertion for each target, so the strip-vs-pass-through
  * choice is locked at test time rather than implied by the override
  * presence/absence. Earned by PR2's per-target namespace lift, when
- * `PostgresSchema` / `SqliteUnspecifiedDatabase` start carrying
+ * `PostgresSchema` / `SqliteUnboundDatabase` start carrying
  * target-specific fields.
  */
 export interface Storage extends IRNode {

@@ -233,8 +233,8 @@ export function buildForeignKeySql(
 ): string {
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
 ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
+FOREIGN KEY (${foreignKey.source.columns.map(quoteIdentifier).join(', ')})
+REFERENCES ${qualifyTableName(schemaName, foreignKey.target.tableName)} (${foreignKey.target.columns
     .map(quoteIdentifier)
     .join(', ')})`;
 

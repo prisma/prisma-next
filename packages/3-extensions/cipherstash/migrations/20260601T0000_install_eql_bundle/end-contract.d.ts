@@ -27,13 +27,12 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:efa685171bebbb8f078f08d12be3578bb5d96b71669dccc6cc9e4be96af8cdb4'>;
+  StorageHashBase<'sha256:5fde95fc595b8f1a040f5e6dd986cd913d07c018319d6fa18fdbeb6d507489ec'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
@@ -56,7 +55,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -64,32 +62,37 @@ export type TypeMaps = TypeMapsType<
 
 type ContractBase = ContractType<
   {
-    readonly tables: {
-      readonly eql_v2_configuration: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly state: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly data: {
-            readonly nativeType: 'jsonb';
-            readonly codecId: 'pg/jsonb@1';
-            readonly nullable: false;
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {
+          readonly eql_v2_configuration: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly state: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly data: {
+                readonly nativeType: 'jsonb';
+                readonly codecId: 'pg/jsonb@1';
+                readonly nullable: false;
+              };
+            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
         };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
-    readonly types: Record<string, never>;
     readonly storageHash: StorageHash;
   },
   {
@@ -145,5 +148,5 @@ type ContractBase = ContractType<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Tables = Contract['storage']['tables'];
+export type Namespaces = Contract['storage']['namespaces'];
 export type Models = Contract['models'];

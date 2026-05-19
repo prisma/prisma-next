@@ -50,15 +50,20 @@ const fixtureContract = createTestContract({
   storageHash: 'test-hash',
   profileHash: 'test-profile-hash',
   storage: {
-    tables: {
-      user: {
-        columns: {
-          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__',
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
   },

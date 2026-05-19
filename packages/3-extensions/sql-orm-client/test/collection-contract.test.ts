@@ -11,6 +11,7 @@ import {
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
 import { buildMixedPolyContract, getTestContract } from './helpers';
+import { unboundTables } from './unbound-tables';
 
 describe('collection-contract capability detection', () => {
   it('detects top-level capability flags', () => {
@@ -75,7 +76,7 @@ describe('collection-contract capability detection', () => {
   it('keeps the 1:1 profile relation backed by a unique child key', () => {
     const contract = getTestContract();
 
-    expect(contract.storage.tables.profiles.uniques).toContainEqual({
+    expect(unboundTables(contract.storage)['profiles']!.uniques).toContainEqual({
       columns: ['user_id'],
     });
   });
@@ -244,10 +245,15 @@ describe('collection-contract capability detection', () => {
     }) =>
       ({
         storage: {
-          tables: {
-            t: {
-              primaryKey: table.primaryKey,
-              uniques: table.uniques ?? [],
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              tables: {
+                t: {
+                  primaryKey: table.primaryKey,
+                  uniques: table.uniques ?? [],
+                },
+              },
             },
           },
         },

@@ -70,7 +70,13 @@ function makeContract(
   return {
     storage: {
       storageHash,
-      collections: storageCollections,
+      namespaces: {
+        __unbound__: {
+          id: '__unbound__',
+          kind: 'mongo-namespace',
+          collections: storageCollections,
+        },
+      },
     },
   } as unknown as MongoContract;
 }

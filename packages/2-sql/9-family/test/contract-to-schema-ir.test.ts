@@ -1,8 +1,7 @@
 import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
@@ -56,6 +55,18 @@ function table(
   };
 }
 
+function unboundStorage(
+  storageHash: StorageHashBase<string>,
+  tables: Record<string, StorageTable>,
+): SqlStorage {
+  return new SqlStorage({
+    storageHash,
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
+  });
+}
+
 function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
@@ -73,19 +84,23 @@ describe('contractToSchemaIR', () => {
   });
 
   it('converts a single table with columns', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        User: table({
-          columns: {
-            id: col({ nativeType: 'text' }),
-            email: col({ nativeType: 'text', nullable: false }),
-            name: col({ nativeType: 'text', nullable: true }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            User: table({
+              columns: {
+                id: col({ nativeType: 'text' }),
+                email: col({ nativeType: 'text', nullable: false }),
+                name: col({ nativeType: 'text', nullable: true }),
+              },
+            }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
 
@@ -99,23 +114,28 @@ describe('contractToSchemaIR', () => {
   });
 
   it('drops codecId, typeParams, and typeRef from columns', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            a: col({
-              nativeType: 'vector',
-              codecId: 'pgvector/vector@1',
-              typeParams: { dimensions: 1536 },
-            }),
-            b: col({
-              nativeType: 'vector',
-              codecId: 'pgvector/vector@1',
-              typeRef: 'MyVector',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                a: col({
+                  nativeType: 'vector',
+                  codecId: 'pgvector/vector@1',
+                  typeParams: { dimensions: 1536 },
+                }),
+                b: col({
+                  nativeType: 'vector',
+                  codecId: 'pgvector/vector@1',
+                  typeRef: 'MyVector',
+                }),
+              },
             }),
           },
-        }),
+        },
       },
       types: {
         MyVector: {
@@ -125,8 +145,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { dimensions: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     const columnA = result.tables['T']!.columns['a']!;
@@ -143,22 +162,26 @@ describe('contractToSchemaIR', () => {
   });
 
   it('expands parameterized native types when expandNativeType is provided', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            id: col({
-              nativeType: 'character',
-              codecId: 'sql/char@1',
-              typeParams: { length: 36 },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                id: col({
+                  nativeType: 'character',
+                  codecId: 'sql/char@1',
+                  typeParams: { length: 36 },
+                }),
+                name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+              },
             }),
-            name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const expand = (input: {
       nativeType: string;
@@ -188,19 +211,24 @@ describe('contractToSchemaIR', () => {
     // producing a spurious `type_mismatch` (and a spurious
     // `alterColumnType` op) when planning from one revision of the
     // contract to itself.
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        Post: table({
-          columns: {
-            embedding: col({
-              nativeType: 'vector',
-              codecId: 'pg/vector@1',
-              nullable: true,
-              typeRef: 'Embedding1536',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            Post: table({
+              columns: {
+                embedding: col({
+                  nativeType: 'vector',
+                  codecId: 'pg/vector@1',
+                  nullable: true,
+                  typeRef: 'Embedding1536',
+                }),
+              },
             }),
           },
-        }),
+        },
       },
       types: {
         Embedding1536: {
@@ -210,8 +238,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { length: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const expand = (input: {
       nativeType: string;
@@ -233,118 +260,142 @@ describe('contractToSchemaIR', () => {
   });
 
   it('uses base nativeType when no expandNativeType is provided', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            id: col({
-              nativeType: 'character',
-              codecId: 'sql/char@1',
-              typeParams: { length: 36 },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                id: col({
+                  nativeType: 'character',
+                  codecId: 'sql/char@1',
+                  typeParams: { length: 36 },
+                }),
+              },
             }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character');
   });
 
   it('converts literal column defaults', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            status: col({
-              nativeType: 'text',
-              default: { kind: 'literal', value: 'active' },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                status: col({
+                  nativeType: 'text',
+                  default: { kind: 'literal', value: 'active' },
+                }),
+              },
             }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['status']!.default).toBe("'active'");
   });
 
   it('escapes single quotes in string literal defaults', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            author: col({
-              nativeType: 'text',
-              default: { kind: 'literal', value: "O'Reilly" },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                author: col({
+                  nativeType: 'text',
+                  default: { kind: 'literal', value: "O'Reilly" },
+                }),
+              },
             }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['author']!.default).toBe("'O''Reilly'");
   });
 
   it('escapes repeated single quotes in string literal defaults', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            textValue: col({
-              nativeType: 'text',
-              default: { kind: 'literal', value: "a'b''c" },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                textValue: col({
+                  nativeType: 'text',
+                  default: { kind: 'literal', value: "a'b''c" },
+                }),
+              },
             }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
   });
 
   it('converts function column defaults', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            createdAt: col({
-              nativeType: 'timestamptz',
-              default: { kind: 'function', expression: 'now()' },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                createdAt: col({
+                  nativeType: 'timestamptz',
+                  default: { kind: 'function', expression: 'now()' },
+                }),
+              },
             }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['createdAt']!.default).toBe('now()');
   });
 
   it('omits default field when column has no default', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            name: col({ nativeType: 'text' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                name: col({ nativeType: 'text' }),
+              },
+            }),
           },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['name']!.default).toBeUndefined();
@@ -352,54 +403,66 @@ describe('contractToSchemaIR', () => {
   });
 
   it('converts primary key', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            id: col({ nativeType: 'text' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                id: col({ nativeType: 'text' }),
+              },
+              primaryKey: { columns: ['id'], name: 'T_pkey' },
+            }),
           },
-          primaryKey: { columns: ['id'], name: 'T_pkey' },
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.primaryKey).toEqual({ columns: ['id'], name: 'T_pkey' });
   });
 
   it('converts unique constraints', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            email: col({ nativeType: 'text' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                email: col({ nativeType: 'text' }),
+              },
+              uniques: [{ columns: ['email'], name: 'T_email_key' }],
+            }),
           },
-          uniques: [{ columns: ['email'], name: 'T_email_key' }],
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.uniques).toEqual([{ columns: ['email'], name: 'T_email_key' }]);
   });
 
   it('converts indexes with unique: false', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            email: col({ nativeType: 'text' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                email: col({ nativeType: 'text' }),
+              },
+              indexes: [{ columns: ['email'], name: 'T_email_idx' }],
+            }),
           },
-          indexes: [{ columns: ['email'], name: 'T_email_idx' }],
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.indexes).toEqual([
@@ -408,32 +471,41 @@ describe('contractToSchemaIR', () => {
   });
 
   it('converts foreign keys (reshapes references)', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        Post: table({
-          columns: {
-            authorId: col({ nativeType: 'text' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            Post: table({
+              columns: {
+                authorId: col({ nativeType: 'text' }),
+              },
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['authorId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+                  name: 'Post_authorId_fkey',
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            }),
           },
-          foreignKeys: [
-            {
-              columns: ['authorId'],
-              references: { table: 'User', columns: ['id'] },
-              name: 'Post_authorId_fkey',
-              constraint: true,
-              index: true,
-            },
-          ],
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['Post']!.foreignKeys).toEqual([
       {
         columns: ['authorId'],
         referencedTable: 'User',
+        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
         name: 'Post_authorId_fkey',
       },
@@ -441,18 +513,22 @@ describe('contractToSchemaIR', () => {
   });
 
   it('converts multiple tables', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        User: table({
-          columns: { id: col({ nativeType: 'text' }) },
-        }),
-        Post: table({
-          columns: { id: col({ nativeType: 'text' }) },
-        }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            User: table({
+              columns: { id: col({ nativeType: 'text' }) },
+            }),
+            Post: table({
+              columns: { id: col({ nativeType: 'text' }) },
+            }),
+          },
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(Object.keys(result.tables)).toEqual(expect.arrayContaining(['User', 'Post']));
@@ -460,14 +536,19 @@ describe('contractToSchemaIR', () => {
   });
 
   it('propagates storage types into annotations', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+              },
+            }),
           },
-        }),
+        },
       },
       types: {
         Embedding: {
@@ -477,8 +558,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { dimensions: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['embedding']!.nativeType).toBe('vector');
@@ -494,14 +574,19 @@ describe('contractToSchemaIR', () => {
   });
 
   it('writes storage type annotations using the configured namespace', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                embedding: col({ nativeType: 'vector', typeRef: 'Embedding' }),
+              },
+            }),
           },
-        }),
+        },
       },
       types: {
         Embedding: {
@@ -511,8 +596,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { dimensions: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIRImpl(wrap(storage), {
       annotationNamespace: 'custom',
@@ -530,135 +614,176 @@ describe('contractToSchemaIR', () => {
   });
 
   it('handles unique constraints without names', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            a: col({ nativeType: 'text' }),
-            b: col({ nativeType: 'text' }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                a: col({ nativeType: 'text' }),
+                b: col({ nativeType: 'text' }),
+              },
+              uniques: [{ columns: ['a', 'b'] }],
+            }),
           },
-          uniques: [{ columns: ['a', 'b'] }],
-        }),
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.uniques[0]).toEqual({ columns: ['a', 'b'] });
   });
 
   it('handles foreign keys without names', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        Post: table({
-          columns: { authorId: col({ nativeType: 'text' }) },
-          foreignKeys: [
-            {
-              columns: ['authorId'],
-              references: { table: 'User', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-          ],
-        }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            Post: table({
+              columns: { authorId: col({ nativeType: 'text' }) },
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['authorId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            }),
+          },
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['Post']!.foreignKeys[0]).toEqual({
       columns: ['authorId'],
       referencedTable: 'User',
+      referencedSchema: UNBOUND_NAMESPACE_ID,
       referencedColumns: ['id'],
     });
   });
 
   it('does not synthesize FK backing index when FK columns match primary key columns', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        User: table({
-          columns: { id: col({ nativeType: 'text' }) },
-          primaryKey: { columns: ['id'] },
-        }),
-        Post: table({
-          columns: { userId: col({ nativeType: 'text' }) },
-          primaryKey: { columns: ['userId'] },
-          foreignKeys: [
-            {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-          ],
-        }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            User: table({
+              columns: { id: col({ nativeType: 'text' }) },
+              primaryKey: { columns: ['id'] },
+            }),
+            Post: table({
+              columns: { userId: col({ nativeType: 'text' }) },
+              primaryKey: { columns: ['userId'] },
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            }),
+          },
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.indexes).toEqual([]);
   });
 
   it('does not synthesize FK backing index when FK columns match unique columns', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        User: table({
-          columns: { id: col({ nativeType: 'text' }) },
-          primaryKey: { columns: ['id'] },
-        }),
-        Post: table({
-          columns: { userId: col({ nativeType: 'text' }) },
-          uniques: [{ columns: ['userId'] }],
-          foreignKeys: [
-            {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-          ],
-        }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            User: table({
+              columns: { id: col({ nativeType: 'text' }) },
+              primaryKey: { columns: ['id'] },
+            }),
+            Post: table({
+              columns: { userId: col({ nativeType: 'text' }) },
+              uniques: [{ columns: ['userId'] }],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            }),
+          },
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.indexes).toEqual([]);
   });
 
   it('deduplicates synthesized FK backing indexes for repeated FK column sets', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        User: table({
-          columns: { id: col({ nativeType: 'text' }) },
-          primaryKey: { columns: ['id'] },
-        }),
-        Post: table({
-          columns: { userId: col({ nativeType: 'text' }) },
-          foreignKeys: [
-            {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-            {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
-              constraint: true,
-              index: true,
-            },
-          ],
-        }),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            User: table({
+              columns: { id: col({ nativeType: 'text' }) },
+              primaryKey: { columns: ['id'] },
+            }),
+            Post: table({
+              columns: { userId: col({ nativeType: 'text' }) },
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'Post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            }),
+          },
+        },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    });
 
     const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.indexes).toEqual([
@@ -669,52 +794,44 @@ describe('contractToSchemaIR', () => {
 
 describe('detectDestructiveChanges', () => {
   it('returns empty for null from', () => {
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { a: col({ nativeType: 'text' }) } }),
+    });
     expect(detectDestructiveChanges(null, to)).toEqual([]);
   });
 
   it('returns empty when no removals', () => {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({ columns: { a: col({ nativeType: 'text' }) } }),
+          },
+        },
+      },
+    });
     expect(detectDestructiveChanges(storage, storage)).toEqual([]);
   });
 
   it('returns empty when columns are added', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { a: col({ nativeType: 'text' }) } }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
+    });
     expect(detectDestructiveChanges(from, to)).toEqual([]);
   });
 
   it('detects removed column', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { a: col({ nativeType: 'text' }) } }),
+    });
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toHaveLength(1);
@@ -725,19 +842,13 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects removed table', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        A: table({ columns: { id: col({ nativeType: 'text' }) } }),
-        B: table({ columns: { id: col({ nativeType: 'text' }) } }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: { A: table({ columns: { id: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      A: table({ columns: { id: col({ nativeType: 'text' }) } }),
+      B: table({ columns: { id: col({ nativeType: 'text' }) } }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      A: table({ columns: { id: col({ nativeType: 'text' }) } }),
+    });
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toHaveLength(1);
@@ -748,20 +859,12 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('does not report columns of a removed table individually', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) },
-        }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {},
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({
+        columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) },
+      }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {});
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toHaveLength(1);
@@ -769,23 +872,15 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects multiple removals', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        A: table({
-          columns: { id: col({ nativeType: 'text' }), name: col({ nativeType: 'text' }) },
-        }),
-        B: table({ columns: { id: col({ nativeType: 'text' }) } }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        A: table({ columns: { id: col({ nativeType: 'text' }) } }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      A: table({
+        columns: { id: col({ nativeType: 'text' }), name: col({ nativeType: 'text' }) },
+      }),
+      B: table({ columns: { id: col({ nativeType: 'text' }) } }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      A: table({ columns: { id: col({ nativeType: 'text' }) } }),
+    });
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toHaveLength(2);
@@ -795,18 +890,10 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects removed table with prototype-name identifier', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        toString: table({ columns: { id: col({ nativeType: 'text' }) } }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {},
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      toString: table({ columns: { id: col({ nativeType: 'text' }) } }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {});
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toEqual([
@@ -818,24 +905,16 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects removed column with prototype-name identifier', () => {
-    const from: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: {
-            toString: col({ nativeType: 'text' }),
-          },
-        }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
-    const to: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({ columns: {} }),
-      },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-    };
+    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({
+        columns: {
+          toString: col({ nativeType: 'text' }),
+        },
+      }),
+    });
+    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: {} }),
+    });
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toEqual([

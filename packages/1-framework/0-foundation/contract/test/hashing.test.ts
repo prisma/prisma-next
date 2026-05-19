@@ -2,30 +2,41 @@ import { describe, expect, it } from 'vitest';
 
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from '../src/hashing';
 
+const emptyNamespacedStorage = () => ({
+  namespaces: {
+    __unbound__: { id: '__unbound__' as const, tables: {} },
+  },
+});
+
 describe('computeStorageHash', () => {
   it('returns a sha256-prefixed hex string', () => {
     const hash = computeStorageHash({
       target: 'postgres',
       targetFamily: 'sql',
-      storage: { tables: {} },
+      storage: emptyNamespacedStorage(),
     });
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
   it('produces stable hashes for identical input', () => {
-    const args = { target: 'postgres', targetFamily: 'sql', storage: { tables: {} } };
+    const args = { target: 'postgres', targetFamily: 'sql', storage: emptyNamespacedStorage() };
     expect(computeStorageHash(args)).toBe(computeStorageHash(args));
   });
 
   it('produces different hashes for different storage', () => {
     const base = { target: 'postgres', targetFamily: 'sql' };
-    const hash1 = computeStorageHash({ ...base, storage: { tables: {} } });
+    const hash1 = computeStorageHash({ ...base, storage: emptyNamespacedStorage() });
     const hash2 = computeStorageHash({
       ...base,
       storage: {
-        tables: {
-          user: {
-            columns: { id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false } },
+        namespaces: {
+          __unbound__: {
+            id: '__unbound__',
+            tables: {
+              user: {
+                columns: { id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false } },
+              },
+            },
           },
         },
       },
@@ -34,7 +45,7 @@ describe('computeStorageHash', () => {
   });
 
   it('produces different hashes for different targets', () => {
-    const storage = { tables: {} };
+    const storage = emptyNamespacedStorage();
     const hash1 = computeStorageHash({ target: 'postgres', targetFamily: 'sql', storage });
     const hash2 = computeStorageHash({ target: 'mysql', targetFamily: 'sql', storage });
     expect(hash1).not.toBe(hash2);
@@ -45,18 +56,28 @@ describe('computeStorageHash', () => {
     const hash1 = computeStorageHash({
       ...base,
       storage: {
-        tables: {
-          a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
-          b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
+        namespaces: {
+          __unbound__: {
+            id: '__unbound__',
+            tables: {
+              a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
+              b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
+            },
+          },
         },
       },
     });
     const hash2 = computeStorageHash({
       ...base,
       storage: {
-        tables: {
-          b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
-          a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
+        namespaces: {
+          __unbound__: {
+            id: '__unbound__',
+            tables: {
+              b: { columns: { y: { codecId: 'pg/text@1', nativeType: 'text' } } },
+              a: { columns: { x: { codecId: 'pg/text@1', nativeType: 'text' } } },
+            },
+          },
         },
       },
     });

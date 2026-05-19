@@ -1,3 +1,8 @@
+import {
+  flatPslCompositeTypes,
+  flatPslEnums,
+  flatPslModels,
+} from '@prisma-next/framework-components/psl-ast';
 import { describe, expect, it } from 'vitest';
 import { parsePslDocument } from '../src/parser';
 
@@ -37,13 +42,13 @@ model Post {
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
-    expect(result.ast.models).toHaveLength(2);
-    expect(result.ast.enums).toHaveLength(1);
+    expect(flatPslModels(result.ast)).toHaveLength(2);
+    expect(flatPslEnums(result.ast)).toHaveLength(1);
     expect(result.ast.types?.declarations).toHaveLength(1);
     expect(result.ast.span.start.line).toBe(1);
     expect(result.ast.span.end.line).toBeGreaterThan(1);
 
-    const userModel = result.ast.models.find((model) => model.name === 'User');
+    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
     expect(userModel).toBeDefined();
     const emailField = userModel?.fields.find((field) => field.name === 'email');
     expect(emailField?.typeRef).toBe('Email');
@@ -55,7 +60,7 @@ model Post {
       args: [{ kind: 'positional', value: '191' }],
     });
 
-    const postModel = result.ast.models.find((model) => model.name === 'Post');
+    const postModel = flatPslModels(result.ast).find((model) => model.name === 'Post');
     const relationField = postModel?.fields.find((field) => field.name === 'user');
     const relationAttribute = relationField?.attributes.find(
       (attribute) => attribute.name === 'relation',
@@ -91,7 +96,7 @@ model Document {
     });
 
     expect(result.ok).toBe(true);
-    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const documentModel = flatPslModels(result.ast).find((model) => model.name === 'Document');
     const payloadField = documentModel?.fields.find((field) => field.name === 'payload');
     const payloadAttribute = payloadField?.attributes.find(
       (attribute) => attribute.name === 'vendor.column',
@@ -201,7 +206,7 @@ model Document {
 
     expect(result.ok).toBe(true);
 
-    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const documentModel = flatPslModels(result.ast).find((model) => model.name === 'Document');
     const shortNameField = documentModel?.fields.find((field) => field.name === 'shortName');
     expect(shortNameField).toMatchObject({
       kind: 'field',
@@ -303,7 +308,7 @@ model File {
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const fileModel = result.ast.models.find((model) => model.name === 'File');
+    const fileModel = flatPslModels(result.ast).find((model) => model.name === 'File');
     const pathField = fileModel?.fields.find((field) => field.name === 'path');
     expect(pathField?.attributes).toMatchObject([
       {
@@ -329,7 +334,7 @@ model Document {
     });
 
     expect(result.ok).toBe(true);
-    const documentModel = result.ast.models.find((model) => model.name === 'Document');
+    const documentModel = flatPslModels(result.ast).find((model) => model.name === 'Document');
     const embeddingField = documentModel?.fields.find((field) => field.name === 'embedding');
     expect(
       embeddingField?.attributes.find((attribute) => attribute.name === 'my-pack.column'),
@@ -356,7 +361,7 @@ model Account {
     });
 
     expect(result.ok).toBe(true);
-    const accountModel = result.ast.models.find((model) => model.name === 'Account');
+    const accountModel = flatPslModels(result.ast).find((model) => model.name === 'Account');
     const emailField = accountModel?.fields.find((field) => field.name === 'email');
     expect(emailField?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
       kind: 'attribute',
@@ -387,7 +392,7 @@ enum UserRole {
     });
 
     expect(result.ok).toBe(true);
-    const userRole = result.ast.enums.find((enumBlock) => enumBlock.name === 'UserRole');
+    const userRole = flatPslEnums(result.ast).find((enumBlock) => enumBlock.name === 'UserRole');
     expect(userRole?.attributes.find((attribute) => attribute.name === 'map')).toMatchObject({
       kind: 'attribute',
       target: 'enum',
@@ -412,7 +417,7 @@ enum Status {
 
     const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
     expect(result.ok).toBe(true);
-    const status = result.ast.enums.find((e) => e.name === 'Status');
+    const status = flatPslEnums(result.ast).find((e) => e.name === 'Status');
     expect(status?.values.map((v) => ({ name: v.name, mapName: v.mapName }))).toEqual([
       { name: 'inProgress', mapName: 'in-progress' },
       { name: '_enum', mapName: 'enum' },
@@ -434,7 +439,7 @@ enum Quoted {
 
     const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
     expect(result.ok).toBe(true);
-    const quoted = result.ast.enums.find((e) => e.name === 'Quoted');
+    const quoted = flatPslEnums(result.ast).find((e) => e.name === 'Quoted');
     expect(quoted?.values.map((v) => v.mapName)).toEqual([
       'with "quote"',
       'with \\back',
@@ -505,7 +510,7 @@ model Post {
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const postModel = result.ast.models.find((model) => model.name === 'Post');
+    const postModel = flatPslModels(result.ast).find((model) => model.name === 'Post');
     const indexAttribute = postModel?.attributes.find((attribute) => attribute.name === 'index');
     expect(indexAttribute).toMatchObject({
       kind: 'attribute',
@@ -543,7 +548,7 @@ model Post {
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const userModel = result.ast.models.find((model) => model.name === 'User');
+    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
     const postsField = userModel?.fields.find((field) => field.name === 'posts');
     const authoredField = userModel?.fields.find((field) => field.name === 'authored');
 
@@ -617,7 +622,7 @@ model Post {
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
-    expect(result.ast.models.map((model) => model.name)).toEqual(['User', 'Post']);
+    expect(flatPslModels(result.ast).map((model) => model.name)).toEqual(['User', 'Post']);
   });
 
   it('parses default function expressions used for ID parity fixtures', () => {
@@ -642,7 +647,7 @@ model Defaults {
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
 
-    const defaultsModel = result.ast.models.find((model) => model.name === 'Defaults');
+    const defaultsModel = flatPslModels(result.ast).find((model) => model.name === 'Defaults');
     expect(defaultsModel).toBeDefined();
 
     const byFieldName = new Map(defaultsModel?.fields.map((field) => [field.name, field]));
@@ -841,7 +846,7 @@ model User {
       expect.arrayContaining([expect.stringContaining('conflicts with enum name "Role"')]),
     );
 
-    const userModel = result.ast.models.find((model) => model.name === 'User');
+    const userModel = flatPslModels(result.ast).find((model) => model.name === 'User');
     const roleField = userModel?.fields.find((field) => field.name === 'role');
     expect(roleField?.typeName).toBe('Role');
     expect(roleField?.typeRef).toBeUndefined();
@@ -865,9 +870,9 @@ model User {
 `;
     const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
     expect(result.ok).toBe(true);
-    expect(result.ast.compositeTypes).toHaveLength(1);
+    expect(flatPslCompositeTypes(result.ast)).toHaveLength(1);
 
-    const address = result.ast.compositeTypes[0]!;
+    const address = flatPslCompositeTypes(result.ast)[0]!;
     expect(address.kind).toBe('compositeType');
     expect(address.name).toBe('Address');
     expect(address.fields).toHaveLength(3);
@@ -895,7 +900,7 @@ model User {
     const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
     expect(result.ok).toBe(true);
 
-    const userModel = result.ast.models.find((m) => m.name === 'User')!;
+    const userModel = flatPslModels(result.ast).find((m) => m.name === 'User')!;
     const addressField = userModel.fields.find((f) => f.name === 'address')!;
     expect(addressField.typeName).toBe('Address');
     expect(addressField.typeRef).toBeUndefined();
@@ -919,9 +924,9 @@ type Address {
 `;
     const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
     expect(result.ok).toBe(true);
-    expect(result.ast.compositeTypes).toHaveLength(2);
+    expect(flatPslCompositeTypes(result.ast)).toHaveLength(2);
 
-    const address = result.ast.compositeTypes.find((ct) => ct.name === 'Address')!;
+    const address = flatPslCompositeTypes(result.ast).find((ct) => ct.name === 'Address')!;
     const locationField = address.fields.find((f) => f.name === 'location')!;
     expect(locationField.typeName).toBe('GeoPoint');
   });
@@ -934,9 +939,241 @@ type Address {
 `;
     const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
     expect(result.ok).toBe(true);
-    const address = result.ast.compositeTypes[0]!;
+    const address = flatPslCompositeTypes(result.ast)[0]!;
     const tagsField = address.fields.find((f) => f.name === 'tags')!;
     expect(tagsField.list).toBe(true);
     expect(tagsField.typeName).toBe('String');
+  });
+
+  describe('namespace blocks', () => {
+    it('parses a named namespace block and routes declarations into its bucket', () => {
+      const schema = `
+model TopLevel {
+  id Int @id
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+
+  enum Role {
+    ADMIN
+    MEMBER
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.ast.namespaces.map((ns) => ns.name)).toEqual(['__unspecified__', 'auth']);
+
+      const top = result.ast.namespaces.find((ns) => ns.name === '__unspecified__');
+      expect(top?.models.map((m) => m.name)).toEqual(['TopLevel']);
+      expect(top?.enums).toEqual([]);
+
+      const auth = result.ast.namespaces.find((ns) => ns.name === 'auth');
+      expect(auth?.models.map((m) => m.name)).toEqual(['User']);
+      expect(auth?.enums.map((e) => e.name)).toEqual(['Role']);
+    });
+
+    it('drops the synthesised __unspecified__ bucket when every declaration is namespaced', () => {
+      const schema = `
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.ast.namespaces.map((ns) => ns.name)).toEqual(['auth']);
+    });
+
+    it('reopens and merges multiple namespace blocks with the same name', () => {
+      const schema = `
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+
+namespace auth {
+  enum Role {
+    ADMIN
+    MEMBER
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.ast.namespaces).toHaveLength(1);
+      const auth = result.ast.namespaces[0]!;
+      expect(auth.name).toBe('auth');
+      expect(auth.models.map((m) => m.name)).toEqual(['User']);
+      expect(auth.enums.map((e) => e.name)).toEqual(['Role']);
+    });
+
+    it('rejects a recursive namespace block as a parse diagnostic', () => {
+      const schema = `
+namespace outer {
+  namespace inner {
+    model X {
+      id Int @id
+    }
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.diagnostics.map((d) => d.code)).toContain('PSL_INVALID_NAMESPACE_BLOCK');
+      const recursive = result.diagnostics.find(
+        (d) => d.code === 'PSL_INVALID_NAMESPACE_BLOCK' && /inner/.test(d.message),
+      );
+      expect(recursive).toBeDefined();
+    });
+
+    it('rejects a `types` block declared inside a namespace block', () => {
+      const schema = `
+namespace auth {
+  types {
+    Email = String
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      const offending = result.diagnostics.find(
+        (d) =>
+          d.code === 'PSL_INVALID_NAMESPACE_BLOCK' &&
+          /types` blocks must be declared at the document top level/.test(d.message),
+      );
+      expect(offending).toBeDefined();
+    });
+
+    it('rejects a user-authored namespace named __unspecified__', () => {
+      const schema = `
+namespace __unspecified__ {
+  model X {
+    id Int @id
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(
+        result.diagnostics.some(
+          (d) => d.code === 'PSL_INVALID_NAMESPACE_BLOCK' && /reserved/.test(d.message),
+        ),
+      ).toBe(true);
+    });
+
+    it('does not reserve identifiers like `unbound`, `public`, or `auth` at the framework parser layer', () => {
+      const schema = `
+namespace unbound {
+  model A {
+    id Int @id
+  }
+}
+
+namespace public {
+  model B {
+    id Int @id
+  }
+}
+
+namespace auth {
+  model C {
+    id Int @id
+  }
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.ast.namespaces.map((ns) => ns.name).sort()).toEqual([
+        'auth',
+        'public',
+        'unbound',
+      ]);
+    });
+  });
+
+  describe('dot-qualified field types', () => {
+    it('parses a qualified type reference into typeName + typeNamespaceId', () => {
+      const schema = `
+model Profile {
+  id Int @id
+  user auth.User @relation(fields: [userId], references: [id])
+  userId Int
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
+      const userField = profile?.fields.find((f) => f.name === 'user');
+      expect(userField?.typeName).toBe('User');
+      expect(userField?.typeNamespaceId).toBe('auth');
+    });
+
+    it('parses a qualified list type reference', () => {
+      const schema = `
+model User {
+  id Int @id
+  posts public.Post[]
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const user = flatPslModels(result.ast).find((m) => m.name === 'User');
+      const postsField = user?.fields.find((f) => f.name === 'posts');
+      expect(postsField?.typeName).toBe('Post');
+      expect(postsField?.typeNamespaceId).toBe('public');
+      expect(postsField?.list).toBe(true);
+    });
+
+    it('rejects nested dot-qualified types with a parse error', () => {
+      const schema = `
+model Foo {
+  id Int @id
+  bar a.b.Bar
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+      expect(result.diagnostics[0]?.message).toContain('a.b.Bar');
+      expect(result.diagnostics[0]?.span).toBeDefined();
+    });
+
+    it('rejects nested dot-qualified list types with a parse error', () => {
+      const schema = `
+model Foo {
+  id Int @id
+  bars a.b.Bar[]
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    });
+
+    it('leaves unqualified types unchanged (no typeNamespaceId)', () => {
+      const schema = `
+model Post {
+  id Int @id
+  title String
+  published Boolean @default(false)
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      const post = flatPslModels(result.ast).find((m) => m.name === 'Post');
+      const titleField = post?.fields.find((f) => f.name === 'title');
+      expect(titleField?.typeName).toBe('String');
+      expect(titleField?.typeNamespaceId).toBeUndefined();
+    });
   });
 });

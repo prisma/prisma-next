@@ -22,6 +22,7 @@ import {
 } from '../src/query-plan';
 import { withReturningCapability } from './collection-fixtures';
 import { getTestContract } from './helpers';
+import { unboundTables } from './unbound-tables';
 
 function assertInsertAst(ast: unknown): asserts ast is InsertAst {
   expect((ast as { kind: string }).kind).toBe('insert');
@@ -32,7 +33,7 @@ function usersColParam(
   column: string,
   value: unknown,
 ): ParamRef {
-  const columns = contract.storage.tables.users?.columns as
+  const columns = unboundTables(contract.storage)['users']?.columns as
     | Record<string, { codecId?: string }>
     | undefined;
   const columnMeta = columns?.[column];
@@ -112,7 +113,7 @@ describe('query plan mutations', () => {
     expect(plan.ast.onConflict?.action?.kind).toBe('do-nothing');
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com']);
     expect(plan.ast.returning?.map((item) => item.alias)).toEqual(
-      Object.keys(contract.storage.tables.users.columns),
+      Object.keys(unboundTables(contract.storage)['users']!.columns),
     );
   });
 

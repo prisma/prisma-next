@@ -138,7 +138,9 @@ function createTestContract(
     roots: {},
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables: tableEntries,
+      namespaces: {
+        __unbound__: { id: '__unbound__', tables: tableEntries },
+      },
       ...ifDefined('types', types),
     }),
     extensionPacks: {},

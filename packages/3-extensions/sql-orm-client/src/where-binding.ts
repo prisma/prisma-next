@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   type AnyExpression,
@@ -119,7 +120,13 @@ function createParamRef(
   columnRef: ColumnRef,
   value: unknown,
 ): ParamRef {
-  if (!contract.storage.tables[columnRef.table]?.columns[columnRef.column]) {
+  if (
+    !(
+      contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[columnRef.table] as
+        | StorageTable
+        | undefined
+    )?.columns[columnRef.column]
+  ) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
   const codec = codecRefForStorageColumn(contract.storage, columnRef.table, columnRef.column);

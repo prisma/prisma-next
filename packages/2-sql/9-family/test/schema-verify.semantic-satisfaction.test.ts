@@ -6,6 +6,8 @@
  * - Name differences are ignored (names are for DDL/diagnostics, not identity)
  * - Stronger objects can satisfy weaker requirements (e.g., unique index satisfies non-unique index)
  */
+
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -484,8 +486,12 @@ describe('verifySqlSchema - semantic satisfaction', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['author_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 name: 'post_author_fk',
               },
             ],
@@ -538,8 +544,12 @@ describe('verifySqlSchema - semantic satisfaction', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['author_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 name: 'post_author_fk',
               },
             ],
@@ -588,8 +598,16 @@ describe('verifySqlSchema - semantic satisfaction', () => {
           {
             foreignKeys: [
               {
-                columns: ['tenant_id', 'tenant_org_id'],
-                references: { table: 'tenant', columns: ['id', 'org_id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'document',
+                  columns: ['tenant_id', 'tenant_org_id'],
+                },
+                target: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'tenant',
+                  columns: ['id', 'org_id'],
+                },
                 name: 'document_tenant_fk',
               },
             ],

@@ -29,6 +29,19 @@ type ContractOverrides<
 
 const DUMMY_HASH = coreHash('sha256:test');
 
+const DEFAULT_FRAMEWORK_STORAGE = { namespaces: {} } as const;
+
+const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
+
+const DEFAULT_SQL_STORAGE = {
+  namespaces: {
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables: {},
+    },
+  },
+} as const;
+
 export function createContract<
   TStorage extends StorageBase = StorageBase,
   TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
@@ -37,8 +50,7 @@ export function createContract<
   const targetFamily = overrides.targetFamily ?? 'sql';
   const capabilities = overrides.capabilities ?? {};
 
-  const rawStorage =
-    overrides.storage ?? ({ tables: {} } as unknown as Omit<TStorage, 'storageHash'>);
+  const rawStorage = overrides.storage ?? DEFAULT_FRAMEWORK_STORAGE;
 
   const storageHash = computeStorageHash({
     target,
@@ -81,7 +93,9 @@ export function createContract<
 }
 
 type SqlStorageLike = StorageBase & {
-  readonly tables: Record<string, unknown>;
+  readonly namespaces: Readonly<
+    Record<string, { readonly id: string; readonly tables: Readonly<Record<string, unknown>> }>
+  >;
   readonly types?: Record<string, unknown>;
 };
 
@@ -91,10 +105,10 @@ export function createSqlContract(
   overrides: ContractOverrides<SqlStorageLike, Record<string, SqlModelLike>> = {},
 ): Contract<SqlStorageLike, Record<string, SqlModelLike>> {
   return createContract<SqlStorageLike, Record<string, SqlModelLike>>({
-    target: 'postgres',
-    targetFamily: 'sql',
-    storage: overrides.storage ?? { tables: {} },
     ...overrides,
+    target: overrides.target ?? 'postgres',
+    targetFamily: overrides.targetFamily ?? 'sql',
+    storage: overrides.storage ?? DEFAULT_SQL_STORAGE,
   });
 }
 
