@@ -1,4 +1,3 @@
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { MongoFieldFilter, MongoProjectStage } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
 import { mongoQuery } from '../src/query';
@@ -10,7 +9,10 @@ import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
 describe('contractModelToMongoResultShape', () => {
-  const contract = validateMongoContract<TContract>(testContractJson).contract;
+  // Hand-authored fixture JSON; cast at the test-fixture seam (allowed by
+  // `.cursor/rules/as-contract-cast-smell.mdc`). Production code crosses
+  // the family `deserializeContract` seam instead.
+  const contract = testContractJson as unknown as TContract;
 
   it('maps full Order model scalars to leaf shapes', () => {
     const model = contract.models['Order'];

@@ -70,12 +70,4 @@ export type {
   PolymorphicIndexScope,
 } from '../polymorphic-index-scope';
 export { applyPolymorphicScopeToMongoIndex } from '../polymorphic-index-scope';
-// Foundation-layer structural-validation helper. Plays the same role for
-// Mongo that `validateSqlContractFully` plays for SQL: a layering-allowed
-// validation primitive for non-family consumers (authoring/query-builder
-// layers that cannot depend on `family-mongo`). The user-facing facade
-// (`mongo<Contract>(...)`) routes through the SPI implementation in
-// `family-mongo` instead.
-export type { MongoContractIndices, ValidatedMongoContract } from '../validate-mongo-contract';
-export { validateMongoContract } from '../validate-mongo-contract';
 export { validateMongoStorage } from '../validate-storage';

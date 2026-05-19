@@ -140,7 +140,7 @@ The runner returns structured errors with the following codes:
 
 - **`@prisma-next/framework-components`**: Control plane types via `./control` (`ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`, `ControlDriverInstance`, etc.)
 - **`@prisma-next/sql-contract-emitter`**: SQL target family hook (`sqlEmission`)
-- **`@prisma-next/sql-contract`**: SQL contract types plus validation (`validateContract`)
+- **`@prisma-next/sql-contract`**: SQL contract types plus validation primitives (`validateSqlContractFully`, consumed by the family serializer base)
 - **`@prisma-next/sql-operations`**: SQL operation registry types (`SqlOperationEntry`, `SqlOperationRegistry`)
 
 **Dependents:**

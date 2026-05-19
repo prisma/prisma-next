@@ -37,10 +37,10 @@
     "node": ">=20"
   },
   "exports": {
+    "./contract-validation-error": "./dist/contract-validation-error.mjs",
     "./hashing": "./dist/hashing.mjs",
     "./testing": "./dist/testing.mjs",
     "./types": "./dist/types.mjs",
-    "./validate-contract": "./dist/validate-contract.mjs",
     "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"
   },

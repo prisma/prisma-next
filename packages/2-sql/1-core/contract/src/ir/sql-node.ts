@@ -15,7 +15,7 @@ import { IRNodeBase } from '@prisma-next/framework-components/ir';
  *
  * - `JSON.stringify(node)` produces the canonical pre-lift JSON envelope
  *   shape (no `kind` field), so emitted contract.json files and the
- *   `validateSqlContract` arktype schemas stay unchanged.
+ *   `validateSqlContractFully` arktype schemas stay unchanged.
  * - Test assertions that use `toEqual({...})` against the pre-lift flat
  *   shape continue to pass — only enumerable own properties are
  *   compared.
