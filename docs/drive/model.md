@@ -399,7 +399,7 @@ The on-disk shape of an artefact is **per-context**. The model deliberately allo
 | Spike artefact (dispatch-scope) | `projects/<project>/spikes/<date>-<q>.md` for in-project spikes; transient scratch for orphan-context spikes |
 | Spike artefact (slice-scope) | A doc PR (an ADR, an analysis); shipped under the project's normal docs path |
 | Deployment plan | `projects/<project>/deployment-plan.md` (project-scope) |
-| Review artefacts | `projects/<project>/reviews/{code-review,system-design-review,walkthrough}.md` (per `drive-build-workflow`); for orphan slices, lighter shape attached to the PR review surface |
+| Review artefacts | `projects/<project>/reviews/code-review.md` (per `drive-build-workflow`; the single per-round review artifact); for orphan slices, lighter shape attached to the PR review surface |
 | Manual-QA script | `projects/<project>/manual-qa.md` (in-project); inline QA section in PR description (orphan). Authored via `drive-qa-plan`. |
 | Manual-QA run report | `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (in-project); inline QA findings in PR review thread (orphan). Authored via `drive-qa-run`. One per run; reports accumulate (never overwritten) so the QA history is auditable. |
 | Scope-deferred candidates (during project) | `projects/<project>/deferred.md`. Reviewed at project closure; each item triaged individually |
