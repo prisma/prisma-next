@@ -918,14 +918,35 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    if (!input.modelNames.has(relationAttribute.field.typeName)) {
+    const { typeName: fieldTypeName, typeNamespaceId: fieldTypeNamespaceId } =
+      relationAttribute.field;
+    const qualifiedTypeName = fieldTypeNamespaceId
+      ? `${fieldTypeNamespaceId}.${fieldTypeName}`
+      : fieldTypeName;
+
+    if (!input.modelNames.has(fieldTypeName)) {
       diagnostics.push({
         code: 'PSL_INVALID_RELATION_TARGET',
-        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${qualifiedTypeName}"`,
         sourceId,
         span: relationAttribute.field.span,
       });
       continue;
+    }
+
+    if (fieldTypeNamespaceId !== undefined) {
+      const resolvedTargetNamespaceId = input.modelNamespaceIds.get(fieldTypeName);
+      const normalizedQualifier =
+        fieldTypeNamespaceId === 'unbound' ? '__unbound__' : fieldTypeNamespaceId;
+      if (resolvedTargetNamespaceId !== normalizedQualifier) {
+        diagnostics.push({
+          code: 'PSL_INVALID_RELATION_TARGET',
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${qualifiedTypeName}"`,
+          sourceId,
+          span: relationAttribute.field.span,
+        });
+        continue;
+      }
     }
 
     const parsedRelation = parseRelationAttribute({
@@ -948,11 +969,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    const targetMapping = input.modelMappings.get(relationAttribute.field.typeName);
+    const targetMapping = input.modelMappings.get(fieldTypeName);
     if (!targetMapping) {
       diagnostics.push({
         code: 'PSL_INVALID_RELATION_TARGET',
-        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${qualifiedTypeName}"`,
         sourceId,
         span: relationAttribute.field.span,
       });
