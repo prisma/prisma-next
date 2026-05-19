@@ -69,12 +69,16 @@ function TableCard({ tableName, table }: { tableName: string; table: StorageTabl
           </div>
         ))}
         {(table.foreignKeys ?? []).map((foreignKey) => (
-          <div key={foreignKey.source.columns.join(',')} className="column">
+          <div
+            key={`${foreignKey.source.namespaceId}.${foreignKey.source.tableName}:${foreignKey.source.columns.join(',')}->${foreignKey.target.namespaceId}.${foreignKey.target.tableName}:${foreignKey.target.columns.join(',')}`}
+            className="column"
+          >
             <span className="col-name">
               {'\u2192'} {foreignKey.source.columns.join(', ')}
             </span>
             <span className="col-type">
-              {'\u2192'} {foreignKey.target.tableName}({foreignKey.target.columns.join(', ')})
+              {'\u2192'} {foreignKey.target.namespaceId}.{foreignKey.target.tableName}(
+              {foreignKey.target.columns.join(', ')})
             </span>
           </div>
         ))}
@@ -137,7 +141,7 @@ export function ContractView({ contract }: { contract: Contract }) {
       <Section title="Tables">
         {Object.values(contract.storage.namespaces).flatMap((ns) =>
           Object.entries(ns.tables as Record<string, StorageTable>).map(([tableName, table]) => (
-            <TableCard key={tableName} tableName={tableName} table={table} />
+            <TableCard key={`${ns.id}.${tableName}`} tableName={tableName} table={table} />
           )),
         )}
       </Section>
