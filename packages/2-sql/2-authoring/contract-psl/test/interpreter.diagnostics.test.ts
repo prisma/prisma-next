@@ -1139,14 +1139,12 @@ model User {
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
-            message: expect.stringMatching(/SQLite/),
-          }),
-        ]),
+      const unsupported = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
       );
+      expect(unsupported).toBeDefined();
+      expect(unsupported?.message).toMatch(/SQLite/);
+      expect(unsupported?.span).toBeDefined();
     });
 
     it('Postgres rejects `namespace unbound { … }` alongside a sibling named namespace', () => {
@@ -1174,14 +1172,16 @@ namespace auth {
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'PSL_RESERVED_NAMESPACE_NAME',
-            message: expect.stringContaining('unbound'),
-          }),
-        ]),
+      const reserved = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME',
       );
+      expect(reserved).toBeDefined();
+      expect(reserved?.message).toContain('unbound');
+      // Span must be populated so editor tooling can locate the offending
+      // `namespace unbound { … }` block. A future refactor that drops the
+      // `ifDefined('span', unboundBlock?.span)` shape would silently
+      // regress this without an explicit assertion.
+      expect(reserved?.span).toBeDefined();
     });
 
     it('Postgres accepts `namespace unbound { … }` when it is the only named namespace', () => {
