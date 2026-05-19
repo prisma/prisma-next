@@ -10,7 +10,7 @@ When a retro lesson could land in multiple surfaces, the team's preference:
 - **Triage / sizing heuristics** → `drive/triage/README.md`.
 - **Failure-mode patterns specific to this codebase** → `drive/plan/README.md` § Failure-mode catalogue.
 - **Failure-mode patterns that generalise to any contract-first system** → canonical (via `drive-update-skills`).
-- **Durable architectural decisions** → ADR under `docs/architecture docs/adrs/`.
+- **Durable architectural decisions** → ADR under [docs/architecture docs/adrs/](docs/architecture%20docs/adrs/).
 - **Process changes that affect the whole methodology** → propose upstream PR to `prisma/ignite` (after one or two repetitions to confirm the pattern).
 
 ## Recurring-pattern catalogue
