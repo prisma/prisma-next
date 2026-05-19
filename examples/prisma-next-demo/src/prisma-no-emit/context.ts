@@ -18,12 +18,12 @@ export const stack = createSqlExecutionStack({
 });
 
 // The no-emit path passes the TS-authored contract directly; the
-// deserializer validates its structure and returns a wider `Contract`
-// type. The cast restores the literal-typed shape so downstream DSL
-// calls keep their precise types.
-const validatedContract = new SqlContractSerializer().deserializeContract(
+// deserializer's method-level type parameter recovers the literal-
+// typed contract shape (from the generated `contract.d.ts`) so
+// downstream DSL calls keep their precise types.
+const validatedContract = new SqlContractSerializer().deserializeContract<typeof contract>(
   contract,
-) as unknown as typeof contract;
+);
 
 export const context = createExecutionContext({
   contract: validatedContract,

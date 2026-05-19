@@ -34,9 +34,9 @@ import { type as arktypeType } from 'arktype';
 export abstract class MongoContractSerializerBase<TContract>
   implements ContractSerializer<TContract>
 {
-  deserializeContract(json: unknown): TContract {
+  deserializeContract<T extends TContract = TContract>(json: unknown): T {
     const validated = this.parseMongoContractStructure(json);
-    return this.constructTargetContract(validated);
+    return this.constructTargetContract(validated) as T;
   }
 
   serializeContract(contract: TContract): JsonObject {

@@ -1,5 +1,5 @@
-import type { Contract } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import {
@@ -45,10 +45,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>,
   ) {}
 
-  deserializeContract(json: unknown): TContract {
+  deserializeContract<T extends TContract = TContract>(json: unknown): T {
     const validated = this.parseSqlContractStructure(json);
     const hydrated = this.hydrateSqlStorage(validated);
-    return this.constructTargetContract(hydrated);
+    return this.constructTargetContract(hydrated) as T;
   }
 
   serializeContract(contract: TContract): JsonObject {

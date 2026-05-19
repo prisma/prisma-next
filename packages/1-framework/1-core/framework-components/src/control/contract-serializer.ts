@@ -21,8 +21,14 @@ export interface ContractSerializer<TContract> {
    * Validate the JSON shape and construct typed class instances. Throws on
    * structural / domain / storage validation failures. Returns the typed
    * contract on success.
+   *
+   * The method-level type parameter lets call sites that hold a
+   * precisely-typed contract literal (e.g. `typeof contract` from a
+   * generated `contract.d.ts`) recover that literal type without an
+   * external cast. The default `T = TContract` preserves the inferred
+   * return type for every caller that does not opt in.
    */
-  deserializeContract(json: unknown): TContract;
+  deserializeContract<T extends TContract = TContract>(json: unknown): T;
 
   /**
    * Serialize a typed contract to its canonical JSON shape. Returns
