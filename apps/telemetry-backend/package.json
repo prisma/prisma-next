@@ -1,0 +1,38 @@
+{
+  "name": "@prisma-next/telemetry-backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "bun": ">=1.3",
+    "node": ">=24"
+  },
+  "scripts": {
+    "deploy": "bunx @prisma/cli@preview app deploy --app telemetry-backend --entry src/server.ts",
+    "emit": "prisma-next contract emit",
+    "emit:check": "pnpm emit && git diff --exit-code src/prisma/contract.json src/prisma/contract.d.ts",
+    "start": "bun run src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@prisma-next/postgres": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "arktype": "catalog:"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/bun": "^1.2.18",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

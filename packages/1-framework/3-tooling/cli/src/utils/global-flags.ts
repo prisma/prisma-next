@@ -1,3 +1,5 @@
+import { isCI } from './is-ci';
+
 export interface GlobalFlags {
   readonly json?: boolean;
   readonly quiet?: boolean;
@@ -70,8 +72,10 @@ export function parseGlobalFlags(options: CommonCommandOptions): GlobalFlags {
   } else if (options.color !== undefined) {
     flags.color = options.color;
   } else {
-    // Default: enable color if TTY
-    flags.color = process.stdout.isTTY && !process.env['CI'];
+    // Default: enable color if TTY and not in CI. Uses the consolidated
+    // `isCI()` helper (`./is-ci.ts`) — the single source of truth shared
+    // with telemetry-skip detection.
+    flags.color = process.stdout.isTTY && !isCI();
   }
 
   // Interactivity: --interactive/--no-interactive

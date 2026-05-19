@@ -1,0 +1,46 @@
+{
+  "name": "@prisma-next/cli-telemetry",
+  "version": "0.9.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "CLI telemetry client for Prisma Next: detached subprocess sender, gating resolution, user-config store, and consent surface",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@prisma-next/tsconfig": "workspace:0.9.0",
+    "@prisma-next/tsdown": "workspace:0.9.0",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/exports/index.d.mts",
+      "import": "./dist/exports/index.mjs"
+    },
+    "./sender": {
+      "types": "./dist/sender.d.mts",
+      "import": "./dist/sender.mjs"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/1-framework/3-tooling/cli-telemetry"
+  }
+}
