@@ -52,6 +52,7 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
         "tables": {
           "eql_v2_configuration": {
             "columns": {
