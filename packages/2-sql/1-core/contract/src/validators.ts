@@ -180,8 +180,15 @@ const StorageSchema = type({
   'namespaces?': type({ '[string]': NamespaceEntrySchema }),
 });
 
+// SQL-specific namespace walk shape (`tables` is the SQL family's idiom —
+// the framework `Namespace` interface no longer carries it). The wider
+// `object` table value keeps this helper structurally compatible with
+// `SqlNamespace` (whose tables narrow to `StorageTable`) and the JSON
+// envelope variants that lose class identity.
 type NamespacedStorageWalk = {
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  readonly namespaces: Readonly<
+    Record<string, Namespace & { readonly tables?: Readonly<Record<string, object>> }>
+  >;
 };
 
 function eachStorageTable(storage: NamespacedStorageWalk) {
