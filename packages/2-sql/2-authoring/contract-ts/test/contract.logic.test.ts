@@ -181,7 +181,7 @@ describe('SqlContractSerializer logic validation', () => {
       }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
-      /foreignKey references non-existent table "NonExistent"/,
+      /foreignKey references non-existent table "__unbound__\.NonExistent"/,
     );
   });
 

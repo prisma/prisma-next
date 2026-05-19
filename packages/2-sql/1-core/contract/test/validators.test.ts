@@ -553,6 +553,177 @@ describe('SQL contract validators', () => {
       });
       expect(() => validateSqlContractFully(c)).not.toThrow();
     });
+
+    it('rejects FK whose source coordinates do not match the owning table', () => {
+      const rawContract = createContract({
+        storage: unboundTables({
+          user: {
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'wrongTable',
+                  columns: ['userId'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                constraint: true,
+                index: true,
+              },
+            ],
+          },
+        }),
+      });
+      expect(() => validateSqlContractFully(rawContract)).toThrow(/mismatched source coordinates/);
+    });
+
+    it('resolves cross-namespace FK targets by namespaceId, not by bare table name', () => {
+      const rawContract = createContract({
+        storage: {
+          storageHash: 'sha256:cross-ns',
+          namespaces: {
+            auth: {
+              id: 'auth',
+              tables: {
+                users: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+            analytics: {
+              id: 'analytics',
+              tables: {
+                users: {
+                  columns: {
+                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['user_uuid'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+                events: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [
+                    {
+                      source: {
+                        namespaceId: 'analytics',
+                        tableName: 'events',
+                        columns: ['user_uuid'],
+                      },
+                      target: {
+                        namespaceId: 'analytics',
+                        tableName: 'users',
+                        columns: ['user_uuid'],
+                      },
+                      constraint: true,
+                      index: true,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(() => validateSqlContractFully(rawContract)).not.toThrow();
+    });
+
+    it('rejects an FK whose target namespaceId points at a different namespace whose same-named table lacks the referenced column', () => {
+      // Same fixture as above but the FK target.namespaceId is "auth" instead
+      // of "analytics". Pre-fix this validated against the workspace-wide
+      // table-name set and silently accepted, because "users" existed in
+      // analytics. With namespace-qualified resolution it correctly resolves
+      // to auth.users — which has only column "id", not "user_uuid".
+      const rawContract = createContract({
+        storage: {
+          storageHash: 'sha256:cross-ns-mismatch',
+          namespaces: {
+            auth: {
+              id: 'auth',
+              tables: {
+                users: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+            analytics: {
+              id: 'analytics',
+              tables: {
+                users: {
+                  columns: {
+                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['user_uuid'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+                events: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [
+                    {
+                      source: {
+                        namespaceId: 'analytics',
+                        tableName: 'events',
+                        columns: ['user_uuid'],
+                      },
+                      target: {
+                        namespaceId: 'auth',
+                        tableName: 'users',
+                        columns: ['user_uuid'],
+                      },
+                      constraint: true,
+                      index: true,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(() => validateSqlContractFully(rawContract)).toThrow(
+        /non-existent column "user_uuid" in table "users"/,
+      );
+    });
   });
 
   describe('validateStorageSemantics', () => {

@@ -211,16 +211,6 @@ function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: 
   return undefined;
 }
 
-function allStorageTableNames(storage: NamespacedStorageWalk): Set<string> {
-  const names = new Set<string>();
-  for (const ns of Object.values(storage.namespaces)) {
-    for (const k of Object.keys(ns.tables ?? {})) {
-      names.add(k);
-    }
-  }
-  return names;
-}
-
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -594,8 +584,6 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
  * counts match their referenced columns. Throws on the first mismatch.
  */
 export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): void {
-  const tableNames = allStorageTableNames(contract.storage);
-
   for (const { namespaceId, tableName, table: rawTable } of eachStorageTable(contract.storage)) {
     const table = rawTable as StorageTable;
     const columnNames = new Set(Object.keys(table.columns));
@@ -643,6 +631,13 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
     }
 
     for (const fk of table.foreignKeys) {
+      if (fk.source.namespaceId !== namespaceId || fk.source.tableName !== tableName) {
+        throw new ContractValidationError(
+          `Namespace "${namespaceId}" table "${tableName}" contains foreignKey with mismatched source coordinates (${fk.source.namespaceId}.${fk.source.tableName})`,
+          'storage',
+        );
+      }
+
       for (const colName of fk.source.columns) {
         if (!columnNames.has(colName)) {
           throw new ContractValidationError(
@@ -652,15 +647,14 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      if (!tableNames.has(fk.target.tableName)) {
+      const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
+      const referencedRaw = targetNamespace?.tables?.[fk.target.tableName];
+      if (referencedRaw === undefined) {
         throw new ContractValidationError(
-          `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}"`,
+          `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,
           'storage',
         );
       }
-
-      const referencedRaw = findStorageTableByTableName(contract.storage, fk.target.tableName);
-      if (referencedRaw === undefined) continue;
       const referencedTable = referencedRaw as StorageTable;
       const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
       for (const colName of fk.target.columns) {
