@@ -76,7 +76,7 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "mongo-namespace",
-        "tables": {
+        "collections": {
           "shops": {
             "kind": "mongo-collection"
           }

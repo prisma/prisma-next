@@ -72,7 +72,7 @@ type ContractBase = {
       readonly __unbound__: {
         readonly id: '__unbound__';
         readonly kind: 'mongo-namespace';
-        readonly tables: {
+        readonly collections: {
           readonly shops: { readonly kind: 'mongo-collection' };
         };
       };
