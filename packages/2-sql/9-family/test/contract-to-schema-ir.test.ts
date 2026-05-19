@@ -505,6 +505,7 @@ describe('contractToSchemaIR', () => {
       {
         columns: ['authorId'],
         referencedTable: 'User',
+        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
         name: 'Post_authorId_fkey',
       },
@@ -666,6 +667,7 @@ describe('contractToSchemaIR', () => {
     expect(result.tables['Post']!.foreignKeys[0]).toEqual({
       columns: ['authorId'],
       referencedTable: 'User',
+      referencedSchema: UNBOUND_NAMESPACE_ID,
       referencedColumns: ['id'],
     });
   });

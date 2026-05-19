@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
@@ -26,11 +27,19 @@ function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTab
   const uniqueIndexKeys = new Set(
     table.indexes.filter((i) => i.unique).map((i) => i.columns.join(',')),
   );
-  const fkKeys = new Set(
-    table.foreignKeys.map(
-      (fk) => `${fk.columns.join(',')}|${fk.referencedTable}|${fk.referencedColumns.join(',')}`,
-    ),
-  );
+  const fkKeys = new Set<string>();
+  for (const fk of table.foreignKeys) {
+    const cols = fk.columns.join(',');
+    const refCols = fk.referencedColumns.join(',');
+    // Always store the unqualified key so that unbound-namespace contract FKs
+    // can match via hasForeignKey's fallback path.
+    fkKeys.add(`${cols}||${fk.referencedTable}|${refCols}`);
+    // Also store the qualified key when referencedSchema is present so that
+    // cross-namespace contract FKs can match precisely by (schema, table).
+    if (fk.referencedSchema !== undefined) {
+      fkKeys.add(`${cols}|${fk.referencedSchema}|${fk.referencedTable}|${refCols}`);
+    }
+  }
   return { uniqueKeys, indexKeys, uniqueIndexKeys, fkKeys };
 }
 
@@ -48,7 +57,12 @@ export function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]):
 }
 
 export function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
-  return lookup.fkKeys.has(
-    `${fk.source.columns.join(',')}|${fk.target.tableName}|${fk.target.columns.join(',')}`,
-  );
+  const cols = fk.source.columns.join(',');
+  const refCols = fk.target.columns.join(',');
+  // For unbound-namespace FKs, use the unqualified key (matches any schema).
+  // For bound-namespace FKs, use the qualified key (exact schema match).
+  if (fk.target.namespaceId === UNBOUND_NAMESPACE_ID) {
+    return lookup.fkKeys.has(`${cols}||${fk.target.tableName}|${refCols}`);
+  }
+  return lookup.fkKeys.has(`${cols}|${fk.target.namespaceId}|${fk.target.tableName}|${refCols}`);
 }

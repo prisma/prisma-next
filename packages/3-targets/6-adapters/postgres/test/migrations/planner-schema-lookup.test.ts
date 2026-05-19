@@ -78,7 +78,7 @@ describe('buildSchemaLookupMap', () => {
       },
     };
     const lookup = buildSchemaLookupMap(schema).get('post')!;
-    expect(lookup.fkKeys.has('author_id|user|id')).toBe(true);
+    expect(lookup.fkKeys.has('author_id||user|id')).toBe(true);
   });
 });
 

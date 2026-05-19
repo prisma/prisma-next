@@ -149,6 +149,7 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
   return {
     columns: fk.source.columns,
     referencedTable: fk.target.tableName,
+    referencedSchema: fk.target.namespaceId,
     referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
   };

@@ -8,6 +8,8 @@ export interface SqlForeignKeyIRInput {
   readonly columns: readonly string[];
   readonly referencedTable: string;
   readonly referencedColumns: readonly string[];
+  /** Schema (namespace) of the referenced table — populated by adapters that introspect cross-schema FKs. */
+  readonly referencedSchema?: string;
   readonly name?: string;
   readonly onDelete?: SqlReferentialAction;
   readonly onUpdate?: SqlReferentialAction;
@@ -26,6 +28,7 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode {
   readonly columns: readonly string[];
   readonly referencedTable: string;
   readonly referencedColumns: readonly string[];
+  declare readonly referencedSchema?: string;
   declare readonly name?: string;
   declare readonly onDelete?: SqlReferentialAction;
   declare readonly onUpdate?: SqlReferentialAction;
@@ -36,6 +39,7 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode {
     this.columns = input.columns;
     this.referencedTable = input.referencedTable;
     this.referencedColumns = input.referencedColumns;
+    if (input.referencedSchema !== undefined) this.referencedSchema = input.referencedSchema;
     if (input.name !== undefined) this.name = input.name;
     if (input.onDelete !== undefined) this.onDelete = input.onDelete;
     if (input.onUpdate !== undefined) this.onUpdate = input.onUpdate;

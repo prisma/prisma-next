@@ -7,6 +7,7 @@ import type {
   SchemaIssue,
   SchemaVerificationNode,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   ForeignKey,
   Index,
@@ -183,9 +184,20 @@ export function verifyForeignKeys(
   for (const contractFK of contractFKs) {
     const fkPath = `${tablePath}.foreignKeys[${contractFK.source.columns.join(',')}]`;
     const matchingFK = schemaFKs.find((fk) => {
+      // When the schema FK carries referencedSchema (populated by the Postgres
+      // adapter for cross-schema FKs), compare the full (namespace, table) pair
+      // against the contract FK's target coordinate. When referencedSchema is
+      // absent (same-schema FKs, older introspection, or hand-crafted test
+      // fixtures), fall back to table-name-only comparison so same-namespace
+      // contracts continue to verify correctly.
+      const tablesMatch =
+        fk.referencedSchema !== undefined && contractFK.target.namespaceId !== UNBOUND_NAMESPACE_ID
+          ? fk.referencedSchema === contractFK.target.namespaceId &&
+            fk.referencedTable === contractFK.target.tableName
+          : fk.referencedTable === contractFK.target.tableName;
       return (
         arraysEqual(fk.columns, contractFK.source.columns) &&
-        fk.referencedTable === contractFK.target.tableName &&
+        tablesMatch &&
         arraysEqual(fk.referencedColumns, contractFK.target.columns)
       );
     });
@@ -255,9 +267,14 @@ export function verifyForeignKeys(
   if (strict) {
     for (const schemaFK of schemaFKs) {
       const matchingFK = contractFKs.find((fk) => {
+        const tablesMatch =
+          schemaFK.referencedSchema !== undefined && fk.target.namespaceId !== UNBOUND_NAMESPACE_ID
+            ? schemaFK.referencedSchema === fk.target.namespaceId &&
+              schemaFK.referencedTable === fk.target.tableName
+            : schemaFK.referencedTable === fk.target.tableName;
         return (
           arraysEqual(fk.source.columns, schemaFK.columns) &&
-          fk.target.tableName === schemaFK.referencedTable &&
+          tablesMatch &&
           arraysEqual(fk.target.columns, schemaFK.referencedColumns)
         );
       });
