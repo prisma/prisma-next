@@ -509,7 +509,7 @@ describe('ORM client integration examples', () => {
             seededPostIds.newer,
           ]);
           expect(posts.every((post) => 'embedding' in post === false)).toBe(true);
-          expect(posts.map((post) => post.user.id)).toEqual([
+          expect(posts.map((post) => post.user!.id)).toEqual([
             seededUserIds.adminTwo,
             seededUserIds.adminTwo,
             seededUserIds.admin,
@@ -763,7 +763,7 @@ describe('ORM client integration examples', () => {
             embeddingPostIds.similar1,
             embeddingPostIds.similar2,
           ]);
-          expect(results.map((r) => r.user.email)).toEqual([
+          expect(results.map((r) => r.user!.email)).toEqual([
             'member@example.com',
             'admin2@example.org',
           ]);

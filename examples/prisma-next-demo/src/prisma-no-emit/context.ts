@@ -17,9 +17,13 @@ export const stack = createSqlExecutionStack({
   extensionPacks: [pgvector],
 });
 
+// The no-emit path passes the TS-authored contract directly; the
+// deserializer validates its structure and returns a wider `Contract`
+// type. The cast restores the literal-typed shape so downstream DSL
+// calls keep their precise types.
 const validatedContract = new SqlContractSerializer().deserializeContract(
   contract,
-) as typeof contract;
+) as unknown as typeof contract;
 
 export const context = createExecutionContext({
   contract: validatedContract,
