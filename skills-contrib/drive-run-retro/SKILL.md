@@ -15,7 +15,7 @@ metadata:
 
 Run a retro on a triggering event or at mandatory project close. Produces lessons that land in a memory-strong surface.
 
-Per [`projects/drive-domain-model/principles/retro.md`](/projects/drive-domain-model/principles/retro.md): retros are **trigger-based**, not cadence-based — daily/weekly retros on a slow-firing team becomes ritual without learning. The triggers are the signal. And the retro's output must **land** in a surface the next dispatch reads (canonical skill body / project-context README / ADR) — without the landed output, the lesson stays in the operator's head and the next dispatch repeats the failure.
+Per `drive/retro/README.md` team overlays and the retro principle this skill embodies: retros are **trigger-based**, not cadence-based — daily/weekly retros on a slow-firing team becomes ritual without learning. The triggers are the signal. And the retro's output must **land** in a surface the next dispatch reads (canonical skill body / project-context README / ADR) — without the landed output, the lesson stays in the operator's head and the next dispatch repeats the failure.
 
 ## When to use
 
@@ -142,7 +142,7 @@ When invoked as the mandatory final retro at project close:
 
 ## Pitfalls
 
-1. **Retro without a landed output.** "We talked about it" is not a retro — it's a conversation. Without the landing, the lesson stays in the operator's head; the next dispatch repeats the failure. Per [`principles/retro.md`](/projects/drive-domain-model/principles/retro.md) the retro is not done until the output lands.
+1. **Retro without a landed output.** "We talked about it" is not a retro — it's a conversation. Without the landing, the lesson stays in the operator's head; the next dispatch repeats the failure. The retro is not done until the output lands in a memory-strong surface.
 2. **Retro at the wrong level.** A dispatch-failure retro that lands as an ADR is over-cooking; an architectural-shift retro that lands as a one-line README entry is under-cooking. Pick the landing surface that matches the lesson's scope.
 3. **Root-causing to "the implementer made a mistake."** That's proximate, not root. The root is upstream: which gate / pattern / brief item would have caught it. Stay upstream.
 4. **Cadence-based retros.** "Friday retros" become ritual without learning when nothing triggered them that week. The principle is trigger-based; deviations should be a deliberate operator choice with documented rationale.
@@ -171,6 +171,5 @@ When invoked as the mandatory final retro at project close:
 
 ## References
 
-- [`projects/drive-domain-model/principles/retro.md`](/projects/drive-domain-model/principles/retro.md) — the principle this skill embodies
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 5 — invariant I10
-- [`projects/drive-domain-model/principles/protocol-as-memory.md`](/projects/drive-domain-model/principles/protocol-as-memory.md) — the two-homes architecture (canonical vs project-context) the landing-surface choice navigates
+- [`drive/retro/README.md`](../../drive/retro/README.md) — team retro conventions and landing-surface preferences
+- [`drive/README.md`](../../drive/README.md) — protocol-as-memory (canonical skill bodies vs project-context READMEs)

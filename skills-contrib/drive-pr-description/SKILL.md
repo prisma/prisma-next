@@ -152,7 +152,7 @@ S3 credentials expire after 90 days. Rather than manual rotation or backup failu
 
 ## Direct-change mode
 
-For PRs routed by `drive-start-workflow` as **direct change** (~30-second-verifiable diff; no spec; no plan; no dispatch ceremony — per [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Direct change).
+For PRs routed by `drive-start-workflow` as **direct change** (~30-second-verifiable diff; no spec; no plan; no dispatch ceremony — see `drive/triage/README.md` for team sizing anchors).
 
 ### Direct-change structure
 
