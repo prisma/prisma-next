@@ -50,9 +50,10 @@ import {
 } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
-  locateTable,
+  resolveNamespaceIdForIssue,
   type StrategyContext,
   sqlitePlannerStrategies,
+  tableAt,
 } from './planner-strategies';
 import { CONTROL_TABLE_NAMES } from './statement-builders';
 
@@ -298,12 +299,13 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
       }
-      const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
+      const namespaceId = resolveNamespaceIdForIssue(issue);
+      const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(
             'unsupportedOperation',
-            `Table "${issue.table}" reported missing but not found in destination contract`,
+            `Table "${issue.table}" in namespace "${namespaceId}" reported missing but not found in destination contract`,
           ),
         );
       }
@@ -330,7 +332,8 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
         );
       }
-      const { table: contractTable2 } = locateTable(ctx.toContract.storage, issue.table) ?? {};
+      const namespaceId = resolveNamespaceIdForIssue(issue);
+      const contractTable2 = tableAt(ctx.toContract.storage, namespaceId, issue.table);
       const column = contractTable2?.columns[issue.column];
       if (!column) {
         return notOk(
@@ -363,8 +366,9 @@ function mapIssueToCall(
           ),
         );
       }
+      const namespaceId = resolveNamespaceIdForIssue(issue);
       const columns = issue.expected.split(', ');
-      const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
+      const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(

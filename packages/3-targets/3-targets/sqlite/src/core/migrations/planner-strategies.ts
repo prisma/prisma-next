@@ -21,6 +21,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   SqlStorage,
@@ -45,23 +46,34 @@ export interface StrategyContext {
 }
 
 /**
- * Finds a table by name across all namespaces in the storage.
- * Returns the namespace ID alongside the table so callers always have
- * the full coordinate (namespace ID + table name), not just the table.
+ * Look up a storage table by its explicit namespace coordinate. Returns
+ * `undefined` when the namespace has no table by that name (or no such
+ * namespace exists). Callers that get `undefined` MUST treat it as an
+ * explicit conflict rather than silently falling back to a name-only
+ * walk across namespaces — the SQLite target currently has a single
+ * namespace, but this helper enforces the explicit-coordinate
+ * discipline so a future multi-namespace SQLite shape inherits the
+ * conflict-on-stale-coordinate behaviour the Postgres planner already
+ * has.
  */
-export function locateTable(
+export function tableAt(
   storage: SqlStorage,
+  namespaceId: string,
   tableName: string,
-): { nsId: string; table: StorageTable } | undefined {
-  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-    // Namespace.tables is typed as Record<string, IRNode> at the interface level;
-    // SQL family namespaces always hold StorageTable instances.
-    const table = ns.tables[tableName] as StorageTable | undefined;
-    if (table !== undefined) {
-      return { nsId, table };
-    }
-  }
-  return undefined;
+): StorageTable | undefined {
+  return storage.namespaces[namespaceId]?.tables[tableName] as StorageTable | undefined;
+}
+
+/**
+ * Default namespace coordinate for an issue that does not carry one
+ * explicitly. Hand-crafted unit-test issues fall back to `__unbound__`,
+ * the only namespace any single-namespace contract carries —
+ * verifier-emitted issues for legacy single-namespace contracts already
+ * stamp this id explicitly. Typed structurally so issue variants
+ * without a `namespaceId` slot flow through to the same fallback.
+ */
+export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: string }): string {
+  return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
 }
 
 export type CallMigrationStrategy = (
@@ -112,7 +124,10 @@ function classifyIssue(issue: SchemaIssue): 'widening' | 'destructive' | null {
  * consumed are removed so `mapIssueToCall` doesn't double-handle them.
  */
 export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const byTable = new Map<string, { issues: SchemaIssue[]; hasDestructive: boolean }>();
+  const byTable = new Map<
+    string,
+    { issues: SchemaIssue[]; hasDestructive: boolean; namespaceId: string }
+  >();
   const consumed = new Set<SchemaIssue>();
 
   for (const issue of issues) {
@@ -126,7 +141,11 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
       entry.issues.push(issue);
       if (cls === 'destructive') entry.hasDestructive = true;
     } else {
-      byTable.set(table, { issues: [issue], hasDestructive: cls === 'destructive' });
+      byTable.set(table, {
+        issues: [issue],
+        hasDestructive: cls === 'destructive',
+        namespaceId: resolveNamespaceIdForIssue(issue),
+      });
     }
     consumed.add(issue);
   }
@@ -135,7 +154,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
 
   const calls: SqliteOpFactoryCall[] = [];
   for (const [tableName, entry] of byTable) {
-    const contractTable = locateTable(ctx.toContract.storage, tableName)?.table;
+    const contractTable = tableAt(ctx.toContract.storage, entry.namespaceId, tableName);
     const schemaTable = ctx.schema.tables[tableName];
     if (!contractTable || !schemaTable) continue;
     const operationClass: MigrationOperationClass = entry.hasDestructive
@@ -227,7 +246,8 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
     // needs no backfill.
     if (issue.expected === 'true') continue;
 
-    const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[issue.column];
     if (!column || column.nullable === true) continue;
 
     calls.push(
