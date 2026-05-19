@@ -16,7 +16,7 @@ metadata:
 
 Pilots the triage + setup chain. Workflow skill — invoked top-down and returns when the entry point has been routed to its right shape and the immediate setup is done.
 
-```
+```text
         Entry point (Linear ticket / bug / ask / mid-flight scope-shift signal)
                                   │
                                   ▼
@@ -29,16 +29,16 @@ Pilots the triage + setup chain. Workflow skill — invoked top-down and returns
        direct change   orphan slice    in-project slice  new project
             │            │                 │              │
             ▼            ▼                 ▼              ▼
-       drive-pr-      drive-slice-     drive-slice-    drive-create-
-       description    specify          specify         project
+       drive-pr-      drive-specify-   drive-specify-  drive-create-
+       description    slice            slice           project
        (direct-                                          │
        change framing)                                   ▼
-            │                                       drive-project-
-            ▼                                       specify
+            │                                       drive-specify-
+            ▼                                       project
        gh pr create                                     │
                                                         ▼
-                                                   drive-project-
-                                                   plan
+                                                   drive-plan-
+                                                   project
                                                         │
                                                         ▼
                                                    drive-deliver-
@@ -97,7 +97,7 @@ Use **mid-flight when scope shifts**:
 
 ## Project context
 
-Load `drive/triage/README.md` at workflow step 1 if it exists. This is the team's accumulated triage protocol — failure modes you've hit, sizing heuristics, ticket-shape patterns, the team's calibration for "what's a direct change here vs an orphan slice." See [`projects/drive-domain-model/principles/protocol-as-memory.md`](/projects/drive-domain-model/principles/protocol-as-memory.md) for the two-homes architecture.
+Load `drive/triage/README.md` at workflow step 1 if it exists. This is the team's accumulated triage protocol — failure modes you've hit, sizing heuristics, ticket-shape patterns, the team's calibration for "what's a direct change here vs an orphan slice." See [`drive/README.md`](../../drive/README.md) for the protocol-as-memory two-homes architecture (canonical skill bodies vs project-context READMEs).
 
 ## Workflow
 
@@ -169,7 +169,7 @@ See `model.md` § Linear sync § Demotion pattern.
 1. `drive-build-workflow` with a spike-flavoured brief: single dispatch; DoD = "the artefact answers the planning question" not "code is committed"; artefact is a doc under `projects/<project>/spikes/<date>-<question>.md` (in-project) or `wip/spikes/...` (orphan).
 2. On artefact emission: re-route via `drive-start-workflow` — the artefact carries enough information to triage the actual work to its right shape.
 
-See [`projects/drive-domain-model/principles/spikes.md`](/projects/drive-domain-model/principles/spikes.md).
+See `drive/triage/README.md` for spike-first conventions and team overlays.
 
 #### Defer
 
@@ -221,7 +221,6 @@ If invoked without an operator session (e.g. via a watchdog hook firing on a Lin
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 2 — Triage workflow; § Linear sync — promotion and demotion patterns
-- [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Triage outputs
-- [`projects/drive-domain-model/principles/decomposition-and-cost.md`](/projects/drive-domain-model/principles/decomposition-and-cost.md) — sizing discipline triage enforces
-- [`projects/drive-domain-model/principles/gradual-ai-adoption.md`](/projects/drive-domain-model/principles/gradual-ai-adoption.md) — workflow vs atomic skill tiers; operators can run triage manually instead of invoking this workflow
+- [`drive/triage/README.md`](../../drive/triage/README.md) — triage outputs, Linear-sync conventions, promotion/demotion patterns
+- [`drive/plan/README.md`](../../drive/plan/README.md) — sizing discipline triage enforces
+- [`drive/README.md`](../../drive/README.md) — protocol-as-memory; operators can run `drive-triage-work` manually instead of this workflow

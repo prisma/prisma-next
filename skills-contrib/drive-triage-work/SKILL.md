@@ -79,7 +79,7 @@ For fresh entries: read the Linear ticket / bug report / ask text. For mid-fligh
 
 In order — first branch that fires wins.
 
-```
+```text
 Q0. Is this a mid-flight scope-shift signal (rather than a fresh entry)?
     │
     ├─ Yes → go to Q5 (promote/demote)
@@ -204,7 +204,5 @@ Default heuristics for the four "size" questions. Teams should override / extend
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 2 — Triage workflow; § Triage outputs
-- [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Triage outputs
-- [`projects/drive-domain-model/principles/decomposition-and-cost.md`](/projects/drive-domain-model/principles/decomposition-and-cost.md) — the sizing discipline this skill enforces
-- [`projects/drive-domain-model/principles/spikes.md`](/projects/drive-domain-model/principles/spikes.md) — when spike-first is the right verdict
+- [`drive/triage/README.md`](../../drive/triage/README.md) — triage workflow outputs, team calibration anchors, spike-first conventions
+- [`drive/plan/README.md`](../../drive/plan/README.md) — sizing discipline this skill enforces
