@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:107ce92788984cad3aff9ee860e328048f14e156869ae418ba9ec96f31d6f4df'>;
+  StorageHashBase<'sha256:1a11ef0c4ef2dc0d6ae0663e65bf61113f980fee7f55e3dd828f65fe439a88cb'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -60,27 +60,32 @@ export type TypeMaps = TypeMapsType<
 
 type ContractBase = ContractType<
   {
-    readonly tables: {
-      readonly feature_flag: {
-        columns: {
-          readonly key: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly enabled: {
-            readonly nativeType: 'bool';
-            readonly codecId: 'pg/bool@1';
-            readonly nullable: false;
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {
+          readonly feature_flag: {
+            columns: {
+              readonly key: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly enabled: {
+                readonly nativeType: 'bool';
+                readonly codecId: 'pg/bool@1';
+                readonly nullable: false;
+              };
+            };
+            primaryKey: { readonly columns: readonly ['key'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
         };
-        primaryKey: { readonly columns: readonly ['key'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
       };
     };
-    readonly types: Record<string, never>;
     readonly storageHash: StorageHash;
   },
   {
@@ -131,5 +136,5 @@ type ContractBase = ContractType<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Tables = Contract['storage']['tables'];
+export type Namespaces = Contract['storage']['namespaces'];
 export type Models = Contract['models'];

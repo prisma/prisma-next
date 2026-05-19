@@ -115,4 +115,46 @@ describe('assertDescriptorSelfConsistency', () => {
       }),
     ).not.toThrow();
   });
+
+  it('strips namespace `kind` discriminators before recomputing', () => {
+    // Target serializers (e.g. Postgres) inject a `kind` discriminator
+    // into each namespace JSON envelope when writing contract.json.
+    // The authoring-time storage hash is computed against IR class
+    // instances whose `kind` is non-enumerable, so the published hash
+    // never sees `kind`. This test pins the helper's behaviour:
+    // recomputing against on-disk JSON that *does* carry `kind` must
+    // still match the authoring-time hash.
+    const namespacedBody = {
+      namespaces: {
+        public: {
+          id: 'public',
+          tables: STORAGE_BODY.tables,
+        },
+      },
+    };
+    const namespacedHash = computeStorageHash({
+      target: TARGET,
+      targetFamily: FAMILY,
+      storage: namespacedBody,
+    });
+    const onDiskStorage = {
+      namespaces: {
+        public: {
+          id: 'public',
+          kind: 'postgres-schema',
+          tables: STORAGE_BODY.tables,
+        },
+      },
+      storageHash: namespacedHash,
+    };
+    expect(() =>
+      assertDescriptorSelfConsistency({
+        extensionId: 'test-extension',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: onDiskStorage,
+        headRefHash: namespacedHash,
+      }),
+    ).not.toThrow();
+  });
 });
