@@ -67,7 +67,7 @@ describe('buildSchemaLookupMap', () => {
     expect(lookup.uniqueIndexKeys.has('created_at')).toBe(false);
   });
 
-  it('populates fkKeys with pipe-delimited encoding', () => {
+  it('populates fkKeys with a structurally-unambiguous encoding', () => {
     const schema: SqlSchemaIR = {
       tables: {
         post: makeTable({
@@ -78,7 +78,7 @@ describe('buildSchemaLookupMap', () => {
       },
     };
     const lookup = buildSchemaLookupMap(schema).get('post')!;
-    expect(lookup.fkKeys.has('author_id||user|id')).toBe(true);
+    expect(lookup.fkKeys.has(JSON.stringify([['author_id'], 'user', ['id']]))).toBe(true);
   });
 });
 

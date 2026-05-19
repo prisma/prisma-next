@@ -29,15 +29,17 @@ function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTab
   );
   const fkKeys = new Set<string>();
   for (const fk of table.foreignKeys) {
-    const cols = fk.columns.join(',');
-    const refCols = fk.referencedColumns.join(',');
-    // Always store the unqualified key so that unbound-namespace contract FKs
-    // can match via hasForeignKey's fallback path.
-    fkKeys.add(`${cols}||${fk.referencedTable}|${refCols}`);
-    // Also store the qualified key when referencedSchema is present so that
-    // cross-namespace contract FKs can match precisely by (schema, table).
+    // Keys are JSON-encoded tuples so identifiers containing any character
+    // (including the column-list comma or pipe characters) cannot collide
+    // across structurally-distinct FKs. Unqualified keys are 3-tuples
+    // (cols, table, refCols); qualified keys are 4-tuples
+    // (cols, schema, table, refCols) — the arity difference makes the two
+    // key shapes fundamentally non-collidable.
+    fkKeys.add(JSON.stringify([fk.columns, fk.referencedTable, fk.referencedColumns]));
     if (fk.referencedSchema !== undefined) {
-      fkKeys.add(`${cols}|${fk.referencedSchema}|${fk.referencedTable}|${refCols}`);
+      fkKeys.add(
+        JSON.stringify([fk.columns, fk.referencedSchema, fk.referencedTable, fk.referencedColumns]),
+      );
     }
   }
   return { uniqueKeys, indexKeys, uniqueIndexKeys, fkKeys };
@@ -57,12 +59,20 @@ export function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]):
 }
 
 export function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
-  const cols = fk.source.columns.join(',');
-  const refCols = fk.target.columns.join(',');
-  // For unbound-namespace FKs, use the unqualified key (matches any schema).
-  // For bound-namespace FKs, use the qualified key (exact schema match).
+  // Mirror the encoding produced by buildSchemaTableLookup exactly:
+  // unqualified 3-tuple for unbound-namespace FKs, qualified 4-tuple for
+  // bound-namespace FKs.
   if (fk.target.namespaceId === UNBOUND_NAMESPACE_ID) {
-    return lookup.fkKeys.has(`${cols}||${fk.target.tableName}|${refCols}`);
+    return lookup.fkKeys.has(
+      JSON.stringify([fk.source.columns, fk.target.tableName, fk.target.columns]),
+    );
   }
-  return lookup.fkKeys.has(`${cols}|${fk.target.namespaceId}|${fk.target.tableName}|${refCols}`);
+  return lookup.fkKeys.has(
+    JSON.stringify([
+      fk.source.columns,
+      fk.target.namespaceId,
+      fk.target.tableName,
+      fk.target.columns,
+    ]),
+  );
 }
