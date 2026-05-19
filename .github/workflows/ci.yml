@@ -45,6 +45,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint dependencies
         run: pnpm lint:deps
+      - name: Lint code shape
+        run: pnpm lint:code
       - name: Lint packages
         run: pnpm lint:packages
       - name: Lint examples
