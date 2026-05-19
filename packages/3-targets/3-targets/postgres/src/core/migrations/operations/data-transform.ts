@@ -157,7 +157,13 @@ function invokeAndLower(
   const plan = isBuildable(result) ? result.build() : result;
   assertContractMatches(plan, contract, name);
   const lowered = adapter.lower(plan.ast, { contract });
-  return { sql: lowered.sql, params: lowered.params };
+  const params = lowered.params.map((slot) => {
+    if (slot.kind === 'literal') return slot.value;
+    throw new Error(
+      `data-transform: bind-site slot '${slot.name}' is not allowed in migration plans`,
+    );
+  });
+  return { sql: lowered.sql, params };
 }
 
 function isBuildable(value: unknown): value is Buildable {

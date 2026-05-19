@@ -9,6 +9,10 @@
  * - repo-user-posts <id> [limit]           Fetch a user with their posts (relational include)
  * - repo-create-user <id> <email> <name>   Create a user via the ORM client
  * - insert-user <email> <name>             Insert a user via the SQL builder (INSERT … RETURNING)
+ * - user-by-email-prepared <email> [<email> ...]
+ *                                          Build a `PreparedStatement` once and reuse it for
+ *                                          each email — single lower(), single beforeCompile(),
+ *                                          repeated execute()
  *
  * Each command opens a connection, runs the operation, prints the result as
  * JSON, and closes. Exits non-zero on usage errors or runtime failures.
@@ -20,6 +24,7 @@ import { ormClientFindUserById } from './orm-client/find-user-by-id';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { db } from './prisma/db';
 import { insertUser } from './queries/dml-operations';
+import { getUserByEmailPrepared } from './queries/get-user-by-email-prepared';
 import { getUsers } from './queries/get-users';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
@@ -74,10 +79,19 @@ async function main() {
       }
       const user = await insertUser(email, displayName);
       console.log(JSON.stringify(user, null, 2));
+    } else if (cmd === 'user-by-email-prepared') {
+      if (args.length === 0) {
+        console.error('Usage: pnpm start -- user-by-email-prepared <email> [<email> ...]');
+        process.exitCode = 1;
+        return;
+      }
+      const results = await getUserByEmailPrepared(args);
+      console.log(JSON.stringify(results, null, 2));
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] | ' +
-          'repo-create-user <id> <email> <displayName> | insert-user <email> <displayName>]',
+          'repo-create-user <id> <email> <displayName> | insert-user <email> <displayName> | ' +
+          'user-by-email-prepared <email> [<email> ...]]',
       );
       process.exitCode = 1;
       return;

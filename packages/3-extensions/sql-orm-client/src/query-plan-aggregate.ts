@@ -94,6 +94,9 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
     param() {
       throw new Error('ParamRef is not supported in grouped having expressions');
     },
+    preparedParam() {
+      throw new Error('PreparedParamRef is not supported in grouped having expressions');
+    },
     list: rejectHavingExpr,
     and(expr) {
       return AndExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));

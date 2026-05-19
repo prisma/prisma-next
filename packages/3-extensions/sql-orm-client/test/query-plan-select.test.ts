@@ -1,5 +1,6 @@
 import {
   AndExpr,
+  type AnyParamRef,
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
@@ -37,8 +38,12 @@ function codecForColumn(table: string, column: string): string {
   return columnMeta.codecId;
 }
 
-function paramCodecs(plan: { ast: { collectParamRefs(): ParamRef[] } }): Array<string | undefined> {
-  return [...new Set(plan.ast.collectParamRefs())].map((ref) => ref.codec?.codecId);
+function paramCodecs(plan: {
+  ast: { collectParamRefs(): AnyParamRef[] };
+}): Array<string | undefined> {
+  return [...new Set(plan.ast.collectParamRefs())].map((ref) =>
+    ref.kind === 'param-ref' ? ref.codec?.codecId : ref.codec.codecId,
+  );
 }
 
 function expectSelectAst(ast: unknown): asserts ast is SelectAst {

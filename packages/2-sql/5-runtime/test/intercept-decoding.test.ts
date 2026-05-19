@@ -95,6 +95,7 @@ function createMockDriver(): SqlDriver {
 
   return {
     execute: rootExecute,
+    executePrepared: vi.fn().mockRejectedValue(new Error('executePrepared not used in this test')),
     query,
     connect: vi.fn().mockImplementation(async (_binding?: undefined) => undefined),
     acquireConnection: vi.fn().mockRejectedValue(new Error('not used in this test')),

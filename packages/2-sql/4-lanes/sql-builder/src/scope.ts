@@ -1,10 +1,8 @@
 import type { QueryOperationTypesBase, StorageTable } from '@prisma-next/sql-contract/types';
 import type { AnyFromSource, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import type { ScopeField } from '@prisma-next/sql-relational-core/expression';
+import type { CodecTypesBase, ScopeField } from '@prisma-next/sql-relational-core/expression';
 
 export type { ScopeField };
-
-export type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 
 export type TraitField = { traits: readonly string[]; nullable: boolean };
 export type FieldSpec = ScopeField | TraitField;

@@ -15,11 +15,11 @@ import {
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { decodeRow } from '../src/codecs/decoding';
+import { buildDecodeContext, decodeRow } from '../src/codecs/decoding';
 import { encodeParams } from '../src/codecs/encoding';
 import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
-import { buildTestContractCodecs } from './utils';
+import { buildTestContractCodecs, stubAst } from './utils';
 
 // ============================================================================= Shared helpers — AST-backed plans (ADR 205) =============================================================================
 
@@ -87,6 +87,7 @@ function buildRawPlan(params: readonly unknown[] = []): SqlExecutionPlan {
   return {
     sql: 'SELECT 1',
     params: [...params],
+    ast: stubAst(),
     meta: {
       target: 'postgres',
       storageHash: TEST_HASH,
@@ -357,7 +358,11 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
 
     const row = { a: 'A', b: 'B', n: 21 };
-    const promise = decodeRow(row, plan, {}, buildTestContractCodecs(registry));
+    const promise = decodeRow(
+      row,
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
+      {},
+    );
 
     expect(callOrder).toEqual(['decode-a-start', 'decode-b-start', 'decode-sync']);
 
@@ -382,7 +387,11 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'name', codecId: 'test/async@1' }],
     });
 
-    const result = await decodeRow({ name: 'alice' }, plan, {}, buildTestContractCodecs(registry));
+    const result = await decodeRow(
+      { name: 'alice' },
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
+      {},
+    );
     expect(typeof (result['name'] as { then?: unknown } | null)?.then).toBe('undefined');
     expect(result['name']).toBe('decoded:alice');
   });
@@ -420,17 +429,15 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
     const ok = await decodeRow(
       { metadata: '{"name":"alice"}' },
-      plan,
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
       {},
-      buildTestContractCodecs(registry),
     );
     expect(ok['metadata']).toEqual({ name: 'alice' });
 
     const rejection = (await decodeRow(
       { metadata: '{"age":30}' },
-      plan,
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
       {},
-      buildTestContractCodecs(registry),
     ).catch((e: unknown) => e)) as Error & {
       code?: string;
       details?: { issues?: unknown };
@@ -463,7 +470,11 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
 
     await expect(
-      decodeRow({ explody: 'wire' }, plan, {}, buildTestContractCodecs(registry)),
+      decodeRow(
+        { explody: 'wire' },
+        buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
+        {},
+      ),
     ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       category: 'RUNTIME',
@@ -492,9 +503,8 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     const plan = buildRawPlan();
     const result = await decodeRow(
       { id: 1, email: 'a@b.com' },
-      plan,
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
       {},
-      buildTestContractCodecs(registry),
     );
     expect(result).toEqual({ id: 1, email: 'a@b.com' });
   });
@@ -506,7 +516,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
 
     await expect(
-      decodeRow({ id: 1 }, plan, {}, buildTestContractCodecs(registry)),
+      decodeRow({ id: 1 }, buildDecodeContext(plan.ast, buildTestContractCodecs(registry)), {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       details: {
@@ -532,7 +542,11 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'id', codecId: 'test/should-not-run@1' }],
     });
 
-    const result = await decodeRow({ id: null }, plan, {}, buildTestContractCodecs(registry));
+    const result = await decodeRow(
+      { id: null },
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
+      {},
+    );
     expect(result).toEqual({ id: null });
   });
 
@@ -571,9 +585,8 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
     const result = await decodeRow(
       { syncCol: 'a', asyncCol: 'b' },
-      plan,
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
       {},
-      buildTestContractCodecs(registry),
     );
     expect(result).toEqual({ syncCol: 'sync:a', asyncCol: 'async:b' });
   });
@@ -616,7 +629,11 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       ],
     });
 
-    const result = await decodeRow({ secret: wire }, plan, {}, buildTestContractCodecs(registry));
+    const result = await decodeRow(
+      { secret: wire },
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
+      {},
+    );
     expect(result['secret']).toBe('top-secret');
   });
 
@@ -635,9 +652,8 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
 
     const rejection = await decodeRow(
       { secret: 'bad-payload' },
-      plan,
+      buildDecodeContext(plan.ast, buildTestContractCodecs(registry)),
       {},
-      buildTestContractCodecs(registry),
     ).catch((e: unknown) => e);
     expect(rejection).toBeInstanceOf(Error);
     const err = rejection as Error & {

@@ -1,5 +1,5 @@
 import type { ParamRefMutator } from '@prisma-next/framework-components/runtime';
-import type { ParamRef } from '../ast/types';
+import type { AnyParamRef } from '../ast/types';
 import { collectOrderedParamRefs } from '../ast/util';
 import type { SqlExecutionPlan } from '../sql-execution-plan';
 
@@ -57,6 +57,10 @@ export type ParamRefEntryUnion<TCodecMap extends Record<string, unknown>> =
  * insert / remove `ParamRef`s, rewrite SQL, or modify projection. The
  * type-level `ParamRefHandle` brand and the `replaceValue(ref,
  * newValue)` shape enforce this at compile time.
+ *
+ * `entries()` surfaces both literal call-site `ParamRef` slots and
+ * `prepare()`-time `PreparedParamRef` bind slots; the handle and codec
+ * id work the same for both.
  *
  * Allocation discipline: the mutator is constructed lazily from the
  * plan. `entries()` walks the plan's existing AST without allocating
@@ -135,7 +139,7 @@ export function createSqlParamRefMutator<
   TCodecMap extends Record<string, unknown> = Record<string, unknown>,
 >(plan: SqlExecutionPlan): SqlParamRefMutatorInternal<TCodecMap> {
   const originalParams = plan.params;
-  const refs: ReadonlyArray<ParamRef> = plan.ast ? collectOrderedParamRefs(plan.ast) : [];
+  const refs: ReadonlyArray<AnyParamRef> = plan.ast ? collectOrderedParamRefs(plan.ast) : [];
   let workingParams: unknown[] | undefined;
 
   const indexOfRef = (handle: AnyHandle): number => {
@@ -143,7 +147,7 @@ export function createSqlParamRefMutator<
     // from entries(); equality is identity equality on the ParamRef. The
     // brand on ParamRefHandle is unforgeable from outside, so the only
     // legal handles came from this mutator's entries().
-    return refs.indexOf(handle as unknown as ParamRef);
+    return refs.indexOf(handle as unknown as AnyParamRef);
   };
 
   const ensureWorkingParams = (): unknown[] => {
@@ -164,8 +168,17 @@ export function createSqlParamRefMutator<
       const ref = refs[i];
       if (!ref) continue;
       const handle = ref as unknown as ParamRefHandle<string | undefined>;
-      const value = i < view.length ? view[i] : ref.value;
-      const codecId = ref.codec?.codecId;
+      let value: unknown;
+      let codecId: string | undefined;
+      if (ref.kind === 'param-ref') {
+        value = i < view.length ? view[i] : ref.value;
+        codecId = ref.codec?.codecId;
+      } else {
+        // PreparedParamRef positions carry no AST-side fallback value —
+        // the slot value at index `i` is the only source.
+        value = i < view.length ? view[i] : undefined;
+        codecId = ref.codec.codecId;
+      }
       // The runtime erases the discriminated union to a single shape; the
       // public type pins each entry's `ref` to the matching `codecId`
       // arm at compile time.

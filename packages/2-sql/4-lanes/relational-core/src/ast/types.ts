@@ -18,6 +18,7 @@ export interface ExpressionRewriter {
   columnRef?(expr: ColumnRef): AnyExpression;
   identifierRef?(expr: IdentifierRef): AnyExpression;
   paramRef?(expr: ParamRef): ParamRef | LiteralExpr;
+  preparedParamRef?(expr: PreparedParamRef): PreparedParamRef;
   literal?(expr: LiteralExpr): LiteralExpr;
   list?(expr: ListExpression): ListExpression | LiteralExpr;
   select?(ast: SelectAst): SelectAst;
@@ -44,6 +45,7 @@ export interface ExprVisitor<R> {
   not(expr: NotExpr): R;
   literal(expr: LiteralExpr): R;
   param(expr: ParamRef): R;
+  preparedParam(expr: PreparedParamRef): R;
   list(expr: ListExpression): R;
 }
 
@@ -54,13 +56,14 @@ export interface ExpressionFolder<T> {
   columnRef?(expr: ColumnRef): T;
   identifierRef?(expr: IdentifierRef): T;
   paramRef?(expr: ParamRef): T;
+  preparedParamRef?(expr: PreparedParamRef): T;
   literal?(expr: LiteralExpr): T;
   list?(expr: ListExpression): T;
   select?(ast: SelectAst): T;
 }
 
 export type ProjectionExpr = AnyExpression;
-export type InsertValue = ColumnRef | ParamRef | DefaultValueExpr;
+export type InsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;
 export type JoinOnExpr = EqColJoinOn | AnyExpression;
 export type WhereArg = AnyExpression | ToWhereExpr;
 export type JsonObjectEntry = {
@@ -113,6 +116,8 @@ function rewriteComparable(value: AnyExpression, rewriter: ExpressionRewriter): 
   switch (value.kind) {
     case 'param-ref':
       return rewriter.paramRef ? rewriter.paramRef(value) : value;
+    case 'prepared-param-ref':
+      return rewriter.preparedParamRef ? rewriter.preparedParamRef(value) : value;
     case 'literal':
       return rewriter.literal ? rewriter.literal(value) : value;
     case 'list':
@@ -129,6 +134,8 @@ function foldComparable<T>(value: AnyExpression, folder: ExpressionFolder<T>): T
   switch (value.kind) {
     case 'param-ref':
       return folder.paramRef ? folder.paramRef(value) : folder.empty;
+    case 'prepared-param-ref':
+      return folder.preparedParamRef ? folder.preparedParamRef(value) : folder.empty;
     case 'literal':
       return folder.literal ? folder.literal(value) : folder.empty;
     case 'list':
@@ -147,11 +154,12 @@ function collectColumnRefsWith<TNode extends Expression>(node: TNode): ColumnRef
   });
 }
 
-function collectParamRefsWith<TNode extends Expression>(node: TNode): ParamRef[] {
-  return node.fold<ParamRef[]>({
+function collectParamRefsWith<TNode extends Expression>(node: TNode): AnyParamRef[] {
+  return node.fold<AnyParamRef[]>({
     empty: [],
     combine: (a, b) => [...a, ...b],
     paramRef: (paramRef) => [paramRef],
+    preparedParamRef: (paramRef) => [paramRef],
     select: (ast) => ast.collectParamRefs(),
   });
 }
@@ -174,6 +182,8 @@ function rewriteInsertValue(value: InsertValue, rewriter: AstRewriter): InsertVa
   switch (value.kind) {
     case 'param-ref':
       return rewriter.paramRef ? rewriteParamRefForInsert(value, rewriter) : value;
+    case 'prepared-param-ref':
+      return rewriter.preparedParamRef ? rewriter.preparedParamRef(value) : value;
     case 'column-ref':
       return rewriter.columnRef ? rewriteColumnRefForInsert(value, rewriter) : value;
     case 'default-value':
@@ -202,27 +212,40 @@ function rewriteInsertRow(
   return result;
 }
 
-function rewriteUpdateSetValue(
-  value: ColumnRef | ParamRef,
-  rewriter: AstRewriter,
-): ColumnRef | ParamRef {
-  if (value.kind === 'column-ref') {
-    const rewritten = rewriter.columnRef ? rewriter.columnRef(value) : value;
-    return rewritten.kind === 'column-ref' ? rewritten : value;
+type UpdateSetValue = ColumnRef | ParamRef | PreparedParamRef;
+
+function rewriteUpdateSetValue(value: UpdateSetValue, rewriter: AstRewriter): UpdateSetValue {
+  switch (value.kind) {
+    case 'column-ref': {
+      const rewritten = rewriter.columnRef ? rewriter.columnRef(value) : value;
+      return rewritten.kind === 'column-ref' ? rewritten : value;
+    }
+    case 'param-ref': {
+      const rewritten = rewriter.paramRef ? rewriter.paramRef(value) : value;
+      return rewritten.kind === 'param-ref' ? rewritten : value;
+    }
+    case 'prepared-param-ref':
+      return rewriter.preparedParamRef ? rewriter.preparedParamRef(value) : value;
   }
-  const rewritten = rewriter.paramRef ? rewriter.paramRef(value) : value;
-  return rewritten.kind === 'param-ref' ? rewritten : value;
 }
 
 function rewriteUpdateSet(
-  set: Readonly<Record<string, ColumnRef | ParamRef>>,
+  set: Readonly<Record<string, UpdateSetValue>>,
   rewriter: AstRewriter,
-): Record<string, ColumnRef | ParamRef> {
-  const result: Record<string, ColumnRef | ParamRef> = {};
+): Record<string, UpdateSetValue> {
+  const result: Record<string, UpdateSetValue> = {};
   for (const [key, value] of Object.entries(set)) {
     result[key] = rewriteUpdateSetValue(value, rewriter);
   }
   return result;
+}
+
+function rewriteLimitOffset<T extends number | AnyExpression | undefined>(
+  value: T,
+  rewriter: AstRewriter,
+): T {
+  if (value === undefined || typeof value === 'number') return value;
+  return value.rewrite(rewriter) as T;
 }
 
 function rewriteOnConflict(onConflict: InsertOnConflict, rewriter: AstRewriter): InsertOnConflict {
@@ -250,7 +273,7 @@ abstract class AstNode {
 }
 
 abstract class QueryAst extends AstNode {
-  abstract collectParamRefs(): ParamRef[];
+  abstract collectParamRefs(): AnyParamRef[];
   abstract toQueryAst(): AnyQueryAst;
 }
 
@@ -268,7 +291,7 @@ abstract class Expression extends AstNode implements ExpressionSource {
     return collectColumnRefsWith(this);
   }
 
-  collectParamRefs(): ParamRef[] {
+  collectParamRefs(): AnyParamRef[] {
     return collectParamRefsWith(this);
   }
 
@@ -446,6 +469,41 @@ export class ParamRef extends Expression {
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return folder.paramRef ? folder.paramRef(this) : folder.empty;
+  }
+}
+
+/**
+ * Bind-site placeholder: occupies the same positions as `ParamRef` in the
+ * AST, but carries no value — the value is supplied per-execute by the
+ * `PreparedStatement.execute(params)` caller and matched to this node by
+ * `name`.
+ */
+export class PreparedParamRef extends Expression {
+  readonly kind = 'prepared-param-ref' as const;
+  readonly name: string;
+  readonly codec: CodecRef;
+
+  constructor(name: string, codec: CodecRef) {
+    super();
+    this.name = name;
+    this.codec = frozenCodecRef(codec);
+    this.freeze();
+  }
+
+  static of(name: string, codec: CodecRef): PreparedParamRef {
+    return new PreparedParamRef(name, codec);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.preparedParam(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return rewriter.preparedParamRef ? rewriter.preparedParamRef(this) : this;
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return folder.preparedParamRef ? folder.preparedParamRef(this) : folder.empty;
   }
 }
 
@@ -1106,6 +1164,8 @@ export class ProjectionItem extends AstNode {
   }
 }
 
+export type LimitOffsetValue = number | AnyExpression;
+
 export interface SelectAstOptions {
   readonly from: AnyFromSource;
   readonly joins: ReadonlyArray<JoinAst> | undefined;
@@ -1116,8 +1176,8 @@ export interface SelectAstOptions {
   readonly distinctOn: ReadonlyArray<AnyExpression> | undefined;
   readonly groupBy: ReadonlyArray<AnyExpression> | undefined;
   readonly having: AnyExpression | undefined;
-  readonly limit: number | undefined;
-  readonly offset: number | undefined;
+  readonly limit: LimitOffsetValue | undefined;
+  readonly offset: LimitOffsetValue | undefined;
   readonly selectAllIntent: { readonly table?: string } | undefined;
 }
 
@@ -1132,8 +1192,8 @@ export class SelectAst extends QueryAst {
   readonly distinctOn: ReadonlyArray<AnyExpression> | undefined;
   readonly groupBy: ReadonlyArray<AnyExpression> | undefined;
   readonly having: AnyExpression | undefined;
-  readonly limit: number | undefined;
-  readonly offset: number | undefined;
+  readonly limit: LimitOffsetValue | undefined;
+  readonly offset: LimitOffsetValue | undefined;
   readonly selectAllIntent: { readonly table?: string } | undefined;
 
   constructor(options: SelectAstOptions) {
@@ -1234,11 +1294,11 @@ export class SelectAst extends QueryAst {
     return new SelectAst({ ...this, having });
   }
 
-  withLimit(limit: number | undefined): SelectAst {
+  withLimit(limit: LimitOffsetValue | undefined): SelectAst {
     return new SelectAst({ ...this, limit });
   }
 
-  withOffset(offset: number | undefined): SelectAst {
+  withOffset(offset: LimitOffsetValue | undefined): SelectAst {
     return new SelectAst({ ...this, offset });
   }
 
@@ -1268,8 +1328,8 @@ export class SelectAst extends QueryAst {
       distinctOn: this.distinctOn?.map((expr) => expr.rewrite(rewriter)),
       groupBy: this.groupBy?.map((expr) => expr.rewrite(rewriter)),
       having: this.having?.rewrite(rewriter),
-      limit: this.limit,
-      offset: this.offset,
+      limit: rewriteLimitOffset(this.limit, rewriter),
+      offset: rewriteLimitOffset(this.offset, rewriter),
       selectAllIntent: this.selectAllIntent,
     });
 
@@ -1317,13 +1377,19 @@ export class SelectAst extends QueryAst {
         pushRefs(join.on.collectColumnRefs());
       }
     }
+    if (typeof this.limit === 'object') {
+      pushRefs(this.limit.collectColumnRefs());
+    }
+    if (typeof this.offset === 'object') {
+      pushRefs(this.offset.collectColumnRefs());
+    }
 
     return refs;
   }
 
-  collectParamRefs(): ParamRef[] {
-    const refs: ParamRef[] = [];
-    const pushRefs = (params: ReadonlyArray<ParamRef>) => {
+  collectParamRefs(): AnyParamRef[] {
+    const refs: AnyParamRef[] = [];
+    const pushRefs = (params: ReadonlyArray<AnyParamRef>) => {
       refs.push(...params);
     };
 
@@ -1360,6 +1426,12 @@ export class SelectAst extends QueryAst {
         pushRefs(join.on.collectParamRefs());
       }
     }
+    if (typeof this.limit === 'object') {
+      pushRefs(this.limit.collectParamRefs());
+    }
+    if (typeof this.offset === 'object') {
+      pushRefs(this.offset.collectParamRefs());
+    }
 
     return refs;
   }
@@ -1388,9 +1460,9 @@ export class DoNothingConflictAction extends InsertOnConflictAction {
 
 export class DoUpdateSetConflictAction extends InsertOnConflictAction {
   readonly kind = 'do-update-set' as const;
-  readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
+  readonly set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>;
 
-  constructor(set: Readonly<Record<string, ColumnRef | ParamRef>>) {
+  constructor(set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>) {
     super();
     this.set = frozenRecordCopy(set);
     this.freeze();
@@ -1421,7 +1493,9 @@ export class InsertOnConflict extends AstNode {
     return new InsertOnConflict(this.columns, new DoNothingConflictAction());
   }
 
-  doUpdateSet(set: Readonly<Record<string, ColumnRef | ParamRef>>): InsertOnConflict {
+  doUpdateSet(
+    set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>,
+  ): InsertOnConflict {
     return new InsertOnConflict(this.columns, new DoUpdateSetConflictAction(set));
   }
 }
@@ -1491,18 +1565,18 @@ export class InsertAst extends QueryAst {
     );
   }
 
-  override collectParamRefs(): ParamRef[] {
-    const refs: ParamRef[] = [];
+  override collectParamRefs(): AnyParamRef[] {
+    const refs: AnyParamRef[] = [];
     for (const row of this.rows) {
       for (const value of Object.values(row)) {
-        if (value.kind === 'param-ref') {
+        if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
           refs.push(value);
         }
       }
     }
     if (this.onConflict?.action.kind === 'do-update-set') {
       for (const value of Object.values(this.onConflict.action.set)) {
-        if (value.kind === 'param-ref') {
+        if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
           refs.push(value);
         }
       }
@@ -1523,13 +1597,13 @@ export class InsertAst extends QueryAst {
 export class UpdateAst extends QueryAst {
   readonly kind = 'update' as const;
   readonly table: TableSource;
-  readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
+  readonly set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>;
   readonly where: AnyExpression | undefined;
   readonly returning: ReadonlyArray<ProjectionItem> | undefined;
 
   constructor(
     table: TableSource,
-    set: Readonly<Record<string, ColumnRef | ParamRef>> = {},
+    set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>> = {},
     where?: AnyExpression,
     returning?: ReadonlyArray<ProjectionItem>,
   ) {
@@ -1545,7 +1619,7 @@ export class UpdateAst extends QueryAst {
     return new UpdateAst(table);
   }
 
-  withSet(set: Readonly<Record<string, ColumnRef | ParamRef>>): UpdateAst {
+  withSet(set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>): UpdateAst {
     return new UpdateAst(this.table, set, this.where, this.returning);
   }
 
@@ -1566,10 +1640,10 @@ export class UpdateAst extends QueryAst {
     );
   }
 
-  override collectParamRefs(): ParamRef[] {
-    const refs: ParamRef[] = [];
+  override collectParamRefs(): AnyParamRef[] {
+    const refs: AnyParamRef[] = [];
     for (const value of Object.values(this.set)) {
-      if (value.kind === 'param-ref') {
+      if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
         refs.push(value);
       }
     }
@@ -1627,8 +1701,8 @@ export class DeleteAst extends QueryAst {
     );
   }
 
-  override collectParamRefs(): ParamRef[] {
-    const refs: ParamRef[] = [];
+  override collectParamRefs(): AnyParamRef[] {
+    const refs: AnyParamRef[] = [];
     if (this.where) {
       refs.push(...this.where.collectParamRefs());
     }
@@ -1681,8 +1755,8 @@ export class RawSqlExpr extends QueryAst {
     return new RawSqlExpr(fragments, args);
   }
 
-  override collectParamRefs(): ParamRef[] {
-    const refs: ParamRef[] = [];
+  override collectParamRefs(): AnyParamRef[] {
+    const refs: AnyParamRef[] = [];
     for (const arg of this.args) {
       if (arg.kind === 'param-ref') {
         refs.push(arg);
@@ -1704,6 +1778,7 @@ export type AnyExpression =
   | ColumnRef
   | IdentifierRef
   | ParamRef
+  | PreparedParamRef
   | LiteralExpr
   | SubqueryExpr
   | OperationExpr
@@ -1717,9 +1792,10 @@ export type AnyExpression =
   | ExistsExpr
   | NullCheckExpr
   | NotExpr;
+export type AnyParamRef = ParamRef | PreparedParamRef;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
-export type AnyInsertValue = ColumnRef | ParamRef | DefaultValueExpr;
-export type AnyOperationArg = AnyExpression | ParamRef | LiteralExpr;
+export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;
+export type AnyOperationArg = AnyExpression | ParamRef | PreparedParamRef | LiteralExpr;
 
 export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([
   'select',
@@ -1759,8 +1835,26 @@ export interface ToWhereExpr {
   toWhereExpr(): AnyExpression;
 }
 
+/**
+ * One positional slot of a lowered SQL statement.
+ *
+ * - `literal` — a value baked into the AST; passes through to the driver.
+ * - `bind` — a `PreparedParamRef` placeholder; the runtime resolves the
+ *   value from the per-execute `userParams[name]` before calling the driver.
+ *
+ * The same `name` may legitimately appear in multiple `bind` slots when a
+ * renderer does not dedupe `PreparedParamRef` occurrences (e.g. SQLite's
+ * positional `?` walker calls `ast.collectParamRefs()` directly rather than
+ * `collectOrderedParamRefs`); resolution-by-name handles that case
+ * correctly. See `collectOrderedParamRefs` in `./util` for the dedupe
+ * contract used by Postgres' `$N` renderer.
+ */
+export type LoweredParam =
+  | { readonly kind: 'literal'; readonly value: unknown }
+  | { readonly kind: 'bind'; readonly name: string };
+
 export interface LoweredStatement {
   readonly sql: string;
-  readonly params: readonly unknown[];
+  readonly params: readonly LoweredParam[];
   readonly annotations?: Record<string, unknown>;
 }

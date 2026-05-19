@@ -301,6 +301,9 @@ describe('Postgres adapter', () => {
       execute() {
         throw new Error('not used in this test');
       },
+      executePrepared() {
+        throw new Error('not used in this test');
+      },
       async query<Row>(sql: string, params?: readonly unknown[]): Promise<SqlQueryResult<Row>> {
         calls.push({ sql, params });
         return { rows: [], rowCount: 0 } as SqlQueryResult<Row>;
@@ -319,6 +322,9 @@ describe('Postgres adapter', () => {
     let call = 0;
     const queryable: SqlQueryable = {
       execute() {
+        throw new Error('not used in this test');
+      },
+      executePrepared() {
         throw new Error('not used in this test');
       },
       async query<Row>(): Promise<SqlQueryResult<Row>> {
@@ -462,6 +468,9 @@ describe('Postgres adapter', () => {
     let call = 0;
     const queryable: SqlQueryable = {
       execute() {
+        throw new Error('not used in this test');
+      },
+      executePrepared() {
         throw new Error('not used in this test');
       },
       async query<Row>(): Promise<SqlQueryResult<Row>> {

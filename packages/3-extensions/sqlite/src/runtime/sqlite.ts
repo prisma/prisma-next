@@ -6,10 +6,16 @@ import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import type { CodecTypesBase } from '@prisma-next/sql-relational-core/expression';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
+  BindSiteParams,
+  Declaration,
   ExecutionContext,
+  ParamsFromDeclaration,
+  PreparedStatement,
   Runtime,
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
@@ -34,6 +40,14 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
   connect(bindingInput?: { readonly path: string }): Promise<Runtime>;
   runtime(): Runtime;
+  prepare<
+    D extends Declaration<CT>,
+    Row,
+    CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
+  >(
+    declaration: D,
+    callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+  ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
 }
 
 export interface SqliteOptionsBase {
@@ -194,6 +208,16 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     },
     runtime() {
       return getRuntime();
+    },
+    prepare<
+      D extends Declaration<CT>,
+      Row,
+      CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
+    >(
+      declaration: D,
+      callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+    ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
+      return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },
   };
 }
