@@ -26,7 +26,7 @@ Linear project.
 
 **Symptom.** On a freshly-dropped DB whose `extensionPacks` declares `pgvector`, `db init` fails:
 
-```
+```text
 PN-MIG-5001 — Contract-space layout violation
   [declaredButUnmigrated] pgvector
     Extension 'pgvector' is declared in extensionPacks but has not been emitted; run `prisma-next migrate`.
