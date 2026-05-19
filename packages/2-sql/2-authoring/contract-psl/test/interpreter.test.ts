@@ -880,7 +880,7 @@ model OrderItem {
       expect(json).not.toHaveProperty('namespaceId');
     });
 
-    it('Postgres routes a mixed top-level + namespaced document into the right slots', () => {
+    it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {
       const document = parsePslDocument({
         schema: `model Post {
   id Int @id
@@ -892,8 +892,8 @@ namespace auth {
   }
 }
 
-namespace unbound {
-  model Tenant {
+namespace logs {
+  model AuditLog {
     id Int @id
   }
 }
@@ -909,7 +909,7 @@ namespace unbound {
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['post']).toBeDefined();
       expect(storage.namespaces['auth']?.tables['user']).toBeDefined();
-      expect(unboundTables(storage)['tenant']).toBeDefined();
+      expect(storage.namespaces['logs']?.tables['auditLog']).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
     });
   });

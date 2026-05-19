@@ -249,19 +249,36 @@ function validateNamespaceBlocksForSqlTarget(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): void {
-  if (input.targetId !== 'sqlite') {
+  if (input.targetId === 'sqlite') {
+    for (const namespace of input.namespaces) {
+      if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
+        continue;
+      }
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+        message: `SQLite does not support \`namespace ${namespace.name} { … }\` blocks (SQLite has no schema concept; declare models at the document top level instead).`,
+        sourceId: input.sourceId,
+        span: namespace.span,
+      });
+    }
     return;
   }
-  for (const namespace of input.namespaces) {
-    if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
-      continue;
+
+  if (input.targetId === 'postgres') {
+    const namedBlocks = input.namespaces.filter((ns) => ns.name !== UNSPECIFIED_PSL_NAMESPACE_NAME);
+    const hasUnbound = namedBlocks.some((ns) => ns.name === 'unbound');
+    const hasSibling = namedBlocks.some((ns) => ns.name !== 'unbound');
+    if (hasUnbound && hasSibling) {
+      const unboundBlock = namedBlocks.find((ns) => ns.name === 'unbound');
+      input.diagnostics.push({
+        code: 'PSL_RESERVED_NAMESPACE_NAME',
+        message:
+          'Namespace "unbound" is reserved for the late-binding sentinel mapping and cannot appear alongside other named namespace blocks. ' +
+          'Use `namespace unbound { … }` alone (no sibling named namespaces) for late-binding multi-tenant contracts.',
+        sourceId: input.sourceId,
+        span: unboundBlock?.span,
+      });
     }
-    input.diagnostics.push({
-      code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
-      message: `SQLite does not support \`namespace ${namespace.name} { … }\` blocks (SQLite has no schema concept; declare models at the document top level instead).`,
-      sourceId: input.sourceId,
-      span: namespace.span,
-    });
   }
 }
 

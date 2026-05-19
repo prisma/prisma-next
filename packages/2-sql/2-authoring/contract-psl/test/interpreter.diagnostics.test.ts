@@ -1,41 +1,10 @@
-import {
-  freezeNode,
-  type IRNode,
-  type Namespace,
-  NamespaceBase,
-} from '@prisma-next/framework-components/ir';
 import type { ParsePslDocumentResult, PslSpan } from '@prisma-next/psl-parser';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract,
 } from '../src/interpreter';
-
-class StubNamespace extends NamespaceBase {
-  readonly kind = 'schema' as const;
-  readonly id: string;
-  readonly tables: Readonly<Record<string, IRNode>> = Object.freeze({});
-
-  constructor(id: string) {
-    super();
-    this.id = id;
-    freezeNode(this);
-  }
-
-  qualifier(): string {
-    return `"${this.id}"`;
-  }
-
-  qualifyTable(name: string): string {
-    return `"${this.id}"."${name}"`;
-  }
-}
-
-function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
-  return new StubNamespace(input.id);
-}
 
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -1180,7 +1149,7 @@ model User {
       );
     });
 
-    it('Postgres accepts `namespace unbound { … }` and `namespace auth { … }` without diagnostics', () => {
+    it('Postgres rejects `namespace unbound { … }` alongside a sibling named namespace', () => {
       const document = parsePslDocument({
         schema: `namespace unbound {
   model Tenant {
@@ -1201,15 +1170,41 @@ namespace auth {
         ...baseInput,
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
-        createNamespace: createStubNamespace,
       });
 
-      // Postgres must not surface any PSL_UNSUPPORTED_NAMESPACE_BLOCK
-      // diagnostic for either explicit block.
-      const namespaceDiagnostics = result.ok
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_RESERVED_NAMESPACE_NAME',
+            message: expect.stringContaining('unbound'),
+          }),
+        ]),
+      );
+    });
+
+    it('Postgres accepts `namespace unbound { … }` when it is the only named namespace', () => {
+      const document = parsePslDocument({
+        schema: `namespace unbound {
+  model Tenant {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      const reservedDiagnostics = result.ok
         ? []
-        : result.failure.diagnostics.filter((d) => d.code === 'PSL_UNSUPPORTED_NAMESPACE_BLOCK');
-      expect(namespaceDiagnostics).toEqual([]);
+        : result.failure.diagnostics.filter((d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME');
+      expect(reservedDiagnostics).toEqual([]);
     });
   });
 });
