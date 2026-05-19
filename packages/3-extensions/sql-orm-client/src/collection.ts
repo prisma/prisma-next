@@ -224,6 +224,25 @@ export class Collection<
     this.includeRefinementMode = options.includeRefinementMode ?? false;
   }
 
+  /**
+   * Narrow the collection with a `WHERE` predicate. Returns a new
+   * collection — chain further builders or run a terminal on it.
+   *
+   * Accepts a callback receiving a typed model accessor, a raw
+   * `WhereArg` expression, or a shorthand field/value object. Multiple
+   * calls are AND-combined.
+   *
+   * ```typescript
+   * // Callback form with column-level operators:
+   * const matches = await db.orm.User.where((u) => u.email.eq('alice@example.com')).all();
+   *
+   * // Shorthand object form:
+   * const user = await db.orm.User.where({ id: 1, active: true }).first();
+   *
+   * // Chained AND — still a builder, run a terminal to execute:
+   * const adults = await db.orm.User.where({ active: true }).where((u) => u.age.gt(18)).all();
+   * ```
+   */
   where(
     fn: (model: ModelAccessor<TContract, ModelName>) => WhereDirectInput,
   ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
@@ -258,6 +277,25 @@ export class Collection<
     });
   }
 
+  /**
+   * Narrow a polymorphic model to a specific variant. The returned
+   * collection has the variant's row shape and a discriminator filter
+   * is automatically applied. Chaining `.variant(...)` again replaces
+   * the previous variant filter.
+   *
+   * ```typescript
+   * // Read only admin users (STI):
+   * const admins = await db.orm.User.variant('Admin').all();
+   *
+   * // Iterate the rows:
+   * for await (const admin of db.orm.User.variant('Admin').all()) {
+   *   console.log(admin.role);
+   * }
+   *
+   * // Insert under a variant — discriminator is injected automatically:
+   * await db.orm.User.variant('Admin').create({ name: 'Ada', role: 'super' });
+   * ```
+   */
   variant<V extends VariantNames<TContract, ModelName>>(
     variantName: V,
   ): Collection<
@@ -314,6 +352,34 @@ export class Collection<
     });
   }
 
+  /**
+   * Eagerly load a related model. The relation appears on every
+   * returned row under its declared name; to-one relations are mapped
+   * to a single object (or `null`), to-many relations to an array.
+   *
+   * An optional refinement callback receives a child collection that
+   * can be further constrained, projected, ordered, paginated, or
+   * reduced to scalars via `count()`/`sum()`/etc. or to multiple
+   * sub-aggregates via `combine()`.
+   *
+   * ```typescript
+   * // Simple include — every user comes back with its posts array:
+   * const users = await db.orm.User.include('posts').all();
+   *
+   * // Refine the related collection:
+   * const withRecent = await db.orm.User.include('posts', (posts) =>
+   *   posts.where({ published: true }).orderBy((p) => p.createdAt.desc()).take(5),
+   * ).all();
+   *
+   * // Reduce a to-many relation to a scalar value:
+   * const withCounts = await db.orm.User.include('posts', (posts) => posts.count()).all();
+   *
+   * // Multiple sub-views via combine():
+   * const overview = await db.orm.User.include('posts', (posts) =>
+   *   posts.combine({ recent: posts.take(3), total: posts.count() }),
+   * ).all();
+   * ```
+   */
   include<
     RelName extends RelationNames<TContract, ModelName>,
     RelatedName extends RelatedModelName<TContract, ModelName, RelName> & string = RelatedModelName<
@@ -441,6 +507,20 @@ export class Collection<
     });
   }
 
+  /**
+   * Project the row down to a subset of scalar fields. Previously
+   * included relations are preserved on the resulting row shape; only
+   * scalar columns are narrowed.
+   *
+   * ```typescript
+   * const summaries = await db.orm.User.select('id', 'email').all();
+   * // typeof summaries[number] === { id: ...; email: ... }
+   *
+   * for await (const row of db.orm.User.select('id', 'email').all()) {
+   *   console.log(row.id, row.email);
+   * }
+   * ```
+   */
   select<
     Fields extends readonly [
       keyof DefaultModelRow<TContract, ModelName> & string,
@@ -470,6 +550,23 @@ export class Collection<
     });
   }
 
+  /**
+   * Append an `ORDER BY` clause. Pass a single selector callback or an
+   * array of callbacks; each receives a typed model accessor whose
+   * columns expose `.asc()` and `.desc()`. Multiple calls append to the
+   * existing list (left-to-right ordering preserved).
+   *
+   * Calling `orderBy(...)` unlocks `cursor(...)` and `distinctOn(...)`,
+   * which both require a defined sort order.
+   *
+   * ```typescript
+   * const newest = await db.orm.User.orderBy((u) => u.createdAt.desc()).all();
+   *
+   * const byName = await db.orm.User
+   *   .orderBy([(u) => u.lastName.asc(), (u) => u.firstName.asc()])
+   *   .all();
+   * ```
+   */
   orderBy(
     selection:
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByItem)
@@ -486,6 +583,19 @@ export class Collection<
     });
   }
 
+  /**
+   * Switch to grouped-aggregate mode. Returns a `GroupedCollection`
+   * whose `.aggregate(...)` terminal produces one row per group with
+   * the chosen key columns plus the requested aggregates.
+   *
+   * ```typescript
+   * const stats = await db.orm.Post
+   *   .where({ published: true })
+   *   .groupBy('userId')
+   *   .aggregate((agg) => ({ count: agg.count(), totalViews: agg.sum('views') }));
+   * // [{ userId: 1, count: 3, totalViews: 120 }, ...]
+   * ```
+   */
   groupBy<
     Fields extends readonly [
       keyof DefaultModelRow<TContract, ModelName> & string,
@@ -503,11 +613,34 @@ export class Collection<
     });
   }
 
+  /**
+   * Scalar reducer — reduces a to-many relation to the number of
+   * related rows. Use inside an `include(...)` refinement callback as
+   * `include(..., (rel) => rel.count())`; throws if called elsewhere.
+   * The parent row's relation field becomes that count instead of an
+   * array.
+   *
+   * ```typescript
+   * const users = await db.orm.User.include('posts', (posts) => posts.count()).all();
+   * // each user row: { ...user, posts: number }
+   * ```
+   */
   count(): IncludeScalar<number> {
     this.#assertIncludeRefinementMode('count()');
     return createIncludeScalar<number>('count', this.state);
   }
 
+  /**
+   * Scalar reducer — reduces a to-many relation to the sum of `field`
+   * across related rows. Returns `null` when there are no related
+   * rows. Use inside an `include(...)` refinement callback; throws if
+   * called elsewhere.
+   *
+   * ```typescript
+   * const users = await db.orm.User.include('posts', (posts) => posts.sum('views')).all();
+   * // each user row: { ...user, posts: number | null }
+   * ```
+   */
   sum<FieldName extends NumericFieldNames<TContract, ModelName>>(
     field: FieldName,
   ): IncludeScalar<number | null> {
@@ -516,6 +649,17 @@ export class Collection<
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
 
+  /**
+   * Scalar reducer — reduces a to-many relation to the average of
+   * `field` across related rows. Returns `null` when there are no
+   * related rows. Use inside an `include(...)` refinement callback;
+   * throws if called elsewhere.
+   *
+   * ```typescript
+   * const users = await db.orm.User.include('posts', (posts) => posts.avg('views')).all();
+   * // each user row: { ...user, posts: number | null }
+   * ```
+   */
   avg<FieldName extends NumericFieldNames<TContract, ModelName>>(
     field: FieldName,
   ): IncludeScalar<number | null> {
@@ -524,6 +668,16 @@ export class Collection<
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
 
+  /**
+   * Scalar reducer — reduces a to-many relation to the minimum value
+   * of `field` across related rows. Returns `null` when there are no
+   * related rows. Use inside an `include(...)` refinement callback;
+   * throws if called elsewhere.
+   *
+   * ```typescript
+   * const users = await db.orm.User.include('posts', (posts) => posts.min('views')).all();
+   * ```
+   */
   min<FieldName extends NumericFieldNames<TContract, ModelName>>(
     field: FieldName,
   ): IncludeScalar<number | null> {
@@ -532,6 +686,16 @@ export class Collection<
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
 
+  /**
+   * Scalar reducer — reduces a to-many relation to the maximum value
+   * of `field` across related rows. Returns `null` when there are no
+   * related rows. Use inside an `include(...)` refinement callback;
+   * throws if called elsewhere.
+   *
+   * ```typescript
+   * const users = await db.orm.User.include('posts', (posts) => posts.max('views')).all();
+   * ```
+   */
   max<FieldName extends NumericFieldNames<TContract, ModelName>>(
     field: FieldName,
   ): IncludeScalar<number | null> {
@@ -540,6 +704,27 @@ export class Collection<
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
 
+  /**
+   * Produce multiple named sub-views of a to-many relation in a
+   * single `include(...)`. Each branch is either another refined
+   * collection (mapped to a row array on the parent) or a scalar
+   * reducer such as `count()`/`sum(...)`. Only valid inside an
+   * `include(...)` refinement callback for to-many relations.
+   *
+   * ```typescript
+   * const users = await db.orm.User.include('posts', (posts) =>
+   *   posts.combine({
+   *     recent: posts.where({ published: true }).take(3),
+   *     total: posts.count(),
+   *     averageViews: posts.avg('views'),
+   *   }),
+   * ).all();
+   * // each user row: {
+   * //   ...user,
+   * //   posts: { recent: Post[]; total: number; averageViews: number | null };
+   * // }
+   * ```
+   */
   combine<
     Spec extends Record<
       string,
@@ -586,6 +771,26 @@ export class Collection<
     }>;
   }
 
+  /**
+   * Resume pagination from a known cursor position. Requires a prior
+   * `orderBy(...)` so the cursor has a stable basis; provide a value
+   * for every column referenced by the active `orderBy(...)` so each
+   * ordered axis has a defined boundary.
+   *
+   * ```typescript
+   * const page1 = await db.orm.Post
+   *   .orderBy((p) => p.createdAt.desc())
+   *   .take(20)
+   *   .all();
+   *
+   * const last = page1[page1.length - 1]!;
+   * const page2 = await db.orm.Post
+   *   .orderBy((p) => p.createdAt.desc())
+   *   .cursor({ createdAt: last.createdAt })
+   *   .take(20)
+   *   .all();
+   * ```
+   */
   cursor(
     cursorValues: State['hasOrderBy'] extends true
       ? Partial<Record<keyof DefaultModelRow<TContract, ModelName> & string, unknown>>
@@ -606,6 +811,14 @@ export class Collection<
     });
   }
 
+  /**
+   * Emit `SELECT DISTINCT` keyed on the given fields. Replaces any
+   * previous `distinct(...)` / `distinctOn(...)` selection.
+   *
+   * ```typescript
+   * const groups = await db.orm.User.distinct('country', 'role').all();
+   * ```
+   */
   distinct<
     Fields extends readonly [
       keyof DefaultModelRow<TContract, ModelName> & string,
@@ -620,6 +833,20 @@ export class Collection<
     });
   }
 
+  /**
+   * Emit `SELECT DISTINCT ON (fields)` — keep the first row per
+   * distinct key according to the current `orderBy(...)`. Requires a
+   * prior `orderBy(...)`; replaces any previous `distinct(...)` /
+   * `distinctOn(...)` selection.
+   *
+   * ```typescript
+   * // Latest post per user:
+   * const latestPerUser = await db.orm.Post
+   *   .orderBy([(p) => p.userId.asc(), (p) => p.createdAt.desc()])
+   *   .distinctOn('userId')
+   *   .all();
+   * ```
+   */
   distinctOn<
     Fields extends readonly [
       keyof DefaultModelRow<TContract, ModelName> & string,
@@ -640,27 +867,101 @@ export class Collection<
     });
   }
 
+  /**
+   * Apply `LIMIT n`. Replaces any previous limit set on this collection.
+   *
+   * ```typescript
+   * const firstTen = await db.orm.User.orderBy((u) => u.id.asc()).take(10).all();
+   * ```
+   */
   take(n: number): Collection<TContract, ModelName, Row, State> {
     return this.#clone({ limit: n });
   }
 
+  /**
+   * Apply `OFFSET n`. Replaces any previous offset set on this collection.
+   *
+   * ```typescript
+   * const page2 = await db.orm.User
+   *   .orderBy((u) => u.id.asc())
+   *   .skip(10)
+   *   .take(10)
+   *   .all();
+   * ```
+   */
   skip(n: number): Collection<TContract, ModelName, Row, State> {
     return this.#clone({ offset: n });
   }
 
   /**
-   * Read terminal: stream all rows matching the current state.
+   * Read terminal: execute the query and stream every matching row.
+   *
+   * The returned `AsyncIterableResult<Row>` is BOTH a thenable that
+   * resolves to `Row[]` (so `await` collects all rows into an array)
+   * AND an async iterable (so `for await` streams rows as they
+   * arrive, without buffering the whole result set in memory). Pick
+   * whichever fits the caller. A single result can only be consumed
+   * once.
+   *
+   * Streaming is the default and the expected execution model. The
+   * only scenarios that fall back to buffering internally before
+   * yielding are drivers that cannot expose a cursor to the
+   * underlying database, and — for queries with `include(...)` —
+   * targets whose SQL dialect supports neither lateral joins nor
+   * correlated subqueries (so child rows cannot be stitched in a
+   * single streaming query). These are implementation details below
+   * the public API; the iteration shape itself is genuinely
+   * streaming whenever the driver and plan allow it.
+   *
+   * ```typescript
+   * // Thenable — collect to an array:
+   * const users = await db.orm.User.all();
+   * for (const user of users) console.log(user.id);
+   *
+   * // Async iterable — stream rows as they arrive:
+   * for await (const user of db.orm.User.all()) {
+   *   console.log(user.id);
+   * }
+   * ```
    *
    * Accepts an optional `configure` callback that receives a
    * `MetaBuilder<'read'>` so the caller can attach typed user
    * annotations to the executed plan. `meta.annotate(...)` enforces
    * applicability at the type level and at runtime; annotations are
    * merged into `plan.meta.annotations` at compile time.
+   *
+   * ```typescript
+   * await db.orm.User.all((meta) => meta.annotate(cacheAnnotation({ ttl: 60 })));
+   * ```
    */
   all(configure?: (meta: MetaBuilder<'read'>) => void): AsyncIterableResult<Row> {
     return this.#withAnnotationsFromMeta(configure, 'all').#dispatch();
   }
 
+  /**
+   * Read terminal: return the first matching row, or `null` if none
+   * match. Optionally accepts a filter (callback or shorthand object)
+   * followed by a `configure` callback for typed read annotations.
+   *
+   * To attach annotations without further narrowing, pass `undefined`
+   * as the filter (or chain `.where(...)` first):
+   *
+   * ```typescript
+   * // No filter — first row in the collection:
+   * const someone = await db.orm.User.first();
+   *
+   * // Shorthand filter:
+   * const alice = await db.orm.User.first({ email: 'alice@example.com' });
+   *
+   * // Callback filter:
+   * const old = await db.orm.User.first((u) => u.age.gt(60));
+   *
+   * // Annotate without filtering further:
+   * await db.orm.User.first(undefined, (meta) =>
+   *   meta.annotate(cacheAnnotation({ ttl: 60 })),
+   * );
+   * ```
+   */
   async first(): Promise<Row | null>;
   async first(
     filter: undefined,
@@ -674,20 +975,6 @@ export class Collection<
     filter: ShorthandWhereFilter<TContract, ModelName>,
     configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
-  /**
-   * Read terminal: return the first matching row, or `null`.
-   *
-   * Accepts an optional `filter` (function or shorthand) followed by an
-   * optional `configure` callback that receives a `MetaBuilder<'read'>`
-   * for attaching typed annotations. To attach annotations without
-   * narrowing further, pass `undefined` as the filter (or chain
-   * `.where(...)` first):
-   *
-   * ```typescript
-   * await db.User.first({ id }, (meta) => meta.annotate(cacheAnnotation({ ttl: 60 })));
-   * await db.User.first(undefined, (meta) => meta.annotate(cacheAnnotation({ ttl: 60 })));
-   * ```
-   */
   async first(
     filter?:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
@@ -707,7 +994,20 @@ export class Collection<
 
   /**
    * Read terminal: run an aggregate query (count, sum, avg, min, max)
-   * built via the `AggregateBuilder` callback.
+   * built via the `AggregateBuilder` callback. Returns one object
+   * with the requested aggregate values keyed by the aliases supplied
+   * in the spec.
+   *
+   * ```typescript
+   * const stats = await db.orm.Post
+   *   .where({ published: true })
+   *   .aggregate((agg) => ({
+   *     total: agg.count(),
+   *     averageViews: agg.avg('views'),
+   *     maxViews: agg.max('views'),
+   *   }));
+   * // { total: 42, averageViews: 17.3, maxViews: 9001 }
+   * ```
    *
    * Accepts an optional `configure` callback that receives a
    * `MetaBuilder<'read'>` for attaching typed annotations.
@@ -742,16 +1042,40 @@ export class Collection<
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
-  async create(
-    data: ResolvedCreateInput<TContract, ModelName, State['variantName']>,
-    configure?: (meta: MetaBuilder<'write'>) => void,
-  ): Promise<Row>;
-  async create(
-    data: MutationCreateInputWithRelations<TContract, ModelName>,
-    configure?: (meta: MetaBuilder<'write'>) => void,
-  ): Promise<Row>;
   /**
-   * Write terminal: insert one row and return it.
+   * Write terminal: insert one row and return it (with any configured
+   * `select(...)` / `include(...)` projections applied to the returned
+   * shape).
+   *
+   * Related rows can be created or linked through relation callbacks
+   * on parent/child-owned relations (one-to-one or one-to-many).
+   * The callback receives a mutator exposing `create(...)` and
+   * `connect(...)`; `disconnect(...)` is only supported in nested
+   * `update(...)` mutations. Many-to-many relations are not yet
+   * supported as nested-mutation targets.
+   *
+   * ```typescript
+   * // Simple insert:
+   * const user = await db.orm.User.create({
+   *   email: 'alice@example.com',
+   *   name: 'Alice',
+   * });
+   *
+   * // Nested create on a child-owned to-many relation:
+   * const author = await db.orm.User.create({
+   *   email: 'bob@example.com',
+   *   posts: (posts) => posts.create([
+   *     { title: 'Hello' },
+   *     { title: 'World' },
+   *   ]),
+   * });
+   *
+   * // Connect a child-owned post to an existing parent author:
+   * const reply = await db.orm.Post.create({
+   *   title: 'Re: Hello',
+   *   author: (author) => author.connect({ id: 1 }),
+   * });
+   * ```
    *
    * Accepts an optional `configure` callback that receives a
    * `MetaBuilder<'write'>` for attaching typed annotations.
@@ -764,6 +1088,14 @@ export class Collection<
    * logical `create()` call but do not currently flow into each
    * constituent SQL statement issued for the related rows.
    */
+  async create(
+    data: ResolvedCreateInput<TContract, ModelName, State['variantName']>,
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): Promise<Row>;
+  async create(
+    data: MutationCreateInputWithRelations<TContract, ModelName>,
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): Promise<Row>;
   async create(
     data:
       | ResolvedCreateInput<TContract, ModelName, State['variantName']>
@@ -803,6 +1135,33 @@ export class Collection<
     throw new Error(`create() for model "${this.modelName}" did not return a row`);
   }
 
+  /**
+   * Write terminal: insert many rows and stream the inserted rows.
+   *
+   * The returned `AsyncIterableResult<Row>` is BOTH a thenable that
+   * resolves to `Row[]` AND an async iterable that streams inserted
+   * rows as they arrive. Use whichever shape fits the caller — but
+   * only consume it once. Streaming is the default; some
+   * driver/plan combinations may still buffer internally before
+   * yielding.
+   *
+   * ```typescript
+   * // Thenable — collect all inserted rows into an array:
+   * const created = await db.orm.User.createAll([
+   *   { email: 'a@example.com' },
+   *   { email: 'b@example.com' },
+   * ]);
+   *
+   * // Async iterable — stream inserted rows as they arrive:
+   * for await (const row of db.orm.User.createAll(seedUsers)) {
+   *   console.log('inserted', row.id);
+   * }
+   * ```
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'write'>` for attaching typed annotations to the
+   * compiled insert plan.
+   */
   createAll(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
     configure?: (meta: MetaBuilder<'write'>) => void,
@@ -1024,6 +1383,24 @@ export class Collection<
     });
   }
 
+  /**
+   * Write terminal: insert many rows without materializing the
+   * inserted rows, returning the number of inserted records.
+   *
+   * Prefer `createAll(...)` when you need the returned rows; prefer
+   * this when you only need to know how many rows were inserted (the
+   * compiled plan skips `RETURNING`).
+   *
+   * ```typescript
+   * const inserted = await db.orm.User.createCount([
+   *   { email: 'a@example.com' },
+   *   { email: 'b@example.com' },
+   * ]);
+   * // inserted === 2
+   * ```
+   *
+   * Not supported on MTI variants — use `createAll(...)` instead.
+   */
   async createCount(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
     configure?: (meta: MetaBuilder<'write'>) => void,
@@ -1058,9 +1435,36 @@ export class Collection<
   }
 
   /**
-   * Passing `update: {}` makes this behave like a conditional create.
-   * On conflict, `ON CONFLICT DO NOTHING RETURNING ...` may return zero rows,
-   * so this method may issue a follow-up reload query to return the existing row.
+   * Write terminal: insert a row, or update the existing row on
+   * conflict. Returns the resulting row (the inserted one or the
+   * updated/existing one).
+   *
+   * `conflictOn` selects which unique constraint drives the conflict
+   * resolution — omit to use the model's primary key.
+   *
+   * ```typescript
+   * // Insert-or-update on email uniqueness:
+   * await db.orm.User.upsert({
+   *   create: { email: 'alice@example.com', name: 'Alice' },
+   *   update: { name: 'Alice (updated)' },
+   *   conflictOn: { email: 'alice@example.com' },
+   * });
+   *
+   * // Conditional create — `update: {}` keeps the existing row
+   * // unchanged. `conflictOn` must reference the constraint that
+   * // makes the row "already exist"; omit only when the conflict is
+   * // on the primary key. On conflict,
+   * // `ON CONFLICT DO NOTHING RETURNING ...` may return zero rows,
+   * // so a follow-up reload is issued to fetch and return the
+   * // existing row.
+   * await db.orm.User.upsert({
+   *   create: { email: 'alice@example.com', name: 'Alice' },
+   *   update: {},
+   *   conflictOn: { email: 'alice@example.com' },
+   * });
+   * ```
+   *
+   * Not supported on MTI variants.
    */
   async upsert(
     input: {
@@ -1137,7 +1541,30 @@ export class Collection<
 
   /**
    * Write terminal: update matching rows and return the first one (or
-   * null when no row matched).
+   * `null` when no row matched). Requires a prior `.where(...)` —
+   * calling `update(...)` on an unfiltered collection is a type error.
+   *
+   * Related rows can be created or relinked through relation
+   * callbacks on parent/child-owned relations (one-to-one or
+   * one-to-many). The callback receives a mutator exposing
+   * `create(...)`, `connect(...)`, and `disconnect(...)`. Nested
+   * updates against existing related rows, and many-to-many relations
+   * as nested-mutation targets, are not supported through this API.
+   *
+   * ```typescript
+   * // Update one row by id:
+   * const updated = await db.orm.User
+   *   .where({ id: 1 })
+   *   .update({ name: 'Alice Renamed' });
+   *
+   * // Update + relink — runs as a graph of internal mutations:
+   * await db.orm.User
+   *   .where({ id: 1 })
+   *   .update({
+   *     name: 'Alice',
+   *     posts: (posts) => posts.connect([{ id: 5 }]),
+   *   });
+   * ```
    *
    * Accepts an optional `configure` callback that receives a
    * `MetaBuilder<'write'>` for attaching typed annotations.
@@ -1190,6 +1617,31 @@ export class Collection<
     });
   }
 
+  /**
+   * Write terminal: update every matching row and stream the updated
+   * rows. Requires a prior `.where(...)` filter.
+   *
+   * The returned `AsyncIterableResult<Row>` is BOTH a thenable that
+   * resolves to `Row[]` AND an async iterable that streams updated
+   * rows as they arrive. Use whichever fits; a result can only be
+   * consumed once. Streaming is the default; some driver/plan
+   * combinations may still buffer internally before yielding.
+   *
+   * ```typescript
+   * // Thenable — collect updated rows into an array:
+   * const updated = await db.orm.Post
+   *   .where({ published: false })
+   *   .updateAll({ published: true });
+   *
+   * // Async iterable — stream updated rows as they arrive:
+   * for await (const row of db.orm.Post.where({ draft: true }).updateAll({ draft: false })) {
+   *   console.log('published', row.id);
+   * }
+   * ```
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'write'>` for attaching typed annotations.
+   */
   updateAll(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
@@ -1240,6 +1692,20 @@ export class Collection<
     });
   }
 
+  /**
+   * Write terminal: update every matching row without returning them,
+   * resolving to the count of rows that were updated. Requires a prior
+   * `.where(...)` filter.
+   *
+   * Prefer `updateAll(...)` when you need the updated rows; prefer
+   * this when you only need the affected-row count.
+   *
+   * ```typescript
+   * const count = await db.orm.Post
+   *   .where({ published: false })
+   *   .updateCount({ published: true });
+   * ```
+   */
   async updateCount(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
@@ -1276,8 +1742,14 @@ export class Collection<
   }
 
   /**
-   * Write terminal: delete matching rows and return the first one (or
-   * null when no row matched).
+   * Write terminal: delete matching rows and return the first deleted
+   * row (or `null` when no row matched). Requires a prior `.where(...)`
+   * — calling `delete()` on an unfiltered collection is a type error.
+   *
+   * ```typescript
+   * const deleted = await db.orm.User.where({ id: 1 }).delete();
+   * if (deleted) console.log('deleted', deleted.email);
+   * ```
    *
    * Accepts an optional `configure` callback that receives a
    * `MetaBuilder<'write'>` for attaching typed annotations.
@@ -1300,6 +1772,29 @@ export class Collection<
     });
   }
 
+  /**
+   * Write terminal: delete every matching row and stream the deleted
+   * rows. Requires a prior `.where(...)` filter.
+   *
+   * The returned `AsyncIterableResult<Row>` is BOTH a thenable that
+   * resolves to `Row[]` AND an async iterable that streams deleted
+   * rows as they arrive. Use whichever fits; a result can only be
+   * consumed once. Streaming is the default; some driver/plan
+   * combinations may still buffer internally before yielding.
+   *
+   * ```typescript
+   * // Thenable — collect the deleted rows into an array:
+   * const deleted = await db.orm.Post.where({ archived: true }).deleteAll();
+   *
+   * // Async iterable — stream deleted rows as they arrive:
+   * for await (const row of db.orm.Post.where({ archived: true }).deleteAll()) {
+   *   console.log('removed', row.id);
+   * }
+   * ```
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'write'>` for attaching typed annotations.
+   */
   deleteAll(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
@@ -1339,6 +1834,18 @@ export class Collection<
     });
   }
 
+  /**
+   * Write terminal: delete every matching row without returning them,
+   * resolving to the count of rows that were deleted. Requires a prior
+   * `.where(...)` filter.
+   *
+   * Prefer `deleteAll(...)` when you need the deleted rows; prefer
+   * this when you only need the affected-row count.
+   *
+   * ```typescript
+   * const removed = await db.orm.Post.where({ archived: true }).deleteCount();
+   * ```
+   */
   async deleteCount(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
