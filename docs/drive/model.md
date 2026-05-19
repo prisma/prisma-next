@@ -540,7 +540,7 @@ Still open (working positions): the trial period ([`trial.md`](trial.md)) is whe
 - The bodies of any skills (skill restructuring lives in [`skill-conventions.md`](skill-conventions.md)).
 - The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under [`principles/`](principles/)).
 - The migration plan from canonical to the new model (per-consumer adoption is downstream).
-- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's calibration; [`calibration/prisma-next.md`](calibration/prisma-next.md) is the worked example).
+- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's project context — for prisma-next, in [`drive/plan/README.md`](../../drive/plan/README.md)).
 
 All of those are downstream. This document is the input.
 
@@ -549,7 +549,7 @@ All of those are downstream. This document is the input.
 - [`workflow.md`](workflow.md) — operational layer (the lifecycle map with skills + agile parallels + cadences)
 - [`problem-statement.md`](problem-statement.md) — self-contained problem framing for canonical-side maintainers
 - [`principles/`](principles/) — per-principle deep-dives
-- [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration
+- [`../../drive/`](../../drive/) — prisma-next's project-context overlays (the calibration is part of project context, not long-lived docs)
 - [`skill-conventions.md`](skill-conventions.md) — skill set with augmentations + implementation sequencing
 - [`trial.md`](trial.md) — trial-period framing + synthesis pointer
 - [PR #522](https://github.com/prisma/prisma-next/pull/522) — the shaping + build PR (closes out the `drive-domain-model` project; commit history contains the full chronological alternatives ledger)

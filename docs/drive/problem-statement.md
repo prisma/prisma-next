@@ -127,7 +127,7 @@ We're not opening the upstream PRs yet — we want to trial the family locally i
 - [`workflow.md`](workflow.md) — the operational lifecycle map (every skill plugs into a named phase)
 - [`skill-conventions.md`](skill-conventions.md) — workflow → skill map + per-skill verdicts + implementation sequencing
 - [`principles/`](principles/) — the principles the restructure is built on (protocol-as-memory, brief-discipline, DoR, DoD, retro, etc.)
-- [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration showing what `drive/<category>/README.md` overlays look like in practice
+- prisma-next's project-context overlays — what `drive/<category>/README.md` looks like in practice — live at the repo root under [`drive/`](../../drive/) (calibration content is project-context, not long-lived docs)
 - [`trial.md`](trial.md) — trial-period framing and findings-recording protocol
 - [PR #522](https://github.com/prisma/prisma-next/pull/522) — the shaping + build PR (closes out the `drive-domain-model` project; includes the chronological decisions log in commit history)
 - [PR #93](https://github.com/prisma/ignite/pull/93) — the assumed-landed base; all proposed PRs stack on top

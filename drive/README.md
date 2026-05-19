@@ -13,13 +13,14 @@ Both are loaded by drive-* skills at workflow entry. Both are human-readable and
 
 | Category | Loaded by | Holds |
 |---|---|---|
-| [`triage/`](triage/README.md) | `drive-triage-work`, `drive-start-workflow` | Sizing anchors, ticket-shape patterns, calibration for "direct change vs slice in this repo," Linear-sync conventions |
-| [`spec/`](spec/README.md) | `drive-specify-project`, `drive-specify-slice` | Required sections beyond template, common scope traps, edge-case patterns specific to prisma-next |
-| [`plan/`](plan/README.md) | `drive-plan-project`, `drive-plan-slice` | Dispatch-sizing reference cases, per-dispatch DoR overlays, failure-mode catalogue, parallelisation heuristics |
-| [`project/`](project/README.md) | `drive-deliver-workflow`, `drive-plan-project` | Project-level conventions, status-update cadence, slice-composition patterns |
+| [`triage/`](triage/README.md) | `drive-triage-work`, `drive-start-workflow` | Sizing anchors, ticket-shape patterns, calibration for "direct change vs slice in this repo," Linear-sync conventions, promote / demote ceremony |
+| [`spec/`](spec/README.md) | `drive-specify-project`, `drive-specify-slice` | Required sections beyond template, common scope traps, edge-case patterns, slice-DoR overlay, slice-DoD spec-side items |
+| [`plan/`](plan/README.md) | `drive-plan-project`, `drive-plan-slice`, `drive-build-workflow` | Dispatch-sizing reference anchors (XS/S/M/L/XL), DoR / DoD overlays (dispatch-level), failure-mode catalogue, grep library, model-tier routing, parallelisation heuristics |
+| [`project/`](project/README.md) | `drive-create-project`, `drive-close-project`, `drive-deliver-workflow`, `drive-plan-project` | Linear conventions, status-update cadence, slice-composition patterns, project-DoR / project-DoD overlays, close-out destinations |
+| [`pr/`](pr/README.md) | `drive-pr-description`, `drive-pr-walkthrough` | PR-title / body conventions, walkthrough conventions, Linear-issue conventions, Linear state conventions, slice-DoD PR-side items, commit-style rules |
+| [`qa/`](qa/README.md) | `drive-qa-plan`, `drive-qa-run` | Consumer audiences (extension authors / end users), substrate locations, coverage-gate gaps, slice-DoD QA-side items |
 | [`retro/`](retro/README.md) | `drive-run-retro` | Team-specific retro prompts, landing-surface preferences, common patterns |
 | [`health/`](health/README.md) | `drive-check-health`, `drive-deliver-workflow` | Drift-signal thresholds, pick-next heuristics, throughput baselines, common false-positives |
-| [`pr/`](pr/README.md) | `drive-pr-description`, `drive-pr-walkthrough` | PR-body conventions, scope-statement patterns, commit-style rules |
 
 ## Reconciliation loop
 

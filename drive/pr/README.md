@@ -45,4 +45,29 @@ For PRs routed as **direct change** by `drive-start-workflow`:
 - For project-spanning PRs (close-out PRs that migrate `projects/<project>/` to `docs/`), the walkthrough is in `projects/<project>/walkthroughs/` and referenced from the PR body.
 - Link to specific test files as evidence; per the `walkthrough.mdc` user rule, prefer repo-relative links (`path/to/file.ts (L12-L34)`) that editors can open.
 
+## Linear-issue conventions
+
+- Each slice maps to a Linear Issue.
+- Issue description links back to `projects/<project>/slices/<slice>/` (in-project) or to the orphan-slice PR description path (orphan).
+- PR title prefix: `<tml-id>:` (Linear ticket). Example: `tml-2549: drive-domain-model consolidation`.
+- PR description references the Linear issue (`Refs: TML-XXXX` line OR included in the title — either is enough for auto-close).
+
+## Linear state conventions
+
+- The team's terminal-before-merge state is **`Ready to be merged`** (not `Done`). The GitHub integration auto-transitions to the team's completed state on merge.
+- Do not manually transition issues to a completed state; the integration handles it.
+- Manual transitions before merge are fine (e.g. moving to `In review` when the PR opens).
+
+## Slice-DoD overlay (PR-side items)
+
+In addition to the canonical slice DoD:
+
+- [ ] Linear issue moved to `Ready to be merged` (the team's terminal-before-merge state).
+- [ ] PR title carries Linear ticket prefix (e.g. `tml-XXXX:`).
+- [ ] PR description follows `drive-pr-description` shape (decision-led, narrative).
+- [ ] PR linked to its Linear issue via GitHub integration (auto-close on merge works).
+- [ ] No `projects/` references in long-lived files added by the slice (per the doc-maintenance rule; grep gate lives in `drive/plan/README.md`).
+
+(Manual-QA slice-DoD items live in `drive/qa/README.md`. Plan-side gates / failure-mode references live in `drive/plan/README.md`.)
+
 _(Living; add conventions as they emerge.)_

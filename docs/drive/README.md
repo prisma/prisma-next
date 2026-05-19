@@ -28,9 +28,9 @@ These docs migrated from the `drive-domain-model` shaping project (close-out: PR
 
 - [`skill-conventions.md`](./skill-conventions.md) — the two-tier (workflow + atomic) skill architecture, naming rules (D28: `drive-<verb>-<noun>`), and the per-skill restructure that produced today's `skills-contrib/drive-*` set.
 
-**Worked example:**
+**Worked example (project context, not long-lived docs):**
 
-- [`calibration/prisma-next.md`](./calibration/prisma-next.md) — prisma-next's calibration: reference tasks for t-shirt sizing, DoR/DoD overlays, failure-mode catalogue. Section-by-section pointers to where each calibration overlay lives in `drive/<category>/README.md`.
+prisma-next's own calibration — reference tasks for t-shirt sizing, DoR/DoD overlays, failure-mode catalogue, grep library, model-tier routing — lives where each skill loads it: in [`drive/<category>/README.md`](../../drive/) at the repo root. The calibration *content* is project-specific by definition; only the conventions that govern it (in `principles/`) are long-lived. See the [drive/ README](../../drive/README.md) for the category map.
 
 **Trial period:**
 

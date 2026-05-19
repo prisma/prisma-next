@@ -32,10 +32,22 @@ Common edge cases prisma-next slices should consider:
 
 _(Add patterns as the team accrues experience.)_
 
-## Slice-DoD overlays specific to prisma-next
+## Slice-DoR overlay
+
+In addition to the canonical slice DoR:
+
+- [ ] Linear issue created and linked from slice spec (issue description carries a link back to `projects/<x>/slices/<s>/`).
+- [ ] Slice's PR-to-be will carry a `Refs: <issue-id>` line (or the ticket ID in the title).
+- [ ] Slice's parent branch is the project's working branch (or `main` for orphan slices).
+
+(The "calibration entries referenced from slice plan" items live in `drive/plan/README.md` — slice plan owns them.)
+
+## Slice-DoD overlay (spec-side items)
 
 - If the slice touches `packages/3-*-extensions/**`, the slice plan must include a `pnpm fixtures:check` dispatch step.
 - If the slice touches package boundaries / imports, the slice plan must include `pnpm lint:deps`.
 - If the slice changes typed surfaces consumed elsewhere, the slice plan must include a downstream `pnpm typecheck` after the producing package's `pnpm build`.
+
+(PR-side slice-DoD items — title prefix, ticket linkage, walkthrough — live in `drive/pr/README.md`. Manual-QA slice-DoD items live in `drive/qa/README.md`.)
 
 _(Populated by retros; treat as living.)_
