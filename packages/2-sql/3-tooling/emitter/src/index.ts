@@ -13,7 +13,6 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import { assertDefined } from '@prisma-next/utils/assertions';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
   if (!params || Object.keys(params).length === 0) {
@@ -28,6 +27,15 @@ function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined)
   return `{ ${entries.join('; ')} }`;
 }
 
+/**
+ * Name-only lookup that walks every namespace until it finds a table
+ * with the given name. Survives this slice only for the two model-side
+ * call sites whose `SqlModelStorage.table` is still a bare name without
+ * a namespace coordinate; both call sites — and this helper — are
+ * deleted by TML-2584, which promotes `SqlModelStorage` to carry the
+ * model's namespace id so model→table resolution can use explicit
+ * coordinates like the FK-ref site already does.
+ */
 function findSqlTable(
   storage: SqlStorage,
   tableName: string,
@@ -207,18 +215,14 @@ export const sqlEmission = {
             }
           }
 
-          const referenced = findSqlTable(storage, fk.target.tableName);
-          if (!referenced) {
+          const referencedTable = storage.namespaces[fk.target.namespaceId]?.tables[
+            fk.target.tableName
+          ] as StorageTable | undefined;
+          if (!referencedTable) {
             throw new Error(
-              `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}"`,
+              `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}" in namespace "${fk.target.namespaceId}"`,
             );
           }
-
-          const referencedTable = referenced.table;
-          assertDefined(
-            referencedTable,
-            `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}"`,
-          );
 
           const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
           for (const colName of fk.target.columns) {
