@@ -1097,8 +1097,8 @@ namespace auth {
     });
   });
 
-  describe('dotted bare type names', () => {
-    it('parses a dotted typeName via the simple-type fallback (no constructor args)', () => {
+  describe('dot-qualified field types', () => {
+    it('parses a qualified type reference into typeName + typeNamespaceId', () => {
       const schema = `
 model Profile {
   id Int @id
@@ -1111,7 +1111,69 @@ model Profile {
       expect(result.diagnostics).toEqual([]);
       const profile = flatPslModels(result.ast).find((m) => m.name === 'Profile');
       const userField = profile?.fields.find((f) => f.name === 'user');
-      expect(userField?.typeName).toBe('auth.User');
+      expect(userField?.typeName).toBe('User');
+      expect(userField?.typeNamespaceId).toBe('auth');
+    });
+
+    it('parses a qualified list type reference', () => {
+      const schema = `
+model User {
+  id Int @id
+  posts public.Post[]
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      expect(result.diagnostics).toEqual([]);
+      const user = flatPslModels(result.ast).find((m) => m.name === 'User');
+      const postsField = user?.fields.find((f) => f.name === 'posts');
+      expect(postsField?.typeName).toBe('Post');
+      expect(postsField?.typeNamespaceId).toBe('public');
+      expect(postsField?.list).toBe(true);
+    });
+
+    it('rejects nested dot-qualified types with a parse error', () => {
+      const schema = `
+model Foo {
+  id Int @id
+  bar a.b.Bar
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+      expect(result.diagnostics[0]?.message).toContain('a.b.Bar');
+      expect(result.diagnostics[0]?.span).toBeDefined();
+    });
+
+    it('rejects nested dot-qualified list types with a parse error', () => {
+      const schema = `
+model Foo {
+  id Int @id
+  bars a.b.Bar[]
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]?.code).toBe('PSL_INVALID_QUALIFIED_TYPE');
+    });
+
+    it('leaves unqualified types unchanged (no typeNamespaceId)', () => {
+      const schema = `
+model Post {
+  id Int @id
+  title String
+  published Boolean @default(false)
+}
+`;
+      const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+      expect(result.ok).toBe(true);
+      const post = flatPslModels(result.ast).find((m) => m.name === 'Post');
+      const titleField = post?.fields.find((f) => f.name === 'title');
+      expect(titleField?.typeName).toBe('String');
+      expect(titleField?.typeNamespaceId).toBeUndefined();
     });
   });
 });

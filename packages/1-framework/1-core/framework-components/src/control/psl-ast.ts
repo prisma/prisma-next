@@ -21,7 +21,8 @@ export type PslDiagnosticCode =
   | 'PSL_INVALID_REFERENTIAL_ACTION'
   | 'PSL_INVALID_DEFAULT_VALUE'
   | 'PSL_INVALID_ENUM_MEMBER'
-  | 'PSL_INVALID_TYPES_MEMBER';
+  | 'PSL_INVALID_TYPES_MEMBER'
+  | 'PSL_INVALID_QUALIFIED_TYPE';
 
 export interface PslDiagnostic {
   readonly code: PslDiagnosticCode;
@@ -81,7 +82,10 @@ export type PslFieldAttribute = PslAttribute;
 export interface PslField {
   readonly kind: 'field';
   readonly name: string;
+  /** Unqualified type name, e.g. `"User"` for both `User` and `auth.User`. */
   readonly typeName: string;
+  /** Namespace qualifier from a dot-qualified type reference, e.g. `"auth"` for `auth.User`. Absent for unqualified types. */
+  readonly typeNamespaceId?: string;
   readonly typeConstructor?: PslTypeConstructorCall;
   readonly optional: boolean;
   readonly list: boolean;

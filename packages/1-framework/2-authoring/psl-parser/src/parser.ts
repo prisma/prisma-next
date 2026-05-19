@@ -785,15 +785,41 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     return undefined;
   }
 
-  const simpleTypeMatch = baseTypeSource.match(/^([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)$/);
-  const typeName = typeConstructor?.path.join('.') ?? simpleTypeMatch?.[1];
-  if (!typeName) {
-    pushDiagnostic(context, {
-      code: 'PSL_INVALID_MODEL_MEMBER',
-      message: `Invalid model member declaration "${line}"`,
-      span: createTrimmedLineSpan(context, lineIndex),
-    });
-    return undefined;
+  let typeName: string;
+  let typeNamespaceId: string | undefined;
+
+  if (typeConstructor) {
+    typeName = typeConstructor.path.join('.');
+  } else {
+    const dotCount = (baseTypeSource.match(/\./g) ?? []).length;
+    if (dotCount > 1) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_QUALIFIED_TYPE',
+        message: `Nested dot-qualified type "${baseTypeSource}" is not supported; use exactly one qualifier segment (e.g. "ns.TypeName")`,
+        span: createInlineSpan(
+          context,
+          lineIndex,
+          typeStartColumn,
+          typeStartColumn + baseTypeSource.length,
+        ),
+      });
+      return undefined;
+    }
+    const singleMatch = baseTypeSource.match(/^([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?$/);
+    if (!singleMatch) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_MODEL_MEMBER',
+        message: `Invalid model member declaration "${line}"`,
+        span: createTrimmedLineSpan(context, lineIndex),
+      });
+      return undefined;
+    }
+    if (singleMatch[2] !== undefined) {
+      typeNamespaceId = singleMatch[1];
+      typeName = singleMatch[2];
+    } else {
+      typeName = singleMatch[1] ?? '';
+    }
   }
 
   const attributes: PslFieldAttribute[] = [];
@@ -814,6 +840,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
       kind: 'field',
       name: fieldName,
       typeName,
+      ...ifDefined('typeNamespaceId', typeNamespaceId),
       ...ifDefined('typeConstructor', typeConstructor),
       optional,
       list,
@@ -838,6 +865,7 @@ function parseField(context: ParserContext, line: string, lineIndex: number): Ps
     kind: 'field',
     name: fieldName,
     typeName,
+    ...ifDefined('typeNamespaceId', typeNamespaceId),
     ...ifDefined('typeConstructor', typeConstructor),
     optional,
     list,
