@@ -47,7 +47,7 @@ This skill is the **output** of the project design phase, not part of it. If sig
 - Purpose statement is explicit and minimal (1-3 sentences); per I7 it's the contract for the project's lifetime.
 - Scope boundary names what's in AND what's deliberately out (Non-goals).
 - Project-DoD lists verifiable conditions (each one binary; each one observable).
-- Project DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Project DoR) is met or its gaps are recorded as open questions.
+- Project DoR (per `drive/spec/README.md` overlays and § Project DoR in this skill) is met or its gaps are recorded as open questions.
 
 ## Project context
 
@@ -95,7 +95,7 @@ Present open questions to the operator (numbered list); process answers; update 
 
 ### Step 6 — Confirm DoR
 
-Walk through Project DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Project DoR). Either confirm each item is met, or record gaps as open questions / pending design discussion.
+Walk through Project DoR (per `drive/spec/README.md` overlays and § Project DoR in this skill). Either confirm each item is met, or record gaps as open questions / pending design discussion.
 
 ### Step 7 — Hand off
 
@@ -207,7 +207,6 @@ _Residual design-level questions. Each with a working position so the operator c
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Project (unit); § Layer 5 — invariants I7 + I12
-- [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Project DoR
-- [`projects/drive-domain-model/principles/definition-of-done.md`](/projects/drive-domain-model/principles/definition-of-done.md) § Project DoD
-- [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17 — split rationale
+- [`drive/spec/README.md`](../../drive/spec/README.md) — project-spec authoring overlays, DoR / DoD conventions
+- [`drive/project/README.md`](../../drive/project/README.md) — project-level conventions
+- Invariants I7 (immutable purpose after first dispatch) and I12 (no silent spec amendments) — enforced by this skill and `drive-discussion` stop-conditions
