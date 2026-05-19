@@ -276,7 +276,7 @@ function validateNamespaceBlocksForSqlTarget(input: {
           'Namespace "unbound" is reserved for the late-binding sentinel mapping and cannot appear alongside other named namespace blocks. ' +
           'Use `namespace unbound { … }` alone (no sibling named namespaces) for late-binding multi-tenant contracts.',
         sourceId: input.sourceId,
-        span: unboundBlock?.span,
+        ...ifDefined('span', unboundBlock?.span),
       });
     }
   }
