@@ -8,7 +8,7 @@
  * verbatim.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
@@ -83,7 +83,7 @@ async function executeMigrationNewCommand(
 
   let contractJsonContent: string;
   try {
-    contractJsonContent = readFileSync(contractPathAbsolute, 'utf-8');
+    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
   } catch (error) {
     if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
       return notOk(
@@ -238,8 +238,6 @@ async function executeMigrationNewCommand(
       }
     }
 
-    const stack = createControlStack(config);
-    const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
     const emptyPlan = planner.emptyMigration(
       {

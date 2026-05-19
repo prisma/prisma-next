@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
+  type ControlFamilyInstance,
   createControlStack,
   hasOperationPreview,
   type MigrationPlanOperation,
@@ -81,7 +82,7 @@ interface MigrationPlanOptions extends CommonCommandOptions {
  */
 async function readPredecessorEndContract(
   migrationDir: string,
-  deserializeContract: (json: unknown) => Contract,
+  familyInstance: ControlFamilyInstance<string, unknown>,
 ): Promise<Contract> {
   const path = join(migrationDir, 'end-contract.json');
   let raw: string;
@@ -97,7 +98,7 @@ async function readPredecessorEndContract(
     throw error;
   }
   try {
-    return deserializeContract(JSON.parse(raw) as unknown);
+    return familyInstance.deserializeContract(JSON.parse(raw) as unknown);
   } catch (error) {
     if (CliStructuredError.is(error)) {
       throw error;
@@ -263,9 +264,7 @@ async function executeMigrationPlanCommand(
         );
       }
       fromContractSourceDir = matchingBundle.dirPath;
-      fromContract = await readPredecessorEndContract(fromContractSourceDir, (json) =>
-        familyInstance.deserializeContract(json),
-      );
+      fromContract = await readPredecessorEndContract(fromContractSourceDir, familyInstance);
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -275,9 +274,7 @@ async function executeMigrationPlanCommand(
         );
         if (leafPkg) {
           fromContractSourceDir = leafPkg.dirPath;
-          fromContract = await readPredecessorEndContract(fromContractSourceDir, (json) =>
-            familyInstance.deserializeContract(json),
-          );
+          fromContract = await readPredecessorEndContract(fromContractSourceDir, familyInstance);
         }
       }
     }
