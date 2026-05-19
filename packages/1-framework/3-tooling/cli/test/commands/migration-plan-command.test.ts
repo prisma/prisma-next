@@ -98,7 +98,7 @@ function setupBaseConfig(): void {
     family: {
       familyId: 'mongo',
       create: vi.fn().mockReturnValue({
-        validateContract: (c: unknown) => c,
+        deserializeContract: (c: unknown) => c,
       }),
     },
     target: {
@@ -253,7 +253,7 @@ describe('migration plan command', () => {
         family: {
           familyId: 'sql',
           create: vi.fn().mockReturnValue({
-            validateContract: (c: unknown) => c,
+            deserializeContract: (c: unknown) => c,
           }),
         },
         target: {

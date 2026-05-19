@@ -110,7 +110,7 @@ function loadContract(testDir: string): { contract: Contract; contractPath: stri
       extensionPacks: [],
     }),
   );
-  const contract = familyInstance.validateContract(contractJson);
+  const contract = familyInstance.deserializeContract(contractJson);
   return { contract, contractPath };
 }
 

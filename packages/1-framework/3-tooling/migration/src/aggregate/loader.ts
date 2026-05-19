@@ -50,7 +50,7 @@ export interface LoadAggregateInput {
   readonly migrationsDir: string;
   readonly appContract: Contract;
   readonly declaredExtensions: ReadonlyArray<DeclaredExtensionEntry>;
-  readonly validateContract: (contractJson: unknown) => Contract;
+  readonly deserializeContract: (contractJson: unknown) => Contract;
   /**
    * Hydrated migration graph for the **app member**.
    *
@@ -131,7 +131,7 @@ interface LoadedExtensionState {
  * migration-tools primitives — layout precheck (via
  * {@link listContractSpaceDirectories}), integrity checks (via
  * {@link readMigrationsDir} / {@link readContractSpaceHeadRef} /
- * {@link readContractSpaceContract} / `validateContract`), and
+ * {@link readContractSpaceContract} / `deserializeContract`), and
  * disjointness — into a single typed value.
  *
  * Failure semantics: every failure variant in {@link LoadAggregateError}
@@ -220,7 +220,7 @@ export async function loadContractSpaceAggregate(
 
     let spaceContract: Contract;
     try {
-      spaceContract = input.validateContract(spaceContractRaw);
+      spaceContract = input.deserializeContract(spaceContractRaw);
     } catch (error) {
       return notOk({
         kind: 'validationFailure',

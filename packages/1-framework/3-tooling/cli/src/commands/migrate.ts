@@ -144,7 +144,7 @@ async function executeMigrateCommand(
   }
 
   // Construct the family instance up-front so the on-disk contract read
-  // crosses the serializer seam (`familyInstance.validateContract`) at
+  // crosses the serializer seam (`familyInstance.deserializeContract`) at
   // the read site. The downstream `client.migrationApply({ contract })`
   // re-validates internally (no harm — validation is idempotent), but
   // closing the gap at the read site is what makes the cast-pattern
@@ -174,7 +174,7 @@ async function executeMigrateCommand(
     );
   }
   try {
-    contractRaw = familyInstance.validateContract(JSON.parse(contractContent) as unknown);
+    contractRaw = familyInstance.deserializeContract(JSON.parse(contractContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(

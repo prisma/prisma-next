@@ -41,7 +41,7 @@ export interface ControlTargetDescriptor<
    * JSON ⇄ class boundary for this target's contract. Every target
    * ships the SPI: framework consumers reach the serializer through
    * `descriptor.contractSerializer` rather than importing a per-target
-   * `validateContract` helper. The descriptor IS the aggregator.
+   * `deserializeContract` helper. The descriptor IS the aggregator.
    */
   readonly contractSerializer: ContractSerializer<TContract>;
   create(): TTargetInstance;

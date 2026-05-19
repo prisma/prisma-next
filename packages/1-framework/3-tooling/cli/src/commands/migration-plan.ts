@@ -63,7 +63,7 @@ interface MigrationPlanOptions extends CommonCommandOptions {
 /**
  * Load a predecessor migration's destination contract from its sibling
  * `end-contract.json` on disk and route it through the family's
- * `ContractSerializer` (via `validateContract`) so the in-memory shape
+ * `ContractSerializer` (via `deserializeContract`) so the in-memory shape
  * is the hydrated `Contract` every other caller sees. Bypassing this
  * seam was the root cause of TML-2536: a raw `JSON.parse(...) as Contract`
  * here let polymorphic `storage.types` entries reach the planner without
@@ -81,7 +81,7 @@ interface MigrationPlanOptions extends CommonCommandOptions {
  */
 async function readPredecessorEndContract(
   migrationDir: string,
-  validateContract: (json: unknown) => Contract,
+  deserializeContract: (json: unknown) => Contract,
 ): Promise<Contract> {
   const path = join(migrationDir, 'end-contract.json');
   let raw: string;
@@ -97,7 +97,7 @@ async function readPredecessorEndContract(
     throw error;
   }
   try {
-    return validateContract(JSON.parse(raw) as unknown);
+    return deserializeContract(JSON.parse(raw) as unknown);
   } catch (error) {
     if (CliStructuredError.is(error)) {
       throw error;
@@ -215,7 +215,7 @@ async function executeMigrationPlanCommand(
 
   let toContract: Contract;
   try {
-    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
+    toContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
@@ -264,7 +264,7 @@ async function executeMigrationPlanCommand(
       }
       fromContractSourceDir = matchingBundle.dirPath;
       fromContract = await readPredecessorEndContract(fromContractSourceDir, (json) =>
-        familyInstance.validateContract(json),
+        familyInstance.deserializeContract(json),
       );
     } else {
       const latestMigration = findLatestMigration(graph);
@@ -276,7 +276,7 @@ async function executeMigrationPlanCommand(
         if (leafPkg) {
           fromContractSourceDir = leafPkg.dirPath;
           fromContract = await readPredecessorEndContract(fromContractSourceDir, (json) =>
-            familyInstance.validateContract(json),
+            familyInstance.deserializeContract(json),
           );
         }
       }
@@ -357,7 +357,7 @@ async function executeMigrationPlanCommand(
   // state that phase 1 just seeded. The seed phase guarantees every
   // declared extension has its head ref pinned, so the loader's
   // declaredButUnmigrated precheck always passes here. The app contract
-  // was already routed through `familyInstance.validateContract` at the
+  // was already routed through `familyInstance.deserializeContract` at the
   // read site above (see TML-2536), so it's the hydrated `Contract`
   // here — no second validation pass needed.
   const aggregateResult = await buildContractSpaceAggregate({
@@ -365,7 +365,7 @@ async function executeMigrationPlanCommand(
     migrationsDir,
     appContract: toContract,
     extensionPacks: config.extensionPacks ?? [],
-    validateContract: (json: unknown) => familyInstance.validateContract(json),
+    deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
   });
   if (!aggregateResult.ok) {
     return notOk(aggregateResult.failure);

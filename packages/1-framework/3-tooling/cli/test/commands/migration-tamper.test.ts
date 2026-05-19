@@ -83,7 +83,7 @@ async function writeTestPackage(
 
 function setupConfigMock(): void {
   // The mocked family.create() returns a stub family instance whose
-  // `validateContract` is a pass-through. The tamper tests construct
+  // `deserializeContract` is a pass-through. The tamper tests construct
   // an intentionally-skeletal contract (just `storage.storageHash`) to
   // get past the read-and-validate step in commands like `migrate` /
   // `migration plan` / `migration new` — the bug under test is about
@@ -95,7 +95,7 @@ function setupConfigMock(): void {
     family: {
       familyId: TARGET_FAMILY,
       create: vi.fn().mockReturnValue({
-        validateContract: (json: unknown) => json,
+        deserializeContract: (json: unknown) => json,
       }),
     },
     target: {

@@ -118,7 +118,7 @@ describe('loadAggregateStatusSpaces', () => {
       migrationsDir: '/tmp/__nope',
       appContractRaw: {},
       extensionPacks: [],
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       markersBySpace: null,
     });
 
@@ -142,7 +142,7 @@ describe('loadAggregateStatusSpaces', () => {
       migrationsDir: '/tmp/__nope',
       appContractRaw: {},
       extensionPacks: [],
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       markersBySpace: new Map(),
     });
 
@@ -191,7 +191,7 @@ describe('loadAggregateStatusSpaces', () => {
       migrationsDir: '/tmp/__nope',
       appContractRaw: {},
       extensionPacks: [],
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       markersBySpace: new Map(),
     });
 
@@ -222,7 +222,7 @@ describe('loadAggregateStatusSpaces', () => {
       migrationsDir: '/tmp/__nope',
       appContractRaw: {},
       extensionPacks: [],
-      validateContract: () => ({}) as Contract,
+      deserializeContract: () => ({}) as Contract,
       markersBySpace: new Map(),
     });
 

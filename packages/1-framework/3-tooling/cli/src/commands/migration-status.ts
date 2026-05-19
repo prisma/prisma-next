@@ -437,15 +437,15 @@ export async function loadAggregateStatusSpaces(args: {
   readonly migrationsDir: string;
   readonly appContractRaw: unknown;
   readonly extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'];
-  readonly validateContract: BuildAggregateInputs<string, string>['validateContract'];
+  readonly deserializeContract: BuildAggregateInputs<string, string>['deserializeContract'];
   readonly markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null;
 }): Promise<readonly MigrationStatusSpaceEntry[]> {
   const loadInputs: BuildAggregateInputs<string, string> = {
     targetId: args.targetId,
     migrationsDir: args.migrationsDir,
-    appContract: args.validateContract(args.appContractRaw),
+    appContract: args.deserializeContract(args.appContractRaw),
     extensionPacks: args.extensionPacks,
-    validateContract: args.validateContract,
+    deserializeContract: args.deserializeContract,
   };
 
   const loaded = await buildContractSpaceAggregate(loadInputs);
@@ -774,7 +774,7 @@ async function executeMigrationStatusCommand(
   let aggregateSpaces: readonly MigrationStatusSpaceEntry[] = [];
   if (contractRawForAggregate !== null) {
     // The aggregate loader needs a typed-Contract producer. Build a
-    // real control stack so `validateContract` runs against a fully
+    // real control stack so `deserializeContract` runs against a fully
     // composed family instance — descriptors that read stack members
     // during construction (e.g. codec lookups) get a consistent view.
     const stack = createControlStack(config);
@@ -785,7 +785,7 @@ async function executeMigrationStatusCommand(
         migrationsDir,
         appContractRaw: contractRawForAggregate,
         extensionPacks: config.extensionPacks ?? [],
-        validateContract: (json: unknown) => familyInstance.validateContract(json),
+        deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
         markersBySpace: allMarkers,
       });
     } catch {

@@ -257,7 +257,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       migrationsDir,
       appContract,
       declaredExtensions,
-      validateContract: (json: unknown): Contract => json as Contract,
+      deserializeContract: (json: unknown): Contract => json as Contract,
       appMigrationPackages: [],
     });
     expect(loaded.ok).toBe(true);

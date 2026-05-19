@@ -49,7 +49,7 @@ function buildInput(overrides: Partial<LoadAggregateInput>): LoadAggregateInput 
     migrationsDir: '',
     appContract,
     declaredExtensions: [],
-    validateContract: makeIdentityValidator(new Map()),
+    deserializeContract: makeIdentityValidator(new Map()),
     appMigrationPackages: [],
     ...overrides,
   };
@@ -201,7 +201,7 @@ describe('loadContractSpaceAggregate', () => {
       const result = await loadContractSpaceAggregate(
         buildInput({
           migrationsDir,
-          validateContract: validator,
+          deserializeContract: validator,
           declaredExtensions: [
             {
               id: 'cipherstash',
@@ -237,7 +237,7 @@ describe('loadContractSpaceAggregate', () => {
       const result = await loadContractSpaceAggregate(
         buildInput({
           migrationsDir,
-          validateContract: failingValidator,
+          deserializeContract: failingValidator,
           declaredExtensions: [
             {
               id: 'cipherstash',
@@ -280,7 +280,7 @@ describe('loadContractSpaceAggregate', () => {
       const result = await loadContractSpaceAggregate(
         buildInput({
           migrationsDir,
-          validateContract: validator,
+          deserializeContract: validator,
           declaredExtensions: [{ id: 'cipherstash', targetId: 'postgres' }],
         }),
       );
@@ -319,7 +319,7 @@ describe('loadContractSpaceAggregate', () => {
         buildInput({
           migrationsDir,
           appContract,
-          validateContract: validator,
+          deserializeContract: validator,
           declaredExtensions: [
             {
               id: 'cipherstash',
@@ -373,7 +373,7 @@ describe('loadContractSpaceAggregate', () => {
           migrationsDir,
           targetId: 'mongo',
           appContract,
-          validateContract: validator,
+          deserializeContract: validator,
           declaredExtensions: [{ id: 'cipherstash', targetId: 'mongo' }],
         }),
       );
@@ -446,7 +446,7 @@ describe('loadContractSpaceAggregate', () => {
             target: 'postgres',
             storage: { tables: { app_user: {} } },
           }),
-          validateContract: validator,
+          deserializeContract: validator,
           declaredExtensions: [
             // Declaration order does NOT determine apply order.
             {

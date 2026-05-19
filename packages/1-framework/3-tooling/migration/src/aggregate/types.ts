@@ -30,7 +30,7 @@ export interface HydratedMigrationGraph {
  * - `contract`: the validated contract value for this member. For the
  *   app, the user's authored contract; for an extension, the on-disk
  *   `migrations/<spaceId>/contract.json`. Both have already passed the
- *   family's `validateContract` at the loader boundary.
+ *   family's `deserializeContract` at the loader boundary.
  * - `headRef.hash`: the storage hash this member is targeting. For the
  *   app, equals `contract.storage.storageHash`. For extensions, the
  *   on-disk `refs/head.json.hash`.

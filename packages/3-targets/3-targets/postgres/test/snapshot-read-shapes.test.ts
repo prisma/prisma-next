@@ -25,7 +25,7 @@ import { PostgresEnumType } from '../src/core/postgres-enum-type';
  *
  * The "snapshot read seam" exercised here is the same code path
  * `readPredecessorEndContract` (and every other CLI on-disk read)
- * crosses: `JSON.parse` → `familyInstance.validateContract`
+ * crosses: `JSON.parse` → `familyInstance.deserializeContract`
  * (delegates to `PostgresContractSerializer.deserializeContract`).
  */
 

@@ -120,7 +120,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
  * Codec-triple authors that have an untagged shape on hand can call
  * `toStorageTypeInstance(...)` (which stamps the `'codec-instance'`
  * discriminator) before constructing `SqlStorage`. On-disk reads
- * cross `familyInstance.validateContract` first; the structural
+ * cross `familyInstance.deserializeContract` first; the structural
  * arktype schema rejects untagged entries earlier, so this throw
  * only fires for in-memory authoring bugs.
  */

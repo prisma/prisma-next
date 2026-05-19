@@ -62,7 +62,7 @@ describe('buildContractSpaceAggregate — AC15: does not read contractSpace.cont
       migrationsDir: join(tempDir, 'migrations'),
       appContract: STUB_APP_CONTRACT,
       extensionPacks: [throwingExtension],
-      validateContract: () => STUB_APP_CONTRACT,
+      deserializeContract: () => STUB_APP_CONTRACT,
     });
 
     // The getter was never invoked — we got a Result instead of a thrown error.

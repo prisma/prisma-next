@@ -202,7 +202,7 @@ for (const hit of hits) {
 }
 console.error('');
 console.error(
-  'Replace `as Contract` with `validateContract<Contract>(JSON.parse(raw) as unknown)`.',
+  'Replace `as Contract` with `familyInstance.deserializeContract(JSON.parse(raw) as unknown)`.',
 );
 console.error('See .cursor/rules/as-contract-cast-smell.mdc for the rule + allowlist policy.');
 process.exit(1);

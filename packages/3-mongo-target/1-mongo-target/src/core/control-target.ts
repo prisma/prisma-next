@@ -73,7 +73,7 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         // The framework `MigrationRunner` interface types `destinationContract`
         // as `unknown`; the Mongo runner narrows to `MongoContract`. Validation
         // happens upstream — `migrate` calls
-        // `familyInstance.validateContract(contract)` on the project-root
+        // `familyInstance.deserializeContract(contract)` on the project-root
         // contract loaded from disk before routing it here, so this cast
         // preserves the framework signature without weakening the runner's
         // typed surface.
@@ -176,7 +176,7 @@ function toSpaceMember(
     // (the framework does not know which family's `Contract` shape
     // a runner consumes). The caller is the aggregate runner,
     // which only forwards a value already validated through the
-    // family `validateContract` seam at the aggregate boundary.
+    // family `deserializeContract` seam at the aggregate boundary.
     contract: opts.destinationContract as unknown as Contract,
     headRef: { hash: '', invariants: [] },
     migrations: {

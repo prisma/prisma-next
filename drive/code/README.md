@@ -10,7 +10,7 @@ Project-context bootstrap used by the `drive-code-review` and `drive-pr-local-re
 
 These are bypass-the-seam patterns that look fine in isolation but encode a class of bugs the codebase has already paid for. Cross-reference the linked rule files when flagging the smell so the comment has a permanent home for the rationale.
 
-- **`as Contract` cast bypasses the family `ContractSerializer` seam.** Any `JSON.parse(...) as Contract` (or `as Contract<…>`) in `packages/**/src/**` outside the allowlist is a serializer-bypass smell — see [`.cursor/rules/as-contract-cast-smell.mdc`](../../.cursor/rules/as-contract-cast-smell.mdc) and [`.cursor/rules/contract-normalization-responsibilities.mdc`](../../.cursor/rules/contract-normalization-responsibilities.mdc). The replacement idiom is `validateContract<Contract>(JSON.parse(raw) as unknown)`. Originally surfaced by `TML-2536`.
+- **`as Contract` cast bypasses the family `ContractSerializer` seam.** Any `JSON.parse(...) as Contract` (or `as Contract<…>`) in `packages/**/src/**` outside the allowlist is a serializer-bypass smell — see [`.cursor/rules/as-contract-cast-smell.mdc`](../../.cursor/rules/as-contract-cast-smell.mdc). The replacement idiom is `familyInstance.deserializeContract(JSON.parse(raw) as unknown)`. Originally surfaced by `TML-2536`.
 
 ## When this file should change
 

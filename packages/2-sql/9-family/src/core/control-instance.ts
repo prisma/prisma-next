@@ -184,7 +184,15 @@ export interface SqlControlFamilyInstance
     PslContractInferCapable<SqlSchemaIR>,
     OperationPreviewCapable,
     SqlFamilyInstanceState {
-  validateContract(contractJson: unknown): Contract;
+  /**
+   * The family seam-of-record for on-disk contract reads. Structurally
+   * validates the JSON envelope, then hydrates IR-class instances via
+   * the per-target ContractSerializer. The single named entry point
+   * every CLI on-disk read crosses (TML-2536) — `as Contract` casts
+   * in production package sources are a serializer-bypass smell guarded
+   * by `pnpm lint:no-contract-cast`.
+   */
+  deserializeContract(contractJson: unknown): Contract;
 
   verify(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
@@ -374,7 +382,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionIds,
     typeMetadataRegistry,
 
-    validateContract(contractJson: unknown): Contract {
+    deserializeContract(contractJson: unknown): Contract {
       return deserializeWithTargetSerializer(contractJson);
     },
 

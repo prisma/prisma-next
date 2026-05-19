@@ -1231,7 +1231,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
   - `create(options)` - Creates a family instance that implements domain actions
   - `hook` - Target family hook for contract emission
 - Family instances provide:
-  - `validateContract(contractJson)` - Validates and normalizes contract, returns `Contract` without mappings
+  - `deserializeContract(contractJson)` - Validates and normalizes contract, returns `Contract` without mappings
   - `emitContract(options)` - Emits contract (handles stripping mappings and validation internally)
   - `verify(options)` - Verifies database marker against contract
   - `schemaVerify(options)` - Verifies database schema against contract
