@@ -157,20 +157,41 @@ function isAlreadyStamped(value: unknown): boolean {
 function looksLikeUntaggedCodecTriple(value: unknown): value is UntaggedCodecTriple {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
-  return (
-    typeof obj['codecId'] === 'string' &&
-    typeof obj['nativeType'] === 'string' &&
-    typeof obj['typeParams'] === 'object' &&
-    obj['typeParams'] !== null
-  );
+  if (
+    typeof obj['codecId'] !== 'string' ||
+    typeof obj['nativeType'] !== 'string' ||
+    typeof obj['typeParams'] !== 'object' ||
+    obj['typeParams'] === null
+  ) {
+    return false;
+  }
+  // A `pg/enum@1` triple is only recognisable as an untagged enum if its
+  // `typeParams.values` is already a string[]. Without this guard a
+  // malformed enum entry would slip through the classifier and surface
+  // a different (more specific) diagnostic from `stampEntry` than the
+  // outer "neither stamped nor untagged-triple — hand-edit required"
+  // throw. Folding that case into the predicate gives every malformed
+  // entry the same single diagnostic shape.
+  if (obj['codecId'] === POSTGRES_ENUM_CODEC_ID) {
+    const values = (obj['typeParams'] as { values?: unknown })['values'];
+    if (!Array.isArray(values) || !values.every((v) => typeof v === 'string')) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function stampEntry(name: string, raw: UntaggedCodecTriple): StampedEntry {
   if (raw.codecId === POSTGRES_ENUM_CODEC_ID) {
     const values = (raw.typeParams as { values?: unknown })['values'];
+    // Invariant: `looksLikeUntaggedCodecTriple` already gated this — a
+    // `pg/enum@1` entry that reaches `stampEntry` has a string[]
+    // `typeParams.values`. The runtime check stays as a defensive
+    // marker so a future loosening of the predicate doesn't silently
+    // produce a malformed StampedPostgresEnum.
     if (!Array.isArray(values) || !values.every((v) => typeof v === 'string')) {
       throw new Error(
-        `storage.types[${JSON.stringify(name)}] has codecId="${POSTGRES_ENUM_CODEC_ID}" but typeParams.values is not a string[]`,
+        `invariant: storage.types[${JSON.stringify(name)}] reached stampEntry with codecId="${POSTGRES_ENUM_CODEC_ID}" but typeParams.values is not a string[]; the classifier should have rejected this entry`,
       );
     }
     return {
