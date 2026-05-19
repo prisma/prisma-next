@@ -7,9 +7,9 @@ export {
   type ReferentialAction,
 } from './ir/foreign-key';
 export {
-  ForeignKeyReferences,
-  type ForeignKeyReferencesInput,
-} from './ir/foreign-key-references';
+  ForeignKeyReference,
+  type ForeignKeyReferenceInput,
+} from './ir/foreign-key-reference';
 export {
   isPostgresEnumStorageEntry,
   POSTGRES_ENUM_KIND,
