@@ -5,7 +5,7 @@ function storageDeclaresCollection(
   collectionName: string,
 ): boolean {
   for (const ns of Object.values(storage.namespaces)) {
-    if (collectionName in ns.tables) {
+    if (collectionName in ns.collections) {
       return true;
     }
   }
@@ -21,7 +21,7 @@ export function validateMongoStorage(contract: MongoContract): void {
       !storageDeclaresCollection(contract.storage, model.storage.collection)
     ) {
       errors.push(
-        `Model "${modelName}" references collection "${model.storage.collection}" which is not declared under any namespace's tables map`,
+        `Model "${modelName}" references collection "${model.storage.collection}" which is not declared under any namespace's collections map`,
       );
     }
 

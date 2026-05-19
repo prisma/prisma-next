@@ -321,7 +321,7 @@ const MongoNamespaceEnvelopeSchema = type({
   '+': 'reject',
   id: 'string',
   'kind?': 'string',
-  'tables?': type({ '[string]': StorageCollectionSchema }),
+  'collections?': type({ '[string]': StorageCollectionSchema }),
 });
 
 export const MongoContractSchema = type({

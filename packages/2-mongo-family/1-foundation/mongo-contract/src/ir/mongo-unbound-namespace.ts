@@ -9,7 +9,7 @@ export class MongoUnboundNamespace extends NamespaceBase {
   static readonly instance: MongoUnboundNamespace = new MongoUnboundNamespace();
 
   readonly id = UNBOUND_NAMESPACE_ID;
-  readonly tables: Readonly<Record<string, MongoCollection>> = Object.freeze({});
+  readonly collections: Readonly<Record<string, MongoCollection>> = Object.freeze({});
   declare readonly kind?: string;
 
   private constructor() {

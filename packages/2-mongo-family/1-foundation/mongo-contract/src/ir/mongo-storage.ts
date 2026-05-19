@@ -10,14 +10,14 @@ import {
 import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
 import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
-export interface MongoNamespaceTablesInput {
+export interface MongoNamespaceCollectionsInput {
   readonly id: string;
-  readonly tables?: Record<string, MongoCollection | MongoCollectionInput>;
+  readonly collections?: Record<string, MongoCollection | MongoCollectionInput>;
 }
 
 export interface MongoStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces?: Readonly<Record<string, Namespace | MongoNamespaceTablesInput>>;
+  readonly namespaces?: Readonly<Record<string, Namespace | MongoNamespaceCollectionsInput>>;
 }
 
 const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
@@ -28,14 +28,14 @@ class MongoNamespacePayload extends NamespaceBase {
   declare readonly kind?: string;
 
   readonly id: string;
-  readonly tables: Readonly<Record<string, MongoCollection>>;
+  readonly collections: Readonly<Record<string, MongoCollection>>;
 
-  constructor(input: MongoNamespaceTablesInput) {
+  constructor(input: MongoNamespaceCollectionsInput) {
     super();
     this.id = input.id;
-    this.tables = Object.freeze(
+    this.collections = Object.freeze(
       Object.fromEntries(
-        Object.entries(input.tables ?? {}).map(([name, c]) => [
+        Object.entries(input.collections ?? {}).map(([name, c]) => [
           name,
           c instanceof MongoCollection ? c : new MongoCollection(c),
         ]),
@@ -53,24 +53,26 @@ class MongoNamespacePayload extends NamespaceBase {
 
 function normaliseNamespaceEntry(
   nsKey: string,
-  ns: Namespace | MongoNamespaceTablesInput,
+  ns: Namespace | MongoNamespaceCollectionsInput,
 ): Namespace {
   if (ns instanceof NamespaceBase) {
     return ns;
   }
-  const tableCount = Object.keys(ns.tables ?? {}).length;
-  if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0) {
+  const collectionCount = Object.keys(ns.collections ?? {}).length;
+  if (nsKey === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
     return MongoUnboundNamespace.instance;
   }
-  return new MongoNamespacePayload(ns as MongoNamespaceTablesInput);
+  return new MongoNamespacePayload(ns as MongoNamespaceCollectionsInput);
 }
 
-// Mongo concretions always store `MongoCollection` instances in `tables`.
+// Mongo concretions always store `MongoCollection` instances in
+// `collections` (Mongo idiom — distinct from the SQL family's `tables`).
 // Narrowing the namespace map here lets target/family-level consumers
-// iterate `namespaces[*].tables[*]` and recover the concrete collection type
-// without the framework's wider `object` value tripping them up.
+// iterate `namespaces[*].collections[*]` and recover the concrete
+// collection type without the framework's wider `Namespace` tripping
+// them up.
 export type MongoNamespace = Namespace & {
-  readonly tables: Readonly<Record<string, MongoCollection>>;
+  readonly collections: Readonly<Record<string, MongoCollection>>;
 };
 
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {

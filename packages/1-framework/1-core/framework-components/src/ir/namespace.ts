@@ -37,21 +37,17 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
  *
  * See `UNBOUND_NAMESPACE_ID` above for the sentinel id and the
  * singleton-subclass pattern that materialises it.
+ *
+ * The framework promises only the coordinate (`id`) — the named storage
+ * entities a namespace contains are family-typed (SQL contributes
+ * `tables`, Mongo contributes `collections`, future families pick their
+ * own native idiom). Generic consumers walking "all named entries" go
+ * through a family-typed namespace, not the framework `Namespace`.
  */
 export interface Namespace extends IRNode {
   readonly id: string;
-  // Tables are framework-level opaque entries. Concrete family/target
-  // Namespaces narrow this back to their `StorageTable` (SQL) or
-  // collection-equivalent type. The wider `object` here lets emitted
-  // `contract.d.ts` table literals (which lack a runtime `kind`
-  // discriminator) structurally satisfy the framework type without a
-  // structural "weak type" rejection — `IRNode` here would be too strict
-  // because its only field is optional, triggering TS's "no overlapping
-  // members" check against pure POJOs.
-  readonly tables: Readonly<Record<string, object>>;
 }
 
 export abstract class NamespaceBase extends IRNodeBase implements Namespace {
   abstract readonly id: string;
-  abstract readonly tables: Readonly<Record<string, object>>;
 }

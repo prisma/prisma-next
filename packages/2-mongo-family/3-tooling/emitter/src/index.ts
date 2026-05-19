@@ -6,7 +6,7 @@ import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract'
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const coll of Object.keys(ns.tables)) {
+    for (const coll of Object.keys(ns.collections)) {
       const existing = seen.get(coll);
       if (existing !== undefined && existing !== namespaceId) {
         throw new Error(
@@ -26,11 +26,13 @@ function generateMongoCollectionEntryType(coll: MongoCollection): string {
   return serializeValue(coll);
 }
 
-function generateMongoNamespaceTablesType(
-  tables: Readonly<Record<string, MongoCollection>>,
+function generateMongoNamespaceCollectionsType(
+  collections: Readonly<Record<string, MongoCollection>>,
 ): string {
   const entries: string[] = [];
-  for (const [collName, coll] of Object.entries(tables).sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [collName, coll] of Object.entries(collections).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
     entries.push(
       `readonly ${serializeObjectKey(collName)}: ${generateMongoCollectionEntryType(coll)}`,
     );
@@ -48,12 +50,12 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
   }
   const parts: string[] = [];
   for (const [name, ns] of sorted) {
-    const tablesType = generateMongoNamespaceTablesType(
-      ns.tables as Readonly<Record<string, MongoCollection>>,
+    const collectionsType = generateMongoNamespaceCollectionsType(
+      ns.collections as Readonly<Record<string, MongoCollection>>,
     );
     const nsKind = (ns as { kind?: string }).kind ?? 'mongo-namespace';
     parts.push(
-      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly kind: ${serializeValue(nsKind)}; readonly tables: ${tablesType} }`,
+      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly kind: ${serializeValue(nsKind)}; readonly collections: ${collectionsType} }`,
     );
   }
   return `{ ${parts.join('; ')} }`;
@@ -115,7 +117,7 @@ export const mongoEmission = {
 
     const collectionNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
-      for (const c of Object.keys(ns.tables)) {
+      for (const c of Object.keys(ns.collections)) {
         collectionNames.add(c);
       }
     }
@@ -155,7 +157,7 @@ export const mongoEmission = {
       } else if (collection) {
         if (!collectionNames.has(collection)) {
           throw new Error(
-            `Model "${modelName}" references collection "${collection}" which is not in storage.namespaces[..].tables`,
+            `Model "${modelName}" references collection "${collection}" which is not in storage.namespaces[..].collections`,
           );
         }
       }
