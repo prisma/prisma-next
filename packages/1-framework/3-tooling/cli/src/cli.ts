@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import packageJson from '../package.json' with { type: 'json' };
 import { createContractEmitCommand } from './commands/contract-emit';
 import { createContractInferCommand } from './commands/contract-infer';
 import { createInitCommand } from './commands/init';
@@ -65,7 +66,7 @@ function formatSuggestion(input: string, candidates: readonly string[]): string 
 
 const program = new Command();
 
-program.name('prisma-next').description('Prisma Next CLI').version('0.0.1');
+program.name('prisma-next').description('Prisma Next CLI').version(packageJson.version);
 
 // Override version option description to match capitalization style
 const versionOption = program.options.find((opt) => opt.flags.includes('--version'));
