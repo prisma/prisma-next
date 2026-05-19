@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:78a45030d50fe0b9ac365d3ce7812be7ed0aa8304e6c7da7783a968b18ad4f94'>;
+  StorageHashBase<'sha256:7926114e786c1a8fcc103d295a0c7fe5eb414b669ebb5b06a1e816d0019cbe7f'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -207,8 +207,16 @@ type ContractBase = ContractType<
             indexes: readonly [];
             foreignKeys: readonly [
               {
-                readonly columns: readonly ['userId'];
-                readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+                readonly source: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'post';
+                  readonly columns: readonly ['userId'];
+                };
+                readonly target: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'user';
+                  readonly columns: readonly ['id'];
+                };
                 readonly constraint: true;
                 readonly index: true;
               },
@@ -263,8 +271,16 @@ type ContractBase = ContractType<
             indexes: readonly [];
             foreignKeys: readonly [
               {
-                readonly columns: readonly ['userId'];
-                readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+                readonly source: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'task';
+                  readonly columns: readonly ['userId'];
+                };
+                readonly target: {
+                  readonly namespaceId: '__unbound__';
+                  readonly tableName: 'user';
+                  readonly columns: readonly ['id'];
+                };
                 readonly constraint: true;
                 readonly index: true;
               },

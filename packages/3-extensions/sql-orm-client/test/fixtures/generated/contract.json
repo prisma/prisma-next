@@ -469,16 +469,21 @@
             },
             "foreignKeys": [
               {
-                "columns": [
-                  "post_id"
-                ],
                 "constraint": true,
                 "index": true,
-                "references": {
+                "source": {
+                  "columns": [
+                    "post_id"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "comments"
+                },
+                "target": {
                   "columns": [
                     "id"
                   ],
-                  "table": "posts"
+                  "namespaceId": "__unbound__",
+                  "tableName": "posts"
                 }
               }
             ],
@@ -523,16 +528,21 @@
             },
             "foreignKeys": [
               {
-                "columns": [
-                  "user_id"
-                ],
                 "constraint": true,
                 "index": true,
-                "references": {
+                "source": {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "posts"
+                },
+                "target": {
                   "columns": [
                     "id"
                   ],
-                  "table": "users"
+                  "namespaceId": "__unbound__",
+                  "tableName": "users"
                 }
               }
             ],
@@ -564,16 +574,21 @@
             },
             "foreignKeys": [
               {
-                "columns": [
-                  "user_id"
-                ],
                 "constraint": true,
                 "index": true,
-                "references": {
+                "source": {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "profiles"
+                },
+                "target": {
                   "columns": [
                     "id"
                   ],
-                  "table": "users"
+                  "namespaceId": "__unbound__",
+                  "tableName": "users"
                 }
               }
             ],
@@ -652,16 +667,21 @@
             },
             "foreignKeys": [
               {
-                "columns": [
-                  "invited_by_id"
-                ],
                 "constraint": true,
                 "index": true,
-                "references": {
+                "source": {
+                  "columns": [
+                    "invited_by_id"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "users"
+                },
+                "target": {
                   "columns": [
                     "id"
                   ],
-                  "table": "users"
+                  "namespaceId": "__unbound__",
+                  "tableName": "users"
                 }
               }
             ],
@@ -682,7 +702,7 @@
         }
       }
     },
-    "storageHash": "sha256:14a8fa05938393edb36bb0400cd3dd59e70d9a8e285b27c1261b0be3112b8eb8"
+    "storageHash": "sha256:09cdc4f47bebe6d16423f62b2be3025be4bdd8936fe2f7f529d176a9524a6cdf"
   },
   "execution": {
     "executionHash": "sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847",

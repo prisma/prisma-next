@@ -465,16 +465,21 @@
             },
             "foreignKeys": [
               {
-                "columns": [
-                  "userId"
-                ],
                 "constraint": true,
                 "index": true,
-                "references": {
+                "source": {
+                  "columns": [
+                    "userId"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "post"
+                },
+                "target": {
                   "columns": [
                     "id"
                   ],
-                  "table": "user"
+                  "namespaceId": "__unbound__",
+                  "tableName": "user"
                 }
               }
             ],
@@ -537,16 +542,21 @@
             },
             "foreignKeys": [
               {
-                "columns": [
-                  "userId"
-                ],
                 "constraint": true,
                 "index": true,
-                "references": {
+                "source": {
+                  "columns": [
+                    "userId"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "task"
+                },
+                "target": {
                   "columns": [
                     "id"
                   ],
-                  "table": "user"
+                  "namespaceId": "__unbound__",
+                  "tableName": "user"
                 }
               }
             ],
@@ -628,7 +638,7 @@
         }
       }
     },
-    "storageHash": "sha256:78a45030d50fe0b9ac365d3ce7812be7ed0aa8304e6c7da7783a968b18ad4f94",
+    "storageHash": "sha256:7926114e786c1a8fcc103d295a0c7fe5eb414b669ebb5b06a1e816d0019cbe7f",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
