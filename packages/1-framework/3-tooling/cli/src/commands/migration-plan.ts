@@ -97,7 +97,7 @@ async function readPredecessorEndContract(
     throw error;
   }
   try {
-    return validateContract(JSON.parse(raw));
+    return validateContract(JSON.parse(raw) as unknown);
   } catch (error) {
     if (CliStructuredError.is(error)) {
       throw error;
@@ -215,7 +215,7 @@ async function executeMigrationPlanCommand(
 
   let toContract: Contract;
   try {
-    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent));
+    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(

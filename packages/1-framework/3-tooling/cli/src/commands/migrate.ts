@@ -174,7 +174,7 @@ async function executeMigrateCommand(
     );
   }
   try {
-    contractRaw = familyInstance.validateContract(JSON.parse(contractContent));
+    contractRaw = familyInstance.validateContract(JSON.parse(contractContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(

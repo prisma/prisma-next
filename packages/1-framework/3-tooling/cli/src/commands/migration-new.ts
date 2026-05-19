@@ -98,7 +98,7 @@ async function executeMigrationNewCommand(
 
   let toContract: Contract;
   try {
-    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent));
+    toContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {

@@ -378,7 +378,7 @@ async function executeMigrationShowCommand(
 
   let appContract: Contract;
   try {
-    appContract = familyInstance.validateContract(JSON.parse(contractJsonContent));
+    appContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
