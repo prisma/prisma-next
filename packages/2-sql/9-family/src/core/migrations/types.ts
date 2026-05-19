@@ -476,7 +476,7 @@ export interface SqlControlTargetDescriptor<
    * JSON ⇄ class boundary for the SQL target's contract. The descriptor
    * composes a concrete `SqlContractSerializerBase` subclass; the rest
    * of the control stack reaches `descriptor.contractSerializer` rather
-   * than importing a per-target `validateContract` function.
+   * than importing a per-target deserialization function.
    */
   readonly contractSerializer: ContractSerializer<TContract>;
   /**

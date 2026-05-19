@@ -1,4 +1,4 @@
-import { ContractValidationError } from './validate-contract';
+import { ContractValidationError } from './contract-validation-error';
 
 export interface DomainModelShape {
   readonly fields: Record<string, unknown>;

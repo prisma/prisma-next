@@ -1,4 +1,4 @@
-import { ContractValidationError } from '@prisma-next/contract/validate-contract';
+import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import paradedbPack from '@prisma-next/extension-paradedb/pack';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';

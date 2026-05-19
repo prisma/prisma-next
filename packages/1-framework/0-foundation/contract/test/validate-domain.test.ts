@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ContractValidationError } from '../src/validate-contract';
+import { ContractValidationError } from '../src/contract-validation-error';
 import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
 
