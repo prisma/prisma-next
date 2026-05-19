@@ -1,7 +1,6 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
-import { StorageTable } from '../src/ir/storage-table';
 
 describe('SQL contract factories', () => {
   describe('col', () => {

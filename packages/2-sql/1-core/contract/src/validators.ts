@@ -203,7 +203,7 @@ function eachStorageTable(storage: NamespacedStorageWalk) {
 
 function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: string): unknown {
   for (const ns of Object.values(storage.namespaces)) {
-    const t = (ns.tables ?? {})[tableName];
+    const t = ns.tables?.[tableName];
     if (t !== undefined) {
       return t;
     }
