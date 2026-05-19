@@ -538,9 +538,15 @@ type BuiltStorageTables<Definition> = {
     : Record<string, never>);
 };
 
+type BuiltStorageTypes<Definition> = {
+  readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends PostgresEnumStorageEntry
+    ? never
+    : K]: DefinitionTypes<Definition>[K];
+};
+
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly types: DefinitionTypes<Definition>;
+  readonly types: BuiltStorageTypes<Definition>;
   // SQL contracts always carry a literal `__unbound__` namespace whose tables
   // slot is narrowed to the actual built table shape so downstream DSL
   // surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
