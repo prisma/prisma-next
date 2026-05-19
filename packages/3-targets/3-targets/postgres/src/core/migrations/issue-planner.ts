@@ -246,7 +246,11 @@ function mapIssueToCall(
           const fkSpec: ForeignKeySpec = {
             name: fkName,
             columns: fk.source.columns,
-            references: { table: fk.target.tableName, columns: fk.target.columns },
+            references: {
+              schema: fk.target.namespaceId,
+              table: fk.target.tableName,
+              columns: fk.target.columns,
+            },
             ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
             ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
           };
@@ -539,7 +543,11 @@ function mapIssueToCall(
             const fkSpec: ForeignKeySpec = {
               name: fkName,
               columns: fk.source.columns,
-              references: { table: fk.target.tableName, columns: fk.target.columns },
+              references: {
+                schema: fk.target.namespaceId,
+                table: fk.target.tableName,
+                columns: fk.target.columns,
+              },
               ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
               ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
             };
