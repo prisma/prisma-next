@@ -2,7 +2,7 @@
 
 Loaded by `drive-create-project`, `drive-close-project`, `drive-deliver-workflow`, and `drive-plan-project`. Holds prisma-next's project-level conventions, status-update cadence, slice-composition patterns, and close-out destinations.
 
-> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md) per the quality bar at the top of that file. See [`docs/drive/learnings/README.md`](../../docs/drive/learnings/README.md) for the trial framing and synthesis ticket.
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
 
 ## Status-update cadence
 

@@ -2,6 +2,8 @@
 
 Loaded by `drive-plan-project` and `drive-plan-slice`. Holds prisma-next's dispatch-sizing reference cases, per-dispatch DoR overlays, failure-mode catalogue, and parallelisation heuristics.
 
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
+
 ## Dispatch-sizing reference cases (calibration)
 
 The default S/M/L/XL sizes (per `drive-plan-slice`) need calibration against this repo's reality. Reference cases for size estimation:

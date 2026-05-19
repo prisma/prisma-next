@@ -2,6 +2,8 @@
 
 Loaded by `drive-triage-work` and `drive-start-workflow`. Holds prisma-next's accumulated triage protocol — failure modes, sizing anchors, ticket-shape patterns, Linear-sync conventions.
 
+> **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`docs/drive/trial.md`](../../docs/drive/trial.md).
+
 ## Sizing anchors (calibration for this repo)
 
 Reference tasks that calibrate "what's a direct change vs orphan slice vs in-project slice in prisma-next." Populated by retros + operator calibration; treat as living.
