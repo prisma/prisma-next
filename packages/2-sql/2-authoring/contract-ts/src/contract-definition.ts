@@ -122,6 +122,15 @@ export interface ContractDefinition {
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly storageTypes?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   /**
+   * Enum types declared inside a named `namespace { enum … }` block,
+   * keyed first by namespace id then by type name. These are routed to
+   * `storage.namespaces[nsId].types` rather than the implicit fallback
+   * namespace used for top-level `storageTypes` enums.
+   */
+  readonly namespaceTypes?: Readonly<
+    Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>
+  >;
+  /**
    * Declared namespace coordinates for this contract — populates
    * `SqlStorage.namespaces` together with `createNamespace`.
    */

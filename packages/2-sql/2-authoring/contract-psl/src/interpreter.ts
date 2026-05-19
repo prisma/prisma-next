@@ -1453,7 +1453,26 @@ export function interpretPslDocumentToSqlContract(
       }
     }
   }
-  const enums = input.document.ast.namespaces.flatMap((ns) => ns.enums);
+  // Top-level enums (the __unspecified__ bucket) route to `storageTypes`;
+  // enums inside a named namespace block route to `namespaceTypes[nsId]`.
+  const topLevelEnums = input.document.ast.namespaces
+    .filter((ns) => ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME)
+    .flatMap((ns) => ns.enums);
+  const namedNamespaceEnumsByNsId = new Map<string, readonly PslEnum[]>();
+  for (const ns of input.document.ast.namespaces) {
+    if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME || ns.enums.length === 0) {
+      continue;
+    }
+    const resolvedId = resolveNamespaceIdForSqlTarget({
+      bucketName: ns.name,
+      targetId: input.target.targetId,
+    });
+    if (resolvedId === undefined) {
+      continue;
+    }
+    namedNamespaceEnumsByNsId.set(resolvedId, ns.enums);
+  }
+
   const compositeTypes = input.document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
@@ -1466,21 +1485,50 @@ export function interpretPslDocumentToSqlContract(
     generatorDescriptorById.set(descriptor.id, descriptor);
   }
 
+  const enumEntityDescriptor = getAuthoringEntity(input.authoringContributions, ['enum']);
+  const enumEntityContext = {
+    family: input.target.familyId,
+    target: input.target.targetId,
+  };
+
   const enumResult = processEnumDeclarations({
-    enums,
+    enums: topLevelEnums,
     sourceId,
-    enumEntityDescriptor: getAuthoringEntity(input.authoringContributions, ['enum']),
-    entityContext: {
-      family: input.target.familyId,
-      target: input.target.targetId,
-    },
+    enumEntityDescriptor,
+    entityContext: enumEntityContext,
     diagnostics,
   });
+
+  // Process enums declared in named namespace blocks and collect them into
+  // `namespaceTypes` keyed by the resolved namespace id.
+  const allEnumTypeDescriptors = new Map(enumResult.enumTypeDescriptors);
+  const namespaceEnumStorageTypes: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
+  for (const [nsId, nsEnums] of namedNamespaceEnumsByNsId) {
+    const nsEnumResult = processEnumDeclarations({
+      enums: nsEnums,
+      sourceId,
+      enumEntityDescriptor,
+      entityContext: enumEntityContext,
+      diagnostics,
+    });
+    for (const [name, descriptor] of nsEnumResult.enumTypeDescriptors) {
+      allEnumTypeDescriptors.set(name, descriptor);
+    }
+    const nsEntries: Record<string, PostgresEnumStorageEntry> = {};
+    for (const [name, entry] of Object.entries(nsEnumResult.storageTypes)) {
+      if (isPostgresEnumStorageEntry(entry)) {
+        nsEntries[name] = entry;
+      }
+    }
+    if (Object.keys(nsEntries).length > 0) {
+      namespaceEnumStorageTypes[nsId] = nsEntries;
+    }
+  }
 
   const namedTypeResult = resolveNamedTypeDeclarations({
     declarations: input.document.ast.types?.declarations ?? [],
     sourceId,
-    enumTypeDescriptors: enumResult.enumTypeDescriptors,
+    enumTypeDescriptors: allEnumTypeDescriptors,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     composedExtensions,
     familyId: input.target.familyId,
@@ -1508,7 +1556,7 @@ export function interpretPslDocumentToSqlContract(
       modelMappings,
       modelNames,
       compositeTypeNames,
-      enumTypeDescriptors: enumResult.enumTypeDescriptors,
+      enumTypeDescriptors: allEnumTypeDescriptors,
       namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
       composedExtensions,
       familyId: input.target.familyId,
@@ -1549,7 +1597,7 @@ export function interpretPslDocumentToSqlContract(
 
   const valueObjects = buildValueObjects({
     compositeTypes,
-    enumTypeDescriptors: enumResult.enumTypeDescriptors,
+    enumTypeDescriptors: allEnumTypeDescriptors,
     namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     composedExtensions,
@@ -1578,6 +1626,9 @@ export function interpretPslDocumentToSqlContract(
       ),
     ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
+    ...(Object.keys(namespaceEnumStorageTypes).length > 0
+      ? { namespaceTypes: namespaceEnumStorageTypes }
+      : {}),
     ...ifDefined('createNamespace', input.createNamespace),
     models: modelNodes.map((model) => ({
       ...model,

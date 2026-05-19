@@ -305,4 +305,84 @@ model Event {
     });
     expect(result.value.roots).toEqual({ event: 'Event' });
   });
+
+  it('lowers a top-level enum into the public namespace types slot', () => {
+    const document = parsePslDocument({
+      schema: `enum UserRole {
+  ADMIN
+  USER
+}
+
+model Account {
+  id   Int      @id
+  role UserRole
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      namespaces: {
+        public: {
+          types: {
+            UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
+          },
+        },
+      },
+    });
+    const storageNs = (
+      result.value.storage as unknown as { namespaces: Record<string, { types?: unknown }> }
+    ).namespaces;
+    expect(storageNs['auth']).toBeUndefined();
+  });
+
+  it('lowers a namespace-scoped enum into storage.namespaces[nsId].types', () => {
+    const document = parsePslDocument({
+      schema: `namespace auth {
+  enum user_type {
+    admin
+    user
+  }
+
+  model User {
+    id       Int       @id
+    userType user_type
+  }
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      namespaces: {
+        auth: {
+          types: {
+            user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
+          },
+        },
+      },
+    });
+    const storageNs2 = (
+      result.value.storage as unknown as { namespaces: Record<string, { types?: unknown }> }
+    ).namespaces;
+    expect(storageNs2['public']?.types).toBeUndefined();
+  });
 });

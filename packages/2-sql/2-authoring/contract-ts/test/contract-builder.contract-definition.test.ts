@@ -362,4 +362,45 @@ describe('shared contract definition lowering', () => {
       /Contract semantic validation failed:.*primary key column "id".*primary key columns must be NOT NULL/,
     );
   });
+
+  it('routes namespaceTypes enums to storage.namespaces[nsId].types', () => {
+    const contract = buildSqlContractFromDefinition({
+      target: postgresTargetPack,
+      namespaceTypes: {
+        auth: {
+          user_type: {
+            kind: 'postgres-enum',
+            name: 'user_type',
+            nativeType: 'user_type',
+            values: ['admin', 'user'],
+            codecId: 'pg/enum@1',
+          },
+        },
+      },
+      models: [
+        {
+          modelName: 'User',
+          tableName: 'users',
+          namespaceId: 'auth',
+          fields: [
+            {
+              fieldName: 'id',
+              columnName: 'id',
+              descriptor: { codecId: 'pg/text@1', nativeType: 'text' },
+              nullable: false,
+            },
+          ],
+          id: { columns: ['id'] },
+        },
+      ],
+    });
+
+    const nsStorage = contract.storage as unknown as {
+      namespaces: Record<string, { types?: Record<string, unknown> }>;
+    };
+    expect(nsStorage.namespaces['auth']?.types).toMatchObject({
+      user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
+    });
+    expect(nsStorage.namespaces['public']?.types).toBeUndefined();
+  });
 });

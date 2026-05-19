@@ -232,6 +232,7 @@ const POSTGRES_ENUM_NAMESPACE_ID = 'public';
 function partitionStorageTypesForTarget(
   targetId: string,
   types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  namespaceTypes?: Readonly<Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>>,
 ): {
   readonly documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
@@ -254,6 +255,23 @@ function partitionStorageTypesForTarget(
       continue;
     }
     documentTypes[name] = entry;
+  }
+  if (namespaceTypes !== undefined) {
+    for (const [nsId, enumsInNs] of Object.entries(namespaceTypes)) {
+      for (const [name, entry] of Object.entries(enumsInNs)) {
+        if (targetId !== 'postgres') {
+          throw new Error(
+            `buildSqlContractFromDefinition: postgres enum "${name}" is only valid when target is "postgres" (got "${targetId}").`,
+          );
+        }
+        let slot = namespaceEnumTypesById[nsId];
+        if (slot === undefined) {
+          slot = {};
+          namespaceEnumTypesById[nsId] = slot;
+        }
+        slot[name] = entry;
+      }
+    }
   }
   return { documentTypes, namespaceEnumTypesById };
 }
@@ -501,6 +519,7 @@ export function buildSqlContractFromDefinition(
   const { documentTypes, namespaceEnumTypesById } = partitionStorageTypesForTarget(
     target,
     storageTypes,
+    definition.namespaceTypes,
   );
   const namespaceCoordinateIds = collectStorageNamespaceCoordinateIds(definition);
   for (const id of Object.keys(namespaceEnumTypesById)) {
