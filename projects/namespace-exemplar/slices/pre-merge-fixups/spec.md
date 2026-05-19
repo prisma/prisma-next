@@ -15,12 +15,12 @@ Items not in this slice were deferred. They belong to TML-2584 because they're s
 
 ## Items in scope (must land before PR #534 merges)
 
-### Item 1 — Schema verifier propagates namespace coordinate on issues; delete `effectiveSchemaForTable` / `locateTable` / `findSqlTable`
+### Item 1 — Schema verifier propagates namespace coordinate on issues; delete `effectiveSchemaForTable` and `locateTable` (planner duplications)
 
 **Problem.** The SQL family schema verifier walks `storage.namespaces[nsId].tables[name]` to find drift, but writes only `name` into the `SchemaIssue` it produces — destroying the namespace coordinate it already knew. The Postgres planner then has to re-derive the coordinate by walking `storage.namespaces` again via `locateTable`. This is the structural cause of:
 
 - F01 — `effectiveSchemaForTable` silent fallthrough to `ctx.schemaName` (correctness gap; wrong-schema DDL in multi-namespace contracts when `locateTable` returns `undefined`).
-- F06 — four independent reimplementations of the same "walk namespaces, find table by name" loop across planner-strategies, sql-renderer, issue-planner, emitter.
+- F06 — four independent reimplementations of the same "walk namespaces, find table by name" loop across planner-strategies (Postgres + SQLite), sql-renderer, and emitter. This slice eliminates the two **migration-planner** duplications (Postgres + SQLite). The remaining two — `getInsertColumnOrder`'s fallback walk in `sql-renderer.ts` and the model-side callers of `findSqlTable` in the emitter — are deferred to TML-2584 (see § Deferred to TML-2584); their deletion requires structural carrier changes (`SqlModelStorage.namespaceId`, `InsertAst` carrying namespace) that overlap with TML-2584's plane reshape.
 - F03 partial — the planner needs `instanceof PostgresSchema` checks to decide where the unbound bucket projects, because the issue doesn't carry enough context to make that decision intrinsically.
 
 **Scope cut.** The minimal fix in this slice is to **add `namespaceId?: string` as a sibling field on the existing framework-layer `BaseSchemaIssue`**. The verifier populates it; the planner reads it. No type restructuring, no layering reshape. This is enough to fix F01 and to delete the four walks, which is what TML-2520 needs to ship cleanly.
@@ -34,14 +34,15 @@ The deeper architectural cleanup — splitting `BaseSchemaIssue` between framewo
 3. Update Postgres planner consumers (`planner-strategies.ts`, `issue-planner.ts`) to read `issue.namespaceId` directly. Replace every `locateTable(...)?.table` pattern with the direct lookup `storage.namespaces[issue.namespaceId].tables[issue.table]`.
 4. Update SQLite planner consumers analogously.
 5. Delete `effectiveSchemaForTable`. Layer 3 (the FR16c "where does the unbound bucket project?" logic) promotes to a polymorphic method on the namespace concretion (`PostgresSchema#ddlSchemaName(): string` / `PostgresUnboundSchema#ddlSchemaName(): string`), called by the planner once per namespace it touches. No more `instanceof PostgresSchema` in planner code.
-6. Delete `locateTable` (planner-strategies.ts), the inline equivalents in `sql-renderer.ts` and `issue-planner.ts`, and `findSqlTable` (emitter). All four were F06's "same walk reinvented four times."
-7. Update tests (Postgres planner tests, SQLite planner tests, SQL family schema-verify tests). Mongo verifier tests don't need changes (they don't populate `namespaceId`; the field stays absent).
+6. Delete `locateTable` from `packages/3-targets/3-targets/postgres/src/core/migrations/planner-strategies.ts` and `packages/3-targets/3-targets/sqlite/src/core/migrations/planner-strategies.ts`. Where call sites still need typed access to a `StorageTable` given its coordinate, introduce a small 3-arg helper (`tableAt(storage, namespaceId, tableName): StorageTable | undefined`) that requires the coordinate explicitly — no scan, no silent fallthrough.
+7. Replace the **FK-reference** `findSqlTable` call site in `packages/2-sql/3-tooling/emitter/src/index.ts` (line 210, the `fk.target.tableName` lookup) with direct access via `fk.target.namespaceId` — `ForeignKeyReference` already carries that coordinate. The two **model-side** `findSqlTable` callers (lines 118 and 283) stay as-is on this PR; their deletion is deferred to TML-2584 because `SqlModelStorage.table` is a bare string and adding `namespaceId` to `SqlModelStorage` is a domain-plane carrier change (TML-2584 § D2). Similarly the inline namespace walk inside `getInsertColumnOrder` (`packages/3-targets/6-adapters/postgres/src/core/sql-renderer.ts` line 633) stays — its deletion requires threading namespace through `InsertAst`, which is DSL-shape work outside this slice.
+8. Update tests (Postgres planner tests, SQLite planner tests, SQL family schema-verify tests). Mongo verifier tests don't need changes (they don't populate `namespaceId`; the field stays absent).
 
 **Acceptance criteria.**
 
 - **AC1.1.** `BaseSchemaIssue` carries a `readonly namespaceId?: string` sibling field. Optional; populated by the SQL family verifier, absent in Mongo issues.
 - **AC1.2.** Every SQL schema-issue construction site (in `packages/2-sql/9-family/src/core/schema-verify/`) populates `namespaceId` with the `nsId` from the verifier's outer walk. Grep gate: every place that builds an issue with `table:` also sets `namespaceId:`.
-- **AC1.3.** Every Postgres planner site that previously called `locateTable(...)?.table` or `effectiveSchemaForTable(ctx, issue.table)` reads from `issue.namespaceId` / `issue.table` directly. Same for SQLite. Grep gate: zero references to `locateTable` / `effectiveSchemaForTable` / `findSqlTable` in `packages/**`.
+- **AC1.3.** Every Postgres planner site that previously called `locateTable(...)?.table` or `effectiveSchemaForTable(ctx, issue.table)` reads from `issue.namespaceId` / `issue.table` directly. Same for SQLite. Grep gate: zero references to `effectiveSchemaForTable` anywhere in `packages/**`; zero references to `locateTable` in `packages/3-targets/3-targets/{postgres,sqlite}/`; the FK-reference call to `findSqlTable(storage, fk.target.tableName)` in the emitter is gone (replaced by direct access via `fk.target.namespaceId`). The two model-side `findSqlTable` callers and `sql-renderer.ts`'s inline equivalent are explicitly **out of scope** for this AC — they're deferred to TML-2584.
 - **AC1.4.** Layer 3 of the old `effectiveSchemaForTable` is preserved behaviour-equivalently as a polymorphic method on `PostgresSchema` / `PostgresUnboundSchema`. No `instanceof PostgresSchema` in `planner-strategies.ts`.
 - **AC1.5.** Regression test for the previously-silent F01 path: an issue naming a table that isn't in any namespace of `toContract.storage` returns an explicit error (not silent wrong-schema DDL). Same multi-namespace setup that would have exhibited the bug.
 - **AC1.6.** All existing tests pass: `pnpm typecheck`, `pnpm test:packages`, `pnpm fixtures:check`, `pnpm lint:deps` clean.
@@ -125,6 +126,8 @@ The Postgres `ForeignKeySpec.references.schema` field is a namespace coordinate 
 - **IR constructor discipline** (`SqlStorage` / `MongoStorage` constructors accept only fully-constructed `Namespace` instances; delete `DEFAULT_NAMESPACES`, `normaliseNamespaceEntry`, `SqlNamespacePayload`, `stripNamespaceKinds`).
 - **Serializer `kind` removal** — class identity resolved from `(targetFamily, target)` + position rather than emitted as a JSON discriminator.
 - **F03 fully** — the `POSTGRES_ENUM_NAMESPACE_ID = 'public'` hardcoded fallback in the TS builder. Partial pressure relief lands in this slice (the polymorphic `ddlSchemaName` method makes the assumption easier to test) but the full fix needs the plane reshape or the [TML-2537](https://linear.app/prisma-company/issue/TML-2537) enum reshape.
+- **Delete `findSqlTable` (emitter, model-side callers)** — the two callers at lines 118 and 283 of `packages/2-sql/3-tooling/emitter/src/index.ts` look up tables from `ContractModel.storage.table` (a bare string). `SqlModelStorage` carries no namespace coordinate, so the lookup is structurally necessary today. Once TML-2584 adds `namespaceId` to the domain plane's model storage (or moves models under namespace keys), both callers become direct accesses and `findSqlTable` deletes alongside `locateTable` (already gone in Item 1).
+- **Collapse `getInsertColumnOrder`'s inline namespace walk** (`packages/3-targets/6-adapters/postgres/src/core/sql-renderer.ts` line 633) — the runtime INSERT-DEFAULT-VALUES fallback scans `contract.storage.namespaces` to find the target table by bare name. Deletion requires threading namespace through `InsertAst` so the renderer receives a coordinate, which is DSL-shape work that overlaps with TML-2584's cross-reference object-pair rename (D5).
 
 ## Out of scope entirely
 
@@ -137,7 +140,7 @@ The Postgres `ForeignKeySpec.references.schema` field is a namespace coordinate 
 
 This section accumulates discoveries during implementation. Append-only; don't rewrite history.
 
-- *(empty — first entries land as Item 1 implementation begins.)*
+- **2026-05-19 — Item 1 scope narrowed at build time.** Territory map showed Item 1's literal "delete all four helpers" promise would pull in `SqlModelStorage.namespaceId` (a TML-2584 carrier change) and `InsertAst` namespace threading (a DSL-shape sweep), both deferred-project territory. Narrowed to the two migration-planner deletions (`effectiveSchemaForTable`, `locateTable` × Postgres + SQLite) plus the one deletable emitter site (FK ref). The two model-side `findSqlTable` callers and the `sql-renderer.ts` inline walk land with TML-2584. F01 (the silent fallthrough) is still fully fixed — it lives only in `effectiveSchemaForTable`, which still goes. Spec § Item 1 step 6/7 and AC1.3 narrowed; TML-2584 deferred-pickups list grew the two helpers.
 
 ## References
 
