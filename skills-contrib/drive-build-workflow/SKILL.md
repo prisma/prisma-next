@@ -5,7 +5,7 @@ description: >
   brief assembly → delegate one dispatch to implementer → WIP inspection (≤ 5 min) →
   post-flight DoD (per dispatch) → reviewer subagent verdict → loop / escalate / next
   dispatch / close. Use when a slice spec + slice plan exist and you want the dispatch
-  loop driven to slice DoD. Renamed and augmented from `drive-build-workflow`.
+  loop driven to slice DoD. Renamed and augmented from `drive-orchestrate-plan`.
 metadata:
   version: "2026.5.18-s6"
   renamed_from: drive-orchestrate-plan
@@ -40,12 +40,12 @@ The implementer and reviewer subagents are *not* the tech-lead persona — they 
 
 **Use this skill when:**
 
-- A `projects/{project}/spec.md` and `projects/{project}/plans/plan.md` already exist (typically produced by `drive-create-spec` and `drive-create-plan`).
+- A `projects/{project}/spec.md` and slice plan (inline in the slice spec or `projects/{project}/slices/<slice>/plan.md`) already exist (typically produced by `drive-specify-slice` and `drive-plan-slice`).
 - The user wants to drive the plan to a review-clean state on the local branch, before opening a PR.
 
 **Do not use this skill for:**
 
-- Producing the spec or plan — defer to `drive-create-project` / `drive-create-spec` / `drive-create-plan`.
+- Producing the spec or plan — defer to `drive-create-project` / `drive-specify-project` / `drive-specify-slice` / `drive-plan-slice` / `drive-plan-project`.
 - Addressing PR review comments — defer to your team's PR-comment-handling skill.
 - Driving CI failures to green — that is a separate concern with different signals (CI logs, not spec ACs).
 
@@ -55,7 +55,7 @@ The loop iterates **per dispatch**, not per milestone in the legacy sense. Each 
 
 ### 1. Pre-flight: per-dispatch DoR
 
-Before delegating to the implementer, walk the per-dispatch DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Per-dispatch DoR). Items the dispatch must pass:
+Before delegating to the implementer, walk the per-dispatch DoR (per `drive/spec/README.md` overlays and § Per-dispatch DoR in this skill's dispatch protocol). Items the dispatch must pass:
 
 - [ ] Intent statement clear: what changes; what stays the same.
 - [ ] Files-in-play named (concrete paths, from the slice plan).
@@ -69,7 +69,7 @@ If any DoR item fails: fix the gap, OR halt and surface to the operator. Do not 
 
 ### 2. Brief assembly
 
-Once DoR passes, assemble the dispatch brief. The brief is what the implementer reads as its full context for the dispatch (per [`projects/drive-domain-model/principles/brief-discipline.md`](/projects/drive-domain-model/principles/brief-discipline.md)).
+Once DoR passes, assemble the dispatch brief. The brief is what the implementer reads as its full context for the dispatch (per `drive/plan/README.md` brief-discipline overlays).
 
 Brief template (specialise in `drive/plan/README.md`):
 
@@ -130,7 +130,7 @@ If WIP inspection finds drift: surface to the implementer with a brief course-co
 
 ### 4. Post-flight: per-dispatch DoD (with intent-validation)
 
-After the implementer reports done and before triggering review, walk the per-dispatch DoD (per [`projects/drive-domain-model/principles/definition-of-done.md`](/projects/drive-domain-model/principles/definition-of-done.md) § Per-dispatch DoD):
+After the implementer reports done and before triggering review, walk the per-dispatch DoD (per `drive/spec/README.md` overlays and § Per-dispatch DoD in this skill's dispatch protocol):
 
 - [ ] All "Done when" gates from the brief pass (CI; lint; typecheck; fixtures; etc.).
 - [ ] **Intent-validation**: the diff matches the brief's intent. No scope creep; no out-of-scope surfaces touched.
@@ -165,7 +165,7 @@ In all cases, the stop-condition is **visible** — recorded in `code-review.md`
 ## Pre-conditions
 
 - `projects/{project}/spec.md` exists and is current.
-- `projects/{project}/plans/plan.md` exists and is broken into milestones (see `drive-create-plan`).
+- Slice plan exists and is broken into dispatches (see `drive-plan-slice`).
 - The plan's milestones name explicit validation gates (test/lint/typecheck/build commands the harness should run before declaring a milestone done). If the plan does not yet declare them, the orchestrator infers them on first invocation; see § Validation gates.
 - The orchestrator (you, the calling agent) has the user's approval to delegate work to sub-agents.
 
@@ -190,7 +190,7 @@ Patterns surfaced during prior runs of this skill in the consuming repo are reco
 
 Upstream sibling skills (different directory):
 
-- `drive-create-project`, `drive-create-spec`, `drive-create-plan` produce this skill's inputs.
+- `drive-create-project`, `drive-specify-slice`, `drive-plan-slice` produce this skill's inputs.
 - `commit-as-you-go` for commit-shaping guidance during the implementation rounds.
 - `drive-pr-local-review` if the project lacks a `code-review.md` and you want one bootstrapped before iteration begins.
 
@@ -202,16 +202,16 @@ Downstream sibling skills:
 ## Subcommands
 
 ```text
-/drive-build-workflow iterate [milestone-id]
-/drive-build-workflow implement [milestone-id]
+/drive-build-workflow iterate [dispatch-id]
+/drive-build-workflow implement [dispatch-id]
 /drive-build-workflow review
 ```
 
-- **`iterate`** (default): full loop on the named milestone (or the next pending milestone if omitted) until SATISFIED.
+- **`iterate`** (default): full loop on the named dispatch (or the next pending dispatch if omitted) until SATISFIED.
 - **`implement`**: delegate one round of implementation only. Useful for stepping through manually.
 - **`review`**: delegate one round of review only. Useful for auditing current state without changing code.
 
-`{milestone-id}` corresponds to a milestone identifier in `plan.md` (e.g. `m1`, `m3`).
+`{dispatch-id}` corresponds to a dispatch identifier in the slice plan (e.g. `dispatch-1`, `dispatch-2`).
 
 ## The three personas
 
@@ -733,8 +733,8 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 
 | From this skill                | To                                | Trigger                                                                 |
 |--------------------------------|-----------------------------------|-------------------------------------------------------------------------|
-| `drive-create-spec`            | `drive-create-plan`               | Spec exists; plan is being generated.                                   |
-| `drive-create-plan`            | this skill                        | Plan exists with milestones + validation gates; ready to execute.       |
+| `drive-specify-slice`          | `drive-plan-slice`                | Slice spec exists; slice plan is being generated.                       |
+| `drive-plan-slice`             | this skill                        | Slice plan exists with dispatches + validation gates; ready to execute. |
 | this skill                     | `commit-as-you-go`                | Implementer needs commit-shaping guidance.                              |
 | this skill                     | `drive-pr-local-review`           | `code-review.md` doesn't yet exist; scaffold via that skill's templates.|
 | this skill                     | team's PR-opening skill           | All milestones SATISFIED; branch is review-clean; ready to open PR.     |
