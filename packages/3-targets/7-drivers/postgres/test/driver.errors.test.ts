@@ -37,16 +37,13 @@ describe('@prisma-next/driver-postgres', () => {
       _ending: false,
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
-      query: vi.fn((statement: unknown) => {
-        if (typeof statement === 'string') {
-          return Promise.resolve({ rows: [] });
-        }
-        return {
-          read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) =>
-            cb('cursor failed with string', []),
-          close: (cb: (err?: unknown) => void) => cb(),
-        };
-      }),
+      // The non-Error cursor failure is rethrown without falling through
+      // to buffered, so the mock only needs to model the cursor path.
+      query: vi.fn(() => ({
+        read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) =>
+          cb('cursor failed with string', []),
+        close: (cb: (err?: unknown) => void) => cb(),
+      })),
     };
     const driver = createBoundDriverFromBinding(
       { kind: 'pgClient', client: mockClient as unknown as Client },
@@ -72,7 +69,13 @@ describe('@prisma-next/driver-postgres', () => {
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
       query: vi.fn((statement: unknown) => {
-        if (typeof statement === 'string') {
+        // The cursor throws an Error that isn't a pg error, so runQuery
+        // falls through from cursor mode to buffered. Both shapes are hit
+        // on the same client.query mock — Submittables (cursor) vs strings
+        // / query configs (buffered).
+        const isCursor =
+          typeof statement === 'object' && statement !== null && 'submit' in statement;
+        if (!isCursor) {
           return Promise.resolve({ rows: [{ id: 1, name: 'fallback' }] });
         }
         return {
@@ -107,16 +110,11 @@ describe('@prisma-next/driver-postgres', () => {
       _ending: false,
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
-      query: vi.fn((statement: unknown) => {
-        if (typeof statement === 'string') {
-          return Promise.resolve({ rows: [] });
-        }
-        return {
-          read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) =>
-            cb(pgCursorError, []),
-          close: (cb: (err?: unknown) => void) => cb(),
-        };
-      }),
+      // pg cursor errors are rethrown without falling through to buffered.
+      query: vi.fn(() => ({
+        read: (_size: number, cb: (err: unknown, rows: unknown[]) => void) => cb(pgCursorError, []),
+        close: (cb: (err?: unknown) => void) => cb(),
+      })),
     };
     const driver = createBoundDriverFromBinding(
       { kind: 'pgClient', client: mockClient as unknown as Client },

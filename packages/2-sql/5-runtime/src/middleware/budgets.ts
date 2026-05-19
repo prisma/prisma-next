@@ -51,10 +51,13 @@ function estimateRowsFromAst(
 
   const tableEstimate = tableRows[primaryTableFromAst(ast)] ?? defaultTableRows;
 
-  if (ast.limit !== undefined) {
+  if (typeof ast.limit === 'number') {
     return Math.min(ast.limit, tableEstimate);
   }
 
+  // Expression-form limit: value is dynamic at execute time (e.g. a prepared
+  // bind site). Treat as bounded but unknown — the table estimate is the
+  // worst case.
   return tableEstimate;
 }
 

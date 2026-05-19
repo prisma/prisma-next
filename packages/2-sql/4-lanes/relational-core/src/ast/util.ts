@@ -1,4 +1,4 @@
-import type { AnyQueryAst, ParamRef } from './types';
+import type { AnyParamRef, AnyQueryAst } from './types';
 
 export function compact<T extends Record<string, unknown>>(o: T): T {
   const out: Record<string, unknown> = {};
@@ -20,9 +20,9 @@ export function compact<T extends Record<string, unknown>>(o: T): T {
  * SQLite's `?`-placeholder renderer intentionally does NOT use this helper
  * because it needs one params entry per occurrence in the SQL.
  */
-export function collectOrderedParamRefs(ast: AnyQueryAst): ReadonlyArray<ParamRef> {
-  const seen = new Set<ParamRef>();
-  const ordered: ParamRef[] = [];
+export function collectOrderedParamRefs(ast: AnyQueryAst): ReadonlyArray<AnyParamRef> {
+  const seen = new Set<AnyParamRef>();
+  const ordered: AnyParamRef[] = [];
   for (const ref of ast.collectParamRefs()) {
     if (seen.has(ref)) continue;
     seen.add(ref);

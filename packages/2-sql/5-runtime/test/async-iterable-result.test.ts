@@ -10,6 +10,7 @@ import {
   createTestContext,
   createTestContract,
   createTestTargetDescriptor,
+  stubAst,
 } from './utils';
 
 class MockDriver {
@@ -27,6 +28,15 @@ class MockDriver {
   }
 
   async *execute<Row = Record<string, unknown>>(_options: {
+    sql: string;
+    params: readonly unknown[];
+  }): AsyncIterable<Row> {
+    for (const row of this.rows) {
+      yield row as Row;
+    }
+  }
+
+  async *executePrepared<Row = Record<string, unknown>>(_options: {
     sql: string;
     params: readonly unknown[];
   }): AsyncIterable<Row> {
@@ -94,6 +104,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     const plan: SqlExecutionPlan<{ id: number; email: string }> = {
       sql: 'SELECT id, email FROM "user" ORDER BY id',
       params: [],
+      ast: stubAst(),
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
@@ -119,6 +130,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     const plan: SqlExecutionPlan<{ id: number; email: string }> = {
       sql: 'SELECT id, email FROM "user" LIMIT 1',
       params: [],
+      ast: stubAst(),
       meta: {
         target: 'postgres',
         targetFamily: 'sql',

@@ -21,7 +21,7 @@ export interface SelectQuery<
   RowType extends Record<string, ScopeField>,
 > extends Subquery<RowType>,
     WithSelect<QC, AvailableScope, RowType>,
-    WithPagination,
+    WithPagination<QC>,
     WithDistinct,
     WithAlias<RowType>,
     WithBuild<QC, RowType> {
