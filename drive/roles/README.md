@@ -141,7 +141,7 @@ Each layer catches failures the layer above it misses. Convention fires before a
 
 **Rule:** Every atomic-skill call from a workflow skill uses a template that carries role-binding prose explicitly into the dispatched Executor's context.
 
-**Rationale:** The Orchestrator's role constraint does not automatically propagate to the Executors it spawns. Each Executor starts with a fresh context; the dispatch brief is the only reliable channel for carrying the role assignment. Templates make this carrier systematic and authoring-time-verified rather than ad hoc. The existing `delegate-implement.md` / `delegate-review.md` templates in `.claude/skills/drive-build-workflow/templates/` are the precedent; S2 (dispatch-templates slice) extends this pattern to Specialist dispatches from all three workflow skills.
+**Rationale:** The Orchestrator's role constraint does not automatically propagate to the Executors it spawns. Each Executor starts with a fresh context; the dispatch brief is the only reliable channel for carrying the role assignment. Templates make this carrier systematic and authoring-time-verified rather than ad hoc. The existing `delegate-implement.md` / `delegate-review.md` templates in `.claude/skills/drive-build-workflow/templates/` are the precedent; the same pattern extends to Specialist dispatches from `drive-start-workflow` and `drive-deliver-workflow`.
 
 A well-formed dispatch brief for an Executor carries, at minimum:
 1. **Role declaration** — "You are running as an Executor / Specialist. You are not an Orchestrator."
@@ -271,7 +271,7 @@ Each Executor subtype has a small number of **named variants** with documented m
 | **reviewer/fast** | Default per-round review verdicts | mid (sonnet-class) | persistent across rounds within a slice |
 | **reviewer/thorough** | Escalation review for high-leverage rounds | thorough (opus-class) | spawned on escalation |
 
-The Orchestrator dispatches by variant name; the variant name is the contract for which model tier and persistence policy the Executor will use. Downstream slices (S2–S5) must use the slash-separated convention consistently — `implementer/fast`, `reviewer/thorough`, etc. — when referencing variants in dispatch templates, skill bodies, and registry entries.
+The Orchestrator dispatches by variant name; the variant name is the contract for which model tier and persistence policy the Executor will use. All consumers of this vocabulary must use the slash-separated convention consistently — `implementer/fast`, `reviewer/thorough`, etc. — when referencing variants in dispatch templates, skill bodies, and registry entries.
 
 **Variant-switching is always a new sub-agent spawn.** The model tier is fixed at spawn time (this is a Cursor/Claude Code constraint on the model+resume interaction). Switching from `implementer/fast` to `implementer/thorough` spawns a fresh sub-agent with the new model tier — it does not upgrade the existing one in place. The registry records the new ID alongside the old one with a swap note.
 
@@ -351,7 +351,7 @@ The Orchestrator looks up `setup-specialist` → `abc-1234` for each of the thre
 
 ## Alternatives considered
 
-### Runtime capability constraint (D3) — rejected
+### Runtime capability constraint — rejected
 
 **Option:** Enforce the Orchestrator/Executor split by literally removing `Read` / `Grep` / `Glob` / `Shell` / `Write` / `StrReplace` from the Orchestrator's tool list at runtime — a "read-only" or "dispatch-only" capability profile.
 
@@ -362,16 +362,16 @@ The Orchestrator looks up `setup-specialist` → `abc-1234` for each of the thre
 
 The layered convention approach is strictly more portable and nearly as strong as a runtime constraint in practice, given the five-layer depth.
 
-### Harness-specific affordances (D4) — rejected
+### Harness-specific affordances — rejected
 
 **Option:** Use Cursor-specific affordances — specifically, custom subagent types declared under `.cursor/agents/` (e.g. `drive-orchestrator`, `drive-specialist`, `drive-implementer`, `drive-reviewer`) — to bind roles at the harness level.
 
 **Rejected because:**
 1. **Harness diversity is permanent.** The team runs Cursor, Claude Code, and at least one other harness. Any ship must work across all of them without harness-specific affordances. Anything that lands in `.cursor/agents/` is invisible to a Claude Code runner.
-2. **Portability requirement is load-bearing.** NFR1 (harness portability) is not a nice-to-have — it is structural. Skills are the team's methodology; if a critical part of the binding only works under one harness, the methodology becomes harness-fragmented and the team accumulates a maintainability debt on every harness transition.
+2. **Portability requirement is load-bearing.** Harness portability is not a nice-to-have — it is structural. Skills are the team's methodology; if a critical part of the binding only works under one harness, the methodology becomes harness-fragmented and the team accumulates a maintainability debt on every harness transition.
 3. **Convention is sufficient.** The five-layer binding is harness-agnostic — it uses only skill bodies (markdown files), dispatch templates (markdown files), and per-project registry files. No harness cooperation required.
 
-### Registry location (Q6) — working position
+### Registry location — working position
 
 **Options considered:**
 - **(a) `projects/<x>/subagent-registry.md`** — separate file, Orchestrator-owned. *(Working position)*
