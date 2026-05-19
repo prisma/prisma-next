@@ -23,7 +23,7 @@ Long-lived methodology for the Drive workflow used in prisma-next: a Kanban-shap
 
 **Worked example (project context, not long-lived docs):**
 
-prisma-next's own calibration — reference tasks for t-shirt sizing, DoR/DoD overlays, failure-mode catalogue, grep library, model-tier routing — lives where each skill loads it: in [`drive/<category>/README.md`](../../drive/) at the repo root. The calibration *content* is project-specific by definition; only the conventions that govern it (in `principles/`) are long-lived. See the [drive/ README](../../drive/README.md) for the category map.
+prisma-next's own calibration — reference tasks for t-shirt sizing, DoR/DoD overlays, failure-mode catalogue, grep library, model-tier routing, accreted patterns — lives in one centralised home: [`drive/calibration/`](../../drive/calibration/README.md) at the repo root. Each [`drive/<category>/README.md`](../../drive/) links out to the relevant calibration files; calibration is loaded by the matching skill at workflow step 1. The calibration *content* is project-specific by definition; only the conventions that govern it (in `principles/`) are long-lived.
 
 **Trial period (project context, not long-lived):**
 

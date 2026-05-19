@@ -10,7 +10,7 @@ description: >
   operator at end-of-project. Replaces the close-out section that used to live in the
   drive-project-workflow Cursor rule.
 metadata:
-  version: "2026.5.19.1"
+  version: "2026.5.19.2"
 ---
 
 # Drive: Close Project
@@ -109,7 +109,7 @@ Default classification rules (override via `drive/project/README.md`):
 | `*-conventions.md` | long-lived **(prose-audit at step 4.5)** | Convention reference. Prose audit catches restructure / migration framing. |
 | `*-restructure.md`, `*-restructure-plan.md`, `migration-plan.md`, `*-changes.md` | transient | Execution plans describing project deltas. What survives is the resulting state (which lives in other long-lived docs); the plan itself is project archeology. |
 | `adrs/**.md`, `decisions/**.md` | long-lived | ADRs migrate into the repo's ADR root. |
-| `calibration/**` | transient | Project-specific calibration; surfaces of value get **lifted into project-context READMEs** (`drive/<category>/README.md`), not migrated as docs. Same lift-then-delete pattern applies to any per-project worked-example overlays. |
+| `calibration/**` | transient | Project-specific calibration; surfaces of value get **lifted into the team's centralised project-context calibration** (`drive/calibration/<topic>.md` for teams using a centralised layout; the matching `drive/<category>/README.md` for teams that keep calibration per-category), not migrated as docs. Same lift-then-delete pattern applies to any per-project worked-example overlays. |
 | `problem-statement.md`, `pitch.md`, `proposal.md`, `motivation.md` | transient | Project-shaping / advocacy artefacts. Their content might feed the PR description but they don't survive close — the project is its own justification once it ships. |
 | `trial.md`, `validation.md`, `rollout.md` | transient | Time-windowed project-execution artefacts tied to specific dates / tickets. If the *concept* is reusable (e.g. "always run a trial period when adopting"), it lifts into project context or a principle; the instance does not. |
 | `spec.md`, `specs/**` | transient | Shaping artefact. |
@@ -148,7 +148,7 @@ For every file classified `long-lived` at step 4, read the file and apply the fo
 - "Living document. We'll iterate as the project ships."
 - Trial-window dates, "we're trialling for two weeks", "we'll re-converge when we promote upstream"
 
-**Smell test 3 — Worked-example pollution.** Sections like *"Worked example for `<repo-name>`:"* that enumerate the same overlays already lifted into project-context READMEs (`drive/<category>/README.md`). Same anti-pattern as `calibration/**`: project-context masquerading as methodology illustration.
+**Smell test 3 — Worked-example pollution.** Sections like *"Worked example for `<repo-name>`:"* that enumerate the same overlays already lifted into the team's project context (`drive/calibration/` for teams using a centralised layout; `drive/<category>/README.md` for teams that keep calibration per-category). Same anti-pattern as `calibration/**`: project-context masquerading as methodology illustration.
 
 **Smell test 4 — Worked examples anchored to specific real-world incidents.** Specific dates (`Date: 2026-05-17`), specific project names (`projects/storage-shape-flatten/...`), specific ticket IDs (`TML-2549`), specific PR numbers. A worked example is fine; *anchoring* it to a single repo's history is not (another team has no context).
 
@@ -158,7 +158,7 @@ For every file classified `long-lived` at step 4, read the file and apply the fo
 | --- | --- |
 | Smell test 1 dominates (entire file is project narrative) | **Reclassify as transient.** File's content is project-shaping; methodology survives in other docs. |
 | Smell test 1 / 2 in framing only (methodology core is sound) | **Rewrite-at-migration.** Migrate the file but strip the project framing — replace "new / existing / before-after" with steady-state description; remove project-status blocks; drop "Updates here are load-bearing for this project" footers. |
-| Smell test 3 (worked example duplicates project-context) | **Lift-example-to-context, keep methodology.** Move the "Worked example for `<repo>`:" content into the matching `drive/<category>/README.md` (per the `calibration/**` rule); replace in the migrated file with a one-line pointer ("see your team's `drive/<category>/README.md`"). |
+| Smell test 3 (worked example duplicates project-context) | **Lift-example-to-context, keep methodology.** Move the "Worked example for `<repo>`:" content into the team's project context (typically `drive/calibration/<topic>.md` for centralised layouts; the matching `drive/<category>/README.md` for per-category layouts); replace in the migrated file with a one-line pointer ("see your team's project context"). |
 | Smell test 4 (specific real-world anchors in a worked example) | **Soften-at-migration.** Migrate but generalise — replace specific dates / project names / ticket IDs with placeholders (`<date>`, `<your-project>`, `<ticket-id>`) or anonymised stand-ins. Keep the example shape; lose the archeology. |
 
 **Non-portable conventions** also surface here: references to repo-specific paths (e.g. `wip/`, `examples/`, `packages/3-extensions/`) embedded in methodology prose should be replaced with the universal concept they stand in for ("operator scratchpad", "example apps", "extension worked-examples"). Repo-specific paths belong in project context.
@@ -185,7 +185,7 @@ For each `long-lived` record, apply its step-4.5 disposition:
 
 - **No audit match.** `git mv` the file to its destination (preserve history).
 - **Rewrite-at-migration.** Read the file, rewrite to strip the project-shaping framing identified by smell tests 1 / 2, then write the rewritten content at the destination path. Stage the source for deletion (`git rm` the original after the rewritten file is in place; the resulting commit records the move + rewrite as one change).
-- **Lift-example-to-context.** Move the "Worked example for `<repo>`:" content into the matching `drive/<category>/README.md` (per the `calibration/**` rule). Replace the section in the migrated file with a one-line pointer ("see your team's `drive/<category>/README.md`"). Surface to operator if the destination READMEs already contain the content (likely — that's the duplication this audit catches).
+- **Lift-example-to-context.** Move the "Worked example for `<repo>`:" content into the team's project context (typically `drive/calibration/<topic>.md` for centralised layouts; the matching `drive/<category>/README.md` for per-category layouts). Replace the section in the migrated file with a one-line pointer ("see your team's project context"). Surface to operator if the destination already contains the content (likely — that's the duplication this audit catches).
 - **Soften-at-migration.** Read the file, replace specific dates / project names / ticket IDs with placeholders, then write at destination. Same shape as rewrite-at-migration but narrower.
 - **Reclassify-as-transient.** No migration; the file moves to the transient pile and deletes at step 8 with the rest of `projects/<project>/`.
 
@@ -257,7 +257,7 @@ Push and open the PR.
 6. **Closing on incomplete deferral records.** Symptom: a slice was "deferred" but no follow-up ticket exists, so the work just disappears. Fix: step 2 verifies every deferral has a follow-up ticket reference; absent that, the DoD check fails.
 7. **Forgetting the close-out PR's Linear reference.** Symptom: PR merges, issues don't auto-transition, operator manually closes them and the Linear activity log gets noisy. Fix: step 9 requires the Linear Project reference in the PR title or description before pushing.
 8. **Migrating project-shaping voice as long-lived methodology.** Symptom: a doc whose *content* is methodology (model, workflow, principles) but whose *voice* is project-shaping ("what we're proposing", "before-after", "what changes") gets `git mv`'d into `docs/` unchanged. A fresh reader has no baseline for "new vs existing"; the framing becomes incoherent the moment the project closes. Fix: step 4.5 runs the prose audit and routes such files to rewrite-at-migration (strip framing, keep methodology) — or reclassifies them as transient if the file *is* fundamentally project narrative. Filename-only classification is necessary but not sufficient.
-9. **Migrating worked-example pollution that duplicates project-context.** Symptom: a principle doc has a "Worked example for `<repo>`:" section enumerating overlays — the same overlays that already live in `drive/<category>/README.md`. After migration the overlay exists in two homes, drifts independently, and ties methodology to a specific repo. Fix: step 4.5's smell test 3 catches this; the disposition is lift-example-to-context (move the worked-example content to the matching READMEs) + replace with a one-line pointer in the migrated file. Same pattern as `calibration/**`.
+9. **Migrating worked-example pollution that duplicates project-context.** Symptom: a principle doc has a "Worked example for `<repo>`:" section enumerating overlays — the same overlays that already live in the team's project context (e.g. `drive/calibration/` or `drive/<category>/README.md`). After migration the overlay exists in two homes, drifts independently, and ties methodology to a specific repo. Fix: step 4.5's smell test 3 catches this; the disposition is lift-example-to-context (move the worked-example content into project context) + replace with a one-line pointer in the migrated file. Same pattern as `calibration/**`.
 10. **Migrating worked examples anchored to specific incidents.** Symptom: a methodology principle uses a real-world example with a specific date, project name, or ticket ID. Useful as the project's living memory; opaque archeology once it migrates to docs other teams will read. Fix: step 4.5's smell test 4 catches this; the disposition is soften-at-migration (placeholders for specifics, keep the example shape).
 
 ## Reference files

@@ -88,7 +88,7 @@ The juniors-pulling-small-stories pattern is regarded as one of Agile's biggest 
 - **Decomposition is part of the orchestrator's primary job.** Not an optimisation, not an afterthought — the act of decomposing IS the orchestrator's contribution to throughput and cost.
 - **Every dispatch carries an explicit model-tier decision.** Default-to-parent is treated as a bug.
 - **The brief specifies the expected tier.** Part of DoR is "this brief is sized for tier X." If tier and size disagree, refine.
-- **Cost is measured.** Over time, the orchestrator-implementer pair builds an empirical sense of which dispatch shapes are safe at which tier. That sense lives in `drive/plan/README.md`'s routing rules and grows by retro accretion.
+- **Cost is measured.** Over time, the orchestrator-implementer pair builds an empirical sense of which dispatch shapes are safe at which tier. That sense lives in the team's project-context model-tier routing rules and grows by retro accretion.
 
 ## Related principles
 

@@ -1,8 +1,14 @@
 # drive/pr — project-context for PR-body and walkthrough authoring
 
-Loaded by `drive-pr-description` and `drive-pr-walkthrough`. Holds prisma-next's PR conventions, scope-statement patterns, commit-style rules.
+Loaded by `drive-pr-description` and `drive-pr-walkthrough`. Holds prisma-next's PR conventions — title prefix, body shape, commit style, walkthrough placement, and Linear linkage.
 
 > **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`drive/trial.md`](../trial.md).
+
+## Calibration
+
+PR authoring reads:
+
+- [`drive/calibration/dod.md § Slice-DoD overlay (PR-side items)`](../calibration/dod.md#pr-side-items) — what the PR needs to satisfy as part of the slice DoD
 
 ## PR title convention
 
@@ -11,6 +17,7 @@ Loaded by `drive-pr-description` and `drive-pr-walkthrough`. Holds prisma-next's
 - One-line summary, present tense, imperative mood.
 
 Examples:
+
 - `feat(sql): add returning() to insert operations (TML-2549)`
 - `fix(emitter): handle null defaults in column codecs (TML-2487)`
 
@@ -23,7 +30,7 @@ The canonical `drive-pr-description` structure applies. Additional repo conventi
 - **Note fixture regen** if the PR includes regenerated fixtures (so the reviewer knows the diff sprawl is from regen, not code change).
 - **No reference to transient project artefacts** in the PR body — per `.cursor/rules/doc-maintenance.mdc`, ADR numbers + Linear tickets are durable references; `projects/<x>/...` paths are not.
 
-## Direct-change mode conventions (per slice 9 augmentation)
+## Direct-change mode conventions
 
 For PRs routed as **direct change** by `drive-start-workflow`:
 
@@ -58,16 +65,6 @@ For PRs routed as **direct change** by `drive-start-workflow`:
 - Do not manually transition issues to a completed state; the integration handles it.
 - Manual transitions before merge are fine (e.g. moving to `In review` when the PR opens).
 
-## Slice-DoD overlay (PR-side items)
+## When this file changes
 
-In addition to the canonical slice DoD:
-
-- [ ] Linear issue moved to `Ready to be merged` (the team's terminal-before-merge state).
-- [ ] PR title carries Linear ticket prefix (e.g. `tml-XXXX:`).
-- [ ] PR description follows `drive-pr-description` shape (decision-led, narrative).
-- [ ] PR linked to its Linear issue via GitHub integration (auto-close on merge works).
-- [ ] No `projects/` references in long-lived files added by the slice (per the doc-maintenance rule; grep gate lives in `drive/plan/README.md`).
-
-(Manual-QA slice-DoD items live in `drive/qa/README.md`. Plan-side gates / failure-mode references live in `drive/plan/README.md`.)
-
-_(Living; add conventions as they emerge.)_
+Append when a new operational convention emerges (e.g. a new conventional-commit scope is adopted, a new PR-body section is standardised). For PR-side slice-DoD changes: edit [`drive/calibration/dod.md`](../calibration/dod.md) — never duplicate DoD items here.

@@ -10,7 +10,7 @@ The agile orchestrator runs the slice DoR check first:
 - [x] Slice plan exists — `projects/storage-shape-flatten/slices/round-2/plan.md`
 - [x] Every dispatch sized ≤ M — all three are M
 - [x] Outcome fits in one PR — three dispatches × M ≈ 50 files; borderline but reviewable
-- [ ] **Calibration entries linked — missing.** `drive/plan/README.md` has an entry for "Dual-shape support relocated under a new name" + grep patterns (`'columns' in`, `looksLike`) that exactly match this slice's shape. They're not linked from the slice plan.
+- [ ] **Calibration entries linked — missing.** The team's project-context failure-mode catalogue has an entry for "Dual-shape support relocated under a new name" + matching grep patterns (`'columns' in`, `looksLike`) that exactly fit this slice's shape. They're not linked from the slice plan.
 - [x] Spike dependencies resolved — the test-sites spike artefact exists
 - [x] Design calls settled
 - [x] Slice serves the parent project's purpose
@@ -53,7 +53,7 @@ A slice is ready to start when:
 1. **Slice spec exists** (inline in PR description for orphan; under `projects/<x>/slices/<s>/spec.md` for in-project). Has a clear outcome, scope (in / out within the parent project's purpose), and slice-DoD.
 2. **Slice plan exists.** Decomposes the slice into a dispatch sequence. Every dispatch sized ≤ M; declared DoR + DoD per dispatch; declared model tier per dispatch. Plan refuses to finalise with L or XL.
 3. **Outcome fits in one PR** (the PR-cap test, per invariant I1). If the plan reveals the work won't fit, the slice splits *now*, not after the dispatch loop starts.
-4. **Calibration entries referenced.** Any failure-mode catalogue entries / grep library patterns / reference tasks in `drive/plan/README.md` that apply to this slice's shape are linked from the slice plan, so dispatch briefs can thread them in.
+4. **Calibration entries referenced.** Any failure-mode catalogue entries / grep library patterns / reference tasks in the team's project context that apply to this slice's shape are linked from the slice plan, so dispatch briefs can thread them in.
 5. **Spike dependencies resolved.** If the slice plan depends on spike artefacts, those artefacts exist and are linked. No "we'll spike during the dispatch."
 6. **Design calls settled.** Any design call the slice's outcome turns on has been resolved (recorded in `design-decisions.md` if relevant). No "we'll decide during implementation."
 7. **(In-project) Slice serves the parent project's purpose** — the scope-in test against the project spec, per invariant I2.
@@ -68,7 +68,7 @@ A dispatch is ready to delegate when:
 2. **Brief is sized ≤ M.** Defence in depth on top of slice-plan sizing. Any dispatch whose brief is L/XL is refused at dispatch time.
 3. **Model tier is declared** per [`decomposition-and-cost.md`](decomposition-and-cost.md). Defaulting to the parent's tier is not a valid declaration.
 4. **Inputs are loadable.** Every linked input (slice spec, spike artefact, calibration entry) is at the linked path and is readable. A broken link means the brief is not ready.
-5. **Edge-case table includes overlay matches.** Every failure-mode entry in `drive/plan/README.md` whose shape matches this dispatch's work is in the brief's edge-case table with a disposition.
+5. **Edge-case table includes overlay matches.** Every failure-mode entry in the team's project context whose shape matches this dispatch's work is in the brief's edge-case table with a disposition.
 6. **Gates are runnable.** Each command in the "Done when" section runs from the repo root. A check that depends on an env var nobody set or a tool nobody installed is not ready.
 7. **Implementer + reviewer are named.** The brief identifies who; the implementer (subagent or operator) has the context to execute; the reviewer is configured to verify.
 
@@ -88,7 +88,7 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 - [ ] Project-DoD exists (what "done" means at project level)
 - [ ] Triage verdict is "project" (not slice / direct change / promote / demote)
 
-# Team overlays (from drive/project/README.md)
+# Team overlays (from project context — project category)
 - [ ] <team-specific item — e.g. "Linear Project created with promotion
        pattern applied if started from a ticket">
 - [ ] <…>
@@ -104,12 +104,12 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 - [ ] Every dispatch in plan is sized ≤ M; declares DoR + DoD + model tier
 - [ ] Outcome fits in one PR (PR-cap test passed)
 - [ ] Calibration entries linked (failure-mode catalogue / grep library /
-       reference tasks in drive/plan/README.md that apply)
+       reference tasks in the team's project context that apply)
 - [ ] Spike dependencies resolved (spike artefacts exist and are linked)
 - [ ] Design calls settled (recorded in design-decisions.md if relevant)
 - [ ] (In-project) Slice serves the parent project's purpose per I2
 
-# Team overlays (from drive/spec/README.md + drive/plan/README.md)
+# Team overlays (from project context — spec + plan categories)
 - [ ] <team-specific item — e.g. "Linear issue created and linked from
        slice spec">
 - [ ] <…>
@@ -126,11 +126,11 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 - [ ] All linked inputs are loadable (slice spec / spike artefact /
        calibration entries)
 - [ ] Edge-case table includes every applicable failure-mode entry from
-       drive/plan/README.md with a disposition
+       the team's project context with a disposition
 - [ ] "Done when" commands are runnable (work from repo root)
 - [ ] Implementer + reviewer are named with context to execute / verify
 
-# Team overlays (from drive/plan/README.md)
+# Team overlays (from project context — plan category)
 - [ ] <team-specific item — e.g. "Brief's outcome aligns with Linear
        issue's acceptance criteria">
 - [ ] <…>
@@ -142,12 +142,12 @@ Each `drive/<category>/README.md` adds team-specific DoR items the matching skil
 
 | Skill | Reads | Adds overlays for |
 |---|---|---|
-| `drive-create-project` | `drive/project/README.md` | Project-DoR items (Linear setup, branch naming, etc.) |
-| `drive-specify-slice` | `drive/spec/README.md` | Slice-DoR items related to spec content |
-| `drive-plan-slice` | `drive/plan/README.md` | Slice-DoR items related to plan structure |
-| `drive-build-workflow` | `drive/plan/README.md` | Dispatch-DoR items (brief assembly conventions, model-tier routing rules) |
+| `drive-create-project` | project category | Project-DoR items (Linear setup, branch naming, etc.) |
+| `drive-specify-slice` | spec category | Slice-DoR items related to spec content |
+| `drive-plan-slice` | plan category | Slice-DoR items related to plan structure |
+| `drive-build-workflow` | plan category | Dispatch-DoR items (brief assembly conventions, model-tier routing rules) |
 
-Each team's own overlays live in their `drive/<category>/README.md` files — concrete DoR items shaped around their tracker, branch conventions, failure-mode catalogue, and model-tier choices. Browse [`drive/`](../../../drive/) at the repo root for prisma-next's current set.
+Each team's own overlays live in their project-context calibration — concrete DoR items shaped around their tracker, branch conventions, failure-mode catalogue, and model-tier choices. For prisma-next, that's [`drive/calibration/dor.md`](../../../drive/calibration/dor.md) at the repo root.
 
 Overlay items grow by retro accretion. The protocol layer (canonical skill body) stays small; the team's overlays grow.
 

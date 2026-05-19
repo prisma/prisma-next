@@ -4,18 +4,13 @@ Loaded by `drive-qa-plan` and `drive-qa-run` when authoring manual-QA scripts an
 
 > **Trial period in effect (ends 2026-06-02).** When any drive-* skill in this category produces a finding, record it in [`findings.md`](./findings.md). Quality bar, tags, and format live in [`drive/trial.md`](../trial.md).
 
-## Consumer audiences
+## Calibration
 
-Manual-QA scripts for prisma-next slices that touch user-observable surface should name and exercise both consumer audiences:
+Manual QA reads:
 
-- **Extension authors.** Audience that authors `@prisma-next/extension-*` packages and consumes the framework's authoring substrate, IR, and ADR-defined extension points.
-  - Substrate location: `packages/3-extensions/` (worked examples of real extensions) + the framework export surface in `packages/0-framework/` and `packages/1-sql/` / `packages/1-document/`.
-  - Common probes: "does the upgrade-skills coverage gate fire on a planted regression?"; "does the ADR's new extension point work end-to-end for at least one example extension?"; "do the extension's tests still pass after a framework substrate change?"
-- **End users.** Audience that uses prisma-next via the demo or example apps.
-  - Substrate location: `examples/` (the demo + the example apps under `examples/*`).
-  - Common probes: "does `pnpm demo` still run cleanly?"; "does the example app's `pnpm dev` produce the expected first-run output?"; "does a deliberately-malformed schema produce the documented error envelope?"
-
-Scripts that touch only one audience must say so explicitly in the "What this script is testing" block — that's a coverage statement, not a gap.
+- [`drive/calibration/patterns.md § Consumer audiences`](../calibration/patterns.md#consumer-audiences) — the two audience groups every script must consider (extension authors via `packages/3-extensions/`, end users via `examples/`)
+- [`drive/calibration/failure-modes.md § QA coverage-gate gaps`](../calibration/failure-modes.md#qa-coverage-gate-gaps) — surfaces CI doesn't cover, that QA scripts should preferentially target
+- [`drive/calibration/dod.md § Slice-DoD overlay (QA-side items)`](../calibration/dod.md#qa-side-items) — what manual QA needs to deliver as part of the slice DoD
 
 ## Substrate locations
 
@@ -32,21 +27,6 @@ Scripts that touch only one audience must say so explicitly in the "What this sc
 
 A clean pre-QA tree means `pnpm typecheck && pnpm test:packages && pnpm fixtures:check` all green. QA against an unverified tree wastes the runner's time discovering broken assertions that a 1-minute `pnpm test:packages` would have surfaced.
 
-## Known coverage-gate gaps
-
-QA's comparative advantage over CI in this repo is **judgement-class observation**: `pnpm test:packages` and `pnpm test:e2e` exercise structural shape and exit codes; they do not verify:
-
-- **Error envelope copy quality** (`fix:` lines, suggested verbs, legibility, freshness, cross-reference correctness). `pnpm test:packages` asserts shape, not legibility. A script that says "the user pastes their broken schema; does the error message tell them what to fix?" is the only way to catch error-copy regressions.
-- **CLI diagnostic flow.** `pnpm test:e2e` runs end-to-end but doesn't read the output the way a human would. Scripts that re-run a known-broken CLI flow and judge diagnostic clarity catch what e2e tests cannot.
-- **Generated artefact shape** (the `contract.d.ts` consumers actually edit against). Fixtures check that the emitted shape matches the golden; manual QA should sometimes open the generated `.d.ts` and read it as a downstream type-author would.
-- **Migration applicability across the demo's history.** Migrations apply forward in test fixtures, but a manual run that walks the demo through its migration history and confirms each step produces a usable database is uniquely valuable when a migration-system slice ships.
-- **`--help` text legibility, freshness, cross-reference correctness.**
-- **Multi-command developer journeys** (A then B then C as a real user would).
-- **Output legibility** (table formatting; JSON envelope shape against `--json` consumers' expectations).
-- **Negative-control gate behaviour** (whether a lint / strict throw actually fires on a planted violation; CI only checks today's clean tree).
-
-Manual-QA scripts should preferentially target these gaps. Re-running the automated suite is **not** a QA scenario.
-
 ## Where QA artefacts live
 
 - **In-project slices** (project under `projects/<x>/`): `projects/<x>/manual-qa.md` (script) + `projects/<x>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (one per run).
@@ -54,14 +34,6 @@ Manual-QA scripts should preferentially target these gaps. Re-running the automa
 - **Artefacts referenced by findings**: `projects/<x>/manual-qa-reports/artefacts/F-<N>/`.
 
 Both `drive-qa-plan` and `drive-qa-run` enforce these locations.
-
-## Slice-DoD overlay (QA-side items)
-
-In addition to the canonical slice DoD:
-
-- [ ] `drive-qa-plan` script exists + ≥1 `drive-qa-run` report exists.
-- [ ] No unresolved 🛑 Blocker findings.
-- [ ] Script names **both** prisma-next QA audiences (extension authors via `packages/3-extensions/`, end users via `examples/`) where relevant — OR explicit "N/A — no user-observable change" with a one-line rationale.
 
 ## When to mark "N/A"
 
@@ -73,13 +45,6 @@ A slice may legitimately mark "Manual QA: N/A" when:
 
 The slice's DoD records the N/A with a one-line rationale; the project DoD's QA-coverage check confirms the rationale is honest. An "internal refactor" that turns out to have changed a user-visible error message is the failure mode this check exists to catch.
 
-## When this file should change
+## When this file changes
 
-Append (rather than overwrite) when any of the following surface during a QA round:
-
-- A new consumer audience the existing two categories don't cover.
-- A new substrate location that QA scripts repeatedly touch.
-- A coverage-gate gap previously not enumerated.
-- A reusable fixture worth adding to the catalogue.
-
-Reduce or remove (with explanation) when an entry is no longer relevant.
+Append when a new substrate location emerges (a new place QA scripts repeatedly need to touch), a new artefact-storage convention is needed, or a new "N/A" rationale becomes common enough to enumerate. For new consumer audiences, new coverage-gate gaps, or new QA-side DoD items: edit the matching file under [`drive/calibration/`](../calibration/) — never duplicate calibration here.

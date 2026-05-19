@@ -29,9 +29,9 @@ your-repo/
 
 The **shared playbook** lives upstream in [`prisma/ignite`](https://github.com/prisma/ignite). When you install skills (via the `skills` CLI), copies land in `your-repo/.agents/skills/`. The skill bodies describe *how* each ritual works — what a Definition of Ready is, what a brief looks like, what counts as Done. You don't edit these in your repo; you run `drive-update-skills` to pull updates.
 
-**Your team's notes** live in `your-repo/drive/<category>/README.md`. The first thing every drive-* skill does when it runs is read its matching README. So if `drive/plan/README.md` says "every brief in this repo needs a `Customer impact:` section," every brief assembled in this repo gets that section — without anyone touching the shared skill body.
+**Your team's notes** live in `your-repo/drive/`. The first thing every drive-* skill does when it runs is read its matching `drive/<category>/README.md`. Inside that README, two kinds of content coexist: operational conventions (how this team integrates the skill with its tracker, branch naming, etc.) and calibration content (failure-mode entries, DoR / DoD overlays, grep patterns, sizing anchors). The layout is the team's choice — some teams keep both kinds of content inline per category; others centralise calibration under `drive/calibration/` and have each category README link out, so a cross-cutting failure mode lives in one place instead of being duplicated across category READMEs.
 
-Both surfaces are **human-readable and human-runnable**, not just agent context loaders. A team member who hasn't invoked a single drive-* skill can read `drive/plan/README.md` directly to consult the team's failure-mode catalogue; they can read a canonical skill body to learn what shape a brief is supposed to have. This is what makes the gradual-AI-adoption spectrum walkable (see [`gradual-ai-adoption.md`](gradual-ai-adoption.md)) — humans participate in the protocol at any level, from "running everything by hand using the docs" to "letting `drive-build-workflow` pilot the loop."
+Both surfaces are **human-readable and human-runnable**, not just agent context loaders. A team member who hasn't invoked a single drive-* skill can read the team's project context directly to consult the failure-mode catalogue; they can read a canonical skill body to learn what shape a brief is supposed to have. This is what makes the gradual-AI-adoption spectrum walkable (see [`gradual-ai-adoption.md`](gradual-ai-adoption.md)) — humans participate in the protocol at any level, from "running everything by hand using the docs" to "letting `drive-build-workflow` pilot the loop."
 
 ## What goes where
 
@@ -41,7 +41,7 @@ Both surfaces are **human-readable and human-runnable**, not just agent context 
 - The invariants every team should honour (no L/XL dispatch, ≤ 5-min WIP cadence, intent-validation before slice close, no silent agent-side spec amendments).
 - The workflows themselves (triage decision tree, slice execution loop, etc.).
 
-**In `your-repo/drive/<category>/README.md`** (where your team's accumulated lessons live):
+**In your team's project context** (`drive/`, where your team's accumulated lessons live):
 
 - Failure modes you've hit before. ("Dual-shape support relocated under a new name" — recurring trap in our IR.)
 - Greps to watch for. (`rg "Object\.fromEntries\(" packages/2-sql/src` — programmatic equivalents of legacy shapes.)
@@ -53,21 +53,29 @@ Both surfaces are **human-readable and human-runnable**, not just agent context 
 The test: **would another team using these same skills want this rule?**
 
 - Yes → propose it upstream to `prisma/ignite`.
-- No → it's yours; put it in `drive/<category>/README.md`.
+- No → it's yours; put it in project context.
 
-When in doubt, start in your README. Promoting later (when you notice multiple teams writing the same thing) is cheap; pulling back a half-baked canonical change is not.
+When in doubt, start in your project context. Promoting later (when you notice multiple teams writing the same thing) is cheap; pulling back a half-baked canonical change is not.
 
 ## "I just learned X — where do I put it?"
 
-| The lesson is about... | Where it lands |
+Where calibration content lands depends on the team's layout. The two common shapes:
+
+- **Centralised calibration.** Calibration lives under `drive/calibration/` (one file per topic: `sizing.md`, `dor.md`, `dod.md`, `failure-modes.md`, `grep-library.md`, `model-tier.md`, `patterns.md`). Category READMEs hold operational conventions and link out to the relevant calibration files. Recommended when calibration grows enough that the same item informs multiple categories.
+- **Per-category calibration.** Calibration lives inline in each `drive/<category>/README.md` alongside that category's operational conventions. Simpler for small or new teams.
+
+The destinations table below assumes the centralised layout; for per-category layouts, substitute the matching `drive/<category>/README.md`.
+
+| The lesson is about... | Where it lands (centralised layout) |
 |---|---|
-| A new edge case briefs of a particular shape should pre-name | `drive/plan/README.md` |
-| A grep gate to add to slice DoD | `drive/plan/README.md` |
-| A new failure-mode catalogue entry | `drive/plan/README.md` |
-| A new reference task for sizing | `drive/plan/README.md` |
-| A model-tier routing rule | `drive/plan/README.md` |
-| A QA scenario your team keeps forgetting | `drive/qa/README.md` |
-| A PR-description convention | `drive/pr/README.md` |
+| A new edge case briefs of a particular shape should pre-name | `drive/calibration/failure-modes.md` |
+| A grep gate to add to slice DoD | `drive/calibration/grep-library.md` |
+| A new failure-mode catalogue entry | `drive/calibration/failure-modes.md` |
+| A new reference task for sizing | `drive/calibration/sizing.md` |
+| A model-tier routing rule | `drive/calibration/model-tier.md` |
+| A new DoR / DoD item at any scope | `drive/calibration/dor.md` / `drive/calibration/dod.md` |
+| A QA scenario your team keeps forgetting | `drive/calibration/patterns.md` (consumer audiences) or `drive/qa/README.md` (operational) |
+| A PR-description convention | `drive/pr/README.md` (operational) |
 | A code-review focus area | `drive/code-review/README.md` |
 | A spec-template variation | `drive/spec/README.md` |
 | A triage heuristic the team trusts | `drive/triage/README.md` |
@@ -148,6 +156,6 @@ The mechanics of retros (when they fire, what triggers count, the template) live
 
 - **[`retro.md`](retro.md)** — the ritual that lands the lessons. Triggers and template.
 - **[`gradual-ai-adoption.md`](gradual-ai-adoption.md)** — the memory surfaces are designed for both humans and agents; this is what makes the spectrum from "zero AI" to "full delegation" walkable.
-- **[`brief-discipline.md`](brief-discipline.md)** — the brief draws from `drive/plan/README.md`'s failure-mode catalogue and grep library every time it's assembled.
+- **[`brief-discipline.md`](brief-discipline.md)** — the brief draws from the team's failure-mode catalogue and grep library every time it's assembled.
 - **[`definition-of-ready.md`](definition-of-ready.md)** + **[`definition-of-done.md`](definition-of-done.md)** — the templates carry the gate's shape; `drive/<category>/README.md` overlays carry the team-specific gate items.
 - **`drive-reconcile-skills` + `drive-update-skills`** ([PR #93](https://github.com/prisma/ignite/pull/93)) — the meta-skills that keep canonical and your local copy in sync.

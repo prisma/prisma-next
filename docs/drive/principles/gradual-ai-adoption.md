@@ -24,7 +24,7 @@ Three concrete commitments:
 
 2. **The protocol is human-readable and human-runnable.** Every skill body documents the steps it runs. The Definition-of-Ready / Definition-of-Done / brief / WIP-inspection / retro templates work whether a human or an agent runs them. A human who hasn't touched any Drive skill should be able to read `principles/definition-of-ready.md` and run the gate manually; a human who runs only `drive-plan-slice` directly should get the same shape of slice plan as a human who runs `drive-build-workflow` and lets it call `drive-plan-slice` internally.
 
-3. **Project-context memory (`drive/<category>/README.md`) serves both humans and agents.** The READMEs aren't just agent context loaders — they're the team's documented protocol, readable by anyone on the team. When a human runs a slice manually, they consult the same `drive/plan/README.md` an agent would load. When the team adopts more agent delegation, the agent inherits the human's accumulated lessons via the same surface.
+3. **Project-context memory (`drive/`) serves both humans and agents.** The category READMEs and the team's calibration aren't just agent context loaders — they're the team's documented protocol, readable by anyone on the team. When a human runs a slice manually, they consult the same project context an agent would load. When the team adopts more agent delegation, the agent inherits the human's accumulated lessons via the same surface.
 
 ## Why this matters
 

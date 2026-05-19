@@ -13,7 +13,7 @@ The legacy-shape migration dispatch from [`brief-discipline.md`](brief-disciplin
 
 Six checked, one not. Dispatch DoD is not satisfied. The implementer's work was clever — it routes around the grep gate while not delivering the spec's intent. Without intent-validation, this dispatch would have shipped; the next dispatch (Postgres-introspector tightening) would have been built on a substrate that doesn't actually match the intended shape.
 
-Work to resolve: a follow-up S-sized dispatch converts the two programmatic-flat-shape sites to literal-flat-shape. The failure mode "grep gate routed around with programmatic equivalent" gets added to `drive/plan/README.md`'s failure-mode catalogue, so future briefs will name it as an edge case.
+Work to resolve: a follow-up S-sized dispatch converts the two programmatic-flat-shape sites to literal-flat-shape. The failure mode "grep gate routed around with programmatic equivalent" gets added to the team's failure-mode catalogue (in project context), so future briefs will name it as an edge case.
 
 That's what DoD does — it catches the silent drift that passes mechanical checks.
 
@@ -29,7 +29,7 @@ DoD is the *handoff* gate — pass/fail, structural, not negotiable. Three scope
 
 DoD has a stronger role than DoR for one reason: **it's the contract the reviewer verifies.** Without DoD, the reviewer has nothing sharp to check — only "does this look right?" which is fragile. With it, the reviewer runs the same commands and asks the same questions every time.
 
-The protocol carries the shape; your team's `drive/<category>/README.md` carries the content.
+The protocol carries the shape; your team's project context carries the content.
 
 ## Three categories of gate
 
@@ -56,7 +56,7 @@ A project is done when:
 3. **Stated outcomes hold.** The purpose statement's "what is true that wasn't before" is now true. Scope-boundary commitments met (or sharpened-down with documentation).
 4. **Deferred-work bundle reviewed.** `projects/<x>/deferred.md` items each triaged individually (adopt as new project / slice / direct change; route to backlog; drop).
 5. **Long-lived docs migrated.** Anything from `projects/<x>/` that needs to live past close-out has been moved to `docs/` (or canonical home) and references updated.
-6. **Manual-QA coverage adequate across user-observable surface.** Every slice that touched it has a script + at least one run report; no unresolved 🛑 Blocker findings; refactor slices honestly marked N/A; project-specific QA expectations sourced from `drive/qa/README.md`.
+6. **Manual-QA coverage adequate across user-observable surface.** Every slice that touched it has a script + at least one run report; no unresolved 🛑 Blocker findings; refactor slices honestly marked N/A; project-specific QA expectations sourced from the team's project context.
 7. **Final retro complete.** Per [`retro.md`](retro.md), the project close retro is mandatory and must produce a protocol / overlay / ADR update. If none, the retro failed.
 8. **Linear cleanup done.** Linear Project marked Completed (or Cancelled, with rationale); open issues under it closed; original promoted ticket (if applicable) reflects completion.
 9. **`projects/<x>/` deleted.** Transient project directory removed.
@@ -72,7 +72,7 @@ A slice is done when:
 3. **PR is review-clean.** Reviewer (distinct from implementer) accepted; findings addressed or explicitly accepted.
 4. **Intent-validation passes.** Orchestrator-tier confirms the PR delivers the spec's intent, not just the literal acceptance criteria.
 5. **No silent spec/plan amendments survived** (per invariant I12 — every amendment was design-discussion output or operator-authorised).
-6. **Manual QA satisfied** — *if* the slice touched user-observable surface. A `drive-qa-plan` script exists; at least one `drive-qa-run` report exists; no unresolved 🛑 Blocker findings; ⚠️ High findings addressed or accepted; 📝 Follow-ups captured. *If* the slice did not touch user-observable surface, record "Manual QA: N/A — no user-observable change" with a one-line rationale. Team-specific QA conventions come from `drive/qa/README.md`.
+6. **Manual QA satisfied** — *if* the slice touched user-observable surface. A `drive-qa-plan` script exists; at least one `drive-qa-run` report exists; no unresolved 🛑 Blocker findings; ⚠️ High findings addressed or accepted; 📝 Follow-ups captured. *If* the slice did not touch user-observable surface, record "Manual QA: N/A — no user-observable change" with a one-line rationale. Team-specific QA conventions come from the team's project context.
 7. **Slice-DoD team overlay items pass.**
 8. **Slice closure rituals complete.** Scope-deferred candidates surfaced and recorded; retro triggered if a learning surfaced (not mandatory unless project DoD); next slice (if stacked) is unblocked.
 
@@ -92,7 +92,7 @@ Dispatch DoD is the gate `drive-build-workflow` runs at post-flight. Every dispa
 
 ## Templates
 
-The protocol-layer starter templates. Your `drive/<category>/README.md` overlays the team-specific items.
+The protocol-layer starter templates. Your team's project context overlays the team-specific items.
 
 ### Project DoD template
 
@@ -107,13 +107,13 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 - [ ] Manual-QA coverage adequate across user-observable surface
        (every slice that touched it has a script + at least one run report;
        no unresolved 🛑 Blocker findings; refactor slices honestly marked N/A;
-       project-specific expectations sourced from drive/qa/README.md)
+       project-specific expectations sourced from the team's project context)
 - [ ] Final retro complete with protocol / overlay / ADR update
 - [ ] Linear cleanup done (project Completed/Cancelled; issues closed;
        promoted ticket reflects completion if applicable)
 - [ ] projects/<x>/ deleted
 
-# Team overlays (from drive/project/README.md + drive/qa/README.md)
+# Team overlays (from project context — project + QA categories)
 - [ ] <team-specific item — e.g. "Customer success notified of feature
        availability with agreed messaging">
 - [ ] <…>
@@ -135,14 +135,13 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
        report exists; no unresolved 🛑 Blocker findings; ⚠️ High findings
        addressed or accepted; 📝 Follow-ups captured
        — OR explicitly "N/A — no user-observable change" with a rationale
-       (project-specific shape per drive/qa/README.md)
+       (project-specific shape per the team's project context)
 - [ ] Scope-deferred candidates recorded (in projects/<x>/deferred.md
        or operator scratch)
 - [ ] Retro fired if learning surfaced (not mandatory at slice scope,
        but checked as a question)
 
-# Team overlays (from drive/plan/README.md + drive/qa/README.md
-#  + drive/pr/README.md + drive/code-review/README.md)
+# Team overlays (from project context — plan + QA + PR + code-review categories)
 - [ ] <team-specific item — e.g. "Linear issue moved to 'Ready to be
        merged' (the team's terminal-before-merge state)">
 - [ ] <…>
@@ -163,7 +162,7 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
        (code-review.md / system-design-review.md / walkthrough.md)
 - [ ] (Spike-flavoured) Artefact exists at named path with named shape
 
-# Team overlays (from drive/plan/README.md)
+# Team overlays (from project context — plan category)
 - [ ] <team-specific item — e.g. "Brief's referenced failure-mode entries
        were checked during execution and noted as 'avoided' in the
        dispatch summary">
@@ -172,18 +171,20 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 
 ## How team overlays work
 
-Each `drive/<category>/README.md` adds team-specific DoD items the matching skill enforces:
+Each skill loads its category README **plus** the team's centralised calibration. The category README carries operational conventions (how this team integrates the skill with its tracker / branch / tooling); the calibration carries the DoD overlay items themselves (because the same DoD item often informs multiple categories, so it lives in one place and gets referenced from each).
 
-| Skill | Reads | Adds overlays for |
+| Skill | Reads (category README) | Adds overlays for |
 |---|---|---|
-| `drive-close-project` | `drive/project/README.md` + `drive/qa/README.md` | Project-DoD items + project-scope QA coverage check |
-| `drive-build-workflow` (at slice closure) | `drive/plan/README.md` | Most slice-DoD items |
-| `drive-pr-description` / `drive-pr-walkthrough` | `drive/pr/README.md` | PR-shape items in slice DoD |
-| `drive-review-code` | `drive/code-review/README.md` | Reviewer-verdict items in slice DoD |
-| `drive-qa-plan` / `drive-qa-run` | `drive/qa/README.md` | Manual-QA items in slice + project DoD |
-| `drive-build-workflow` (at dispatch closure) | `drive/plan/README.md` | Dispatch-DoD items |
+| `drive-close-project` | project + QA categories | Project-DoD items + project-scope QA coverage check |
+| `drive-build-workflow` (at slice closure) | plan category | Most slice-DoD items |
+| `drive-pr-description` / `drive-pr-walkthrough` | PR category | PR-shape items in slice DoD |
+| `drive-review-code` | code-review category | Reviewer-verdict items in slice DoD |
+| `drive-qa-plan` / `drive-qa-run` | QA category | Manual-QA items in slice + project DoD |
+| `drive-build-workflow` (at dispatch closure) | plan category | Dispatch-DoD items |
 
-Each team's own overlays live in their `drive/<category>/README.md` files — concrete DoD items shaped around their tracker workflow, validation gates, manual-QA audiences, and merge conventions. Browse [`drive/`](../../../drive/) at the repo root for prisma-next's current set.
+Where the team centralises its DoD overlays is up to the team. Teams that prefer one home for all DoD content (so cross-cutting items live in one place) can keep them under `drive/calibration/dod.md` and reference it from each category README; teams that prefer per-category DoD content inline keep each overlay in its own category README. The principle is agnostic about layout.
+
+Each team's own overlays live in their project-context calibration — concrete DoD items shaped around their tracker workflow, validation gates, manual-QA audiences, and merge conventions. For prisma-next, that's [`drive/calibration/dod.md`](../../../drive/calibration/dod.md) at the repo root.
 
 Overlay items grow by retro accretion.
 
@@ -215,10 +216,10 @@ DoD is **not**:
 
 ## Related principles
 
-- **[`protocol-as-memory.md`](protocol-as-memory.md)** — DoD overlays live in `drive/<category>/README.md` and accrete by retro.
+- **[`protocol-as-memory.md`](protocol-as-memory.md)** — DoD overlays live in the team's project context and accrete by retro.
 - **[`brief-discipline.md`](brief-discipline.md)** — dispatch DoD is the brief's "Done when" section operationalised at handoff.
 - **[`definition-of-ready.md`](definition-of-ready.md)** — the pickup gate that bookends every unit; together with DoD they form the unit's contract.
 - **[`roles-and-personas.md`](roles-and-personas.md)** — the agile orchestrator runs DoD at every scope; reviewer is a separate role for the adversarial verdict.
 - **[`spikes.md`](spikes.md)** — spike DoD is "the artefact is actionable," not "code is committed."
 - **[`retro.md`](retro.md)** — when DoD catches a gap, the gate worked; when something gets past DoD and is discovered later, the retro updates the overlay.
-- **`drive-qa-plan` + `drive-qa-run`** ([PR #93](https://github.com/prisma/ignite/pull/93)) — the canonical manual-QA discipline slice and project DoD reference. Team-specific QA context lives in `drive/qa/README.md`.
+- **`drive-qa-plan` + `drive-qa-run`** — the canonical manual-QA discipline slice and project DoD reference. Team-specific QA context lives in the team's project context.

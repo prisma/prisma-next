@@ -8,9 +8,9 @@ Loaded by `drive-run-retro`. Holds prisma-next's retro conventions, recurring-pa
 
 When a retro lesson could land in multiple surfaces, the team's preference:
 
-- **Calibration of size / cost / DoR items** → `drive/plan/README.md` (project-context). These rarely generalise; they're tied to this repo's package layout and CI shape.
-- **Triage / sizing heuristics** → `drive/triage/README.md`.
-- **Failure-mode patterns specific to this codebase** → `drive/plan/README.md` § Failure-mode catalogue.
+- **Calibration of size / cost / DoR / DoD items** → the matching file under [`drive/calibration/`](../calibration/README.md). These rarely generalise; they're tied to this repo's package layout and CI shape.
+- **Triage / sizing heuristics** → triage decision rules go to [`drive/triage/README.md`](../triage/README.md); sizing anchors themselves go to [`drive/calibration/sizing.md`](../calibration/sizing.md).
+- **Failure-mode patterns specific to this codebase** → [`drive/calibration/failure-modes.md`](../calibration/failure-modes.md); the matching grep pattern (if any) → [`drive/calibration/grep-library.md`](../calibration/grep-library.md).
 - **Failure-mode patterns that generalise to any contract-first system** → canonical (via `drive-update-skills`).
 - **Durable architectural decisions** → ADR under [docs/architecture docs/adrs/](../../docs/architecture%20docs/adrs/).
 - **Process changes that affect the whole methodology** → propose upstream PR to `prisma/ignite` (after one or two repetitions to confirm the pattern).

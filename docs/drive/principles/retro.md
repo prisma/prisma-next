@@ -35,17 +35,17 @@ accepted because the grep passed, not because intent matched.
 The brief's edge-case table should have included "grep gate satisfied
 by programmatic equivalent" with the disposition "refuse and surface."
 It didn't because we'd never seen this pattern before; it wasn't in
-drive/plan/README.md's failure-mode catalogue.
+the team's failure-mode catalogue.
 
 ## Output
 
-- [x] **Team-context update:** add to drive/plan/README.md §
-       failure-mode catalogue: "Grep gate satisfied by programmatic
-       equivalent (e.g. constructing the structure dynamically rather
-       than as a literal)." Disposition: brief's edge-case table
-       includes "if the gated shape would be programmatically
-       constructed, refuse and surface." Grep library: add the
-       relevant dynamic-construction pattern for follow-up dispatches.
+- [x] **Team-context update:** add to the team's failure-mode
+       catalogue: "Grep gate satisfied by programmatic equivalent
+       (e.g. constructing the structure dynamically rather than as
+       a literal)." Disposition: brief's edge-case table includes
+       "if the gated shape would be programmatically constructed,
+       refuse and surface." Grep library: add the relevant
+       dynamic-construction pattern for follow-up dispatches.
 - [ ] Canonical update: not applicable — this specific shape is
        team-local; routing around grep gates in general is already
        covered by canonical brief-discipline.
@@ -53,11 +53,10 @@ drive/plan/README.md's failure-mode catalogue.
 
 ## Update landed (post-retro)
 
-<commit-hash> — drive/plan/README.md § failure-mode catalogue +
-§ grep library.
+<commit-hash> — team failure-mode catalogue + grep library.
 ```
 
-7 minutes. Output: one team-context entry + one grep library pattern in `drive/plan/README.md`. The next time `drive-plan-slice` or `drive-build-workflow` runs on a slice that touches the affected surface, the README loads at workflow step 1 and the failure mode gets threaded into the brief's edge-case table; the failure mode doesn't recur.
+7 minutes. Output: one team-context entry + one grep library pattern in the team's project context. The next time `drive-plan-slice` or `drive-build-workflow` runs on a slice that touches the affected surface, the project context loads at workflow step 1 and the failure mode gets threaded into the brief's edge-case table; the failure mode doesn't recur.
 
 That's what a retro looks like when it works. Trigger → write down what happened, why, what should have caught it → land an update somewhere an agent will read it next time → done.
 
@@ -176,7 +175,7 @@ Run by the orchestrator (operator or orchestrator agent). Short — a retro that
 2. **Calendar-based retro.** "Every Friday we retro the week." Generates noise; misses the moment (lessons two days old are less vivid, less accurate). Trigger-based retros run when the trigger fires.
 3. **Retro by committee.** A retro that requires multiple participants and a scheduled meeting is human-team shape; agent teams don't have that overhead, but they also don't have the conversational refinement human-team retros benefit from. The orchestrator runs the retro alone (with operator participation if a design-discussion-flavoured call is involved); speed is the protection against the lesson going stale.
 4. **Retro that names the proximate cause and stops.** "The implementer drifted." OK — but *why* did the dispatch loop allow the drift? The structural cause is what generates the update. Stopping at proximate cause produces no canonical or team-context delta; the gap recurs.
-5. **Vague update.** "We should be more careful about briefs." Doesn't update any surface; agents on the next dispatch won't know what changed. Updates must be concrete: "add 'grep gate routed around with programmatic equivalent' to `drive/plan/README.md` § failure-mode catalogue, with two example dispositions."
+5. **Vague update.** "We should be more careful about briefs." Doesn't update any surface; agents on the next dispatch won't know what changed. Updates must be concrete: "add 'grep gate routed around with programmatic equivalent' to the team's failure-mode catalogue, with two example dispositions."
 6. **Update lands in a weak-memory surface.** Per [`protocol-as-memory.md`](protocol-as-memory.md), the strong surfaces are always-loaded (`.cursor/rules/`, `AGENTS.md`) and `drive/<category>/README.md` (loaded by their matching skill at workflow step 1). Operator scratch (untracked working notes) is no-memory; `projects/<x>/` is transient. An update that lands only in operator scratch or in transient project notes is the same as no update — the lesson won't survive project close-out.
 7. **Project DoD skipped because "the team knows the retro outcome."** The retro is the team's only memory. A project that ships without its retro has lost its lessons regardless of what's in the operator's head.
 8. **Retro held but the "Update landed" line never gets filled in.** The template's post-retro link is the proof-of-landing. Without it, the protocol has a retro that intended to update but didn't.
@@ -207,6 +206,6 @@ Don't create category READMEs unilaterally for skills that don't exist yet — t
 - **[`roles-and-personas.md`](roles-and-personas.md)** — the orchestrator hat owns retro running.
 - **[`definition-of-ready.md`](definition-of-ready.md)** — DoR overlays in `drive/<category>/README.md` grow by retro accretion.
 - **[`definition-of-done.md`](definition-of-done.md)** — DoD overlays grow by retro accretion; project DoD makes the close retro mandatory.
-- **[`brief-discipline.md`](brief-discipline.md)** — many retro outputs land in `drive/plan/README.md`'s failure-mode catalogue and grep library, then thread into subsequent briefs' edge-case tables.
-- **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — `drive/plan/README.md`'s model-tier routing table grows by retro accretion (which dispatch shapes turned out to be safe at which tier).
+- **[`brief-discipline.md`](brief-discipline.md)** — many retro outputs land in the team's failure-mode catalogue and grep library, then thread into subsequent briefs' edge-case tables.
+- **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the team's model-tier routing table grows by retro accretion (which dispatch shapes turned out to be safe at which tier).
 - **`drive-reconcile-skills`** ([PR #93](https://github.com/prisma/ignite/pull/93)) — pairs with retro discipline: routes in-repo skill drift to the right home.

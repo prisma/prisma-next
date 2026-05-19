@@ -405,7 +405,7 @@ The on-disk shape of an artefact is **per-context**. The model deliberately allo
 | Scope-deferred candidates (during project) | `projects/<project>/deferred.md`. Reviewed at project closure; each item triaged individually |
 | Dispatch brief | Transient — assembled at dispatch time from the slice plan + spike artefacts; not separately persisted |
 | `design-decisions.md` entry (per project) | `projects/<project>/design-decisions.md`; orphan work uses operator scratch or in-PR captures |
-| Project-context conventions (per consumer repo) | `drive/<category>/README.md` (categories: `spec`, `project`, `plan`, `qa`, `code-review`, `pr`, `deployment`, `post-update`). Read by drive-* skills as workflow step 1. |
+| Project-context conventions (per consumer repo) | `drive/<category>/README.md` for operational conventions (categories: `spec`, `project`, `plan`, `qa`, `code-review`, `pr`, `deployment`, `post-update`, `retro`, `health`, `triage`). Cross-cutting calibration (sizing, DoR / DoD overlays, failure modes, grep library, model-tier routing) typically lives under a centralised `drive/calibration/` and is referenced from the category READMEs. Read by drive-* skills as workflow step 1. |
 
 The forcing principle: **persistence is per-context, not uniform.** Without this concession, triage will keep routing-to-project just to use the tooling.
 
@@ -519,7 +519,7 @@ Specs and plans are per-scope (project / slice) because the inputs, outputs, and
 | `drive-pr-description` | Slice / direct change | PR description authoring; handles both the slice case and the direct-change case (where the PR description is the only persisted intent artefact). |
 | `drive-pr-walkthrough` | Slice | PR walkthrough authoring at PR-open time. |
 | `drive-review-code` | Slice | Reviewer-side code review. |
-| `drive-qa-plan` | Slice | Manual-QA script authoring against the project-context audiences in `drive/qa/README.md`. |
+| `drive-qa-plan` | Slice | Manual-QA script authoring against the project-context consumer audiences (loaded from the team's project context). |
 | `drive-qa-run` | Slice | Manual-QA execution + severity-classified run report. |
 | `drive-check-health` | Project | Project rollups: slice progress, drifted slices, dispatch throughput, recommended next pick. Session-bookended (interactive) or trigger-fired (unattended). Called by `drive-deliver-workflow` on cadence. |
 | `drive-run-retro` | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical / project-context / ADR home, land the update. Mandatory at project closure; trigger-fired on dispatch failure / drift / escapee. |
@@ -536,7 +536,7 @@ Triage's "direct change" verdict routes the developer straight to `gh pr create`
 - The bodies of any skills (those live in [`skills-contrib/drive-*/SKILL.md`](../../skills-contrib/) as their canonical source).
 - The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under [`principles/`](principles/)).
 - The migration plan from canonical to the new model (per-consumer adoption is downstream).
-- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's project context — for prisma-next, in [`drive/plan/README.md`](../../drive/plan/README.md)).
+- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's project context — for prisma-next, in [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md)).
 
 All of those are downstream. This document is the input.
 

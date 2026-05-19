@@ -60,8 +60,8 @@ the capability premium isn't paying for anything here.
 
 - Slice spec: projects/<project>/slices/round-2/spec.md
 - Spike artefact: projects/<project>/spikes/<date>-test-sites.md
-- Calibration: drive/plan/README.md § "<the relevant failure-mode entry>"
-  + grep patterns from drive/plan/README.md's grep library
+- Calibration: team's failure-mode catalogue § "<the relevant entry>"
+  + grep patterns from the team's grep library
 
 ## Implementer + Reviewer
 
@@ -73,7 +73,7 @@ The well-shaped brief is verbose but unsurprising. The dispatch produced from it
 
 ## What every brief needs
 
-Eight sections. None may be omitted; your team's `drive/plan/README.md` may add more.
+Eight sections. None may be omitted; your team's project context may add more.
 
 | Section | What it says | Why it matters |
 |---|---|---|
@@ -93,9 +93,9 @@ A spike-flavoured brief swaps the "Done when" section for an artefact spec — s
 Two sources at brief-assembly time:
 
 1. **From the slice plan.** The implementer who authored the slice plan walked through this dispatch's work and asked "what's the implementer likely to encounter that's not the happy path?" — those are the candidate edge cases.
-2. **From your team's `drive/plan/README.md`.** The failure-mode catalogue and grep library entries that match this dispatch's shape get pulled into the edge-case table at brief-assembly time. Every failure the team has hit before that matches this shape goes in, with a disposition.
+2. **From your team's project context.** The failure-mode catalogue and grep library entries that match this dispatch's shape get pulled into the edge-case table at brief-assembly time. Every failure the team has hit before that matches this shape goes in, with a disposition.
 
-The *first* time an edge case happens, the brief was the wrong place to catch it — you didn't know to name it. That's a retro trigger. The lesson goes into `drive/plan/README.md`; the next brief that matches the shape pulls the entry and pre-names the edge case. Over time the catalogue grows; new dispatches inherit the team's accumulated lessons automatically.
+The *first* time an edge case happens, the brief was the wrong place to catch it — you didn't know to name it. That's a retro trigger. The lesson goes into the team's project context; the next brief that matches the shape pulls the entry and pre-names the edge case. Over time the catalogue grows; new dispatches inherit the team's accumulated lessons automatically.
 
 ## The brief is fresh per dispatch; the slice spec is stable
 
@@ -198,7 +198,7 @@ For a spike, swap "Done when" for:
 
 ## Related principles
 
-- **[`protocol-as-memory.md`](protocol-as-memory.md)** — `drive/plan/README.md`'s failure-mode catalogue + grep library are what the brief draws from when assembling the edge-case table.
+- **[`protocol-as-memory.md`](protocol-as-memory.md)** — the team's failure-mode catalogue + grep library are what the brief draws from when assembling the edge-case table.
 - **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the brief's model-tier section is the per-dispatch routing decision.
 - **[`spikes.md`](spikes.md)** — a spike's brief swaps "Done when" for an artefact spec.
 - **[`roles-and-personas.md`](roles-and-personas.md)** — the agile orchestrator assembles the brief; implementer + reviewer assignments live in the brief.
