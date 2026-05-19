@@ -135,7 +135,7 @@ Given a spec, generate the full plan:
    - Delete `projects/{project}/` (everything under it is transient)
    - If the project spec was merged, the close-out work is often done as a final PR that performs the doc migration + deletion
 
-   The close-out task **must not** include manually closing the Linear ticket. Linear's GitHub integration auto-transitions the linked issue to the team's completed state when the close-out PR merges, provided the PR references the issue identifier (e.g. `(TML-XXXX)` in the title or `Refs: TML-XXXX` in the body) or the branch name carries it. Manual closure is redundant and risks landing the issue in the wrong completed state (e.g. `Done` instead of `Ready to be merged`). See `.agents/rules/drive-project-workflow.mdc` § "Keep Linear up to date during execution" for the full policy.
+   The close-out task **must not** include manually closing the tracker ticket. Tracker integrations (e.g. Linear's GitHub integration) auto-transition the linked issue to the team's completed state when the close-out PR merges, provided the PR references the issue identifier (e.g. `(TML-XXXX)` in the title or `Refs: TML-XXXX` in the body) or the branch name carries it. Manual closure is redundant and risks landing the issue in the wrong completed state (e.g. `Done` instead of `Ready to be merged`). Team-specific tracker conventions live in the team's project context (for prisma-next: `drive/project/README.md § Linear conventions` and `drive/pr/README.md § Linear state conventions`).
 
 8. **Write the plan file** using the template below, saved to the `projects/{project}/` layout described above.
 

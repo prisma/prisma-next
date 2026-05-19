@@ -98,7 +98,7 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 ## Frequent Tasks
 
 - Day-to-day playbook (add SQL operation, split monolith, fix import violation, etc.): [Common Tasks Playbook](docs/onboarding/Common-Tasks-Playbook.md)
-- Shape and deliver a project (spec → plan → implement): `.agents/rules/drive-project-workflow.mdc` (artifacts live under `projects/`, see `projects/README.md`)
+- Shape and deliver a project (spec → plan → implement): run `drive-start-workflow`; methodology in [`docs/drive/`](docs/drive/README.md); project artifacts live under `projects/` (see [`projects/README.md`](projects/README.md))
 - Cut the next npm minor release: `.agents/skills/publish-npm-version/SKILL.md` (policy in [`docs/oss/versioning.md`](docs/oss/versioning.md))
 
 ## Subsystem Deep Dives
