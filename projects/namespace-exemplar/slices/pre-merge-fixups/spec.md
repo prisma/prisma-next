@@ -70,6 +70,31 @@ The deeper architectural cleanup — splitting `BaseSchemaIssue` between framewo
 - **AC3.3.** Every existing un-typed `deserializeContract(json)` call continues to type-check unchanged.
 - **AC3.4.** `pnpm typecheck` clean across the workspace; no new `as unknown as` casts introduced.
 
+### Item 4 — `hasForeignKey` unqualified-key format collides for identifiers containing `|`
+
+**Problem.** F04 in the code review. The Postgres planner-schema-lookup helper encodes unqualified FK keys as `${cols}||${refTable}|${refCols}` — a double-pipe is used as the schema separator and a single-pipe as the column separator, deliberately distinct so qualified and unqualified keys can't collide. The trick works only for identifiers that don't contain `|`. Postgres quoted identifiers can carry arbitrary characters, so a column or table name containing `|` corrupts the key and `hasForeignKey` returns a false negative — the verifier then reports a phantom "missing FK" issue.
+
+The blast radius is small in practice (standard Postgres identifiers are `[a-z_][a-z_0-9]*`), but the encoding is fragile and the fix is mechanical.
+
+**Fix shape.** Replace the pipe-separator encoding with a structurally unambiguous key — JSON-encoded tuple (`JSON.stringify([qualifier, table, [...cols], [...refCols]])`) or a separator that can't appear in quoted identifiers (`\u0000`). Apply to both qualified and unqualified key construction in `packages/3-targets/3-targets/postgres/src/core/migrations/planner-schema-lookup.ts`.
+
+**Acceptance criteria.**
+
+- **AC4.1.** The qualified and unqualified FK key encodings are structurally unambiguous: no separator-character assumption about identifier contents.
+- **AC4.2.** Unit test exercises `hasForeignKey` against a table with an identifier containing `|` (and `||` for paranoia); asserts the lookup returns true / false correctly without false negatives.
+- **AC4.3.** All existing FK-lookup callers continue to type-check and pass tests.
+
+### Item 5 — Add span assertion to the PSL-reserved-namespace diagnostic test (AC4 weak verification)
+
+**Problem.** PR #534's code review § 6 flagged the AC4 verification as **WEAK**: the test for `namespace unbound { … }` alongside a sibling named namespace asserts the diagnostic `code` and `message` content but doesn't assert that `span` is populated. The implementation uses `...ifDefined('span', unboundBlock?.span)` so span is present when parsed; the test would silently pass even if a future refactor stopped emitting span.
+
+**Fix shape.** Add an explicit `expect(diagnostic.span).toBeDefined()` (or stricter — assert the span has plausible line/column data) to the relevant test case in `packages/2-sql/2-authoring/contract-psl/test/interpreter.diagnostics.test.ts`.
+
+**Acceptance criteria.**
+
+- **AC5.1.** The PSL-reserved-namespace diagnostic test asserts the diagnostic carries a non-`undefined` `span`.
+- **AC5.2.** No implementation change required; the test alone should pass with current code.
+
 ## Architectural insights surfaced during scoping
 
 These don't change the slice's scope; they're recorded here so they don't get lost in chat:
@@ -87,6 +112,10 @@ These items came up during the same scoping discussion but **do not** belong in 
 ### [TML-2585](https://linear.app/prisma-company/issue/TML-2585/split-schemaissue-into-framework-shared-base-family-specific) — Split `SchemaIssue` into framework base + family extensions
 
 The minimal `namespaceId?: string` sibling added in Item 1 is a stopgap. The honest layering shape (`SqlSchemaIssue` with structured `table: { namespaceId, name }`, `MongoSchemaIssue` with its collection coordinate, framework base with only target-agnostic fields) is cross-cutting type refactor that would bloat PR #534's review surface. Tracked as TML-2585 to land in its own focused PR or fold into TML-2584's blast radius.
+
+### [TML-2586](https://linear.app/prisma-company/issue/TML-2586/type-foreignkeyspecreferencesschema-as-namespaceid-not-string) — Type `ForeignKeySpec.references.schema` as `NamespaceId`, not `string`
+
+The Postgres `ForeignKeySpec.references.schema` field is a namespace coordinate typed as a bare `string`. Should be `NamespaceId` (or the SQL family's narrowed equivalent). Cross-cutting type-discipline rewire across every `ForeignKeySpec` consumer; most natural home is folded into TML-2584 (which already touches every FK reference site for the cross-reference object-pair encoding rename) rather than landing as its own PR.
 
 ### [TML-2584](https://linear.app/prisma-company/issue/TML-2584/restructure-contract-ir-into-two-planes-domain-storage-with-uniform) — Contract IR planes
 
