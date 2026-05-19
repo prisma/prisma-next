@@ -77,7 +77,12 @@ describe('per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    expect(contract.storage.namespaces['auth']?.tables['User']).toBeDefined();
+    // The type-level `tables` for a declared namespace is `{}` to keep
+    // `keyof` as `never` (preventing `Db<C>` from collapsing to a string
+    // index signature). The runtime value is correct; cast to verify it.
+    expect(
+      (contract.storage.namespaces['auth']?.tables as Record<string, unknown>)['User'],
+    ).toBeDefined();
   });
 
   it('omits `namespaceId` for models that do not set `namespace` — the late-bound default stays implicit', () => {

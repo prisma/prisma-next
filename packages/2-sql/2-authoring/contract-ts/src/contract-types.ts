@@ -561,7 +561,7 @@ type BuiltStorage<Definition> = {
     readonly [Ns in Exclude<DefinitionNamespaces<Definition>, '__unbound__'>]: {
       readonly id: Ns;
       readonly kind?: string;
-      readonly tables: Readonly<Record<string, object>>;
+      readonly tables: Record<never, never>;
       readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
     };
   };
