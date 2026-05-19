@@ -134,12 +134,14 @@ export function verifyPrimaryKey(
   contractPK: PrimaryKey,
   schemaPK: PrimaryKey | undefined,
   tableName: string,
+  namespaceId: string,
   issues: SchemaIssue[],
 ): 'pass' | 'fail' {
   if (!schemaPK) {
     issues.push({
       kind: 'primary_key_mismatch',
       table: tableName,
+      namespaceId,
       expected: contractPK.columns.join(', '),
       message: `Table "${tableName}" is missing primary key`,
     });
@@ -150,6 +152,7 @@ export function verifyPrimaryKey(
     issues.push({
       kind: 'primary_key_mismatch',
       table: tableName,
+      namespaceId,
       expected: contractPK.columns.join(', '),
       actual: schemaPK.columns.join(', '),
       message: `Table "${tableName}" has primary key mismatch: expected columns [${contractPK.columns.join(', ')}], got [${schemaPK.columns.join(', ')}]`,
@@ -174,6 +177,7 @@ export function verifyForeignKeys(
   contractFKs: readonly ForeignKey[],
   schemaFKs: readonly SqlForeignKeyIR[],
   tableName: string,
+  namespaceId: string,
   tablePath: string,
   issues: SchemaIssue[],
   strict: boolean,
@@ -206,6 +210,7 @@ export function verifyForeignKeys(
       issues.push({
         kind: 'foreign_key_mismatch',
         table: tableName,
+        namespaceId,
         expected: `${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
         message: `Table "${tableName}" is missing foreign key: ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
       });
@@ -229,6 +234,7 @@ export function verifyForeignKeys(
         issues.push({
           kind: 'foreign_key_mismatch',
           table: tableName,
+          namespaceId,
           // Set indexOrConstraint so the planner classifies this as a non-additive
           // conflict (existing FK with wrong actions cannot be fixed additively).
           indexOrConstraint: matchingFK.name ?? `fk(${contractFK.source.columns.join(',')})`,
@@ -283,6 +289,7 @@ export function verifyForeignKeys(
         issues.push({
           kind: 'extra_foreign_key',
           table: tableName,
+          namespaceId,
           indexOrConstraint: schemaFK.name ?? `fk(${schemaFK.columns.join(',')})`,
           message: `Extra foreign key found in database (not in contract): ${schemaFK.columns.join(', ')} -> ${schemaFK.referencedTable}(${schemaFK.referencedColumns.join(', ')})`,
         });
@@ -320,6 +327,7 @@ export function verifyUniqueConstraints(
   schemaUniques: readonly SqlUniqueIR[],
   schemaIndexes: readonly SqlIndexIR[],
   tableName: string,
+  namespaceId: string,
   tablePath: string,
   issues: SchemaIssue[],
   strict: boolean,
@@ -344,6 +352,7 @@ export function verifyUniqueConstraints(
       issues.push({
         kind: 'unique_constraint_mismatch',
         table: tableName,
+        namespaceId,
         expected: contractUnique.columns.join(', '),
         message: `Table "${tableName}" is missing unique constraint: ${contractUnique.columns.join(', ')}`,
       });
@@ -386,6 +395,7 @@ export function verifyUniqueConstraints(
         issues.push({
           kind: 'extra_unique_constraint',
           table: tableName,
+          namespaceId,
           indexOrConstraint: schemaUnique.name ?? `unique(${schemaUnique.columns.join(',')})`,
           message: `Extra unique constraint found in database (not in contract): ${schemaUnique.columns.join(', ')}`,
         });
@@ -423,6 +433,7 @@ export function verifyIndexes(
   schemaIndexes: readonly SqlIndexIR[],
   schemaUniques: readonly SqlUniqueIR[],
   tableName: string,
+  namespaceId: string,
   tablePath: string,
   issues: SchemaIssue[],
   strict: boolean,
@@ -453,6 +464,7 @@ export function verifyIndexes(
       issues.push({
         kind: 'index_mismatch',
         table: tableName,
+        namespaceId,
         expected: contractIndex.columns.join(', '),
         message: `Table "${tableName}" is missing index: ${contractIndex.columns.join(', ')}`,
       });
@@ -501,6 +513,7 @@ export function verifyIndexes(
         issues.push({
           kind: 'extra_index',
           table: tableName,
+          namespaceId,
           indexOrConstraint: schemaIndex.name ?? `idx(${schemaIndex.columns.join(',')})`,
           message: `Extra index found in database (not in contract): ${schemaIndex.columns.join(', ')}`,
         });
