@@ -96,7 +96,7 @@ Apply the team's calibration (in `drive/plan/README.md` if present; otherwise th
 
 ### Step 5 — Per-dispatch DoR
 
-For each dispatch, walk the per-dispatch DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Per-dispatch DoR). For each item, either confirm it's met or fix it before declaring the dispatch ready.
+For each dispatch, walk the per-dispatch DoR (per `drive/plan/README.md` overlays and § Per-dispatch DoR in `drive-build-workflow`). For each item, either confirm it's met or fix it before declaring the dispatch ready.
 
 Canonical per-dispatch DoR items (specialise in `drive/plan/README.md`):
 
@@ -184,9 +184,5 @@ _..._
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Slice; § Dispatch; § Layer 3 — sizing discipline
-- [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Dispatch loop
-- [`projects/drive-domain-model/principles/decomposition-and-cost.md`](/projects/drive-domain-model/principles/decomposition-and-cost.md) — two-cap sizing system
-- [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Per-dispatch DoR
-- [`projects/drive-domain-model/principles/brief-discipline.md`](/projects/drive-domain-model/principles/brief-discipline.md) — how dispatch intent + files-in-play feed the brief
-- [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17 — split rationale
+- [`drive/plan/README.md`](../../drive/plan/README.md) — two-cap sizing system, per-dispatch DoR overlays, brief discipline
+- [`drive-build-workflow/SKILL.md`](../drive-build-workflow/SKILL.md) — dispatch loop this plan feeds

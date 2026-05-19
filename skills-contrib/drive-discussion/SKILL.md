@@ -12,7 +12,7 @@ The skill is the *mode of operation*: the operating rules, the response shape, t
 
 ## When to use
 
-Five canonical triggers (per [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 2 — Design discussion):
+Five canonical triggers (design discussion at triage / spec / mid-flight boundaries — see `drive/triage/README.md` for team overlays):
 
 1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-specify-project` or `drive-specify-slice`.
 2. **Mid-spec.** A spec authoring session hits a fork-in-the-road that needs collaborative resolution rather than a unilateral pick by the agent.
@@ -154,7 +154,7 @@ If the user asks to implement or edit before explicitly exiting, push back once:
 
 **Personas:** `architect` (system shape, naming, bounded contexts) → `principal-engineer` (failure modes, blast radius, operability, cost). Sequenced because the lenses cross-pollinate.
 
-**Outcome:** typically a project spec (`projects/<project>/spec.md`), handed off to `drive-create-spec` for the file write.
+**Outcome:** typically a project spec (`projects/<project>/spec.md`), handed off to `drive-specify-project` for the file write.
 
 ### B. Product framing for a new feature
 
