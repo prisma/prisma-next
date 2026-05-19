@@ -21,7 +21,7 @@ metadata:
 - **Project specs** → `drive-specify-project` (`projects/<project>/spec.md`).
 - **Slice specs** → `drive-specify-slice` (`projects/<project>/slices/<slice>/spec.md` for in-project; inline in the PR description for orphan slices).
 
-The split is per [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17: project and slice specs differ in purpose, scope, and template; one skill conflated them at the cost of always asking *"what scope?"* at entry.
+The split is per [`docs/drive/skill-conventions.md`](/docs/drive/skill-conventions.md): project and slice specs differ in purpose, scope, and template; one skill conflated them at the cost of always asking *"what scope?"* at entry.
 
 The body below remains as shared reference material — template structure, anti-patterns, code-sample guidance — that both scope-specific variants link back to. Treat the body as documentation, not invokable behaviour.
 

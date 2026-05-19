@@ -95,7 +95,7 @@ Per-dispatch is too noisy (polling cadence); per-project alone is too coarse (dr
 
 ## Skill surface (forward look)
 
-The map exposes two workflow skills new and one renamed, three new atomic skills, four split-from-old atomic skills, two atomic augmentations, and a promotion of an existing mode skill. Full detail in [`skill-restructure.md`](skill-restructure.md).
+The map exposes two new workflow skills and one renamed, three new atomic skills, four split-from-old atomic skills, two atomic augmentations, and a promotion of an existing mode skill. Full detail in [`skill-conventions.md`](skill-conventions.md).
 
 **Workflow tier:**
 

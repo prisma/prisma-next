@@ -2,7 +2,7 @@
 
 Project-specific calibration for the `prisma-next` codebase. This is the **worked-example calibration** that informs the general protocol — eventually each section migrates to the matching `prisma-next/drive/<category>/README.md` per the [PR #93](https://github.com/prisma/ignite/pull/93) project-context convention.
 
-Per [`spec.md`](../spec.md) and the principles under [`principles/`](../principles/), the calibration covers:
+Per the [methodology overview](../README.md) and the principles under [`../principles/`](../principles/), the calibration covers:
 
 | Section | Content | Eventual home in `prisma-next/` |
 |---|---|---|

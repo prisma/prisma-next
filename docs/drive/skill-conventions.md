@@ -2,7 +2,7 @@
 
 Maps the consolidated Drive workflow onto skills and shows how the canonical inventory needs to change to land the model.
 
-The skills are built **locally in `prisma-next`** first (`.agents/skills/drive-*/SKILL.md`), validated by use over a couple of weeks of real work, and then promoted upstream to [`prisma/ignite`](https://github.com/prisma/ignite) as a series of small PRs informed by what survived the trial. The execution sequencing is in [`plan.md`](plan.md); this doc describes the target inventory.
+The skills are built **locally in `prisma-next`** first (`skills-contrib/drive-*/SKILL.md`), validated through a trial period (see [`trial.md`](trial.md)), and then promoted upstream to [`prisma/ignite`](https://github.com/prisma/ignite) as a series of PRs informed by what survived the trial.
 
 ## Base assumption
 
@@ -144,7 +144,7 @@ No skill is retired by the restructure. Two **vocabulary retirements**:
 
 ## 4. Build sequencing
 
-Skills are built **locally in `prisma-next`** first (`.agents/skills/drive-*/SKILL.md`); see [`plan.md`](plan.md) for the full execution sequence. Dependency-respecting order for the build:
+Skills are built **locally in `prisma-next`** first (`skills-contrib/drive-*/SKILL.md`). Dependency-respecting order for the build:
 
 1. **Workflow tier first.** `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`. Writing the workflows first surfaces the atomic-skill contracts they depend on.
 2. **`drive-triage-work` + `drive-discussion` + `drive-run-retro` + `drive-check-health`.** The new atomic skills the workflows call. Built after the workflows so the calling contracts are clear.
@@ -158,7 +158,7 @@ Once the full family is in place locally, a couple of weeks of real work in `pri
 
 After the trial period, the trialed-and-survived family is promoted upstream to `prisma/ignite` as a series of small PRs, each independently reviewable. The per-PR ordering aligns with § 4 above. Per-skill PRs land canonical-side stacked on top of PR #93; consumers of `prisma/ignite` adopt skill-by-skill via `drive-reconcile-skills` (already part of PR #93).
 
-[`plan.md`](plan.md) carries the slice-by-slice schedule including the upstream-promotion slices.
+The slice-by-slice schedule (including the upstream-promotion slices) was tracked in the shaping project's plan and shipped over the project's PR series; see [`trial.md`](trial.md) for the trial-period horizon.
 
 ## 6. What this plan does not decide
 
@@ -171,9 +171,7 @@ After the trial period, the trialed-and-survived family is promoted upstream to 
 
 - [`model.md`](model.md) — pinned domain model (vocabulary + workflows + invariants the skills enforce)
 - [`workflow.md`](workflow.md) — operational lifecycle layered on the model
-- [`spec.md`](spec.md) — what this project delivers; ACs that mention the skill restructuring
-- [`plan.md`](plan.md) — execution plan (build sequence + upstream promotion)
-- [`design-decisions.md`](design-decisions.md) — the alternatives ledger (D17 split rationale; later D24/D25/D26 for the workflow-tier separation, rename, and work-locally-first pivot)
 - [`principles/`](principles/) — the principle docs every augmentation references; gradual-ai-adoption is the principle the workflow-vs-atomic split serves
+- [PR #522](https://github.com/prisma/prisma-next/pull/522) — the shaping + build PR that produced this skill set; closes out the `drive-domain-model` project
 - [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) — the assumed-landed base (project-context convention + QA pair + meta-skills)
 - [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/main/skills/README.md) — naming convention (consistency-preferred)

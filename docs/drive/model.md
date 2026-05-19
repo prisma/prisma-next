@@ -26,7 +26,7 @@ Linear sync:
   the symmetric mid-flight reshape ceremonies.
 ```
 
-This document is the source of truth. The spec ([`spec.md`](spec.md)) sets the project's scope and acceptance criteria; the workflow map ([`workflow.md`](workflow.md)) is the operational layer that names every skill plug-point.
+This document is the source of truth for the Drive domain model. The workflow map ([`workflow.md`](workflow.md)) is the operational layer that names every skill plug-point.
 
 ## Two forcing constraints
 
@@ -472,7 +472,7 @@ The demotion path is heavier — more Linear state to clean up. The agile orches
 
 ## Implications for existing canonical Drive
 
-Sketched here; the full skill-restructure plan with sequencing lives in [`skill-restructure.md`](skill-restructure.md).
+Sketched here; the full skill-restructure plan with sequencing lives in [`skill-conventions.md`](skill-conventions.md).
 
 ### Two skill tiers: workflow and atomic
 
@@ -533,11 +533,11 @@ Resolved during consolidation, recorded here as closed for the historical trail:
 - ~~OQ6. Split `drive-create-spec` / `drive-create-plan` or take a scope flag?~~ **Closed.** Split. The two pairs (`drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`) have genuinely different inputs, outputs, audiences, and shape. A scope flag papers over the difference.
 - ~~OQ10. What happens to "milestone" as a word?~~ **Closed.** Retired from Drive vocabulary entirely.
 
-Still open (working positions): see [`spec.md`](spec.md) § Open questions for the full list with working positions.
+Still open (working positions): the trial period ([`trial.md`](trial.md)) is where these get pressure-tested and resolved.
 
 ## What this document does *not* decide
 
-- The bodies of any skills (skill restructuring lives in [`skill-restructure.md`](skill-restructure.md)).
+- The bodies of any skills (skill restructuring lives in [`skill-conventions.md`](skill-conventions.md)).
 - The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under [`principles/`](principles/)).
 - The migration plan from canonical to the new model (per-consumer adoption is downstream).
 - The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's calibration; [`calibration/prisma-next.md`](calibration/prisma-next.md) is the worked example).
@@ -547,10 +547,9 @@ All of those are downstream. This document is the input.
 ## Pointers
 
 - [`workflow.md`](workflow.md) — operational layer (the lifecycle map with skills + agile parallels + cadences)
-- [`spec.md`](spec.md) — project scope and acceptance criteria
 - [`problem-statement.md`](problem-statement.md) — self-contained problem framing for canonical-side maintainers
-- [`design-decisions.md`](design-decisions.md) — chronological decisions log (the full alternatives ledger)
 - [`principles/`](principles/) — per-principle deep-dives
 - [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration
-- [`skill-restructure.md`](skill-restructure.md) — proposed skill set with augmentations + implementation sequencing
-- [`plan.md`](plan.md) — execution plan (upcoming)
+- [`skill-conventions.md`](skill-conventions.md) — skill set with augmentations + implementation sequencing
+- [`trial.md`](trial.md) — trial-period framing + synthesis pointer
+- [PR #522](https://github.com/prisma/prisma-next/pull/522) — the shaping + build PR (closes out the `drive-domain-model` project; commit history contains the full chronological alternatives ledger)

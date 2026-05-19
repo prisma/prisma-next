@@ -97,7 +97,7 @@ Stacks on top of [PR #93](https://github.com/prisma/ignite/pull/93). The restruc
 
 **Vocabulary refresh** across all unchanged skills — "milestone" and "task" retire; "step" demotes to implementer-internal.
 
-We're building the family locally in `prisma-next` first (`.agents/skills/drive-*/SKILL.md`) and trialing for a couple of weeks of real work. Once we know what survived, we'll open the upstream PR series. [`skill-restructure.md`](skill-restructure.md) has the target inventory; [`plan.md`](plan.md) has the build + promotion sequencing.
+We're building the family locally in `prisma-next` first (`skills-contrib/drive-*/SKILL.md`) and trialing for a couple of weeks of real work. Once we know what survived, we'll open the upstream PR series. [`skill-conventions.md`](skill-conventions.md) has the target inventory; [`trial.md`](trial.md) frames the trial; [TML-2567](https://linear.app/prisma-company/issue/TML-2567/drive-trial-synthesise-findings-and-prepare-upstream-pr-to-ignite) tracks the synthesis + upstream PR.
 
 ## How it leans on PR #93
 
@@ -111,8 +111,8 @@ So the restructure isn't a sweeping rewrite that breaks consumers. Each consumer
 
 ## What we'd like from you
 
-1. A read of [`spec.md`](spec.md) — does the proposed model fit where canonical is heading? Are there constraints we missed (frontmatter conventions, naming patterns, in-flight work we'd collide with)?
-2. A read of [`skill-restructure.md`](skill-restructure.md) — does the workflow-vs-atomic tier split make sense? Does the inventory cover what canonical needs?
+1. A read of this doc and [`model.md`](model.md) — does the proposed model fit where canonical is heading? Are there constraints we missed (frontmatter conventions, naming patterns, in-flight work we'd collide with)?
+2. A read of [`skill-conventions.md`](skill-conventions.md) — does the workflow-vs-atomic tier split make sense? Does the inventory cover what canonical needs?
 3. Pushback on anything that conflicts with where Drive is heading on your side, especially:
    - The two-tier split (workflow skills with `-workflow` suffix vs atomic skills).
    - The new skill names (we tried to follow the dominant `drive-<verb>-<noun>` and `drive-<sub-namespace>-<verb>` shapes; the `-workflow` suffix is a new shape).
@@ -123,11 +123,11 @@ We're not opening the upstream PRs yet — we want to trial the family locally i
 
 ## Where the rest of the material is
 
-- [`spec.md`](spec.md) — full project spec (design, requirements, acceptance criteria, alternatives considered)
 - [`model.md`](model.md) — the pinned domain model in detail (vocabulary, workflows, invariants, Linear sync)
 - [`workflow.md`](workflow.md) — the operational lifecycle map (every skill plugs into a named phase)
-- [`skill-restructure.md`](skill-restructure.md) — workflow → skill map + per-skill verdicts + implementation sequencing
+- [`skill-conventions.md`](skill-conventions.md) — workflow → skill map + per-skill verdicts + implementation sequencing
 - [`principles/`](principles/) — the principles the restructure is built on (protocol-as-memory, brief-discipline, DoR, DoD, retro, etc.)
 - [`calibration/prisma-next.md`](calibration/prisma-next.md) — worked-example calibration showing what `drive/<category>/README.md` overlays look like in practice
-- [`design-decisions.md`](design-decisions.md) — chronological decisions log (alternatives + rationale)
+- [`trial.md`](trial.md) — trial-period framing and findings-recording protocol
+- [PR #522](https://github.com/prisma/prisma-next/pull/522) — the shaping + build PR (closes out the `drive-domain-model` project; includes the chronological decisions log in commit history)
 - [PR #93](https://github.com/prisma/ignite/pull/93) — the assumed-landed base; all proposed PRs stack on top

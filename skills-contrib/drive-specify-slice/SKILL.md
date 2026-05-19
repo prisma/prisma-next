@@ -49,7 +49,7 @@ Slice specs are authored by the implementer (the person / agent who'll do the wo
 - Scope is concrete (named files / surfaces / behaviours), ≤ 1 PR worth.
 - Slice-DoD lists verifiable conditions (binary, observable, includes manual-QA where user-observable surface is touched OR explicit N/A with rationale).
 - Edge cases pre-named with dispositions; new edge cases discovered during slice execution amend the spec via design-discussion (I12).
-- Slice DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Slice DoR) is met or its gaps are recorded.
+- Slice DoR (per [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR) is met or its gaps are recorded.
 
 ## Project context
 
@@ -106,7 +106,7 @@ Verifiable, binary conditions. Examples:
 
 ### Step 8 — Confirm DoR
 
-Walk through Slice DoR (per [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Slice DoR). Either confirm each item is met or record gaps as open questions.
+Walk through Slice DoR (per [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR). Either confirm each item is met or record gaps as open questions.
 
 ### Step 9 — Write / inject
 
@@ -207,8 +207,8 @@ _Residual questions that need answering during or before slice execution. Each w
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Slice (unit); § Layer 5 — invariants I1 + I12
-- [`projects/drive-domain-model/principles/definition-of-ready.md`](/projects/drive-domain-model/principles/definition-of-ready.md) § Slice DoR
-- [`projects/drive-domain-model/principles/definition-of-done.md`](/projects/drive-domain-model/principles/definition-of-done.md) § Slice DoD
-- [`projects/drive-domain-model/principles/brief-discipline.md`](/projects/drive-domain-model/principles/brief-discipline.md) — Example-Mapping edge cases
-- [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17 — split rationale
+- [`docs/drive/model.md`](/docs/drive/model.md) § Slice (unit); § Layer 5 — invariants I1 + I12
+- [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR
+- [`docs/drive/principles/definition-of-done.md`](/docs/drive/principles/definition-of-done.md) § Slice DoD
+- [`docs/drive/principles/brief-discipline.md`](/docs/drive/principles/brief-discipline.md) — Example-Mapping edge cases
+- [`docs/drive/skill-conventions.md`](/docs/drive/skill-conventions.md) — the project-vs-slice split rationale
