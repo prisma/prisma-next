@@ -36,7 +36,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '../postgres-enum-type';
-import { PostgresSchema } from '../postgres-schema';
+import { isPostgresSchema } from '../postgres-schema';
 import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
@@ -73,23 +73,54 @@ import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-ta
 const REBUILD_SUFFIX = '__prisma_next_new';
 
 /**
- * Finds a table by name across all namespaces in the storage.
- * Returns the namespace ID alongside the table so callers always have
- * the full coordinate (namespace ID + table name), not just the table.
+ * Look up a storage table by its explicit namespace coordinate. Returns
+ * `undefined` when the namespace has no table by that name (or no such
+ * namespace exists). Callers that get `undefined` MUST treat it as an
+ * explicit conflict — never silently fall back to a global default
+ * schema or a name-only walk, because that footgun would resolve a
+ * stale or duplicate table name to whichever namespace the iteration
+ * order surfaced first (a real data-loss hazard in multi-namespace
+ * contracts where two namespaces can carry the same table name).
  */
-export function locateTable(
+export function tableAt(
   storage: SqlStorage,
+  namespaceId: string,
   tableName: string,
-): { nsId: string; table: StorageTable } | undefined {
-  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-    // Namespace.tables is typed as Record<string, IRNode> at the interface level;
-    // SQL family namespaces always hold StorageTable instances.
-    const table = ns.tables[tableName] as StorageTable | undefined;
-    if (table !== undefined) {
-      return { nsId, table };
-    }
+): StorageTable | undefined {
+  // Namespace.tables is typed as Record<string, IRNode> at the interface level;
+  // SQL family namespaces always hold StorageTable instances.
+  return storage.namespaces[namespaceId]?.tables[tableName] as StorageTable | undefined;
+}
+
+/**
+ * Default namespace coordinate for an issue that does not carry one
+ * explicitly. Hand-crafted unit-test issues and `extra_table` issues
+ * fall back to `__unbound__`, the only namespace any single-namespace
+ * contract carries — verifier-emitted issues for legacy
+ * single-namespace contracts already stamp this id explicitly. Typed
+ * structurally so issue variants without a `namespaceId` slot
+ * (e.g. `EnumValuesChangedIssue`) flow through to the same fallback.
+ */
+export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: string }): string {
+  return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
+}
+
+/**
+ * Resolve the DDL schema name for a namespace coordinate. Postgres-aware
+ * namespaces dispatch to their polymorphic `ddlSchemaName` override —
+ * named schemas return their own id and the unbound singleton projects
+ * to `'public'` (sibling-present) or the framework sentinel
+ * (sibling-absent). Legacy single-namespace contracts whose `__unbound__`
+ * slot is the framework-default `SqlUnboundNamespace` (rather than the
+ * Postgres-aware `PostgresUnboundSchema`) flow the coordinate through
+ * unchanged so downstream `qualifyTableName` resolves polymorphically.
+ */
+export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: string): string {
+  const namespace = ctx.toContract.storage.namespaces[namespaceId];
+  if (isPostgresSchema(namespace)) {
+    return namespace.ddlSchemaName(ctx.toContract.storage);
   }
-  return undefined;
+  return namespaceId;
 }
 
 /**
@@ -133,54 +164,6 @@ export interface StrategyContext {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
-/**
- * Resolve the schema-coordinate string for a per-table migration op.
- *
- * Resolution order:
- *
- * 1. Explicit `StorageTable.namespaceId` (named schema or
- *    `__unbound__` sentinel) wins — that coordinate flows verbatim
- *    through the migration ops and downstream `qualifyTableName` /
- *    `regclassLiteral` calls dispatch via `postgresCreateNamespace` to
- *    `PostgresSchema(id)` (named) or `PostgresSchema.unbound` (elides
- *    so `search_path` resolves at runtime).
- * 2. When `namespaceId` is absent, inspect the contract's
- *    `SqlStorage.namespaces` map:
- *    - If the unbound slot carries a `PostgresSchema` concretion, the
- *      contract was authored with the Postgres-aware `createNamespace`
- *      factory (FR16a). FR16c then maps the implicit "no coordinate"
- *      bucket to `'public'` if the contract declared one, else to
- *      the framework `__unbound__` sentinel (the only other slot the
- *      author chose to populate).
- *    - Otherwise the namespaces map is the framework family default
- *      (`{ __unbound__: SqlUnboundNamespace.instance }`), which is the
- *      shape every legacy single-namespace contract carries — fall back
- *      to the planner's global `ctx.schemaName` to keep existing
- *      migration fixtures byte-identical.
- */
-export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string): string {
-  const located = locateTable(ctx.toContract.storage, tableName);
-  const nsId = located?.nsId;
-
-  if (nsId === undefined) {
-    return ctx.schemaName;
-  }
-
-  if (nsId !== UNBOUND_NAMESPACE_ID) {
-    return nsId;
-  }
-
-  const namespaces = ctx.toContract.storage.namespaces;
-  const unbound = namespaces[UNBOUND_NAMESPACE_ID];
-  if (!(unbound instanceof PostgresSchema)) {
-    return UNBOUND_NAMESPACE_ID;
-  }
-  if (namespaces['public'] !== undefined) {
-    return 'public';
-  }
-  return UNBOUND_NAMESPACE_ID;
-}
-
 // ============================================================================
 // Call strategies (for issue planner)
 // ============================================================================
@@ -208,12 +191,13 @@ export type CallMigrationStrategy = (
   | { kind: 'no_match' };
 
 function buildColumnSpec(
+  namespaceId: string,
   table: string,
   column: string,
   ctx: StrategyContext,
   overrides?: { nullable?: boolean },
 ) {
-  const col = locateTable(ctx.toContract.storage, table)?.table.columns[column];
+  const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -229,12 +213,13 @@ function buildColumnSpec(
 }
 
 function buildAlterTypeOptions(
+  namespaceId: string,
   table: string,
   column: string,
   ctx: StrategyContext,
   using?: string,
 ) {
-  const col = locateTable(ctx.toContract.storage, table)?.table.columns[column];
+  const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -263,13 +248,14 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
 
-    const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true || column.default !== undefined) continue;
 
     matched.push(issue);
-    const spec = buildColumnSpec(issue.table, issue.column, ctx, { nullable: true });
-    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
+    const spec = buildColumnSpec(namespaceId, issue.table, issue.column, ctx, { nullable: true });
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     calls.push(
       new AddColumnCall(schemaForTable, issue.table, spec),
       new DataTransformCall(
@@ -306,10 +292,13 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   for (const issue of issues) {
     if (issue.kind !== 'type_mismatch') continue;
     if (!issue.table || !issue.column) continue;
+    const namespaceId = resolveNamespaceIdForIssue(issue);
     const fromColumn = ctx.fromContract
-      ? locateTable(ctx.fromContract.storage, issue.table)?.table.columns[issue.column]
+      ? tableAt(ctx.fromContract.storage, namespaceId, issue.table)?.columns[issue.column]
       : undefined;
-    const toColumn = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
+    const toColumn = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
+      issue.column
+    ];
     if (!fromColumn || !toColumn) continue;
     const fromType = fromColumn.nativeType;
     const toType = toColumn.nativeType;
@@ -317,8 +306,8 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     const isSafeWidening = SAFE_WIDENINGS.has(`${fromType}→${toType}`);
     if (!isSafeWidening && !dataAllowed) continue;
     matched.push(issue);
-    const alterOpts = buildAlterTypeOptions(issue.table, issue.column, ctx);
-    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
+    const alterOpts = buildAlterTypeOptions(namespaceId, issue.table, issue.column, ctx);
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     if (isSafeWidening) {
       calls.push(new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts));
     } else {
@@ -353,12 +342,13 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
   for (const issue of issues) {
     if (issue.kind !== 'nullability_mismatch' || !issue.table || !issue.column) continue;
 
-    const column = locateTable(ctx.toContract.storage, issue.table)?.table.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true) continue;
 
     matched.push(issue);
-    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     calls.push(
       new DataTransformCall(
         `handle-nulls-${issue.table}-${issue.column}`,
@@ -391,13 +381,13 @@ function enumRebuildCallRecipe(
     : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
-  const columnRefs: { table: string; column: string }[] = [];
-  for (const ns of Object.values(ctx.toContract.storage.namespaces)) {
+  const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
+  for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
     for (const [tableName, tableNode] of Object.entries(ns.tables)) {
       const table = tableNode as StorageTable;
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef === typeName) {
-          columnRefs.push({ table: tableName, column: columnName });
+          columnRefs.push({ namespaceId: nsId, table: tableName, column: columnName });
         }
       }
     }
@@ -408,7 +398,7 @@ function enumRebuildCallRecipe(
     ...columnRefs.map((ref) => {
       const using = `${ref.column}::text::${tempName}`;
       return new AlterColumnTypeCall(
-        effectiveSchemaForTable(ctx, ref.table),
+        resolveDdlSchemaForNamespace(ctx, ref.namespaceId),
         ref.table,
         ref.column,
         {
@@ -656,7 +646,8 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
-    const contractTable = locateTable(ctx.toContract.storage, issue.table)?.table;
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
     const column = contractTable?.columns[issue.column];
     if (!column) continue;
 
@@ -680,7 +671,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
     matched.push(issue);
 
-    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
 
     if (canUseSharedTempDefault && temporaryDefault !== null) {
       calls.push(

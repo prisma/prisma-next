@@ -177,6 +177,19 @@ export class PostgresUnboundSchema extends PostgresSchema {
 PostgresSchema.unbound = PostgresUnboundSchema.instance;
 
 /**
+ * Narrow an arbitrary namespace (or `undefined`) to `PostgresSchema`
+ * so callers can dispatch to the polymorphic emission methods without
+ * branching at the call site. Uses the structural `kind` discriminator
+ * (`'schema'`) rather than `instanceof` so the check survives realm /
+ * bundle / hot-reload boundaries — matching the rest of the IR's
+ * narrowing convention. `PostgresUnboundSchema` passes through because
+ * it inherits the same `kind: 'schema'` from `PostgresSchema`.
+ */
+export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
+  return (ns as { kind?: unknown } | null | undefined)?.kind === 'schema';
+}
+
+/**
  * Target-supplied `Namespace` factory the Postgres target plumbs
  * through `defineContract({ createNamespace })` and the SQL PSL
  * interpreter. Returns the unbound singleton for the framework

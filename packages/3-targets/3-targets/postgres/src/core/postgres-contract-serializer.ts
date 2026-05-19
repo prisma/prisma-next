@@ -13,7 +13,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
-import { PostgresSchema } from './postgres-schema';
+import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
@@ -79,7 +79,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-      if (ns instanceof PostgresSchema) {
+      if (isPostgresSchema(ns)) {
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
       } else {
         // Family-level SqlNamespacePayload / SqlUnboundNamespace haven't
