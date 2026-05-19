@@ -196,7 +196,5 @@ _Plan-level risks (sequencing assumption that might not hold; parallelisation th
 
 ## References
 
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Project; § Layer 3 — sequencing
-- [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Stack vs parallel
-- [`projects/drive-domain-model/principles/decomposition-and-cost.md`](/projects/drive-domain-model/principles/decomposition-and-cost.md) — sizing discipline this skill enforces
-- [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 17 — split rationale
+- [`drive/plan/README.md`](../../drive/plan/README.md) — stack vs parallel heuristics, sizing reference cases, dispatch overlays
+- [`drive/project/README.md`](../../drive/project/README.md) — slice-composition patterns for this repo
