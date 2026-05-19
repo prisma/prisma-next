@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:1bd4d40e248eb9d1d917a196bb0ee73a9a20a55620e2bb9c8eea00dbffd08e48'>;
+  StorageHashBase<'sha256:7926114e786c1a8fcc103d295a0c7fe5eb414b669ebb5b06a1e816d0019cbe7f'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -136,58 +136,6 @@ type ContractBase = ContractType<
       readonly __unbound__: {
         readonly id: '__unbound__';
         readonly kind: 'sql-namespace';
-        readonly tables: Record<string, never>;
-      };
-      readonly auth: {
-        readonly id: 'auth';
-        readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly user: {
-            columns: {
-              readonly id: {
-                readonly nativeType: 'character';
-                readonly codecId: 'sql/char@1';
-                readonly nullable: false;
-                readonly typeParams: { readonly length: 36 };
-              };
-              readonly email: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly displayName: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly createdAt: {
-                readonly nativeType: 'timestamptz';
-                readonly codecId: 'pg/timestamptz@1';
-                readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-              };
-              readonly kind: {
-                readonly nativeType: 'user_type';
-                readonly codecId: 'pg/enum@1';
-                readonly nullable: false;
-                readonly typeRef: 'user_type';
-              };
-              readonly address: {
-                readonly nativeType: 'jsonb';
-                readonly codecId: 'pg/jsonb@1';
-                readonly nullable: true;
-              };
-            };
-            primaryKey: { readonly columns: readonly ['id'] };
-            uniques: readonly [];
-            indexes: readonly [];
-            foreignKeys: readonly [];
-          };
-        };
-      };
-      readonly public: {
-        readonly id: 'public';
-        readonly kind: 'sql-namespace';
         readonly tables: {
           readonly bug: {
             columns: {
@@ -260,12 +208,12 @@ type ContractBase = ContractType<
             foreignKeys: readonly [
               {
                 readonly source: {
-                  readonly namespaceId: 'public';
+                  readonly namespaceId: '__unbound__';
                   readonly tableName: 'post';
                   readonly columns: readonly ['userId'];
                 };
                 readonly target: {
-                  readonly namespaceId: 'auth';
+                  readonly namespaceId: '__unbound__';
                   readonly tableName: 'user';
                   readonly columns: readonly ['id'];
                 };
@@ -324,12 +272,12 @@ type ContractBase = ContractType<
             foreignKeys: readonly [
               {
                 readonly source: {
-                  readonly namespaceId: 'public';
+                  readonly namespaceId: '__unbound__';
                   readonly tableName: 'task';
                   readonly columns: readonly ['userId'];
                 };
                 readonly target: {
-                  readonly namespaceId: 'auth';
+                  readonly namespaceId: '__unbound__';
                   readonly tableName: 'user';
                   readonly columns: readonly ['id'];
                 };
@@ -338,7 +286,53 @@ type ContractBase = ContractType<
               },
             ];
           };
+          readonly user: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'character';
+                readonly codecId: 'sql/char@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly length: 36 };
+              };
+              readonly email: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly displayName: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly createdAt: {
+                readonly nativeType: 'timestamptz';
+                readonly codecId: 'pg/timestamptz@1';
+                readonly nullable: false;
+                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+              };
+              readonly kind: {
+                readonly nativeType: 'user_type';
+                readonly codecId: 'pg/enum@1';
+                readonly nullable: false;
+                readonly typeRef: 'user_type';
+              };
+              readonly address: {
+                readonly nativeType: 'jsonb';
+                readonly codecId: 'pg/jsonb@1';
+                readonly nullable: true;
+              };
+            };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
+          };
         };
+      };
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'sql-namespace';
+        readonly tables: Record<string, never>;
       };
     };
     readonly types: {

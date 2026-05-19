@@ -392,67 +392,6 @@
       "__unbound__": {
         "id": "__unbound__",
         "kind": "postgres-unbound-schema",
-        "tables": {}
-      },
-      "auth": {
-        "id": "auth",
-        "kind": "postgres-schema",
-        "tables": {
-          "user": {
-            "columns": {
-              "address": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": true
-              },
-              "createdAt": {
-                "codecId": "pg/timestamptz@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
-                },
-                "nativeType": "timestamptz",
-                "nullable": false
-              },
-              "displayName": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
-                }
-              },
-              "kind": {
-                "codecId": "pg/enum@1",
-                "nativeType": "user_type",
-                "nullable": false,
-                "typeRef": "user_type"
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
-          }
-        }
-      },
-      "public": {
-        "id": "public",
-        "kind": "postgres-schema",
         "tables": {
           "bug": {
             "columns": {
@@ -532,14 +471,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "public",
+                  "namespaceId": "__unbound__",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "auth",
+                  "namespaceId": "__unbound__",
                   "tableName": "user"
                 }
               }
@@ -609,14 +548,14 @@
                   "columns": [
                     "userId"
                   ],
-                  "namespaceId": "public",
+                  "namespaceId": "__unbound__",
                   "tableName": "task"
                 },
                 "target": {
                   "columns": [
                     "id"
                   ],
-                  "namespaceId": "auth",
+                  "namespaceId": "__unbound__",
                   "tableName": "user"
                 }
               }
@@ -628,8 +567,63 @@
               ]
             },
             "uniques": []
+          },
+          "user": {
+            "columns": {
+              "address": {
+                "codecId": "pg/jsonb@1",
+                "nativeType": "jsonb",
+                "nullable": true
+              },
+              "createdAt": {
+                "codecId": "pg/timestamptz@1",
+                "default": {
+                  "expression": "now()",
+                  "kind": "function"
+                },
+                "nativeType": "timestamptz",
+                "nullable": false
+              },
+              "displayName": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "email": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "kind": {
+                "codecId": "pg/enum@1",
+                "nativeType": "user_type",
+                "nullable": false,
+                "typeRef": "user_type"
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
           }
-        },
+        }
+      },
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
+        "tables": {},
         "types": {
           "user_type": {
             "codecId": "pg/enum@1",
@@ -644,7 +638,7 @@
         }
       }
     },
-    "storageHash": "sha256:1bd4d40e248eb9d1d917a196bb0ee73a9a20a55620e2bb9c8eea00dbffd08e48",
+    "storageHash": "sha256:7926114e786c1a8fcc103d295a0c7fe5eb414b669ebb5b06a1e816d0019cbe7f",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

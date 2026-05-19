@@ -24,8 +24,8 @@ namespace auth {
     createdAt   DateTime  @default(now())
     kind        user_type
     address     Address?
-    posts       Post[]
-    tasks       Task[]
+    posts       public.Post[]
+    tasks       public.Task[]
 
     @@map("user")
   }
@@ -39,7 +39,7 @@ namespace public {
     createdAt DateTime       @default(now())
     embedding Embedding1536?
 
-    user User @relation(fields: [userId], references: [id])
+    user auth.User @relation(fields: [userId], references: [id])
 
     @@map("post")
   }
@@ -53,7 +53,7 @@ namespace public {
     userId      String
     createdAt   DateTime @default(now())
 
-    user User @relation(fields: [userId], references: [id])
+    user auth.User @relation(fields: [userId], references: [id])
 
     @@discriminator(type)
     @@map("task")
