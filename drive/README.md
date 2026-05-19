@@ -2,12 +2,12 @@
 
 This directory is **prisma-next's home for project-context Drive memory** — the team's accumulated lessons, calibrations, and conventions overlaid onto the canonical Drive skill bodies.
 
-Per [`projects/drive-domain-model/principles/protocol-as-memory.md`](../projects/drive-domain-model/principles/protocol-as-memory.md), the methodology has two memory homes:
+Per the **protocol-as-memory** architecture (canonical skill bodies vs project-context READMEs under `drive/<category>/`, documented in this directory), the methodology has two memory homes:
 
 - **Canonical skill bodies** (in `.agents/skills/drive-*/SKILL.md`, eventually pulled from upstream `prisma/ignite`). Portable methodology — the protocol every team adopts.
 - **Project-context READMEs** (here, under `drive/<category>/README.md`). Team-specific protocol — the lessons, the calibrations, the failure-mode catalogues that don't generalise across teams.
 
-Both are loaded by drive-* skills at workflow entry. Both are human-readable and human-runnable (per [`gradual-ai-adoption.md`](../projects/drive-domain-model/principles/gradual-ai-adoption.md)). A team member who hasn't invoked a single drive-* skill can read these directly to consult the team's protocol.
+Both are loaded by drive-* skills at workflow entry. Both are human-readable and human-runnable (workflow vs atomic skill tiers — operators can run steps manually without invoking skills). A team member who hasn't invoked a single drive-* skill can read these directly to consult the team's protocol.
 
 ## Categories
 
@@ -25,7 +25,7 @@ Both are loaded by drive-* skills at workflow entry. Both are human-readable and
 
 Lessons accumulate here from `drive-run-retro` invocations. When a lesson generalises across teams, it gets promoted to canonical via `drive-update-skills` ([PR #93](https://github.com/prisma/ignite/pull/93)). When a canonical body changes upstream, `drive-reconcile-skills` flags overlays that may now be redundant or contradictory.
 
-The split between canonical (portable) and project-context (team-specific) is the load-bearing architecture per [`protocol-as-memory.md`](../projects/drive-domain-model/principles/protocol-as-memory.md). Don't move team-specific things into canonical; don't keep cross-team things only in project-context.
+The split between canonical (portable) and project-context (team-specific) is the load-bearing protocol-as-memory architecture. Don't move team-specific things into canonical; don't keep cross-team things only in project-context.
 
 ## Status: seeded scaffolds
 
