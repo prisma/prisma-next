@@ -5,7 +5,11 @@ import {
   NamespaceBase,
 } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  ForeignKey,
+  SqlNamespaceTablesInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -34,8 +38,8 @@ class StubNamespace extends NamespaceBase {
   }
 }
 
-function createStubNamespace(id: string): Namespace {
-  return new StubNamespace(id);
+function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
+  return new StubNamespace(input.id);
 }
 
 const baseInput = {

@@ -520,7 +520,7 @@ model Post {
       scalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
-      createNamespace: (id) => new StubNamespace(id),
+      createNamespace: (input) => new StubNamespace(input.id),
     });
 
     expect(pslContract.ok).toBe(true);
@@ -552,7 +552,7 @@ model Post {
       family: sqlFamilyPack,
       target: portablePostgresTargetPack,
       namespaces: ['auth'],
-      createNamespace: (id) => new StubNamespace(id),
+      createNamespace: (input) => new StubNamespace(input.id),
       models: { User, Post },
     });
 

@@ -7,6 +7,7 @@ import {
 } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
@@ -36,8 +37,8 @@ class StubNamespace extends NamespaceBase {
   }
 }
 
-function createStubNamespace(id: string): Namespace {
-  return new StubNamespace(id);
+function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
+  return new StubNamespace(input.id);
 }
 
 import {

@@ -9,6 +9,7 @@ import {
   type Namespace,
   NamespaceBase,
 } from '@prisma-next/framework-components/ir';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 
@@ -32,8 +33,8 @@ class StubNamespace extends NamespaceBase {
   }
 }
 
-function createStubNamespace(id: string): Namespace {
-  return new StubNamespace(id);
+function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
+  return new StubNamespace(input.id);
 }
 
 const sqlFamilyPack = {

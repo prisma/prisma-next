@@ -76,23 +76,22 @@ describe('PostgresUnboundSchema', () => {
 });
 
 describe('postgresCreateNamespace factory', () => {
-  it('returns the unbound singleton for the framework-reserved sentinel', () => {
-    const namespace = postgresCreateNamespace(UNBOUND_NAMESPACE_ID);
-    expect(namespace).toBe(PostgresSchema.unbound);
+  it('returns a PostgresUnboundSchema for the framework-reserved sentinel', () => {
+    const namespace = postgresCreateNamespace({ id: UNBOUND_NAMESPACE_ID });
     expect(namespace).toBeInstanceOf(PostgresUnboundSchema);
     expect(namespace.qualifyTable('users')).toBe('"users"');
   });
 
   it('materialises a fresh PostgresSchema instance for any named coordinate', () => {
-    const auth = postgresCreateNamespace('auth');
+    const auth = postgresCreateNamespace({ id: 'auth' });
     expect(auth).toBeInstanceOf(PostgresSchema);
     expect(auth.id).toBe('auth');
     expect(auth.qualifyTable('users')).toBe('"auth"."users"');
   });
 
   it('returns distinct PostgresSchema instances for distinct named coordinates', () => {
-    const auth = postgresCreateNamespace('auth');
-    const billing = postgresCreateNamespace('billing');
+    const auth = postgresCreateNamespace({ id: 'auth' });
+    const billing = postgresCreateNamespace({ id: 'billing' });
     expect(auth).not.toBe(billing);
     expect(auth.id).toBe('auth');
     expect(billing.id).toBe('billing');

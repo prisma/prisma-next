@@ -6,6 +6,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -53,8 +54,8 @@ class StubNamespace extends NamespaceBase {
   }
 }
 
-function createStubNamespace(id: string): Namespace {
-  return new StubNamespace(id);
+function createStubNamespace(input: SqlNamespaceTablesInput): Namespace {
+  return new StubNamespace(input.id);
 }
 
 const int4Column = columnDescriptor('pg/int4@1');
