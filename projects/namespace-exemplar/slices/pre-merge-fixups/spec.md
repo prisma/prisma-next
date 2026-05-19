@@ -96,6 +96,201 @@ The blast radius is small in practice (standard Postgres identifiers are `[a-z_]
 - **AC5.1.** The PSL-reserved-namespace diagnostic test asserts the diagnostic carries a non-`undefined` `span`.
 - **AC5.2.** No implementation change required; the test alone should pass with current code.
 
+## Dispatches
+
+Item 1 is L by `drive/calibration/sizing.md` (substrate field + every SQL-side consumer + helper deletions + new polymorphic method + multi-package). Decomposed below into 6 S/M dispatches. Items 2–5 are XS/S leaves and run as single dispatches. Execution order: Item 1 chain (1.a → 1.f) first to keep the structural fix contiguous for review continuity, then leaves (2 → 3 → 4 → 5).
+
+Validation gates per dispatch use the standard harness — `pnpm typecheck`, `pnpm test:packages -- <pkg>`, scoped greps for the grep-gated ACs. The slice DoD (AC1.6 + analogues) runs the full workspace gate after dispatch 5.
+
+### Dispatch 1.a — Add `namespaceId?: string` to `BaseSchemaIssue` (XS)
+
+**Intent.** Type-only change. Field is optional, populated by family verifiers later in the chain. Mongo doesn't populate; the field stays absent for Mongo issues.
+
+**Files in play.**
+- `packages/1-framework/1-core/framework-components/src/control/control-result-types.ts` — add field with the doc-comment shape from AC1.1.
+
+**Done when.**
+- [ ] `pnpm typecheck` clean at the framework-components package and downstream consumers (Mongo verifier, SQL family verifier, both planners — all currently use only existing fields, so addition is purely additive).
+- [ ] Grep gate: `rg "readonly namespaceId" packages/1-framework/1-core/framework-components/src/control/control-result-types.ts` returns the new field.
+
+**ACs satisfied (partial).** AC1.1 (the field exists).
+
+**Out of scope.** Populating the field; reading the field; restructuring `BaseSchemaIssue` (TML-2585 territory).
+
+---
+
+### Dispatch 1.b — SQL family verifier populates `namespaceId` at every issue construction site (M)
+
+**Intent.** Every SQL-side `issues.push({ kind: …, table: tableName, … })` site stamps `namespaceId` from the verifier's outer namespace walk. `extra_table` (DB-side table not in any contract namespace) is the only exception — field stays absent because there's no contract coordinate to record.
+
+**Files in play.**
+- `packages/2-sql/9-family/src/core/schema-verify/verify-sql-schema.ts` — thread `namespaceId` through `verifyTableChildren`, `collectContractColumnNodes`, `appendExtraColumnNodes`, `verifyColumn` options. Stamp at every `issues.push({ kind: 'missing_table' | 'missing_column' | 'extra_column' | 'extra_primary_key' | 'type_mismatch' | 'nullability_mismatch' | 'default_missing' | 'default_mismatch' | 'extra_default', ... })` site.
+- `packages/2-sql/9-family/src/core/schema-verify/verify-helpers.ts` — extend `verifyPrimaryKey`, `verifyForeignKeys`, `verifyUniqueConstraints`, `verifyIndexes` signatures with `namespaceId: string`; stamp at their construction sites (`primary_key_mismatch`, `foreign_key_mismatch`, `extra_foreign_key`, `unique_constraint_mismatch`, `extra_unique_constraint`, `index_mismatch`, `extra_index`).
+
+**Done when.**
+- [ ] `pnpm typecheck` clean.
+- [ ] `pnpm test:packages -- packages/2-sql/9-family` green (existing schema-verify tests; no behaviour change in pass/fail outcomes, only `namespaceId` now present on issue objects).
+- [ ] Grep gate: every `issues.push({ kind: 'X', table: ... })` site in `packages/2-sql/9-family/src/core/schema-verify/` also sets `namespaceId:`, except the `extra_table` site (which has no contract coordinate — verifier-side comment explains why).
+- [ ] Mongo verifier tests untouched and still pass.
+
+**ACs satisfied (partial).** AC1.2.
+
+**Out of scope.** Anyone reading the field (planners — that's 1.d/1.e); the polymorphism promotion (1.c).
+
+---
+
+### Dispatch 1.c — Promote `effectiveSchemaForTable`'s Layer 3 to polymorphic `ddlSchemaName()` (S)
+
+**Intent.** Replace the `instanceof PostgresSchema` + `public`-vs-sentinel projection logic from `effectiveSchemaForTable` (lines 165–182 of `planner-strategies.ts`) with a `ddlSchemaName(contract: Contract): string` instance method on `PostgresSchema` and `PostgresUnboundSchema`. Pattern is a sibling of the existing `qualifyTable` polymorphic dispatch. Existing `instanceof PostgresSchema` check in planner code (one site) goes away.
+
+**Files in play.**
+- `packages/3-targets/3-targets/postgres/src/core/postgres-schema.ts` — add `ddlSchemaName(contract)` method on `PostgresSchema` (returns own id) and on `PostgresUnboundSchema` (returns `'public'` if contract has a `public` namespace, else `UNBOUND_NAMESPACE_ID`).
+- New tests for both concretions in `packages/3-targets/3-targets/postgres/test/postgres-schema.test.ts` covering the unbound→public projection and unbound→sentinel fallback.
+
+**Done when.**
+- [ ] `pnpm typecheck` clean.
+- [ ] `pnpm test:packages -- packages/3-targets/3-targets/postgres` green; new tests cover both unbound projection paths.
+- [ ] Grep gate: `rg "ddlSchemaName" packages/3-targets/3-targets/postgres/src/` shows the new method on both concretions.
+
+**ACs satisfied (partial).** AC1.4 (the polymorphic method exists; the planner-side `instanceof` removal lands in 1.d).
+
+**Out of scope.** Planner consumer rewrite (1.d).
+
+---
+
+### Dispatch 1.d — Postgres planner consumers + delete helpers + F01 regression test goes green (M)
+
+**Intent.** Replace every `effectiveSchemaForTable(ctx, issue.table)` with `issue.namespaceId` (or `ddlSchemaName(toContract)` resolution when the namespace is `UNBOUND_NAMESPACE_ID`). Replace every `locateTable(ctx.toContract.storage, issue.table)?.table` with `tableAt(storage, issue.namespaceId, issue.table)` (a new 3-arg helper that requires the coordinate). The FK-ref site at line 411 carries `nsId` from its enclosing walk. Delete `effectiveSchemaForTable` and `locateTable`. Add the F01 regression test from AC1.5 (it's red until this dispatch; green after).
+
+**Files in play.**
+- `packages/3-targets/3-targets/postgres/src/core/migrations/planner-strategies.ts` — delete `effectiveSchemaForTable`; delete `locateTable`; introduce `tableAt(storage, namespaceId, tableName): StorageTable | undefined`; update the 7 `effectiveSchemaForTable` call sites and the ~13 `locateTable` call sites; update the FK-ref site in `enumRebuildCallRecipe` to carry `nsId` through the walk.
+- `packages/3-targets/3-targets/postgres/src/core/migrations/issue-planner.ts` — drop the imports + update 11 caller sites (case branches all already have `issue.table` and now `issue.namespaceId` in scope).
+- `packages/3-targets/3-targets/postgres/test/migrations/issue-planner.test.ts` — add the AC1.5 regression test (stale-namespace `missing_table` → explicit conflict) and a positive companion (correct `namespaceId` → correctly-qualified DDL).
+
+**Done when.**
+- [ ] `pnpm typecheck` clean.
+- [ ] `pnpm test:packages -- packages/3-targets/3-targets/postgres` green, including the new F01 regression tests.
+- [ ] `pnpm fixtures:check` clean (planner-strategies refactor should be byte-identical for single-namespace contracts because `issue.namespaceId === UNBOUND_NAMESPACE_ID` → `ddlSchemaName(contract)` returns the same result as the deleted Layer-3 logic).
+- [ ] Grep gates: `rg "effectiveSchemaForTable|locateTable\b" packages/3-targets/3-targets/postgres/src/` returns zero matches; `rg "instanceof PostgresSchema" packages/3-targets/3-targets/postgres/src/core/migrations/` returns zero matches.
+
+**ACs satisfied.** AC1.3 (Postgres half), AC1.4 (planner consumes `ddlSchemaName` instead of `instanceof`), AC1.5.
+
+**Out of scope.** SQLite (1.e); emitter (1.f).
+
+---
+
+### Dispatch 1.e — SQLite planner consumers + delete SQLite `locateTable` (S)
+
+**Intent.** Same shape as 1.d, narrower surface. SQLite has no `effectiveSchemaForTable` and no Layer-3 unbound-projection (single-schema engine), so the work is just `locateTable` → `tableAt` swap + helper deletion.
+
+**Files in play.**
+- `packages/3-targets/3-targets/sqlite/src/core/migrations/planner-strategies.ts` — delete `locateTable`; introduce or import `tableAt`; update 3 call sites.
+- `packages/3-targets/3-targets/sqlite/src/core/migrations/issue-planner.ts` — update 4 call sites.
+
+**Done when.**
+- [ ] `pnpm typecheck` clean.
+- [ ] `pnpm test:packages -- packages/3-targets/3-targets/sqlite` green.
+- [ ] `pnpm fixtures:check` clean for SQLite fixtures.
+- [ ] Grep gate: `rg "locateTable\b" packages/3-targets/3-targets/sqlite/src/` returns zero matches.
+
+**ACs satisfied.** AC1.3 (SQLite half).
+
+**Open decision for the implementer (surface, do not silently resolve).** Where does the shared `tableAt` helper live? Two reasonable answers: (i) duplicate the trivial 1-liner per target; (ii) lift to a small shared utility in `packages/2-sql/9-family/` and import from both targets. Default to (i) unless the implementer hits friction; either choice is acceptable per the slice spec — surface the call in the dispatch's heartbeat / report.
+
+---
+
+### Dispatch 1.f — Emitter FK-ref `findSqlTable` call site → direct access (S)
+
+**Intent.** Replace `findSqlTable(storage, fk.target.tableName)` at line 210 of the emitter with `storage.namespaces[fk.target.namespaceId]?.tables[fk.target.tableName] as StorageTable | undefined` — `ForeignKeyReference.namespaceId` already exists. The two model-side `findSqlTable` callers (lines 118, 283) stay; they're tagged as deferred to TML-2584.
+
+**Files in play.**
+- `packages/2-sql/3-tooling/emitter/src/index.ts` — replace the FK-ref call site; leave `findSqlTable` defined for the two model-side callers; add a brief comment above `findSqlTable` referencing TML-2584 as the ticket that finishes the deletion.
+
+**Done when.**
+- [ ] `pnpm typecheck` clean.
+- [ ] `pnpm test:packages -- packages/2-sql/3-tooling/emitter` green.
+- [ ] Grep gate: `rg "findSqlTable.*fk\.target" packages/2-sql/3-tooling/emitter/src/index.ts` returns zero matches; `rg "findSqlTable" packages/2-sql/3-tooling/emitter/src/index.ts` shows only the function definition + the two model-side call sites + the TML-2584 comment.
+
+**ACs satisfied.** AC1.3 (emitter portion of the gate).
+
+---
+
+### Dispatch 2 — TML-2583 reference comments above the two snapshot-read-shapes exclusions (XS)
+
+**Intent.** Two `// TML-2583: …` comments per AC2.1.
+
+**Files in play.**
+- `packages/3-targets/3-targets/postgres/test/snapshot-read-shapes.test.ts` — annotate the two `if (rel.startsWith('examples/.../migrations/'))` lines.
+
+**Done when.**
+- [ ] `pnpm test:packages -- packages/3-targets/3-targets/postgres` green (no logic change).
+- [ ] Grep gate: `rg "TML-2583" packages/3-targets/3-targets/postgres/test/snapshot-read-shapes.test.ts` returns 2 matches.
+
+**ACs satisfied.** AC2.1, AC2.2.
+
+---
+
+### Dispatch 3 — Generic `deserializeContract<T>(json): T` + drop demo cast (S)
+
+**Intent.** Make the family-level `deserializeContract` generic with a `Contract` default. Existing un-typed call sites stay typing-clean (default kicks in). Drop the demo's `as unknown as typeof contract` cast in favour of `deserializeContract<typeof contract>(json)`.
+
+**Files in play.**
+- `packages/2-sql/9-family/src/core/ir/sql-contract-serializer-base.ts` — add `<T extends Contract = Contract>` to `deserializeContract`; return `T`.
+- (If Mongo has a sibling, mirror it for parity: `packages/2-mongo-family/.../mongo-contract-serializer-base.ts`.)
+- `examples/prisma-next-demo/src/prisma-no-emit/context.ts` — replace the cast with `deserializeContract<typeof contract>(json)`.
+
+**Done when.**
+- [ ] `pnpm typecheck` clean across the workspace (cross-package: every existing un-typed `deserializeContract(json)` call must still resolve via the default).
+- [ ] `pnpm test:packages` workspace-wide green.
+- [ ] Grep gate: zero new `as unknown as` casts introduced; the existing demo cast is gone.
+
+**ACs satisfied.** AC3.1, AC3.2, AC3.3, AC3.4.
+
+---
+
+### Dispatch 4 — `hasForeignKey` key-encoding fix + collision test (S)
+
+**Intent.** Replace the pipe-separator key encoding in `planner-schema-lookup.ts` with a structurally unambiguous one (JSON tuple or `\u0000` separator). Add a unit test exercising an identifier containing `|` / `||`.
+
+**Files in play.**
+- `packages/3-targets/3-targets/postgres/src/core/migrations/planner-schema-lookup.ts` — replace both qualified + unqualified key construction.
+- `packages/3-targets/3-targets/postgres/test/migrations/planner-schema-lookup.test.ts` (new or existing) — add the collision test.
+
+**Done when.**
+- [ ] `pnpm typecheck` clean.
+- [ ] `pnpm test:packages -- packages/3-targets/3-targets/postgres` green, including the new collision test.
+- [ ] `pnpm fixtures:check` clean (encoding change is internal to the lookup map — no fixtures touched).
+
+**ACs satisfied.** AC4.1, AC4.2, AC4.3.
+
+---
+
+### Dispatch 5 — AC4 span assertion on the PSL-reserved-namespace test (XS)
+
+**Intent.** Add `expect(diagnostic.span).toBeDefined()` to the existing `namespace unbound { … }` diagnostic test.
+
+**Files in play.**
+- `packages/2-sql/2-authoring/contract-psl/test/interpreter.diagnostics.test.ts` — single-line addition.
+
+**Done when.**
+- [ ] `pnpm test:packages -- packages/2-sql/2-authoring/contract-psl` green; the new assertion passes with current implementation (no source change).
+
+**ACs satisfied.** AC5.1, AC5.2.
+
+---
+
+### Slice DoD (after dispatch 5)
+
+The final dispatch is followed by a closing gate that confirms the slice is review-clean:
+
+- [ ] `pnpm typecheck`
+- [ ] `pnpm test:packages`
+- [ ] `pnpm fixtures:check`
+- [ ] `pnpm lint:deps`
+- [ ] AC scoreboard in `reviews/code-review.md` shows every AC PASS.
+
+That re-states AC1.6 + the analogous closing checks for Items 2–5. The slice closes only when this gate passes.
+
 ## Architectural insights surfaced during scoping
 
 These don't change the slice's scope; they're recorded here so they don't get lost in chat:
