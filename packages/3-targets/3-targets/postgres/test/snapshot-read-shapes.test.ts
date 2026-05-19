@@ -123,13 +123,13 @@ describe('snapshot-read shape scan — checked-in on-disk contracts deserialize 
     // DATABASE_URL and is being tracked as a follow-up. Skip from
     // the strict-validation scan.
     if (rel.startsWith('examples/prisma-next-postgis-demo/migrations/')) return false;
-    // Historical migration snapshots in the demo and cipherstash-integration
-    // examples were emitted before the per-namespace storage shape landed,
-    // so they carry legacy `storage.tables` (flat) and untagged
+    // TML-2583: re-baseline historical migration snapshots in the demo
+    // and cipherstash-integration examples against the post-namespace
+    // storage shape. They were emitted before the per-namespace shape
+    // landed, so they carry legacy `storage.tables` (flat) and untagged
     // `storage.types` entries. Regenerating them in-place would rewrite
     // committed migration history (and require DATABASE_URL for the
-    // cipherstash example); tracked as a follow-up to re-baseline these
-    // examples against the post-namespace shape.
+    // cipherstash example).
     if (rel.startsWith('examples/prisma-next-demo/migrations/')) return false;
     if (rel.startsWith('examples/cipherstash-integration/migrations/')) return false;
     return true;

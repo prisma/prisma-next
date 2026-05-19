@@ -196,8 +196,8 @@ function mapIssueToCall(
   ctx: StrategyContext,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
   const { schemaName, codecHooks, storageTypes } = ctx;
-  // Per-table effective schema (FR15 namespaces). `extra_table` issues
-  // intentionally omit `namespaceId` — the live DB carries a table that
+  // Per-table effective schema. `extra_table` issues intentionally
+  // omit `namespaceId` — the live DB carries a table that
   // is not claimed by any contract namespace, so there is no contract
   // coordinate to project from. Those issues fall back to the planner's
   // global `ctx.schemaName`; every other issue dispatches through the
