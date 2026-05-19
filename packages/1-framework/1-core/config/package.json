@@ -19,7 +19,7 @@
     "@prisma-next/contract": "workspace:0.9.0",
     "@prisma-next/framework-components": "workspace:0.9.0",
     "@prisma-next/utils": "workspace:0.9.0",
-    "arktype": "^2.1.29"
+    "arktype": "^2.2.0"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:0.9.0",

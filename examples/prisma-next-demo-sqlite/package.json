@@ -29,7 +29,7 @@
     "@prisma-next/sql-relational-core": "workspace:0.9.0",
     "@prisma-next/sql-runtime": "workspace:0.9.0",
     "@prisma-next/target-sqlite": "workspace:0.9.0",
-    "arktype": "^2.1.29",
+    "arktype": "^2.2.0",
     "dotenv": "^17.4.2"
   },
   "devDependencies": {
