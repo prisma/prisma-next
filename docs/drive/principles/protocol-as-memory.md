@@ -80,7 +80,7 @@ You'll sometimes edit `.agents/skills/drive-*/SKILL.md` in your repo to patch be
 
 | Skill | What it does | When to run it |
 |---|---|---|
-| **`drive-reconcile-skills`** | Walks every `drive-*` skill in your `.agents/skills/`, diffs each against canonical. For each delta: if it looks team-specific, moves it into the matching `drive/<category>/README.md`; if it looks generally useful, writes it to `wip/drive-upstream-improvements.md` for you to triage. Then replaces the local skill body with the canonical version. Idempotent. | When the local copy has drifted: new team member arrives, you've been patching, after a big upstream rewrite. |
+| **`drive-reconcile-skills`** | Walks every `drive-*` skill in your `.agents/skills/`, diffs each against canonical. For each delta: if it looks team-specific, moves it into the matching `drive/<category>/README.md`; if it looks generally useful, writes it to an operator-scratch upstream-improvements file (untracked) for you to triage. Then replaces the local skill body with the canonical version. Idempotent. | When the local copy has drifted: new team member arrives, you've been patching, after a big upstream rewrite. |
 | **`drive-update-skills`** | Pulls canonical updates without the reconciliation step. Safe when you trust there's no drift. | Most days. |
 
 Both ship in [PR #93](https://github.com/prisma/ignite/pull/93). Together they're how lessons flow between your repo and canonical without anyone editing the local skill copy and forgetting.
@@ -117,7 +117,7 @@ Surfaces, strongest to weakest:
 | Canonical `drive-*` skill bodies in `prisma/ignite` | When that skill runs | Conditional, shared across teams |
 | `docs/` | Only when something else links to it | Weak |
 | `projects/<x>/` | Only during that project's lifetime, only by skills working inside it | Transient |
-| `wip/` | Not loaded by anything | None — this is scratch, not memory |
+| Operator scratch (untracked working notes, draft files outside the tracked tree) | Not loaded by anything | None — this is scratch, not memory |
 
 `drive/<category>/README.md` is the strongest landing surface for a lesson specific to one skill family. It's only weaker than the always-loaded surfaces, and stronger than `docs/` because something has to actively link to a doc for an agent to find it.
 
@@ -138,7 +138,7 @@ The mechanics of retros (when they fire, what triggers count, the template) live
 ## Anti-patterns
 
 1. **Editing the local skill copy and not running `drive-reconcile-skills`.** Patches accumulate; the team's lessons get trapped in stale local copies; canonical slowly diverges from what teams actually use. Reconcile periodically.
-2. **Writing lessons into `wip/` or into a one-off PR description.** Nothing reads `wip/`; nothing re-reads old PR descriptions. The lesson exists in commit history but not in any surface that fires on the next dispatch. By the time someone hits the same failure, no agent on the path has any way to know.
+2. **Writing lessons into operator scratch or into a one-off PR description.** Nothing reads untracked scratch files; nothing re-reads old PR descriptions. The lesson exists in commit history but not in any surface that fires on the next dispatch. By the time someone hits the same failure, no agent on the path has any way to know.
 3. **A long skill body crammed with every team's specifics.** A 10,000-word skill body is past what the orchestrator agent can usefully hold. Canonical bodies stay small; team-specific detail goes in `drive/<category>/README.md` and gets pulled in only when relevant.
 4. **Editing entries in `drive/<category>/README.md` you previously wrote.** Add new entries as new entries — accretion, not editing. The team that hits the failure for the second time consults the existing entry rather than rediscovering it. Edit existing entries only to refine an inadequate mitigation, never to "clean up" the catalogue.
 5. **Retros where someone says "we should add a check for that" and nobody adds it.** The lesson exists in the operator's head; the team doesn't have it. The retro isn't complete until the commit lands.

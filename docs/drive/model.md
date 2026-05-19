@@ -2,7 +2,7 @@
 
 ## At a glance
 
-Drive's domain model has three sized **units of work** (Direct change, Slice, Project), one **delegation unit** (Dispatch), eight **workflows** (seven lifecycle-stage + one cross-cutting), three **aggregate roots** that the workflows mutate, and twelve **invariants** that hold across everything. Two forcing constraints — the PR cap (units of work) and the M-cap (dispatches) — keep work appropriately sized; an anti-corruption layer maps Drive's units to Linear's.
+Drive's domain model has three sized **units of work** (Direct change, Slice, Project), one **delegation unit** (Dispatch), eight **workflows** (seven lifecycle-stage + one cross-cutting), three **aggregate roots** that the workflows mutate, and twelve **invariants** that hold across everything. Two forcing constraints — the PR cap (units of work) and the M-cap (dispatches) — keep work appropriately sized; an anti-corruption layer maps Drive's units to the team's tracker.
 
 ```
 Sized units (smallest → largest):
@@ -21,8 +21,8 @@ Forcing constraints:
   Units of work bounded by PR cap (triage enforces).
   Dispatches bounded by M cap (slice planning enforces; slice execution refuses L/XL).
 
-Linear sync:
-  Anti-corruption layer maps Drive units → Linear units; promotion + demotion are
+Tracker sync:
+  Anti-corruption layer maps Drive units → tracker units; promotion + demotion are
   the symmetric mid-flight reshape ceremonies.
 ```
 
@@ -105,17 +105,18 @@ The terms below are pinned. Every drive-* skill body uses these and only these f
 │  Project-scope; not slice-scope.                              │
 └───────────────────────────────────────────────────────────────┘
 
-╔═ Tracker context (Linear) — external ═════════════════════════╗
-║  Linear project, Linear milestone, Linear issue,              ║
+╔═ Tracker context — external ══════════════════════════════════╗
+║  Tracker project, tracker milestone, tracker issue,           ║
 ║  status update, workflow state.                               ║
 ║  Anti-corruption layer between Planning and Tracker:          ║
-║  Drive units translate outward to Linear units via fixed      ║
-║  mapping (§ Linear sync). Drive's domain does not depend on   ║
+║  Drive units translate outward to tracker units via a fixed   ║
+║  mapping (§ Tracker sync). Drive's domain does not depend on  ║
 ║  Tracker concepts.                                            ║
+║  Worked examples: Linear, Jira, GitHub Issues.                ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
 
-The Planning context is what Drive owns. The Execution context is below-the-line; Drive doesn't prescribe its internals. Review and Deployment are adjacent — Drive serves them but doesn't own their rhythm. The Tracker context (Linear) is external; the anti-corruption layer keeps Drive's domain uncorrupted by Linear's data model.
+The Planning context is what Drive owns. The Execution context is below-the-line; Drive doesn't prescribe its internals. Review and Deployment are adjacent — Drive serves them but doesn't own their rhythm. The Tracker context is external; the anti-corruption layer keeps Drive's domain uncorrupted by the tracker's data model.
 
 ## Layer 2: roles and personas
 
@@ -148,7 +149,7 @@ These sit on top of (and refine) the four-stage lifecycle described in [the skil
 Runs at every entry point AND mid-flight when scope shifts. Currently absent from canonical Drive. Without it, the canonical's project-shape gravity (only `drive-create-project` exposes an entry path) wins by default and small work gets coerced into project-scope.
 
 ```text
-Triggered by:  (a) a fresh entry point — Linear ticket, bug report,
+Triggered by:  (a) a fresh entry point — tracker ticket, bug report,
                    customer ask, "I should do X" thought, a
                    scope-deferred candidate from a prior project; OR
                (b) new work surfacing mid-flight inside another
@@ -180,9 +181,9 @@ Decision tree:
 
 Mid-flight variants:
   - PROMOTE: an in-flight slice has grown beyond one PR. Route to
-    promotion workflow (§ Linear sync — Promotion pattern).
+    promotion workflow (§ Tracker sync — Promotion pattern).
   - DEMOTE: an in-flight project has shrunk to fit one PR. Route to
-    demotion workflow (§ Linear sync — Demotion pattern).
+    demotion workflow (§ Tracker sync — Demotion pattern).
   - DEFER: surfaced work is out of scope for the current project's
     purpose. Record in projects/<project>/deferred.md (or operator
     scratch for orphan work); do not act on it.
@@ -315,7 +316,7 @@ Three aggregate roots, expressed in workflow terms rather than DDD-classroom ter
 
 - **Project** is mutated only by project initiation, mid-flight triage (when the agile orchestrator adopts new scope or demotes), and project closure. The project owns: project spec, project plan, slice and direct-change references, project state (`open` | `closed`).
 - **Slice** is mutated only by slice initiation, slice execution, slice review, and slice closure. The slice owns: slice spec, slice plan, slice state (`specified` | `planned` | `in-flight` | `delivered` | `abandoned`), PR reference.
-- **Direct change** is mutated only by triage (creation), and the bare commit + PR + review + merge sequence. The direct change owns: PR reference, optional Linear-issue link. State (`open` | `merged` | `abandoned`) tracks PR lifecycle.
+- **Direct change** is mutated only by triage (creation), and the bare commit + PR + review + merge sequence. The direct change owns: PR reference, optional tracker-issue link. State (`open` | `merged` | `abandoned`) tracks PR lifecycle.
 
 Project references slices and direct changes by ID. Slices may reference back to a project. Splitting a slice (when implementation reveals it's too big — I1) is a slice operation; the project notices and updates its plan to reflect the new composition.
 
@@ -380,7 +381,7 @@ Scope discipline operates in both directions.
 > Does the remaining work still warrant project-scope ceremony?
 
 - **Yes** → continue as planned.
-- **No** → demote (project → slice or direct change). Run the demotion workflow (§ Linear sync — Demotion pattern).
+- **No** → demote (project → slice or direct change). Run the demotion workflow (§ Tracker sync — Demotion pattern).
 
 The scope-deferred-work landing pad is `projects/<project>/deferred.md` (or operator scratch for orphan work). Reviewed at project closure; each item triaged individually.
 
@@ -399,47 +400,48 @@ The on-disk shape of an artefact is **per-context**. The model deliberately allo
 | Spike artefact (slice-scope) | A doc PR (an ADR, an analysis); shipped under the project's normal docs path |
 | Deployment plan | `projects/<project>/deployment-plan.md` (project-scope) |
 | Review artefacts | `projects/<project>/reviews/{code-review,system-design-review,walkthrough}.md` (per `drive-build-workflow`); for orphan slices, lighter shape attached to the PR review surface |
-| Manual-QA script | `projects/<project>/manual-qa.md` (in-project); inline QA section in PR description (orphan). Per [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93) `drive-qa-plan`. |
-| Manual-QA run report | `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (in-project); inline QA findings in PR review thread (orphan). Per `drive-qa-run`. One per run; reports accumulate (never overwritten) so the QA history is auditable. |
+| Manual-QA script | `projects/<project>/manual-qa.md` (in-project); inline QA section in PR description (orphan). Authored via `drive-qa-plan`. |
+| Manual-QA run report | `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (in-project); inline QA findings in PR review thread (orphan). Authored via `drive-qa-run`. One per run; reports accumulate (never overwritten) so the QA history is auditable. |
 | Scope-deferred candidates (during project) | `projects/<project>/deferred.md`. Reviewed at project closure; each item triaged individually |
 | Dispatch brief | Transient — assembled at dispatch time from the slice plan + spike artefacts; not separately persisted |
 | `design-decisions.md` entry (per project) | `projects/<project>/design-decisions.md`; orphan work uses operator scratch or in-PR captures |
-| Project-context conventions (per consumer repo) | `drive/<category>/README.md` (categories: `spec`, `project`, `plan`, `qa`, `code-review`, `pr`, `deployment`, `post-update`). Read by drive-* skills as workflow step 1. Per [`prisma/ignite#93`](https://github.com/prisma/ignite/pull/93). |
+| Project-context conventions (per consumer repo) | `drive/<category>/README.md` (categories: `spec`, `project`, `plan`, `qa`, `code-review`, `pr`, `deployment`, `post-update`). Read by drive-* skills as workflow step 1. |
 
 The forcing principle: **persistence is per-context, not uniform.** Without this concession, triage will keep routing-to-project just to use the tooling.
 
-## Linear sync
+## Tracker sync
 
-One-tier mapping via the anti-corruption layer. Pinned units → fixed Linear translation:
+One-tier mapping via the anti-corruption layer. Pinned units → fixed tracker translation (the table uses generic tracker vocabulary; the team's tracker — Linear, Jira, GitHub Issues, etc. — substitutes its own concepts via project context):
 
-| Drive unit | Linear unit |
+| Drive unit | Tracker unit |
 |---|---|
-| Project | Linear project |
-| Project spec | Linear project description (or linked doc) |
-| Slice | Linear issue |
-| Slice spec | Linear issue description (or linked doc) |
-| Direct change | Linear issue (if one exists for the original ask) OR no Linear unit if developer-initiated |
+| Project | Tracker project |
+| Project spec | Tracker project description (or linked doc) |
+| Slice | Tracker issue |
+| Slice spec | Tracker issue description (or linked doc) |
+| Direct change | Tracker issue (if one exists for the original ask) OR no tracker unit if developer-initiated |
 | Slice plan | Not synced — internal to the slice's execution |
-| Dispatch | Not synced — below the Linear-care line |
-| PR | Linked to its Linear issue via GitHub integration; auto-closes on merge |
+| Dispatch | Not synced — below the tracker-care line |
+| PR | Linked to its tracker issue via the tracker's PR integration; auto-closes on merge where supported |
 
-`save_status_update` is project-scope only. The agent's dispatch-level decomposition does not sync anywhere.
+Status updates are project-scope only. The agent's dispatch-level decomposition does not sync anywhere.
+
+Tracker-specific MCP tool names, ticket-ID conventions, branch-naming patterns, and terminal-state workflow names live in the team's project context (for prisma-next: [`drive/project/README.md`](../../drive/project/README.md), [`drive/triage/README.md`](../../drive/triage/README.md), [`drive/pr/README.md`](../../drive/pr/README.md)).
 
 ### Promotion pattern (ticket → project)
 
 Triggered when triage decides a ticket represents work too big for a single slice — needs project ceremony.
 
 ```text
-1. Create Linear Project (save_project) with name + description from
-   the ticket's framing.
-2. Move the originating ticket into the new Linear Project
-   (update_issue with project = <new project id>).
+1. Create a tracker project with name + description from the
+   ticket's framing.
+2. Move the originating ticket into the new tracker project.
 3. Mark the ticket Done; either:
      a. Rename to "Plan: <project name>" — clear forward-pointer.
      b. Add a comment "Converted to project: <project url>" —
         preserves original title.
 4. Continue with drive-create-project → drive-specify-project →
-   drive-plan-project. Slices subsequently created as new Linear
+   drive-plan-project. Slices subsequently created as new tracker
    issues under the project.
 ```
 
@@ -452,13 +454,13 @@ Triggered when triage decides an in-flight project has shrunk to fit one PR (or 
 ```text
 1. Identify the surviving scope (usually: one slice's worth of
    remaining work, sometimes a single direct change).
-2. Pick or create the Linear issue that will carry the surviving
+2. Pick or create the tracker issue that will carry the surviving
    scope forward.
-3. Close other open Linear issues under the project with a
+3. Close other open tracker issues under the project with a
    "merged into <surviving-ticket>" comment.
-4. Move the surviving ticket OUT of the Linear Project
-   (update_issue with project = null) so it stands alone.
-5. Mark the Linear Project as Cancelled (with rationale in the
+4. Move the surviving ticket OUT of the tracker project so it
+   stands alone.
+5. Mark the tracker project as Cancelled (with rationale in the
    final status update) OR Completed (if part of the original
    scope did ship).
 6. Migrate or retire on-disk artefacts: useful content from
@@ -468,15 +470,13 @@ Triggered when triage decides an in-flight project has shrunk to fit one PR (or 
 7. Surviving work continues as orphan slice (or direct change).
 ```
 
-The demotion path is heavier — more Linear state to clean up. The agile orchestrator runs it cautiously: surfaces the cleanup steps explicitly, asks the operator for sign-off before mass-closing issues.
+The demotion path is heavier — more tracker state to clean up. The agile orchestrator runs it cautiously: surfaces the cleanup steps explicitly, asks the operator for sign-off before mass-closing issues.
 
 ## Skill set
 
 The drive-* family is organised in two tiers.
 
 ### Two skill tiers: workflow and atomic
-
-A new structural distinction the restructure introduces:
 
 - **Workflow skills** (`drive-<verb>-workflow`) pilot a multi-step loop top-to-bottom. The orchestrator (human or agent wearing the hat) invokes a workflow skill and it returns when the scope's DoD is met. Workflow skills call atomic skills as steps in their loop.
 - **Atomic skills** (`drive-<verb>-<noun>` or `drive-<sub-namespace>-<verb>`) do one bounded thing. Called either directly by the operator or by a workflow skill as one step in its loop. Most skills are atomic.
@@ -494,57 +494,42 @@ Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/mai
 
 *Scope units* (project / slice) are not sub-namespaces — they show up as the **noun** in `drive-<verb>-<noun>`, not as a leading namespace token. The verb leads so the skill reads as a command (*"drive specify project"*, *"drive plan slice"*, *"drive check health"*).
 
-Workflow skills (three; all new or renamed):
+### Workflow skills
 
-| Skill | Pilots | Replaces / new? |
-|---|---|---|
-| **`drive-start-workflow`** | Triage + the verdict's setup. Routes the work to its right shape and runs the immediate downstream setup (creates the project / scaffolds the slice / opens the direct-change PR). Fires at fresh entry AND mid-flight (promote / demote). | New |
-| **`drive-build-workflow`** | A slice's implementation loop: pre-flight DoR → dispatch loop with WIP inspection → post-flight DoD → review → close. Plus the augmentations (intent-validation, L/XL refusal, design-discussion stop-condition). | Renamed + augmented from `drive-orchestrate-plan` |
-| **`drive-deliver-workflow`** | A project's lifecycle: project init → slice-by-slice (each via `drive-build-workflow`) → health checks → retros on triggers → mandatory final retro → close. | New |
+| Skill | Pilots |
+|---|---|
+| `drive-start-workflow` | Triage + the verdict's setup. Routes the work to its right shape and runs the immediate downstream setup (creates the project / scaffolds the slice / opens the direct-change PR). Fires at fresh entry AND mid-flight (promote / demote). |
+| `drive-build-workflow` | A slice's implementation loop: pre-flight DoR → dispatch loop with WIP inspection → post-flight DoD → review → close. Includes intent-validation, L/XL refusal, and the design-discussion stop-condition. |
+| `drive-deliver-workflow` | A project's lifecycle: project init → slice-by-slice (each via `drive-build-workflow`) → health checks → retros on triggers → mandatory final retro → close. |
 
-### Atomic skills that split
+### Atomic skills
 
-| Canonical skill | Today | Under this model |
-|---|---|---|
-| `drive-create-spec` | Produces "a spec" — scope implicit. | **Splits** into `drive-specify-project` and `drive-specify-slice`. Body differs meaningfully (project: purpose + scope boundary + project-DoD; slice: scope-within-project + slice-DoD + Example-Mapping edge cases). |
-| `drive-create-plan` | Produces "a plan" with a milestone → task two-level decomposition that floats across scopes. | **Splits** into `drive-plan-project` (slice composition; stack/parallel) and `drive-plan-slice` (dispatch sequence; sizing discipline; DoR-per-dispatch). |
-
-### Atomic skills that stay (some lightly augmented)
-
-| Canonical skill | Scope | Augmentation |
-|---|---|---|
-| `drive-create-project` | Project | Seed placeholders for slice template + calibration links; called by `drive-deliver-workflow` at project init. |
-| `drive-close-project` | Project | Mandatory final retro step (calls `drive-run-retro`); called by `drive-deliver-workflow` at project close. |
-| `drive-create-deployment-plan` | Project | None |
-| `drive-pr-description` | Slice / direct change | Extended to handle the direct-change case (only persisted intent artefact for a direct change). |
-| `drive-pr-walkthrough` | Slice | None |
-| `drive-review-code` | Slice | None |
-| `drive-post-update` | Project | None |
-| `drive-list` (in `.system/`) | Cross-cutting | None |
-| `drive-discussion` (mode) | Cross-cutting | None; promoted to first-class workflow standing in this model (still a mode skill, still atomic — fires on trigger from any workflow skill or operator invocation). |
-
-### New atomic skills
+Specs and plans are per-scope (project / slice) because the inputs, outputs, and templates differ meaningfully at each scope.
 
 | Skill | Scope | Purpose |
 |---|---|---|
-| **`drive-triage-work`** | Cross-cutting (entry) | Runs the triage decision tree and outputs one of the eight verdicts. Called by `drive-start-workflow` (which then executes the verdict's setup). Operators can also invoke it directly. |
-| **`drive-check-health`** | Project (rollup) | Produces session-bookended (interactive) or trigger-fired (unattended) project rollups: slice progress, drifted slices, dispatch throughput so far, calibration signals, recommended next pick. Called by `drive-deliver-workflow` on cadence; operators can invoke it directly. |
-| **`drive-run-retro`** | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical vs project-context vs ADR home, name the update, land it in the matching memory home. Mandatory at project closure (enforced by `drive-deliver-workflow`); trigger-fired on dispatch failure / drift / escapee (from `drive-build-workflow`). |
+| `drive-specify-project` | Project | Project spec: purpose + scope boundary + project-DoD. |
+| `drive-specify-slice` | Slice | Slice spec: scope-within-project + slice-DoD + Example-Mapping edge cases. |
+| `drive-plan-project` | Project | Project plan: slice composition; stack / parallel sequencing. |
+| `drive-plan-slice` | Slice | Slice plan: dispatch sequence; sizing discipline; DoR-per-dispatch. |
+| `drive-triage-work` | Cross-cutting | Runs the triage decision tree and outputs one of the eight verdicts. Called by `drive-start-workflow`; operators can invoke directly. |
+| `drive-create-project` | Project | Scaffolds `projects/<x>/`; seeds slice template + project-context links. Called by `drive-deliver-workflow` at project init. |
+| `drive-close-project` | Project | Verifies project DoD, prose-audits long-lived candidates, migrates / lifts / softens, deletes the project folder, opens the close-out PR. Mandatory final retro step. Called by `drive-deliver-workflow` at project close. |
+| `drive-create-deployment-plan` | Project | Deployment plan authoring (where applicable). |
+| `drive-pr-description` | Slice / direct change | PR description authoring; handles both the slice case and the direct-change case (where the PR description is the only persisted intent artefact). |
+| `drive-pr-walkthrough` | Slice | PR walkthrough authoring at PR-open time. |
+| `drive-review-code` | Slice | Reviewer-side code review. |
+| `drive-qa-plan` | Slice | Manual-QA script authoring against the project-context audiences in `drive/qa/README.md`. |
+| `drive-qa-run` | Slice | Manual-QA execution + severity-classified run report. |
+| `drive-check-health` | Project | Project rollups: slice progress, drifted slices, dispatch throughput, recommended next pick. Session-bookended (interactive) or trigger-fired (unattended). Called by `drive-deliver-workflow` on cadence. |
+| `drive-run-retro` | Trigger-based | Runs the retro template: surface the failure or learning, decide canonical / project-context / ADR home, land the update. Mandatory at project closure; trigger-fired on dispatch failure / drift / escapee. |
+| `drive-post-update` | Project | Wider-team status updates. |
+| `drive-discussion` (mode) | Cross-cutting | Operator + agile orchestrator design discussion. Fires on trigger from any workflow skill or operator invocation. |
+| `drive-list` (in `.system/`) | Cross-cutting | Lists / discoverability helper. |
 
 ### Direct change has no dedicated skill
 
 Triage's "direct change" verdict routes the developer straight to `gh pr create`. No Drive skill is involved in execution; the implementer reads the intent, makes the edit, opens the PR. `drive-start-workflow` orchestrates this path by calling `drive-pr-description` (in its direct-change framing) and then returning; the path is deliberately ceremonial-light.
-
-## Open questions
-
-Resolved during consolidation, recorded here as closed for the historical trail:
-
-- ~~OQ1. Linear unit for a slice — issue or milestone?~~ **Closed.** Linear issue. (More universal; matches consumer practice; reserves "milestone" for the Linear-side vocabulary that doesn't map to Drive.)
-- ~~OQ5. Exact persistence shape for in-project slices.~~ **Closed.** `projects/<project>/slices/<slice>/spec.md` + `plan.md`.
-- ~~OQ6. Split `drive-create-spec` / `drive-create-plan` or take a scope flag?~~ **Closed.** Split. The two pairs (`drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`) have genuinely different inputs, outputs, audiences, and shape. A scope flag papers over the difference.
-- ~~OQ10. What happens to "milestone" as a word?~~ **Closed.** Retired from Drive vocabulary entirely.
-
-Still open (working positions): the team's current trial period is where these get pressure-tested and resolved — see [`drive/trial.md`](../../drive/trial.md) for the active trial framing.
 
 ## What this document does *not* decide
 

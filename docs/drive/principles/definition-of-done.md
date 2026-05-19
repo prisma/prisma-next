@@ -2,7 +2,7 @@
 
 ## What a DoD check actually looks like
 
-The `StorageTable` migration dispatch from [`brief-discipline.md`](brief-discipline.md) finishes. The implementer subagent reports done. The agile orchestrator runs the dispatch DoD check:
+The legacy-shape migration dispatch from [`brief-discipline.md`](brief-discipline.md) finishes. The implementer subagent reports done. The agile orchestrator runs the dispatch DoD check:
 
 - [x] All "Done when" commands from the brief pass — `pnpm typecheck` clean; `pnpm test:packages` passing; `rg "tables: \{" -- 'packages/*/src/test/**'` empty for the 8 migrated sites; no new TODOs; per-site commit messages reference the spike artefact
 - [x] Every brief edge case handled per its disposition — one site flagged as intentionally legacy-shape (skipped); one fixture file deferred per disposition; two mixed sites surfaced per "refuse and surface" (resolved by operator before dispatch ended)
@@ -43,7 +43,7 @@ A common DoD failure is conflating these. Each closes a different gap:
 
 The `drive-qa-plan` / `drive-qa-run` skills ship in [PR #93](https://github.com/prisma/ignite/pull/93). The QA skill body explicitly endorses "N/A — no user-observable change" as a legitimate slice DoD outcome for pure refactors.
 
-The intent-validation step caught the `StorageTable` failure above — CI's grep gate passed, but the intent didn't. That's the gap intent-validation exists to close.
+The intent-validation step caught the failure above — CI's grep gate passed, but the intent didn't. That's the gap intent-validation exists to close.
 
 ## Items at each scope
 
@@ -205,7 +205,7 @@ DoD is **not**:
 ## Anti-patterns
 
 1. **"Soft" DoD.** Items skipped under deadline pressure. Drift slips through. The gate must be enforced — `drive-build-workflow` refuses to close a dispatch with unmet DoD; slice closure refuses to merge with unmet slice DoD; `drive-close-project` refuses to delete `projects/<x>/` with unmet project DoD.
-2. **DoD = CI gates only.** Skips intent-validation and manual QA. Symptom: typecheck/test/lint all pass, but the dispatch silently solved the wrong problem (the `StorageTable` example above) or shipped a feature whose CLI diagnostic is incomprehensible because CI doesn't read English. Intent-validation is non-optional in dispatch + slice DoD; manual QA is non-optional in slice DoD whenever the change touches user-observable surface.
+2. **DoD = CI gates only.** Skips intent-validation and manual QA. Symptom: typecheck/test/lint all pass, but the dispatch silently solved the wrong problem (the migration example above) or shipped a feature whose CLI diagnostic is incomprehensible because CI doesn't read English. Intent-validation is non-optional in dispatch + slice DoD; manual QA is non-optional in slice DoD whenever the change touches user-observable surface.
 3. **DoD authored by the implementer post-hoc.** The brief's "Done when" is the contract; the implementer cannot edit the gate they're being evaluated against. (Operator-authorised mid-flight edits via design discussion are fine; silent implementer-side edits violate I12.)
 4. **Wishlist DoD.** Items like "the code is elegant" or "the abstractions are right." Uncheckable; doesn't gate handoff. Aspirational quality belongs in code-review feedback.
 5. **Project DoD without the mandatory retro.** The retro is the team's only learning mechanism. Skipping it means lessons don't accrete; the next project re-discovers the same failures.

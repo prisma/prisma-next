@@ -12,7 +12,7 @@ The orchestrator picks a model tier per dispatch. The rule for picking is shape-
 | Batch fix | "Update import paths after package reorg" | Cheap |
 | Tricky one-line bug whose fix needs reading the spec carefully | "Fix the edge case in `mergeColumns` where two FKs collide on rename" | Mid (Sonnet) |
 | Spike (investigation, output is an artefact) | "Count how many test sites use the legacy shape; output a table by package" | Cheap with short time-box |
-| High blast radius even if conceptually simple | "Drop optionality from `StorageTable` — affects every IR consumer" | Orchestrator OR smaller dispatch |
+| High blast radius even if conceptually simple | "Drop optionality from a substrate type that affects every consumer in the IR" | Orchestrator OR smaller dispatch |
 | L or XL composite shape | "Do the whole migration end-to-end" | **Refuse — decompose first.** No tier is safe at this shape. |
 
 The rule behind the rule: **decomposition is what makes a cheap tier safe.** Without it, the orchestrator can't drop tier — the verification gates can't catch drift on feature-sized scopes, so the only protection left is the implementer's capability. With decomposition, the gates do enough of the work that the cheap tier becomes safe.
@@ -49,7 +49,7 @@ Properly decomposed, the same work would have been:
 
 | Dispatch | Size | Tier | Why |
 |---|---|---|---|
-| Drop `?:` from `StorageTable` + `ForeignKeyReference` (substrate change) | M | Opus | Design judgment — typology decision |
+| Drop `?:` from two adjacent substrate types (typology decision affecting all consumers) | M | Opus | Design judgment — typology decision |
 | TS-builder caller normalisation | M | Cheap | Mechanical, well-bounded |
 | PSL-interpreter caller normalisation | M | Cheap | Mechanical, well-bounded |
 | Verifier inlining + delete `foreignKeyNamespacesMatch` | S | Cheap | Mechanical |

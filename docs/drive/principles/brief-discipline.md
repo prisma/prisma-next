@@ -4,7 +4,7 @@
 
 A brief that drifts:
 
-> Migrate the legacy `StorageTable` shape to the new flat shape across consumers.
+> Migrate a legacy data shape (the kind that lives across multiple consumers) to its replacement.
 
 That's it. No outcome statement beyond the topic. No scope split. No edge cases. No DoD. No size. No tier. No inputs.
 
@@ -13,12 +13,12 @@ A dispatch run from this brief will pick whichever consumers the implementer hap
 The same brief, well-shaped:
 
 ```markdown
-# Brief: Migrate StorageTable consumers to flat shape (round 2 of 3)
+# Brief: Migrate legacy-shape consumers (round 2 of 3)
 
 ## Outcome
 
 Migrate the 8 in-source test sites listed in the spike artefact to the
-new flat shape. One commit per file. No other consumers touched.
+new shape. One commit per file. No other consumers touched.
 
 ## Scope
 
@@ -27,23 +27,23 @@ In scope:
 - Test fixture regeneration ONLY if a fixture is listed as touched
 
 Out of scope:
-- PSL-interpreter consumers (round 1 of next slice)
-- Postgres-introspector tightening (round 3)
+- Authoring-layer consumers (round 1 of next slice)
+- Introspector tightening (round 3)
 - Any fixture or consumer NOT in the spike artefact
 
 ## Edge cases
 
 | Edge case | Do what |
 |---|---|
-| Site has a 'columns' literal intentionally legacy-shape (rejection test) | Skip; flag in dispatch summary |
+| Site has a legacy-shape literal intentionally (rejection test) | Skip; flag in dispatch summary |
 | Fixture file has drifted since the spike | Defer to a follow-up dispatch; do not regenerate inline |
-| Site mixes legacy + flat shape (partial migration from earlier) | Refuse and surface — slice-spec ambiguity, escalate to design discussion |
+| Site mixes legacy + new shape (partial migration from earlier) | Refuse and surface — slice-spec ambiguity, escalate to design discussion |
 
 ## Done when
 
-- [ ] `pnpm typecheck` clean
-- [ ] `pnpm test:packages` passing
-- [ ] `rg "tables: \{" packages/*/src/test` returns empty for migrated sites
+- [ ] `<typecheck command>` clean
+- [ ] `<test command>` passing
+- [ ] `<grep-for-legacy-shape command>` returns empty for migrated sites
 - [ ] No new TODOs
 - [ ] Per-site commit messages reference the spike artefact
 
@@ -58,10 +58,10 @@ the capability premium isn't paying for anything here.
 
 ## Inputs
 
-- Slice spec: projects/storage-shape-flatten/slices/round-2/spec.md
-- Spike artefact: projects/storage-shape-flatten/spikes/2026-05-17-test-sites.md
-- Calibration: drive/plan/README.md § "Dual-shape support relocated"
-  + grep patterns 'columns' in / looksLike
+- Slice spec: projects/<project>/slices/round-2/spec.md
+- Spike artefact: projects/<project>/spikes/<date>-test-sites.md
+- Calibration: drive/plan/README.md § "<the relevant failure-mode entry>"
+  + grep patterns from drive/plan/README.md's grep library
 
 ## Implementer + Reviewer
 

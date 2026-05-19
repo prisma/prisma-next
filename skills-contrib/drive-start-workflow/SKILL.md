@@ -150,7 +150,7 @@ Per the post-conditions above. Each branch is a sequence of atomic-skill calls +
 4. Migrate the in-flight slice spec / draft into `projects/<project>/spec.md` (rough first draft; refine via `drive-specify-project`).
 5. Return — caller invokes `drive-plan-project` and then `drive-deliver-workflow`.
 
-See `model.md` § Linear sync § Promotion pattern for the canonical MCP-tool sequence.
+See `model.md` § Tracker sync § Promotion pattern for the canonical tool-call sequence.
 
 #### Demote (mid-flight: project → slice / direct change)
 
@@ -162,7 +162,7 @@ See `model.md` § Linear sync § Promotion pattern for the canonical MCP-tool se
 6. Delete `projects/<project>/`.
 7. Re-route the surviving work via `drive-start-workflow` (it becomes an orphan slice or direct change).
 
-See `model.md` § Linear sync § Demotion pattern.
+See `model.md` § Tracker sync § Demotion pattern.
 
 #### Spike first
 

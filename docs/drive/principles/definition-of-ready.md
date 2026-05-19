@@ -2,7 +2,7 @@
 
 ## What a DoR check actually looks like
 
-A slice with this outcome: *"Migrate `StorageTable` consumers to flat shape."* The implementer has drafted a slice spec, a slice plan (three dispatches: PSL-interpreter migration, TS-builder migration, fixture regeneration), and is about to start the first dispatch.
+A slice with this outcome: *"Migrate consumers of a legacy data shape to its replacement."* The implementer has drafted a slice spec, a slice plan (three dispatches: authoring-layer migration, builder-layer migration, fixture regeneration), and is about to start the first dispatch.
 
 The agile orchestrator runs the slice DoR check first:
 

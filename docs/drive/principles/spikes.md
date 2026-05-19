@@ -4,11 +4,11 @@
 
 **Good spike:**
 
-> **Question:** How many in-source test literals construct the old flat-shape `tables: {<name>: ...}` contract?
+> **Question:** How many in-source test literals construct the old data shape we're migrating away from?
 >
 > **Time-box:** 20 min.
 >
-> **Output** (write to `projects/<x>/spikes/2026-05-17-flat-shape-test-sites.md`): a per-package table with file paths + occurrence counts + the total. Flag separately any sites that are *intentionally* flat-shape (e.g. testing rejection).
+> **Output** (write to `projects/<x>/spikes/<date>-old-shape-test-sites.md`): a per-package table with file paths + occurrence counts + the total. Flag separately any sites that are *intentionally* using the old shape (e.g. testing rejection).
 
 That output table goes directly into the brief for the migration dispatch. The next agent reads it; sizes the migration; lists the sites in the migration brief's scope-in; pre-names the rejection-test sites as edge cases. The spike paid for itself.
 
@@ -76,15 +76,15 @@ A spike's output IS the spike. No artefact = not done, regardless of what was le
 
 ## A few more worked examples
 
-**Good spike:** *"Does the existing codebase have a utility for converting a `Record<NamespaceId, ...>` to a flat per-table list? Look in `packages/2-sql/`. Time-box: 10 min. Output: yes/no + file path + signature if yes; recommendation if no."*
+**Good spike:** *"Does the existing codebase have a utility for converting between two specific shapes we'd otherwise have to bridge? Look in `<package-area>/`. Time-box: 10 min. Output: yes/no + file path + signature if yes; recommendation if no."*
 
 The yes/no directly shapes whether the next dispatch needs to write a helper or use an existing one.
 
-**Bad spike:** *"What's the right way to design the new IR shape?"*
+**Bad spike:** *"What's the right way to design the new data shape?"*
 
-Design question, not a spike. Belongs in an ADR discussion. A spike could support it ("survey existing IR shapes in the codebase") but can't answer it.
+Design question, not a spike. Belongs in an ADR discussion. A spike could support it ("survey existing shapes in the codebase") but can't answer it.
 
-**Good spike:** *"What's the maximum nesting depth our PSL parser produces today? Run the test suite with the depth tracker enabled and report the max. Time-box: 5 min. Output: integer + one-line breakdown by fixture."*
+**Good spike:** *"What's the maximum nesting depth our parser produces today? Run the test suite with the depth tracker enabled and report the max. Time-box: 5 min. Output: integer + one-line breakdown by fixture."*
 
 A fact about the system. Informs whether a depth-bounded migration approach is realistic.
 
@@ -119,9 +119,9 @@ If the orchestrator doesn't have a specific question to ask, spend time formulat
 
 ## Spike artefacts are memory (or aren't, depending where they live)
 
-Per [`protocol-as-memory.md`](protocol-as-memory.md), spike outputs are part of the team's memory *iff* they live where downstream agents will read them. Spike outputs in `wip/` are not memory; spike outputs linked from the project plan or referenced in the next dispatch's brief are.
+Per [`protocol-as-memory.md`](protocol-as-memory.md), spike outputs are part of the team's memory *iff* they live where downstream agents will read them. Spike outputs in operator scratch (untracked working notes, transient drafts) are not memory; spike outputs linked from the project plan or referenced in the next dispatch's brief are.
 
-Useful default: **spike outputs that inform the next dispatch live in the project's spec/plan tree; spike outputs that are one-shot stay in `wip/` and are deleted after the consuming dispatch completes.** The criterion is "will another dispatch need to read this?"
+Useful default: **spike outputs that inform the next dispatch live in the project's spec/plan tree; spike outputs that are one-shot stay in operator scratch and are deleted after the consuming dispatch completes.** The criterion is "will another dispatch need to read this?"
 
 Stale spikes are worse than no spikes — an output that no longer reflects the codebase but is still being referenced will mislead. Spike outputs under `projects/<x>/spikes/` are deleted at project close-out (per the transient-projects discipline) unless they've graduated to a long-lived doc in `docs/` or a `drive/<category>/README.md` entry.
 
