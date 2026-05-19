@@ -10,7 +10,9 @@ import {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
+import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
+import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresEnumType } from '../../src/exports/types';
 
 function makeContract(
@@ -756,6 +758,92 @@ describe('planIssues', () => {
       expect(ts).toContain('placeholder(');
       expect(ts).toContain('setNotNull(');
       expect(ts).toContain("from '@prisma-next/target-postgres/migration'");
+    });
+  });
+
+  describe('namespace coordinate on issues', () => {
+    function makeMultiNamespaceContract(): Contract<SqlStorage> {
+      const userTable: StorageTableInput = {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+      return {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: profileHash('sha256:test'),
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:multi-namespace-contract'),
+          namespaces: {
+            tenant_a: new PostgresSchema({ id: 'tenant_a', tables: { users: userTable } }),
+            tenant_b: new PostgresSchema({ id: 'tenant_b', tables: { users: userTable } }),
+          },
+        }),
+        roots: {},
+        models: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+      };
+    }
+
+    it('surfaces an explicit conflict when an issue carries a stale namespaceId not present in the contract', () => {
+      const toContract = makeMultiNamespaceContract();
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_table',
+          table: 'users',
+          namespaceId: 'tenant_c',
+          message: 'Table "users" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('expected conflict');
+      expect(result.failure).toHaveLength(1);
+      const conflict = result.failure[0]!;
+      expect(conflict.summary).toContain('users');
+      expect(conflict.summary).toContain('tenant_c');
+    });
+
+    it('emits correctly-qualified DDL when an issue carries a valid namespaceId', () => {
+      const toContract = makeMultiNamespaceContract();
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_table',
+          table: 'users',
+          namespaceId: 'tenant_a',
+          message: 'Table "users" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const createTableCall = result.value.calls[0] as CreateTableCall;
+      expect(createTableCall.factoryName).toBe('createTable');
+      expect(createTableCall.tableName).toBe('users');
+      expect(createTableCall.schemaName).toBe('tenant_a');
     });
   });
 });
