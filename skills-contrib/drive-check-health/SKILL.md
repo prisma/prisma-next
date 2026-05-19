@@ -13,7 +13,7 @@ metadata:
 
 # Drive: Check Health
 
-Run a project-health rollup. Atomic skill — does one thing: produces a rollup.
+Run a project-health rollup. Atomic skill — its primary output is the rollup document. Step 5 may **recommend** (interactive) or **policy-gate auto-invoke** (unattended) downstream skills when triggers fire; that handoff is optional and never substitutes for the rollup itself.
 
 A rollup answers:
 
@@ -25,7 +25,7 @@ A rollup answers:
 
 ## When to use
 
-Three canonical cadences (per [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Project-health rollup cadence):
+Three canonical cadences (per `drive/health/README.md` team overlays; default policy below):
 
 1. **Session-bookend.** At the start of a Drive session on the project (opening rollup) and at the end (closing rollup). Most common cadence for interactive operators.
 2. **Per-slice-merge.** After each slice merges, refresh the rollup before picking the next slice. Surfaces drift between slices.
@@ -119,12 +119,14 @@ Each drift signal carries a severity:
 
 Interactive mode: display in chat. Unattended mode: write to `projects/<project>/rollups/<timestamp>.md` and emit a notification surface for the operator to read on return.
 
-### Step 5 — Fire downstream skills on triggers
+### Step 5 — Downstream skill recommendations (policy-gated)
 
-- **Scope-shift candidate** → recommend (or, in unattended mode, halt and surface for) `drive-start-workflow` mid-flight invocation for re-triage.
-- **Retro trigger** (dispatch failure / drift event / scope-shift escapee surfaced in the rollup that wasn't already retroed) → recommend `drive-run-retro`.
+The rollup is complete after Step 4. This step surfaces **recommendations only** unless unattended policy explicitly allows auto-invoke:
+
+- **Scope-shift candidate** → recommend `drive-start-workflow` for mid-flight re-triage (unattended: halt and surface unless policy permits auto-invoke).
+- **Retro trigger** (dispatch failure / drift event / scope-shift escapee not already retroed) → recommend `drive-run-retro`.
 - **Project-DoD coverage gap** (a DoD condition with no slice that will finish it) → recommend `drive-plan-project` to amend the plan.
-- **Recommended next pick** → in interactive mode, present to operator for confirmation; in unattended mode, log and proceed to `drive-build-workflow` on the picked unit if the operator's policy allows.
+- **Recommended next pick** → interactive: present for operator confirmation; unattended: log and proceed to `drive-build-workflow` on the picked unit only if operator policy allows.
 
 ## Rollup template
 
@@ -191,6 +193,5 @@ Interactive mode: display in chat. Unattended mode: write to `projects/<project>
 
 ## References
 
-- [`projects/drive-domain-model/workflow.md`](/projects/drive-domain-model/workflow.md) § Project-health rollup cadence
-- [`projects/drive-domain-model/model.md`](/projects/drive-domain-model/model.md) § Layer 4 — Project-health rollup
-- [`projects/drive-domain-model/design-decisions.md`](/projects/drive-domain-model/design-decisions.md) § 10 — bookend cadence rationale
+- [`drive/health/README.md`](../../drive/health/README.md) — project-health rollup cadence overlays, drift thresholds, pick-next heuristics
+- [`drive/README.md`](../../drive/README.md) — protocol-as-memory (canonical vs project-context)
