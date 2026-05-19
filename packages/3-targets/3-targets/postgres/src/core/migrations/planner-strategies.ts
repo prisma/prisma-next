@@ -790,7 +790,8 @@ function canUseSharedTemporaryDefaultStrategy(options: {
   }
 
   for (const foreignKey of table.foreignKeys) {
-    if (foreignKey.constraint === false || !foreignKey.columns.includes(columnName)) continue;
+    if (foreignKey.constraint === false || !foreignKey.source.columns.includes(columnName))
+      continue;
     if (!schemaLookup || !hasForeignKey(schemaLookup, foreignKey)) return false;
   }
 

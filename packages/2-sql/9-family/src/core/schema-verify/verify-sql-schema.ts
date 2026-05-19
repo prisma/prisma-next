@@ -573,9 +573,9 @@ function verifyTableChildren(options: {
     .filter(
       (fk) =>
         fk.index === true &&
-        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.columns)),
+        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.source.columns)),
     )
-    .map((fk) => ({ columns: fk.columns }));
+    .map((fk) => ({ columns: fk.source.columns }));
   const allExpectedIndexes = [...contractTable.indexes, ...fkBackingIndexes];
 
   const indexStatuses = verifyIndexes(

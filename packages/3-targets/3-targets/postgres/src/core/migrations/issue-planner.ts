@@ -242,19 +242,21 @@ function mapIssueToCall(
       );
       for (const fk of contractTable.foreignKeys) {
         if (fk.constraint) {
-          const fkName = fk.name ?? `${issue.table}_${fk.columns.join('_')}_fkey`;
+          const fkName = fk.name ?? `${issue.table}_${fk.source.columns.join('_')}_fkey`;
           const fkSpec: ForeignKeySpec = {
             name: fkName,
-            columns: fk.columns,
-            references: { table: fk.references.table, columns: fk.references.columns },
+            columns: fk.source.columns,
+            references: { table: fk.target.tableName, columns: fk.target.columns },
             ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
             ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
           };
           calls.push(new AddForeignKeyCall(schemaForTable, issue.table, fkSpec));
         }
-        if (fk.index && !explicitIndexColumnSets.has(fk.columns.join(','))) {
-          const indexName = `${issue.table}_${fk.columns.join('_')}_idx`;
-          calls.push(new CreateIndexCall(schemaForTable, issue.table, indexName, [...fk.columns]));
+        if (fk.index && !explicitIndexColumnSets.has(fk.source.columns.join(','))) {
+          const indexName = `${issue.table}_${fk.source.columns.join('_')}_idx`;
+          calls.push(
+            new CreateIndexCall(schemaForTable, issue.table, indexName, [...fk.source.columns]),
+          );
         }
       }
       for (const unique of contractTable.uniques) {
@@ -531,13 +533,13 @@ function mapIssueToCall(
           const columns = issue.expected.slice(0, arrowIdx).split(', ');
           const fkName = `${issue.table}_${columns.join('_')}_fkey`;
           const fk = locateTable(ctx.toContract.storage, issue.table)?.table.foreignKeys.find(
-            (k) => k.columns.join(', ') === columns.join(', '),
+            (k) => k.source.columns.join(', ') === columns.join(', '),
           );
           if (fk) {
             const fkSpec: ForeignKeySpec = {
               name: fkName,
-              columns: fk.columns,
-              references: { table: fk.references.table, columns: fk.references.columns },
+              columns: fk.source.columns,
+              references: { table: fk.target.tableName, columns: fk.target.columns },
               ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
               ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
             };

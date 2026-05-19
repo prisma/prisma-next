@@ -199,7 +199,7 @@ export const sqlEmission = {
         }
 
         for (const fk of table.foreignKeys) {
-          for (const colName of fk.columns) {
+          for (const colName of fk.source.columns) {
             if (!columnNames.has(colName)) {
               throw new Error(
                 `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
@@ -207,31 +207,31 @@ export const sqlEmission = {
             }
           }
 
-          const referenced = findSqlTable(storage, fk.references.table);
+          const referenced = findSqlTable(storage, fk.target.tableName);
           if (!referenced) {
             throw new Error(
-              `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+              `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}"`,
             );
           }
 
           const referencedTable = referenced.table;
           assertDefined(
             referencedTable,
-            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+            `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}"`,
           );
 
           const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
-          for (const colName of fk.references.columns) {
+          for (const colName of fk.target.columns) {
             if (!referencedColumnNames.has(colName)) {
               throw new Error(
-                `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
+                `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.target.tableName}"`,
               );
             }
           }
 
-          if (fk.columns.length !== fk.references.columns.length) {
+          if (fk.source.columns.length !== fk.target.columns.length) {
             throw new Error(
-              `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+              `Table "${tableName}" foreignKey column count (${fk.source.columns.length}) does not match referenced column count (${fk.target.columns.length})`,
             );
           }
         }
@@ -492,10 +492,12 @@ function generateTableLiteralType(table: StorageTable): string {
 
   const fks = table.foreignKeys
     .map((fk) => {
-      const cols = fk.columns.map((c: string) => serializeValue(c)).join(', ');
-      const refCols = fk.references.columns.map((c: string) => serializeValue(c)).join(', ');
+      const srcCols = fk.source.columns.map((c: string) => serializeValue(c)).join(', ');
+      const tgtCols = fk.target.columns.map((c: string) => serializeValue(c)).join(', ');
       const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
-      return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: ${serializeValue(fk.references.table)}; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
+      const srcRef = `{ readonly namespaceId: ${serializeValue(fk.source.namespaceId)}; readonly tableName: ${serializeValue(fk.source.tableName)}; readonly columns: readonly [${srcCols}] }`;
+      const tgtRef = `{ readonly namespaceId: ${serializeValue(fk.target.namespaceId)}; readonly tableName: ${serializeValue(fk.target.tableName)}; readonly columns: readonly [${tgtCols}] }`;
+      return `{ readonly source: ${srcRef}; readonly target: ${tgtRef}${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
     })
     .join(', ');
   tableParts.push(`foreignKeys: readonly [${fks}]`);

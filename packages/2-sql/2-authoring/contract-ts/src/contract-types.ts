@@ -508,8 +508,16 @@ type BuiltStorageTables<Definition> = {
     }>;
     readonly indexes: ReadonlyArray<Index>;
     readonly foreignKeys: ReadonlyArray<{
-      readonly columns: readonly string[];
-      readonly references: { readonly table: string; readonly columns: readonly string[] };
+      readonly source: {
+        readonly namespaceId: string;
+        readonly tableName: string;
+        readonly columns: readonly string[];
+      };
+      readonly target: {
+        readonly namespaceId: string;
+        readonly tableName: string;
+        readonly columns: readonly string[];
+      };
       readonly name?: string;
       readonly onDelete?: ReferentialAction;
       readonly onUpdate?: ReferentialAction;

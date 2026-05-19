@@ -326,6 +326,11 @@ export function buildSqlContractFromDefinition(
       }
     }
 
+    const namespaceId =
+      semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
+        ? semanticModel.namespaceId
+        : UNBOUND_NAMESPACE_ID;
+
     const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
       const targetModel = assertKnownTargetModel(
         modelsByName,
@@ -340,8 +345,8 @@ export function buildSqlContractFromDefinition(
         'Foreign key',
       );
       return {
-        columns: fk.columns,
-        references: { table: fk.references.table, columns: fk.references.columns },
+        source: { namespaceId, tableName, columns: fk.columns },
+        target: { namespaceId, tableName: fk.references.table, columns: fk.references.columns },
         ...applyFkDefaults(
           {
             ...ifDefined('constraint', fk.constraint),
@@ -354,11 +359,6 @@ export function buildSqlContractFromDefinition(
         ...ifDefined('onUpdate', fk.onUpdate),
       };
     });
-
-    const namespaceId =
-      semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
-        ? semanticModel.namespaceId
-        : UNBOUND_NAMESPACE_ID;
 
     const existingNs = tableNameToNamespaceId.get(tableName);
     if (existingNs !== undefined && existingNs !== namespaceId) {
