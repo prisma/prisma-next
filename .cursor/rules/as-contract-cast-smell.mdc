@@ -31,6 +31,10 @@ The `as unknown` half is the explicit `JSON.parse → unknown` step — `JSON.pa
 
 In production code that already has a `Contract` value validated upstream and just needs to pass it along, no cast is needed — the existing typing carries through.
 
+## Lint scope
+
+The `lint:no-contract-cast` workspace script enforces the cast-keyword variant of this smell (`as Contract` and `as Contract<...>` outside the allowlist). Structural-assignment variants — e.g. `const c: Contract = JSON.parse(raw)`, or passing a `JSON.parse`'d value into a function whose parameter is annotated `Contract` — are NOT lint-enforced, because TypeScript's structural typing makes complete coverage arbitrarily hard. The seam-of-record is the lint *plus* the convention: every on-disk contract read must be a `familyInstance.deserializeContract(...)` call at the read site, reviewed in PR.
+
 ## Where the cast is allowed (allowlist)
 
 The grep-based lint (`pnpm lint:no-contract-cast`) walks `packages/**/src/**` and fails on `as Contract\b` / `as Contract<` hits **outside** these paths:
