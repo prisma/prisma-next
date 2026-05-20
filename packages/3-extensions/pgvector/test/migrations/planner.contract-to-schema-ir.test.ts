@@ -265,13 +265,13 @@ describe('contractToSchemaIR → planner round-trip', () => {
               nativeType: 'text',
               codecId: 'pg/text@1',
               nullable: false,
-              default: { kind: 'literal', value: 'active' },
+              default: { kind: 'expression', expression: "'active'" },
             },
             createdAt: {
               nativeType: 'timestamptz',
               codecId: 'pg/timestamptz@1',
               nullable: false,
-              default: { kind: 'function', expression: 'now()' },
+              default: { kind: 'expression', expression: 'now()' },
             },
           },
           primaryKey: { columns: ['id'] },
@@ -713,7 +713,7 @@ const DEMO_BASE_TABLES = {
       createdAt: col({
         nativeType: 'timestamptz',
         codecId: 'pg/timestamptz@1',
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'expression', expression: 'now()' },
       }),
       kind: col({
         nativeType: 'user_type',
@@ -740,7 +740,7 @@ const DEMO_BASE_TABLES = {
       createdAt: col({
         nativeType: 'timestamptz',
         codecId: 'pg/timestamptz@1',
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'expression', expression: 'now()' },
       }),
       embedding: col({
         nativeType: 'vector',
