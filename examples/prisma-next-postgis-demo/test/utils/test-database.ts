@@ -7,12 +7,8 @@
 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
-import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgis from '@prisma-next/extension-postgis/control';
-import sql from '@prisma-next/family-sql/control';
-import postgres from '@prisma-next/target-postgres/control';
+import { type ControlClient, createPostgresControlClient } from '@prisma-next/postgres/control';
 import pg from 'pg';
 
 export const TEST_DATABASE_URL =
@@ -70,13 +66,9 @@ export async function isPostgisAvailable(): Promise<boolean> {
 }
 
 function createPostgisControlClient(connection: string): ControlClient {
-  return createControlClient({
-    family: sql,
-    target: postgres,
-    adapter: postgresAdapter,
-    driver: postgresDriver,
-    extensionPacks: [postgis],
+  return createPostgresControlClient({
     connection,
+    extensionPacks: [postgis],
   });
 }
 
