@@ -1,7 +1,6 @@
+import { Collection, orm } from '@prisma-next/sql-orm-client';
 import { describe, expect, it } from 'vitest';
-import { Collection } from '../../src/collection';
-import { orm } from '../../src/orm';
-import { getTestContext, type TestContract } from '../helpers';
+import { getTestContext, type TestContract } from './helpers';
 import { timeouts, withCollectionRuntime } from './integration-helpers';
 import { seedComments, seedPosts, seedUsers } from './runtime-helpers';
 
