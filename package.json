@@ -38,7 +38,7 @@
     "bump-minor": "node scripts/bump-minor.ts",
     "check:publish-deps": "node scripts/check-publish-deps.mjs",
     "check:upgrade-coverage": "node scripts/check-upgrade-coverage.mjs",
-    "fixtures:emit": "DATABASE_URL=\"${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}\" pnpm -r --filter='./examples/*' --filter='@prisma-next/sql-builder' --filter='@prisma-next/sql-orm-client' --filter='@prisma-next/e2e-tests' --filter='@prisma-next/integration-tests' run --if-present emit && DATABASE_URL=\"${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}\" pnpm -r --filter='./packages/3-extensions/*' run --if-present build:contract-space",
+    "fixtures:emit": "DATABASE_URL=\"${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}\" pnpm -r --filter='./examples/*' --filter='./apps/*' --filter='@prisma-next/sql-builder' --filter='@prisma-next/sql-orm-client' --filter='@prisma-next/e2e-tests' --filter='@prisma-next/integration-tests' run --if-present emit && DATABASE_URL=\"${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}\" pnpm -r --filter='./packages/3-extensions/*' run --if-present build:contract-space",
     "fixtures:check": "pnpm fixtures:emit && git diff --exit-code -- ':(glob)**/contract.*'",
     "typecheck": "turbo run typecheck",
     "typecheck:all": "pnpm typecheck && pnpm typecheck:examples",
