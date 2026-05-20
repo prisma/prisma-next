@@ -62,6 +62,8 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
     declaration: D,
     callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
+  close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
 }
 
 export interface PostgresOptionsBase {
@@ -167,11 +169,18 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
   let driverConnected = false;
   let connectPromise: Promise<void> | undefined;
   let backgroundConnectError: unknown;
+  let closed = false;
+  let ownedDispose: (() => Promise<void>) | undefined;
+
   const connectDriver = async (resolvedBinding: PostgresBinding): Promise<void> => {
     if (driverConnected) return;
     if (!runtimeDriver) throw new Error('Postgres runtime driver missing');
     if (connectPromise) return connectPromise;
     const runtimeBinding = toRuntimeBinding(resolvedBinding, options);
+    if (resolvedBinding.kind === 'url' && runtimeBinding.kind === 'pgPool') {
+      const pool = runtimeBinding.pool;
+      ownedDispose = () => pool.end().then(() => undefined);
+    }
     connectPromise = runtimeDriver
       .connect(runtimeBinding)
       .then(() => {
@@ -188,6 +197,10 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     return connectPromise;
   };
   const getRuntime = (): Runtime => {
+    if (closed) {
+      throw new Error('Postgres client is closed');
+    }
+
     if (backgroundConnectError !== undefined) {
       throw backgroundConnectError;
     }
@@ -241,6 +254,10 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     stack,
 
     async connect(bindingInput) {
+      if (closed) {
+        throw new Error('Postgres client is closed');
+      }
+
       if (driverConnected || connectPromise) {
         throw new Error('Postgres client already connected');
       }
@@ -303,6 +320,17 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
         return fn(tx);
       });
+    },
+
+    async close(): Promise<void> {
+      if (closed) return;
+      closed = true;
+      await connectPromise?.catch(() => undefined);
+      await ownedDispose?.();
+    },
+
+    [Symbol.asyncDispose](): Promise<void> {
+      return this.close();
     },
   };
 }
