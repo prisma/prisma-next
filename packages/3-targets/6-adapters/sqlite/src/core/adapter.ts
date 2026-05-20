@@ -91,7 +91,7 @@ export function renderLoweredSql(
       sql = renderSelect(node, contract);
       break;
     case 'insert':
-      sql = renderInsert(node);
+      sql = renderInsert(node, contract);
       break;
     case 'update':
       sql = renderUpdate(node, contract);
@@ -426,7 +426,7 @@ function renderInsertValue(value: InsertValue): string {
   }
 }
 
-function renderInsert(ast: InsertAst): string {
+function renderInsert(ast: InsertAst, contract: SqliteContract): string {
   const table = quoteIdentifier(ast.table.name);
   const rows = ast.rows;
   if (rows.length === 0) {
