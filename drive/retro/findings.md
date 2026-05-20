@@ -46,7 +46,7 @@ Trialled `composer-2.5-fast` as the implementer tier on two adjacent dispatches 
 
 Cross-document tier vocabulary divergence surfaced during reviewer iteration: `docs/drive/principles/decomposition-and-cost.md` declares canonical tier labels as `fast / mid / thorough`; `docs/drive/principles/brief-discipline.md` declares them as `cheap / mid / orchestrator`. Each document is internally consistent post-fix; the framework uses two parallel taxonomies for the same concept. Worth a separate harmonization effort once the divergence causes confusion in practice; not filed as a Linear ticket pending operator decision.
 
-**Suggested action:** follow-up Linear ticket exists. Until harmonised, new drive-* docs should adopt one taxonomy and cross-reference (not redefine) — pick whichever the team prefers and align everything else.
+**Suggested action:** no follow-up Linear ticket filed yet (pending operator decision). Until harmonised, new drive-* docs should adopt one taxonomy and cross-reference (not redefine) — pick whichever the team prefers and align everything else.
 
 **Upstream candidate?** Yes — harmonization choice and the convention "one taxonomy across `docs/drive/principles/*`" propagates upstream.
 

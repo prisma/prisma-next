@@ -386,7 +386,7 @@ When the user is running a one-off `tsx my-script.ts` (not a long-lived server),
 import { db } from '../prisma/db';
 
 for (const u of users) {
-  await db.orm.User.insert(u).all();
+  await db.orm.User.create(u);
 }
 console.log('Seeded.');
 
