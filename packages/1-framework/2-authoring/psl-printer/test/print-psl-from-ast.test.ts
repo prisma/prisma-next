@@ -941,4 +941,27 @@ namespace auth {
       );
     });
   });
+
+  describe('namespace ordering and escape handling', () => {
+    it('sorts non-unspecified namespaces alphabetically', () => {
+      const source =
+        'namespace billing {\n  model Invoice {\n    id Int @id\n  }\n}\n\nnamespace auth {\n  model User {\n    id Int @id\n  }\n}\n';
+      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
+      expect(parsed.ok).toBe(true);
+      const printed = printPslFromAst(parsed.ast);
+      expect(printed.indexOf('namespace auth')).toBeLessThan(printed.indexOf('namespace billing'));
+    });
+
+    it('decodes carriage-return and preserves unknown escape sequences in enum @@map values', () => {
+      const source = `enum Status {\n  active\n  inactive\n\n  @@map("a\\rb\\zc")\n}\n`;
+      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
+      expect(parsed.ok).toBe(true);
+      const printed = printPslFromAst(parsed.ast);
+      // Carriage return decodes to a literal CR (re-escapes to \r); the
+      // unrecognised \z escape is preserved verbatim then re-escaped (so the
+      // single backslash becomes \\). The exact bytes matter less than
+      // exercising both branches of unescapePslString.
+      expect(printed).toMatch(/@@map\("a\\rb\\\\zc"\)/);
+    });
+  });
 });

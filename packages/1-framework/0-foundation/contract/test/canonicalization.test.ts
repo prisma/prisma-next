@@ -488,6 +488,40 @@ describe('index and unique sorting', () => {
     );
     expect(unboundTables(result)['bad']).toBeNull();
   });
+
+  it('passes non-object namespace values through unchanged', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          storageHash: 'sha256:stub',
+          namespaces: {
+            broken: null as unknown as Record<string, unknown>,
+          },
+        },
+      }),
+    );
+    const storage = drill(result, 'storage');
+    expect((storage['namespaces'] as Record<string, unknown>)['broken']).toBeNull();
+  });
+
+  it('passes namespaces without a tables map through unchanged (e.g. Mongo)', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          storageHash: 'sha256:stub',
+          namespaces: {
+            [UNBOUND]: {
+              id: UNBOUND,
+              collections: { posts: { columns: {} } },
+            },
+          },
+        },
+      }),
+    );
+    const ns = drill(result, 'storage', 'namespaces', UNBOUND);
+    expect(ns).not.toHaveProperty('tables');
+    expect(ns['collections']).toEqual({ posts: {} });
+  });
 });
 
 describe('canonicalizeContract', () => {
