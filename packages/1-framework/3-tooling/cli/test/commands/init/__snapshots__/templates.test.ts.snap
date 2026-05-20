@@ -43,9 +43,10 @@ Your data contract is the heart of your application. It lives at [\`prisma/contr
 
 \`\`\`prisma
 model User {
-  id    ObjectId @id @map("_id")
-  email String   @unique
-  name  String?
+  id       ObjectId @id @map("_id")
+  email    String   @unique
+  username String?
+  name     String?
   @@map("users")
 }
 \`\`\`
@@ -60,7 +61,7 @@ const user = await db.orm.users
   .first();
 
 // Your editor will show the type of user as
-// { _id: ObjectId; email: string; name: string | null; posts: Post[] } | null
+// { _id: ObjectId; email: string; username: string | null; name: string | null; posts: Post[] } | null
 \`\`\`
 
 \`db\` connects to MongoDB lazily on the first query, so there is no manual \`connect(...)\` step in your application code. Call \`await db.close()\` if you need to release the underlying connection (typically only in tests or short-lived scripts). After \`close()\` the client is single-shot — any further query, \`connect()\`, or \`runtime()\` call rejects with \`"Mongo client is closed"\`. Construct a new \`mongo({...})\` if you need to use it again.
@@ -157,10 +158,11 @@ exports[`templates > per-cell snapshots (FR5.4) > mongo + psl > starterSchema is
 "// use prisma-next
 
 model User {
-  id    ObjectId @id @map("_id")
-  email String   @unique
-  name  String?
-  posts Post[]
+  id       ObjectId @id @map("_id")
+  email    String   @unique
+  username String?
+  name     String?
+  posts    Post[]
   @@map("users")
 }
 
@@ -230,6 +232,7 @@ export const contract = defineContract(
         fields: {
           _id: field.objectId(),
           email: field.string(),
+          username: field.string().optional(),
           name: field.string().optional(),
         },
       }),
@@ -248,7 +251,7 @@ const user = await db.orm.users
   .first();
 
 // Your editor will show the type of user as
-// { _id: ObjectId; email: string; name: string | null; posts: Post[] } | null
+// { _id: ObjectId; email: string; username: string | null; name: string | null; posts: Post[] } | null
 \`\`\`
 
 \`db\` connects to MongoDB lazily on the first query, so there is no manual \`connect(...)\` step in your application code. Call \`await db.close()\` if you need to release the underlying connection (typically only in tests or short-lived scripts). After \`close()\` the client is single-shot — any further query, \`connect()\`, or \`runtime()\` call rejects with \`"Mongo client is closed"\`. Construct a new \`mongo({...})\` if you need to use it again.
@@ -355,6 +358,7 @@ export const contract = defineContract(
         fields: {
           _id: field.objectId(),
           email: field.string(),
+          username: field.string().optional(),
           name: field.string().optional(),
         },
         relations: {
@@ -423,9 +427,10 @@ Your data contract is the heart of your application. It lives at [\`prisma/contr
 
 \`\`\`prisma
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  username String?
+  name     String?
 }
 \`\`\`
 
@@ -439,7 +444,7 @@ const user = await db.orm.User
   .first();
 
 // Your editor will show the type of user as
-// { id: number; email: string; createdAt: Date, name: string, posts: Post[] } | null
+// { id: number; email: string; username: string | null; name: string | null; createdAt: Date; posts: Post[] } | null
 \`\`\`
 
 Your contract has two companion files in the same directory:
@@ -517,6 +522,7 @@ exports[`templates > per-cell snapshots (FR5.4) > postgres + psl > starterSchema
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
+  username  String?
   name      String?
   posts     Post[]
   createdAt DateTime @default(now())
@@ -589,6 +595,7 @@ export const contract = defineContract(
         fields: {
           id: field.id.uuidv7(),
           email: field.text().unique(),
+          username: field.text().optional(),
           name: field.text().optional(),
         },
       }),
@@ -607,7 +614,7 @@ const user = await db.orm.User
   .first();
 
 // Your editor will show the type of user as
-// { id: number; email: string; createdAt: Date, name: string, posts: Post[] } | null
+// { id: number; email: string; username: string | null; name: string | null; createdAt: Date; posts: Post[] } | null
 \`\`\`
 
 Your contract has two companion files in the same directory:
@@ -692,6 +699,7 @@ export const contract = defineContract(
         fields: {
           id: field.id.uuidv7(),
           email: field.text().unique(),
+          username: field.text().optional(),
           name: field.text().optional(),
           createdAt: field.temporal.createdAt(),
           updatedAt: field.temporal.updatedAt(),
