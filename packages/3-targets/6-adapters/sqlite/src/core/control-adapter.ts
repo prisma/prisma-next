@@ -17,7 +17,10 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
+import {
+  parseSqliteDefault,
+  parseSqliteDefaultValue,
+} from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
@@ -70,6 +73,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly targetId = 'sqlite' as const;
 
   readonly normalizeDefault = parseSqliteDefault;
+  readonly parseSchemaDefaultValue = parseSqliteDefaultValue;
   readonly normalizeNativeType = normalizeSqliteNativeType;
 
   /**

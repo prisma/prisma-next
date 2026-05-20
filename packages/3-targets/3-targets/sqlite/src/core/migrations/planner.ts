@@ -17,7 +17,8 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import { parseSqliteDefault } from '../default-normalizer';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
+import { parseSqliteDefault, parseSqliteDefaultValue } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
 import {
@@ -176,6 +177,8 @@ export class SqliteMigrationPlanner
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parseSqliteDefault,
+      parseSchemaDefaultValue: parseSqliteDefaultValue,
+      codecLookup: extractCodecLookup(options.frameworkComponents),
       normalizeNativeType: normalizeSqliteNativeType,
     });
     return verifyResult.schema.issues;
