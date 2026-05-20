@@ -24,6 +24,13 @@ export interface TelemetryBackendConfig {
   readonly databaseUrl: string;
   readonly port: number;
   readonly requestsPerMinute: number;
+  /**
+   * Opt into trusting the first `x-forwarded-for` address for per-IP rate
+   * limiting. Set this only when the backend sits behind a proxy that
+   * strips inbound `x-forwarded-for` and writes its own. Defaults to
+   * false; without a stripping proxy the header is attacker-controlled.
+   */
+  readonly trustForwardedFor: boolean;
 }
 
 export interface TelemetryBackendShutdownTarget {
@@ -42,6 +49,17 @@ function parsePositiveIntegerFromEnv(name: string, fallbackValue: string): numbe
     throw new Error(`Invalid ${name} value: ${value}`);
   }
   return parsed;
+}
+
+function parseBooleanEnv(
+  name: string,
+  env: Record<string, string | undefined>,
+  fallback: boolean,
+): boolean {
+  const raw = env[name];
+  if (raw === undefined) return fallback;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
 function shutdownTimeout(): Promise<'timed-out'> {
@@ -73,7 +91,11 @@ function createTelemetryBackendApp(config: TelemetryBackendConfig): TelemetryBac
   const db = createTelemetryDb(config.databaseUrl);
   const rateLimiter = createRequestsPerMinuteRateLimiter(config.requestsPerMinute);
   return {
-    handler: createHandler({ db, rateLimiter }),
+    handler: createHandler({
+      db,
+      rateLimiter,
+      trustForwardedFor: config.trustForwardedFor,
+    }),
     requestsPerMinute: config.requestsPerMinute,
     close: () => db.runtime().close(),
   };
@@ -89,8 +111,9 @@ export function resolveTelemetryBackendConfig(
 
   const port = parsePositiveIntegerFromEnv('PORT', '8080');
   const requestsPerMinute = parsePositiveIntegerFromEnv('RATE_LIMIT_RPM', '120');
+  const trustForwardedFor = parseBooleanEnv('TELEMETRY_TRUST_FORWARDED_FOR', env, false);
 
-  return { databaseUrl, port, requestsPerMinute };
+  return { databaseUrl, port, requestsPerMinute, trustForwardedFor };
 }
 
 export async function runTelemetryBackendServer(

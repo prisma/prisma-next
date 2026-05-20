@@ -6,6 +6,14 @@ import { eventPayloadSchema } from './schema';
 export interface HandlerDeps {
   readonly db: TelemetryDb;
   readonly rateLimiter?: RateLimiter;
+  /**
+   * When true, the handler trusts the first `x-forwarded-for` address for
+   * the per-IP rate-limit key. Enable only when the backend sits behind a
+   * proxy that strips inbound `x-forwarded-for` and writes its own (e.g.
+   * Prisma Compute). Defaults to false because any direct caller can set
+   * the header otherwise and trivially bypass the limit.
+   */
+  readonly trustForwardedFor?: boolean;
 }
 
 export interface HandlerInfo {
@@ -52,12 +60,16 @@ function firstForwardedAddress(value: string | null): string | null {
   return value.split(',')[0]?.trim() || null;
 }
 
-function rateLimitKey(request: Request, info: HandlerInfo | undefined): string {
-  return (
-    firstForwardedAddress(request.headers.get('x-forwarded-for')) ??
-    info?.remoteAddress ??
-    'unknown'
-  );
+function rateLimitKey(
+  request: Request,
+  info: HandlerInfo | undefined,
+  trustForwardedFor: boolean,
+): string {
+  if (trustForwardedFor) {
+    const forwarded = firstForwardedAddress(request.headers.get('x-forwarded-for'));
+    if (forwarded !== null) return forwarded;
+  }
+  return info?.remoteAddress ?? 'unknown';
 }
 
 function parseJson(bodyText: string): JsonParseResult {
@@ -99,6 +111,7 @@ async function readBodyTextWithLimit(request: Request): Promise<string> {
 }
 
 export function createHandler(deps: HandlerDeps) {
+  const trustForwardedFor = deps.trustForwardedFor ?? false;
   return async function handler(request: Request, info?: HandlerInfo): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname !== EVENTS_PATH) {
@@ -113,7 +126,7 @@ export function createHandler(deps: HandlerDeps) {
     }
 
     if (deps.rateLimiter) {
-      if (!deps.rateLimiter.allow(rateLimitKey(request, info))) {
+      if (!deps.rateLimiter.allow(rateLimitKey(request, info, trustForwardedFor))) {
         return new Response('Too Many Requests', { status: 429 });
       }
     }

@@ -40,12 +40,10 @@ describe('rate-limited POST /events', () => {
     return handler(
       new Request('http://localhost/events', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-forwarded-for': ip,
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify(validPayload),
       }),
+      { remoteAddress: ip },
     );
   }
 
@@ -53,7 +51,7 @@ describe('rate-limited POST /events', () => {
     return (await db.orm.TelemetryEvent.all()).length;
   }
 
-  it('uses the first x-forwarded-for address before the server socket address', async () => {
+  it('ignores client-supplied x-forwarded-for by default and keys on the socket address', async () => {
     const keys: string[] = [];
     const handler = createHandler({
       db,
@@ -63,6 +61,35 @@ describe('rate-limited POST /events', () => {
           return true;
         },
       },
+    });
+
+    const response = await handler(
+      new Request('http://localhost/events', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '203.0.113.77',
+        },
+        body: JSON.stringify(validPayload),
+      }),
+      { remoteAddress: '10.0.0.2' },
+    );
+
+    expect(response.status).toBe(202);
+    expect(keys).toEqual(['10.0.0.2']);
+  });
+
+  it('honours the first x-forwarded-for address when trustForwardedFor is enabled', async () => {
+    const keys: string[] = [];
+    const handler = createHandler({
+      db,
+      rateLimiter: {
+        allow(key) {
+          keys.push(key);
+          return true;
+        },
+      },
+      trustForwardedFor: true,
     });
 
     const response = await handler(
@@ -104,6 +131,32 @@ describe('rate-limited POST /events', () => {
     expect((await handler(request(), { remoteAddress: '10.0.0.3' })).status).toBe(202);
     expect((await handler(request())).status).toBe(202);
     expect(keys).toEqual(['10.0.0.3', 'unknown']);
+  });
+
+  it('falls back to the socket address in trusted-proxy mode when x-forwarded-for is absent', async () => {
+    const keys: string[] = [];
+    const handler = createHandler({
+      db,
+      rateLimiter: {
+        allow(key) {
+          keys.push(key);
+          return true;
+        },
+      },
+      trustForwardedFor: true,
+    });
+
+    const response = await handler(
+      new Request('http://localhost/events', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(validPayload),
+      }),
+      { remoteAddress: '10.0.0.4' },
+    );
+
+    expect(response.status).toBe(202);
+    expect(keys).toEqual(['10.0.0.4']);
   });
 
   it('rejects over-limit requests with 429 while continuing to accept compliant clients', async () => {
