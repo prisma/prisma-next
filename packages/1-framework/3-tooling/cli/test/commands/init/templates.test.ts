@@ -31,6 +31,7 @@ describe('templates', () => {
 
       expect(schema).toContain('model User');
       expect(schema).toContain('model Post');
+      expect(schema).toContain('username  String?');
       expect(schema).toContain('@default(autoincrement())');
     });
 
@@ -46,6 +47,7 @@ describe('templates', () => {
 
       expect(schema).toContain('model User');
       expect(schema).toContain('model Post');
+      expect(schema).toContain('username String?');
       expect(schema).toContain('ObjectId @id @map("_id")');
       expect(schema).not.toContain('autoincrement');
     });
@@ -62,6 +64,7 @@ describe('templates', () => {
 
       expect(schema).toContain('defineContract');
       expect(schema).toContain("from '@prisma-next/postgres/contract-builder'");
+      expect(schema).toContain('username: field.text().optional()');
     });
 
     it('uses defineContract for mongo TypeScript imported from facade', () => {
@@ -69,6 +72,7 @@ describe('templates', () => {
 
       expect(schema).toContain('defineContract');
       expect(schema).toContain("from '@prisma-next/mongo/contract-builder'");
+      expect(schema).toContain('username: field.string().optional()');
     });
 
     it('only imports from the facade package for postgres TypeScript', () => {

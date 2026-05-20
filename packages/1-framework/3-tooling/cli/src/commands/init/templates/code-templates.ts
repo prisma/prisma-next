@@ -42,9 +42,10 @@ export function schemaSample(target: TargetId, authoring: AuthoringId): string {
 function schemaSamplePslPostgres(): string {
   return `\`\`\`prisma
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  username String?
+  name     String?
 }
 \`\`\``;
 }
@@ -52,9 +53,10 @@ model User {
 function schemaSamplePslMongo(): string {
   return `\`\`\`prisma
 model User {
-  id    ObjectId @id @map("_id")
-  email String   @unique
-  name  String?
+  id       ObjectId @id @map("_id")
+  email    String   @unique
+  username String?
+  name     String?
   @@map("users")
 }
 \`\`\``;
@@ -74,6 +76,7 @@ export const contract = defineContract(
         fields: {
           id: field.id.uuidv7(),
           email: field.text().unique(),
+          username: field.text().optional(),
           name: field.text().optional(),
         },
       }),
@@ -98,6 +101,7 @@ export const contract = defineContract(
         fields: {
           _id: field.objectId(),
           email: field.string(),
+          username: field.string().optional(),
           name: field.string().optional(),
         },
       }),
@@ -113,6 +117,7 @@ function starterSchemaPslPostgres(): string {
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
+  username  String?
   name      String?
   posts     Post[]
   createdAt DateTime @default(now())
@@ -135,10 +140,11 @@ function starterSchemaPslMongo(): string {
   return `// use prisma-next
 
 model User {
-  id    ObjectId @id @map("_id")
-  email String   @unique
-  name  String?
-  posts Post[]
+  id       ObjectId @id @map("_id")
+  email    String   @unique
+  username String?
+  name     String?
+  posts    Post[]
   @@map("users")
 }
 
@@ -166,6 +172,7 @@ export const contract = defineContract(
         fields: {
           id: field.id.uuidv7(),
           email: field.text().unique(),
+          username: field.text().optional(),
           name: field.text().optional(),
           createdAt: field.temporal.createdAt(),
           updatedAt: field.temporal.updatedAt(),
@@ -208,6 +215,7 @@ export const contract = defineContract(
         fields: {
           _id: field.objectId(),
           email: field.string(),
+          username: field.string().optional(),
           name: field.string().optional(),
         },
         relations: {
