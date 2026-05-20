@@ -1685,6 +1685,9 @@ importers:
       '@dagrejs/dagre':
         specifier: ^3.0.0
         version: 3.0.0
+      '@prisma-next/cli-telemetry':
+        specifier: workspace:0.10.0
+        version: link:../cli-telemetry
       '@prisma-next/config':
         specifier: workspace:0.10.0
         version: link:../../1-core/config
@@ -1715,6 +1718,9 @@ importers:
       c12:
         specifier: ^3.3.4
         version: 3.3.4(magicast@0.5.2)
+      ci-info:
+        specifier: ^4.3.1
+        version: 4.4.0
       clipanion:
         specifier: 4.0.0-rc.4
         version: 4.0.0-rc.4(typanion@3.14.0)
