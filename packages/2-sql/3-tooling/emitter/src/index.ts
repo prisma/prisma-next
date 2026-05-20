@@ -335,10 +335,6 @@ export const sqlEmission = {
     return [
       'export type LaneCodecTypes = CodecTypes;',
       `export type QueryOperationTypes = ${queryOperationTypes};`,
-      'type DefaultLiteralValue<CodecId extends string, _Encoded> =',
-      '  CodecId extends keyof CodecTypes',
-      "    ? CodecTypes[CodecId]['output']",
-      '    : _Encoded;',
     ].join('\n');
   },
 
@@ -445,11 +441,9 @@ function generateTableLiteralType(table: StorageTable): string {
     const nativeType = serializeValue(col.nativeType);
     const codecId = serializeValue(col.codecId);
     const defaultSpec = col.default
-      ? col.default.kind === 'literal'
-        ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${serializeValue(
-            col.default.value,
-          )}> }`
-        : `; readonly default: { readonly kind: 'function'; readonly expression: ${serializeValue(
+      ? col.default.kind === 'autoincrement'
+        ? `; readonly default: { readonly kind: 'autoincrement' }`
+        : `; readonly default: { readonly kind: 'expression'; readonly expression: ${serializeValue(
             col.default.expression,
           )} }`
       : '';
