@@ -40,6 +40,10 @@ function namespacedMongoContract(contract: MongoContract): MongoContract {
     return contract;
   }
   const { collections, storageHash, ...rest } = storage as FlatMongoStorage;
+  // Test-only rewrap of a legacy on-disk end-contract.json whose storageHash
+  // is a plain string. MongoContract's storage carries a branded StorageHash;
+  // the brand is purely a type-level marker and the runtime payload is
+  // identical, so a structural rewrap is safe here.
   return {
     ...contract,
     storage: {
@@ -53,7 +57,7 @@ function namespacedMongoContract(contract: MongoContract): MongoContract {
         },
       },
     },
-  } as MongoContract;
+  } as unknown as MongoContract;
 }
 
 function loadMigration(dirName: string): {
