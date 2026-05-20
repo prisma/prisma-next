@@ -1,6 +1,66 @@
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
+export interface EntityCoordinate {
+  readonly namespaceId: string;
+  readonly entityKind: string;
+  readonly entityName: string;
+}
+
+const SLOT_KEYS_BY_NAMESPACE_KIND = new Map<
+  string,
+  ReadonlyArray<{ readonly slotKey: string; readonly entityKind: string }>
+>([
+  [
+    'sql-namespace',
+    [
+      { slotKey: 'tables', entityKind: 'tables' },
+      { slotKey: 'types', entityKind: 'types' },
+    ],
+  ],
+  ['mongo-namespace', [{ slotKey: 'collections', entityKind: 'collections' }]],
+]);
+
+/**
+ * Lazy walk over every named storage entity in a `Storage`-shaped
+ * value, yielded as `(namespaceId, entityKind, entityName)` triples.
+ *
+ * Dispatch is keyed on each namespace's `kind` literal. The slot-key
+ * table below is hardcoded for the two namespace kinds shipping
+ * today (`'sql-namespace'`, `'mongo-namespace'`); the
+ * pack-contributed descriptor registry replaces this lookup once it
+ * lands. Unrecognised `kind` values throw with a diagnostic naming
+ * the namespace id and the offending kind — silent skipping would
+ * hide drift from the future verifier consumer.
+ */
+export function* elementCoordinates(storage: Storage): Generator<EntityCoordinate> {
+  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+    const kind = ns.kind;
+    if (kind === undefined) {
+      throw new Error(
+        `elementCoordinates(): namespace ${JSON.stringify(namespaceId)} is missing required kind.`,
+      );
+    }
+    const slotKeys = SLOT_KEYS_BY_NAMESPACE_KIND.get(kind);
+    if (slotKeys === undefined) {
+      throw new Error(
+        `elementCoordinates(): unrecognised namespace kind ${JSON.stringify(kind)} ` +
+          `on namespace ${JSON.stringify(namespaceId)}. ` +
+          'Add a slot-key entry to SLOT_KEYS_BY_NAMESPACE_KIND, ' +
+          'or wait for the pack-contributed descriptor registry (D2).',
+      );
+    }
+    for (const { slotKey, entityKind } of slotKeys) {
+      const slot = (ns as unknown as Readonly<Record<string, unknown>>)[slotKey];
+      if (slot !== undefined && slot !== null && typeof slot === 'object') {
+        for (const entityName of Object.keys(slot)) {
+          yield { namespaceId, entityKind, entityName };
+        }
+      }
+    }
+  }
+}
+
 /**
  * Framework-level promise that every Contract IR / Schema IR carries a
  * collection of namespaces keyed by namespace id. Family storage
