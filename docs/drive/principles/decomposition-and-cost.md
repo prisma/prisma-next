@@ -39,13 +39,13 @@ The orchestrator picks a model tier per dispatch. The rule for picking is shape-
 
 | Dispatch shape | Concrete example | Tier |
 |---|---|---|
-| Design judgment / novel pattern / spec interpretation | "Decide between two API shapes; pick one and justify in an ADR" | Orchestrator tier (Opus) |
-| Codemod over many files | "Rename `getCwd` → `getCurrentWorkingDirectory` across 50 files" | Cheap (Sonnet / composer) |
+| Design judgment / novel pattern / spec interpretation | "Decide between two API shapes; pick one and justify in an ADR" | thorough tier |
+| Codemod over many files | "Rename `getCwd` → `getCurrentWorkingDirectory` across 50 files" | fast tier |
 | Mechanical migration | "Migrate the 8 test sites listed in the spike artefact to the new flat shape" | Cheap |
 | Batch fix | "Update import paths after package reorg" | Cheap |
-| Tricky one-line bug whose fix needs reading the spec carefully | "Fix the edge case in `mergeColumns` where two FKs collide on rename" | Mid (Sonnet) |
+| Tricky one-line bug whose fix needs reading the spec carefully | "Fix the edge case in `mergeColumns` where two FKs collide on rename" | mid tier |
 | Spike (investigation, output is an artefact) | "Count how many test sites use the legacy shape; output a table by package" | Cheap with short time-box |
-| High blast radius even if conceptually simple | "Drop optionality from a substrate type that affects every consumer in the IR" | Orchestrator OR smaller dispatch |
+| High blast radius even if conceptually simple | "Drop optionality from a substrate type that affects every consumer in the IR" | thorough tier, or decompose into smaller dispatches |
 | L or XL composite shape | "Do the whole migration end-to-end" | **Refuse — decompose first.** No tier is safe at this shape. |
 
 The rule behind the rule: **decomposition is what makes a cheap tier safe.** Without it, the orchestrator can't drop tier — the verification gates can't catch drift on feature-sized scopes, so the only protection left is the implementer's capability. With decomposition, the gates do enough of the work that the cheap tier becomes safe.
@@ -76,23 +76,23 @@ The cheap model is safe now because the protocol around the dispatch (DoR, DoD, 
 
 ## Worked example: a reversal we actually did
 
-The reversal dispatch we ran was effectively L/XL: "drop optionality across the IR substrate + update every caller + retire the conditional envelope + tighten the introspector + delete the helper + regenerate fixtures." We ran the whole thing at Opus throughout — the prior dispatch attempts at cheaper tiers had drifted on simpler scopes, so we leaned on capability to avoid drift again.
+The reversal dispatch we ran was effectively L/XL: "drop optionality across the IR substrate + update every caller + retire the conditional envelope + tighten the introspector + delete the helper + regenerate fixtures." We ran the whole thing at thorough tier throughout — the prior dispatch attempts at cheaper tiers had drifted on simpler scopes, so we leaned on capability to avoid drift again.
 
 Properly decomposed, the same work would have been:
 
 | Dispatch | Size | Tier | Why |
 |---|---|---|---|
-| Drop `?:` from two adjacent substrate types (typology decision affecting all consumers) | M | Opus | Design judgment — typology decision |
+| Drop `?:` from two adjacent substrate types (typology decision affecting all consumers) | M | thorough | Design judgment — typology decision |
 | TS-builder caller normalisation | M | Cheap | Mechanical, well-bounded |
 | PSL-interpreter caller normalisation | M | Cheap | Mechanical, well-bounded |
 | Verifier inlining + delete `foreignKeyNamespacesMatch` | S | Cheap | Mechanical |
-| Envelope shape simplification (retire conditional, delete probe) | M | Opus | Design judgment — canonical shape contract |
+| Envelope shape simplification (retire conditional, delete probe) | M | thorough | Design judgment — canonical shape contract |
 | Postgres introspector tightening | S | Cheap | Mechanical |
 | F01 regression test | XS | Cheap | Mechanical |
 | Fixture regeneration | XS | Cheap | Pure command execution |
-| Final integration verify | S | Opus | Judgment on whether the pieces compose |
+| Final integration verify | S | thorough | Judgment on whether the pieces compose |
 
-Two Opus dispatches for the genuine design judgment; six cheap dispatches for the mechanical execution; one final Opus for composition judgment. Total Opus-hours would have been ~25-40% of what we actually spent.
+Two thorough-tier dispatches for the genuine design judgment; six cheap dispatches for the mechanical execution; one final thorough-tier dispatch for composition judgment. Total thorough-tier hours would have been ~25-40% of what we actually spent.
 
 The cost reduction fell out of the decomposition. We didn't set out to optimise cost — we set out to make the work safer. The cost reduction was a derived benefit.
 
@@ -133,14 +133,16 @@ The continuity argument has a second leg: prose-discipline degrades past ~100 tu
 
 **Role variants.** Each Executor subtype (Specialist / Implementer / Reviewer; see [`drive/roles/README.md`](../../../drive/roles/README.md)) admits a small number of named variants with documented model tiers and persistence policies:
 
-| Role / variant | Purpose | Model tier (default) | Persistence |
+| Role / variant | Purpose | Tier (default) | Persistence |
 |---|---|---|---|
-| **scaffolder** | Mechanical work: directory setup, MCP setup, sweep-style edits | fast (composer-class) | one-shot |
-| **setup-specialist** | Authoring: project spec, project plan, spec amendments | thorough (opus-class) | persistent across project-setup phase |
-| **implementer/fast** | Routine code edits within a slice | mid (sonnet-class) | persistent across rounds within a slice |
-| **implementer/thorough** | Escalation for hard problems | thorough (opus-class) | spawned on escalation |
-| **reviewer/fast** | Default per-round review verdicts | mid (sonnet-class) | persistent across rounds within a slice |
-| **reviewer/thorough** | Escalation review for high-leverage rounds | thorough (opus-class) | spawned on escalation |
+| **scaffolder** | Mechanical work: directory setup, MCP setup, sweep-style edits | fast | one-shot |
+| **setup-specialist** | Authoring: project spec, project plan, spec amendments | thorough | persistent across project-setup phase |
+| **implementer/fast** | Routine code edits within a slice | mid | persistent across rounds within a slice |
+| **implementer/thorough** | Escalation for hard problems | thorough | spawned on escalation |
+| **reviewer/fast** | Default per-round review verdicts | mid | persistent across rounds within a slice |
+| **reviewer/thorough** | Escalation review for high-leverage rounds | thorough | spawned on escalation |
+
+Tier names (`fast` / `mid` / `thorough`) are deliberately tooling-agnostic. Each tooling environment (Cursor, Windsurf, Claude Code, Codex, etc.) ships its own model menu; the binding of tier label to a specific model is a project-context concern, not a framework concern. Record your project's tier-to-model mapping in your project-context surface (e.g. `drive/agents/README.md` if your project keeps one, or in your project spec) — never in this principles doc.
 
 Variant naming uses the slash form (`role/variant`) consistently across this principles doc, the role anchor doc, and dispatch templates.
 
@@ -150,7 +152,7 @@ Why named variants matter:
 - **Cost optimization.** Each variant has a documented model tier so dispatch matches problem shape: fast tier for routine work where the gates carry the protection, thorough tier for escalation where capability is doing the carrying.
 - **Reproducible dispatch decisions.** Variant name + role together name the dispatch shape unambiguously across projects. An orchestrator picking up an in-flight project reads the registry, finds the active `implementer/fast` for the current slice, and continues without re-deriving role assignments or paying the cold-spawn context tax.
 
-**Canonical worked example: the project-setup chain.** The three calls `drive-create-project` → `drive-specify-project` → `drive-plan-project` flow through a single resumed `setup-specialist`. The first call spawns the sub-agent and records its ID in `projects/<x>/subagent-registry.md`; the next two calls resume the same ID. The sub-agent holds the project's purpose statement and scope decisions from the first call by the time the third call asks it to lay out the plan — no re-paste of the spec into a fresh thorough-tier sub-agent. Two cold spawns avoided; ~6–16k tokens of re-paste saved at opus-class pricing for the chain.
+**Canonical worked example: the project-setup chain.** The three calls `drive-create-project` → `drive-specify-project` → `drive-plan-project` flow through a single resumed `setup-specialist`. The first call spawns the sub-agent and records its ID in `projects/<x>/subagent-registry.md`; the next two calls resume the same ID. The sub-agent holds the project's purpose statement and scope decisions from the first call by the time the third call asks it to lay out the plan — no re-paste of the spec into a fresh thorough-tier sub-agent. Two cold spawns avoided; ~6–16k tokens of re-paste saved at thorough-tier pricing for the chain.
 
 This principles doc carries the *why* — context preservation, cost arithmetic, named-roles-make-dispatch-reproducible. [`drive/roles/README.md`](../../../drive/roles/README.md) carries the *how*: per-project registry shape, ID-resumption mechanics, the swap-on-variant-change note, and the escape-hatch policy.
 

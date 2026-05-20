@@ -287,14 +287,14 @@ If the context instead holds source file contents, test output, grep results, or
 
 Each Executor subtype has a small number of **named variants** with documented model tiers and persistence policies. Naming convention is slash-separated: `role/variant` (e.g. `implementer/fast`, `reviewer/thorough`).
 
-| Role / variant | Purpose | Model tier (default) | Persistence |
+| Role / variant | Purpose | Tier (default) | Persistence |
 |---|---|---|---|
-| **scaffolder** | Mechanical work: directory setup, MCP setup, sweep-style edits | fast (composer-class) | one-shot |
-| **setup-specialist** | Authoring: project spec, project plan, spec amendments | thorough (opus-class) | persistent across project-setup phase |
-| **implementer/fast** | Routine code edits within a slice | mid (sonnet-class) | persistent across rounds within a slice |
-| **implementer/thorough** | Escalation for hard problems | thorough (opus-class) | spawned on escalation |
-| **reviewer/fast** | Default per-round review verdicts | mid (sonnet-class) | persistent across rounds within a slice |
-| **reviewer/thorough** | Escalation review for high-leverage rounds | thorough (opus-class) | spawned on escalation |
+| **scaffolder** | Mechanical work: directory setup, MCP setup, sweep-style edits | fast | one-shot |
+| **setup-specialist** | Authoring: project spec, project plan, spec amendments | thorough | persistent across project-setup phase |
+| **implementer/fast** | Routine code edits within a slice | mid | persistent across rounds within a slice |
+| **implementer/thorough** | Escalation for hard problems | thorough | spawned on escalation |
+| **reviewer/fast** | Default per-round review verdicts | mid | persistent across rounds within a slice |
+| **reviewer/thorough** | Escalation review for high-leverage rounds | thorough | spawned on escalation |
 
 The Orchestrator dispatches by variant name; the variant name is the contract for which model tier and persistence policy the Executor will use. All consumers of this vocabulary must use the slash-separated convention consistently — `implementer/fast`, `reviewer/thorough`, etc. — when referencing variants in dispatch templates, skill bodies, and registry entries.
 
@@ -316,7 +316,7 @@ See [Alternatives considered — registry location](#registry-location-q6-workin
 
 ### Why resumption matters
 
-Cold-spawning a new sub-agent for every atomic-skill call pays a context re-derivation cost: the spec, plan, and prior discussion context must be re-pasted into each new prompt. At typical Drive project sizes (3–8k tokens of spec/plan content per sub-agent), three cold spawns in a setup chain costs 9–24k tokens in re-pasting alone. At opus-class model pricing, this is material.
+Cold-spawning a new sub-agent for every atomic-skill call pays a context re-derivation cost: the spec, plan, and prior discussion context must be re-pasted into each new prompt. At typical Drive project sizes (3–8k tokens of spec/plan content per sub-agent), three cold spawns in a setup chain costs 9–24k tokens in re-pasting alone. At thorough-tier pricing, this is material.
 
 Resumption avoids that cost: the resumed sub-agent retains the full context it has already built — spec readings, prior commits, prior decisions, prior spec sections it produced — so the Orchestrator can dispatch the next step with a short brief rather than a full-context re-paste.
 
@@ -340,19 +340,19 @@ On subsequent dispatches with the same role/variant:
 ```markdown
 ## Sub-agent registry
 
-| Role / variant | Sub-agent ID | Model tier | Status | Last used |
+| Role / variant | Sub-agent ID | Tier | Status | Last used |
 |---|---|---|---|---|
-| setup-specialist | <agent-id> | opus-class | active | 2026-05-15 |
-| implementer/fast | <agent-id> | sonnet-class | active | 2026-05-18 |
-| reviewer/fast | <agent-id> | sonnet-class | swapped → implementer/thorough | 2026-05-17 |
-| implementer/thorough | <agent-id> | opus-class | active | 2026-05-18 |
+| setup-specialist | <agent-id> | thorough | active | 2026-05-15 |
+| implementer/fast | <agent-id> | mid | active | 2026-05-18 |
+| reviewer/fast | <agent-id> | mid | swapped → implementer/thorough | 2026-05-17 |
+| implementer/thorough | <agent-id> | thorough | active | 2026-05-18 |
 ```
 
 ### Worked example: project-setup chain
 
 The canonical example is the project-setup chain — `drive-create-project` → `drive-specify-project` → `drive-plan-project` — which flows through a single resumed `setup-specialist`:
 
-1. **`drive-create-project`** dispatches a `setup-specialist` (thorough/opus-class) to scaffold the project directory and author the initial `spec.md`. On return, the Orchestrator records the spawned ID in `projects/<x>/subagent-registry.md`.
+1. **`drive-create-project`** dispatches a `setup-specialist` (thorough tier) to scaffold the project directory and author the initial `spec.md`. On return, the Orchestrator records the spawned ID in `projects/<x>/subagent-registry.md`.
 
 2. **`drive-specify-project`** is the next call in the setup chain. Instead of cold-spawning a new thorough-class sub-agent (and paying the context re-derivation cost), the Orchestrator looks up the `setup-specialist` entry in the registry and resumes that sub-agent. The resumed `setup-specialist` already holds the project's purpose statement, scope decisions, and the spec structure it just produced — no re-pasting required.
 
@@ -363,14 +363,14 @@ The canonical example is the project-setup chain — `drive-create-project` → 
 ```markdown
 ## Sub-agent registry
 
-| Role / variant | Sub-agent ID | Model tier | Status | Last used |
+| Role / variant | Sub-agent ID | Tier | Status | Last used |
 |---|---|---|---|---|
-| setup-specialist | abc-1234 | opus-class | active | 2026-05-15 |
+| setup-specialist | abc-1234 | thorough | active | 2026-05-15 |
 ```
 
 The Orchestrator looks up `setup-specialist` → `abc-1234` for each of the three calls. Only one entry exists; the ID is reused.
 
-**Cost implication:** The three-call setup chain through one resumed `setup-specialist` avoids two cold-spawn context costs. At typical project-spec sizes, each cold-spawn requires pasting ~3–8k tokens of spec/plan/discussion content. At two avoided cold spawns, the registry pattern saves ~6–16k tokens in prompt cost for a single project-setup phase — material at the model tiers these calls use (opus-class).
+**Cost implication:** The three-call setup chain through one resumed `setup-specialist` avoids two cold-spawn context costs. At typical project-spec sizes, each cold-spawn requires pasting ~3–8k tokens of spec/plan/discussion content. At two avoided cold spawns, the registry pattern saves ~6–16k tokens in prompt cost for a single project-setup phase — material at the tier these calls use (thorough).
 
 ---
 
