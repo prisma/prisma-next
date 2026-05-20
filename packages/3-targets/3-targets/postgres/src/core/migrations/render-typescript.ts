@@ -21,11 +21,11 @@ export interface RenderMigrationMeta {
 
 /**
  * Always-present base imports for the rendered scaffold. Both come from
- * `@prisma-next/target-postgres/migration` so an authored Postgres
+ * `@prisma-next/postgres/migration` so an authored Postgres
  * `migration.ts` only needs a single dependency for its base class and
  * its CLI entrypoint:
  *
- * - `Migration` — the target-owned re-export fixes the `SqlMigration`
+ * - `Migration` — the facade re-export fixes the `SqlMigration`
  *   generic to `PostgresPlanTargetDetails` and the abstract `targetId`
  *   to `'postgres'`, so user-authored migrations don't need to thread
  *   target-details or redeclare `targetId`.
@@ -38,8 +38,8 @@ export interface RenderMigrationMeta {
  *   config.
  */
 const BASE_IMPORTS: readonly ImportRequirement[] = [
-  { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'Migration' },
-  { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'MigrationCLI' },
+  { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'Migration' },
+  { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'MigrationCLI' },
 ];
 
 export function renderCallsToTypeScript(

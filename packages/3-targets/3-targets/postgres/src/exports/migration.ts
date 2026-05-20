@@ -1,11 +1,11 @@
 // Re-exported so a Postgres `migration.ts` only needs the single
-// `@prisma-next/target-postgres/migration` import for its base class
-// and the CLI entrypoint, mirroring how `placeholder` is surfaced
-// here. The renderer emits the entrypoint call as
+// `@prisma-next/postgres/migration` import for its base class and the
+// CLI entrypoint, mirroring how `placeholder` is surfaced here. The
+// renderer emits the entrypoint call as
 // `MigrationCLI.run(import.meta.url, M)`.
 export { MigrationCLI } from '@prisma-next/cli/migration-cli';
 // Re-exported so user-edited migration.ts files only need to depend on
-// `@prisma-next/target-postgres/migration` to fill in planner-emitted
+// `@prisma-next/postgres/migration` to fill in planner-emitted
 // `placeholder("…")` slots, instead of pulling in `@prisma-next/errors`
 // directly. The planner emits an import from this same module.
 export { placeholder } from '@prisma-next/errors/migration';

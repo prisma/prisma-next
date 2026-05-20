@@ -26,7 +26,7 @@ import type { SqlitePlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
 
-const TARGET_MIGRATION_MODULE = '@prisma-next/target-sqlite/migration';
+const TARGET_MIGRATION_MODULE = '@prisma-next/sqlite/migration';
 
 abstract class SqliteOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;

@@ -46,7 +46,7 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
-const TARGET_MIGRATION_MODULE = '@prisma-next/target-postgres/migration';
+const TARGET_MIGRATION_MODULE = '@prisma-next/postgres/migration';
 
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
   abstract readonly factoryName: string;

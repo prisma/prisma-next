@@ -18,9 +18,9 @@ import type { PostgresPlanTargetDetails } from './planner-target-details';
  * redeclaring target-local identity.
  *
  * Mirrors `MongoMigration` in `@prisma-next/family-mongo`: the renderer
- * emits `extends Migration` against a target-specific re-export of this
- * class from `@prisma-next/target-postgres/migration`, keeping the
- * authoring surface target-scoped rather than family-scoped.
+ * emits `extends Migration` against a facade re-export of this class
+ * from `@prisma-next/postgres/migration`, keeping the authoring surface
+ * target-scoped rather than family-scoped.
  *
  * The constructor materializes a single Postgres `SqlControlAdapter` from
  * `stack.adapter.create(stack)` and stores it; the protected `dataTransform`
