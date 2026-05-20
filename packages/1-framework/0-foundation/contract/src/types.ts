@@ -76,51 +76,6 @@ export type JsonValue =
   | { readonly [key: string]: JsonValue }
   | readonly JsonValue[];
 
-export type ColumnDefaultLiteralValue = JsonValue;
-
-export type ColumnDefaultLiteralInputValue = ColumnDefaultLiteralValue | Date;
-
-/**
- * Runtime predicate for `ColumnDefaultLiteralInputValue`. Authoring layers
- * resolve template values from caller-supplied args (typed `unknown` at the
- * boundary) and need to validate before constructing a `ColumnDefault`.
- * Accepts JSON primitives, plain arrays/objects of JSON values, and `Date`
- * instances. Rejects functions, class instances (other than `Date`),
- * `undefined`, `bigint`, `symbol`, and arrays/objects containing those.
- */
-export function isColumnDefaultLiteralInputValue(
-  value: unknown,
-): value is ColumnDefaultLiteralInputValue {
-  if (value === null) return true;
-  const t = typeof value;
-  if (t === 'string' || t === 'number' || t === 'boolean') return true;
-  if (value instanceof Date) return true;
-  if (Array.isArray(value)) return value.every(isColumnDefaultLiteralInputValue);
-  if (t === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.values(value as Record<string, unknown>).every(isColumnDefaultLiteralInputValue);
-  }
-  return false;
-}
-
-export type ColumnDefault =
-  | {
-      readonly kind: 'literal';
-      readonly value: ColumnDefaultLiteralInputValue;
-    }
-  | { readonly kind: 'function'; readonly expression: string };
-
-export function isColumnDefault(value: unknown): value is ColumnDefault {
-  if (typeof value !== 'object' || value === null) return false;
-  const kind = (value as { kind?: unknown }).kind;
-  if (kind === 'literal') {
-    return 'value' in value;
-  }
-  if (kind === 'function') {
-    return typeof (value as { expression?: unknown }).expression === 'string';
-  }
-  return false;
-}
-
 export type ExecutionMutationDefaultValue = {
   readonly kind: 'generator';
   readonly id: GeneratedValueSpec['id'];

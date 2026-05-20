@@ -1,5 +1,5 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import type { ColumnDefault } from '../types';
 import { SqlNode } from './sql-node';
 
 /**
