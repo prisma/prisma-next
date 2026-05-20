@@ -132,63 +132,55 @@ describe('SqliteControlAdapter.introspect', () => {
 describe('parseSqliteDefault', () => {
   it('normalizes CURRENT_TIMESTAMP to now()', () => {
     expect(parseSqliteDefault('CURRENT_TIMESTAMP')).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'now()',
     });
   });
 
   it("normalizes datetime('now') to now()", () => {
     expect(parseSqliteDefault("(datetime('now'))")).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'now()',
     });
   });
 
-  it('preserves CURRENT_DATE distinctly', () => {
+  it('preserves CURRENT_DATE as expression', () => {
     expect(parseSqliteDefault('CURRENT_DATE')).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'CURRENT_DATE',
     });
   });
 
-  it('preserves CURRENT_TIME distinctly', () => {
+  it('preserves CURRENT_TIME as expression', () => {
     expect(parseSqliteDefault('CURRENT_TIME')).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'CURRENT_TIME',
     });
   });
 
-  it('parses NULL default', () => {
-    expect(parseSqliteDefault('NULL')).toEqual({ kind: 'literal', value: null });
+  it('parses NULL default as expression', () => {
+    expect(parseSqliteDefault('NULL')).toEqual({ kind: 'expression', expression: 'NULL' });
   });
 
-  it('returns number for safe-range integers and falls back to string for 64-bit values', () => {
-    expect(parseSqliteDefault('42', 'integer')).toEqual({ kind: 'literal', value: 42 });
-    expect(parseSqliteDefault('0', 'integer')).toEqual({ kind: 'literal', value: 0 });
-    const big = '9999999999999999999';
-    expect(parseSqliteDefault(big, 'integer')).toEqual({ kind: 'literal', value: big });
+  it('parses numeric default as expression', () => {
+    expect(parseSqliteDefault('42')).toEqual({ kind: 'expression', expression: '42' });
+    expect(parseSqliteDefault('0')).toEqual({ kind: 'expression', expression: '0' });
+    expect(parseSqliteDefault('3.14')).toEqual({ kind: 'expression', expression: '3.14' });
   });
 
-  it('returns number for real nativeType', () => {
-    expect(parseSqliteDefault('3.14', 'real')).toEqual({ kind: 'literal', value: 3.14 });
-    expect(parseSqliteDefault('0xFF', 'real')).toEqual({ kind: 'literal', value: 255 });
-    expect(parseSqliteDefault('1.5e3', 'real')).toEqual({ kind: 'literal', value: 1500 });
+  it('parses string literal default as expression', () => {
+    expect(parseSqliteDefault("'hello'")).toEqual({
+      kind: 'expression',
+      expression: "'hello'",
+    });
   });
 
-  it('returns number when nativeType is unknown', () => {
-    expect(parseSqliteDefault('42')).toEqual({ kind: 'literal', value: 42 });
-  });
-
-  it('parses string literal default', () => {
-    expect(parseSqliteDefault("'hello'")).toEqual({ kind: 'literal', value: 'hello' });
-  });
-
-  it('preserves unrecognized expressions as function', () => {
-    expect(parseSqliteDefault('abs(-5)')).toEqual({ kind: 'function', expression: 'abs(-5)' });
+  it('preserves unrecognized expressions', () => {
+    expect(parseSqliteDefault('abs(-5)')).toEqual({ kind: 'expression', expression: 'abs(-5)' });
   });
 
   it('strips outer parentheses', () => {
-    expect(parseSqliteDefault('(42)')).toEqual({ kind: 'literal', value: 42 });
+    expect(parseSqliteDefault('(42)')).toEqual({ kind: 'expression', expression: '42' });
   });
 });
 
