@@ -1579,13 +1579,13 @@ importers:
         version: 2.0.3
     devDependencies:
       '@prisma-next/test-utils':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../../../test/utils
       '@prisma-next/tsconfig':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../../0-config/tsconfig
       '@prisma-next/tsdown':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../../0-config/tsdown
       '@types/node':
         specifier: 'catalog:'
