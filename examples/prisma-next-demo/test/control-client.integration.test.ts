@@ -24,19 +24,22 @@ describe('control client integration', () => {
         // Use control client to initialize the database
         await initTestDatabase({ connection: connectionString, contract: contract });
 
-        // Verify tables were created by querying the database
+        // Verify tables were created by querying the database. The
+        // 2-namespace contract puts User in `auth` and Post in `public`,
+        // so introspect both schemas to confirm db init laid them down
+        // in the right places.
         const pool = new Pool({ connectionString });
         try {
-          const result = await pool.query(`
-            SELECT table_name
+          const result = await pool.query<{ table_schema: string; table_name: string }>(`
+            SELECT table_schema, table_name
             FROM information_schema.tables
-            WHERE table_schema = 'public'
-            ORDER BY table_name
+            WHERE table_schema IN ('public', 'auth')
+            ORDER BY table_schema, table_name
           `);
-          const tableNames = result.rows.map((r) => r.table_name);
+          const tables = result.rows.map((r) => `${r.table_schema}.${r.table_name}`);
 
-          expect(tableNames).toContain('user');
-          expect(tableNames).toContain('post');
+          expect(tables).toContain('auth.user');
+          expect(tables).toContain('public.post');
         } finally {
           await pool.end();
         }
