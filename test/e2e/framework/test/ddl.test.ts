@@ -14,7 +14,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
       expect(sql).toMatchInlineSnapshot(`
         "CREATE EXTENSION IF NOT EXISTS vector;
 
-        CREATE TABLE "public"."comment" (
+        CREATE TABLE "comment" (
           "content" text NOT NULL,
           "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" SERIAL NOT NULL,
@@ -23,14 +23,14 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        CREATE TABLE "public"."embedding" (
+        CREATE TABLE "embedding" (
           "embedding" vector(1536) NOT NULL,
           "id" SERIAL NOT NULL,
           "profile" jsonb NOT NULL,
           PRIMARY KEY ("id")
         );
 
-        CREATE TABLE "public"."event" (
+        CREATE TABLE "event" (
           "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" character(36) NOT NULL,
           "name" text NOT NULL,
@@ -38,7 +38,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        CREATE TABLE "public"."literal_defaults" (
+        CREATE TABLE "literal_defaults" (
           "active" bool DEFAULT true NOT NULL,
           "big_count" int8 DEFAULT 9007199254740991 NOT NULL,
           "id" SERIAL NOT NULL,
@@ -50,7 +50,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        CREATE TABLE "public"."param_types" (
+        CREATE TABLE "param_types" (
           "bits" bit varying(12),
           "code" character(16),
           "created_at" timestamptz(3),
@@ -64,7 +64,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        CREATE TABLE "public"."post" (
+        CREATE TABLE "post" (
           "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "id" SERIAL NOT NULL,
           "meta" json,
@@ -75,7 +75,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        CREATE TABLE "public"."user" (
+        CREATE TABLE "user" (
           "created_at" timestamptz DEFAULT (now()) NOT NULL,
           "email" character varying(255) NOT NULL,
           "id" SERIAL NOT NULL,
@@ -84,7 +84,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
-        ALTER TABLE "public"."user" ADD CONSTRAINT "user_email_key" UNIQUE ("email")"
+        ALTER TABLE "user" ADD CONSTRAINT "user_email_key" UNIQUE ("email")"
       `);
     });
   });
