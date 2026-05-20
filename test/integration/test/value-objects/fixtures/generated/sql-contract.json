@@ -70,8 +70,7 @@
                 "nativeType": "int4",
                 "nullable": false,
                 "default": {
-                  "kind": "function",
-                  "expression": "autoincrement()"
+                  "kind": "autoincrement"
                 }
               },
               "name": {

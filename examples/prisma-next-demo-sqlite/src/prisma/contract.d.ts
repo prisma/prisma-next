@@ -15,7 +15,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:8ea47fc08b79e387a9136d5a4ac708723e4941a7b3cffe71d57ceca09229a486'>;
+  StorageHashBase<'sha256:2e6a5d2aa8394b2afb958a80fa950bc04c0fb8c6646afb4ceed34267b6f976bd'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae'>;
 export type ProfileHash =
@@ -30,13 +30,13 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly Post: {
-    readonly id: CodecTypes['sql/char@1']['output'];
+    readonly id: Char<36>;
     readonly title: CodecTypes['sqlite/text@1']['output'];
-    readonly userId: CodecTypes['sql/char@1']['output'];
+    readonly userId: Char<36>;
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
   };
   readonly User: {
-    readonly id: CodecTypes['sql/char@1']['output'];
+    readonly id: Char<36>;
     readonly email: CodecTypes['sqlite/text@1']['output'];
     readonly displayName: CodecTypes['sqlite/text@1']['output'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];

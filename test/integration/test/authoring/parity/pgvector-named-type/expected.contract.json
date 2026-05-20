@@ -54,8 +54,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -71,7 +70,7 @@
         }
       }
     },
-    "storageHash": "sha256:923650d8962586ae327c2224a8d4a589abf94ce9465182179bf7939228ef8cef",
+    "storageHash": "sha256:d59787db380c4912fea23876a391db524a5717e7d2d87e8ddbd3f8df82c2be28",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

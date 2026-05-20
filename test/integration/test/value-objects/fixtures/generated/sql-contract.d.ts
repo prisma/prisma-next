@@ -46,8 +46,7 @@ type ContractBase = ContractShape<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
-                  readonly expression: 'autoincrement()';
+                  readonly kind: 'autoincrement';
                 };
               };
               readonly name: {

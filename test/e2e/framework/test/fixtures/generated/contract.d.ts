@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:c01040e095a1fe5dd776c2d5afe4a7767c506e044e96ecd46bfa369a75a13733'>;
+  StorageHashBase<'sha256:06e84ab8bb0d664611300b6e4a576f055a560de08091c2de1b6387d836b773e2'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
@@ -269,11 +269,8 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<
-                    'pg/timestamptz@1',
-                    '2024-01-15T10:30:00.000Z'
-                  >;
+                  readonly kind: 'function';
+                  readonly expression: "'2024-01-15T10:30:00.000Z'::timestamp with time zone";
                 };
               };
               readonly created_at: {
@@ -304,44 +301,35 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/text@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/text@1', 'draft'>;
+                  readonly kind: 'function';
+                  readonly expression: "'draft'::text";
                 };
               };
               readonly score: {
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
-                };
+                readonly default: { readonly kind: 'function'; readonly expression: '0' };
               };
               readonly rating: {
                 readonly nativeType: 'float8';
                 readonly codecId: 'pg/float8@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/float8@1', 3.14>;
-                };
+                readonly default: { readonly kind: 'function'; readonly expression: '3.14' };
               };
               readonly active: {
                 readonly nativeType: 'bool';
                 readonly codecId: 'pg/bool@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/bool@1', true>;
-                };
+                readonly default: { readonly kind: 'function'; readonly expression: 'TRUE' };
               };
               readonly big_count: {
                 readonly nativeType: 'int8';
                 readonly codecId: 'pg/int8@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/int8@1', 9007199254740991>;
+                  readonly kind: 'function';
+                  readonly expression: '9007199254740991';
                 };
               };
               readonly metadata: {
@@ -349,8 +337,8 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/jsonb@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/jsonb@1', { readonly key: 'default' }>;
+                  readonly kind: 'function';
+                  readonly expression: '\'{"key":"default"}\'::jsonb';
                 };
               };
               readonly tags: {
@@ -358,8 +346,8 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/jsonb@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/jsonb@1', readonly ['alpha', 'beta']>;
+                  readonly kind: 'function';
+                  readonly expression: '\'["alpha","beta"]\'::jsonb';
                 };
               };
             };

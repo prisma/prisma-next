@@ -15,7 +15,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:f52ad65b0b6148af276fd084c349f8f21a4a4da2ba8644dfac21b53dd47d9791'>;
+  StorageHashBase<'sha256:55e5e8254d07de5085f404759d2c325862d538704622df14e5f2db8a34a9d01b'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7'>;
@@ -152,10 +152,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'text';
                 readonly codecId: 'sqlite/text@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'sqlite/text@1', 'unnamed'>;
-                };
+                readonly default: { readonly kind: 'function'; readonly expression: "'unnamed'" };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };

@@ -625,7 +625,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -634,7 +634,7 @@
                 "codecId": "pg/int4@1",
                 "default": {
                   "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -673,7 +673,7 @@
                 "codecId": "pg/int4@1",
                 "default": {
                   "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -715,7 +715,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -736,8 +736,8 @@
               "scheduled_at": {
                 "codecId": "pg/timestamptz@1",
                 "default": {
-                  "kind": "literal",
-                  "value": "2024-01-15T10:30:00.000Z"
+                  "expression": "'2024-01-15T10:30:00.000Z'::timestamp with time zone",
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -757,8 +757,8 @@
               "active": {
                 "codecId": "pg/bool@1",
                 "default": {
-                  "kind": "literal",
-                  "value": true
+                  "expression": "TRUE",
+                  "kind": "expression"
                 },
                 "nativeType": "bool",
                 "nullable": false
@@ -766,8 +766,8 @@
               "big_count": {
                 "codecId": "pg/int8@1",
                 "default": {
-                  "kind": "literal",
-                  "value": 9007199254740991
+                  "expression": "9007199254740991",
+                  "kind": "expression"
                 },
                 "nativeType": "int8",
                 "nullable": false
@@ -776,7 +776,7 @@
                 "codecId": "pg/int4@1",
                 "default": {
                   "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -784,8 +784,8 @@
               "label": {
                 "codecId": "pg/text@1",
                 "default": {
-                  "kind": "literal",
-                  "value": "draft"
+                  "expression": "'draft'::text",
+                  "kind": "expression"
                 },
                 "nativeType": "text",
                 "nullable": false
@@ -793,10 +793,8 @@
               "metadata": {
                 "codecId": "pg/jsonb@1",
                 "default": {
-                  "kind": "literal",
-                  "value": {
-                    "key": "default"
-                  }
+                  "expression": "'{\"key\":\"default\"}'::jsonb",
+                  "kind": "expression"
                 },
                 "nativeType": "jsonb",
                 "nullable": false
@@ -804,8 +802,8 @@
               "rating": {
                 "codecId": "pg/float8@1",
                 "default": {
-                  "kind": "literal",
-                  "value": 3.14
+                  "expression": "3.14",
+                  "kind": "expression"
                 },
                 "nativeType": "float8",
                 "nullable": false
@@ -813,8 +811,8 @@
               "score": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "kind": "literal",
-                  "value": 0
+                  "expression": "0",
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -822,11 +820,8 @@
               "tags": {
                 "codecId": "pg/jsonb@1",
                 "default": {
-                  "kind": "literal",
-                  "value": [
-                    "alpha",
-                    "beta"
-                  ]
+                  "expression": "'[\"alpha\",\"beta\"]'::jsonb",
+                  "kind": "expression"
                 },
                 "nativeType": "jsonb",
                 "nullable": false
@@ -887,7 +882,7 @@
                 "codecId": "pg/int4@1",
                 "default": {
                   "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -941,7 +936,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -950,7 +945,7 @@
                 "codecId": "pg/int4@1",
                 "default": {
                   "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -996,7 +991,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -1013,7 +1008,7 @@
                 "codecId": "pg/int4@1",
                 "default": {
                   "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -1048,7 +1043,7 @@
         }
       }
     },
-    "storageHash": "sha256:c01040e095a1fe5dd776c2d5afe4a7767c506e044e96ecd46bfa369a75a13733"
+    "storageHash": "sha256:06e84ab8bb0d664611300b6e4a576f055a560de08091c2de1b6387d836b773e2"
   },
   "execution": {
     "executionHash": "sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27",

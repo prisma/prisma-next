@@ -148,8 +148,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -208,7 +207,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -222,8 +221,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -231,8 +229,8 @@
               "isActive": {
                 "codecId": "pg/bool@1",
                 "default": {
-                  "kind": "literal",
-                  "value": true
+                  "expression": "TRUE",
+                  "kind": "expression"
                 },
                 "nativeType": "bool",
                 "nullable": false
@@ -276,7 +274,7 @@
         }
       }
     },
-    "storageHash": "sha256:b6a07cf933f780f0be10605786b9d3434fda472d5327582cbe8dc7bf3551644e",
+    "storageHash": "sha256:a7d2bd70f2de893a5ca386b1dfe11a2b1ad3153330afe224ce665b90f77b1bc0",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

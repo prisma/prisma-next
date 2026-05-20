@@ -39,7 +39,7 @@
                 "codecId": "pg/text@1",
                 "default": {
                   "expression": "gen_random_uuid()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "text",
                 "nullable": false
@@ -55,7 +55,7 @@
         }
       }
     },
-    "storageHash": "sha256:f83367183867bad124b5fc91b8913d1a1e36bccedfba80a471df5751201d63cc"
+    "storageHash": "sha256:8d5a1931090ec689b5165b7b50fa47c317641003b00ca2fe7af81e8c35c2fd63"
   },
   "capabilities": {
     "postgres": {

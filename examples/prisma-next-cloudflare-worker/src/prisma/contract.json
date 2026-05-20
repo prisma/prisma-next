@@ -423,7 +423,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -481,7 +481,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -502,8 +502,8 @@
               "status": {
                 "codecId": "pg/text@1",
                 "default": {
-                  "kind": "literal",
-                  "value": "open"
+                  "expression": "'open'::text",
+                  "kind": "expression"
                 },
                 "nativeType": "text",
                 "nullable": false
@@ -563,7 +563,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -622,7 +622,7 @@
         }
       }
     },
-    "storageHash": "sha256:17efb9380d28aece136dac05fd18e62d63d164332bae788d13e3e4339b486839"
+    "storageHash": "sha256:335d19f9d862a812f18a5f040982b6157c3a606008db953e752aff28d23c5ba0"
   },
   "execution": {
     "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",
