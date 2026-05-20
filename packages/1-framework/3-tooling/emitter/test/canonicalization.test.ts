@@ -84,7 +84,7 @@ describe('canonicalization', () => {
               codecId: 'pg/timestamptz@1',
               nativeType: 'timestamptz',
               nullable: false,
-              default: { kind: 'function', expression: 'now()' },
+              default: { kind: 'expression', expression: 'now()' },
             },
             updated_at: {
               codecId: 'pg/timestamptz@1',
@@ -117,7 +117,7 @@ describe('canonicalization', () => {
               codecId: 'pg/text@1',
               nativeType: 'text',
               nullable: true,
-              default: { kind: 'literal', value: '' },
+              default: { kind: 'expression', expression: "''" },
             },
           },
         },
@@ -132,7 +132,7 @@ describe('canonicalization', () => {
     const columns = user['columns'] as Record<string, unknown>;
     const bio = columns['bio'] as Record<string, unknown>;
     expect(bio['nullable']).toBe(true);
-    expect(bio['default']).toEqual({ kind: 'literal', value: '' });
+    expect(bio['default']).toEqual({ kind: 'expression', expression: "''" });
   });
 
   it('omits empty arrays and objects except required ones', () => {
