@@ -43,8 +43,12 @@ interface TelemetryBackendApp extends TelemetryBackendShutdownTarget {
   readonly requestsPerMinute: number;
 }
 
-function parsePositiveIntegerFromEnv(name: string, fallbackValue: string): number {
-  const value = process.env[name] ?? fallbackValue;
+function parsePositiveIntegerFromEnv(
+  name: string,
+  env: Record<string, string | undefined>,
+  fallbackValue: string,
+): number {
+  const value = env[name] ?? fallbackValue;
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`Invalid ${name} value: ${value}`);
@@ -110,8 +114,8 @@ export function resolveTelemetryBackendConfig(
     throw new Error('DATABASE_URL must be set');
   }
 
-  const port = parsePositiveIntegerFromEnv('PORT', '8080');
-  const requestsPerMinute = parsePositiveIntegerFromEnv('RATE_LIMIT_RPM', '120');
+  const port = parsePositiveIntegerFromEnv('PORT', env, '8080');
+  const requestsPerMinute = parsePositiveIntegerFromEnv('RATE_LIMIT_RPM', env, '120');
   const trustForwardedFor = parseBooleanEnv('TRUST_FORWARDED_FOR', env, false);
 
   return { databaseUrl, port, requestsPerMinute, trustForwardedFor };

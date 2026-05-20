@@ -1,5 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { stopTelemetryBackend } from '../src/server-runtime';
+import { resolveTelemetryBackendConfig, stopTelemetryBackend } from '../src/server-runtime';
+
+describe('resolveTelemetryBackendConfig', () => {
+  it('honours PORT and RATE_LIMIT_RPM from the passed-in env (not process.env)', () => {
+    const config = resolveTelemetryBackendConfig({
+      DATABASE_URL: 'postgres://test/test',
+      PORT: '4321',
+      RATE_LIMIT_RPM: '7',
+    });
+    expect(config.port).toBe(4321);
+    expect(config.requestsPerMinute).toBe(7);
+  });
+
+  it('falls back to defaults when PORT and RATE_LIMIT_RPM are absent from the passed-in env', () => {
+    const config = resolveTelemetryBackendConfig({ DATABASE_URL: 'postgres://test/test' });
+    expect(config.port).toBe(8080);
+    expect(config.requestsPerMinute).toBe(120);
+  });
+});
 
 describe('telemetry backend shutdown', () => {
   afterEach(() => {
