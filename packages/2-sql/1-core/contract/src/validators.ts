@@ -16,8 +16,6 @@ import {
   type UniqueConstraintInput,
 } from './types';
 
-type ColumnDefaultExpression = { readonly kind: 'expression'; readonly expression: string };
-type ColumnDefaultAutoincrement = { readonly kind: 'autoincrement' };
 const expressionKindSchema = type("'expression'");
 const autoincrementKindSchema = type("'autoincrement'");
 const generatorKindSchema = type("'generator'");
@@ -25,12 +23,14 @@ const generatorIdSchema = type('string').narrow((value, ctx) => {
   return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
 });
 
-export const ColumnDefaultExpressionSchema = type.declare<ColumnDefaultExpression>().type({
+export const ColumnDefaultExpressionSchema = type({
+  '+': 'reject',
   kind: expressionKindSchema,
   expression: 'string',
 });
 
-export const ColumnDefaultAutoincrementSchema = type.declare<ColumnDefaultAutoincrement>().type({
+export const ColumnDefaultAutoincrementSchema = type({
+  '+': 'reject',
   kind: autoincrementKindSchema,
 });
 

@@ -262,6 +262,60 @@ describe('SQL contract validators', () => {
       } as unknown;
       expect(() => validateStorage(s)).toThrow();
     });
+
+    it('rejects autoincrement default with extra expression field', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    default: { kind: 'autoincrement', expression: 'foo' },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).toThrow();
+    });
+
+    it('rejects expression default with extra value field', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  createdAt: {
+                    nativeType: 'timestamptz',
+                    codecId: 'pg/timestamptz@1',
+                    nullable: false,
+                    default: { kind: 'expression', expression: 'x', value: 42 },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).toThrow();
+    });
   });
 
   describe('validateModel', () => {
