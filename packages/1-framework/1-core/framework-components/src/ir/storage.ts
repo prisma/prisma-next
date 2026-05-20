@@ -45,6 +45,9 @@ export function* elementCoordinates(storage: Storage): Generator<EntityCoordinat
       );
     }
     for (const { slotKey, entityKind } of slotKeys) {
+      // Safe because SLOT_KEYS_BY_NAMESPACE_KIND promises slot-key validity for
+      // the looked-up `kind`; further narrowing would require importing
+      // family-specific `Namespace` subtypes into the framework layer.
       const slot = (ns as unknown as Readonly<Record<string, unknown>>)[slotKey];
       if (slot !== undefined && slot !== null && typeof slot === 'object') {
         for (const entityName of Object.keys(slot)) {

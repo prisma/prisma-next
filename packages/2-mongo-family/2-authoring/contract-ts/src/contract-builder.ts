@@ -1528,6 +1528,10 @@ function buildContractFromDefinition<
       targetFamily: definition.family.familyId,
       storage: storageBody,
     }),
+    // Plain-literal namespace bodies under MongoStorageShape carry `kind` only
+    // as a type-side requirement; surfacing it on the runtime object here would
+    // alter the storage hash. Class-instance construction (which carries kind
+    // non-enumerably) is the structural cure and is tracked for follow-up.
   } as unknown as MongoStorageShape<string>;
 
   const builtContract = {
