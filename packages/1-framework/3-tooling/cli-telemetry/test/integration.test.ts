@@ -75,9 +75,9 @@ interface SilentSenderResult {
  * Spawn the sender with stdout + stderr piped into in-memory buffers so a
  * test can assert on what the child wrote. The original failure-mode tests
  * used `stdio: ['pipe', 'ignore', 'ignore', 'ipc']` which discarded the
- * child's stderr entirely; this helper captures it so the test can pin AC8
- * ("no telemetry-originating output appears on stdout or stderr in normal
- * mode; output appears only under `PRISMA_NEXT_DEBUG=1`").
+ * child's stderr entirely; this helper captures it so the test can pin the
+ * silence invariant (no telemetry-originating output appears on stdout or
+ * stderr in normal mode; output appears only under `PRISMA_NEXT_DEBUG=1`).
  *
  * Resolves on `exit` + both stdio streams reporting `end`. `close` is the
  * usual way to wait for both, but the sender's IPC-disconnect-driven idle
