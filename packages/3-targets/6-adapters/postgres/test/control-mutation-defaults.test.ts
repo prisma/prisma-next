@@ -47,7 +47,10 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     const result = handler.lower({ call: makeCall('autoincrement'), context: stubContext });
     expect(result).toMatchObject({
       ok: true,
-      value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'autoincrement()' } },
+      value: {
+        kind: 'storage',
+        defaultValue: { kind: 'expression', expression: 'autoincrement()' },
+      },
     });
   });
 
@@ -56,7 +59,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     const result = handler.lower({ call: makeCall('now'), context: stubContext });
     expect(result).toMatchObject({
       ok: true,
-      value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'now()' } },
+      value: { kind: 'storage', defaultValue: { kind: 'expression', expression: 'now()' } },
     });
   });
 
@@ -142,7 +145,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
       ok: true,
       value: {
         kind: 'storage',
-        defaultValue: { kind: 'function', expression: 'gen_random_uuid()' },
+        defaultValue: { kind: 'expression', expression: 'gen_random_uuid()' },
       },
     });
   });

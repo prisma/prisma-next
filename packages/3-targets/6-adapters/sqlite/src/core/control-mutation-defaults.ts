@@ -110,7 +110,7 @@ function lowerAutoincrement(input: {
     value: {
       kind: 'storage',
       defaultValue: {
-        kind: 'function',
+        kind: 'expression',
         expression: 'autoincrement()',
       },
     },
@@ -134,7 +134,7 @@ function lowerNow(input: {
     value: {
       kind: 'storage',
       defaultValue: {
-        kind: 'function',
+        kind: 'expression',
         expression: 'now()',
       },
     },
@@ -291,7 +291,7 @@ function lowerDbgenerated(input: {
     value: {
       kind: 'storage',
       defaultValue: {
-        kind: 'function',
+        kind: 'expression',
         expression,
       },
     },
