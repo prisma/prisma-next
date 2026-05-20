@@ -239,7 +239,7 @@ export function compileUpsertReturning(
       ).doNothing();
 
   const ast = InsertAst.into(TableSource.named(tableName))
-    .withValues(createAssignments.assignments)
+    .withRows([createAssignments.assignments])
     .withOnConflict(onConflict)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
 
