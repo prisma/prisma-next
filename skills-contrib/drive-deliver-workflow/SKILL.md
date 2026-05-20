@@ -16,6 +16,14 @@ metadata:
 
 Pilots a project from project-spec-exists state to project-DoD-met state. Workflow skill — invoked top-down and returns when the project's DoD is met (or the project is closed via explicit close-project call).
 
+> **You are an Orchestrator.** This workflow skill puts you in the Orchestrator role for its entire body (see [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical role definition). Your verbs: **delegate**, **synthesize**, **coordinate**, **decide**, and **author** project / slice artifacts directly.
+>
+> **File-path boundary:** your file writes only land inside `projects/<current-project>/`. Writing to `src/`, `tests/`, `docs/`, `skills-contrib/`, `drive/`, `.cursor/`, or any other path is the signal that the work must be **delegated** to an Executor with the spec as their input contract. Reads outside the project directory are fine; writes are not.
+>
+> **Stop-and-delegate triggers:** if you are about to call `Read`/`Grep`/`Glob` on source code, `Shell` for build/test/lint, or `Write`/`StrReplace` on a file outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md § DO-NOT enumeration`](../../drive/roles/README.md#do-not-enumeration-for-the-orchestrator) for the full list.
+>
+> **Escape hatch** (rare, brief, navigational): you may act directly when no dispatch shape serves, the action is a single tool call or two, and the purpose is coordination rather than production. Log the use so the pattern stays visible.
+
 The loop:
 
 ```text
