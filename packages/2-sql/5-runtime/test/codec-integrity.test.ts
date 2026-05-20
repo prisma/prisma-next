@@ -20,6 +20,9 @@ describe('createExecutionContext — column codec integrity', () => {
       decode: (w: unknown) => Promise.resolve(w),
       encodeJson: (v) => v as never,
       decodeJson: (j) => j as never,
+      renderSqlLiteral: () => {
+        throw new Error('renderSqlLiteral not configured on integrity-test stub codec');
+      },
     };
   }
 

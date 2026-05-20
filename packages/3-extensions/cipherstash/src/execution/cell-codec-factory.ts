@@ -27,13 +27,13 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import {
-  type AnyCodecDescriptor,
-  CodecImpl,
-  type CodecTrait,
-} from '@prisma-next/framework-components/codec';
+import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { Codec, SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
+import {
+  type Codec,
+  type SqlCodecCallContext,
+  SqlCodecImpl,
+} from '@prisma-next/sql-relational-core/ast';
 import { CIPHERSTASH_CODEC_TRAITS, EQL_V2_ENCRYPTED_TYPE } from '../extension-metadata/constants';
 import type { EncryptedEnvelopeBase } from './envelope-base';
 import type { CipherstashSdk } from './sdk';
@@ -102,7 +102,7 @@ export interface CipherstashCellCodecOptions<E extends EncryptedEnvelopeBase<unk
   }) => E;
 }
 
-export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> extends CodecImpl<
+export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> extends SqlCodecImpl<
   string,
   readonly CodecTrait[],
   unknown,
@@ -186,6 +186,19 @@ export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> exte
   decodeJson(_json: JsonValue): E {
     throw new Error(
       'cipherstash codec: decodeJson is not supported; envelopes do not round-trip through JSON.',
+    );
+  }
+
+  renderSqlLiteral(_value: E): string {
+    // Cipherstash envelopes are opaque encrypted ciphertext bound to a `(table, column)` routing
+    // context. They cannot be rendered as a static DDL `DEFAULT (<expr>)` literal — encryption
+    // happens at insert time via the bulk-encrypt middleware. `.default(<envelope>)` on an
+    // encrypted column is a programming error.
+    throw runtimeError(
+      'RUNTIME.ENCODE_FAILED',
+      `cipherstash ${this.descriptor.codecId}: renderSqlLiteral is not supported on encrypted-cell codecs. ` +
+        'Cipherstash columns cannot carry a literal DDL default — encryption is bound to insert-time middleware.',
+      { codecId: this.descriptor.codecId, reason: 'cipherstash-renderSqlLiteral-unsupported' },
     );
   }
 }

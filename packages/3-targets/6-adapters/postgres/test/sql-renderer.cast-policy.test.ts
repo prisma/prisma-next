@@ -90,7 +90,7 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
 
 describe('renderLoweredSql cast policy', () => {
   it('emits $N::<nativeType> when the codec nativeType is outside the inferrable set', () => {
-    const fooCodec: Codec = defineTestCodec({
+    const fooCodec: SqlCodec = defineTestCodec({
       typeId: 'app/test-foo@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -112,7 +112,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec nativeType is inferrable', () => {
-    const integerCodec: Codec = defineTestCodec({
+    const integerCodec: SqlCodec = defineTestCodec({
       typeId: 'pg/int4@1',
       encode: (value: number): number => value,
       decode: (wire: number): number => wire,
@@ -134,7 +134,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {
-    const enumCodec: Codec = defineTestCodec({
+    const enumCodec: SqlCodec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -211,7 +211,7 @@ describe('renderLoweredSql cast policy', () => {
 
 describe('renderLoweredSql cast policy via stack-derived lookup', () => {
   it('emits the extension-codec cast when the codec is contributed via stack.extensionPacks', () => {
-    const geographyCodec: Codec = defineTestCodec({
+    const geographyCodec: SqlCodec = defineTestCodec({
       typeId: 'app/geography@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,

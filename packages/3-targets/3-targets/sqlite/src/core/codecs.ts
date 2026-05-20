@@ -3,7 +3,7 @@
  *
  * Each codec ships as three artifacts:
  *
- * 1. A `SqliteXCodec` class extending {@link CodecImpl} that wraps the encode/decode/encodeJson/decodeJson conversions inline. SQLite's runtime conversions are simple enough that there is no shared helper module; the class bodies are the single source of truth. 2. A `SqliteXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, and params schema. SQLite codecs do not carry
+ * 1. A `SqliteXCodec` class extending {@link SqlCodecImpl} that wraps the encode/decode/encodeJson/decodeJson conversions inline. SQLite's runtime conversions are simple enough that there is no shared helper module; the class bodies are the single source of truth. 2. A `SqliteXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, and params schema. SQLite codecs do not carry
  * `meta` (no per-target native-type meta today) and are all non-parameterized. 3. A per-codec column helper (`sqliteXColumn`) that calls `descriptor.factory()` directly and packages the result into a {@link ColumnSpec} via the framework {@link column} packager. The helper is tied to its descriptor with `satisfies ColumnHelperFor` + `ColumnHelperForStrict` (every SQLite codec's resolved type is well-defined).
  *
  * After TML-2357 this is the canonical source of SQLite codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers (and the parallel `byScalar` / `codecDescriptorDefinitions` collection exports) retired with the deletion sweep.
@@ -16,7 +16,6 @@ import {
   type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
@@ -24,6 +23,8 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
+  escapeStandardSqlLiteral,
+  SqlCodecImpl,
   sqlCharDescriptor,
   sqlFloatDescriptor,
   sqlIntDescriptor,
@@ -39,7 +40,7 @@ import {
   SQLITE_TEXT_CODEC_ID,
 } from './codec-ids';
 
-export class SqliteTextCodec extends CodecImpl<
+export class SqliteTextCodec extends SqlCodecImpl<
   typeof SQLITE_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -56,6 +57,9 @@ export class SqliteTextCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return `'${escapeStandardSqlLiteral(value)}'`;
   }
 }
 
@@ -77,9 +81,9 @@ export const sqliteTextColumn = () =>
 sqliteTextColumn satisfies ColumnHelperFor<SqliteTextDescriptor>;
 sqliteTextColumn satisfies ColumnHelperForStrict<SqliteTextDescriptor>;
 
-export class SqliteIntegerCodec extends CodecImpl<
+export class SqliteIntegerCodec extends SqlCodecImpl<
   typeof SQLITE_INTEGER_CODEC_ID,
-  readonly ['equality', 'order', 'numeric'],
+  readonly ['equality', 'order', 'numeric', 'autoincrement'],
   number,
   number
 > {
@@ -95,11 +99,14 @@ export class SqliteIntegerCodec extends CodecImpl<
   decodeJson(json: JsonValue): number {
     return json as number;
   }
+  renderSqlLiteral(value: number): string {
+    return String(value);
+  }
 }
 
 export class SqliteIntegerDescriptor extends CodecDescriptorImpl<void> {
   override readonly codecId = SQLITE_INTEGER_CODEC_ID;
-  override readonly traits = ['equality', 'order', 'numeric'] as const;
+  override readonly traits = ['equality', 'order', 'numeric', 'autoincrement'] as const;
   override readonly targetTypes = ['integer'] as const;
   override readonly paramsSchema = voidParamsSchema;
   override factory(): (ctx: CodecInstanceContext) => SqliteIntegerCodec {
@@ -115,7 +122,7 @@ export const sqliteIntegerColumn = () =>
 sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
 sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;
 
-export class SqliteRealCodec extends CodecImpl<
+export class SqliteRealCodec extends SqlCodecImpl<
   typeof SQLITE_REAL_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -132,6 +139,9 @@ export class SqliteRealCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): number {
     return json as number;
+  }
+  renderSqlLiteral(value: number): string {
+    return String(value);
   }
 }
 
@@ -153,7 +163,7 @@ export const sqliteRealColumn = () =>
 sqliteRealColumn satisfies ColumnHelperFor<SqliteRealDescriptor>;
 sqliteRealColumn satisfies ColumnHelperForStrict<SqliteRealDescriptor>;
 
-export class SqliteBlobCodec extends CodecImpl<
+export class SqliteBlobCodec extends SqlCodecImpl<
   typeof SQLITE_BLOB_CODEC_ID,
   readonly ['equality'],
   Uint8Array,
@@ -173,6 +183,9 @@ export class SqliteBlobCodec extends CodecImpl<
       throw new TypeError('sqlite/blob@1 contract value must be a base64 string');
     }
     return new Uint8Array(Buffer.from(json, 'base64'));
+  }
+  renderSqlLiteral(value: Uint8Array): string {
+    return `X'${Buffer.from(value).toString('hex')}'`;
   }
 }
 
@@ -194,7 +207,7 @@ export const sqliteBlobColumn = () =>
 sqliteBlobColumn satisfies ColumnHelperFor<SqliteBlobDescriptor>;
 sqliteBlobColumn satisfies ColumnHelperForStrict<SqliteBlobDescriptor>;
 
-export class SqliteDatetimeCodec extends CodecImpl<
+export class SqliteDatetimeCodec extends SqlCodecImpl<
   typeof SQLITE_DATETIME_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -223,6 +236,9 @@ export class SqliteDatetimeCodec extends CodecImpl<
     }
     return this.parseDate(json);
   }
+  renderSqlLiteral(value: Date): string {
+    return `'${value.toISOString()}'`;
+  }
 }
 
 export class SqliteDatetimeDescriptor extends CodecDescriptorImpl<void> {
@@ -243,7 +259,7 @@ export const sqliteDatetimeColumn = () =>
 sqliteDatetimeColumn satisfies ColumnHelperFor<SqliteDatetimeDescriptor>;
 sqliteDatetimeColumn satisfies ColumnHelperForStrict<SqliteDatetimeDescriptor>;
 
-export class SqliteJsonCodec extends CodecImpl<
+export class SqliteJsonCodec extends SqlCodecImpl<
   typeof SQLITE_JSON_CODEC_ID,
   readonly ['equality'],
   string | JsonValue,
@@ -260,6 +276,9 @@ export class SqliteJsonCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): JsonValue {
     return json;
+  }
+  renderSqlLiteral(value: JsonValue): string {
+    return `'${escapeStandardSqlLiteral(JSON.stringify(value))}'`;
   }
 }
 
@@ -281,7 +300,7 @@ export const sqliteJsonColumn = () =>
 sqliteJsonColumn satisfies ColumnHelperFor<SqliteJsonDescriptor>;
 sqliteJsonColumn satisfies ColumnHelperForStrict<SqliteJsonDescriptor>;
 
-export class SqliteBigintCodec extends CodecImpl<
+export class SqliteBigintCodec extends SqlCodecImpl<
   typeof SQLITE_BIGINT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number | bigint,
@@ -301,6 +320,9 @@ export class SqliteBigintCodec extends CodecImpl<
       throw new TypeError('sqlite/bigint@1 contract value must be a string or number');
     }
     return BigInt(json);
+  }
+  renderSqlLiteral(value: bigint): string {
+    return value.toString();
   }
 }
 

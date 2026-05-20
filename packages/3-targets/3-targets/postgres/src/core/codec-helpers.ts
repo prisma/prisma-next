@@ -7,6 +7,31 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
+
+/**
+ * Escape a string value for embedding in a Postgres single-quoted SQL literal.
+ *
+ * Doubles embedded single quotes (`O'Brien` -> `O''Brien`). Rejects embedded NULL bytes — Postgres truncates UTF-8 strings at the first `\0` byte, so silently passing one through would yield a corrupted literal. Backslashes pass through as literal characters because the runtime assumes `standard_conforming_strings = on` (Postgres default since 9.1).
+ *
+ * Returns the inner content without the surrounding quotes; callers concatenate them.
+ */
+export function escapePgLiteralBody(value: string): string {
+  if (value.includes('\0')) {
+    throw new Error('Postgres literal cannot contain NULL bytes');
+  }
+  return value.replace(/'/g, "''");
+}
+
+/**
+ * Read the Postgres-native type name (e.g. `'integer'`, `'jsonb'`, `'timestamp with time zone'`) recorded on a codec descriptor's `meta` slot. Returns `undefined` if the descriptor carries no Postgres native-type meta — callers that need a cast then fall back to emitting a bare quoted literal and rely on Postgres's column-context inference.
+ */
+export function readPgNativeType(descriptor: AnyCodecDescriptor): string | undefined {
+  const meta = descriptor.meta as
+    | { readonly db?: { readonly sql?: { readonly postgres?: { readonly nativeType?: string } } } }
+    | undefined;
+  return meta?.db?.sql?.postgres?.nativeType;
+}
 
 export function renderLength(
   typeName: string,

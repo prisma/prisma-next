@@ -33,6 +33,9 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
           decode: (w: unknown) => Promise.resolve(w),
           encodeJson: (v) => v as never,
           decodeJson: (j) => j as never,
+          renderSqlLiteral: () => {
+            throw new Error('renderSqlLiteral not configured on context-capturing stub codec');
+          },
         };
         instances.push({ ctx, codec });
         return codec;
@@ -142,6 +145,9 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
           decode: (w: unknown) => Promise.resolve(w),
           encodeJson: (v) => v as never,
           decodeJson: (j) => j as never,
+          renderSqlLiteral: () => {
+            throw new Error('renderSqlLiteral not configured on pgvector-stub test codec');
+          },
         };
         return Object.assign({}, codec, {
           meta: { length: params.length, ctxName: ctx.name },
@@ -388,6 +394,9 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
           decode: (w: unknown) => Promise.resolve(w),
           encodeJson: (v) => v as never,
           decodeJson: (j) => j as never,
+          renderSqlLiteral: () => {
+            throw new Error('renderSqlLiteral not configured on shared stub codec');
+          },
         };
         instances.push({ ctx, codec });
         return codec;

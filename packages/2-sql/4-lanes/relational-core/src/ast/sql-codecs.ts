@@ -3,7 +3,7 @@
  *
  * Each codec ships as three artifacts:
  *
- * 1. A `SqlXCodec` class extending {@link CodecImpl} that wraps the module-level encode/decode constants exported from `sql-codec-helpers.ts` (the single source of truth for runtime behaviour). 2. A `SqlXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, and (where applicable) the emit-path `renderOutputType`. 3. A per-codec column helper (`sqlXColumn`)
+ * 1. A `SqlXCodec` class extending {@link SqlCodecImpl} that wraps the module-level encode/decode constants exported from `sql-codec-helpers.ts` (the single source of truth for runtime behaviour). 2. A `SqlXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, and (where applicable) the emit-path `renderOutputType`. 3. A per-codec column helper (`sqlXColumn`)
  * that calls `descriptor.factory(...)` directly and packages the result into a {@link ColumnSpec} via the framework {@link column} packager. The helper is tied to its descriptor with `satisfies ColumnHelperFor`.
  *
  * After TML-2357 this file is the canonical source of SQL base codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers retired with the deletion sweep.
@@ -13,7 +13,6 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
@@ -23,6 +22,8 @@ import {
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
+  escapeStandardSqlLiteral,
+  readPostgresNativeTypeFromMeta,
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
   SQL_INT_CODEC_ID,
@@ -47,6 +48,12 @@ import {
   sqlVarcharEncode,
   sqlVarcharRenderOutputType,
 } from './sql-codec-helpers';
+import { SqlCodecImpl } from './sql-codec-impl';
+
+function appendPgCast(literal: string, descriptor: { readonly meta?: unknown }): string {
+  const nativeType = readPostgresNativeTypeFromMeta(descriptor.meta);
+  return nativeType ? `${literal}::${nativeType}` : literal;
+}
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
@@ -59,7 +66,7 @@ const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 }) satisfies StandardSchemaV1<PrecisionParams>;
 
-export class SqlTextCodec extends CodecImpl<
+export class SqlTextCodec extends SqlCodecImpl<
   typeof SQL_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -76,6 +83,9 @@ export class SqlTextCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return appendPgCast(`'${escapeStandardSqlLiteral(value)}'`, this.descriptor);
   }
 }
 
@@ -97,7 +107,7 @@ export const sqlTextColumn = () =>
 sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
 sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;
 
-export class SqlIntCodec extends CodecImpl<
+export class SqlIntCodec extends SqlCodecImpl<
   typeof SQL_INT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -114,6 +124,9 @@ export class SqlIntCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): number {
     return json as number;
+  }
+  renderSqlLiteral(value: number): string {
+    return appendPgCast(String(value), this.descriptor);
   }
 }
 
@@ -135,7 +148,7 @@ export const sqlIntColumn = () =>
 sqlIntColumn satisfies ColumnHelperFor<SqlIntDescriptor>;
 sqlIntColumn satisfies ColumnHelperForStrict<SqlIntDescriptor>;
 
-export class SqlFloatCodec extends CodecImpl<
+export class SqlFloatCodec extends SqlCodecImpl<
   typeof SQL_FLOAT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -152,6 +165,9 @@ export class SqlFloatCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): number {
     return json as number;
+  }
+  renderSqlLiteral(value: number): string {
+    return appendPgCast(String(value), this.descriptor);
   }
 }
 
@@ -173,7 +189,7 @@ export const sqlFloatColumn = () =>
 sqlFloatColumn satisfies ColumnHelperFor<SqlFloatDescriptor>;
 sqlFloatColumn satisfies ColumnHelperForStrict<SqlFloatDescriptor>;
 
-export class SqlCharCodec extends CodecImpl<
+export class SqlCharCodec extends SqlCodecImpl<
   typeof SQL_CHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -190,6 +206,9 @@ export class SqlCharCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return appendPgCast(`'${escapeStandardSqlLiteral(value)}'`, this.descriptor);
   }
 }
 
@@ -214,7 +233,7 @@ export const sqlCharColumn = (params: LengthParams = {}) =>
 sqlCharColumn satisfies ColumnHelperFor<SqlCharDescriptor>;
 sqlCharColumn satisfies ColumnHelperForStrict<SqlCharDescriptor>;
 
-export class SqlVarcharCodec extends CodecImpl<
+export class SqlVarcharCodec extends SqlCodecImpl<
   typeof SQL_VARCHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -231,6 +250,9 @@ export class SqlVarcharCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return appendPgCast(`'${escapeStandardSqlLiteral(value)}'`, this.descriptor);
   }
 }
 
@@ -255,7 +277,7 @@ export const sqlVarcharColumn = (params: LengthParams = {}) =>
 sqlVarcharColumn satisfies ColumnHelperFor<SqlVarcharDescriptor>;
 sqlVarcharColumn satisfies ColumnHelperForStrict<SqlVarcharDescriptor>;
 
-export class SqlTimestampCodec extends CodecImpl<
+export class SqlTimestampCodec extends SqlCodecImpl<
   typeof SQL_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -272,6 +294,9 @@ export class SqlTimestampCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): Date {
     return sqlTimestampDecodeJson(json);
+  }
+  renderSqlLiteral(value: Date): string {
+    return appendPgCast(`'${value.toISOString()}'`, this.descriptor);
   }
 }
 

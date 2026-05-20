@@ -15,13 +15,12 @@ import {
   type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
 } from '@prisma-next/framework-components/codec';
-import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
+import { type ExtractCodecTypes, SqlCodecImpl } from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
@@ -43,7 +42,7 @@ const vectorParamsSchema = arktype({
 
 const PG_VECTOR_META = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;
 
-export class PgVectorCodec extends CodecImpl<
+export class PgVectorCodec extends SqlCodecImpl<
   typeof VECTOR_CODEC_ID,
   readonly ['equality'],
   string,
@@ -103,6 +102,11 @@ export class PgVectorCodec extends CodecImpl<
   decodeJson(json: JsonValue): number[] {
     this.assertVector(json);
     return json;
+  }
+
+  renderSqlLiteral(value: number[]): string {
+    this.assertVector(value);
+    return `'[${value.join(',')}]'::vector`;
   }
 }
 

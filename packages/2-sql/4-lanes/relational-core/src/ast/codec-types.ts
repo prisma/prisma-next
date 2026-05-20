@@ -60,9 +60,11 @@ export interface CodecMeta {
 }
 
 /**
- * SQL codec — extends the framework codec base by narrowing the per-call context to the SQL-family {@link SqlCodecCallContext} (adds `column?: SqlColumnRef`). TypeScript treats method-syntax declarations bivariantly, so the SQL narrowing is structurally compatible with the framework {@link BaseCodec} super-interface.
+ * SQL codec — extends the framework codec base by narrowing the per-call context to the SQL-family {@link SqlCodecCallContext} (adds `column?: SqlColumnRef`) and adding the required build-time `renderSqlLiteral(value)` method that lowers a `TInput` to a dialect-specific SQL expression. TypeScript treats method-syntax declarations bivariantly, so the SQL narrowing is structurally compatible with the framework {@link BaseCodec} super-interface.
  *
- * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`, `paramsSchema`, `renderOutputType`) lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor} — the codec instance itself only carries `id` plus the four conversion methods.
+ * `renderSqlLiteral` is required on every SQL codec — there is no identity fallback. Codec authors decide the dialect-specific spelling of literal values (`TRUE`/`FALSE` vs `1`/`0`, ISO-8601 with `::timestamptz` cast vs bare strings, escape rules for embedded quotes/backslashes/NULL bytes, etc.). The returned string is a complete SQL fragment the DDL renderer wraps as `DEFAULT (<expression>)`. Adversarial inputs (quotes, backslashes, NULL bytes, unicode) must be escaped correctly per dialect — the emitter performs no string concatenation around the result.
+ *
+ * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`, `paramsSchema`, `renderOutputType`) lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor} — the codec instance itself carries `id`, the four conversion methods, and `renderSqlLiteral`.
  *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec contract that this interface extends.
  */
@@ -74,6 +76,7 @@ export interface Codec<
 > extends BaseCodec<Id, TTraits, TWire, TInput> {
   encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
   decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
+  renderSqlLiteral(value: TInput): string;
 }
 
 /**

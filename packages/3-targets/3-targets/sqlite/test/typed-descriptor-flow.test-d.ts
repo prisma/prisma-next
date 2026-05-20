@@ -23,7 +23,9 @@ test('list entries extend AnyCodecDescriptor', () => {
 
 test('sqliteIntegerDescriptor.traits is a readonly literal tuple, not widened', () => {
   type Traits = SqliteIntegerDescriptor['traits'];
-  expectTypeOf<Traits>().toEqualTypeOf<readonly ['equality', 'order', 'numeric']>();
+  expectTypeOf<Traits>().toEqualTypeOf<
+    readonly ['equality', 'order', 'numeric', 'autoincrement']
+  >();
   expectTypeOf<Traits[number]>().toExtend<CodecTrait>();
 });
 
@@ -44,7 +46,7 @@ test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
   expectTypeOf<CodecTypes['sqlite/integer@1']>().toExtend<{
     readonly input: number;
     readonly output: number;
-    readonly traits: 'equality' | 'order' | 'numeric';
+    readonly traits: 'equality' | 'order' | 'numeric' | 'autoincrement';
   }>();
 
   expectTypeOf<CodecTypes['sqlite/datetime@1']>().toExtend<{
