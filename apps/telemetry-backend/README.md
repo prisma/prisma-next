@@ -112,17 +112,39 @@ Postgres on `localhost:5433` for local-dev use.
 
 ## Deploy hand-off
 
-This package builds nothing for deployment — `bun run src/server.ts` executes
-the Bun entrypoint TypeScript directly. There is therefore no `dist/` artefact
-to publish; the deploy unit is the package directory tree (or the repo, scoped
-by the workspace filter).
+Deployment goes through Prisma Compute via `pnpm run deploy`, which
+runs `scripts/deploy.ts`. The script uses `@prisma/compute-sdk`'s
+`BunBuild` strategy to build the package from `src/server.ts`, archive
+and upload it, create a new version, and promote it on the configured
+service. The assigned `*.prisma.build` URL is the build-time constant
+the CLI client embeds.
 
-For Prisma Compute, the assigned `*.prisma.build` URL becomes the
-build-time constant the CLI client embeds. Deployment is performed
-separately: push the package directory, provision a Postgres database,
-set the environment variables above, and `pnpm --filter
-@prisma-next/telemetry-backend start` (or its container equivalent —
-`bun run src/server.ts`) takes over.
+`scripts/deploy.ts` reads three env vars (in addition to `DATABASE_URL`,
+which is only needed for the migrate step):
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `TELEMETRY_DEPLOY_SERVICE_TOKEN` | yes | Prisma Management API token. |
+| `TELEMETRY_DEPLOY_PROJECT_ID` | yes | Prisma Compute project ID. |
+| `TELEMETRY_DEPLOY_SERVICE_ID` | yes | Prisma Compute service ID. |
+
+In CI, the canonical entry point is
+[`.github/workflows/deploy-telemetry-backend.yml`](../../.github/workflows/deploy-telemetry-backend.yml),
+which on `main` pushes (and via `workflow_dispatch`) applies any
+pending migrations against the production database with `pnpm run
+migrate` and then runs `pnpm run deploy` against the configured
+project/service. All four secrets above are provided by the workflow.
+
+To deploy manually from a developer machine, set the four env vars and
+run the same two commands from `apps/telemetry-backend/`:
+
+```bash
+DATABASE_URL=<production-postgres-url> \
+  TELEMETRY_DEPLOY_SERVICE_TOKEN=<token> \
+  TELEMETRY_DEPLOY_PROJECT_ID=<project-id> \
+  TELEMETRY_DEPLOY_SERVICE_ID=<service-id> \
+  pnpm run migrate && pnpm run deploy
+```
 
 Post-deploy verification:
 
