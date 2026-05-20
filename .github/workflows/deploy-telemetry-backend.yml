@@ -1,0 +1,24 @@
+# Workflow stub that needs to be on main so we can test the actual workflow from the PR
+
+name: Deploy telemetry-backend
+
+on:
+  workflow_dispatch:
+
+# Serialize deploys: never let two runs race on the same service / database.
+# `cancel-in-progress: false` so an in-flight migrate+deploy completes before
+# the next one starts, rather than being aborted mid-promote.
+concurrency:
+  group: deploy-telemetry-backend
+  cancel-in-progress: false
+
+# Declare the minimal permissions for GITHUB_TOKEN
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrate + deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo stub
