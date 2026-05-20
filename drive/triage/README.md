@@ -75,3 +75,22 @@ Routing per answer:
 The diagnostic question: *if you handed this ticket to an Implementer right now, would they need to make design decisions to get started, or just execute?* If "make design decisions", it's a problem-statement and needs a design pass first. If "just execute", it's a design-to-implement.
 
 This heuristic operates at triage, which is Orchestrator-owned (see [`drive/roles/README.md`](../roles/README.md)); the resulting design discussion (when the answer is problem-statement) is dispatched to a Specialist sub-agent following the dispatch-by-default pattern.
+
+### Design depth ≠ slice count
+
+After a design discussion settles, triage asks the project-vs-slice question by **counting expected PRs**, not by feeling.
+
+A meaty design conversation does not predict implementation size. The conversation's depth determines whether the work needs a *project* (a durable home for design artifacts — spec, plan, alternatives, design notes); it does NOT determine the *slice count* (how many PRs implementation will need).
+
+- **Deep discussion can yield a single clean slice** when the design produces a contained result.
+- **Thin discussion can yield many slices** when scope unfurls after settling on a path.
+
+Routing per signal:
+
+- *Substantial design ceremony needed?* → **Project**. The project provides the design home regardless of how many slices the implementation requires.
+- *Implementation needs more than one PR?* → **Multiple slices** within the project (or, if no project, multiple orphan slices). Each slice is one PR.
+- *Implementation fits one PR?* → **One slice**. May be an orphan slice (no project home needed) or the single slice of a one-slice project (when design ceremony justified the project home anyway).
+
+The diagnostic question: *after the design settles, how many PRs will the implementation take to land?* That answer drives slice count. The design conversation's depth is a separate signal that drives project-or-orphan-slice routing.
+
+Failure mode this guards against: triaging a design-heavy discussion as a multi-slice project just because the discussion was deep, then over-decomposing the implementation into thin horizontal slices. The horizontal slices are not vertical slices — none of them alone delivers value — and the result is multiple thin PRs that should have been one. See [`docs/drive/principles/decomposition-and-cost.md § The sizing stack`](../../docs/drive/principles/decomposition-and-cost.md#the-sizing-stack--pr-slice-project-dispatch) for the canonical sizing model.

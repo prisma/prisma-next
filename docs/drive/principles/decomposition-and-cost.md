@@ -1,5 +1,38 @@
 # Principle: Decomposition is what makes cheap dispatches safe
 
+## The sizing stack — PR, slice, project, dispatch
+
+The natural sizing unit is the **pull request**. PRs have a maximum manageable size (above which review collapses) and a minimum efficient size (below which overhead dominates).
+
+From PR derives the stack:
+
+| Unit | Definition | Sizing |
+|------|------------|--------|
+| Direct change | Trivial work, no design ceremony | ~30-second verifiable diff |
+| Slice | Vertical slice of value | One PR's envelope |
+| Project | Design home for substantial discovery | Justified by depth, not by implementation size |
+| Dispatch | Sub-slice working unit | M-cap, one implementer handoff |
+| Round | Implementer + reviewer iteration on a dispatch | Bounded by "done when" gates |
+
+### Slice ≡ PR ≡ Linear ticket, 1:1:1
+
+One slice produces one PR and gets one Linear ticket. If a single spec for a single slice feels too big or too complex, **split into more slices** (each its own PR, each its own ticket). Never roll multiple slices into one PR — that pattern undermines the 1:1:1 discipline without buying anything that multiple dispatches in one slice doesn't already give.
+
+### Project is independent of slice count
+
+A project is a separate, optional abstraction. It is justified by **design depth**, not implementation size. When the work needs durable design ceremony — substantial spec, alternatives-considered, exploratory design — a project is the right home. The project may resolve to:
+
+- **One slice** when the design produces a clean, contained result.
+- **Multiple slices** when implementation legitimately needs more than one PR, either at plan time or as work progresses.
+
+Slice count is determined by expected PR count after the design settles, not by the depth of the design conversation. Deep discussion can yield a single clean slice; thin discussion can yield many.
+
+### Design is written, not held in context
+
+Spec, plan, and design notes are durable artifacts that subsequent work can verify against. Conversation transcripts are not design artifacts; reasoning that lives only in conversation evaporates as soon as the context window rolls. Every project carries a `design-notes.md` alongside `spec.md` and `plan.md`: a synthesis that captures the design decisions and stands on its own — a reader picks it up and understands the design without inferring it from a chronology of decisions.
+
+This is what makes orchestrator-direct authoring (see [`drive/roles/README.md § The role split / Orchestrator`](../../../drive/roles/README.md#orchestrator)) materially important: the artifacts must exist in the project directory for Executors and future Orchestrators to verify against. An Orchestrator that holds the design "in mind" but doesn't write it down leaves nothing for the dispatch contract to refer to.
+
 ## What dispatch shape → what tier
 
 The orchestrator picks a model tier per dispatch. The rule for picking is shape-based — what kind of work is this, not "who's the agent doing it":
