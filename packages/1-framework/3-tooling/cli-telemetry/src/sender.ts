@@ -19,7 +19,7 @@
  * invoke directly outside the spawn flow.
  */
 import { buildTelemetryEventFromProcess } from './enrich';
-import type { ParentToSenderPayload } from './payload';
+import { isParentToSenderPayload, type ParentToSenderPayload } from './payload';
 
 const REQUEST_TIMEOUT_MS = 1500;
 
@@ -51,16 +51,6 @@ async function postEvent(payload: ParentToSenderPayload): Promise<void> {
   }
 }
 
-function isPayload(value: unknown): value is ParentToSenderPayload {
-  if (value === null || typeof value !== 'object') return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate['installationId'] === 'string' &&
-    typeof candidate['endpoint'] === 'string' &&
-    typeof candidate['command'] === 'string'
-  );
-}
-
 function exitClean(): void {
   // `process.disconnect()` lets the parent's `.disconnect()` complete
   // without lingering IPC handles when the parent is fast.
@@ -73,7 +63,7 @@ function exitClean(): void {
 }
 
 process.on('message', (message: unknown) => {
-  if (!isPayload(message)) {
+  if (!isParentToSenderPayload(message)) {
     debugLog('received malformed payload; exiting');
     exitClean();
     return;
