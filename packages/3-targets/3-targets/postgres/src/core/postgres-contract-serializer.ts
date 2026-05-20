@@ -1,5 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
+import {
+  SqlContractSerializerBase,
+  type SqlNamespaceSlotHydrationFactory,
+} from '@prisma-next/family-sql/ir';
 import {
   type Namespace,
   NamespaceBase,
@@ -15,12 +18,37 @@ import type { JsonObject } from '@prisma-next/utils/json';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
+/**
+ * Hydration factory for the per-namespace enum slot. Pre-extracted as
+ * a module-level binding so the family-base registry receives a stable
+ * reference and the same callable shape is reused when the descriptor
+ * mechanism takes over the registration (S1.A D5).
+ */
+const hydratePostgresEnumType: SqlNamespaceSlotHydrationFactory = (raw) => {
+  if (raw instanceof PostgresEnumType) {
+    return raw;
+  }
+  const plain = raw as Record<string, unknown>;
+  const name = typeof plain['name'] === 'string' ? plain['name'] : String(plain['name']);
+  const nativeType = typeof plain['nativeType'] === 'string' ? plain['nativeType'] : name;
+  const values = Array.isArray(plain['values']) ? (plain['values'] as string[]) : [];
+  return new PostgresEnumType({ name, nativeType, values } as PostgresEnumTypeInput);
+};
+
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
-    // Postgres entity types (enums) are namespace-level and hydrated in
-    // hydrateSqlNamespaceEntry; there are no storage-level codec alias entities
-    // specific to Postgres, so the registry is empty.
-    super(new Map());
+    // Postgres has no storage-level codec-alias entities — the
+    // `storage.types` codec-triple slot is empty for Postgres contracts —
+    // so the kind-keyed entity registry stays empty. Per-namespace
+    // entity hydration goes through the slot-key registry: Postgres
+    // registers its enum hydrator under slot key `'types'`, the slot
+    // those entries flow through in this slice. The slot key renames
+    // to `'postgresEnums'` when the storage shape migration lands; the
+    // registry surface stays identical.
+    const slotRegistry = new Map<string, SqlNamespaceSlotHydrationFactory>([
+      ['types', hydratePostgresEnumType],
+    ]);
+    super(new Map(), slotRegistry);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -42,26 +70,9 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
       ]),
     );
-    const typeEntries = obj.types;
-    const hydratedNsTypes =
-      typeEntries !== undefined && Object.keys(typeEntries).length > 0
-        ? Object.fromEntries(
-            Object.entries(typeEntries).map(([typeName, entry]) => {
-              if (entry instanceof PostgresEnumType) {
-                return [typeName, entry];
-              }
-              const plain = entry as Record<string, unknown>;
-              const name = typeof plain['name'] === 'string' ? plain['name'] : typeName;
-              const nativeType =
-                typeof plain['nativeType'] === 'string' ? plain['nativeType'] : name;
-              const values = Array.isArray(plain['values']) ? (plain['values'] as string[]) : [];
-              return [
-                typeName,
-                new PostgresEnumType({ name, nativeType, values } as PostgresEnumTypeInput),
-              ];
-            }),
-          )
-        : undefined;
+    const hydratedNsTypes = this.hydrateNamespaceSlot('types', obj) as
+      | Record<string, PostgresEnumType>
+      | undefined;
 
     const emptyTables = Object.keys(tables).length === 0;
     const emptyTypes = !hydratedNsTypes || Object.keys(hydratedNsTypes).length === 0;
