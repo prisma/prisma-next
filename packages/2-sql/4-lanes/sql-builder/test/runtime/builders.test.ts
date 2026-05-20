@@ -449,7 +449,7 @@ describe('mutation defaults', () => {
 
   it('INSERT calls applyMutationDefaults with op create', () => {
     const { d, spy } = dbWithSpy();
-    d.users.insert({ id: 1, name: 'A', email: 'a@b.com' }).build();
+    d.users.insert([{ id: 1, name: 'A', email: 'a@b.com' }]).build();
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
       table: 'users',
@@ -468,5 +468,105 @@ describe('mutation defaults', () => {
       table: 'users',
       values: { name: 'B' },
     });
+  });
+});
+
+describe('INSERT multi-row', () => {
+  it('empty array throws at build time', () => {
+    expect(() => db().users.insert([]).build()).toThrow(
+      'insert() called with an empty row array — at least one row is required',
+    );
+  });
+
+  it('single row via array calls applyMutationDefaults once', () => {
+    const spy = vi.fn(() => []);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    d.users.insert([{ id: 1, name: 'A' }]).build();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({
+      op: 'create',
+      table: 'users',
+      values: { id: 1, name: 'A' },
+    });
+  });
+
+  it('multi-row calls applyMutationDefaults once per row', () => {
+    const spy = vi.fn(() => [{ column: 'email', value: 'default@x.com' }]);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    const plan = d.users
+      .insert([
+        { id: 1, name: 'A' },
+        { id: 2, name: 'B' },
+      ])
+      .build();
+    expect(spy).toHaveBeenCalledTimes(2);
+    const params = plan.ast.collectParamRefs();
+    expect(params).toHaveLength(6); // id + name + email (default) for each of 2 rows
+  });
+
+  it('multi-row with differing column sets computes column union and fills NULL for absent columns', () => {
+    const d = db();
+    const plan = d.users
+      .insert([
+        { id: 1, name: 'A' },
+        { id: 2, email: 'b@x.com' },
+      ])
+      .build();
+    const ast = plan.ast;
+    expect(ast.kind).toBe('insert');
+    if (ast.kind !== 'insert') throw new Error('expected insert');
+    expect(ast.rows).toHaveLength(2);
+    // both rows should have the same column set: id, name, email
+    const cols0 = Object.keys(ast.rows[0]!).sort();
+    const cols1 = Object.keys(ast.rows[1]!).sort();
+    expect(cols0).toEqual(['email', 'id', 'name']);
+    expect(cols1).toEqual(['email', 'id', 'name']);
+    // row 0 is missing email — should be NULL param
+    expect(ast.rows[0]!['email']!.kind).toBe('param-ref');
+    // row 1 is missing name — should be NULL param
+    expect(ast.rows[1]!['name']!.kind).toBe('param-ref');
+  });
+
+  it('multi-row with defaults hook: column union includes defaulted columns from any row', () => {
+    const spy = vi.fn((args: { values: Record<string, unknown> }) => {
+      if ('id' in args.values && (args.values['id'] as number) === 1) {
+        return [{ column: 'email', value: 'default@x.com' }];
+      }
+      return [];
+    });
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    const plan = d.users
+      .insert([
+        { id: 1, name: 'A' },
+        { id: 2, name: 'B' },
+      ])
+      .build();
+    expect(spy).toHaveBeenCalledTimes(2);
+    const ast = plan.ast;
+    if (ast.kind !== 'insert') throw new Error('expected insert');
+    expect(ast.rows).toHaveLength(2);
+    // email was injected by defaults for row 0 — both rows should have it in column union
+    expect(Object.keys(ast.rows[0]!).sort()).toEqual(['email', 'id', 'name']);
+    expect(Object.keys(ast.rows[1]!).sort()).toEqual(['email', 'id', 'name']);
+    // row 1 did not get email from defaults — should be NULL param
+    expect(ast.rows[1]!['email']!.kind).toBe('param-ref');
   });
 });
