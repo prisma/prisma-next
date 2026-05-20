@@ -1,4 +1,4 @@
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type { ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -9,6 +9,7 @@ import type {
   SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import type { AuthoredColumnDefault } from './contract-dsl';
 
 export type { ExecutionMutationDefaultPhases };
 
@@ -17,7 +18,7 @@ export interface FieldNode {
   readonly columnName: string;
   readonly descriptor: ColumnTypeDescriptor;
   readonly nullable: boolean;
-  readonly default?: ColumnDefault;
+  readonly default?: AuthoredColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
 }
@@ -83,7 +84,7 @@ export interface ValueObjectFieldNode {
   readonly columnName: string;
   readonly valueObjectName: string;
   readonly nullable: boolean;
-  readonly default?: ColumnDefault;
+  readonly default?: AuthoredColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
 }

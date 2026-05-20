@@ -1,12 +1,8 @@
-import type {
-  ColumnDefault,
-  Contract,
-  ContractRelation,
-  StorageHashBase,
-} from '@prisma-next/contract/types';
+import type { Contract, ContractRelation, StorageHashBase } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
+  ColumnDefault,
   ContractWithTypeMaps,
   Index,
   PostgresEnumStorageEntry,
