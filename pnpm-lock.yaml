@@ -3480,6 +3480,12 @@ importers:
       '@prisma-next/adapter-sqlite':
         specifier: workspace:0.10.0
         version: link:../../3-targets/6-adapters/sqlite
+      '@prisma-next/cli':
+        specifier: workspace:0.9.0
+        version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/config':
+        specifier: workspace:0.9.0
+        version: link:../../1-framework/1-core/config
       '@prisma-next/contract':
         specifier: workspace:0.10.0
         version: link:../../1-framework/0-foundation/contract
@@ -3498,6 +3504,12 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:0.10.0
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-contract-psl':
+        specifier: workspace:0.9.0
+        version: link:../../2-sql/2-authoring/contract-psl
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:0.9.0
+        version: link:../../2-sql/2-authoring/contract-ts
       '@prisma-next/sql-orm-client':
         specifier: workspace:0.10.0
         version: link:../sql-orm-client
@@ -3510,6 +3522,12 @@ importers:
       '@prisma-next/target-sqlite':
         specifier: workspace:0.10.0
         version: link:../../3-targets/3-targets/sqlite
+      '@prisma-next/utils':
+        specifier: workspace:0.9.0
+        version: link:../../1-framework/0-foundation/utils
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.10.0
