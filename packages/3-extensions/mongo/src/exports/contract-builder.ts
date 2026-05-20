@@ -10,10 +10,10 @@ export type {
   ValueObjectBuilder,
 } from '@prisma-next/mongo-contract-ts/contract-builder';
 export {
-  defineContract,
   field,
   index,
   model,
   rel,
   valueObject,
 } from '@prisma-next/mongo-contract-ts/contract-builder';
+export { defineContract } from '../contract/define-contract';
