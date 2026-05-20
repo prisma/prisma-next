@@ -6,6 +6,23 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema } from '../postgres-schema';
 
 /**
+ * Resolves the live-database schema name for a given namespace
+ * coordinate. Mirrors `resolveDdlSchemaForNamespace` in
+ * `planner-strategies.ts` so the verifier's projection and the
+ * planner's projection always agree — Postgres-aware namespaces (the
+ * production path) dispatch to `ddlSchemaName(storage)`, and bare
+ * object payloads (used by some tests) fall back to the coordinate
+ * itself.
+ */
+function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string {
+  const namespace = storage.namespaces[namespaceId];
+  if (isPostgresSchema(namespace)) {
+    return namespace.ddlSchemaName(storage);
+  }
+  return namespaceId;
+}
+
+/**
  * Reads the introspected list of schema names from the Postgres-flavoured
  * annotations slot on the schema IR. Defaults to the always-present
  * `public` schema when introspection did not populate the slot — a fresh
@@ -57,9 +74,7 @@ export function verifyPostgresNamespacePresence(input: {
   const namespaceIds = Object.keys(contract.storage.namespaces).sort();
   for (const namespaceId of namespaceIds) {
     if (namespaceId === UNBOUND_NAMESPACE_ID) continue;
-    const ns = contract.storage.namespaces[namespaceId];
-    if (!isPostgresSchema(ns)) continue;
-    const ddlName = ns.ddlSchemaName(contract.storage);
+    const ddlName = resolveDdlSchemaName(contract.storage, namespaceId);
     if (ddlName === UNBOUND_NAMESPACE_ID) continue;
     if (existing.has(ddlName)) continue;
     issues.push({

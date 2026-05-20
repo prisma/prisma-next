@@ -91,7 +91,6 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
   beforeAll(async () => {
     database = await createTestDatabase();
     driver = await createDriver(database.connectionString);
-    await driver.query('create schema if not exists auth');
   }, testTimeout);
 
   afterAll(async () => {
@@ -118,16 +117,36 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
       expect(planResult.kind).toBe('success');
       if (planResult.kind !== 'success') return;
 
-      // Confirm the FK DDL references the auth schema explicitly
+      // Confirm the plan emits CREATE SCHEMA "auth" before any DDL that
+      // targets that schema — closes the FR9 / AC1 gap where the
+      // database was missing the schema container at apply time.
+      const operationIds = planResult.plan.operations.map((op) => op.id);
+      const createSchemaIdx = operationIds.findIndex((id) => id === 'schema.auth');
+      expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
+
       const allSql = planResult.plan.operations
         .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
         .map((step) => step.sql);
+
+      const createSchemaSql = allSql.find((s) => s.includes('CREATE SCHEMA'));
+      expect(createSchemaSql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
 
       const fkDdl = allSql.find(
         (s) => s.includes('REFERENCES') && s.toLowerCase().includes('auth'),
       );
       expect(fkDdl).toBeDefined();
       expect(fkDdl).toContain('"auth"."user"');
+
+      // CREATE SCHEMA must precede every table DDL that targets auth.
+      const sqlByOpIdx = planResult.plan.operations.map((op) => ({
+        id: op.id,
+        sql: [...op.precheck, ...op.execute, ...op.postcheck].map((step) => step.sql).join('\n'),
+      }));
+      const createAuthUserIdx = sqlByOpIdx.findIndex((entry) =>
+        entry.sql.includes('CREATE TABLE "auth"."user"'),
+      );
+      expect(createAuthUserIdx).toBeGreaterThanOrEqual(0);
+      expect(createSchemaIdx).toBeLessThan(createAuthUserIdx);
 
       // Apply all operations
       for (const op of planResult.plan.operations) {
