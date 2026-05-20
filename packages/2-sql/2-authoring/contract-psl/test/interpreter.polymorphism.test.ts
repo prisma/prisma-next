@@ -7,6 +7,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresCodecLookup,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -19,6 +20,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      codecLookup: postgresCodecLookup,
       ...input,
     });
 

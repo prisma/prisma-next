@@ -15,6 +15,7 @@ import type {
   AuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -95,6 +96,15 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
+  /**
+   * Codec-id-keyed lookup threaded into PSL `@default(...)` lowering so
+   * literal defaults dispatch through `codec.decodeJson` +
+   * `codec.renderSqlLiteral`, and the parse-time `@default(autoincrement())`
+   * recognition gate can read `codec.descriptor.traits`. Optional — when
+   * absent, literal defaults that are not `null` surface a diagnostic
+   * (the lookup is required to render a literal as a SQL expression).
+   */
+  readonly codecLookup?: CodecLookup;
   /**
    * Target-supplied `Namespace` factory threaded into
    * `buildSqlContractFromDefinition` for the contract's
@@ -587,6 +597,7 @@ interface BuildModelNodeInput {
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
+  readonly codecLookup?: CodecLookup;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
@@ -618,6 +629,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     targetId: input.targetId,
     defaultFunctionRegistry: input.defaultFunctionRegistry,
     generatorDescriptorById: input.generatorDescriptorById,
+    ...(input.codecLookup !== undefined ? { codecLookup: input.codecLookup } : {}),
     diagnostics,
     sourceId,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
@@ -1590,6 +1602,7 @@ export function interpretPslDocumentToSqlContract(
       authoringContributions: input.authoringContributions,
       defaultFunctionRegistry,
       generatorDescriptorById,
+      ...(input.codecLookup !== undefined ? { codecLookup: input.codecLookup } : {}),
       scalarTypeDescriptors: input.scalarTypeDescriptors,
       sourceId,
       diagnostics,

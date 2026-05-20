@@ -3,7 +3,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, CodecTrait } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaults,
@@ -223,10 +223,110 @@ const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/vector@1': ['vector'],
 };
 
+/**
+ * Test-only codec traits map keyed by codec id. Real targets ship these on
+ * each codec descriptor; the layer-isolated test lookup synthesises a
+ * minimum-viable subset so PSL lowering tests can read `traits` without
+ * pulling in the postgres pack.
+ */
+const traitsByCodecId: Record<string, readonly CodecTrait[]> = {
+  'pg/text@1': ['equality', 'order', 'textual'],
+  'pg/bool@1': ['equality', 'boolean'],
+  'pg/int4@1': ['equality', 'order', 'numeric', 'autoincrement'],
+  'pg/int8@1': ['equality', 'order', 'numeric', 'autoincrement'],
+  'pg/int2@1': ['equality', 'order', 'numeric', 'autoincrement'],
+  'pg/float4@1': ['equality', 'order', 'numeric'],
+  'pg/float8@1': ['equality', 'order', 'numeric'],
+  'pg/numeric@1': ['equality', 'order', 'numeric'],
+  'pg/timestamp@1': ['equality', 'order'],
+  'pg/timestamptz@1': ['equality', 'order'],
+  'pg/time@1': ['equality', 'order'],
+  'pg/timetz@1': ['equality', 'order'],
+  'pg/jsonb@1': [],
+  'pg/json@1': [],
+  'pg/bytea@1': ['equality'],
+  'sql/char@1': ['equality', 'order', 'textual'],
+  'sql/varchar@1': ['equality', 'order', 'textual'],
+  'pg/vector@1': ['equality'],
+};
+
+interface PslTestCodecStub {
+  readonly id: string;
+  readonly descriptor: { readonly traits: readonly CodecTrait[] };
+  decodeJson(value: unknown): unknown;
+  renderSqlLiteral(value: unknown): string;
+}
+
+function renderSqlLiteralForTestCodec(codecId: string, value: unknown): string {
+  if (codecId === 'pg/text@1' || codecId === 'sql/char@1' || codecId === 'sql/varchar@1') {
+    if (typeof value !== 'string') {
+      throw new Error(`pg-text-like codec expects a string, received ${typeof value}`);
+    }
+    return `'${value.replaceAll("'", "''")}'`;
+  }
+  if (
+    codecId === 'pg/int4@1' ||
+    codecId === 'pg/int8@1' ||
+    codecId === 'pg/int2@1' ||
+    codecId === 'pg/float4@1' ||
+    codecId === 'pg/float8@1' ||
+    codecId === 'pg/numeric@1'
+  ) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`numeric codec expects a finite number, received ${typeof value}`);
+    }
+    return String(value);
+  }
+  if (codecId === 'pg/bool@1') {
+    if (typeof value !== 'boolean') {
+      throw new Error(`bool codec expects a boolean, received ${typeof value}`);
+    }
+    return value ? 'TRUE' : 'FALSE';
+  }
+  return JSON.stringify(value);
+}
+
+function decodeJsonForTestCodec(codecId: string, value: unknown): unknown {
+  if (codecId === 'pg/text@1' || codecId === 'sql/char@1' || codecId === 'sql/varchar@1') {
+    if (typeof value !== 'string') {
+      throw new Error(`pg-text-like codec expects a string, received ${typeof value}`);
+    }
+    return value;
+  }
+  if (
+    codecId === 'pg/int4@1' ||
+    codecId === 'pg/int8@1' ||
+    codecId === 'pg/int2@1' ||
+    codecId === 'pg/float4@1' ||
+    codecId === 'pg/float8@1' ||
+    codecId === 'pg/numeric@1'
+  ) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`numeric codec expects a finite number, received ${typeof value}`);
+    }
+    return value;
+  }
+  if (codecId === 'pg/bool@1') {
+    if (typeof value !== 'boolean') {
+      throw new Error(`bool codec expects a boolean, received ${typeof value}`);
+    }
+    return value;
+  }
+  return value;
+}
+
 export const postgresCodecLookup: CodecLookup = {
   get: (id: string) => {
     if (!targetTypesByCodecId[id]) return undefined;
-    return { id } as ReturnType<CodecLookup['get']>;
+    const stub: PslTestCodecStub = {
+      id,
+      descriptor: { traits: traitsByCodecId[id] ?? [] },
+      decodeJson: (value: unknown) => decodeJsonForTestCodec(id, value),
+      renderSqlLiteral: (value: unknown) => renderSqlLiteralForTestCodec(id, value),
+    };
+    // Test stub omits `encode` / `decode` / `encodeJson` because PSL lowering
+    // never reads them — the cast acknowledges the structural narrowness.
+    return stub as unknown as ReturnType<CodecLookup['get']>;
   },
   targetTypesFor: (id: string) => targetTypesByCodecId[id],
   metaFor: () => undefined,
@@ -260,7 +360,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               ok: true as const,
               value: {
                 kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'autoincrement()' },
+                defaultValue: { kind: 'autoincrement' as const },
               },
             };
           },
@@ -277,7 +377,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               ok: true as const,
               value: {
                 kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'now()' },
+                defaultValue: { kind: 'expression' as const, expression: 'now()' },
               },
             };
           },
@@ -414,7 +514,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               value: {
                 kind: 'storage' as const,
                 defaultValue: {
-                  kind: 'function' as const,
+                  kind: 'expression' as const,
                   expression: rawExpression,
                 },
               },
