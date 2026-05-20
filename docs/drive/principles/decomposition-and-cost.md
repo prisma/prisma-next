@@ -41,10 +41,10 @@ The orchestrator picks a model tier per dispatch. The rule for picking is shape-
 |---|---|---|
 | Design judgment / novel pattern / spec interpretation | "Decide between two API shapes; pick one and justify in an ADR" | thorough tier |
 | Codemod over many files | "Rename `getCwd` → `getCurrentWorkingDirectory` across 50 files" | fast tier |
-| Mechanical migration | "Migrate the 8 test sites listed in the spike artefact to the new flat shape" | Cheap |
-| Batch fix | "Update import paths after package reorg" | Cheap |
+| Mechanical migration | "Migrate the 8 test sites listed in the spike artefact to the new flat shape" | fast tier |
+| Batch fix | "Update import paths after package reorg" | fast tier |
 | Tricky one-line bug whose fix needs reading the spec carefully | "Fix the edge case in `mergeColumns` where two FKs collide on rename" | mid tier |
-| Spike (investigation, output is an artefact) | "Count how many test sites use the legacy shape; output a table by package" | Cheap with short time-box |
+| Spike (investigation, output is an artefact) | "Count how many test sites use the legacy shape; output a table by package" | fast tier with short time-box |
 | High blast radius even if conceptually simple | "Drop optionality from a substrate type that affects every consumer in the IR" | thorough tier, or decompose into smaller dispatches |
 | L or XL composite shape | "Do the whole migration end-to-end" | **Refuse — decompose first.** No tier is safe at this shape. |
 
@@ -83,13 +83,13 @@ Properly decomposed, the same work would have been:
 | Dispatch | Size | Tier | Why |
 |---|---|---|---|
 | Drop `?:` from two adjacent substrate types (typology decision affecting all consumers) | M | thorough | Design judgment — typology decision |
-| TS-builder caller normalisation | M | Cheap | Mechanical, well-bounded |
-| PSL-interpreter caller normalisation | M | Cheap | Mechanical, well-bounded |
-| Verifier inlining + delete `foreignKeyNamespacesMatch` | S | Cheap | Mechanical |
+| TS-builder caller normalisation | M | fast tier | Mechanical, well-bounded |
+| PSL-interpreter caller normalisation | M | fast tier | Mechanical, well-bounded |
+| Verifier inlining + delete `foreignKeyNamespacesMatch` | S | fast tier | Mechanical |
 | Envelope shape simplification (retire conditional, delete probe) | M | thorough | Design judgment — canonical shape contract |
-| Postgres introspector tightening | S | Cheap | Mechanical |
-| F01 regression test | XS | Cheap | Mechanical |
-| Fixture regeneration | XS | Cheap | Pure command execution |
+| Postgres introspector tightening | S | fast tier | Mechanical |
+| F01 regression test | XS | fast tier | Mechanical |
+| Fixture regeneration | XS | fast tier | Pure command execution |
 | Final integration verify | S | thorough | Judgment on whether the pieces compose |
 
 Two thorough-tier dispatches for the genuine design judgment; six cheap dispatches for the mechanical execution; one final thorough-tier dispatch for composition judgment. Total thorough-tier hours would have been ~25-40% of what we actually spent.
