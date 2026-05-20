@@ -10,6 +10,18 @@ PR authoring reads:
 
 - [`drive/calibration/dod.md § Slice-DoD overlay (PR-side items)`](../calibration/dod.md#pr-side-items) — what the PR needs to satisfy as part of the slice DoD
 
+## Branch identity must be settled before PR open
+
+Symptom seen during the drive trial (project `orchestrator-role`): a PR-open specialist was dispatched before the orchestrator finalised the branch name. The specialist opened against the (about-to-be-renamed) branch — PR landed against a stale identifier, had to be closed and re-opened against the correct branch.
+
+Pre-PR-open checklist for the orchestrator:
+
+1. Confirm the branch name reflects the final Linear ticket identifier (no pending rename from project restructuring, ticket merging, methodology shift).
+2. Confirm the local branch is pushed and tracking the remote with the final name.
+3. State both — branch name + Linear ticket — in the first heartbeat of the PR-open dispatch brief so any drift since brief authoring is caught before `gh pr create` fires.
+
+A PR open against the wrong branch is recoverable but visible; this gate costs nothing and the recovery costs an issue close + a PR re-open.
+
 ## PR title convention
 
 - Conventional-commit prefix: `feat:` / `fix:` / `chore:` / `docs:` / `refactor:` / `test:` / `build:` / `ci:`.
