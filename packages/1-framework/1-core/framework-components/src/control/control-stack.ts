@@ -1,3 +1,5 @@
+import { ifDefined } from '@prisma-next/utils/defined';
+
 import type { Codec } from '../shared/codec';
 import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
@@ -381,9 +383,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors, {
-      ...(family.reservedStorageSlotKeys !== undefined
-        ? { reservedStorageSlotKeys: family.reservedStorageSlotKeys }
-        : {}),
+      ...ifDefined('reservedStorageSlotKeys', family.reservedStorageSlotKeys),
     }),
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
