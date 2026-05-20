@@ -3,6 +3,10 @@ name: drive-pr-walkthrough
 description: Write an intent-first walkthrough (semantic narrative) of a PR/branch or commit range - the overall purpose, the sequence of conceptual steps, the concrete behavior changes, and links to both implementation touchpoints and tests as evidence. Use during branch/PR review when the user asks for a walkthrough, narrative of changes, semantic diff, intent of commits, or “what changed and why” (not a file-by-file diff recap).
 ---
 
+> **Execution mode: delegated.** This atomic skill is invoked by an Executor sub-agent under an Orchestrator's dispatch brief. The Executor's job is to execute the skill end-to-end within the dispatch scope and return a structured report.
+>
+> Stay within the dispatch brief's scope. If the skill's body suggests work outside the brief, surface a heartbeat, request scope clarification from the Orchestrator, and do not improvise. See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Executor role definition and report-back conventions.
+
 # Walkthrough
 
 ## What this skill produces

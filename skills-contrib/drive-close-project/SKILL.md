@@ -12,6 +12,10 @@ metadata:
   version: "2026.5.19.2"
 ---
 
+> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
+>
+> If the skill's body asks for work that requires reading source code, running builds/tests, or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+
 # Drive: Close Project
 
 Close out a project — verify its DoD is met, preserve the long-lived knowledge it produced, strip the transient scaffolding, and ship the close-out PR.

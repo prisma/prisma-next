@@ -3,6 +3,10 @@ name: drive-qa-run
 description: Execute an existing manual-QA script (produced by `drive-qa-plan`) end-to-end and produce a structured run report. Use when the user asks to "run manual QA", "execute the QA script", "do the QA walkthrough", "walk through the manual tests", "QA this PR", "run the QA pass and report", or hands you a path to a `manual-qa.md` and asks for results. Authoring the script in the first place is the `drive-qa-plan` skill's job.
 ---
 
+> **Execution mode: delegated.** This atomic skill is invoked by an Executor sub-agent under an Orchestrator's dispatch brief. The Executor's job is to execute the skill end-to-end within the dispatch scope and return a structured report.
+>
+> Stay within the dispatch brief's scope. If the skill's body suggests work outside the brief, surface a heartbeat, request scope clarification from the Orchestrator, and do not improvise. See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Executor role definition and report-back conventions.
+
 # Run a manual QA script
 
 > **You are the runner. Drive the live system through the script's scenarios — in parallel where the isolation tags allow — observe everything verbatim, capture findings as they happen, classify their severity, and produce a report someone can act on.**
