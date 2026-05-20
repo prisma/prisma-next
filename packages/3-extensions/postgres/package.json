@@ -62,6 +62,7 @@
     "./contract-builder": "./dist/contract-builder.mjs",
     "./control": "./dist/control.mjs",
     "./family": "./dist/family.mjs",
+    "./migration": "./dist/migration.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./serverless": "./dist/serverless.mjs",
     "./target": "./dist/target.mjs",

@@ -85,7 +85,35 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 
 ### `@prisma-next/postgres/contract-builder`
 
-Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, ...) so a generated `prisma/contract.ts` can author its contract using only this facade package.
+Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, ...) so a generated `prisma/contract.ts` can author its contract using only this facade package. The `defineContract` export is a Postgres-specific wrapper that pre-binds `family` and `target` — callers do not pass those fields:
+
+```typescript
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
+
+export const contract = defineContract(
+  { extensionPacks: {} },
+  ({ field: f, model: m }) => ({
+    models: {
+      User: m('User', { fields: { id: f.id.uuidv4() } }),
+    },
+  }),
+);
+```
+
+### `@prisma-next/postgres/migration`
+
+Re-exports everything from `@prisma-next/target-postgres/migration` so a user-authored `migration.ts` file can import its base class, CLI runner, and operation helpers from the single Postgres facade:
+
+```typescript
+import { Migration, MigrationCLI, addColumn, createTable } from '@prisma-next/postgres/migration';
+
+export default class M extends Migration {
+  up() {
+    return [createTable('users', ...)];
+  }
+}
+MigrationCLI.run(import.meta.url, M);
+```
 
 ### `@prisma-next/postgres/family`
 
