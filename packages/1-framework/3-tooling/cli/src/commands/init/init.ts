@@ -114,6 +114,11 @@ export async function runInit(
      */
     readonly canPrompt: boolean;
     /**
+     * Called once after the first affirmative telemetry consent is persisted.
+     * Failures are swallowed by the caller; init success must not depend on telemetry.
+     */
+    readonly afterFirstTelemetryConsent?: (inputs: ResolvedInitInputs) => void;
+    /**
      * FR8.3 — test-only seam for the optional database version probe.
      * Production callers omit this; tests inject stub `probePostgres` /
      * `probeMongo` functions so the probe contract (env handling,
@@ -124,7 +129,7 @@ export async function runInit(
     readonly probeOverrides?: ProbeOverrides;
   },
 ): Promise<number> {
-  const { options, flags, canPrompt, probeOverrides } = runOptions;
+  const { options, flags, canPrompt, probeOverrides, afterFirstTelemetryConsent } = runOptions;
   const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
   const warnings: string[] = [];
   const filesWritten: string[] = [];
@@ -142,6 +147,14 @@ export async function runInit(
       return emitError(ui, flags, error);
     }
     throw error;
+  }
+
+  if (inputs.enableTelemetry === true && afterFirstTelemetryConsent !== undefined) {
+    try {
+      afterFirstTelemetryConsent(inputs);
+    } catch {
+      // telemetry is best-effort and must never affect init
+    }
   }
 
   const pm = await detectPackageManager(baseDir);

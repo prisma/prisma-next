@@ -27,6 +27,7 @@ import { setCommandDescriptions } from './utils/command-helpers';
 import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
 import { parseGlobalFlags } from './utils/global-flags';
 import { suggestCommands } from './utils/suggest-command';
+import { fireTelemetryFromPreAction } from './utils/telemetry';
 
 /**
  * Lookup table mapping removed subcommands to their replacement verbs.
@@ -67,6 +68,15 @@ function formatSuggestion(input: string, candidates: readonly string[]): string 
 const program = new Command();
 
 program.name('prisma-next').description('Prisma Next CLI').version(packageJson.version);
+
+// Telemetry hook — fires at command start, before the action body
+// runs. Every failure mode is swallowed inside `runTelemetry`; the
+// hook never throws and never blocks long enough to be perceptible.
+program.hook('preAction', async (_thisCommand, actionCommand) => {
+  await fireTelemetryFromPreAction(actionCommand).catch(() => {
+    // defence-in-depth — runTelemetry already swallows internally.
+  });
+});
 
 // Override version option description to match capitalization style
 const versionOption = program.options.find((opt) => opt.flags.includes('--version'));
