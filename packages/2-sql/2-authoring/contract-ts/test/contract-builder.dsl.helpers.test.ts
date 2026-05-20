@@ -36,7 +36,7 @@ const sqlFamilyPack = {
           output: {
             codecId: 'sql/timestamp@1',
             nativeType: 'timestamp',
-            default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
+            default: { kind: 'expression', expression: 'CURRENT_TIMESTAMP' },
           },
         },
         updatedAt: {

@@ -322,7 +322,7 @@ describe('assembleScalarTypeDescriptors', () => {
 describe('assembleControlMutationDefaults', () => {
   const stubLower = () => ({
     ok: true as const,
-    value: { kind: 'storage' as const, defaultValue: { kind: 'literal' as const, value: 0 } },
+    value: { kind: 'storage' as const, defaultValue: { kind: 'codecValue' as const, value: 0 } },
   });
 
   it('returns empty registry and generators when no descriptors contribute', () => {

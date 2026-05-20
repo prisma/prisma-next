@@ -281,14 +281,14 @@ describe('authoring template resolution', () => {
     );
   });
 
-  it('rejects object-valued function default expressions', () => {
+  it('rejects object-valued expression defaults', () => {
     const descriptor = {
       kind: 'fieldPreset',
       output: {
         codecId: 'test/text@1',
         nativeType: 'text',
         default: {
-          kind: 'function',
+          kind: 'expression',
           expression: {
             kind: 'arg',
             index: 0,
@@ -299,17 +299,17 @@ describe('authoring template resolution', () => {
 
     expect(() =>
       instantiateAuthoringFieldPreset(descriptor, [{ sql: 'CURRENT_TIMESTAMP' }]),
-    ).toThrow(/Resolved authoring function default expression must resolve to a primitive/);
+    ).toThrow(/Resolved authoring expression default must resolve to a primitive/);
   });
 
-  it('rejects literal defaults that resolve to undefined', () => {
+  it('rejects codecValue defaults that resolve to undefined', () => {
     const descriptor = {
       kind: 'fieldPreset',
       output: {
         codecId: 'test/text@1',
         nativeType: 'text',
         default: {
-          kind: 'literal',
+          kind: 'codecValue',
           value: {
             kind: 'arg',
             index: 0,
@@ -324,7 +324,7 @@ describe('authoring template resolution', () => {
     );
   });
 
-  it('resolves literal defaults and execution defaults from field presets', () => {
+  it('resolves codecValue defaults and execution defaults from field presets', () => {
     const descriptor = {
       kind: 'fieldPreset',
       output: {
@@ -337,7 +337,7 @@ describe('authoring template resolution', () => {
           },
         },
         default: {
-          kind: 'literal',
+          kind: 'codecValue',
           value: {
             length: {
               kind: 'arg',
@@ -370,7 +370,7 @@ describe('authoring template resolution', () => {
       },
       nullable: true,
       default: {
-        kind: 'literal',
+        kind: 'codecValue',
         value: {
           length: 1536,
         },
@@ -468,14 +468,14 @@ describe('authoring template resolution', () => {
     );
   });
 
-  it('stringifies primitive function default expressions', () => {
+  it('stringifies primitive expression-default expressions', () => {
     const descriptor = {
       kind: 'fieldPreset',
       output: {
         codecId: 'test/text@1',
         nativeType: 'text',
         default: {
-          kind: 'function',
+          kind: 'expression',
           expression: {
             kind: 'arg',
             index: 0,
@@ -485,8 +485,25 @@ describe('authoring template resolution', () => {
     } as const;
 
     expect(instantiateAuthoringFieldPreset(descriptor, [123]).default).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: '123',
+    });
+  });
+
+  it('lowers autoincrement preset templates to the autoincrement arm', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/int4@1',
+        nativeType: 'int4',
+        default: {
+          kind: 'autoincrement',
+        },
+      },
+    } as const;
+
+    expect(instantiateAuthoringFieldPreset(descriptor, []).default).toEqual({
+      kind: 'autoincrement',
     });
   });
 });

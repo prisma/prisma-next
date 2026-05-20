@@ -1,12 +1,8 @@
 import type {
-  ColumnDefault,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
-import {
-  isColumnDefaultLiteralInputValue,
-  isExecutionMutationDefaultValue,
-} from '@prisma-next/contract/types';
+import { isExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type AuthoringArgRef = {
@@ -59,19 +55,61 @@ export interface AuthoringTypeConstructorDescriptor {
   readonly output: AuthoringStorageTypeTemplate;
 }
 
-export interface AuthoringColumnDefaultTemplateLiteral {
-  readonly kind: 'literal';
+/**
+ * Preset-template arm for a literal default value awaiting codec dispatch.
+ * The preset declares the literal up-front (a `AuthoringTemplateValue` so
+ * preset args can flow in); the SQL authoring layer materializes it through
+ * `codec.renderSqlLiteral` at emit time, once the column's codec is known.
+ *
+ * Mirrors the DSL-internal `AuthoredColumnDefault.codecValue` arm so the
+ * preset surface and the TS DSL surface feed the same authoring shape into
+ * the emitter.
+ */
+export interface AuthoringColumnDefaultTemplateCodecValue {
+  readonly kind: 'codecValue';
   readonly value: AuthoringTemplateValue;
 }
 
-export interface AuthoringColumnDefaultTemplateFunction {
-  readonly kind: 'function';
+/**
+ * Preset-template arm for a SQL expression default that bypasses codec
+ * dispatch entirely. Lowers directly to the contract IR's
+ * `{ kind: 'expression', expression }` shape.
+ */
+export interface AuthoringColumnDefaultTemplateExpression {
+  readonly kind: 'expression';
   readonly expression: AuthoringTemplateValue;
 }
 
+/**
+ * Preset-template arm for a target-mechanism default (Postgres
+ * SERIAL/IDENTITY, SQLite `INTEGER PRIMARY KEY AUTOINCREMENT`). Lowers to
+ * the contract IR's `{ kind: 'autoincrement' }` shape without invoking the
+ * codec; the DDL renderer relies on column-type emission for the
+ * semantics.
+ */
+export interface AuthoringColumnDefaultTemplateAutoincrement {
+  readonly kind: 'autoincrement';
+}
+
 export type AuthoringColumnDefaultTemplate =
-  | AuthoringColumnDefaultTemplateLiteral
-  | AuthoringColumnDefaultTemplateFunction;
+  | AuthoringColumnDefaultTemplateCodecValue
+  | AuthoringColumnDefaultTemplateExpression
+  | AuthoringColumnDefaultTemplateAutoincrement;
+
+/**
+ * Resolved authoring-default shape produced by
+ * {@link instantiateAuthoringFieldPreset}. Distinct from the contract IR's
+ * `ColumnDefault` — carries an extra `codecValue` arm holding a literal
+ * value that has not yet been dispatched through `codec.renderSqlLiteral`.
+ * Authoring consumers (SQL DSL `buildFieldPreset`, PSL preset resolver)
+ * forward this through their emit path; the literal `codecValue` arm is
+ * materialised to `{ kind: 'expression', expression }` once a codec is in
+ * scope.
+ */
+export type AuthoringColumnDefault =
+  | { readonly kind: 'codecValue'; readonly value: unknown }
+  | { readonly kind: 'expression'; readonly expression: string }
+  | { readonly kind: 'autoincrement' };
 
 export interface AuthoringExecutionDefaultsTemplate {
   readonly onCreate?: AuthoringTemplateValue;
@@ -530,22 +568,48 @@ function resolveAuthoringStorageTypeTemplate(
   };
 }
 
+function isAuthoringColumnDefaultCodecLiteralValue(value: unknown): boolean {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return true;
+  }
+  if (value instanceof Date) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.every(isAuthoringColumnDefaultCodecLiteralValue);
+  }
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).every(
+      isAuthoringColumnDefaultCodecLiteralValue,
+    );
+  }
+  return false;
+}
+
 function resolveAuthoringColumnDefaultTemplate(
   template: AuthoringColumnDefaultTemplate,
   args: readonly unknown[],
-): ColumnDefault {
-  if (template.kind === 'literal') {
+): AuthoringColumnDefault {
+  if (template.kind === 'autoincrement') {
+    return { kind: 'autoincrement' };
+  }
+  if (template.kind === 'codecValue') {
     const value = resolveAuthoringTemplateValue(template.value, args);
     if (value === undefined) {
       throw new Error('Resolved authoring literal default must not be undefined');
     }
-    if (!isColumnDefaultLiteralInputValue(value)) {
+    if (!isAuthoringColumnDefaultCodecLiteralValue(value)) {
       throw new Error(
         `Resolved authoring literal default must be a JSON-serializable value or Date, received ${String(value)}`,
       );
     }
     return {
-      kind: 'literal',
+      kind: 'codecValue',
       value,
     };
   }
@@ -553,11 +617,11 @@ function resolveAuthoringColumnDefaultTemplate(
   const expression = resolveAuthoringTemplateValue(template.expression, args);
   if (expression === undefined || (typeof expression === 'object' && expression !== null)) {
     throw new Error(
-      `Resolved authoring function default expression must resolve to a primitive, received ${String(expression)}`,
+      `Resolved authoring expression default must resolve to a primitive, received ${String(expression)}`,
     );
   }
   return {
-    kind: 'function',
+    kind: 'expression',
     expression: String(expression),
   };
 }
@@ -647,7 +711,7 @@ export function instantiateAuthoringFieldPreset(
     readonly typeParams?: Record<string, unknown>;
   };
   readonly nullable: boolean;
-  readonly default?: ColumnDefault;
+  readonly default?: AuthoringColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly id: boolean;
   readonly unique: boolean;
