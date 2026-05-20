@@ -2,6 +2,7 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -88,10 +89,19 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
         // Synthetic-contract opt-out (paired with `strictVerification: false`):
         // these tests exercise the runner against hand-rolled migration ops,
         // not a real authored contract. Supply the minimum well-formed shape
-        // `contractToMongoSchemaIR` reads (`storage.collections`) so the
+        // `contractToMongoSchemaIR` reads (`storage.namespaces`) so the
         // verifier degrades to an empty-expected diff rather than crashing.
         destinationContract: {
-          storage: { storageHash: destinationHash, collections: {} },
+          storage: {
+            storageHash: destinationHash,
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: {
+                id: UNBOUND_NAMESPACE_ID,
+                kind: 'mongo-namespace' as const,
+                collections: {},
+              },
+            },
+          },
         } as unknown as MongoContract,
         policy: ALL_POLICY,
         frameworkComponents: [],
@@ -338,7 +348,16 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           },
           // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
           destinationContract: {
-            storage: { storageHash: destinationHashV2, collections: {} },
+            storage: {
+              storageHash: destinationHashV2,
+              namespaces: {
+                [UNBOUND_NAMESPACE_ID]: {
+                  id: UNBOUND_NAMESPACE_ID,
+                  kind: 'mongo-namespace' as const,
+                  collections: {},
+                },
+              },
+            },
           } as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -380,7 +399,16 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           },
           // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
           destinationContract: {
-            storage: { storageHash: destinationHashV3, collections: {} },
+            storage: {
+              storageHash: destinationHashV3,
+              namespaces: {
+                [UNBOUND_NAMESPACE_ID]: {
+                  id: UNBOUND_NAMESPACE_ID,
+                  kind: 'mongo-namespace' as const,
+                  collections: {},
+                },
+              },
+            },
           } as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
