@@ -130,6 +130,10 @@ function startBackend(port: number): BackendProcess {
   const stderr: string[] = [];
   child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk.toString('utf-8')));
   child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk.toString('utf-8')));
+  // Spawn failures (e.g. ENOENT for `pnpm`) emit `error` but not `exit`;
+  // record them into the stderr buffer so `waitForBackendReady`'s
+  // diagnostic includes them when it times out.
+  child.on('error', (err) => stderr.push(`spawn error: ${err.message}\n`));
   return { child, stdout, stderr };
 }
 
