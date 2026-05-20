@@ -7,11 +7,28 @@ Which model tier should this dispatch run on? Per [`docs/drive/principles/decomp
 | Dispatch shape | Recommended tier |
 |---|---|
 | Substrate change / design judgment / spec interpretation | Opus (orchestrator tier) |
-| Codemod / mechanical migration / batch fix | Sonnet or composer-2 (mid tier) |
-| Test-literal rewrites / fixture regen | composer-2 or composer-2-fast (cheap tier) |
-| Spike (read, count, structure findings) | Sonnet or composer-2 |
-| Architect-class finding remediation (single discipline, narrow surface) | Sonnet |
+| Codemod / mechanical migration / batch fix | composer-2.5 by default; Sonnet if the codemod crosses multi-system invariants |
+| Test-literal rewrites / fixture regen | composer-2.5-fast (cheap tier) |
+| Spike (read, count, structure findings) | Sonnet or composer-2.5 |
+| Architect-class finding remediation (single discipline, narrow surface) | Sonnet by default; **composer-2.5 when the brief is precise and a sibling dispatch already established the pattern** |
+| Voice-aware doc edits (skill / README / matcher updates with explicit insertion points and an established voice to match) | composer-2.5 |
 | Long-running validation gate runs (typecheck, test:packages) | Whichever tier the parent dispatch chose (no model dispatch — just bash) |
+
+## Confidence notes
+
+The composer-2.5 entries above reflect a small but consistent trial — currently two-for-two on dispatches where the design was settled before the dispatch fired (an ownership-rule refactor and a multi-file doc update). The tier holds for:
+
+- Brief-precise dispatches where the implementer's job is to apply an already-named rule or replicate an already-landed pattern, not to negotiate one.
+- Narrow-surface diffs (single package, <100 LoC source / <200 LoC including tests in our trial), where context-retention across many files isn't load-bearing.
+- Work with a strong validation gate (typecheck/test/lint/build for code; existing voice / structure for docs) that catches deviation before it propagates.
+
+Known **non**-fits (kept on Sonnet / Opus until evidence accumulates):
+
+- Dispatches where the design must settle mid-implementation (re-route through `drive-discussion` first; the implementer should not be the one settling design).
+- Multi-package refactors where the diff is wide and the load-bearing context is "what other code in the same family does."
+- Meta-reporting that requires faithful representation of git/workspace state — composer-2.5 has been observed to misread `git status` in its surprise / pushback sections (the deliverable was correct; the prose claim about "uncommitted work" was not). Validate state assertions in the deliverable against `git status` / `git log` rather than the prose summary.
+
+The trial continues. Bump the table or carve a new row as more evidence accumulates; pair each adjustment with a retro entry referencing the worked example.
 
 ## How this table updates
 

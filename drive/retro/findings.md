@@ -28,6 +28,14 @@ AGENTS.md update mid-project (adding the canonical "Where skills and rules live"
 
 **Upstream candidate?** Yes for the *pattern* (document the canonical-vs-presentation distinction in AGENTS.md / agent-onboarding docs) — the *content* is repo-specific.
 
+## 2026-05-20 · drive-build-workflow · win
+
+Trialled `composer-2.5-fast` as the implementer tier on two adjacent dispatches in the `db-close-teardown` project: (1c) a Mongo facade refactor applying a settled ownership rule plus `[Symbol.asyncDispose]`, and (2) a three-file doc update teaching the new surface across `prisma-next-{runtime,queries,debug}` skills. Both succeeded first-try, brief-accurate, voice-matched, with no clarifying questions. The composer tier handled brief-precise, narrow-surface, established-pattern work as well as Sonnet did on sibling dispatches (1a, 1b), at materially lower latency and cost. One miss in the second report: composer claimed "uncommitted work from slice 1 remains" when slice 1 was fully committed — deliverable was correct, the meta-state claim was not. Recommendation calibration updated in `drive/calibration/model-tier.md` to broaden composer-2.5's recommended applicability and to note the meta-reporting gotcha.
+
+**Suggested action:** landed in `drive/calibration/model-tier.md` (new row for voice-aware doc edits; Architect-class narrow-surface row now permits composer-2.5 when brief is precise and pattern established; Confidence notes section added). Continue the trial — bump confidence further only after more dispatches accumulate. Validate composer's git-state assertions against `git status` directly when reading its reports.
+
+**Upstream candidate?** Yes — once the trial accumulates enough evidence (handful more dispatches), the model-tier routing and the "validate state assertions" caveat are both upstream-worthy.
+
 ## 2026-05-20 · drive-run-retro · boundary
 
 Cross-document tier vocabulary divergence surfaced during reviewer iteration: `docs/drive/principles/decomposition-and-cost.md` declares canonical tier labels as `fast / mid / thorough`; `docs/drive/principles/brief-discipline.md` declares them as `cheap / mid / orchestrator`. Each document is internally consistent post-fix; the framework uses two parallel taxonomies for the same concept. Worth a separate harmonization effort once the divergence causes confusion in practice; not filed as a Linear ticket pending operator decision.
