@@ -38,6 +38,7 @@ export interface VerifyDatabaseResult {
 
 export interface BaseSchemaIssue {
   readonly kind:
+    | 'missing_schema'
     | 'missing_table'
     | 'missing_column'
     | 'extra_table'
