@@ -38,6 +38,18 @@ Every actor running inside a Drive workflow is in one of two **structural roles*
 
 Runs `drive-*-workflow` skills. The Orchestrator's job is **routing and synthesis**: it reads condensed artifacts, evaluates verdicts, assembles briefs, dispatches Executor sub-agents, and synthesises their reports back to the operator. It does **not** perform execution work (file edits, searches, shell calls, write operations) directly from its own context — that work belongs to an Executor.
 
+**The Orchestrator's five verbs**:
+
+- **Delegate** — dispatch Executor sub-agents with well-bounded briefs.
+- **Synthesize** — combine condensed sub-agent reports into a unified view.
+- **Coordinate** — manage dispatch sequencing, branch state, project artifact organisation.
+- **Decide** — issue verdicts, pick next actions, route escalations.
+- **Author** — write project and slice artifacts directly: spec, plan, design notes, alternatives-considered, slice spec, slice plan, subagent-registry. These artifacts have inputs that live only in the Orchestrator's conversation context and cannot be cheaply re-derived by an Executor; the Orchestrator authors them.
+
+The fifth verb — *author* — is the non-obvious one. It applies to a specific class of artifact: project and slice planning + design material. The underlying criterion is **re-derivation cost**: if a piece of work's inputs live only in the Orchestrator's context (a just-had discussion, an in-flight model decision), delegation requires the Executor to reconstruct the inputs from external prompts or transcript reads, suffering fidelity loss. If the inputs are well-bounded and externally encoded (a settled spec, a precise input/output contract), delegation is cheaper. Project + slice planning and design artifacts fall on the orchestrator-direct side of that line.
+
+The mechanical consequence: **the Orchestrator's file writes never leave the project directory.** Spec, plan, design notes, alternatives-considered, slice spec, slice plan, subagent-registry — all live inside `projects/<current-project>/`. Touching files outside the project directory (source code, tests, durable docs, skill files, rules, configs) is the signal that the Orchestrator is doing the wrong thing — the work must be delegated to an Executor with the spec as their input contract. Reads outside the project directory are fine (research, context-gathering); writes are not. See [Layer 5 — Moment-of-action fail-safe](#layer-5--moment-of-action-fail-safe) for the file-path check that operationalises this rule.
+
 ### Executor
 
 Runs atomic skills. The Executor's job is **execution**: it performs a bounded unit of work and persists the output to disk so the Orchestrator can read the condensed result. Three subtypes:
@@ -168,6 +180,19 @@ The Executor should not need to do its own project reconnaissance to understand 
 
 The fail-safe's placement is deliberate. An Orchestrator that is drifting into execution will typically reach for an atomic skill that wraps an execution action — `drive-triage-work` to read a ticket, `drive-specify-slice` to author a file, `drive-pr-description` to run a git diff. Each of these skills is an execution unit. By placing the fail-safe at the top of every such skill, the stop-signal appears at the exact moment the drift would become irreversible. A workflow-skill invocation of an atomic skill directly (without dispatching) encounters the stop-signal as its very first input — there is no "partial execution" before the signal fires.
 
+#### Orchestrator-side fail-safe — the file-path check
+
+A complementary fail-safe operates on the Orchestrator side: **the Orchestrator's writes never leave `projects/<current-project>/`**. At the moment the Orchestrator is about to call a write tool (`Write`, `StrReplace`, `Edit`), the file path is the binary check — if the target lies outside the project directory, the Orchestrator stops and dispatches.
+
+```text
+Write target inside  projects/<current-project>/  →  orchestrator-direct (OK)
+Write target outside projects/<current-project>/  →  delegate (STOP, dispatch)
+```
+
+This check is mechanically simple, harder to drift past than a soft "did I really need to do this myself?" prompt, and complementary to the atomic-skill STOP one-liner above: the atomic-skill check fires when an Orchestrator is about to invoke an atomic skill (which is itself a wrapper around execution tools); the file-path check fires when the Orchestrator is about to make a direct write call. Together, both ends of the action chain are guarded.
+
+The deeper rationale is the same re-derivation-cost criterion introduced in [The role split / Orchestrator](#orchestrator): orchestrator-context-only artifacts live in the project directory; everything else has externally-encoded inputs and is Executor work.
+
 ---
 
 ## DO-NOT enumeration for the Orchestrator
@@ -189,7 +214,7 @@ The following actions constitute **execution** rather than coordination. An Orch
 - Read project-level artifacts it owns: `projects/<x>/spec.md`, `projects/<x>/plan.md`, `projects/<x>/subagent-registry.md`, `projects/<x>/reviews/code-review.md` (to read a verdict — not to execute the review itself).
 - Read drive context overlays: `drive/<category>/README.md`, `docs/drive/principles/`, skill bodies it is composing into briefs.
 - Assemble dispatch briefs from templates and in-memory context.
-- Write to project-level orchestrator-owned files (`subagent-registry.md`, heartbeat read on resume, brief files).
+- Write to project-level orchestrator-owned files (`spec.md`, `plan.md`, `design-notes.md`, slice `spec.md` / `plan.md`, `subagent-registry.md`, `reviews/code-review.md` updates, brief files) — see [The role split / Orchestrator](#orchestrator) for the full list and the file-path boundary rule.
 - Read heartbeat files (liveness check during a dispatch loop — this is coordination, not execution).
 - Make MCP calls for Linear/GitHub project management (routing and status, not code execution).
 
