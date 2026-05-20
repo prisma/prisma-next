@@ -1,4 +1,4 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
@@ -9,11 +9,10 @@ import type {
   ControlTargetInstance,
   MigrationRunner,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { ColumnDefault, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
-import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 import { PostgresContractSerializer } from '../core/postgres-contract-serializer';
@@ -45,11 +44,13 @@ function buildNativeTypeExpander(
   };
 }
 
-export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
-  if (def.kind === 'function') {
-    return def.expression;
+export function postgresRenderDefault(def: ColumnDefault, _column: StorageColumn): string {
+  switch (def.kind) {
+    case 'autoincrement':
+      return 'autoincrement()';
+    case 'expression':
+      return def.expression;
   }
-  return renderDefaultLiteral(def.value, column);
 }
 
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =

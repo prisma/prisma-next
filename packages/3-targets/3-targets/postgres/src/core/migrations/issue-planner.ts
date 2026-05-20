@@ -191,7 +191,7 @@ function toColumnSpec(
       codecHooks as Map<string, CodecControlHooks>,
       storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
     ),
-    defaultSql: buildColumnDefaultSql(column.default, column),
+    defaultSql: buildColumnDefaultSql(column.default),
     nullable: column.nullable,
   };
 }
@@ -337,7 +337,7 @@ function mapIssueToCall(
             ),
           );
         }
-        const defaultSql = buildColumnDefaultSql(column.default, column);
+        const defaultSql = buildColumnDefaultSql(column.default);
         if (!defaultSql) return ok([]);
         return ok([new SetDefaultCall(tableSchema(issue), issue.table, issue.column, defaultSql)]);
       }
@@ -473,7 +473,7 @@ function mapIssueToCall(
           issue.column
         ];
         if (!column?.default) return ok([]);
-        const defaultSql = buildColumnDefaultSql(column.default, column);
+        const defaultSql = buildColumnDefaultSql(column.default);
         if (!defaultSql) return ok([]);
         return ok([
           new SetDefaultCall(tableSchema(issue), issue.table, issue.column, defaultSql, 'widening'),

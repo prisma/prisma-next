@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 
 /**
  * Pre-compiled regex patterns for performance.
@@ -12,11 +12,6 @@ const TEXT_CAST_SUFFIX = /::text$/i;
 const NOW_LITERAL_PATTERN = /^'now'$/i;
 const UUID_PATTERN = /^gen_random_uuid\s*\(\s*\)$/i;
 const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
-const NULL_PATTERN = /^NULL(?:::.+)?$/i;
-const TRUE_PATTERN = /^true$/i;
-const FALSE_PATTERN = /^false$/i;
-const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
 
 /**
  * Returns the canonical expression for a timestamp default function, or undefined
@@ -64,68 +59,26 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
  */
 export function parsePostgresDefault(
   rawDefault: string,
-  nativeType?: string,
+  _nativeType?: string,
 ): ColumnDefault | undefined {
   const trimmed = rawDefault.trim();
-  const normalizedType = nativeType?.toLowerCase();
-  const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
 
   if (NEXTVAL_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'autoincrement()' };
+    return { kind: 'autoincrement' };
   }
 
   const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);
   if (canonicalTimestamp) {
-    return { kind: 'function', expression: canonicalTimestamp };
+    return { kind: 'expression', expression: canonicalTimestamp };
   }
 
   if (UUID_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'gen_random_uuid()' };
+    return { kind: 'expression', expression: 'gen_random_uuid()' };
   }
 
   if (UUID_OSSP_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'gen_random_uuid()' };
+    return { kind: 'expression', expression: 'gen_random_uuid()' };
   }
 
-  if (NULL_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: null };
-  }
-
-  if (TRUE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: true };
-  }
-  if (FALSE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: false };
-  }
-
-  if (NUMERIC_PATTERN.test(trimmed)) {
-    const num = Number(trimmed);
-    if (!Number.isFinite(num)) return undefined;
-    if (isBigInt && !Number.isSafeInteger(num)) {
-      return { kind: 'literal', value: trimmed };
-    }
-    return { kind: 'literal', value: num };
-  }
-
-  const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
-  if (stringMatch?.[1] !== undefined) {
-    const unescaped = stringMatch[1].replace(/''/g, "'");
-    if (normalizedType === 'json' || normalizedType === 'jsonb') {
-      try {
-        return { kind: 'literal', value: JSON.parse(unescaped) };
-      } catch {
-        // Keep legacy behavior for malformed/non-JSON string content.
-      }
-    }
-    if (isBigInt && NUMERIC_PATTERN.test(unescaped)) {
-      const num = Number(unescaped);
-      if (Number.isSafeInteger(num)) {
-        return { kind: 'literal', value: num };
-      }
-      return { kind: 'literal', value: unescaped };
-    }
-    return { kind: 'literal', value: unescaped };
-  }
-
-  return { kind: 'function', expression: trimmed };
+  return { kind: 'expression', expression: trimmed };
 }
