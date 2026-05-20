@@ -76,7 +76,13 @@ export class SqliteTextDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteTextDescriptor = new SqliteTextDescriptor();
 
 export const sqliteTextColumn = () =>
-  column(sqliteTextDescriptor.factory(), sqliteTextDescriptor.codecId, undefined, 'text');
+  column(
+    sqliteTextDescriptor.factory(),
+    sqliteTextDescriptor.codecId,
+    undefined,
+    'text',
+    sqliteTextDescriptor.traits,
+  );
 
 sqliteTextColumn satisfies ColumnHelperFor<SqliteTextDescriptor>;
 sqliteTextColumn satisfies ColumnHelperForStrict<SqliteTextDescriptor>;
@@ -117,7 +123,13 @@ export class SqliteIntegerDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteIntegerDescriptor = new SqliteIntegerDescriptor();
 
 export const sqliteIntegerColumn = () =>
-  column(sqliteIntegerDescriptor.factory(), sqliteIntegerDescriptor.codecId, undefined, 'integer');
+  column(
+    sqliteIntegerDescriptor.factory(),
+    sqliteIntegerDescriptor.codecId,
+    undefined,
+    'integer',
+    sqliteIntegerDescriptor.traits,
+  );
 
 sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
 sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;
@@ -158,7 +170,13 @@ export class SqliteRealDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteRealDescriptor = new SqliteRealDescriptor();
 
 export const sqliteRealColumn = () =>
-  column(sqliteRealDescriptor.factory(), sqliteRealDescriptor.codecId, undefined, 'real');
+  column(
+    sqliteRealDescriptor.factory(),
+    sqliteRealDescriptor.codecId,
+    undefined,
+    'real',
+    sqliteRealDescriptor.traits,
+  );
 
 sqliteRealColumn satisfies ColumnHelperFor<SqliteRealDescriptor>;
 sqliteRealColumn satisfies ColumnHelperForStrict<SqliteRealDescriptor>;
@@ -202,7 +220,13 @@ export class SqliteBlobDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteBlobDescriptor = new SqliteBlobDescriptor();
 
 export const sqliteBlobColumn = () =>
-  column(sqliteBlobDescriptor.factory(), sqliteBlobDescriptor.codecId, undefined, 'blob');
+  column(
+    sqliteBlobDescriptor.factory(),
+    sqliteBlobDescriptor.codecId,
+    undefined,
+    'blob',
+    sqliteBlobDescriptor.traits,
+  );
 
 sqliteBlobColumn satisfies ColumnHelperFor<SqliteBlobDescriptor>;
 sqliteBlobColumn satisfies ColumnHelperForStrict<SqliteBlobDescriptor>;
@@ -254,7 +278,13 @@ export class SqliteDatetimeDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteDatetimeDescriptor = new SqliteDatetimeDescriptor();
 
 export const sqliteDatetimeColumn = () =>
-  column(sqliteDatetimeDescriptor.factory(), sqliteDatetimeDescriptor.codecId, undefined, 'text');
+  column(
+    sqliteDatetimeDescriptor.factory(),
+    sqliteDatetimeDescriptor.codecId,
+    undefined,
+    'text',
+    sqliteDatetimeDescriptor.traits,
+  );
 
 sqliteDatetimeColumn satisfies ColumnHelperFor<SqliteDatetimeDescriptor>;
 sqliteDatetimeColumn satisfies ColumnHelperForStrict<SqliteDatetimeDescriptor>;
@@ -295,7 +325,13 @@ export class SqliteJsonDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteJsonDescriptor = new SqliteJsonDescriptor();
 
 export const sqliteJsonColumn = () =>
-  column(sqliteJsonDescriptor.factory(), sqliteJsonDescriptor.codecId, undefined, 'text');
+  column(
+    sqliteJsonDescriptor.factory(),
+    sqliteJsonDescriptor.codecId,
+    undefined,
+    'text',
+    sqliteJsonDescriptor.traits,
+  );
 
 sqliteJsonColumn satisfies ColumnHelperFor<SqliteJsonDescriptor>;
 sqliteJsonColumn satisfies ColumnHelperForStrict<SqliteJsonDescriptor>;
@@ -339,7 +375,13 @@ export class SqliteBigintDescriptor extends CodecDescriptorImpl<void> {
 export const sqliteBigintDescriptor = new SqliteBigintDescriptor();
 
 export const sqliteBigintColumn = () =>
-  column(sqliteBigintDescriptor.factory(), sqliteBigintDescriptor.codecId, undefined, 'integer');
+  column(
+    sqliteBigintDescriptor.factory(),
+    sqliteBigintDescriptor.codecId,
+    undefined,
+    'integer',
+    sqliteBigintDescriptor.traits,
+  );
 
 sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
