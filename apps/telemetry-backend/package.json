@@ -41,6 +41,7 @@
     "@types/bun": "^1.2.18",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "pathe": "^2.0.3",
     "pg": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

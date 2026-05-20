@@ -1,12 +1,12 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { executeDbInit } from '@prisma-next/cli/control-api';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
+import { join } from 'pathe';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
 const frameworkComponents = [
