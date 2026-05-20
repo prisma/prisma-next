@@ -81,11 +81,11 @@ interface InstallReport {
   readonly warnings: readonly string[];
   /**
    * The package manager that actually ran. Equal to the detected `pm`
-   * on the common path; differs when the FR7.2 pnpm → npm fallback
-   * fired, in which case it's `'npm'`. Threaded into the skills
-   * install so the runner stays consistent with the install we just
-   * ran — re-trying through `pnpm dlx` when `pnpm install` just failed
-   * for workspace/catalog reasons would fail again for the same reason.
+   * on the common path; differs when the pnpm → npm fallback fired, in
+   * which case it's `'npm'`. Threaded into the skills install so the
+   * runner stays consistent with the install we just ran — re-trying
+   * through `pnpm dlx` when `pnpm install` just failed for
+   * workspace/catalog reasons would fail again for the same reason.
    */
   readonly effectivePm: PackageManager;
 }
