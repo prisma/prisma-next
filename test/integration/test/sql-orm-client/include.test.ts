@@ -14,7 +14,7 @@ import {
   createUsersCollection,
   timeouts,
   withCollectionRuntime,
-} from './helpers';
+} from './integration-helpers';
 import { seedComments, seedPosts, seedProfiles, seedUsers } from './runtime-helpers';
 
 function expectSelectAst(ast: unknown): asserts ast is SelectAst {

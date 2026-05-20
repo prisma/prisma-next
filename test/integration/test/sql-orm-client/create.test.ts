@@ -8,7 +8,7 @@ import {
   createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
-} from './helpers';
+} from './integration-helpers';
 
 function expectInsertBatchAst(
   ast: unknown,

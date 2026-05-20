@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createUsersCollection, timeouts, withCollectionRuntime } from './helpers';
+import { createUsersCollection, timeouts, withCollectionRuntime } from './integration-helpers';
 import { seedUsers } from './runtime-helpers';
 
 describe('integration/pagination', () => {

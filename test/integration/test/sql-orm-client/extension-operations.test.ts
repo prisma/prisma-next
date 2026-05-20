@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPostsCollection, timeouts, withCollectionRuntime } from './helpers';
+import { createPostsCollection, timeouts, withCollectionRuntime } from './integration-helpers';
 import { seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/extension-operations', () => {

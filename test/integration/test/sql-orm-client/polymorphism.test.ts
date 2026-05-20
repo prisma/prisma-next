@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
 import { buildMixedPolyContract, getTestContext, type TestContract } from '../helpers';
-import { timeouts, withCollectionRuntime } from './helpers';
+import { timeouts, withCollectionRuntime } from './integration-helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
 
 function polyContract() {

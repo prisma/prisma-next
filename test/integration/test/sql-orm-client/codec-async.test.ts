@@ -19,7 +19,7 @@ import {
   createUsersCollection,
   timeouts,
   withCollectionRuntime,
-} from './helpers';
+} from './integration-helpers';
 import { seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/codec-async', () => {

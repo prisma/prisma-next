@@ -1,9 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
-import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import {
   createExecutionContext,
@@ -12,7 +10,8 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
-import { getTestContract, type TestContract } from './helpers';
+import type { RuntimeQueryable } from '../../src/types';
+import { getTestContract, type TestContract } from '../helpers';
 
 interface SeedUser {
   id: number;
@@ -69,7 +68,6 @@ export async function createPgIntegrationRuntime(
         target: postgresTarget,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [pgvectorRuntime],
       });
 
       const context = createExecutionContext<TestContract>({ contract, stack });
@@ -165,8 +163,6 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
     meta jsonb not null default '{}',
     invariants text[] not null default '{}'
   )`);
-  await runtime.query('create extension if not exists vector');
-
   await runtime.query('drop table if exists tags');
   await runtime.query('drop table if exists comments');
   await runtime.query('drop table if exists profiles');

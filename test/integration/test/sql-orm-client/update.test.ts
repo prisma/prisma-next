@@ -5,7 +5,7 @@ import {
   createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
-} from './helpers';
+} from './integration-helpers';
 import { seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/update', () => {

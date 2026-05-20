@@ -10,7 +10,7 @@ import {
   createUsersCollectionWithoutReturning,
   timeouts,
   withCollectionRuntime,
-} from './helpers';
+} from './integration-helpers';
 import { seedUsers } from './runtime-helpers';
 
 function isInsertAst(ast: unknown): ast is InsertAst {

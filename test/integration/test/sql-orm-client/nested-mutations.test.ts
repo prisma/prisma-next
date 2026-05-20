@@ -4,7 +4,7 @@ import {
   createReturningUsersCollection,
   timeouts,
   withCollectionRuntime,
-} from './helpers';
+} from './integration-helpers';
 import { seedPosts, seedProfiles, seedUsers } from './runtime-helpers';
 
 describe('integration/nested-mutations', () => {

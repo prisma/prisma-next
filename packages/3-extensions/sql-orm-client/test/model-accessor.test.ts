@@ -117,10 +117,9 @@ describe('createModelAccessor', () => {
 
   it('cosineDistance accepts a raw vector value and produces a ParamRef on arg0', () => {
     const post = createModelAccessor(context, 'Post');
-    const result = post['embedding']!.cosineDistance([1, 2, 3]) as unknown as Record<
-      string,
-      unknown
-    >;
+    const result = (
+      post['embedding']! as unknown as { cosineDistance(v: number[]): unknown }
+    ).cosineDistance([1, 2, 3]) as unknown as Record<string, unknown>;
     // Non-predicate return → ComparisonMethods wrapper; the underlying AST is behind the comparison methods. Invoke a comparison to observe it.
     const gt = (result['gt'] as (value: number) => BinaryExpr)(0.5);
     expect(gt).toBeInstanceOf(BinaryExpr);
@@ -138,10 +137,9 @@ describe('createModelAccessor', () => {
     const post = createModelAccessor(context, 'Post');
     const otherPost = createModelAccessor(context, 'Post');
 
-    const result = post['embedding']!.cosineDistance(otherPost['embedding']!) as unknown as Record<
-      string,
-      unknown
-    >;
+    const result = (
+      post['embedding']! as unknown as { cosineDistance(v: unknown): unknown }
+    ).cosineDistance(otherPost['embedding']!) as unknown as Record<string, unknown>;
     const gt = (result['gt'] as (value: number) => BinaryExpr)(0.5);
     const opExpr = gt.left as OperationExpr;
     expect(opExpr).toBeInstanceOf(OperationExpr);

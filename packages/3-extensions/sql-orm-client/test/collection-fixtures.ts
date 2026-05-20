@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import { Collection } from '../src/collection';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 

@@ -1,0 +1,776 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "roots": {
+    "articles": "Article",
+    "comments": "Comment",
+    "posts": "Post",
+    "profiles": "Profile",
+    "tags": "Tag",
+    "users": "User"
+  },
+  "models": {
+    "Article": {
+      "fields": {
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "reviewerId": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "title": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {
+        "reviewer": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "reviewerId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        }
+      },
+      "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "reviewerId": {
+            "column": "reviewer_id"
+          },
+          "title": {
+            "column": "title"
+          }
+        },
+        "table": "articles"
+      }
+    },
+    "Comment": {
+      "fields": {
+        "body": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "postId": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "body": {
+            "column": "body"
+          },
+          "id": {
+            "column": "id"
+          },
+          "postId": {
+            "column": "post_id"
+          }
+        },
+        "table": "comments"
+      }
+    },
+    "Post": {
+      "fields": {
+        "embedding": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/vector@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 3
+            }
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "title": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "userId": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "views": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {
+        "author": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        },
+        "comments": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "postId"
+            ]
+          },
+          "to": "Comment"
+        }
+      },
+      "storage": {
+        "fields": {
+          "embedding": {
+            "column": "embedding"
+          },
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "user_id"
+          },
+          "views": {
+            "column": "views"
+          }
+        },
+        "table": "posts"
+      }
+    },
+    "Profile": {
+      "fields": {
+        "bio": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "userId": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        }
+      },
+      "storage": {
+        "fields": {
+          "bio": {
+            "column": "bio"
+          },
+          "id": {
+            "column": "id"
+          },
+          "userId": {
+            "column": "user_id"
+          }
+        },
+        "table": "profiles"
+      }
+    },
+    "Tag": {
+      "fields": {
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "name": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "name": {
+            "column": "name"
+          }
+        },
+        "table": "tags"
+      }
+    },
+    "User": {
+      "fields": {
+        "address": {
+          "nullable": true,
+          "type": {
+            "kind": "valueObject",
+            "name": "Address"
+          }
+        },
+        "email": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "invitedById": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "name": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {
+        "invitedBy": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "invitedById"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        },
+        "invitedUsers": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "invitedById"
+            ]
+          },
+          "to": "User"
+        },
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
+          },
+          "to": "Post"
+        },
+        "profile": {
+          "cardinality": "1:1",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
+          },
+          "to": "Profile"
+        }
+      },
+      "storage": {
+        "fields": {
+          "address": {
+            "column": "address"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "invitedById": {
+            "column": "invited_by_id"
+          },
+          "name": {
+            "column": "name"
+          }
+        },
+        "table": "users"
+      }
+    }
+  },
+  "valueObjects": {
+    "Address": {
+      "fields": {
+        "city": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "street": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "zip": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:f11b50f00065a242f5755d2aa750bcbc6904163dd1a88dfb200c42c8aa7b44db",
+    "tables": {
+      "articles": {
+        "columns": {
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "reviewer_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "comments": {
+        "columns": {
+          "body": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "post_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "post_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "posts"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "posts": {
+        "columns": {
+          "embedding": {
+            "codecId": "pg/vector@1",
+            "nativeType": "vector",
+            "nullable": true,
+            "typeParams": {
+              "length": 3
+            }
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "user_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "views": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "user_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "users"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "profiles": {
+        "columns": {
+          "bio": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "user_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "user_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "users"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": [
+          {
+            "columns": [
+              "user_id"
+            ]
+          }
+        ]
+      },
+      "tags": {
+        "columns": {
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": [
+          {
+            "columns": [
+              "name"
+            ]
+          }
+        ]
+      },
+      "users": {
+        "columns": {
+          "address": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true
+          },
+          "email": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "invited_by_id": {
+            "codecId": "pg/int4@1",
+            "nativeType": "int4",
+            "nullable": true
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "invited_by_id"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "users"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": [
+          {
+            "columns": [
+              "email"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "execution": {
+    "executionHash": "sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "tags"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "pgvector.cosine": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "returning": true
+    }
+  },
+  "extensionPacks": {
+    "pgvector": {
+      "capabilities": {
+        "postgres": {
+          "pgvector.cosine": true
+        }
+      },
+      "familyId": "sql",
+      "id": "pgvector",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "codecTypes": {
+          "import": {
+            "alias": "PgVectorTypes",
+            "named": "CodecTypes",
+            "package": "@prisma-next/extension-pgvector/codec-types"
+          },
+          "typeImports": [
+            {
+              "alias": "Vector",
+              "named": "Vector",
+              "package": "@prisma-next/extension-pgvector/codec-types"
+            }
+          ]
+        },
+        "operationTypes": {
+          "import": {
+            "alias": "PgVectorOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PgVectorQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
+        },
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "vector",
+            "targetId": "postgres",
+            "typeId": "pg/vector@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    }
+  },
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

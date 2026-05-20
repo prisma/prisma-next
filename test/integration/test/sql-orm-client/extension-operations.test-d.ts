@@ -1,5 +1,5 @@
+import type { ComparisonMethods, ModelAccessor } from '@prisma-next/sql-orm-client';
 import { describe, expectTypeOf, test } from 'vitest';
-import type { ComparisonMethods, ModelAccessor } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 
 type PostAccessor = ModelAccessor<Contract, 'Post'>;

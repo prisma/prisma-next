@@ -1,14 +1,12 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
-import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
+import type { RuntimeQueryable } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 
@@ -49,7 +47,6 @@ const testContext: ExecutionContext<TestContract> = createExecutionContext({
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: [pgvectorRuntime],
   }),
 });
 
@@ -105,7 +102,7 @@ export function buildMixedPolyContract(): TestContract {
     base: 'Task',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
+  raw.storage.tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -118,7 +115,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.features = {
+  raw.storage.tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -166,17 +163,17 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
+  raw.storage.tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.role = {
+  raw.storage.tables.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.plan = {
+  raw.storage.tables.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
