@@ -115,6 +115,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
   let connectPromise: Promise<void> | undefined;
+  let closePromise: Promise<void> | undefined;
   let backgroundConnectError: unknown;
   let closed = false;
   let ownedDispose: (() => Promise<void>) | undefined;
@@ -233,11 +234,14 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },
 
-    async close(): Promise<void> {
-      if (closed) return;
+    close(): Promise<void> {
+      if (closePromise) return closePromise;
       closed = true;
-      await connectPromise?.catch(() => undefined);
-      await ownedDispose?.();
+      closePromise = (async () => {
+        await connectPromise?.catch(() => undefined);
+        await ownedDispose?.();
+      })();
+      return closePromise;
     },
 
     [Symbol.asyncDispose](): Promise<void> {
