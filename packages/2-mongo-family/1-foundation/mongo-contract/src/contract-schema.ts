@@ -1,4 +1,4 @@
-import { type } from 'arktype';
+import { type Type, type } from 'arktype';
 import type { MongoJsonObject, MongoJsonPrimitive, MongoJsonValue } from './contract-types';
 
 const ScalarFieldTypeSchema = type({
@@ -317,36 +317,67 @@ const StorageCollectionSchema = type({
   'options?': MongoCollectionOptionsSchema,
 });
 
-const MongoNamespaceEnvelopeSchema = type({
-  '+': 'reject',
-  id: 'string',
-  'kind?': 'string',
-  'collections?': type({ '[string]': StorageCollectionSchema }),
-});
-
-export const MongoContractSchema = type({
-  '+': 'reject',
-  targetFamily: "'mongo'",
-  'schemaVersion?': 'string',
-  'target?': 'string',
-  'storageHash?': 'string',
-  'profileHash?': 'string',
-  roots: 'Record<string, string>',
-  'capabilities?': 'Record<string, unknown>',
-  'extensionPacks?': 'Record<string, unknown>',
-  'meta?': 'Record<string, unknown>',
-  'sources?': 'Record<string, unknown>',
-  '_generated?': 'Record<string, unknown>',
-  storage: type({
+/**
+ * Builds the per-namespace envelope schema for Mongo storage. Pack
+ * contributions are folded in as optional `'<slotKey>?': type({
+ * '[string]': fragment })` entries so the structural check covers
+ * slots introduced outside the family core. Mongo today has no pack
+ * contributions; the composition surface exists for symmetry with SQL
+ * and as the substrate for future entity kinds.
+ */
+export function createMongoNamespaceEnvelopeSchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  const slotEntries: Record<string, Type<unknown>> = {};
+  if (fragments) {
+    for (const [slotKey, fragment] of fragments) {
+      slotEntries[`${slotKey}?`] = type({ '[string]': fragment });
+    }
+  }
+  return type({
     '+': 'reject',
-    namespaces: type({ '[string]': MongoNamespaceEnvelopeSchema }),
+    id: 'string',
+    'kind?': 'string',
+    'collections?': type({ '[string]': StorageCollectionSchema }),
+    ...slotEntries,
+  }) as Type<unknown>;
+}
+
+/**
+ * Builds the full Mongo contract schema. The per-namespace entry
+ * threading happens through {@link createMongoNamespaceEnvelopeSchema};
+ * the rest of the envelope is family-shared.
+ */
+export function createMongoContractSchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  const namespaceEnvelope = createMongoNamespaceEnvelopeSchema(fragments);
+  return type({
+    '+': 'reject',
+    targetFamily: "'mongo'",
+    'schemaVersion?': 'string',
+    'target?': 'string',
     'storageHash?': 'string',
-  }),
-  models: type({ '[string]': ModelDefinitionSchema }),
-  'valueObjects?': type({
-    '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
-  }),
-});
+    'profileHash?': 'string',
+    roots: 'Record<string, string>',
+    'capabilities?': 'Record<string, unknown>',
+    'extensionPacks?': 'Record<string, unknown>',
+    'meta?': 'Record<string, unknown>',
+    'sources?': 'Record<string, unknown>',
+    '_generated?': 'Record<string, unknown>',
+    storage: type({
+      '+': 'reject',
+      namespaces: type({ '[string]': namespaceEnvelope }),
+      'storageHash?': 'string',
+    }),
+    models: type({ '[string]': ModelDefinitionSchema }),
+    'valueObjects?': type({
+      '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
+    }),
+  }) as Type<unknown>;
+}
+
+export const MongoContractSchema = createMongoContractSchema();
 
 export {
   CollationSchema,
