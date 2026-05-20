@@ -317,6 +317,22 @@ program.addCommand(dbCommand);
 program.addCommand(migrationCommand);
 program.addCommand(refCommand);
 
+// Test-only hidden command used by `cli-telemetry`'s `cli-e2e.test.ts`
+// to verify that telemetry still lands when a CLI command crashes
+// mid-execution. The preAction hook fires the detached sender as
+// `void`-d work; the action body's 200ms sleep gives the sender enough
+// time to fork before the throw kills the parent. Hidden from help;
+// underscore prefix marks it as internal. Doesn't depend on any
+// project state, so it runs in any tempdir.
+const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
+  .description('Internal: deliberately throw for the telemetry e2e suite.')
+  .action(async () => {
+    await new Promise((settle) => setTimeout(settle, 200));
+    throw new Error('__telemetry-crash-test: intentional crash for e2e coverage');
+  });
+telemetryCrashTestCommand.configureHelp({ visibleCommands: () => [] });
+program.addCommand(telemetryCrashTestCommand, { hidden: true });
+
 // Create help command
 const helpCommand = new Command('help')
   .description('Show usage instructions')
