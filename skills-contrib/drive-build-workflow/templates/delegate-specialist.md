@@ -16,6 +16,7 @@ You are operating under the `<workflow-skill>` skill (e.g. `drive-build-workflow
 
 ## Skill invocation
 
+- **Model:** `<explicit model identifier>` — **always specify explicitly**. If you omit the `model` parameter in your dispatch call, the sub-agent silently inherits the parent's model (typically thorough-tier — expensive). Pick per the dispatch's tier from [`drive/roles/README.md § Role-variant table`](../../../drive/roles/README.md).
 - **Atomic skill:** `<skill-name>` (e.g. `drive-pr-walkthrough`)
 - **Skill location:** `skills-contrib/<skill-name>/SKILL.md` — re-read its body before executing.
 - **Execution mode:** the skill's preamble declares `delegated`. Your job is to execute the skill end-to-end within this dispatch's scope.
