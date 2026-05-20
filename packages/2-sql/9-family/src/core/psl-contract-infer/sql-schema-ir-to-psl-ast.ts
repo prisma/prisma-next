@@ -1,4 +1,3 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   PslAttribute,
   PslAttributeArgument,
@@ -13,6 +12,7 @@ import type {
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultMappingOptions } from './default-mapping';
 import { mapDefault } from './default-mapping';

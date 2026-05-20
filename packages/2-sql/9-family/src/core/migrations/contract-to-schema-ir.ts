@@ -1,5 +1,6 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import {
   type ForeignKey,
   type Index,
