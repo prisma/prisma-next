@@ -82,10 +82,7 @@ const fixtureConfigSource = [
  * is enough.
  */
 function rewriteImports(tsSource: string): string {
-  return tsSource.replace(
-    "'@prisma-next/target-sqlite/migration'",
-    `'${targetSqliteMigrationExport}'`,
-  );
+  return tsSource.replace("'@prisma-next/sqlite/migration'", `'${targetSqliteMigrationExport}'`);
 }
 
 const META = {

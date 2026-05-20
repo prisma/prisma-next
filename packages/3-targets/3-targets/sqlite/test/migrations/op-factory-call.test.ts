@@ -93,10 +93,10 @@ describe('CreateTableCall', () => {
     expect(ts).toContain('typeSql:');
   });
 
-  it('importRequirements() points at @prisma-next/target-sqlite/migration', () => {
+  it('importRequirements() points at @prisma-next/sqlite/migration', () => {
     const call = new CreateTableCall('user', tableSpec([colSpec()]));
     expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'createTable' },
+      { moduleSpecifier: '@prisma-next/sqlite/migration', symbol: 'createTable' },
     ]);
   });
 });
@@ -295,8 +295,8 @@ describe('DataTransformCall', () => {
   it('importRequirements() pulls dataTransform + placeholder from the migration module', () => {
     const reqs = makeCall().importRequirements();
     expect(reqs).toEqual([
-      { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'dataTransform' },
-      { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'placeholder' },
+      { moduleSpecifier: '@prisma-next/sqlite/migration', symbol: 'dataTransform' },
+      { moduleSpecifier: '@prisma-next/sqlite/migration', symbol: 'placeholder' },
     ]);
   });
 });

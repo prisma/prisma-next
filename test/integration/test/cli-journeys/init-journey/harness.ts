@@ -464,7 +464,7 @@ function rewritePackageJsonForTarballs(dir: string, cell: CellId, tarballs: Pack
 
   // The framework-emitted `migration.ts` imports framework packages
   // directly (not via the user-facing facade): postgres goes through
-  // `@prisma-next/target-postgres/migration`; mongo goes through
+  // `@prisma-next/postgres/migration`; mongo goes through
   // `@prisma-next/cli/migration-cli` + `@prisma-next/family-mongo/migration`
   // + `@prisma-next/target-mongo/migration`. Under `node-linker=isolated`
   // (the layout this journey deliberately uses to catch TML-2485-class

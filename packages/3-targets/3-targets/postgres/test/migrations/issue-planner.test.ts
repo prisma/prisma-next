@@ -757,7 +757,7 @@ describe('planIssues', () => {
       expect(ts).toContain('this.dataTransform(');
       expect(ts).toContain('placeholder(');
       expect(ts).toContain('setNotNull(');
-      expect(ts).toContain("from '@prisma-next/target-postgres/migration'");
+      expect(ts).toContain("from '@prisma-next/postgres/migration'");
     });
   });
 
