@@ -416,4 +416,3 @@ The layered convention approach is strictly more portable and nearly as strong a
 - [`.claude/skills/drive-agent-personas/SKILL.md`](../../.claude/skills/drive-agent-personas/SKILL.md) — persona library. Roles and personas are orthogonal; see the role-vs-persona table above for the interaction.
 - [`drive/triage/README.md`](../triage/README.md) — triage heuristics and ticket-shape patterns. Triage determines which workflow skill runs, which determines which role the agent enters.
 - [Linear: TML-2587](https://linear.app/prisma-data/issue/TML-2587) — the project ticket that introduced this vocabulary.
-- [Linear: TML-2589](https://linear.app/prisma-data/issue/TML-2589) — the slice ticket that authored this document.
