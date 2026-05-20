@@ -36,6 +36,7 @@ export interface MongoClient<
   connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime>;
   runtime(): Promise<MongoRuntime>;
   close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
 }
 
 export interface MongoOptionsBase {
@@ -126,6 +127,7 @@ export default function mongo<
   // build resets `runtimePromise` so a retry is possible (see test).
   let runtimePromise: Promise<MongoRuntime> | undefined;
   let closed = false;
+  let ownedDispose: (() => Promise<void>) | undefined;
 
   const buildRuntime = async (resolvedBinding: MongoBinding): Promise<MongoRuntime> => {
     const stack = createMongoExecutionStack({
@@ -137,6 +139,9 @@ export default function mongo<
       resolvedBinding.kind === 'url'
         ? await MongoDriverImpl.fromConnection(resolvedBinding.url, resolvedBinding.dbName)
         : MongoDriverImpl.fromDb(resolvedBinding.client.db(resolvedBinding.dbName));
+    if (resolvedBinding.kind === 'url') {
+      ownedDispose = () => driver.close();
+    }
     return createMongoRuntime({
       context,
       driver,
@@ -216,11 +221,15 @@ export default function mongo<
       // the user's intent is "release any resources we acquired" — there is
       // nothing to close if the build never produced a runtime.
       try {
-        const runtime = await runtimePromise;
-        await runtime.close();
+        await runtimePromise;
+        await ownedDispose?.();
       } catch {
         // build failed; nothing to close.
       }
+    },
+
+    [Symbol.asyncDispose](): Promise<void> {
+      return this.close();
     },
   };
 }

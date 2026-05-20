@@ -62,6 +62,8 @@ import mongo from '../src/runtime/mongo';
 
 const fakeContract = { roots: {}, models: {} } as unknown as AnyMongoContract;
 const fakeRuntime = { id: 'runtime-instance', close: vi.fn().mockResolvedValue(undefined) };
+const fakeDriverClose = vi.fn().mockResolvedValue(undefined);
+const fakeDriverFromDbClose = vi.fn().mockResolvedValue(undefined);
 const fakeOrm = { id: 'orm-instance' };
 const fakeQuery = { id: 'query-instance' };
 
@@ -74,12 +76,17 @@ describe('mongo() facade', () => {
     mocks.deserializeContract.mockReturnValue(fakeContract);
     mocks.createMongoExecutionStack.mockReturnValue({ id: 'stack-instance' });
     mocks.createMongoExecutionContext.mockReturnValue({ id: 'context-instance' });
-    mocks.driverFromConnection.mockResolvedValue({ id: 'driver-from-url' });
-    mocks.driverFromDb.mockReturnValue({ id: 'driver-from-db' });
+    mocks.driverFromConnection.mockResolvedValue({
+      id: 'driver-from-url',
+      close: fakeDriverClose,
+    });
+    mocks.driverFromDb.mockReturnValue({ id: 'driver-from-db', close: fakeDriverFromDbClose });
     mocks.createMongoRuntime.mockReturnValue(fakeRuntime);
     mocks.mongoOrm.mockReturnValue(fakeOrm);
     mocks.mongoQuery.mockReturnValue(fakeQuery);
     fakeRuntime.close.mockClear();
+    fakeDriverClose.mockClear();
+    fakeDriverFromDbClose.mockClear();
   });
 
   it('exposes orm and query eagerly without connecting the driver', () => {
@@ -317,13 +324,35 @@ describe('mongo() facade', () => {
     );
   });
 
-  it('close() propagates to the underlying runtime when one was built', async () => {
+  it('close() releases the facade-constructed driver when binding is { url }', async () => {
     const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
 
     await db.runtime();
     await db.close();
 
-    expect(fakeRuntime.close).toHaveBeenCalledTimes(1);
+    expect(fakeDriverClose).toHaveBeenCalledTimes(1);
+    expect(fakeRuntime.close).not.toHaveBeenCalled();
+  });
+
+  it('close() does NOT touch a caller-supplied mongoClient', async () => {
+    const fakeClient = {
+      close: vi.fn(),
+      db: vi.fn().mockReturnValue({ id: 'db-handle' }),
+    };
+    const db = mongo({
+      contract: fakeContract,
+      mongoClient: fakeClient as unknown as import('mongodb').MongoClient,
+      dbName: 'my_db',
+    });
+
+    await db.runtime();
+    await db.close();
+
+    expect(fakeClient.close).not.toHaveBeenCalled();
+    expect(fakeDriverFromDbClose).not.toHaveBeenCalled();
+    expect(fakeRuntime.close).not.toHaveBeenCalled();
+    fakeClient.db('other_db');
+    expect(fakeClient.db).toHaveBeenCalledWith('other_db');
   });
 
   it('close() is a no-op when no runtime has been built', async () => {
@@ -331,17 +360,19 @@ describe('mongo() facade', () => {
 
     await db.close();
 
+    expect(fakeDriverClose).not.toHaveBeenCalled();
     expect(fakeRuntime.close).not.toHaveBeenCalled();
   });
 
-  it('close() is idempotent (only calls runtime.close once across repeated calls)', async () => {
+  it('close() is idempotent (only disposes the owned driver once across repeated calls)', async () => {
     const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
 
     await db.runtime();
     await db.close();
     await db.close();
 
-    expect(fakeRuntime.close).toHaveBeenCalledTimes(1);
+    expect(fakeDriverClose).toHaveBeenCalledTimes(1);
+    expect(fakeRuntime.close).not.toHaveBeenCalled();
   });
 
   it('clears the cached runtime promise after a failed first build, so a later call can retry', async () => {
@@ -385,6 +416,7 @@ describe('mongo() facade', () => {
 
     await db.close();
 
+    expect(fakeDriverClose).not.toHaveBeenCalled();
     expect(fakeRuntime.close).not.toHaveBeenCalled();
     await expect(db.runtime()).rejects.toThrow('Mongo client is closed');
   });
@@ -398,8 +430,20 @@ describe('mongo() facade', () => {
     await db.close();
     await inflight;
 
+    expect(fakeDriverClose).not.toHaveBeenCalled();
     expect(fakeRuntime.close).not.toHaveBeenCalled();
     await expect(db.runtime()).rejects.toThrow('Mongo client is closed');
+  });
+
+  it('await using db executes [Symbol.asyncDispose] on scope exit (driver.close called)', async () => {
+    async function run() {
+      await using db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.runtime();
+    }
+
+    await run();
+    expect(fakeDriverClose).toHaveBeenCalledTimes(1);
+    expect(fakeRuntime.close).not.toHaveBeenCalled();
   });
 
   it('validates the contract via the SPI deserializer for both authoring modes', () => {
