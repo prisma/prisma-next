@@ -1,11 +1,7 @@
-import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
 
 export const contract = defineContract(
   {
-    family: sqlFamily,
-    target: postgresPack,
     capabilities: {
       postgres: {
         lateral: true,

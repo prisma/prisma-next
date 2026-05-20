@@ -1,12 +1,8 @@
 import { datetimeColumn, textColumn } from '@prisma-next/adapter-sqlite/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import sqlitePack from '@prisma-next/target-sqlite/pack';
+import { defineContract, rel } from '@prisma-next/sqlite/contract-builder';
 
 export const contract = defineContract(
   {
-    family: sqlFamily,
-    target: sqlitePack,
     capabilities: {
       sql: {
         returning: true,

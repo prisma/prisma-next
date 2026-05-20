@@ -1,20 +1,10 @@
 import 'dotenv/config';
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig } from '@prisma-next/cli/config-types';
-import postgresDriver from '@prisma-next/driver-postgres/control';
 import paradedb from '@prisma-next/extension-paradedb/control';
-import sql from '@prisma-next/family-sql/control';
-import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
-import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './prisma/contract';
+import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
-  family: sql,
-  target: postgres,
-  driver: postgresDriver,
-  adapter: postgresAdapter,
-  extensionPacks: [paradedb],
-  contract: typescriptContract(contract, 'src/prisma/contract.json'),
+  contract: './prisma/contract.ts',
+  extensions: [paradedb],
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env
     connection: process.env['DATABASE_URL']!,
