@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/adapter-mongo": "workspace:0.10.0",
+    "@prisma-next/cli": "workspace:0.10.0",
     "@prisma-next/config": "workspace:0.10.0",
     "@prisma-next/contract": "workspace:0.10.0",
     "@prisma-next/driver-mongo": "workspace:0.10.0",
@@ -55,9 +56,10 @@
     "node": ">=20"
   },
   "exports": {
-    ".": "./dist/index.mjs",
+    "./bson": "./dist/bson.mjs",
     "./config": "./dist/config.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
+    "./control": "./dist/control.mjs",
     "./family": "./dist/family.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./target": "./dist/target.mjs",
