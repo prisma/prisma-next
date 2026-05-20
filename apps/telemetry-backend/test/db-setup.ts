@@ -32,8 +32,9 @@ export async function resetTelemetrySchema(connectionString: string): Promise<vo
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  const driver = await postgresDriverDescriptor.create(connectionString);
+  let driver: Awaited<ReturnType<typeof postgresDriverDescriptor.create>> | undefined;
   try {
+    driver = await postgresDriverDescriptor.create(connectionString);
     await driver.query('drop schema if exists public cascade');
     await driver.query('drop schema if exists prisma_contract cascade');
     await driver.query('create schema public');
@@ -55,7 +56,9 @@ export async function resetTelemetrySchema(connectionString: string): Promise<vo
       throw new Error(`Telemetry schema init failed: ${JSON.stringify(result.failure)}`);
     }
   } finally {
-    await driver.close();
+    if (driver !== undefined) {
+      await driver.close();
+    }
     await rm(projectRoot, { recursive: true, force: true });
   }
 }
