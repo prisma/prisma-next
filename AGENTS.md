@@ -28,6 +28,16 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 - **Machine-readable**: Structured artifacts that agents can understand and manipulate
 - **Runtime verification**: Contract hashes and guardrails ensure safety before execution
 
+## Where skills and rules live
+
+The repo keeps a single canonical home for each kind of agent surface, with presentation symlinks that satisfy the paths each harness expects.
+
+- **Skills — canonical home:** `skills-contrib/<skill-name>/SKILL.md`. These are the tracked, deliverable source-of-truth files.
+- **Skills — presentation symlinks:** `.claude/skills/<skill-name>` and `.agents/skills/<skill-name>` are symlink directories pointing into `skills-contrib/`. They exist so the various agent harnesses (Cursor, Claude Code, …) can find the skills at the paths they expect. Both symlink trees are gitignored.
+- **Skills — wired post-install:** the symlink trees (and any tooling-specific copies) are materialized by the `prepare` script in [`package.json`](./package.json), which runs `skills add ./skills-contrib --skill '*' --agent universal claude-code -y`. After `pnpm install`, `.claude/skills/` and `.agents/skills/` are populated automatically — no manual setup. If you add a new skill under `skills-contrib/`, re-run `pnpm install` (or just the prepare hook) to wire it into the tooling locations.
+- **Rules — canonical home:** `.agents/rules/<rule-name>.mdc` (tracked via a whitelist exception in `.gitignore`). The `.cursor/rules/` and `.claude/rules/` paths are presentation symlinks into `.agents/rules/`.
+- **Practical implication for editors and sub-agents:** when amending or authoring a skill or rule, **edit at the canonical path** (`skills-contrib/` for skills, `.agents/rules/` for rules) — not at the symlinked path. An edit through a symlink writes to the canonical file on disk, but `git status` and `git ls-files` report against the canonical path; addressing the canonical path keeps diffs legible and avoids surface churn.
+
 ## Golden Rules
 
 - **Node.js version**: Use the shell's Node — do not run `nvm`/`fnm` or any version switcher. Source of truth is the root `package.json` `engines.node`. If the shell's `node -v` doesn't satisfy that, report that the shell is misconfigured (e.g. user should set their default Node in their version manager, or use Volta) — don't try to switch it yourself.

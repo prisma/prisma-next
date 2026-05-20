@@ -13,6 +13,10 @@ metadata:
   version: "2026.5.19"
 ---
 
+> **Execution mode: delegated.** This atomic skill is invoked by an Executor sub-agent under an Orchestrator's dispatch brief. The Executor's job is to execute the skill end-to-end within the dispatch scope and return a structured report.
+>
+> Stay within the dispatch brief's scope. If the skill's body suggests work outside the brief, surface a heartbeat, request scope clarification from the Orchestrator, and do not improvise. See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Executor role definition and report-back conventions.
+
 # Drive: Reconcile Drifted Skill Copies
 
 Reconcile drifted in-repo drive-* skill copies against canonical. Extracts project-specific deltas into `drive/<category>/README.md`, records upstream-worthy deltas to a wip surface for operator triage, and restores in-repo skill bodies to byte-identical canonical.

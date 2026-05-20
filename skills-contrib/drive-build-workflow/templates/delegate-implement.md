@@ -16,6 +16,7 @@ You are operating under the `drive-build-workflow` skill. Your persona, protocol
 
 ## Milestone scope
 
+- **Model:** `<explicit model identifier>` — **always specify explicitly**. If you omit the `model` parameter in your dispatch call, the sub-agent silently inherits the parent's model (typically thorough-tier — expensive). Pick per the dispatch's tier from [`drive/roles/README.md § Role-variant table`](../../../drive/roles/README.md).
 - **Plan:** `projects/{project}/plans/plan.md`
 - **Spec:** `projects/{project}/spec.md`
 - **Code review log (read-only for you):** `projects/{project}/reviews/code-review.md`

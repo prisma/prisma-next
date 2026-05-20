@@ -12,6 +12,10 @@ metadata:
   version: "2026.5.19"
 ---
 
+> **Execution mode: delegated.** This atomic skill is invoked by an Executor sub-agent under an Orchestrator's dispatch brief. The Executor's job is to execute the skill end-to-end within the dispatch scope and return a structured report.
+>
+> Stay within the dispatch brief's scope. If the skill's body suggests work outside the brief, surface a heartbeat, request scope clarification from the Orchestrator, and do not improvise. See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Executor role definition and report-back conventions.
+
 # Drive: Update Skills from Canonical, Patch Cross-References
 
 Once a consumer project is on the `drive/` context convention (in-repo `drive-*` skill bodies are byte-identical to canonical; project specifics live in `drive/<category>/README.md`), updates become routine: pull latest canonical into the consumer repo. This skill does that, plus patches any cross-references in *non-drive* in-repo skills that point at drive-* skill text that moved or was renamed in the update.

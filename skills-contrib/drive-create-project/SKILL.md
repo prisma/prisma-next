@@ -10,6 +10,10 @@ metadata:
   version: "2026.5.18"
 ---
 
+> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
+>
+> If the skill's body asks for work that requires reading source code, running builds/tests, or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+
 # Drive: Create Project Workspace
 
 Create the standard `projects/<project>/` structure so shaping work can start immediately and artifacts land in the right place, walk the project DoR before allowing handoff to spec authoring, and bootstrap project-context README surfaces if missing.
@@ -47,6 +51,7 @@ Notes:
 - Project-level artifacts live at the project root:
   - Spec: `projects/{project}/spec.md`
   - Plan: `projects/{project}/plan.md`
+  - Design notes: `projects/{project}/design-notes.md` (orchestrator-direct authored — see [`drive/roles/README.md`](../../drive/roles/README.md))
 
 ## Stub files (optional)
 
@@ -54,6 +59,7 @@ If stubs are requested (or defaulted) **and** the developer is **not** immediate
 
 - `projects/{project}/spec.md` (project spec placeholder)
 - `projects/{project}/plan.md` (project plan placeholder)
+- `projects/{project}/design-notes.md` (project design-notes placeholder; copy from `./templates/design-notes.template.md`)
 
 Use these minimal stubs:
 
@@ -111,6 +117,10 @@ _Drafted via drive-create-plan. Replace this placeholder._
 - [ ] Strip repo-wide references to `projects/{project}/**` (replace with canonical `docs/` links or remove)
 - [ ] Delete `projects/{project}/`
 ```
+
+### `projects/{project}/design-notes.md`
+
+Copy from `./templates/design-notes.template.md`. The template provides the canonical section structure (principles, the model, alternatives considered, open questions, references). Design-notes is a mandatory project-level artifact, on equal footing with `spec.md` and `plan.md`, and is authored directly by the Orchestrator — see [`drive/roles/README.md`](../../drive/roles/README.md) for the orchestrator-direct authoring rule.
 
 ## Project DoR check
 

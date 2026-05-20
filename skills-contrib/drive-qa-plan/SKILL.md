@@ -3,6 +3,10 @@ name: drive-qa-plan
 description: Author a manual-QA script (markdown document) that accompanies a spec, exercises the system end-to-end the way a real user would, and probes behaviour CI cannot meaningfully cover. Use when a spec has shipped (or is about to) and the implementer asks for a "manual QA script", "QA walkthrough", "manual test plan", "QA checklist", or "manual regression doc", or when a user surfaced a bug that needs a re-enactment scenario beyond the unit-test gates that fix it. Authoring only; executing the script and writing the run report is the `drive-qa-run` skill's job.
 ---
 
+> **Execution mode: delegated.** This atomic skill is invoked by an Executor sub-agent under an Orchestrator's dispatch brief. The Executor's job is to execute the skill end-to-end within the dispatch scope and return a structured report.
+>
+> Stay within the dispatch brief's scope. If the skill's body suggests work outside the brief, surface a heartbeat, request scope clarification from the Orchestrator, and do not improvise. See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Executor role definition and report-back conventions.
+
 # Write a manual QA script
 
 > **Manual QA does not run our tests. It drives the live system the way a user would, watches what they would see, and judges what tests can't.**

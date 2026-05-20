@@ -12,6 +12,10 @@ metadata:
   version: "2026.5.19"
 ---
 
+> **Execution mode: delegated.** This atomic skill is invoked by an Executor sub-agent under an Orchestrator's dispatch brief. The Executor's job is to execute the skill end-to-end within the dispatch scope and return a structured report.
+>
+> Stay within the dispatch brief's scope. If the skill's body suggests work outside the brief, surface a heartbeat, request scope clarification from the Orchestrator, and do not improvise. See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Executor role definition and report-back conventions.
+
 # Drive: Bootstrap Project-Context Directory
 
 Scaffold the `drive/` directory so drive-* skills have a project-context surface to read from. Skills are portable across teams, but running them well requires project-specific knowledge the generic skill body can't know a priori (e.g., this codebase's QA needs to verify two consumer audiences; this team's PRs go through a non-standard label workflow). That knowledge lives in `drive/<category>/README.md` at the consumer repo root.

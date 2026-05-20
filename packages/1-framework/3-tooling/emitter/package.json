@@ -23,7 +23,7 @@
     "@prisma-next/framework-components": "workspace:0.9.0",
     "@prisma-next/operations": "workspace:0.9.0",
     "@prisma-next/utils": "workspace:0.9.0",
-    "arktype": "^2.1.29",
+    "arktype": "^2.2.0",
     "prettier": "^3.8.3"
   },
   "devDependencies": {

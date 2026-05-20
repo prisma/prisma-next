@@ -4,6 +4,10 @@ description: Drops the agent into a structured Q&A mode that iterates with the u
 disable-model-invocation: true
 ---
 
+> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
+>
+> Read-only codebase investigation (Read, Grep, Glob, SemanticSearch, read-only Shell) is **permitted and expected** — the skill body requires grounding claims in the actual code state. If the skill's body asks for work that requires running builds/tests or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+
 # Discussion mode
 
 A Q&A loop where the agent stress-tests an idea, framing, or decision with the user — one thread at a time, through one or more named persona lenses — until the topic is understood well enough to commit to an artefact (a project spec, a project plan, a decision record, or whatever shape the user wants).

@@ -27,6 +27,17 @@ Manual QA reads:
 
 A clean pre-QA tree means `pnpm typecheck && pnpm test:packages && pnpm fixtures:check` all green. QA against an unverified tree wastes the runner's time discovering broken assertions that a 1-minute `pnpm test:packages` would have surfaced.
 
+## Sample coherence, not just placement, for content-preamble dispatches
+
+Symptom seen during the drive trial (project `orchestrator-role`): a dispatch added a uniform delegated-execution preamble across 19 atomic skills. Manual-QA dry-run sampled preamble placement (right line, right format, cross-link resolves) — found nothing wrong. Reviewer (CodeRabbit) then surfaced three "critical" findings on stop-condition coherence: the preamble's "STOP. Dispatch on Read/Grep/Glob" rule contradicted skill bodies whose Step 2 explicitly required Read/Grep/Glob investigation as the default first step.
+
+Rule: when manual-QA covers a preamble / boilerplate insertion across many files, sample **both**:
+
+1. **Placement** — preamble at the right line, right format, cross-links resolve. (What a sweep-style audit catches.)
+2. **Coherence** — preamble's operational rules agree with each file's body. A 2-3 file deep-read pass: do the preamble's stop-conditions, output descriptions, and constraint enumeration align with each body's Step N operational requirements? Sample disjoint files (not the first three by alphabetical order) to surface boilerplate-vs-body mismatch.
+
+Placement-only sampling is a leading indicator of "did the dispatch land mechanically"; coherence sampling is a leading indicator of "did the dispatch produce semantically correct output". Both gates matter for content insertions across many files.
+
 ## Where QA artefacts live
 
 - **In-project slices** (project under `projects/<x>/`): `projects/<x>/manual-qa.md` (script) + `projects/<x>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` (one per run).

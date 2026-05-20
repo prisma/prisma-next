@@ -11,6 +11,10 @@ metadata:
   version: "2026.5.18"
 ---
 
+> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
+>
+> If the skill's body asks for work that requires reading source code, running builds/tests, or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+
 # Drive: Triage Work
 
 Runs the triage decision tree on an incoming entry-point (or a mid-flight scope-shift signal). Atomic skill — does one thing: produces a verdict.
