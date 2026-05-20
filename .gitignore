@@ -44,11 +44,6 @@ skills-lock.json
 # re-including a file in a wholly-ignored directory does not work
 # (git stops traversing once the directory is excluded).
 projects/**/reviews/*
-# Exception: the AC13 PII-zero audit checklist for the cli-telemetry
-# project is a signed-off close-out artefact and must live in PR
-# history. Removed at project close-out together with the rest of
-# `projects/cli-telemetry/`.
-!projects/cli-telemetry/reviews/ac13-audit.md
 
 # Generated contract files in test fixtures
 test/**/fixtures/generated/
