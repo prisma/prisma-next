@@ -15,7 +15,7 @@ type CreateInputContract = Contract<
                 codecId: 'pg/int4@1';
                 nullable: false;
                 default: {
-                  kind: 'function';
+                  kind: 'expression';
                   expression: "nextval('user_id_seq'::regclass)";
                 };
               };
@@ -27,7 +27,7 @@ type CreateInputContract = Contract<
                 codecId: 'pg/text@1';
                 nullable: false;
                 default: {
-                  kind: 'function';
+                  kind: 'expression';
                   expression: 'now()';
                 };
               };
