@@ -18,6 +18,22 @@ A persona is not a runtime contract. It is a *bias-frame* loaded into the execut
 
 **What a persona shifts (honest framing).** A persona shifts the executor's *priorities* and the *bar at which a class of concern is dismissed*. It does not turn the executor into the user during interactive review. The m1 architect-persona A/B test demonstrated a verdict shift (CONCERNS vs SATISFIED on identical evidence) and surfaced typology concerns the unframed run dismissed — but neither pass fully recovered the strongest form of the user's post-implementation finding (which surfaced through interactive iteration, not single-pass review). The library raises the floor of the agent's default scrutiny; it does not replace the human-in-the-loop pass.
 
+## Role vs persona
+
+Roles and personas are orthogonal: a **role** is a structural constraint on *what* an actor does; a **persona** is a bias-frame on *how* the actor reasons. Both coexist within a single sub-agent. Loading a persona does not change the actor's role, and binding a role does not specify which persona the actor wears within that role.
+
+The structural roles defined in [`drive/roles/README.md`](../../drive/roles/README.md) — Orchestrator (runs `drive-*-workflow` skills) and Executor with three subtypes (Specialist runs an atomic skill end-to-end; Implementer edits product code within a slice; Reviewer reads code and writes review verdicts) — set the boundary of what tools and actions are appropriate. The persona library defined in this skill sets the lens through which the actor inside that boundary reasons.
+
+Concrete combinations:
+
+- An Executor running `drive-specify-project` can wear the `tech-lead` persona (orchestrating spec authoring), the `architect` persona (naming and typology focus), or any other persona the skill calls for. The role stays Specialist — the persona only shifts the scrutiny frame.
+- A Reviewer in `drive-build-workflow` can wear the `principal-engineer` persona (buildability, blast radius, operability) for an escalation review without becoming an Orchestrator. The role stays Reviewer; the persona only sharpens the review priorities.
+- An Orchestrator running `drive-deliver-workflow` defaults to the `tech-lead` persona (orchestration of multi-persona work). Loading `tech-lead` does not authorise the Orchestrator to call `Read`/`Grep`/`Write` directly — the role constraint still applies. A `tech-lead`-persona Orchestrator that drifts into execution is mis-applying the persona; the persona is the lens, not the license.
+
+The practical consequence for skill authors: a skill that requires a specific persona should still respect the role binding established by the calling workflow. A dispatch brief carries both — the role declaration ("you are running as an Executor / Specialist") and the persona instruction ("adopt the `tech-lead` persona"). The two are independent and both load-bearing.
+
+See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical definitions, the five binding layers, the DO-NOT enumeration, and the escape-hatch policy.
+
 ## Resolution rule
 
 When a skill instructs you to *adopt the `<id>` persona*, load `personas/<id>.md` from this skill directory (`.agents/skills/drive-agent-personas/personas/<id>.md`) and follow it for the remainder of the current task.
