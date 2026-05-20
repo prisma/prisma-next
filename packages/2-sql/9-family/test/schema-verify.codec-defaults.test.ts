@@ -392,9 +392,10 @@ describe('verifySqlSchema — codec-aware default comparison', () => {
   });
 
   it('falls back to the legacy normalizer path when no codec or parser is supplied', () => {
-    // No codecLookup or parseSchemaDefaultValue → the function must behave
-    // exactly as it did before D9 (string-normalised compare via the
-    // optional normalizer).
+    // No codecLookup or parseSchemaDefaultValue → fall back to the legacy
+    // string-normalised compare via the optional normalizer. Required so
+    // callers without codec dispatch wired up still get the prior
+    // verification behaviour.
     const contract = createTestContract({
       user: createContractTable({
         status: {
