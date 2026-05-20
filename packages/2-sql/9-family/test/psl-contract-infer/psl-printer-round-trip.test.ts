@@ -10,7 +10,7 @@ function roundTrip(schemaIR: SqlSchemaIR): string {
 
 function assertParsesSilently(pslText: string): void {
   const result = parsePslDocument({ schema: pslText, sourceId: 'round-trip.psl' });
-  expect(result.diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
+  expect(result.ok).toBe(true);
 }
 
 describe('PSL printer round-trip across new ColumnDefault union', () => {
