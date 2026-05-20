@@ -1,6 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import {
   readUserConfig,
   sanitizeCommanderResult,
@@ -8,6 +7,7 @@ import {
   writeUserConfig,
 } from '@prisma-next/cli-telemetry';
 import { Command } from 'commander';
+import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/config-loader';
 import { isCI } from '../../src/utils/is-ci';
