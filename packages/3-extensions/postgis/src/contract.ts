@@ -35,28 +35,20 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract } from '@prisma-next/postgres/contract-builder';
 import { POSTGIS_GEOMETRY_CODEC_ID } from './core/constants';
 import { POSTGIS_NATIVE_TYPE } from './core/contract-space-constants';
 
-export const contract = defineContract(
-  {
-    family: sqlFamily,
-    target: postgresPack,
-  },
-  () => ({
-    types: {
-      [POSTGIS_NATIVE_TYPE]: {
-        kind: 'codec-instance',
-        codecId: POSTGIS_GEOMETRY_CODEC_ID,
-        nativeType: POSTGIS_NATIVE_TYPE,
-        typeParams: {},
-      },
+export const contract = defineContract({}, () => ({
+  types: {
+    [POSTGIS_NATIVE_TYPE]: {
+      kind: 'codec-instance',
+      codecId: POSTGIS_GEOMETRY_CODEC_ID,
+      nativeType: POSTGIS_NATIVE_TYPE,
+      typeParams: {},
     },
-    models: {},
-  }),
-);
+  },
+  models: {},
+}));
 
 export default contract;

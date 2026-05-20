@@ -33,6 +33,7 @@
     "@prisma-next/adapter-postgres": "workspace:0.10.0",
     "@prisma-next/cli": "workspace:0.10.0",
     "@prisma-next/operations": "workspace:0.10.0",
+    "@prisma-next/postgres": "workspace:0.10.0",
     "@prisma-next/sql-contract-ts": "workspace:0.10.0",
     "@prisma-next/target-postgres": "workspace:0.10.0",
     "@prisma-next/test-utils": "workspace:0.10.0",
