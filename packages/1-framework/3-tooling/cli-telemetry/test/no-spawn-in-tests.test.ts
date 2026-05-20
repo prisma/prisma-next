@@ -1,7 +1,7 @@
 import * as childProcess from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runTelemetry } from '../src/spawn';
 import { userConfigPath, writeUserConfig } from '../src/user-config';
