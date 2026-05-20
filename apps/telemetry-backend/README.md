@@ -74,7 +74,7 @@ The service is configured exclusively through environment variables:
 | `DATABASE_URL` | yes | — | Postgres connection string (`postgres://` or `postgresql://`). |
 | `PORT` | no | `8080` | TCP port for the HTTP server. |
 | `RATE_LIMIT_RPM` | no | `120` | Requests/minute/IP. The token-bucket capacity is set to this value (i.e. it doubles as the burst budget). |
-| `TELEMETRY_TRUST_FORWARDED_FOR` | no | `false` | Set to `1` / `true` / `yes` only when the backend sits behind a proxy that strips inbound `x-forwarded-for` and writes its own (e.g. Prisma Compute). When unset, the per-IP rate-limit key is taken from the socket address, because any direct caller could otherwise set the header to bypass the limit. |
+| `TRUST_FORWARDED_FOR` | no | `false` | Set to `1` / `true` / `yes` only when the backend sits behind a proxy that strips inbound `x-forwarded-for` and writes its own (e.g. Prisma Compute). When unset, the per-IP rate-limit key is taken from the socket address, because any direct caller could otherwise set the header to bypass the limit. |
 
 The Postgres schema is the model authored in `src/prisma/contract.prisma`
 (committed in `src/prisma/contract.json` / `contract.d.ts`). Use

@@ -111,7 +111,7 @@ export function resolveTelemetryBackendConfig(
 
   const port = parsePositiveIntegerFromEnv('PORT', '8080');
   const requestsPerMinute = parsePositiveIntegerFromEnv('RATE_LIMIT_RPM', '120');
-  const trustForwardedFor = parseBooleanEnv('TELEMETRY_TRUST_FORWARDED_FOR', env, false);
+  const trustForwardedFor = parseBooleanEnv('TRUST_FORWARDED_FOR', env, false);
 
   return { databaseUrl, port, requestsPerMinute, trustForwardedFor };
 }
