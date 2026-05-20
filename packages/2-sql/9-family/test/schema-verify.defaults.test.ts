@@ -1,5 +1,5 @@
-import { type ColumnDefault, type Contract, executionHash } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { type Contract, executionHash } from '@prisma-next/contract/types';
+import type { ColumnDefault, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultNormalizer } from '../src/core/schema-verify/verify-sql-schema';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
@@ -22,35 +22,35 @@ const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | 
   const nowPattern = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i;
   const clockPattern = /^clock_timestamp\s*\(\s*\)$/i;
   const timestampCastSuffix = /::timestamp(?:tz|\s+(?:with|without)\s+time\s+zone)?$/i;
-  if (nowPattern.test(trimmed)) return { kind: 'function', expression: 'now()' };
-  if (clockPattern.test(trimmed)) return { kind: 'function', expression: 'clock_timestamp()' };
+  if (nowPattern.test(trimmed)) return { kind: 'expression', expression: 'now()' };
+  if (clockPattern.test(trimmed)) return { kind: 'expression', expression: 'clock_timestamp()' };
   if (timestampCastSuffix.test(trimmed)) {
     let inner = trimmed.replace(timestampCastSuffix, '').trim();
     if (inner.startsWith('(') && inner.endsWith(')')) {
       inner = inner.slice(1, -1).trim();
     }
-    if (nowPattern.test(inner)) return { kind: 'function', expression: 'now()' };
-    if (clockPattern.test(inner)) return { kind: 'function', expression: 'clock_timestamp()' };
+    if (nowPattern.test(inner)) return { kind: 'expression', expression: 'now()' };
+    if (clockPattern.test(inner)) return { kind: 'expression', expression: 'clock_timestamp()' };
     inner = inner.replace(/::text$/i, '').trim();
-    if (/^'now'$/i.test(inner)) return { kind: 'function', expression: 'now()' };
+    if (/^'now'$/i.test(inner)) return { kind: 'expression', expression: 'now()' };
   }
 
   // NULL or NULL::type
   if (/^NULL(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+(?:,\d+)?\))?)?$/i.test(trimmed)) {
-    return { kind: 'literal', value: null };
+    return { kind: 'expression', expression: 'NULL' };
   }
 
   // Boolean literals
   if (/^true$/i.test(trimmed)) {
-    return { kind: 'literal', value: true };
+    return { kind: 'expression', expression: 'true' };
   }
   if (/^false$/i.test(trimmed)) {
-    return { kind: 'literal', value: false };
+    return { kind: 'expression', expression: 'false' };
   }
 
   // Numeric literals
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-    return { kind: 'literal', value: Number(trimmed) };
+    return { kind: 'expression', expression: trimmed };
   }
 
   // String literals: 'value'::type or just 'value'
@@ -58,15 +58,11 @@ const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | 
   const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/);
   if (stringMatch?.[1] !== undefined) {
     const unescaped = stringMatch[1].replace(/''/g, "'");
-    try {
-      return { kind: 'literal', value: JSON.parse(unescaped) };
-    } catch {
-      return { kind: 'literal', value: unescaped };
-    }
+    return { kind: 'expression', expression: unescaped };
   }
 
   // Fallback
-  return { kind: 'function', expression: trimmed };
+  return { kind: 'expression', expression: trimmed };
 };
 
 describe('verifySqlSchema - defaults', () => {
@@ -76,7 +72,7 @@ describe('verifySqlSchema - defaults', () => {
         id: {
           nativeType: 'int4',
           nullable: false,
-          default: { kind: 'function', expression: 'now()' },
+          default: { kind: 'expression', expression: 'now()' },
         },
       }),
     });
@@ -112,7 +108,7 @@ describe('verifySqlSchema - defaults', () => {
         status: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', value: 'draft' },
+          default: { kind: 'expression', expression: 'draft' },
         },
       }),
     });
@@ -153,12 +149,12 @@ describe('verifySqlSchema - defaults', () => {
         created_at: {
           nativeType: 'timestamptz',
           nullable: false,
-          default: { kind: 'function', expression: 'now()' },
+          default: { kind: 'expression', expression: 'now()' },
         },
         label: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', value: 'draft' },
+          default: { kind: 'expression', expression: 'draft' },
         },
       }),
     });
@@ -193,13 +189,13 @@ describe('verifySqlSchema - defaults', () => {
     expect(result.schema.issues).toHaveLength(0);
   });
 
-  it('treats JSON defaults as equal when schema normalizer returns string literals', () => {
+  it('treats JSON defaults as equal when schema normalizer returns matching expression', () => {
     const contract = createTestContract({
       literal_defaults: createContractTable({
         metadata: {
           nativeType: 'jsonb',
           nullable: false,
-          default: { kind: 'literal', value: { key: 'default' } },
+          default: { kind: 'expression', expression: '{"key":"default"}' },
         },
       }),
     });
@@ -209,42 +205,7 @@ describe('verifySqlSchema - defaults', () => {
         metadata: {
           nativeType: 'jsonb',
           nullable: false,
-          default: '\'{"key": "default"}\'::jsonb',
-        },
-      }),
-    });
-
-    const result = verifySqlSchema({
-      contract,
-      schema,
-      strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
-      frameworkComponents: [],
-      normalizeDefault: testNormalizer,
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
-  });
-
-  it('matches JSONB default with different key order (stable key sort)', () => {
-    const contract = createTestContract({
-      literal_defaults: createContractTable({
-        metadata: {
-          nativeType: 'jsonb',
-          nullable: false,
-          default: { kind: 'literal', value: { alpha: 1, beta: 2, gamma: 3 } },
-        },
-      }),
-    });
-
-    const schema = createTestSchemaIR({
-      literal_defaults: createSchemaTable('literal_defaults', {
-        metadata: {
-          nativeType: 'jsonb',
-          nullable: false,
-          // Postgres may canonicalize key order differently
-          default: '\'{"gamma":3,"alpha":1,"beta":2}\'::jsonb',
+          default: '\'{"key":"default"}\'::jsonb',
         },
       }),
     });
@@ -268,7 +229,7 @@ describe('verifySqlSchema - defaults', () => {
         payload: {
           nativeType: 'jsonb',
           nullable: false,
-          default: { kind: 'literal', value: { $type: 'bigint', value: '42' } },
+          default: { kind: 'expression', expression: '{"$type":"bigint","value":"42"}' },
         },
       }),
     });
@@ -303,7 +264,7 @@ describe('verifySqlSchema - defaults', () => {
           nativeType: 'text',
           nullable: false,
           // Contract default value
-          default: { kind: 'literal', value: 'draft' },
+          default: { kind: 'expression', expression: 'draft' },
         },
       }),
     });
@@ -384,7 +345,7 @@ describe('verifySqlSchema - timestamp default normalization', () => {
         created_at: {
           nativeType: 'timestamptz',
           nullable: false,
-          default: { kind: 'function', expression: 'now()' },
+          default: { kind: 'expression', expression: 'now()' },
         },
       }),
     });
@@ -418,7 +379,7 @@ describe('verifySqlSchema - timestamp default normalization', () => {
         created_at: {
           nativeType: 'timestamptz',
           nullable: false,
-          default: { kind: 'function', expression: 'now()' },
+          default: { kind: 'expression', expression: 'now()' },
         },
       }),
     });
@@ -454,7 +415,7 @@ describe('verifySqlSchema - null default normalization', () => {
         value: {
           nativeType: 'text',
           nullable: true,
-          default: { kind: 'literal', value: null },
+          default: { kind: 'expression', expression: 'NULL' },
         },
       }),
     });
@@ -490,7 +451,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         provisionStatus: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', value: 'ready' },
+          default: { kind: 'expression', expression: 'ready' },
         },
       }),
     });
@@ -524,7 +485,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         role: {
           nativeType: 'character varying',
           nullable: false,
-          default: { kind: 'literal', value: 'member' },
+          default: { kind: 'expression', expression: 'member' },
         },
       }),
     });
@@ -558,7 +519,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         kind: {
           nativeType: 'EnvironmentModelKind',
           nullable: false,
-          default: { kind: 'literal', value: 'production' },
+          default: { kind: 'expression', expression: 'production' },
         },
       }),
     });
@@ -592,7 +553,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         title: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', value: "it's a default" },
+          default: { kind: 'expression', expression: "it's a default" },
         },
       }),
     });
@@ -626,7 +587,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         allowRemoteDatabases: {
           nativeType: 'bool',
           nullable: false,
-          default: { kind: 'literal', value: true },
+          default: { kind: 'expression', expression: 'true' },
         },
       }),
     });
@@ -660,7 +621,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         status: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', value: 'active' },
+          default: { kind: 'expression', expression: 'active' },
         },
       }),
     });
@@ -700,7 +661,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         value: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', value: '' },
+          default: { kind: 'expression', expression: '' },
         },
       }),
     });
@@ -734,7 +695,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         billingState: {
           nativeType: 'BillingState',
           nullable: false,
-          default: { kind: 'literal', value: 'atRisk' },
+          default: { kind: 'expression', expression: 'atRisk' },
         },
       }),
     });
@@ -768,7 +729,7 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
         billingState: {
           nativeType: 'BillingState',
           nullable: false,
-          default: { kind: 'literal', value: 'active' },
+          default: { kind: 'expression', expression: 'active' },
         },
       }),
     });

@@ -231,12 +231,12 @@ describe('planFieldEventOperations', () => {
   it("fires 'altered' when the default value changes", () => {
     const fromContract = contract({
       User: table({
-        flag: col({ codecId: 'cs/string@1', default: { kind: 'literal', value: 'a' } }),
+        flag: col({ codecId: 'cs/string@1', default: { kind: 'expression', expression: 'a' } }),
       }),
     });
     const newContract = contract({
       User: table({
-        flag: col({ codecId: 'cs/string@1', default: { kind: 'literal', value: 'b' } }),
+        flag: col({ codecId: 'cs/string@1', default: { kind: 'expression', expression: 'b' } }),
       }),
     });
 
