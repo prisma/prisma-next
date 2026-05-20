@@ -365,6 +365,7 @@ export function createMongoContractSchema(
     'meta?': 'Record<string, unknown>',
     'sources?': 'Record<string, unknown>',
     '_generated?': 'Record<string, unknown>',
+    'domain?': 'unknown',
     storage: type({
       '+': 'reject',
       namespaces: type({ '[string]': namespaceEnvelope }),
