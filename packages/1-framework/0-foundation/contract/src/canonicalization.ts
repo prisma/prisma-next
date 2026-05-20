@@ -23,6 +23,7 @@ const TOP_LEVEL_ORDER = [
   'roots',
   'models',
   'valueObjects',
+  'domain',
   'storage',
   'execution',
   'capabilities',
