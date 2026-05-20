@@ -3,15 +3,21 @@ import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import mongoDriver from '@prisma-next/driver-mongo/control';
 import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
+import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/mongo-contract-ts/config-types';
 import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { extname } from 'pathe';
 
 export interface MongoConfigOptions {
   readonly contract: string;
   readonly db?: {
     readonly connection?: string;
+  };
+  readonly extensions?: readonly ControlExtensionDescriptor<'mongo', 'mongo'>[];
+  readonly migrations?: {
+    readonly dir?: string;
   };
 }
 
@@ -24,6 +30,7 @@ function deriveOutputPath(contractPath: string): string {
 }
 
 export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mongo', 'mongo'> {
+  const extensions = options.extensions ?? [];
   const output = deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
@@ -37,7 +44,9 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
     target: mongoTargetDescriptor,
     adapter: mongoAdapter,
     driver: mongoDriver,
+    extensionPacks: extensions,
     contract: contractConfig,
-    ...(options.db !== undefined ? { db: options.db } : {}),
+    ...ifDefined('db', options.db),
+    ...ifDefined('migrations', options.migrations),
   });
 }

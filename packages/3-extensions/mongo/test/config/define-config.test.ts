@@ -62,4 +62,43 @@ describe('defineConfig facade', () => {
 
     expect(config.db?.connection).toBe('mongodb://localhost:27017/mydb');
   });
+
+  it('passes migrations config through', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+      migrations: { dir: 'custom-migrations' },
+    });
+
+    expect(config.migrations?.dir).toBe('custom-migrations');
+  });
+
+  it('omits db and migrations when they are not provided', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+    });
+
+    expect(Object.hasOwn(config, 'db')).toBe(false);
+    expect(Object.hasOwn(config, 'migrations')).toBe(false);
+  });
+
+  it('passes extensions through to config', () => {
+    const mockExtension = {
+      kind: 'extension' as const,
+      familyId: 'mongo' as const,
+      targetId: 'mongo' as const,
+      id: 'test-extension',
+      version: '1.0.0',
+      create: () => ({
+        familyId: 'mongo' as const,
+        targetId: 'mongo' as const,
+      }),
+    };
+
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+      extensions: [mockExtension],
+    });
+
+    expect(config.extensionPacks).toContain(mockExtension);
+  });
 });
