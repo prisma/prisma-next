@@ -146,6 +146,7 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
+          kind: 'sql-namespace',
           tables: {
             [APP_TABLE]: {
               columns: {

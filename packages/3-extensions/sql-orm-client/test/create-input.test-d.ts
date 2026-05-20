@@ -7,6 +7,7 @@ type CreateInputContract = Contract<
     namespaces: {
       __unbound__: {
         id: '__unbound__';
+        kind: 'sql-namespace';
         tables: {
           user: {
             columns: {

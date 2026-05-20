@@ -10,6 +10,7 @@ type TestContract = Contract<
     readonly namespaces: {
       readonly __unbound__: {
         readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
         readonly tables: {
           readonly document: {
             readonly columns: {

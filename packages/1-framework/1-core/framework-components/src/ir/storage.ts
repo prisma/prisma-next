@@ -35,16 +35,10 @@ const SLOT_KEYS_BY_NAMESPACE_KIND = new Map<
  */
 export function* elementCoordinates(storage: Storage): Generator<EntityCoordinate> {
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const kind = ns.kind;
-    if (kind === undefined) {
-      throw new Error(
-        `elementCoordinates(): namespace ${JSON.stringify(namespaceId)} is missing required kind.`,
-      );
-    }
-    const slotKeys = SLOT_KEYS_BY_NAMESPACE_KIND.get(kind);
+    const slotKeys = SLOT_KEYS_BY_NAMESPACE_KIND.get(ns.kind);
     if (slotKeys === undefined) {
       throw new Error(
-        `elementCoordinates(): unrecognised namespace kind ${JSON.stringify(kind)} ` +
+        `elementCoordinates(): unrecognised namespace kind ${JSON.stringify(ns.kind)} ` +
           `on namespace ${JSON.stringify(namespaceId)}. ` +
           'Add a slot-key entry to SLOT_KEYS_BY_NAMESPACE_KIND, ' +
           'or wait for the pack-contributed descriptor registry (D2).',

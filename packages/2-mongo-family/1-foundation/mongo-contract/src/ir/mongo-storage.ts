@@ -25,7 +25,7 @@ const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
 });
 
 class MongoNamespacePayload extends NamespaceBase {
-  declare readonly kind?: string;
+  declare readonly kind: string;
 
   readonly id: string;
   readonly collections: Readonly<Record<string, MongoCollection>>;

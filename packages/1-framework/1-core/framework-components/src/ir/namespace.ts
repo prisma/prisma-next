@@ -46,8 +46,10 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
  */
 export interface Namespace extends IRNode {
   readonly id: string;
+  readonly kind: string;
 }
 
 export abstract class NamespaceBase extends IRNodeBase implements Namespace {
   abstract readonly id: string;
+  abstract override readonly kind: string;
 }

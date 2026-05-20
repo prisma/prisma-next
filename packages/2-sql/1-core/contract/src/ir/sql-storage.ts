@@ -47,7 +47,7 @@ export interface SqlStorageInput<THash extends string = string> {
 }
 
 class SqlNamespacePayload extends NamespaceBase {
-  declare readonly kind?: string;
+  declare readonly kind: string;
   declare readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 
   readonly id: string;
