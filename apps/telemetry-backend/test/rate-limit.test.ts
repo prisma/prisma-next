@@ -109,7 +109,7 @@ describe('createRequestsPerMinuteRateLimiter', () => {
     let now = 0;
     const limiter = createRequestsPerMinuteRateLimiter(60, () => now);
     for (let i = 0; i < 60; i += 1) {
-      limiter.allow('client');
+      expect(limiter.allow('client')).toBe(true);
     }
     expect(limiter.allow('client')).toBe(false);
     now = 1000;
