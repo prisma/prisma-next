@@ -1565,6 +1565,9 @@ importers:
 
   packages/1-framework/3-tooling/cli-telemetry:
     dependencies:
+      arktype:
+        specifier: 'catalog:'
+        version: 2.2.0
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
