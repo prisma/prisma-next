@@ -8,6 +8,7 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  assertNoReservedStorageSlotKeyCollisions,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
@@ -145,8 +146,20 @@ export function extractComponentIds(
   return ids;
 }
 
+export interface AssembleAuthoringContributionsOptions {
+  /**
+   * Storage-slot keys reserved by the family for its built-in
+   * per-namespace slots. Pack-contributed
+   * `AuthoringEntityTypeDescriptor.storageSlotKey` values matching any
+   * of these are rejected here. Typically sourced from
+   * `FamilyDescriptor.reservedStorageSlotKeys`.
+   */
+  readonly reservedStorageSlotKeys?: ReadonlyArray<string>;
+}
+
 export function assembleAuthoringContributions(
   descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
+  options?: AssembleAuthoringContributionsOptions,
 ): AssembledAuthoringContributions {
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
@@ -186,6 +199,7 @@ export function assembleAuthoringContributions(
   const typeNamespace = type as AuthoringTypeNamespace;
   const entityTypeNamespace = entityTypes as AuthoringEntityTypeNamespace;
   assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace, entityTypeNamespace);
+  assertNoReservedStorageSlotKeyCollisions(entityTypeNamespace, options?.reservedStorageSlotKeys);
 
   return {
     field: fieldNamespace,
@@ -366,7 +380,11 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     codecLookup,
-    authoringContributions: assembleAuthoringContributions(allDescriptors),
+    authoringContributions: assembleAuthoringContributions(allDescriptors, {
+      ...(family.reservedStorageSlotKeys !== undefined
+        ? { reservedStorageSlotKeys: family.reservedStorageSlotKeys }
+        : {}),
+    }),
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
   };

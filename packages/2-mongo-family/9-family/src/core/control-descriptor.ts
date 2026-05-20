@@ -13,6 +13,9 @@ class MongoFamilyDescriptor
   readonly familyId = 'mongo' as const;
   readonly version = '0.0.1';
   readonly emission = mongoEmission;
+  // Family-reserved per-namespace storage slot. See SqlFamilyDescriptor
+  // for the rationale; Mongo's built-in slot is `collections`.
+  readonly reservedStorageSlotKeys: ReadonlyArray<string> = ['collections'];
 
   create<TTargetId extends string>(
     stack: ControlStack<'mongo', TTargetId>,

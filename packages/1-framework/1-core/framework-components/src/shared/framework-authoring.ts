@@ -362,6 +362,42 @@ function collectAuthoringLeafPaths(
   return paths;
 }
 
+/**
+ * Walks the entity-type namespace tree and rejects any descriptor whose
+ * `storageSlotKey` collides with one of the family's built-in
+ * per-namespace slot names (e.g. `'tables'` for SQL, `'collections'`
+ * for Mongo). Throws on the first collision with the path of the
+ * offending descriptor included so authors can locate it quickly.
+ *
+ * No-op when `reservedStorageSlotKeys` is empty / undefined.
+ */
+export function assertNoReservedStorageSlotKeyCollisions(
+  entityTypeNamespace: AuthoringEntityTypeNamespace,
+  reservedStorageSlotKeys: ReadonlyArray<string> | undefined,
+): void {
+  if (reservedStorageSlotKeys === undefined || reservedStorageSlotKeys.length === 0) {
+    return;
+  }
+  const reserved = new Set(reservedStorageSlotKeys);
+  const walk = (node: AuthoringEntityTypeNamespace, path: readonly string[]): void => {
+    for (const [key, value] of Object.entries(node)) {
+      const currentPath = [...path, key];
+      if (isAuthoringEntityTypeDescriptor(value)) {
+        if (value.storageSlotKey !== undefined && reserved.has(value.storageSlotKey)) {
+          throw new Error(
+            `Authoring entity descriptor "${currentPath.join('.')}" declares storageSlotKey "${value.storageSlotKey}", which collides with a family-reserved slot. Reserved slot names: ${reservedStorageSlotKeys.join(', ')}.`,
+          );
+        }
+        continue;
+      }
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        walk(value as AuthoringEntityTypeNamespace, currentPath);
+      }
+    }
+  };
+  walk(entityTypeNamespace, []);
+}
+
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
