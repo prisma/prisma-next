@@ -102,6 +102,9 @@ describe('verifyPostgresNamespacePresence', () => {
     const issues = verifyPostgresNamespacePresence({ contract, schema });
 
     expect(issues).toHaveLength(2);
-    expect(issues.map((i) => i.namespaceId)).toEqual(['analytics', 'auth']);
+    expect(issues.map((i) => ('namespaceId' in i ? i.namespaceId : undefined))).toEqual([
+      'analytics',
+      'auth',
+    ]);
   });
 });
