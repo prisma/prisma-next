@@ -35,7 +35,7 @@
     "@prisma-next/tsconfig": "workspace:0.10.0",
     "@types/node": "catalog:",
     "pathe": "^2.0.3",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.1",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

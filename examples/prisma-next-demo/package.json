@@ -63,7 +63,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^4.2.3",
     "jsdom": "^29.0.2",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.1",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
