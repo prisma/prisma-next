@@ -6,7 +6,7 @@ One-package SQLite setup for Prisma Next. Install this single package to get con
 
 - **Domain**: extensions
 - **Layer**: adapters
-- **Planes**: shared (config, contract-builder, migration), migration (control), runtime (runtime)
+- **Planes**: shared (config, contract-builder), migration (control, migration), runtime (runtime)
 
 ## Quick Start
 
