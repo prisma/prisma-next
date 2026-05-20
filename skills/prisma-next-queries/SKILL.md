@@ -1,6 +1,6 @@
 ---
 name: prisma-next-queries
-description: Write Prisma Next queries — pick a lane (`db.orm.<Model>` for CRUD and includes, `db.sql.<table>` SQL builder for set-builder shapes the ORM doesn't express), filter / project / sort / paginate, eager-load relations with `.include(...)`, transactions via `db.transaction(...)`, aggregates via `.aggregate(...)`. Use for query, where, select, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client. Also covers result consumption (`.all()` is a Thenable — just `await` it; no `collect()` / `toArray()` helper needed), single-consumption semantics (`RUNTIME.ITERATOR_CONSUMED`), aggregate nullability (`count` returns `number`, `sum/avg/min/max` return `number | null` per SQL semantics), and range conditions (chain `.where()` clauses or use `and(...)` — there is no `.between(...)`).
+description: Write Prisma Next queries — pick a lane (`db.orm.<Model>` for CRUD and includes, `db.sql.<table>` SQL builder for set-builder shapes the ORM doesn't express), filter / project / sort / paginate, eager-load relations with `.include(...)`, transactions via `db.transaction(...)`, aggregates via `.aggregate(...)`. Use for query, where, select, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client, db.close, script, script won't exit, hangs, close connection, db.end, pool.end, await using. Also covers result consumption (`.all()` is a Thenable — just `await` it; no `collect()` / `toArray()` helper needed), single-consumption semantics (`RUNTIME.ITERATOR_CONSUMED`), aggregate nullability (`count` returns `number`, `sum/avg/min/max` return `number | null` per SQL semantics), and range conditions (chain `.where()` clauses or use `and(...)` — there is no `.between(...)`).
 ---
 
 # Prisma Next — Queries
@@ -376,6 +376,22 @@ await db.transaction(async (tx) => {
 ```
 
 The callback's return value passes through `db.transaction(...)`. Capture inserted ids out of the callback and use them downstream after commit.
+
+## Running queries from a short script
+
+When the user is running a one-off `tsx my-script.ts` (not a long-lived server), call `await db.close()` at the end so the process exits cleanly — especially on Postgres, where the façade-owned pool otherwise keeps Node's event loop alive. See `prisma-next-runtime` § *Running as a script (teardown)* for the full pattern including `await using`.
+
+```typescript
+// src/scripts/seed.ts
+import { db } from '../prisma/db';
+
+for (const u of users) {
+  await db.orm.User.insert(u).all();
+}
+console.log('Seeded.');
+
+await db.close();
+```
 
 ## Common Pitfalls
 
