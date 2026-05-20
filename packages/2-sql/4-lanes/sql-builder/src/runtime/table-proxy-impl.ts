@@ -159,8 +159,30 @@ export class TableProxyImpl<
     return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, rows, this.ctx);
   }
 
-  update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow> {
-    return new UpdateQueryImpl(this.#tableName, this.#table, this.#scope, set, this.ctx);
+  update(setOrCallback: unknown): UpdateQuery<QC, AvailableScope, EmptyRow> {
+    if (typeof setOrCallback === 'function') {
+      return new UpdateQueryImpl(
+        this.#tableName,
+        this.#table,
+        this.#scope,
+        {},
+        this.ctx,
+        [],
+        [],
+        {},
+        new Map(),
+        // UpdateSetCallback is module-private in mutation-impl; the function branch is
+        // guaranteed by the typeof check above, so the structural cast is sound.
+        setOrCallback as never,
+      );
+    }
+    return new UpdateQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      setOrCallback as Record<string, unknown>,
+      this.ctx,
+    );
   }
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {

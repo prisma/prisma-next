@@ -17,7 +17,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { MutationDefaultsOp } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { ExpressionBuilder } from '../expression';
+import type { Expression, ExpressionBuilder } from '../expression';
 import type { ResolveRow } from '../resolve';
 import type { QueryContext, Scope, ScopeField } from '../scope';
 import type {
@@ -60,6 +60,10 @@ function mergeWriteAnnotations(
 }
 
 type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
+type UpdateSetCallback = (
+  fields: ReturnType<typeof createFieldProxy>,
+  fns: ReturnType<typeof createFunctions>,
+) => Record<string, Expression<ScopeField>>;
 
 function buildParamValues(
   values: Record<string, unknown>,
@@ -101,6 +105,21 @@ function evaluateWhere(
   const fns = createFunctions(queryOperationTypes);
   const result = whereCallback(fieldProxy, fns as never);
   return result.buildAst();
+}
+
+function evaluateUpdateCallback(
+  callback: UpdateSetCallback,
+  scope: Scope,
+  queryOperationTypes: BuilderContext['queryOperationTypes'],
+): Record<string, AstExpression> {
+  const fieldProxy = createFieldProxy(scope);
+  const fns = createFunctions(queryOperationTypes);
+  const result = callback(fieldProxy, fns as never);
+  const set: Record<string, AstExpression> = {};
+  for (const [col, expr] of Object.entries(result)) {
+    set[col] = expr.buildAst();
+  }
+  return set;
 }
 
 function buildParamRows(
@@ -248,6 +267,7 @@ export class UpdateQueryImpl<
   readonly #table: StorageTable;
   readonly #scope: Scope;
   readonly #setValues: Record<string, unknown>;
+  readonly #setCallback: UpdateSetCallback | undefined;
   readonly #whereCallbacks: readonly WhereCallback[];
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
@@ -263,12 +283,14 @@ export class UpdateQueryImpl<
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
+    setCallback?: UpdateSetCallback,
   ) {
     super(ctx);
     this.#tableName = tableName;
     this.#table = table;
     this.#scope = scope;
     this.#setValues = setValues;
+    this.#setCallback = setCallback;
     this.#whereCallbacks = whereCallbacks;
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
@@ -286,6 +308,7 @@ export class UpdateQueryImpl<
       this.#returningColumns,
       this.#rowFields,
       this.#annotations,
+      this.#setCallback,
     );
   }
 
@@ -309,6 +332,7 @@ export class UpdateQueryImpl<
         columns,
         newRowFields,
         this.#annotations,
+        this.#setCallback,
       ) as unknown as UpdateQuery<QC, AvailableScope, never>;
     },
   );
@@ -334,17 +358,30 @@ export class UpdateQueryImpl<
         this.#annotations,
         annotations as readonly AnnotationValue<unknown, OperationKind>[],
       ),
+      this.#setCallback,
     );
   }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
-    const setParams = buildParamValues(
-      this.#setValues,
-      this.#table,
-      this.#tableName,
-      'update',
-      this.ctx,
-    );
+    let setExpressions: Record<string, AstExpression>;
+
+    if (this.#setCallback) {
+      const callbackSet = evaluateUpdateCallback(
+        this.#setCallback,
+        this.#scope,
+        this.ctx.queryOperationTypes,
+      );
+      const defaults = buildParamValues({}, this.#table, this.#tableName, 'update', this.ctx);
+      setExpressions = { ...defaults, ...callbackSet };
+    } else {
+      setExpressions = buildParamValues(
+        this.#setValues,
+        this.#table,
+        this.#tableName,
+        'update',
+        this.ctx,
+      );
+    }
 
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>
@@ -353,7 +390,7 @@ export class UpdateQueryImpl<
     );
 
     let ast = UpdateAst.table(TableSource.named(this.#tableName))
-      .withSet(setParams)
+      .withSet(setExpressions)
       .withWhere(whereExpr);
 
     if (this.#returningColumns.length > 0) {

@@ -6,6 +6,7 @@ import {
   DerivedTableSource,
   ExistsExpr,
   IdentifierRef,
+  ParamRef,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
@@ -568,5 +569,59 @@ describe('INSERT multi-row', () => {
     expect(Object.keys(ast.rows[1]!).sort()).toEqual(['email', 'id', 'name']);
     // row 1 did not get email from defaults — should be NULL param
     expect(ast.rows[1]!['email']!.kind).toBe('param-ref');
+  });
+});
+
+describe('UPDATE callback overload', () => {
+  it('set clause carries a non-ParamRef expression node for callback-assigned column', () => {
+    const d = db();
+    const plan = d.users
+      .update((f) => ({ name: f.name }))
+      .where((f, fns) => fns.eq(f.id, 1))
+      .build();
+    const ast = plan.ast;
+    if (ast.kind !== 'update') throw new Error('expected update');
+    const nameValue = ast.set['name'];
+    expect(nameValue).toBeDefined();
+    expect(nameValue).not.toBeInstanceOf(ParamRef);
+    expect(nameValue!.kind).toBe('identifier-ref');
+  });
+
+  it('mutation defaults hook fires once with op update for callback overload', () => {
+    const spy = vi.fn(() => []);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    d.users
+      .update((f) => ({ name: f.name }))
+      .where((f, fns) => fns.eq(f.id, 1))
+      .build();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ op: 'update', table: 'users' }));
+  });
+
+  it('where and returning clauses are identical between object and callback overloads', () => {
+    const d = db();
+    const objectPlan = d.users
+      .update({ name: 'x' })
+      .where((f, fns) => fns.eq(f.id, 42))
+      .returning('id')
+      .build();
+    const callbackPlan = d.users
+      .update((f) => ({ name: f.name }))
+      .where((f, fns) => fns.eq(f.id, 42))
+      .returning('id')
+      .build();
+    const objectAst = objectPlan.ast;
+    const callbackAst = callbackPlan.ast;
+    if (objectAst.kind !== 'update' || callbackAst.kind !== 'update') {
+      throw new Error('expected update');
+    }
+    expect(callbackAst.where).toEqual(objectAst.where);
+    expect(callbackAst.returning).toEqual(objectAst.returning);
   });
 });
