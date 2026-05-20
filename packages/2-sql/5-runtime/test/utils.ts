@@ -17,11 +17,13 @@ import { generateId } from '@prisma-next/ids/runtime';
 import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
+  AnyQueryAst,
   Codec,
   ContractCodecRegistry,
   LoweredStatement,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { SelectAst as SelectAstCtor, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
@@ -378,9 +380,15 @@ export function createStubAdapter(): StubAdapter {
       capabilities: {},
       readMarker: async () => ({ kind: 'absent' as const }),
     },
-    lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
+    lower(ast: SelectAst, _ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
-      return Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] });
+      const refs = ast.collectParamRefs();
+      const params = refs.map((ref) =>
+        ref.kind === 'prepared-param-ref'
+          ? ({ kind: 'bind' as const, name: ref.name } as const)
+          : ({ kind: 'literal' as const, value: ref.value } as const),
+      );
+      return Object.freeze({ sql: sqlText, params });
     },
   };
 }
@@ -409,6 +417,10 @@ export function createTestContract(
     ...(execution ? { execution } : {}),
     profileHash: profileHash(rest['profileHash'] ?? 'sha256:testprofile'),
   };
+}
+
+export function stubAst(): AnyQueryAst {
+  return SelectAstCtor.from(TableSource.named('stub'));
 }
 
 // Re-export generic utilities from test-utils

@@ -48,9 +48,10 @@ describe('cipherstash operator lowering — cipherstashIlike', () => {
     const lowered = makeAdapter().lower(ast, { contract });
 
     expect(lowered.params).toHaveLength(1);
-    const envelope = lowered.params[0];
-    expect(envelope).toBeInstanceOf(EncryptedString);
-    const handle = (envelope as EncryptedString).expose();
+    const slot = lowered.params[0];
+    if (slot?.kind !== 'literal') throw new Error('expected literal slot');
+    expect(slot.value).toBeInstanceOf(EncryptedString);
+    const handle = (slot.value as EncryptedString).expose();
     expect(handle.plaintext).toBe('%alice%');
     expect(handle.table).toBe(TABLE);
     expect(handle.column).toBe(COLUMN);

@@ -5,6 +5,7 @@ import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
+import { stubAst } from './utils';
 
 // Minimal test contract
 const testContract: Contract<SqlStorage> = {
@@ -41,6 +42,9 @@ describe('SqlFamilyAdapter', () => {
       execute: () => {
         throw new Error('not used');
       },
+      executePrepared: () => {
+        throw new Error('not used');
+      },
       query: async () => ({ rows: [] }),
     };
     const result = await adapter.markerReader.readMarker(fakeQueryable);
@@ -58,6 +62,7 @@ describe('SqlFamilyAdapter', () => {
       },
       sql: 'SELECT 1',
       params: [],
+      ast: stubAst(),
     };
 
     // Should not throw
@@ -74,6 +79,7 @@ describe('SqlFamilyAdapter', () => {
       },
       sql: 'SELECT 1',
       params: [],
+      ast: stubAst(),
     };
 
     expect(() => adapter.validatePlan(plan, testContract)).toThrow(
@@ -91,6 +97,7 @@ describe('SqlFamilyAdapter', () => {
       },
       sql: 'SELECT 1',
       params: [],
+      ast: stubAst(),
     };
 
     expect(() => adapter.validatePlan(plan, testContract)).toThrow(

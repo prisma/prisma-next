@@ -74,6 +74,9 @@ function createDriver(): SqlDriver {
     execute: vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
       yield {} as Record<string, unknown>;
     }),
+    executePrepared: vi.fn().mockImplementation(async function* () {
+      yield {} as Record<string, unknown>;
+    }),
     query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     connect: vi.fn().mockImplementation(async (_binding?: undefined) => undefined),
     acquireConnection: vi.fn().mockRejectedValue(new Error('not used')),

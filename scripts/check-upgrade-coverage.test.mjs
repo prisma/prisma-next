@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  coverageTransitionLabel,
+  coverageTransitionChain,
   inFlightTransitionLabel,
   parseTransitionFromPath,
   parseVersion,
@@ -88,25 +88,47 @@ describe('inFlightTransitionLabel', () => {
   });
 });
 
-describe('coverageTransitionLabel', () => {
-  it('PR-mode steady-state (prev.minor === head.minor): returns the in-flight directory', () => {
-    assert.equal(
-      coverageTransitionLabel(parseVersion('0.7.0'), parseVersion('0.7.0')),
+describe('coverageTransitionChain', () => {
+  it('PR-mode steady-state (prev.minor === head.minor): returns a single-element chain naming the in-flight directory', () => {
+    assert.deepEqual(coverageTransitionChain(parseVersion('0.7.0'), parseVersion('0.7.0')), [
       '0.7-to-0.8',
-    );
-    assert.equal(
-      coverageTransitionLabel(parseVersion('0.7.1'), parseVersion('0.7.0')),
+    ]);
+    assert.deepEqual(coverageTransitionChain(parseVersion('0.7.1'), parseVersion('0.7.0')), [
       '0.7-to-0.8',
-    );
+    ]);
   });
-  it('publish mode (head.minor > prev.minor): returns prev → head', () => {
-    assert.equal(
-      coverageTransitionLabel(parseVersion('0.7.0'), parseVersion('0.6.0')),
+  it('consecutive publish (head.minor === prev.minor + 1): returns the single prev → head step', () => {
+    assert.deepEqual(coverageTransitionChain(parseVersion('0.7.0'), parseVersion('0.6.0')), [
       '0.6-to-0.7',
-    );
-    assert.equal(
-      coverageTransitionLabel(parseVersion('0.8.0'), parseVersion('0.6.0')),
-      '0.6-to-0.8',
+    ]);
+  });
+  it('skip-one publish (head.minor === prev.minor + 2): returns both consecutive steps in order', () => {
+    assert.deepEqual(coverageTransitionChain(parseVersion('0.9.0'), parseVersion('0.7.0')), [
+      '0.7-to-0.8',
+      '0.8-to-0.9',
+    ]);
+  });
+  it('skip-many publish (head.minor >> prev.minor + 1): returns every consecutive step', () => {
+    assert.deepEqual(coverageTransitionChain(parseVersion('0.9.0'), parseVersion('0.5.0')), [
+      '0.5-to-0.6',
+      '0.6-to-0.7',
+      '0.7-to-0.8',
+      '0.8-to-0.9',
+    ]);
+  });
+  it('major boundary: returns the existing single-step prev → head (minor counter resets; chain not composed across majors)', () => {
+    assert.deepEqual(coverageTransitionChain(parseVersion('1.0.0'), parseVersion('0.99.0')), [
+      '0.99-to-1.0',
+    ]);
+  });
+  it('reversed same-major range (head.minor < prev.minor): throws naming both versions instead of silently returning an empty chain', () => {
+    assert.throws(
+      () => coverageTransitionChain(parseVersion('0.7.0'), parseVersion('0.9.0')),
+      (err) =>
+        err instanceof Error &&
+        /0\.7/.test(err.message) &&
+        /0\.9/.test(err.message) &&
+        /reversed|behind|chronological/i.test(err.message),
     );
   });
 });
@@ -426,6 +448,137 @@ describe('check-upgrade-coverage — new-entries rule', () => {
   });
 });
 
+describe('check-upgrade-coverage — skip-publish chain (head.minor > prev.minor + 1)', () => {
+  it('coverage: requires every consecutive transition directory; reports each missing one', () => {
+    // Models the TML-2573 case: previously-published v0.7.0, head bumps to
+    // 0.9.0 (v0.8 was bumped in-tree but never published). Coverage is
+    // satisfied iff both `0.7-to-0.8/` and `0.8-to-0.9/` exist; the diagnostic
+    // names each missing directory.
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'a\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.9.0');
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    commitAll('head');
+
+    const missingBoth = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(missingBoth.status, 0);
+    assert.match(
+      missingBoth.stderr,
+      /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.7-to-0\.8/,
+    );
+    assert.match(
+      missingBoth.stderr,
+      /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.8-to-0\.9/,
+    );
+    assert.doesNotMatch(missingBoth.stderr, /upgrades\/0\.7-to-0\.9/);
+
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    commitAll('add 0.7-to-0.8');
+    const missingSecond = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(missingSecond.status, 0);
+    assert.match(
+      missingSecond.stderr,
+      /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.8-to-0\.9/,
+    );
+    assert.doesNotMatch(
+      missingSecond.stderr,
+      /skills\/upgrade\/prisma-next-upgrade\/upgrades\/0\.7-to-0\.8[^/]*$/m,
+    );
+
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.8-to-0.9/instructions.md',
+      '---\nfrom: "0.8"\nto: "0.9"\nchanges: []\n---\n',
+    );
+    commitAll('add 0.8-to-0.9');
+    const both = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(both.status, 0, `expected exit 0; stderr=${both.stderr}`);
+  });
+
+  it('new-entries: accepts an added file in any chain transition or in-flight', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.9.0');
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.8-to-0.9/instructions.md',
+      '---\nfrom: "0.8"\nto: "0.9"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/extension-author/prisma-next-extension-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/extension-author/prisma-next-extension-upgrade/upgrades/0.8-to-0.9/instructions.md',
+      '---\nfrom: "0.8"\nto: "0.9"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.9-to-0.10/instructions.md',
+      '---\nfrom: "0.9"\nto: "0.10"\nchanges: []\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('new-entries: rejects an added file in a pre-prev (stale) transition directory', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.9.0');
+    // Coverage directories for the chain so coverage isn't the failure mode.
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.8-to-0.9/instructions.md',
+      '---\nfrom: "0.8"\nto: "0.9"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.6-to-0.7/new-script.ts',
+      'export const x = 1;\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /new-entries-stale-transition/);
+    assert.match(result.stderr, /0\.6-to-0\.7\/new-script\.ts/);
+    assert.match(result.stderr, /0\.7-to-0\.8/);
+    assert.match(result.stderr, /0\.8-to-0\.9/);
+    assert.match(result.stderr, /0\.9-to-0\.10/);
+  });
+
+  it('--json envelope: one violation per missing chain directory', () => {
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'a\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.9.0');
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD', '--json']);
+    assert.notEqual(result.status, 0);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.ok, false);
+    const coverageDirs = parsed.violations
+      .filter((v) => v.rule === 'coverage' && v.substrate === 'examples/')
+      .map((v) => v.requiredDir);
+    assert.deepEqual(coverageDirs.sort(), [
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8',
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.8-to-0.9',
+    ]);
+  });
+});
+
 describe('check-upgrade-coverage — in-flight minor source-of-truth', () => {
   it('reads the in-flight minor from package.json on the --head ref (not from npm or from main)', () => {
     writePackageJson('0.6.0');
@@ -444,12 +597,15 @@ describe('check-upgrade-coverage — in-flight minor source-of-truth', () => {
     assert.doesNotMatch(a.stderr, /upgrades\/0\.5-to-0\.6/);
 
     // Head B: version 0.8.0 on a new commit → publish-style coverage
-    // requires upgrades/0.6-to-0.8/ because prev is still at 0.6.0.
+    // requires the full chain `0.6-to-0.7` + `0.7-to-0.8` because prev is
+    // still at 0.6.0 (the chain spans every consecutive step from
+    // prev.minor to head.minor).
     writePackageJson('0.8.0');
     writeRepoFile('examples/demo/src/main.ts', 'c\n');
     commitAll('head-0.8.0');
     const b = runScript(['--prev', prev, '--head', 'HEAD']);
     assert.notEqual(b.status, 0);
-    assert.match(b.stderr, /upgrades\/0\.6-to-0\.8/);
+    assert.match(b.stderr, /upgrades\/0\.6-to-0\.7/);
+    assert.match(b.stderr, /upgrades\/0\.7-to-0\.8/);
   });
 });

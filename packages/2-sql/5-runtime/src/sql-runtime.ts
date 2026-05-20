@@ -21,11 +21,14 @@ import type {
   AnyQueryAst,
   ContractCodecRegistry,
   LoweredStatement,
+  PreparedExecuteRequest,
   SqlCodecCallContext,
   SqlDriver,
   SqlQueryable,
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
+import { collectOrderedParamRefs } from '@prisma-next/sql-relational-core/ast';
+import type { CodecTypesBase } from '@prisma-next/sql-relational-core/expression';
 import {
   createSqlParamRefMutator,
   type SqlParamRefMutator,
@@ -35,14 +38,26 @@ import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { decodeRow } from './codecs/decoding';
-import { encodeParams } from './codecs/encoding';
+import { buildDecodeContext, type DecodeContext, decodeRow } from './codecs/decoding';
+import { deriveParamMetadata, encodeParams, encodeParamsWithMetadata } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { computeSqlContentHash } from './content-hash';
 import { computeSqlFingerprint } from './fingerprint';
 import { lowerSqlPlan } from './lower-sql-plan';
 import { runBeforeCompileChain } from './middleware/before-compile-chain';
 import type { SqlMiddleware, SqlMiddlewareContext } from './middleware/sql-middleware';
+import { buildBindSiteParams } from './prepared/bind-site-params';
+import { resolvePreparedSlotValues } from './prepared/encode-prepared';
+import {
+  PreparedStatementImpl,
+  type PreparedStatementInternals,
+} from './prepared/prepared-statement';
+import type {
+  Declaration,
+  ParamsFromDeclaration,
+  PrepareCallback,
+  PreparedStatement,
+} from './prepared/types';
 import type {
   RuntimeFamilyAdapter,
   RuntimeTelemetryEvent,
@@ -91,6 +106,16 @@ export interface Runtime extends RuntimeQueryable {
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
+
+  /**
+   * Build a reusable {@link PreparedStatement}. Throws
+   * `RUNTIME.PREPARE_UNUSED_PARAM` if any declared name is unreferenced
+   * by the callback's plan.
+   */
+  prepare<D extends Declaration<CT>, Row, CT extends CodecTypesBase = CodecTypesBase>(
+    declaration: D,
+    callback: PrepareCallback<D, Row>,
+  ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
 }
 
 export interface RuntimeConnection extends RuntimeQueryable {
@@ -114,7 +139,19 @@ export interface RuntimeTransaction extends RuntimeQueryable {
   rollback(): Promise<void>;
 }
 
-export interface RuntimeQueryable extends RuntimeScope {}
+export interface RuntimeQueryable extends RuntimeScope {
+  /**
+   * Run a prepared statement against this scope. Required for the explicit
+   * `PreparedStatement.execute(target, params)` API — every scope (top-level
+   * runtime, connection, transaction) routes prepared executions through the
+   * `SqlQueryable` it is backed by.
+   */
+  executePrepared<Params, Row>(
+    ps: PreparedStatement<Params, Row>,
+    params: Params,
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row>;
+}
 
 export interface TransactionContext extends RuntimeQueryable {
   readonly invalidated: boolean;
@@ -142,6 +179,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly sqlCtx: SqlMiddlewareContext;
   private readonly verify: RuntimeVerifyOptions;
+  readonly #preparedStatementHandles = new WeakMap<object, unknown>();
   private codecRegistryValidated: boolean;
   private verified: boolean;
   private startupVerified: boolean;
@@ -275,6 +313,86 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     return this.executeAgainstQueryable<Row>(plan, this.driver, options);
   }
 
+  executePrepared<Params, Row>(
+    ps: PreparedStatement<Params, Row>,
+    params: Params,
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row> {
+    return this.executePreparedAgainstQueryable<Params, Row>(
+      ps as PreparedStatementImpl<Params, Row>,
+      params as Record<string, unknown>,
+      this.driver,
+      options,
+    );
+  }
+
+  private async *streamRows<Row>(
+    exec: SqlExecutionPlan,
+    decodeContext: DecodeContext,
+    driverCall: () => AsyncIterable<Record<string, unknown>>,
+    codecCtx: SqlCodecCallContext,
+    execMiddlewareCtx: RuntimeMiddlewareContext,
+  ): AsyncGenerator<Row, void, unknown> {
+    this.familyAdapter.validatePlan(exec, this.contract);
+    this._telemetry = null;
+
+    if (!this.startupVerified && this.verify.mode === 'startup') {
+      await this.verifyMarker();
+    }
+
+    if (!this.verified && this.verify.mode === 'onFirstUse') {
+      await this.verifyMarker();
+    }
+
+    const startedAt = Date.now();
+    let outcome: TelemetryOutcome | null = null;
+
+    try {
+      if (this.verify.mode === 'always') {
+        await this.verifyMarker();
+      }
+
+      const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
+        exec,
+        this.middleware,
+        execMiddlewareCtx,
+        driverCall,
+      );
+
+      // Manually drive the driver's async iterator so the between-row
+      // abort check fires *before* requesting the next row. With a
+      // `for await...of` loop the runtime would await `iterator.next()`
+      // first, leaving a window where one extra row is pulled through
+      // the driver after the signal aborted.
+      const iterator = stream[Symbol.asyncIterator]();
+      try {
+        while (true) {
+          checkAborted(codecCtx, 'stream');
+          const next = await iterator.next();
+          if (next.done) {
+            break;
+          }
+          const decodedRow = await decodeRow(next.value, decodeContext, codecCtx);
+          yield decodedRow as Row;
+        }
+      } finally {
+        // Best-effort iterator cleanup so the driver can release its
+        // resources whether the stream finished normally, threw, or was
+        // abandoned by the consumer.
+        await iterator.return?.();
+      }
+
+      outcome = 'success';
+    } catch (error) {
+      outcome = 'runtime-error';
+      throw error;
+    } finally {
+      if (outcome !== null) {
+        this.recordTelemetry(exec, outcome, Date.now() - startedAt);
+      }
+    }
+  }
+
   private executeAgainstQueryable<Row>(
     plan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
     queryable: SqlQueryable,
@@ -350,65 +468,138 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         exec = await self.encodeDraftParams(draftWithMutations, codecCtx);
       }
 
-      self.familyAdapter.validatePlan(exec, self.contract);
-      self._telemetry = null;
+      const decodeContext = buildDecodeContext(exec.ast, self.contractCodecs);
 
-      if (!self.startupVerified && self.verify.mode === 'startup') {
-        await self.verifyMarker();
-      }
+      yield* self.streamRows<Row>(
+        exec,
+        decodeContext,
+        () => queryable.execute<Record<string, unknown>>({ sql: exec.sql, params: exec.params }),
+        codecCtx,
+        execMiddlewareCtx,
+      );
+    };
 
-      if (!self.verified && self.verify.mode === 'onFirstUse') {
-        await self.verifyMarker();
-      }
+    return new AsyncIterableResult(generator());
+  }
 
-      const startedAt = Date.now();
-      let outcome: TelemetryOutcome | null = null;
+  async prepare<D extends Declaration<CT>, Row, CT extends CodecTypesBase = CodecTypesBase>(
+    declaration: D,
+    callback: PrepareCallback<D, Row>,
+  ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
+    this.ensureCodecRegistryValidated();
 
-      try {
-        if (self.verify.mode === 'always') {
-          await self.verifyMarker();
-        }
+    const bindSiteParams = buildBindSiteParams(declaration);
 
-        const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
-          exec,
-          self.middleware,
-          execMiddlewareCtx,
-          () =>
-            queryable.execute<Record<string, unknown>>({
-              sql: exec.sql,
-              // `beforeExecute` ran on the pre-encode draft (see
-              // generator setup above); `exec.params` already carries
-              // any mutator-driven replacements through `encodeParams`.
-              params: exec.params,
-            }),
-        );
+    const userPlan = callback(bindSiteParams);
+    const finalPlan = await this.runBeforeCompile(userPlan);
+    const orderedRefs = collectOrderedParamRefs(finalPlan.ast);
 
-        // Manually drive the driver's async iterator so the between-row abort check fires *before* requesting the next row. With a `for await...of` loop the runtime would await `iterator.next()` first, leaving a window where one extra row is pulled through the driver after the signal aborted.
-        const iterator = stream[Symbol.asyncIterator]();
-        try {
-          while (true) {
-            checkAborted(codecCtx, 'stream');
-            const next = await iterator.next();
-            if (next.done) {
-              break;
-            }
-            const decodedRow = await decodeRow(next.value, exec, codecCtx, self.contractCodecs);
-            yield decodedRow as Row;
-          }
-        } finally {
-          // Best-effort iterator cleanup so the driver can release its resources whether the stream finished normally, threw, or was abandoned by the consumer.
-          await iterator.return?.();
-        }
+    // Type-level detection isn't achievable across chained-builder generics.
+    const referencedNames = new Set<string>();
+    for (const ref of orderedRefs) {
+      if (ref.kind === 'prepared-param-ref') referencedNames.add(ref.name);
+    }
+    const missing = Object.keys(declaration).filter((name) => !referencedNames.has(name));
+    if (missing.length > 0) {
+      throw runtimeError(
+        'RUNTIME.PREPARE_UNUSED_PARAM',
+        `Prepared statement declaration includes parameter${missing.length === 1 ? '' : 's'} not referenced by the callback's plan: ${missing.join(', ')}`,
+        { unused: missing },
+      );
+    }
 
-        outcome = 'success';
-      } catch (error) {
-        outcome = 'runtime-error';
-        throw error;
-      } finally {
-        if (outcome !== null) {
-          self.recordTelemetry(exec, outcome, Date.now() - startedAt);
-        }
-      }
+    const lowered = this.adapter.lower(finalPlan.ast, {
+      contract: this.contract,
+      params: orderedRefs.map((r) => (r.kind === 'param-ref' ? r.value : undefined)),
+    });
+
+    const decodeContext = buildDecodeContext(finalPlan.ast, this.contractCodecs);
+    const paramMetadata = deriveParamMetadata(finalPlan.ast);
+
+    const internals: PreparedStatementInternals = Object.freeze({
+      sql: lowered.sql,
+      ast: finalPlan.ast,
+      meta: finalPlan.meta,
+      slots: lowered.params,
+      decodeContext,
+      paramMetadata,
+    });
+
+    return new PreparedStatementImpl<ParamsFromDeclaration<D, CT>, Row>(internals);
+  }
+
+  private executePreparedAgainstQueryable<P, Row>(
+    ps: PreparedStatementImpl<P, Row>,
+    userParams: Record<string, unknown>,
+    queryable: SqlQueryable,
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row> {
+    this.ensureCodecRegistryValidated();
+
+    const self = this;
+    const signal = options?.signal;
+    const scope = options?.scope ?? 'runtime';
+    const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+    const execMiddlewareCtx: RuntimeMiddlewareContext = {
+      ...self.ctx,
+      ...ifDefined('signal', signal),
+      ...(scope !== 'runtime' ? { scope } : {}),
+    };
+
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      checkAborted(codecCtx, 'stream');
+
+      // Resolve slot order to unencoded values so `beforeExecute`'s
+      // mutator sees pre-encode user values for prepared-param slots
+      // and can override them before encode runs.
+      const preEncodeValues = resolvePreparedSlotValues(ps, userParams);
+      const preEncodeExec: SqlExecutionPlan = {
+        sql: ps.sql,
+        params: preEncodeValues,
+        ast: ps.ast,
+        meta: ps.meta,
+      };
+
+      const mutator: SqlParamRefMutatorInternal = createSqlParamRefMutator(preEncodeExec);
+      await runBeforeExecuteChain<SqlExecutionPlan, SqlParamRefMutator>(
+        preEncodeExec,
+        self.middleware,
+        execMiddlewareCtx,
+        mutator,
+      );
+
+      const encodedParams = await encodeParamsWithMetadata(
+        mutator.currentParams(),
+        ps.paramMetadata,
+        codecCtx,
+        self.contractCodecs,
+      );
+      const exec: SqlExecutionPlan = {
+        sql: ps.sql,
+        params: encodedParams,
+        ast: ps.ast,
+        meta: ps.meta,
+      };
+
+      const handles = self.#preparedStatementHandles;
+      const request: PreparedExecuteRequest = {
+        sql: exec.sql,
+        params: exec.params,
+        handle: {
+          get: () => handles.get(ps),
+          set: (value) => {
+            handles.set(ps, value);
+          },
+        },
+      };
+
+      yield* self.streamRows<Row>(
+        exec,
+        ps.decodeContext,
+        () => queryable.executePrepared<Record<string, unknown>>(request),
+        codecCtx,
+        execMiddlewareCtx,
+      );
     };
 
     return new AsyncIterableResult(generator());
@@ -438,6 +629,18 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
           scope: 'connection',
         });
       },
+      executePrepared<Params, Row>(
+        ps: PreparedStatement<Params, Row>,
+        params: Params,
+        options?: RuntimeExecuteOptions,
+      ): AsyncIterableResult<Row> {
+        return self.executePreparedAgainstQueryable<Params, Row>(
+          ps as PreparedStatementImpl<Params, Row>,
+          params as Record<string, unknown>,
+          driverConn,
+          { ...options, scope: 'connection' },
+        );
+      },
     };
 
     return wrappedConnection;
@@ -460,6 +663,18 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
           ...options,
           scope: 'transaction',
         });
+      },
+      executePrepared<Params, Row>(
+        ps: PreparedStatement<Params, Row>,
+        params: Params,
+        options?: RuntimeExecuteOptions,
+      ): AsyncIterableResult<Row> {
+        return self.executePreparedAgainstQueryable<Params, Row>(
+          ps as PreparedStatementImpl<Params, Row>,
+          params as Record<string, unknown>,
+          driverTx,
+          { ...options, scope: 'transaction' },
+        );
       },
     };
   }
@@ -570,6 +785,25 @@ export async function withTransaction<R>(
         throw transactionClosedError();
       }
       const inner = transaction.execute(plan, options);
+      const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
+        for await (const row of inner) {
+          if (invalidated) {
+            throw transactionClosedError();
+          }
+          yield row;
+        }
+      };
+      return new AsyncIterableResult(guarded());
+    },
+    executePrepared<Params, Row>(
+      ps: PreparedStatement<Params, Row>,
+      params: Params,
+      options?: RuntimeExecuteOptions,
+    ): AsyncIterableResult<Row> {
+      if (invalidated) {
+        throw transactionClosedError();
+      }
+      const inner = transaction.executePrepared(ps, params, options);
       const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
         for await (const row of inner) {
           if (invalidated) {

@@ -25,6 +25,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { describe, expect, it } from 'vitest';
 import { createSqliteAdapter } from '../src/core/adapter';
 import type { SqliteContract } from '../src/core/types';
@@ -91,7 +92,7 @@ describe('SQLite adapter', () => {
 
       const lowered = adapter.lower(ast, { contract });
       expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."email" = ?');
-      expect(lowered.params).toEqual(['test@example.com']);
+      expect(lowered.params).toEqual(litParams('test@example.com'));
     });
 
     it('renders ORDER BY, LIMIT, OFFSET', () => {
@@ -219,7 +220,7 @@ describe('SQLite adapter', () => {
 
       const lowered = adapter.lower(ast, { contract });
       expect(lowered.sql).toBe('INSERT INTO "user" ("id", "email") VALUES (?, ?)');
-      expect(lowered.params).toEqual([1, 'a@example.com']);
+      expect(lowered.params).toEqual(litParams(1, 'a@example.com'));
     });
 
     it('renders multi-row insert', () => {
@@ -298,7 +299,7 @@ describe('SQLite adapter', () => {
 
       const lowered = adapter.lower(ast, { contract });
       expect(lowered.sql).toBe('UPDATE "user" SET "email" = ? WHERE "user"."id" = ?');
-      expect(lowered.params).toEqual(['b@example.com', 1]);
+      expect(lowered.params).toEqual(litParams('b@example.com', 1));
     });
 
     it('renders update with RETURNING', () => {
@@ -322,7 +323,7 @@ describe('SQLite adapter', () => {
 
       const lowered = adapter.lower(ast, { contract });
       expect(lowered.sql).toBe('DELETE FROM "user" WHERE "user"."id" = ?');
-      expect(lowered.params).toEqual([1]);
+      expect(lowered.params).toEqual(litParams(1));
     });
 
     it('renders delete with RETURNING', () => {

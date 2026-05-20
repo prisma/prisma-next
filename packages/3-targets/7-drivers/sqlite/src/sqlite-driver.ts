@@ -2,6 +2,7 @@ import type { SQLInputValue } from 'node:sqlite';
 import { DatabaseSync } from 'node:sqlite';
 import type { RuntimeDriverInstance } from '@prisma-next/framework-components/execution';
 import type {
+  PreparedExecuteRequest,
   SqlConnection,
   SqlDriver,
   SqlDriverState,
@@ -83,6 +84,12 @@ export class SqliteConnectionImpl implements SqlConnection {
     }
   }
 
+  executePrepared<Row = Record<string, unknown>>(
+    request: PreparedExecuteRequest,
+  ): AsyncIterable<Row> {
+    return this.execute<Row>({ sql: request.sql, params: request.params });
+  }
+
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
     try {
       const stmt = this.#db.prepare(`EXPLAIN QUERY PLAN ${request.sql}`);
@@ -148,6 +155,12 @@ class SqliteTransactionImpl implements SqlTransaction {
     } catch (error) {
       throw normalizeSqliteError(error);
     }
+  }
+
+  executePrepared<Row = Record<string, unknown>>(
+    request: PreparedExecuteRequest,
+  ): AsyncIterable<Row> {
+    return this.execute<Row>({ sql: request.sql, params: request.params });
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
@@ -259,6 +272,23 @@ export class SqliteDriver implements SqliteRuntimeDriver {
       };
     }
     return this.#state.conn.execute<Row>(request);
+  }
+
+  executePrepared<Row = Record<string, unknown>>(
+    request: PreparedExecuteRequest,
+  ): AsyncIterable<Row> {
+    if (this.#state.kind !== 'connected') {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              throw driverError('DRIVER.NOT_CONNECTED', NOT_CONNECTED_MESSAGE);
+            },
+          };
+        },
+      };
+    }
+    return this.#state.conn.executePrepared<Row>(request);
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {

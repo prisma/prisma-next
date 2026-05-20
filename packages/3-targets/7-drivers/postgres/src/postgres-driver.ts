@@ -1,4 +1,5 @@
 import type {
+  PreparedExecuteRequest,
   SqlConnection,
   SqlDriver,
   SqlDriverState,
@@ -13,11 +14,13 @@ import type {
   QueryResult as PgQueryResult,
   PoolClient,
   Pool as PoolType,
+  QueryConfig,
   QueryResultRow,
 } from 'pg';
 import { Pool } from 'pg';
 import Cursor from 'pg-cursor';
 import { callbackToPromise } from './callback-to-promise';
+import { NamedCursor } from './named-cursor';
 import { isAlreadyConnectedError, isPostgresError, normalizePgError } from './normalize-error';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
@@ -35,15 +38,66 @@ export interface PostgresCursorOptions {
 interface PostgresDriverOptions {
   readonly connect: { client: Client } | { pool: PoolType };
   readonly cursor?: PostgresCursorOptions | undefined;
+  /**
+   * Use server-side prepared statements for `executePrepared`. Default
+   * `true`. Set `false` when running behind a transaction-mode pooler that
+   * does not support session-scoped prepared statements (e.g. PgBouncer
+   * transaction mode).
+   */
+  readonly preparedStatements?: boolean | undefined;
 }
 
 export type PostgresDriverCreateOptions = Omit<PostgresDriverOptions, 'connect'>;
 
 const DEFAULT_BATCH_SIZE = 100;
+const DEFAULT_PREPARED_STATEMENTS = true;
 
-type ConnectionOptions =
+type CursorOptions =
   | { readonly cursorDisabled: true }
   | { readonly cursorBatchSize: number; readonly cursorDisabled: false };
+
+interface HandleAllocator {
+  mint(): string;
+}
+
+function createHandleAllocator(): HandleAllocator {
+  // Driver-scoped so a single PreparedStatement reused across multiple
+  // Connections/Transactions of the same driver always sees one handle.
+  let next = 1;
+  return {
+    mint: () => `pn_${next++}`,
+  };
+}
+
+type ConnectionOptions = CursorOptions & {
+  readonly preparedStatementsEnabled: boolean;
+  readonly handleAllocator: HandleAllocator;
+};
+
+function buildConnectionOptions(options: PostgresDriverOptions): ConnectionOptions {
+  const cursorOptions: CursorOptions = options.cursor?.disabled
+    ? { cursorDisabled: true }
+    : {
+        cursorBatchSize: options.cursor?.batchSize ?? DEFAULT_BATCH_SIZE,
+        cursorDisabled: false,
+      };
+  return {
+    ...cursorOptions,
+    preparedStatementsEnabled: options.preparedStatements ?? DEFAULT_PREPARED_STATEMENTS,
+    handleAllocator: createHandleAllocator(),
+  };
+}
+
+function isStalePreparedStatementError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code = (error as { code?: string }).code;
+  // 26000 — invalid_sql_statement_name (server lost the named statement,
+  //         e.g. after DEALLOCATE ALL).
+  // 0A000 — cached plan invalidated by DDL (row shape changed).
+  return code === '26000' || code === '0A000';
+}
 
 class AsyncMutex {
   #queue = Promise.resolve();
@@ -75,6 +129,66 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
   }
 
   async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
+    try {
+      yield* this.runQuery<Row>(request);
+    } catch (error) {
+      throw normalizePgError(error);
+    }
+  }
+
+  async *executePrepared<Row = Record<string, unknown>>(
+    request: PreparedExecuteRequest,
+  ): AsyncIterable<Row> {
+    if (!this.options.preparedStatementsEnabled) {
+      // Skip server-side prepare entirely; route as a regular ad-hoc execute.
+      yield* this.execute<Row>(request);
+      return;
+    }
+
+    let handle = request.handle.get();
+    if (handle === undefined) {
+      handle = this.options.handleAllocator.mint();
+      request.handle.set(handle);
+    }
+
+    yield* this.withStaleHandleRetry<Row>(request, handle as string, (h) =>
+      this.runQuery<Row>(request, h),
+    );
+  }
+
+  private async *withStaleHandleRetry<Row>(
+    request: PreparedExecuteRequest,
+    handle: string,
+    attempt: (handle: string) => AsyncIterable<Row>,
+  ): AsyncIterable<Row> {
+    let yielded = false;
+    try {
+      for await (const row of attempt(handle)) {
+        yielded = true;
+        yield row;
+      }
+      return;
+    } catch (error) {
+      // If a row was already yielded, the error came from mid-stream and a
+      // retry would re-yield prior rows to the consumer.
+      if (yielded || !isStalePreparedStatementError(error)) {
+        throw normalizePgError(error);
+      }
+      // pg's parsedStatements still records the old name; only a fresh name
+      // forces pg to re-Parse on this Client.
+      const retryHandle = this.options.handleAllocator.mint();
+      request.handle.set(retryHandle);
+      try {
+        yield* attempt(retryHandle);
+      } catch (retryError) {
+        throw normalizePgError(retryError);
+      }
+    }
+  }
+
+  // Errors propagate as raw pg errors so the caller can read SQLSTATE before
+  // normalising (the prepared-statement retry layer needs the original code).
+  private async *runQuery<Row>(request: SqlExecuteRequest, name?: string): AsyncIterable<Row> {
     const client = await this.acquireClient();
     try {
       if (!this.options.cursorDisabled) {
@@ -84,28 +198,23 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
             request.sql,
             request.params,
             this.options.cursorBatchSize,
+            name,
           )) {
             yield row as Row;
           }
           return;
         } catch (cursorError) {
-          if (!(cursorError instanceof Error)) {
+          // Non-pg cursor-specific errors fall through to the buffered path;
+          // real pg errors propagate.
+          if (!(cursorError instanceof Error) || isPostgresError(cursorError)) {
             throw cursorError;
           }
-          // Check if this is a pg error - if so, normalize and throw
-          // Otherwise, fall back to buffered mode for cursor-specific errors
-          if (isPostgresError(cursorError)) {
-            throw normalizePgError(cursorError);
-          }
-          // Not a pg error - cursor-specific error, fall back to buffered mode
         }
       }
 
-      for await (const row of this.executeBuffered(client, request.sql, request.params)) {
+      for await (const row of this.executeBuffered(client, request.sql, request.params, name)) {
         yield row as Row;
       }
-    } catch (error) {
-      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -146,8 +255,12 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
     sql: string,
     params: readonly unknown[] | undefined,
     cursorBatchSize: number,
+    name?: string,
   ): AsyncIterable<Record<string, unknown>> {
-    const cursor = client.query(new Cursor(sql, params as unknown[] | undefined));
+    const values = (params ?? []) as unknown[];
+    const cursor = client.query(
+      name === undefined ? new Cursor(sql, values) : new NamedCursor({ name, text: sql, values }),
+    );
 
     try {
       while (true) {
@@ -169,8 +282,10 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
     client: PoolClient | Client,
     sql: string,
     params: readonly unknown[] | undefined,
+    name?: string,
   ): AsyncIterable<Record<string, unknown>> {
-    const result = await client.query(sql, params as unknown[] | undefined);
+    const config: QueryConfig = { name, text: sql, values: (params ?? []) as unknown[] };
+    const result = await client.query(config);
     for (const row of result.rows as Record<string, unknown>[]) {
       yield row;
     }
@@ -278,10 +393,7 @@ class PostgresPoolDriverImpl
   #closed = false;
 
   constructor(options: PostgresDriverOptions & { connect: { pool: PoolType } }) {
-    super({
-      cursorBatchSize: options.cursor?.batchSize ?? DEFAULT_BATCH_SIZE,
-      cursorDisabled: options.cursor?.disabled ?? false,
-    });
+    super(buildConnectionOptions(options));
     this.pool = options.connect.pool;
   }
 
@@ -326,10 +438,7 @@ class PostgresDirectDriverImpl
   #connectPromise: Promise<void> | undefined;
 
   constructor(options: PostgresDriverOptions & { connect: { client: Client } }) {
-    super({
-      cursorBatchSize: options.cursor?.batchSize ?? DEFAULT_BATCH_SIZE,
-      cursorDisabled: options.cursor?.disabled ?? false,
-    });
+    super(buildConnectionOptions(options));
     this.directClient = options.connect.client;
   }
 
@@ -421,7 +530,9 @@ class PostgresDirectDriverImpl
 export function createBoundDriverFromBinding(
   binding: PostgresBinding,
   cursorOpts: PostgresDriverCreateOptions['cursor'],
+  extraOpts?: Pick<PostgresDriverCreateOptions, 'preparedStatements'>,
 ): SqlDriver<PostgresBinding> {
+  const preparedStatements = extraOpts?.preparedStatements;
   switch (binding.kind) {
     case 'url': {
       const pool = new Pool({
@@ -432,17 +543,20 @@ export function createBoundDriverFromBinding(
       return new PostgresPoolDriverImpl({
         connect: { pool },
         cursor: cursorOpts,
+        preparedStatements,
       });
     }
     case 'pgPool':
       return new PostgresPoolDriverImpl({
         connect: { pool: binding.pool },
         cursor: cursorOpts,
+        preparedStatements,
       });
     case 'pgClient':
       return new PostgresDirectDriverImpl({
         connect: { client: binding.client },
         cursor: cursorOpts,
+        preparedStatements,
       });
   }
 }

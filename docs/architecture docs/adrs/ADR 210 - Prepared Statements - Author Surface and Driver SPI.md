@@ -30,8 +30,13 @@ const ps = await db.prepare(
       .build(),
 );
 
-await ps.execute({ userId: 124, email: 'carl@example.com' });
-await ps.execute({ userId: 125, email: 'dee@example.com'  });
+const runtime = db.runtime();
+await ps.execute(runtime, { userId: 124, email: 'carl@example.com' });
+await ps.execute(runtime, { userId: 125, email: 'dee@example.com'  });
+
+await db.transaction(async (tx) => {
+  await ps.execute(tx, { userId: 126, email: 'eve@example.com' });
+});
 ```
 
 A few things to notice:
@@ -39,7 +44,8 @@ A few things to notice:
 - **`db.prepare(...)` is a top-level method on the DB facade.** It delegates to `db.runtime().prepare(...)`, the underlying primitive. The two surfaces have identical signatures and return the same object; the facade method exists so that simple call sites don't have to reach for the runtime explicitly.
 - **The first argument declares the parameter shape.** Names mapped to codec ids drawn from the codec registry. The editor autocompletes the codec id strings; the type system rejects unknown ones.
 - **The callback receives a `params` object whose values are bind-site references.** `params.userId` flowing into `eq(f.id, …)` slots in like any other expression — the type at that position is the same arm of `CodecExpression` that the DSL accepts wherever a literal would normally go (`eq`, `update`, `where` predicates, and so on). Slot reuse is implicit by reference equality: referring to `params.userId` twice is one slot used twice.
-- **`.execute(params)` is typed end to end.** `Params` comes from the declaration via each codec's `TInput` mapping; `Row` comes from the plan returned by the callback.
+- **`.execute(target, params)` is typed end to end.** `Params` comes from the declaration via each codec's `TInput` mapping; `Row` comes from the plan returned by the callback.
+- **The execution scope is always explicit.** The first argument is a `RuntimeQueryable` — the top-level runtime, an explicit connection, or an active transaction (or its `TransactionContext`). The same `PreparedStatement` redirects between them without re-preparation; there is no implicit binding back to the runtime that produced it.
 - **The first execute allocates a server-side handle; the second reuses it.** Subsequent executes against the same connection skip both lowering and parsing.
 
 Without `prepare`, ad-hoc `db.sql.from(…).execute()` runs as before: lowered every time, parsed by the server every time, and the framework keeps no state about it.
@@ -70,13 +76,23 @@ The `db.sql` proxy is unchanged. It still maps top-level keys to user-defined ta
 
 `declaration` is a name-keyed object whose values are codec-id strings drawn from the codec registry. The long form `{ codecId, nullable: true }` is used when nullability differs from the default. The codec-id position is statically typed against the registry, so the editor autocompletes it and unknown ids fail to compile.
 
-`Params` for `.execute(params)` is derived by looking each declared entry's codec up in the registry and using its `TInput` mapping, threading nullability through.
+`Params` for `.execute(target, params)` is derived by looking each declared entry's codec up in the registry and using its `TInput` mapping, threading nullability through.
 
 The callback receives `(sql, params)`. `sql` is the same DSL root that the rest of the system uses. Each `params.<name>` is a bind-site reference whose static type is `Expression<{ codecId; nullable }>` — the same arm of `CodecExpression` that the DSL accepts wherever a literal would go. Slot reuse is implicit by reference equality: if the callback refers to `params.userId` twice, that's one slot used twice. Literals not threaded through `params` get baked into the lowered SQL at lower time.
 
 The callback MUST end with `.build()`, returning a plan. `Row` is derived from that plan's row type.
 
 If a name in `declaration` isn't referenced by the callback's plan, `prepare` throws a stable error code under the `RUNTIME` namespace. (Type-level detection of unused declared params isn't achievable across the chained-builder type machinery; runtime detection is the contract.)
+
+### `.execute(target, params)` takes an explicit target
+
+`PreparedStatement.execute(target, params)` always names its execution scope. `target` is a `RuntimeQueryable` — the top-level `Runtime`, an explicit `RuntimeConnection`, or a `RuntimeTransaction` / `TransactionContext`. There is no default and no implicit binding back to the runtime that produced the statement.
+
+`RuntimeQueryable` itself extends to require both `execute(plan)` and `executePrepared(ps, params)`. Each scope (runtime, connection, transaction, transaction context) implements `executePrepared` against the `SqlQueryable` it is backed by; the prepared statement is pure data and just delegates to the target.
+
+This makes the same `PreparedStatement` reusable across scopes: prepare once at startup, and then run it against the runtime for one request, against an active transaction for another. Inside a transaction, `ps.execute(tx, params)` routes through the transaction's connection — a write earlier in the transaction is visible to the prepared lookup, and a rollback discards both. After the transaction ends, the same statement runs unchanged against the runtime.
+
+The alternative — letting `.execute(params)` default to "the runtime that built me" — was rejected. It silently couples prepared statements to a specific scope, makes the transaction case ambiguous (does an outer-prepared statement see the tx's state?), and forces an awkward second API to redirect when the answer is "no". An explicit first argument carries no ambiguity and keeps the prepared statement object scope-free.
 
 ### Why `prepare` is async with no driver I/O
 

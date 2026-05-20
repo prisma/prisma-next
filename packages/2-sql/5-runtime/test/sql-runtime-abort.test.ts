@@ -29,7 +29,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { descriptorsFromCodecs, stubAst } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -81,10 +81,12 @@ function createControlledDriver(options?: DriverOptions): SqlDriver & {
 
   const driver: SqlDriver = {
     execute,
+    executePrepared: execute,
     query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     connect: vi.fn().mockResolvedValue(undefined),
     acquireConnection: vi.fn().mockResolvedValue({
       execute,
+      executePrepared: execute,
       query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
       release: vi.fn().mockResolvedValue(undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
@@ -172,6 +174,7 @@ function rawExecutionPlan(overrides?: Partial<SqlExecutionPlan>): SqlExecutionPl
   return {
     sql: 'select 1',
     params: [],
+    ast: stubAst(),
     ...overrides,
     meta: {
       target: testContract.target,

@@ -3,6 +3,7 @@ import type {
   RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
 import type {
+  PreparedExecuteRequest,
   SqlConnection,
   SqlDriver,
   SqlExecuteRequest,
@@ -69,9 +70,11 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
   #delegate: SqlDriver<PostgresBinding> | null = null;
   #closed = false;
   #cursorOpts: PostgresDriverCreateOptions['cursor'];
+  #preparedStatements: PostgresDriverCreateOptions['preparedStatements'];
 
-  constructor(cursorOpts?: PostgresDriverCreateOptions['cursor']) {
-    this.#cursorOpts = cursorOpts;
+  constructor(options?: PostgresDriverCreateOptions) {
+    this.#cursorOpts = options?.cursor;
+    this.#preparedStatements = options?.preparedStatements;
   }
 
   get state(): 'unbound' | 'connected' | 'closed' {
@@ -98,7 +101,9 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
         bindingKind: binding.kind,
       });
     }
-    this.#delegate = createBoundDriverFromBinding(binding, this.#cursorOpts);
+    this.#delegate = createBoundDriverFromBinding(binding, this.#cursorOpts, {
+      preparedStatements: this.#preparedStatements,
+    });
     this.#closed = false;
   }
 
@@ -126,6 +131,7 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
     const wrapped: SqlConnection = {
       beginTransaction: connection.beginTransaction.bind(connection),
       execute: connection.execute.bind(connection),
+      executePrepared: connection.executePrepared.bind(connection),
       query: connection.query.bind(connection),
       release: async () => {
         try {
@@ -165,6 +171,16 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
     return delegate.execute<Row>(request);
   }
 
+  executePrepared<Row = Record<string, unknown>>(
+    request: PreparedExecuteRequest,
+  ): AsyncIterable<Row> {
+    const delegate = this.#delegate;
+    if (delegate === null) {
+      return unboundExecute<Row>();
+    }
+    return delegate.executePrepared<Row>(request);
+  }
+
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
     const delegate = this.#requireDelegate();
     const explain = delegate.explain;
@@ -191,7 +207,7 @@ const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
 > = {
   ...postgresDriverDescriptorMeta,
   create(options?: PostgresDriverCreateOptions): PostgresRuntimeDriver {
-    return new PostgresUnboundDriverImpl(options?.cursor);
+    return new PostgresUnboundDriverImpl(options);
   },
 };
 

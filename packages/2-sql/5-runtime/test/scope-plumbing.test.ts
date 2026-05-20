@@ -24,7 +24,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { descriptorsFromCodecs, stubAst } from './utils';
 
 /**
  * Verifies the SQL runtime populates `RuntimeMiddlewareContext.scope`
@@ -87,12 +87,18 @@ function createMockDriver(): SqlDriver {
     execute: vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
       yield { id: 3 } as Record<string, unknown>;
     }),
+    executePrepared: vi.fn().mockImplementation(async function* () {
+      yield { id: 3 } as Record<string, unknown>;
+    }),
     query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     commit: vi.fn().mockResolvedValue(undefined),
     rollback: vi.fn().mockResolvedValue(undefined),
   };
   const connection = {
     execute: vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
+      yield { id: 2 } as Record<string, unknown>;
+    }),
+    executePrepared: vi.fn().mockImplementation(async function* () {
       yield { id: 2 } as Record<string, unknown>;
     }),
     query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -102,6 +108,9 @@ function createMockDriver(): SqlDriver {
   };
   return {
     execute: vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
+      yield { id: 1 } as Record<string, unknown>;
+    }),
+    executePrepared: vi.fn().mockImplementation(async function* () {
       yield { id: 1 } as Record<string, unknown>;
     }),
     query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -186,6 +195,7 @@ function createRawExecutionPlan(): SqlExecutionPlan {
   return {
     sql: 'select 1',
     params: [],
+    ast: stubAst(),
     meta: {
       target: testContract.target,
       targetFamily: testContract.targetFamily,
@@ -248,6 +258,98 @@ describe('SQL runtime scope plumbing', () => {
     const transaction = await connection.transaction();
     try {
       await transaction.execute(createRawExecutionPlan()).toArray();
+      await transaction.commit();
+    } finally {
+      await connection.release();
+    }
+
+    expect(seen).toEqual(['transaction']);
+  });
+
+  it('populates ctx.scope = "runtime" on top-level prepared .execute(runtime, ...)', async () => {
+    const seen: Array<'runtime' | 'connection' | 'transaction'> = [];
+    const observer: SqlMiddleware = {
+      name: 'scope-observer',
+      familyId: 'sql',
+      async beforeExecute(_plan, ctx) {
+        seen.push(ctx.scope);
+      },
+    };
+
+    const { runtime } = createTestSetup([observer]);
+    const ps = await runtime.prepare({}, () => ({
+      ast: stubAst(),
+      params: [],
+      meta: {
+        target: testContract.target,
+        targetFamily: testContract.targetFamily,
+        storageHash: testContract.storage.storageHash,
+        lane: 'raw',
+      },
+    }));
+
+    await ps.execute(runtime, {}).toArray();
+    expect(seen).toEqual(['runtime']);
+  });
+
+  it('populates ctx.scope = "connection" on prepared .execute(connection, ...)', async () => {
+    const seen: Array<'runtime' | 'connection' | 'transaction'> = [];
+    const observer: SqlMiddleware = {
+      name: 'scope-observer',
+      familyId: 'sql',
+      async beforeExecute(_plan, ctx) {
+        seen.push(ctx.scope);
+      },
+    };
+
+    const { runtime } = createTestSetup([observer]);
+    const ps = await runtime.prepare({}, () => ({
+      ast: stubAst(),
+      params: [],
+      meta: {
+        target: testContract.target,
+        targetFamily: testContract.targetFamily,
+        storageHash: testContract.storage.storageHash,
+        lane: 'raw',
+      },
+    }));
+
+    const connection = await runtime.connection();
+    try {
+      await ps.execute(connection, {}).toArray();
+    } finally {
+      await connection.release();
+    }
+
+    expect(seen).toEqual(['connection']);
+  });
+
+  it('populates ctx.scope = "transaction" on prepared .execute(transaction, ...)', async () => {
+    const seen: Array<'runtime' | 'connection' | 'transaction'> = [];
+    const observer: SqlMiddleware = {
+      name: 'scope-observer',
+      familyId: 'sql',
+      async beforeExecute(_plan, ctx) {
+        seen.push(ctx.scope);
+      },
+    };
+
+    const { runtime } = createTestSetup([observer]);
+    const ps = await runtime.prepare({}, () => ({
+      ast: stubAst(),
+      params: [],
+      meta: {
+        target: testContract.target,
+        targetFamily: testContract.targetFamily,
+        storageHash: testContract.storage.storageHash,
+        lane: 'raw',
+      },
+    }));
+
+    const connection = await runtime.connection();
+    const transaction = await connection.transaction();
+    try {
+      await ps.execute(transaction, {}).toArray();
       await transaction.commit();
     } finally {
       await connection.release();

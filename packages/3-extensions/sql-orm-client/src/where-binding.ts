@@ -56,6 +56,9 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
     param(expr) {
       return expr;
     },
+    preparedParam(expr) {
+      return expr;
+    },
     list(expr) {
       return bindExpression(contract, expr);
     },

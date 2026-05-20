@@ -16,6 +16,16 @@ export type { LintsOptions } from '../middleware/lints';
 export { lints } from '../middleware/lints';
 export type { SqlMiddleware, SqlMiddlewareContext } from '../middleware/sql-middleware';
 export type {
+  BindSiteParams,
+  Declaration,
+  DeclaredCodecId,
+  DeclaredNullable,
+  ParamSpec,
+  ParamsFromDeclaration,
+  PrepareCallback,
+  PreparedStatement,
+} from '../prepared/types';
+export type {
   MarkerReader,
   RuntimeFamilyAdapter,
   RuntimeTelemetryEvent,
