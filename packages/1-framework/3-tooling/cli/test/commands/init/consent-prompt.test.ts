@@ -6,7 +6,11 @@ import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INIT_EXIT_OK } from '../../../src/commands/init/exit-codes';
 import { runInit } from '../../../src/commands/init/init';
-import { resolveInitInputs, TELEMETRY_CONSENT_MESSAGE } from '../../../src/commands/init/inputs';
+import {
+  type ResolvedInitInputs,
+  resolveInitInputs,
+  TELEMETRY_CONSENT_MESSAGE,
+} from '../../../src/commands/init/inputs';
 import type { GlobalFlags } from '../../../src/utils/global-flags';
 import { isCI } from '../../../src/utils/is-ci';
 
@@ -246,6 +250,34 @@ describe('telemetry consent prompt during `init`', () => {
     });
 
     expect(secondExit).toBe(INIT_EXIT_OK);
+    expect(afterFirstTelemetryConsent).toHaveBeenCalledOnce();
+  });
+
+  it('awaits an async afterFirstTelemetryConsent callback and swallows its rejections', async () => {
+    vi.mocked(clack.confirm).mockResolvedValue(true);
+    let resolveCallback: () => void = () => undefined;
+    const callbackSettled = new Promise<void>((resolve) => {
+      resolveCallback = resolve;
+    });
+    const afterFirstTelemetryConsent = vi.fn<(inputs: ResolvedInitInputs) => Promise<void>>(
+      async () => {
+        resolveCallback();
+        throw new Error('telemetry post failed');
+      },
+    );
+
+    const exitCode = await runInit(projectDir, {
+      options: { ...initOptions, install: false },
+      flags: interactiveFlags(),
+      canPrompt: true,
+      afterFirstTelemetryConsent,
+    });
+
+    await callbackSettled;
+
+    // init succeeds even though the async callback rejected — the try/catch
+    // around the awaited call must swallow it.
+    expect(exitCode).toBe(INIT_EXIT_OK);
     expect(afterFirstTelemetryConsent).toHaveBeenCalledOnce();
   });
 

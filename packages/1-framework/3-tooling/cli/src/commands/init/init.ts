@@ -117,7 +117,7 @@ export async function runInit(
      * Called once after the first affirmative telemetry consent is persisted.
      * Failures are swallowed by the caller; init success must not depend on telemetry.
      */
-    readonly afterFirstTelemetryConsent?: (inputs: ResolvedInitInputs) => void;
+    readonly afterFirstTelemetryConsent?: (inputs: ResolvedInitInputs) => void | Promise<void>;
     /**
      * FR8.3 — test-only seam for the optional database version probe.
      * Production callers omit this; tests inject stub `probePostgres` /
@@ -151,7 +151,7 @@ export async function runInit(
 
   if (inputs.enableTelemetry === true && afterFirstTelemetryConsent !== undefined) {
     try {
-      afterFirstTelemetryConsent(inputs);
+      await afterFirstTelemetryConsent(inputs);
     } catch {
       // telemetry is best-effort and must never affect init
     }
