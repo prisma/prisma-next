@@ -58,6 +58,11 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      # Re-install after build so pnpm relinks workspace bins now that
+      # their target files exist (mirrors `ci.yml`'s `fixtures` job).
+      - name: Link built binaries
+        run: pnpm install --frozen-lockfile
+
       - name: Apply migrations
         working-directory: apps/telemetry-backend
         env:
