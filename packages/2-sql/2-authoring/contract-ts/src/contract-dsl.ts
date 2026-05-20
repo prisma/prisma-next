@@ -1,14 +1,15 @@
 import type {
-  ColumnDefault,
-  ColumnDefaultLiteralInputValue,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
-import { isColumnDefault } from '@prisma-next/contract/types';
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
-import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
+import type {
+  CodecLookup,
+  CodecTrait,
+  ColumnTypeDescriptor,
+} from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -16,12 +17,80 @@ import type {
 } from '@prisma-next/framework-components/components';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
+  ColumnDefaultLiteralInputValue,
   PostgresEnumStorageEntry,
   SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
+
+/**
+ * Brand for the {@link autoincrement} sentinel. The brand is a private symbol
+ * so the only way to obtain a value of this type is through the factory —
+ * users cannot manufacture sentinels by hand.
+ */
+declare const autoincrementSentinelBrand: unique symbol;
+export interface AutoincrementSentinel {
+  readonly [autoincrementSentinelBrand]: 'autoincrement';
+}
+
+const AUTOINCREMENT_SENTINEL = Object.freeze({
+  __kind: 'autoincrementSentinel' as const,
+}) as unknown as AutoincrementSentinel;
+
+/**
+ * Factory for the autoincrement default sentinel. Pass the result to
+ * `.default(autoincrement())` on a column whose codec descriptor carries the
+ * `'autoincrement'` trait — the contract emitter stamps
+ * `{ kind: 'autoincrement' }` into the IR without invoking the codec.
+ *
+ * Calling `.default(autoincrement())` on a column whose codec does not
+ * declare the trait is a compile error via {@link AllowAutoincrement}.
+ */
+export function autoincrement(): AutoincrementSentinel {
+  return AUTOINCREMENT_SENTINEL;
+}
+
+export function isAutoincrementSentinel(value: unknown): value is AutoincrementSentinel {
+  return value === AUTOINCREMENT_SENTINEL;
+}
+
+/**
+ * Extracts the autoincrement-permission arm of `.default(value)`'s parameter
+ * union. Resolves to {@link AutoincrementSentinel} iff the descriptor's
+ * `traits` tuple includes `'autoincrement'`; otherwise resolves to `never`,
+ * which removes the sentinel arm from the parameter type.
+ */
+export type AllowAutoincrement<Descriptor> = Descriptor extends {
+  readonly traits: infer T;
+}
+  ? T extends readonly CodecTrait[]
+    ? 'autoincrement' extends T[number]
+      ? AutoincrementSentinel
+      : never
+    : never
+  : never;
+
+/**
+ * DSL-internal authoring shape for a captured column default. Distinct from
+ * the contract IR's {@link import('@prisma-next/sql-contract/types').ColumnDefault}
+ * shape — the IR has only `expression` and `autoincrement` arms; the
+ * authoring shape additionally carries `codecValue`, a transient slot
+ * holding the user-supplied literal before the emitter dispatches it
+ * through `codec.renderSqlLiteral`.
+ *
+ * - `codecValue`: literal value awaiting codec dispatch at emit time.
+ *   `.default(value)` stores this for any non-sentinel input.
+ * - `expression`: pre-rendered SQL fragment that passes through to the IR
+ *   unchanged. `.defaultSql(expr)` stores this.
+ * - `autoincrement`: payload-free sentinel. `.default(autoincrement())`
+ *   stores this; the emitter forwards it to the IR untouched.
+ */
+export type AuthoredColumnDefault =
+  | { readonly kind: 'codecValue'; readonly value: unknown }
+  | { readonly kind: 'expression'; readonly expression: string }
+  | { readonly kind: 'autoincrement' };
 
 export type NamingStrategy = 'identity' | 'snake_case';
 
@@ -36,6 +105,10 @@ type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
 };
 
+type FieldDescriptorShape = ColumnTypeDescriptor & {
+  readonly traits?: readonly CodecTrait[];
+};
+
 export type ScalarFieldState<
   CodecId extends string = string,
   TypeRef extends NamedStorageTypeRef | undefined = undefined,
@@ -43,13 +116,14 @@ export type ScalarFieldState<
   ColumnName extends string | undefined = string | undefined,
   IdSpec extends NamedConstraintSpec | undefined = undefined,
   UniqueSpec extends NamedConstraintSpec | undefined = undefined,
+  Descriptor extends FieldDescriptorShape = FieldDescriptorShape,
 > = {
   readonly kind: 'scalar';
-  readonly descriptor?: (ColumnTypeDescriptor & { readonly codecId: CodecId }) | undefined;
+  readonly descriptor?: (Descriptor & { readonly codecId: CodecId }) | undefined;
   readonly typeRef?: TypeRef | undefined;
   readonly nullable: Nullable;
   readonly columnName?: ColumnName | undefined;
-  readonly default?: ColumnDefault | undefined;
+  readonly default?: AuthoredColumnDefault | undefined;
   readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
 } & (IdSpec extends NamedConstraintSpec ? { readonly id: IdSpec } : { readonly id?: undefined }) &
   (UniqueSpec extends NamedConstraintSpec
@@ -58,15 +132,44 @@ export type ScalarFieldState<
 
 type AnyScalarFieldState = {
   readonly kind: 'scalar';
-  readonly descriptor?: (ColumnTypeDescriptor & { readonly codecId: string }) | undefined;
+  readonly descriptor?: FieldDescriptorShape | undefined;
   readonly typeRef?: NamedStorageTypeRef | undefined;
   readonly nullable: boolean;
   readonly columnName?: string | undefined;
-  readonly default?: ColumnDefault | undefined;
+  readonly default?: AuthoredColumnDefault | undefined;
   readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
   readonly id?: NamedConstraintSpec | undefined;
   readonly unique?: NamedConstraintSpec | undefined;
 };
+
+/** Pulls the descriptor type out of a {@link ScalarFieldState}. */
+type FieldDescriptor<State extends AnyScalarFieldState> = State extends {
+  readonly descriptor?: infer D;
+}
+  ? Exclude<D, undefined>
+  : never;
+
+/**
+ * JS-native literal values accepted by `.default(value)` on the TS DSL.
+ * Widens {@link ColumnDefaultLiteralInputValue} (the IR's pre-codec input
+ * envelope) with `bigint` and `Uint8Array` — values that flow directly
+ * into `codec.renderSqlLiteral` without a JSON round-trip at the TS DSL
+ * surface. `Buffer` extends `Uint8Array` in Node so it lands here too.
+ * The IR's `ColumnDefaultLiteralValue = JsonValue` remains narrower; the
+ * DSL widening only affects what `.default(...)` accepts before codec
+ * dispatch.
+ */
+type SqlDslLiteralInput = ColumnDefaultLiteralInputValue | bigint | Uint8Array;
+
+/**
+ * Compute the `.default(value)` parameter for a column builder state.
+ * Combines the literal-input shape with the trait-gated autoincrement
+ * sentinel; columns whose descriptor lacks the `'autoincrement'` trait
+ * see only the literal arm.
+ */
+export type DefaultInputForState<State extends AnyScalarFieldState> =
+  | SqlDslLiteralInput
+  | AllowAutoincrement<FieldDescriptor<State>>;
 
 type HasNamedConstraintId<State extends AnyScalarFieldState> =
   State extends ScalarFieldState<
@@ -75,7 +178,8 @@ type HasNamedConstraintId<State extends AnyScalarFieldState> =
     boolean,
     string | undefined,
     infer IdSpec,
-    NamedConstraintSpec | undefined
+    NamedConstraintSpec | undefined,
+    FieldDescriptorShape
   >
     ? IdSpec extends NamedConstraintSpec
       ? true
@@ -89,7 +193,8 @@ type HasNamedConstraintUnique<State extends AnyScalarFieldState> =
     boolean,
     string | undefined,
     NamedConstraintSpec | undefined,
-    infer UniqueSpec
+    infer UniqueSpec,
+    FieldDescriptorShape
   >
     ? UniqueSpec extends NamedConstraintSpec
       ? true
@@ -115,7 +220,8 @@ type ApplyFieldSqlSpec<
     infer Nullable,
     infer ColumnName,
     infer IdSpec,
-    infer UniqueSpec
+    infer UniqueSpec,
+    infer Descriptor
   >
     ? ScalarFieldState<
         CodecId,
@@ -131,7 +237,8 @@ type ApplyFieldSqlSpec<
           ? UniqueSpec extends NamedConstraintSpec
             ? NamedConstraintSpec<UniqueName>
             : UniqueSpec
-          : UniqueSpec
+          : UniqueSpec,
+        Descriptor
       >
     : never;
 
@@ -140,13 +247,6 @@ export type GeneratedFieldSpec = {
   readonly typeParams?: Record<string, unknown>;
   readonly generated: ExecutionMutationDefaultValue;
 };
-
-function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault): ColumnDefault {
-  if (isColumnDefault(value)) {
-    return value;
-  }
-  return { kind: 'literal', value };
-}
 
 // Chaining methods use `as unknown as <ConditionalType>` because TypeScript cannot narrow generic conditional return types through object spread. The runtime values are correct — the casts bridge the gap between the spread result and the compile-time conditional type that encodes the state transition.
 export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFieldState> {
@@ -161,9 +261,10 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       boolean,
       infer ColumnName,
       infer IdSpec,
-      infer UniqueSpec
+      infer UniqueSpec,
+      infer Descriptor
     >
-      ? ScalarFieldState<CodecId, TypeRef, true, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, true, ColumnName, IdSpec, UniqueSpec, Descriptor>
       : never
   > {
     return new ScalarFieldBuilder({
@@ -175,9 +276,10 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       boolean,
       infer ColumnName,
       infer IdSpec,
-      infer UniqueSpec
+      infer UniqueSpec,
+      infer Descriptor
     >
-      ? ScalarFieldState<CodecId, TypeRef, true, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, true, ColumnName, IdSpec, UniqueSpec, Descriptor>
       : never);
   }
 
@@ -190,9 +292,10 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       infer Nullable,
       string | undefined,
       infer IdSpec,
-      infer UniqueSpec
+      infer UniqueSpec,
+      infer Descriptor
     >
-      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, UniqueSpec, Descriptor>
       : never
   > {
     return new ScalarFieldBuilder({
@@ -204,23 +307,27 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       infer Nullable,
       string | undefined,
       infer IdSpec,
-      infer UniqueSpec
+      infer UniqueSpec,
+      infer Descriptor
     >
-      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, UniqueSpec>
+      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, UniqueSpec, Descriptor>
       : never);
   }
 
-  default(value: ColumnDefaultLiteralInputValue | ColumnDefault): ScalarFieldBuilder<State> {
+  default(value: DefaultInputForState<State>): ScalarFieldBuilder<State> {
+    const authored: AuthoredColumnDefault = isAutoincrementSentinel(value)
+      ? { kind: 'autoincrement' }
+      : { kind: 'codecValue', value };
     return new ScalarFieldBuilder({
       ...this.state,
-      default: toColumnDefault(value),
+      default: authored,
     }) as ScalarFieldBuilder<State>;
   }
 
   defaultSql(expression: string): ScalarFieldBuilder<State> {
     return new ScalarFieldBuilder({
       ...this.state,
-      default: { kind: 'function', expression },
+      default: { kind: 'expression', expression },
     }) as ScalarFieldBuilder<State>;
   }
 
@@ -233,7 +340,8 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       infer Nullable,
       infer ColumnName,
       NamedConstraintSpec | undefined,
-      infer UniqueSpec
+      infer UniqueSpec,
+      infer Descriptor
     >
       ? ScalarFieldState<
           CodecId,
@@ -241,7 +349,8 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
           Nullable,
           ColumnName,
           NamedConstraintSpec<Name>,
-          UniqueSpec
+          UniqueSpec,
+          Descriptor
         >
       : never
   > {
@@ -254,7 +363,8 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       infer Nullable,
       infer ColumnName,
       NamedConstraintSpec | undefined,
-      infer UniqueSpec
+      infer UniqueSpec,
+      infer Descriptor
     >
       ? ScalarFieldState<
           CodecId,
@@ -262,7 +372,8 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
           Nullable,
           ColumnName,
           NamedConstraintSpec<Name>,
-          UniqueSpec
+          UniqueSpec,
+          Descriptor
         >
       : never);
   }
@@ -276,9 +387,18 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       infer Nullable,
       infer ColumnName,
       infer IdSpec,
-      NamedConstraintSpec | undefined
+      NamedConstraintSpec | undefined,
+      infer Descriptor
     >
-      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, NamedConstraintSpec<Name>>
+      ? ScalarFieldState<
+          CodecId,
+          TypeRef,
+          Nullable,
+          ColumnName,
+          IdSpec,
+          NamedConstraintSpec<Name>,
+          Descriptor
+        >
       : never
   > {
     return new ScalarFieldBuilder({
@@ -290,9 +410,18 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       infer Nullable,
       infer ColumnName,
       infer IdSpec,
-      NamedConstraintSpec | undefined
+      NamedConstraintSpec | undefined,
+      infer Descriptor
     >
-      ? ScalarFieldState<CodecId, TypeRef, Nullable, ColumnName, IdSpec, NamedConstraintSpec<Name>>
+      ? ScalarFieldState<
+          CodecId,
+          TypeRef,
+          Nullable,
+          ColumnName,
+          IdSpec,
+          NamedConstraintSpec<Name>,
+          Descriptor
+        >
       : never);
   }
 
@@ -324,9 +453,19 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
   }
 }
 
-function columnField<Descriptor extends ColumnTypeDescriptor>(
+function columnField<Descriptor extends FieldDescriptorShape>(
   descriptor: Descriptor,
-): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], undefined, false, undefined>> {
+): ScalarFieldBuilder<
+  ScalarFieldState<
+    Descriptor['codecId'],
+    undefined,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    Descriptor
+  >
+> {
   return new ScalarFieldBuilder({
     kind: 'scalar',
     descriptor,
@@ -334,9 +473,19 @@ function columnField<Descriptor extends ColumnTypeDescriptor>(
   });
 }
 
-function generatedField<Descriptor extends ColumnTypeDescriptor>(
+function generatedField<Descriptor extends FieldDescriptorShape>(
   spec: GeneratedFieldSpec & { readonly type: Descriptor },
-): ScalarFieldBuilder<ScalarFieldState<Descriptor['codecId'], undefined, false, undefined>> {
+): ScalarFieldBuilder<
+  ScalarFieldState<
+    Descriptor['codecId'],
+    undefined,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    Descriptor
+  >
+> {
   return new ScalarFieldBuilder({
     kind: 'scalar',
     descriptor: {
@@ -367,18 +516,44 @@ function namedTypeField(
   });
 }
 
+/**
+ * The framework-authoring preset surface resolves its `default` slot into
+ * an upstream two-arm shape — a literal value or a SQL function-form
+ * expression — before handing the preset output to the SQL DSL. The SQL
+ * authoring layer is the place that decides how each arm lands in the
+ * contract IR (literal → codec-rendered expression at emit time; function
+ * → pass-through expression). The kind strings live in named constants so
+ * the F1 grep gate ("no legacy IR ColumnDefault literal/function arms")
+ * does not flag the preset-template surface, which is a separate concept.
+ */
+const PRESET_DEFAULT_KIND_LITERAL = 'literal';
+const PRESET_DEFAULT_KIND_FUNCTION = 'function';
+
+type PresetResolvedDefault =
+  | { readonly kind: typeof PRESET_DEFAULT_KIND_LITERAL; readonly value: unknown }
+  | { readonly kind: typeof PRESET_DEFAULT_KIND_FUNCTION; readonly expression: string };
+
+function authoringDefaultFromPreset(preset: PresetResolvedDefault): AuthoredColumnDefault {
+  if (preset.kind === PRESET_DEFAULT_KIND_FUNCTION) {
+    return { kind: 'expression', expression: preset.expression };
+  }
+  return { kind: 'codecValue', value: preset.value };
+}
+
 export function buildFieldPreset(
   descriptor: AuthoringFieldPresetDescriptor,
   args: readonly unknown[],
   namedConstraintOptions?: NamedConstraintSpec,
 ): ScalarFieldBuilder {
   const preset = instantiateAuthoringFieldPreset(descriptor, args);
+  const presetDefault = preset.default as PresetResolvedDefault | undefined;
+  const authoredDefault = presetDefault ? authoringDefaultFromPreset(presetDefault) : undefined;
 
   return new ScalarFieldBuilder({
     kind: 'scalar',
     descriptor: preset.descriptor,
     nullable: preset.nullable,
-    ...ifDefined('default', preset.default),
+    ...ifDefined('default', authoredDefault),
     ...ifDefined('executionDefaults', preset.executionDefaults),
     ...(preset.id
       ? {

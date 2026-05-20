@@ -17,6 +17,8 @@ import {
   createComposedAuthoringHelpers,
 } from './composed-authoring-helpers';
 import {
+  type AutoincrementSentinel,
+  autoincrement,
   type ContractInput,
   type ContractModelBuilder,
   field,
@@ -413,5 +415,11 @@ export function defineContract(
   return buildContractFromDsl(builtDefinition);
 }
 
-export type { ComposedAuthoringHelpers, ContractInput, ContractModelBuilder, ScalarFieldBuilder };
-export { field, model, rel };
+export type {
+  AutoincrementSentinel,
+  ComposedAuthoringHelpers,
+  ContractInput,
+  ContractModelBuilder,
+  ScalarFieldBuilder,
+};
+export { autoincrement, field, model, rel };
