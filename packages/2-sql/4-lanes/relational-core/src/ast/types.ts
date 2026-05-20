@@ -1525,10 +1525,6 @@ export class InsertAst extends QueryAst {
     return new InsertAst(table);
   }
 
-  withValues(values: Record<string, InsertValue>): InsertAst {
-    return new InsertAst(this.table, [{ ...values }], this.onConflict, this.returning);
-  }
-
   withRows(rows: ReadonlyArray<Record<string, InsertValue>>): InsertAst {
     return new InsertAst(
       this.table,
