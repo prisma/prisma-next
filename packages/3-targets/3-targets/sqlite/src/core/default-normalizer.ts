@@ -7,17 +7,7 @@
  * `target-sqlite` reaching into `adapter-sqlite`.
  */
 
-import type { ColumnDefault } from '@prisma-next/contract/types';
-
-const NULL_PATTERN = /^NULL$/i;
-const INTEGER_PATTERN = /^-?\d+$/;
-const REAL_PATTERN = /^-?\d+\.\d+(?:[eE][+-]?\d+)?$/;
-const HEX_PATTERN = /^0[xX][\dA-Fa-f]+$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'$/;
-
-function isNumericLiteral(value: string): boolean {
-  return INTEGER_PATTERN.test(value) || REAL_PATTERN.test(value) || HEX_PATTERN.test(value);
-}
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 
 /**
  * Strips a single matched wrapping pair of outer parens from `s`. Conservative:
@@ -42,7 +32,7 @@ export function stripOuterParens(s: string): string {
 
 export function parseSqliteDefault(
   rawDefault: string,
-  nativeType?: string,
+  _nativeType?: string,
 ): ColumnDefault | undefined {
   let trimmed = rawDefault.trim();
 
@@ -62,31 +52,8 @@ export function parseSqliteDefault(
   // form for verification.
   const lower = trimmed.toLowerCase();
   if (lower === 'current_timestamp' || lower === "datetime('now')" || lower === 'datetime("now")') {
-    return { kind: 'function', expression: 'now()' };
+    return { kind: 'expression', expression: 'now()' };
   }
 
-  if (NULL_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: null };
-  }
-
-  // SQLite integers are 64-bit, so values outside the JS safe-integer range can't
-  // be faithfully represented as `number`. Mirror `parsePostgresDefault`'s bigint
-  // handling: parse as JS `number` when safe, fall back to the raw text otherwise.
-  if (isNumericLiteral(trimmed)) {
-    const num = Number(trimmed);
-    if (!Number.isFinite(num)) return undefined;
-    if (nativeType?.toLowerCase() === 'integer' && !Number.isSafeInteger(num)) {
-      return { kind: 'literal', value: trimmed };
-    }
-    return { kind: 'literal', value: num };
-  }
-
-  const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
-  if (stringMatch?.[1] !== undefined) {
-    const unescaped = stringMatch[1].replace(/''/g, "'");
-    return { kind: 'literal', value: unescaped };
-  }
-
-  // Unrecognized expression — preserve as function
-  return { kind: 'function', expression: trimmed };
+  return { kind: 'expression', expression: trimmed };
 }

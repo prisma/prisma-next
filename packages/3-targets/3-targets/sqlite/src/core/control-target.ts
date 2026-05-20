@@ -1,4 +1,4 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
@@ -9,10 +9,13 @@ import type {
   MigrationPlanner,
   MigrationRunner,
 } from '@prisma-next/framework-components/control';
-import { SqlStorage, type StorageColumn } from '@prisma-next/sql-contract/types';
+import {
+  type ColumnDefault,
+  SqlStorage,
+  type StorageColumn,
+} from '@prisma-next/sql-contract/types';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 import { createSqliteMigrationPlanner } from './migrations/planner';
-import { renderDefaultLiteral } from './migrations/planner-ddl-builders';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
 import { createSqliteMigrationRunner } from './migrations/runner';
 import { SqliteContractSerializer } from './sqlite-contract-serializer';
@@ -23,13 +26,13 @@ function isSqlContract(contract: Contract | null): contract is Contract<SqlStora
 }
 
 function sqliteRenderDefault(def: ColumnDefault, _column: StorageColumn): string {
-  if (def.kind === 'function') {
-    if (def.expression === 'now()') {
-      return "datetime('now')";
-    }
-    return def.expression;
+  if (def.kind === 'autoincrement') {
+    return 'INTEGER PRIMARY KEY AUTOINCREMENT';
   }
-  return renderDefaultLiteral(def.value);
+  if (def.expression === 'now()') {
+    return "datetime('now')";
+  }
+  return def.expression;
 }
 
 const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', SqlitePlanTargetDetails> =

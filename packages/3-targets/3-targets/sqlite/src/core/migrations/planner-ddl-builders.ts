@@ -15,7 +15,7 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import { escapeLiteral, quoteIdentifier } from '../sql-utils';
+import { quoteIdentifier } from '../sql-utils';
 
 type SqliteColumnDefault = StorageColumn['default'];
 
@@ -26,15 +26,6 @@ function assertSafeNativeType(nativeType: string): void {
     throw new Error(
       `Unsafe native type name in contract: "${nativeType}". ` +
         'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*$/',
-    );
-  }
-}
-
-function assertSafeDefaultExpression(expression: string): void {
-  if (expression.includes(';') || /--|\/\*|\bSELECT\b/i.test(expression)) {
-    throw new Error(
-      `Unsafe default expression in contract: "${expression}". ` +
-        'Default expressions must not contain semicolons, SQL comment tokens, or subqueries.',
     );
   }
 }
@@ -53,44 +44,45 @@ export function buildColumnTypeSql(
   return resolved.nativeType.toUpperCase();
 }
 
+export interface ColumnDefaultContext {
+  readonly tableName: string;
+  readonly columnName: string;
+  readonly isIntegerPrimaryKey: boolean;
+}
+
 /**
  * Renders the column's `DEFAULT …` clause. Returns the empty string when
- * there is no default, and also when the default is `autoincrement()` —
- * SQLite encodes that as `INTEGER PRIMARY KEY AUTOINCREMENT` inline on the
- * column definition, not as a separate DEFAULT.
+ * there is no default, and also when the default is `autoincrement` on a
+ * valid `INTEGER PRIMARY KEY` column — SQLite encodes that as
+ * `INTEGER PRIMARY KEY AUTOINCREMENT` inline on the column definition, not
+ * as a separate DEFAULT.
+ *
+ * Throws a diagnostic when `kind: 'autoincrement'` arrives on a column that
+ * is not `INTEGER PRIMARY KEY` — SQLite's autoincrement mechanism only
+ * operates on the rowid alias column.
  */
-export function buildColumnDefaultSql(columnDefault: SqliteColumnDefault | undefined): string {
+export function buildColumnDefaultSql(
+  columnDefault: SqliteColumnDefault | undefined,
+  context?: ColumnDefaultContext,
+): string {
   if (!columnDefault) return '';
 
   switch (columnDefault.kind) {
-    case 'literal':
-      return `DEFAULT ${renderDefaultLiteral(columnDefault.value)}`;
-    case 'function': {
-      if (columnDefault.expression === 'autoincrement()') return '';
+    case 'autoincrement': {
+      if (!context || !context.isIntegerPrimaryKey) {
+        const columnPath = context ? `${context.tableName}.${context.columnName}` : '<unknown>';
+        throw new Error(
+          `Column "${columnPath}" has kind 'autoincrement' but is not an INTEGER PRIMARY KEY. ` +
+            'SQLite AUTOINCREMENT is only valid on INTEGER PRIMARY KEY columns.',
+        );
+      }
+      return '';
+    }
+    case 'expression': {
       if (columnDefault.expression === 'now()') return "DEFAULT (datetime('now'))";
-      assertSafeDefaultExpression(columnDefault.expression);
       return `DEFAULT (${columnDefault.expression})`;
     }
   }
-}
-
-export function renderDefaultLiteral(value: unknown): string {
-  if (value instanceof Date) {
-    return `'${escapeLiteral(value.toISOString())}'`;
-  }
-  if (typeof value === 'string') {
-    return `'${escapeLiteral(value)}'`;
-  }
-  if (typeof value === 'number' || typeof value === 'bigint') {
-    return String(value);
-  }
-  if (typeof value === 'boolean') {
-    return value ? '1' : '0';
-  }
-  if (value === null) {
-    return 'NULL';
-  }
-  return `'${escapeLiteral(JSON.stringify(value))}'`;
 }
 
 export function buildCreateIndexSql(
@@ -109,7 +101,7 @@ export function buildDropIndexSql(indexName: string): string {
 
 /**
  * True when the column is rendered inline as `INTEGER PRIMARY KEY
- * AUTOINCREMENT`. Requires the column's default to be `autoincrement()` and
+ * AUTOINCREMENT`. Requires the column's default to be `autoincrement` and
  * the column to be the sole member of the table's primary key — anything
  * else falls back to a separate PRIMARY KEY constraint with a default
  * AUTOINCREMENT semantics expressed elsewhere.
@@ -118,7 +110,7 @@ export function isInlineAutoincrementPrimaryKey(table: StorageTable, columnName:
   if (table.primaryKey?.columns.length !== 1) return false;
   if (table.primaryKey.columns[0] !== columnName) return false;
   const column = table.columns[columnName];
-  return column?.default?.kind === 'function' && column.default.expression === 'autoincrement()';
+  return column?.default?.kind === 'autoincrement';
 }
 
 type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' | 'typeParams'>;

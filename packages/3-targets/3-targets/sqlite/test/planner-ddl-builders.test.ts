@@ -6,7 +6,6 @@ import {
   buildCreateIndexSql,
   buildDropIndexSql,
   isInlineAutoincrementPrimaryKey,
-  renderDefaultLiteral,
 } from '../src/core/migrations/planner-ddl-builders';
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
@@ -59,54 +58,63 @@ describe('buildColumnDefaultSql', () => {
     expect(buildColumnDefaultSql(undefined)).toBe('');
   });
 
-  it('renders literal string default', () => {
-    expect(buildColumnDefaultSql({ kind: 'literal', value: 'hello' })).toBe("DEFAULT 'hello'");
-  });
-
-  it('renders literal number default', () => {
-    expect(buildColumnDefaultSql({ kind: 'literal', value: 42 })).toBe('DEFAULT 42');
-  });
-
-  it('renders literal boolean as 0/1', () => {
-    expect(buildColumnDefaultSql({ kind: 'literal', value: true })).toBe('DEFAULT 1');
-    expect(buildColumnDefaultSql({ kind: 'literal', value: false })).toBe('DEFAULT 0');
-  });
-
-  it('renders NULL literal', () => {
-    expect(buildColumnDefaultSql({ kind: 'literal', value: null })).toBe('DEFAULT NULL');
-  });
-
-  it("renders now() as datetime('now')", () => {
-    expect(buildColumnDefaultSql({ kind: 'function', expression: 'now()' })).toBe(
-      "DEFAULT (datetime('now'))",
-    );
-  });
-
-  it('returns empty for autoincrement()', () => {
-    expect(buildColumnDefaultSql({ kind: 'function', expression: 'autoincrement()' })).toBe('');
-  });
-
-  it('renders custom function default', () => {
-    expect(buildColumnDefaultSql({ kind: 'function', expression: 'random()' })).toBe(
+  it('renders expression default', () => {
+    expect(buildColumnDefaultSql({ kind: 'expression', expression: 'random()' })).toBe(
       'DEFAULT (random())',
     );
   });
 
-  it('rejects unsafe default expressions', () => {
+  it('renders string expression default', () => {
+    expect(buildColumnDefaultSql({ kind: 'expression', expression: "'hello'" })).toBe(
+      "DEFAULT ('hello')",
+    );
+  });
+
+  it('renders numeric expression default', () => {
+    expect(buildColumnDefaultSql({ kind: 'expression', expression: '42' })).toBe('DEFAULT (42)');
+  });
+
+  it('renders NULL expression default', () => {
+    expect(buildColumnDefaultSql({ kind: 'expression', expression: 'NULL' })).toBe(
+      'DEFAULT (NULL)',
+    );
+  });
+
+  it("renders now() as datetime('now') — dialect-specific translation preserved", () => {
+    expect(buildColumnDefaultSql({ kind: 'expression', expression: 'now()' })).toBe(
+      "DEFAULT (datetime('now'))",
+    );
+  });
+
+  it('returns empty for autoincrement on INTEGER PRIMARY KEY column', () => {
+    expect(
+      buildColumnDefaultSql(
+        { kind: 'autoincrement' },
+        { tableName: 'users', columnName: 'id', isIntegerPrimaryKey: true },
+      ),
+    ).toBe('');
+  });
+
+  it('throws diagnostic for autoincrement on non-INTEGER-PK column', () => {
     expect(() =>
-      buildColumnDefaultSql({ kind: 'function', expression: 'foo(); DROP TABLE' }),
-    ).toThrow(/Unsafe/);
-  });
-});
-
-describe('renderDefaultLiteral', () => {
-  it('renders Date as ISO8601 string', () => {
-    const d = new Date('2024-01-15T10:30:00.000Z');
-    expect(renderDefaultLiteral(d)).toBe("'2024-01-15T10:30:00.000Z'");
+      buildColumnDefaultSql(
+        { kind: 'autoincrement' },
+        { tableName: 'users', columnName: 'name', isIntegerPrimaryKey: false },
+      ),
+    ).toThrow('users.name');
   });
 
-  it('renders JSON objects', () => {
-    expect(renderDefaultLiteral({ key: 'val' })).toBe('\'{"key":"val"}\'');
+  it('throws diagnostic for autoincrement on non-INTEGER-PK TEXT column', () => {
+    expect(() =>
+      buildColumnDefaultSql(
+        { kind: 'autoincrement' },
+        { tableName: 'orders', columnName: 'ref_id', isIntegerPrimaryKey: false },
+      ),
+    ).toThrow('orders.ref_id');
+  });
+
+  it('throws for autoincrement with no column context', () => {
+    expect(() => buildColumnDefaultSql({ kind: 'autoincrement' })).toThrow();
   });
 });
 
@@ -137,13 +145,13 @@ describe('buildDropIndexSql', () => {
 });
 
 describe('isInlineAutoincrementPrimaryKey', () => {
-  it('is true for sole-column PK with autoincrement() default', () => {
+  it('is true for sole-column PK with autoincrement default', () => {
     const table = makeTable({
       columns: {
         id: makeColumn({
           nativeType: 'integer',
           nullable: false,
-          default: { kind: 'function', expression: 'autoincrement()' },
+          default: { kind: 'autoincrement' },
         }),
       },
       primaryKey: { columns: ['id'] },
@@ -158,7 +166,7 @@ describe('isInlineAutoincrementPrimaryKey', () => {
         seq: makeColumn({
           nativeType: 'integer',
           nullable: false,
-          default: { kind: 'function', expression: 'autoincrement()' },
+          default: { kind: 'autoincrement' },
         }),
       },
       primaryKey: { columns: ['id'] },
@@ -172,7 +180,7 @@ describe('isInlineAutoincrementPrimaryKey', () => {
         a: makeColumn({
           nativeType: 'integer',
           nullable: false,
-          default: { kind: 'function', expression: 'autoincrement()' },
+          default: { kind: 'autoincrement' },
         }),
         b: makeColumn({ nativeType: 'integer', nullable: false }),
       },
@@ -181,7 +189,7 @@ describe('isInlineAutoincrementPrimaryKey', () => {
     expect(isInlineAutoincrementPrimaryKey(table, 'a')).toBe(false);
   });
 
-  it('is false when default is not autoincrement()', () => {
+  it('is false when default is not autoincrement', () => {
     const table = makeTable({
       columns: {
         id: makeColumn({ nativeType: 'integer', nullable: false }),
