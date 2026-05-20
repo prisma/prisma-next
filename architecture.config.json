@@ -109,7 +109,13 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/1-framework/3-tooling/**",
+      "glob": "packages/1-framework/3-tooling/cli/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/emitter/**",
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"
@@ -119,6 +125,30 @@
       "domain": "framework",
       "layer": "tooling",
       "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/migration/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/prisma-next/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/vite-plugin-contract-emit/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/3-tooling/cli-telemetry/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "shared"
     },
     {
       "glob": "packages/2-sql/1-core/**",

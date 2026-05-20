@@ -44,7 +44,7 @@
     "@vitejs/plugin-react-swc": "^4.2.3",
     "mongodb-memory-server": "catalog:",
     "pathe": "^2.0.3",
-    "tsx": "^4.19.2",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
