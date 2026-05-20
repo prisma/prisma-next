@@ -3,9 +3,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 
 const UserBase = model('User', {
   fields: {
@@ -33,8 +31,6 @@ const User = UserBase.relations({
 }).sql({ table: 'users' });
 
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   models: {
     User,
     Post,

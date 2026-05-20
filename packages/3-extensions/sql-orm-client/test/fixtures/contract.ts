@@ -1,10 +1,8 @@
 import { int4Column, jsonbColumn, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
-import sqlFamily from '@prisma-next/family-sql/pack';
 import { uuidv4 } from '@prisma-next/ids';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 
 const UserBase = model('User', {
   fields: {
@@ -79,8 +77,6 @@ const User = UserBase.relations({
 }).sql({ table: 'users' });
 
 const baseContract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   extensionPacks: { pgvector },
   models: {
     User,

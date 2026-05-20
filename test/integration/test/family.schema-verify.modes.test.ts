@@ -7,9 +7,7 @@ import {
   field,
   int4Column,
   model,
-  postgresPack,
   runSchemaVerify,
-  sqlFamily,
   textColumn,
   timeouts,
   useDevDatabase,
@@ -37,8 +35,6 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=false in strict mode with extra_column issue',
       async () => {
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {
@@ -73,8 +69,6 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=true in permissive mode with extra column',
       async () => {
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {

@@ -8,10 +8,8 @@ import {
   field,
   int4Column,
   model,
-  postgresPack,
   rel,
   runSchemaVerify,
-  sqlFamily,
   textColumn,
   timeouts,
   useDevDatabase,
@@ -70,8 +68,6 @@ describe('family instance schemaVerify - basic', () => {
         }));
 
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: User.relations({
               posts: rel.hasMany(Post, { by: 'userId' }),
@@ -113,8 +109,6 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=false with missing_table issue',
       async () => {
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {
@@ -167,8 +161,6 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=false with missing_column issue',
       async () => {
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {

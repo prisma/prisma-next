@@ -6,13 +6,11 @@ import { createControlClient } from '@prisma-next/cli/control-api';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import sqlFamily from '@prisma-next/family-sql/pack';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
-import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emit } from '../utils/emit';
@@ -27,8 +25,6 @@ import { createIntegrationTestDir } from './utils/cli-test-helpers';
  */
 function createTestContract(): Contract<SqlStorage> {
   return defineContract({
-    family: sqlFamily,
-    target: postgresPack,
     models: {
       User: model('User', {
         fields: {

@@ -1,7 +1,5 @@
 import { int4Column } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 
 const Team = model('Team', {
   fields: {
@@ -33,8 +31,6 @@ const Member = model('Member', {
   }));
 
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   models: {
     Team,
     Member,

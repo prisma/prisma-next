@@ -16,10 +16,8 @@ import { beforeAll } from 'vitest';
 
 // Re-export common imports for test files
 export { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-export { default as sqlFamily } from '@prisma-next/family-sql/pack';
-export { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+export { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 export type { CodecTypes } from '@prisma-next/target-postgres/codec-types';
-export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { pgvector } from './family.schema-verify.extensions';
 export type { Contract, SqlStorage };
 export {

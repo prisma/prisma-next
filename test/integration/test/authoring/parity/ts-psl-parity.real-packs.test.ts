@@ -2,11 +2,10 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyControl from '@prisma-next/family-sql/control';
-import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { defineContract } from '@prisma-next/postgres/contract-builder';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresControl from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { describe, expect, it } from 'vitest';
@@ -49,8 +48,6 @@ describe('TS and PSL authoring parity with real packs', () => {
   it('lowers family-owned and extension-owned type constructors to identical output', () => {
     const tsContract = defineContract(
       {
-        family: sqlFamilyPack,
-        target: postgresPack,
         extensionPacks: { pgvector: pgvectorPack },
       },
       ({ type, field, model }) => {
@@ -99,8 +96,6 @@ model Document {
   it('lowers inline field constructor expressions to the same output as direct TS column descriptors', () => {
     const tsContract = defineContract(
       {
-        family: sqlFamilyPack,
-        target: postgresPack,
         extensionPacks: { pgvector: pgvectorPack },
       },
       ({ type, field, model }) => ({

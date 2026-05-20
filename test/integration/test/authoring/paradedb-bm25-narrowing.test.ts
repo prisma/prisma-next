@@ -9,17 +9,13 @@
  */
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import paradedbPack from '@prisma-next/extension-paradedb/pack';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 describe('paradedb bm25 narrowing in TS authoring DSL', () => {
   it('typechecks and accepts a well-formed bm25 index via the helpers factory', () => {
     const contract = defineContract(
       {
-        family: sqlFamily,
-        target: postgresPack,
         extensionPacks: { paradedb: paradedbPack },
       },
       ({ model: helperModel, field: helperField }) => {
@@ -56,8 +52,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          family: sqlFamily,
-          target: postgresPack,
           extensionPacks: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
@@ -86,8 +80,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          family: sqlFamily,
-          target: postgresPack,
           extensionPacks: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
@@ -116,8 +108,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          family: sqlFamily,
-          target: postgresPack,
           extensionPacks: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
@@ -146,8 +136,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          family: sqlFamily,
-          target: postgresPack,
           extensionPacks: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
@@ -188,8 +176,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
 
     expect(() =>
       defineContract({
-        family: sqlFamily,
-        target: postgresPack,
         models: { Doc },
       }),
     ).toThrow(/unregistered index type "made-up"/);
@@ -208,8 +194,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expectTypeOf<typeof Doc.__indexTypes>().toEqualTypeOf<Record<never, never>>();
 
     defineContract({
-      family: sqlFamily,
-      target: postgresPack,
       models: { Doc },
     });
   });
@@ -217,8 +201,6 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
   it("helpers-bound model() carries the merged packs' index-type map", () => {
     defineContract(
       {
-        family: sqlFamily,
-        target: postgresPack,
         extensionPacks: { paradedb: paradedbPack },
       },
       ({ model: helperModel, field: helperField }) => {

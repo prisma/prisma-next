@@ -1,3 +1,5 @@
+// Intentionally uses verbose sql-contract-ts/contract-builder import: this file verifies
+// type-level behavior of the base defineContract API (not the facade wrapper).
 import {
   int4Column,
   jsonbColumn,

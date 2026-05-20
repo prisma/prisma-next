@@ -14,11 +14,9 @@ import {
   pgvector,
   postgres,
   postgresAdapter,
-  postgresPack,
   runSchemaVerify,
   SqlContractSerializer,
   type SqlStorage,
-  sqlFamily,
   textColumn,
   timeouts,
   useDevDatabase,
@@ -46,8 +44,6 @@ describe('family instance schemaVerify - types', () => {
       'returns ok=false with type_mismatch issue',
       async () => {
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {
@@ -88,8 +84,6 @@ describe('family instance schemaVerify - types', () => {
       'returns ok=false with nullability_mismatch issue',
       async () => {
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {
@@ -164,8 +158,6 @@ describe('family instance schemaVerify - types', () => {
         });
 
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {
@@ -206,8 +198,6 @@ describe('family instance schemaVerify - types', () => {
         // Create a contract with a type ID that doesn't exist in the registry
         // We'll use a fake type ID to simulate missing metadata
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {

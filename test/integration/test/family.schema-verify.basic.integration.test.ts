@@ -4,13 +4,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-import sqlFamily from '@prisma-next/family-sql/pack';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
-import postgresPack from '@prisma-next/target-postgres/pack';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -79,8 +77,6 @@ describe('family instance schemaVerify', () => {
         }));
 
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: { User, Post },
         });
 
@@ -150,8 +146,6 @@ describe('family instance schemaVerify', () => {
         }
 
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {
@@ -234,8 +228,6 @@ describe('family instance schemaVerify', () => {
         }
 
         const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
           models: {
             User: model('User', {
               fields: {

@@ -21,11 +21,9 @@ import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
-import sqlFamily from '@prisma-next/family-sql/pack';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 import { type } from 'arktype';
 
 const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack, arktypeJsonPack]);
@@ -80,8 +78,6 @@ const User = UserBase.relations({
 }).sql({ table: 'user' });
 
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   codecLookup: postgresCodecLookup,
   capabilities: {
     postgres: {

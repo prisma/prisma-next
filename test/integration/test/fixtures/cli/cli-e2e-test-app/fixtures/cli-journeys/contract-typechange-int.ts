@@ -1,7 +1,5 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 /**
  * Type-change *to*-state: the `score` column, previously `text`
@@ -12,8 +10,6 @@ import postgresPack from '@prisma-next/target-postgres/pack';
  * fill in the placeholders with a normalising query.
  */
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   models: {
     User: model('User', {
       fields: {

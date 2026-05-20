@@ -1,7 +1,5 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 /**
  * From-state for the nullable-tightening journey: `User.name` is
@@ -10,8 +8,6 @@ import postgresPack from '@prisma-next/target-postgres/pack';
  * `nullableTighteningCallStrategy`.
  */
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   models: {
     User: model('User', {
       fields: {

@@ -46,6 +46,7 @@
     "@prisma-next/adapter-mongo": "workspace:0.10.0",
     "@prisma-next/driver-mongo": "workspace:0.10.0",
     "@prisma-next/family-mongo": "workspace:0.10.0",
+    "@prisma-next/mongo": "workspace:0.10.0",
     "@prisma-next/mongo-codec": "workspace:0.10.0",
     "@prisma-next/mongo-contract": "workspace:0.10.0",
     "@prisma-next/mongo-contract-psl": "workspace:0.10.0",

@@ -1,7 +1,5 @@
 import { int4Column } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 const embedding1536Type = {
   kind: 'codec-instance',
@@ -11,8 +9,6 @@ const embedding1536Type = {
 } as const;
 
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   types: {
     Embedding1536: embedding1536Type,
   },

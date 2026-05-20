@@ -1,11 +1,9 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
+import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
-import postgresPack from '@prisma-next/target-postgres/pack';
 import { expectTypeOf, test } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -46,8 +44,6 @@ const Post = model('Post', {
 // -- Single-model contract --------------------------------------------------
 
 const singleModelContract = defineContract({
-  family: sqlFamilyPack,
-  target: postgresPack,
   models: { User },
 });
 
@@ -117,8 +113,6 @@ test('ResultType inference produces literal field keys', () => {
 // -- Multi-model contract preserves all literals ----------------------------
 
 const multiModelContract = defineContract({
-  family: sqlFamilyPack,
-  target: postgresPack,
   models: {
     User,
     Post,

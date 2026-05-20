@@ -2,6 +2,7 @@ import { ContractValidationError } from '@prisma-next/contract/contract-validati
 import paradedbPack from '@prisma-next/extension-paradedb/pack';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
+// postgresPack is used directly in interpretPslDocumentToSqlContract (not in defineContract).
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { describe, expect, it } from 'vitest';
 

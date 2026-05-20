@@ -1,3 +1,6 @@
+// Intentionally uses verbose mongo-contract-ts import: the mongo facade's defineContract
+// has a type inference regression for discriminated union contracts with embedded relations
+// (the intersection-based return type loses type precision compared to the base overload).
 import mongoFamily from '@prisma-next/family-mongo/pack';
 import {
   defineContract,

@@ -7,9 +7,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 const types = {
   Email: {
@@ -55,8 +53,6 @@ const Post = model('Post', {
   }));
 
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   types,
   models: {
     User,

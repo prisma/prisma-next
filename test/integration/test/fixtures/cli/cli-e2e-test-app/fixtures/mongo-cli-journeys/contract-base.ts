@@ -1,11 +1,4 @@
-import mongoFamily from '@prisma-next/family-mongo/pack';
-import {
-  defineContract,
-  field,
-  index,
-  model,
-} from '@prisma-next/mongo-contract-ts/contract-builder';
-import mongoTarget from '@prisma-next/target-mongo/pack';
+import { defineContract, field, index, model } from '@prisma-next/mongo/contract-builder';
 
 const User = model('User', {
   collection: 'users',
@@ -18,7 +11,5 @@ const User = model('User', {
 });
 
 export const contract = defineContract({
-  family: mongoFamily,
-  target: mongoTarget,
   models: { User },
 });

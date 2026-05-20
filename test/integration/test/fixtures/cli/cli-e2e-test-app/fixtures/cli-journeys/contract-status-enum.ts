@@ -4,9 +4,7 @@ import {
   int4Column,
   textColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 /**
  * From-state for the enum-rebuild journey: a `status` enum with three
@@ -15,8 +13,6 @@ import postgresPack from '@prisma-next/target-postgres/pack';
  * removes `pending` and triggers the rebuild recipe.
  */
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   types: {
     status: enumType('status', ['active', 'pending', 'archived']),
   },

@@ -1,6 +1,4 @@
-import mongoFamily from '@prisma-next/family-mongo/pack';
-import { defineContract, field, model } from '@prisma-next/mongo-contract-ts/contract-builder';
-import mongoTarget from '@prisma-next/target-mongo/pack';
+import { defineContract, field, model } from '@prisma-next/mongo/contract-builder';
 import { describe, expect, it } from 'vitest';
 
 describe('Mongo pack composition', () => {
@@ -14,8 +12,6 @@ describe('Mongo pack composition', () => {
     });
 
     const contract = defineContract({
-      family: mongoFamily,
-      target: mongoTarget,
       models: { User },
     });
 

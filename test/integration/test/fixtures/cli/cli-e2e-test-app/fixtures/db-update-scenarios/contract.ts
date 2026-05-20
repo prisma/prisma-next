@@ -5,9 +5,7 @@ import {
   timestamptzColumn,
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 const types = {
   AccountStatus: enumType('account_status', ['ACTIVE', 'INVITED', 'SUSPENDED']),
@@ -50,8 +48,6 @@ const Project = model('Project', {
 }));
 
 export const contract = defineContract({
-  family: sqlFamily,
-  target: postgresPack,
   types,
   models: {
     Account,

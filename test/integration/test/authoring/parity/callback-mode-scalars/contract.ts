@@ -1,11 +1,9 @@
 import * as pg from '@prisma-next/adapter-postgres/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
 
 export const contract = defineContract(
-  { family: sqlFamily, target: postgresPack, extensionPacks: { pgvector } },
+  { extensionPacks: { pgvector } },
   ({ field, model, type }) => {
     const types = {
       Embedding: type.pgvector.Vector(1536),
