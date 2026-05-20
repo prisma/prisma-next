@@ -29,6 +29,16 @@ class TokenBucketRateLimiter implements RateLimiter {
   readonly #buckets = new Map<string, Bucket>();
 
   constructor(options: TokenBucketOptions) {
+    if (!Number.isFinite(options.capacity) || options.capacity <= 0) {
+      throw new Error(
+        `TokenBucketRateLimiter: capacity must be a finite number > 0 (got ${options.capacity})`,
+      );
+    }
+    if (!Number.isFinite(options.refillTokensPerMs) || options.refillTokensPerMs < 0) {
+      throw new Error(
+        `TokenBucketRateLimiter: refillTokensPerMs must be a finite number >= 0 (got ${options.refillTokensPerMs})`,
+      );
+    }
     this.#capacity = options.capacity;
     this.#refillTokensPerMs = options.refillTokensPerMs;
     this.#now = options.now ?? Date.now;
@@ -67,6 +77,11 @@ export function createTokenBucketRateLimiter(options: TokenBucketOptions): RateL
  * the minute.
  */
 export function createRequestsPerMinuteRateLimiter(rpm: number, now?: () => number): RateLimiter {
+  if (!Number.isFinite(rpm) || rpm <= 0) {
+    throw new Error(
+      `createRequestsPerMinuteRateLimiter: rpm must be a finite number > 0 (got ${rpm})`,
+    );
+  }
   return createTokenBucketRateLimiter({
     capacity: rpm,
     refillTokensPerMs: rpm / 60_000,

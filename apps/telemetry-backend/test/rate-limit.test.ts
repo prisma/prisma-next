@@ -5,6 +5,25 @@ import {
 } from '../src/rate-limiter';
 
 describe('createTokenBucketRateLimiter', () => {
+  it.each([
+    ['capacity is zero', { capacity: 0, refillTokensPerMs: 0 }],
+    ['capacity is negative', { capacity: -1, refillTokensPerMs: 0 }],
+    ['capacity is NaN', { capacity: Number.NaN, refillTokensPerMs: 0 }],
+    ['capacity is Infinity', { capacity: Number.POSITIVE_INFINITY, refillTokensPerMs: 0 }],
+  ])('rejects invalid capacity when %s', (_label, options) => {
+    expect(() => createTokenBucketRateLimiter({ ...options, now: () => 0 })).toThrow(/capacity/);
+  });
+
+  it.each([
+    ['refillTokensPerMs is negative', -1],
+    ['refillTokensPerMs is NaN', Number.NaN],
+    ['refillTokensPerMs is Infinity', Number.POSITIVE_INFINITY],
+  ])('rejects invalid refill rate when %s', (_label, refillTokensPerMs) => {
+    expect(() =>
+      createTokenBucketRateLimiter({ capacity: 1, refillTokensPerMs, now: () => 0 }),
+    ).toThrow(/refillTokensPerMs/);
+  });
+
   it('grants the configured capacity worth of requests before throttling', () => {
     const limiter = createTokenBucketRateLimiter({
       capacity: 3,
@@ -69,6 +88,15 @@ describe('createTokenBucketRateLimiter', () => {
 });
 
 describe('createRequestsPerMinuteRateLimiter', () => {
+  it.each([
+    ['rpm is zero', 0],
+    ['rpm is negative', -1],
+    ['rpm is NaN', Number.NaN],
+    ['rpm is Infinity', Number.POSITIVE_INFINITY],
+  ])('rejects invalid rpm when %s', (_label, rpm) => {
+    expect(() => createRequestsPerMinuteRateLimiter(rpm, () => 0)).toThrow(/rpm/);
+  });
+
   it('caps a same-instant burst at the requests-per-minute threshold', () => {
     const limiter = createRequestsPerMinuteRateLimiter(60, () => 0);
     for (let i = 0; i < 60; i += 1) {
