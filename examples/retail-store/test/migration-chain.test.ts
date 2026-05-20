@@ -24,15 +24,47 @@ const MIG1_DIR = '20260513T0505_initial';
 const MIG2_DIR = '20260513T0507_add_product_category_index';
 const MIG3_DIR = '20260513T0508_backfill_product_status';
 
+const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
+
+type FlatMongoStorage = {
+  storageHash: string;
+  collections: Record<string, unknown>;
+};
+
+function namespacedMongoContract(contract: MongoContract): MongoContract {
+  const storage = contract.storage;
+  if ('namespaces' in storage && storage.namespaces != null) {
+    return contract;
+  }
+  if (!('collections' in storage)) {
+    return contract;
+  }
+  const { collections, storageHash, ...rest } = storage as FlatMongoStorage;
+  return {
+    ...contract,
+    storage: {
+      ...rest,
+      storageHash,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          kind: 'mongo-namespace' as const,
+          collections,
+        },
+      },
+    },
+  } as MongoContract;
+}
+
 function loadMigration(dirName: string): {
   ops: ReturnType<typeof JSON.parse>;
   endContract: MongoContract;
 } {
   const dir = resolve(import.meta.dirname, '../migrations/app', dirName);
   const ops = JSON.parse(readFileSync(resolve(dir, 'ops.json'), 'utf8'));
-  const endContract = JSON.parse(
-    readFileSync(resolve(dir, 'end-contract.json'), 'utf8'),
-  ) as MongoContract;
+  const endContract = namespacedMongoContract(
+    JSON.parse(readFileSync(resolve(dir, 'end-contract.json'), 'utf8')) as MongoContract,
+  );
   return { ops, endContract };
 }
 
