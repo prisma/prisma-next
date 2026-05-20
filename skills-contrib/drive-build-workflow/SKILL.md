@@ -37,7 +37,7 @@ The orchestrator owns sequencing, escalation, plan/spec amendment in response to
 > **Stop-and-delegate triggers:** if you are about to call `Read`/`Grep`/`Glob` on source code, `Shell` for build/test/lint, or `Write`/`StrReplace` on a file outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md § DO-NOT enumeration`](../../drive/roles/README.md#do-not-enumeration-for-the-orchestrator) for the full list.
 >
 > **Escape hatch** (rare, brief, navigational): you may act directly when no dispatch shape serves, the action is a single tool call or two, and the purpose is coordination rather than production. Log the use so the pattern stays visible.
-
+>
 > **Adopt the `tech-lead` persona** (see the `drive-agent-personas` skill). The tech-lead persona is the source of truth for the orchestrator's generic stance — persona selection, surface-conflicts-don't-merge-them, right-altitude-for-audience, keep-the-user-in-the-loop, make-orchestration-legible, plus the persona-conflict / altitude / human-in-the-loop probes.
 
 This skill adds *plan-loop-specific* mechanics on top of that generic stance: the persistent-implementer-and-reviewer subagents, the artifact contract, the loop algorithm, the intent-vs-artifact epistemic asymmetry the orchestrator alone holds, the unattended-mode protocol, etc. Read those sections as plan-driven specialisations of the tech-lead lens, not as a replacement for it.
