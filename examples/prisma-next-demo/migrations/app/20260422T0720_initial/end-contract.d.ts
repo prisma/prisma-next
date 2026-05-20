@@ -41,9 +41,6 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps & PgVectorQueryOperationTypes;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 export type AddressOutput = {
   readonly street: CodecTypes['pg/text@1']['output'];
   readonly city: CodecTypes['pg/text@1']['output'];
@@ -189,7 +186,7 @@ type ContractBase = ContractType<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+            readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
           };
           readonly embedding: {
             readonly nativeType: 'vector';
@@ -233,8 +230,8 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
             readonly default: {
-              readonly kind: 'literal';
-              readonly value: DefaultLiteralValue<'pg/text@1', 'open'>;
+              readonly kind: 'expression';
+              readonly expression: "'open'";
             };
           };
           readonly type: {
@@ -251,7 +248,7 @@ type ContractBase = ContractType<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+            readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -283,7 +280,7 @@ type ContractBase = ContractType<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
-            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+            readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
           };
           readonly kind: {
             readonly nativeType: 'user_type';
