@@ -5,6 +5,7 @@ import type {
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
+import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
@@ -43,6 +44,14 @@ export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
     discriminator: 'postgres-enum',
+    // Slot key stays `'types'` in this slice — Postgres-enum entries
+    // continue to flow through `storage.<ns>.types`; the rename to
+    // `'postgresEnums'` is the next slice's job (S1.B). Wiring the
+    // registry to `'types'` today means the descriptor-driven hydration
+    // path round-trips identically to the prior hand-rolled override.
+    storageSlotKey: 'types',
+    hydrate: (raw: unknown) => new PostgresEnumType(raw as PostgresEnumTypeInput),
+    validatorSchema: PostgresEnumTypeSchema,
     output: {
       factory: (input: PostgresEnumTypeInput): PostgresEnumStorageEntry =>
         new PostgresEnumType(input),

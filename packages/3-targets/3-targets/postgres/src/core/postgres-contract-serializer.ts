@@ -4,6 +4,10 @@ import {
   type SqlNamespaceSlotHydrationFactory,
 } from '@prisma-next/family-sql/ir';
 import {
+  type AuthoringEntityTypeNamespace,
+  isAuthoringEntityTypeDescriptor,
+} from '@prisma-next/framework-components/authoring';
+import {
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
@@ -15,40 +19,60 @@ import {
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
+import type { Type } from 'arktype';
+import { postgresAuthoringEntityTypes } from './authoring';
+import type { PostgresEnumType } from './postgres-enum-type';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 /**
- * Hydration factory for the per-namespace enum slot. Pre-extracted as
- * a module-level binding so the family-base registry receives a stable
- * reference and the same callable shape is reused when the descriptor
- * mechanism takes over the registration (S1.A D5).
+ * Walks a pack's entity-type namespace tree and emits the
+ * `storageSlotKey`-keyed maps the family base consumes — one map of
+ * hydrators, one map of validator-schema fragments. Only descriptors
+ * that declared a `storageSlotKey` participate in either map; the
+ * corresponding `hydrate` / `validatorSchema` field is the seam.
  */
-const hydratePostgresEnumType: SqlNamespaceSlotHydrationFactory = (raw) => {
-  if (raw instanceof PostgresEnumType) {
-    return raw;
-  }
-  const plain = raw as Record<string, unknown>;
-  const name = typeof plain['name'] === 'string' ? plain['name'] : String(plain['name']);
-  const nativeType = typeof plain['nativeType'] === 'string' ? plain['nativeType'] : name;
-  const values = Array.isArray(plain['values']) ? (plain['values'] as string[]) : [];
-  return new PostgresEnumType({ name, nativeType, values } as PostgresEnumTypeInput);
-};
+function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamespace): {
+  readonly slotRegistry: ReadonlyMap<string, SqlNamespaceSlotHydrationFactory>;
+  readonly validatorFragments: ReadonlyMap<string, Type<unknown>>;
+} {
+  const slotRegistry = new Map<string, SqlNamespaceSlotHydrationFactory>();
+  const validatorFragments = new Map<string, Type<unknown>>();
+  const walk = (node: AuthoringEntityTypeNamespace): void => {
+    for (const value of Object.values(node)) {
+      if (isAuthoringEntityTypeDescriptor(value)) {
+        if (value.storageSlotKey !== undefined && value.hydrate !== undefined) {
+          slotRegistry.set(value.storageSlotKey, value.hydrate);
+        }
+        if (value.storageSlotKey !== undefined && value.validatorSchema !== undefined) {
+          validatorFragments.set(value.storageSlotKey, value.validatorSchema);
+        }
+        continue;
+      }
+      if (typeof value === 'object' && value !== null) {
+        walk(value);
+      }
+    }
+  };
+  walk(namespace);
+  return { slotRegistry, validatorFragments };
+}
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
     // Postgres has no storage-level codec-alias entities — the
-    // `storage.types` codec-triple slot is empty for Postgres contracts —
-    // so the kind-keyed entity registry stays empty. Per-namespace
-    // entity hydration goes through the slot-key registry: Postgres
-    // registers its enum hydrator under slot key `'types'`, the slot
-    // those entries flow through in this slice. The slot key renames
-    // to `'postgresEnums'` when the storage shape migration lands; the
-    // registry surface stays identical.
-    const slotRegistry = new Map<string, SqlNamespaceSlotHydrationFactory>([
-      ['types', hydratePostgresEnumType],
-    ]);
-    super(new Map(), slotRegistry);
+    // `storage.types` codec-triple slot is empty for Postgres
+    // contracts — so the kind-keyed entity registry stays empty.
+    // Per-namespace entity hydration and validation are derived from
+    // the pack's authoring contributions: every descriptor that
+    // declared a `storageSlotKey` + `hydrate` / `validatorSchema`
+    // wires its slot through the family-base registry. Slot key
+    // currently `'types'` (matches the slot enum entries flow through
+    // today); renames to `'postgresEnums'` when the storage shape
+    // migration lands — the registry surface stays identical.
+    const { slotRegistry, validatorFragments } = collectEntityRegistryContributions(
+      postgresAuthoringEntityTypes,
+    );
+    super(new Map(), slotRegistry, validatorFragments);
   }
 
   protected override hydrateSqlNamespaceEntry(
