@@ -470,11 +470,7 @@ function renderInsert(ast: InsertAst): string {
         break;
       case 'do-update-set': {
         const updates = Object.entries(action.set).map(([colName, value]) => {
-          const target = quoteIdentifier(colName);
-          if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
-            return `${target} = ?`;
-          }
-          return `${target} = ${renderColumn(value)}`;
+          return `${quoteIdentifier(colName)} = ${renderExpr(value, contract)}`;
         });
         onConflictClause = ` ON CONFLICT (${conflictColumns.join(', ')}) DO UPDATE SET ${updates.join(', ')}`;
         break;
@@ -492,20 +488,7 @@ function renderInsert(ast: InsertAst): string {
 function renderUpdate(ast: UpdateAst, contract: SqliteContract): string {
   const table = quoteIdentifier(ast.table.name);
   const setClauses = Object.entries(ast.set).map(([col, val]) => {
-    const column = quoteIdentifier(col);
-    let value: string;
-    switch (val.kind) {
-      case 'param-ref':
-      case 'prepared-param-ref':
-        value = '?';
-        break;
-      case 'column-ref':
-        value = renderColumn(val);
-        break;
-      default:
-        throw new Error(`Unsupported value node in UPDATE: ${(val as { kind: string }).kind}`);
-    }
-    return `${column} = ${value}`;
+    return `${quoteIdentifier(col)} = ${renderExpr(val, contract)}`;
   });
 
   const whereClause = ast.where ? ` WHERE ${renderExpr(ast.where, contract)}` : '';

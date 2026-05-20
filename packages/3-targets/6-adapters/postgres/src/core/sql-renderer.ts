@@ -739,11 +739,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
               throw new Error('INSERT onConflict do-update-set requires at least one assignment');
             }
             const updates = updateEntries.map(([colName, value]) => {
-              const target = quoteIdentifier(colName);
-              if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
-                return `${target} = ${renderParamRef(value, pim)}`;
-              }
-              return `${target} = ${renderColumn(value)}`;
+              return `${quoteIdentifier(colName)} = ${renderExpr(value, contract, pim)}`;
             });
             return ` ON CONFLICT (${conflictColumns.join(', ')}) DO UPDATE SET ${updates.join(', ')}`;
           }
@@ -770,22 +766,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamInde
   }
   const setClauses = setEntries.map(([col, val]) => {
     const column = quoteIdentifier(col);
-    let value: string;
-    switch (val.kind) {
-      case 'param-ref':
-      case 'prepared-param-ref':
-        value = renderParamRef(val, pim);
-        break;
-      case 'column-ref':
-        value = renderColumn(val);
-        break;
-      // v8 ignore next 4
-      default:
-        throw new Error(
-          `Unsupported value node in UPDATE: ${(val satisfies never as { kind: string }).kind}`,
-        );
-    }
-    return `${column} = ${value}`;
+    return `${column} = ${renderExpr(val, contract, pim)}`;
   });
 
   const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract, pim)}` : '';
