@@ -24,7 +24,13 @@ import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import {
+  autoincrement,
+  defineContract,
+  field,
+  model,
+  rel,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { type } from 'arktype';
 
@@ -37,7 +43,7 @@ const profileSchema = type({
 
 const UserBase = model('User', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     email: field.column(varcharColumn(255)).unique({ name: 'user_email_key' }),
     createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
     updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
@@ -47,7 +53,7 @@ const UserBase = model('User', {
 
 const PostBase = model('Post', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     userId: field.column(int4Column),
     title: field.column(textColumn),
     createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
@@ -59,7 +65,7 @@ const PostBase = model('Post', {
 
 const Comment = model('Comment', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     postId: field.column(int4Column),
     content: field.column(textColumn),
     createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
@@ -99,7 +105,7 @@ export const contract = defineContract({
 
     ParamTypes: model('ParamTypes', {
       fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        id: field.column(int4Column).default(autoincrement()).id(),
         name: field.column(varcharColumn(255)).optional(),
         code: field.column(charColumn(16)).optional(),
         price: field.column(numericColumn(10, 2)).optional(),
@@ -129,7 +135,7 @@ export const contract = defineContract({
 
     LiteralDefaults: model('LiteralDefaults', {
       fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        id: field.column(int4Column).default(autoincrement()).id(),
         label: field.column(textColumn).default('draft'),
         score: field.column(int4Column).default(0),
         rating: field.column(float8Column).default(3.14),
@@ -142,7 +148,7 @@ export const contract = defineContract({
 
     Embedding: model('Embedding', {
       fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        id: field.column(int4Column).default(autoincrement()).id(),
         embedding: field.column(vector(1536)),
         profile: field.column(arktypeJson(profileSchema)),
       },

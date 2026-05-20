@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:06e84ab8bb0d664611300b6e4a576f055a560de08091c2de1b6387d836b773e2'>;
+  StorageHashBase<'sha256:2a8f1be899b83214689b90fd64943b9007becceadbaca802522bdadb29854f69'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
@@ -178,10 +178,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'expression';
-                  readonly expression: 'autoincrement()';
-                };
+                readonly default: { readonly kind: 'autoincrement' };
               };
               readonly postId: {
                 readonly nativeType: 'int4';
@@ -216,10 +213,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'expression';
-                  readonly expression: 'autoincrement()';
-                };
+                readonly default: { readonly kind: 'autoincrement' };
               };
               readonly embedding: {
                 readonly nativeType: 'vector';
@@ -288,10 +282,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'expression';
-                  readonly expression: 'autoincrement()';
-                };
+                readonly default: { readonly kind: 'autoincrement' };
               };
               readonly label: {
                 readonly nativeType: 'text';
@@ -359,10 +350,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'expression';
-                  readonly expression: 'autoincrement()';
-                };
+                readonly default: { readonly kind: 'autoincrement' };
               };
               readonly name: {
                 readonly nativeType: 'character varying';
@@ -430,10 +418,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'expression';
-                  readonly expression: 'autoincrement()';
-                };
+                readonly default: { readonly kind: 'autoincrement' };
               };
               readonly userId: {
                 readonly nativeType: 'int4';
@@ -478,10 +463,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'expression';
-                  readonly expression: 'autoincrement()';
-                };
+                readonly default: { readonly kind: 'autoincrement' };
               };
               readonly email: {
                 readonly nativeType: 'character varying';

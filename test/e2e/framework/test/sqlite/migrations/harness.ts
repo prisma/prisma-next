@@ -15,6 +15,7 @@ import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import {
   APP_SPACE_ID,
   createControlStack,
+  extractCodecLookup,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -37,7 +38,13 @@ const familyInstance = sqlFamilyDescriptor.create(
 
 const fw = [sqliteTargetDescriptor, sqliteAdapterDescriptor, sqliteDriverDescriptor] as const;
 
-export const pack = { family: sqlFamilyPack, target: sqlitePack } as const;
+const sqliteCodecLookup = extractCodecLookup([sqliteAdapterDescriptor]);
+
+export const pack = {
+  family: sqlFamilyPack,
+  target: sqlitePack,
+  codecLookup: sqliteCodecLookup,
+} as const;
 export const int = field.column(integerColumn);
 export const text = field.column(textColumn);
 export { integerColumn, textColumn };
