@@ -22,12 +22,21 @@
  *     are not interrupted — partial-failure cleanup is the same
  *     situation a serial publish would leave behind, and aborting
  *     mid-batch wouldn't unpublish what's already on the registry.
+ *   - A `pnpm publish` that fails because the version is already on
+ *     the registry ("You cannot publish over the previously published
+ *     versions") is treated as a no-op success. This makes the batch
+ *     idempotent: re-running after a partial failure (the documented
+ *     recovery path) completes cleanly for packages that already
+ *     landed and only retries the ones that didn't. See
+ *     `publish-packages-utils.mjs` for the classification rule.
  *   - Each worker's stdout/stderr is captured and printed grouped by
  *     package (with GitHub Actions `::group::` markers when running
  *     under Actions) so failures are easy to find in interleaved CI logs.
  */
 
 import { execFileSync, spawn } from 'node:child_process';
+
+import { classifyPublishResult } from './publish-packages-utils.mjs';
 
 const args = process.argv.slice(2);
 let tag;
@@ -95,14 +104,17 @@ const queue = [...packages];
 const failures = [];
 let completed = 0;
 
+let alreadyPublishedCount = 0;
+
 async function worker() {
   for (;;) {
     const pkg = queue.shift();
     if (!pkg) return;
     const result = await publishOne(pkg);
+    const { ok, alreadyPublished } = classifyPublishResult(result);
     completed += 1;
-    const ok = result.code === 0;
-    const status = ok ? '✓' : '✗';
+    if (alreadyPublished) alreadyPublishedCount += 1;
+    const status = alreadyPublished ? '↺' : ok ? '✓' : '✗';
     const groupOpen = isGitHubActions
       ? `::group::${status} ${result.name} (${completed}/${packages.length})`
       : `--- ${status} ${result.name} (${completed}/${packages.length}) ---`;
@@ -122,4 +134,11 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`\nAll ${packages.length} packages published successfully.`);
+const freshlyPublished = packages.length - alreadyPublishedCount;
+if (alreadyPublishedCount > 0) {
+  console.log(
+    `\nPublished ${freshlyPublished} package(s); ${alreadyPublishedCount} already on the registry at this version (no-op).`,
+  );
+} else {
+  console.log(`\nAll ${packages.length} packages published successfully.`);
+}
