@@ -1,6 +1,8 @@
 # Dispatch plan — facade-completion
 
-Sequential. Six dispatches, each M or smaller. Sequencing constraint: façade subpaths (D1–D3) land before the renderer switch (D4); renderer switch + in-workspace fixture regen is one commit; example sweep (D5) lands after D4 so examples don't briefly point at a not-yet-emitted specifier; docs sweep (D6) lands last.
+Sequential. Seven dispatches, each M or smaller. Sequencing constraint: façade subpaths (D1–D3) land before the renderer switch (D4); renderer switch + in-workspace fixture regen is one commit; example + test-fixture sweep (D5a + D5b) lands after D4 so user-shaped TS doesn't briefly point at a not-yet-emitted specifier; docs sweep (D6) lands last.
+
+**Mid-flight split.** D5 was originally one M-sized dispatch (~17 files) covering example apps + extension-pack contracts. While preparing the D5 brief the orchestrator grepped for `@prisma-next/(family-(sql|mongo)|target-(postgres|sqlite|mongo))/pack` across the workspace and found ~60 additional user-shaped TS files (CLI-journey + parity test fixtures under `test/integration/test/fixtures/cli/cli-e2e-test-app/fixtures/**/contract*.ts` and `test/integration/test/authoring/parity/**/contract.ts`, plus a handful of `test/e2e/framework/` fixtures and a CLI-recording fixture pair). These weren't in the original D5 inventory but are structurally identical to user contracts (`import sqlFamily from '@prisma-next/family-sql/pack'` + `defineContract({ family: sqlFamily, target: postgresPack, ... })`) and break under the D1/D2/D3 wraps' input-type drop. Folding ~80 files into one dispatch would have pushed D5 to L; per the M-cap, split into D5a (original inventory, ~19 files) + D5b (test fixtures, ~60 files). Each is M-sized and mechanical; D5a establishes the migration pattern on a small surface before D5b scales it. D6 unchanged.
 
 ## Pre-dispatch orchestrator context-gathering (complete; not a dispatch)
 
@@ -190,7 +192,7 @@ Pre-dispatch research that *is* dispatchable (would touch source or change diffs
 
 ---
 
-### Dispatch 5: Example apps + extension-pack contracts migrate to façade form
+### Dispatch 5a: Example apps + extension-pack contracts migrate to façade form
 
 **Intent.** Migrate every user-authored TS file in `examples/` (and the two extension-pack `src/contract.ts` files) to façade form. Two surfaces:
 
@@ -215,11 +217,56 @@ For Mongo examples, opportunistically apply the now-available `extensions` / `mi
 - [ ] `pnpm typecheck` clean for every example (filter per example or run the all-examples task).
 - [ ] `pnpm build` clean across the workspace.
 - [ ] Intent-validation: diff covers only `examples/**/{prisma-next.config.ts,prisma/contract.ts}` + the extension-pack contracts + (if applicable) a handful of control-side test helpers; no façade or framework source change.
-- [ ] FR9 satisfied.
+- [ ] FR9 partially satisfied (examples + extension-pack contracts only; D5b closes the test-fixture remainder).
 
 **Size.** M.
 
 **Tier.** Mid or cheap (mechanical mirror-of-pattern, bounded fan-out; one extension-pack contract has `extensionPacks` wiring that needs careful migration to ensure the wrapped `defineContract` accepts it).
+
+**DoR confirmed.** [ ]
+
+---
+
+### Dispatch 5b: Test fixtures migrate to façade form
+
+**Intent.** Sweep the remaining user-shaped TS files outside `examples/` — the CLI-journey + parity + e2e test fixtures + CLI-recording fixtures + the single mongo-runtime test that constructs a contract — to the wrapped `defineContract`. Mechanically identical to D5a's contract.ts pattern (drop two imports, drop two arguments from the `defineContract` call) but at higher fan-out (~60 files). Most are templated identically — establish the sed-pattern on the first 2-3 files, scale to the rest. Verify the integration suite goes green afterward (this dispatch is what closes the 17 `pnpm test:integration` failures D4's full-suite run surfaced).
+
+**Files in play.**
+
+Per the orchestrator's grep (run before D5a; re-grep to refresh before D5b dispatches):
+
+- **CLI-journey fixtures** (`test/integration/test/fixtures/cli/cli-e2e-test-app/fixtures/cli-journeys/contract-*.ts`) — ~18 files matching `contract*.ts` with `/pack` imports.
+- **CLI-journey + DB-init contracts** (`test/integration/test/fixtures/cli/cli-e2e-test-app/fixtures/{db-init,db-init-with-contract-space,db-update-preflight-gaps,db-update-scenarios,db-verify,db-sign,db-introspect,emit,migration-apply,migration-plan,vite-plugin,mongo-cli-journeys}/contract*.ts`) — ~15 files.
+- **CLI-integration fixtures** (`test/integration/test/fixtures/cli/cli-integration-test-app/fixtures/{emit-command,emit-contract,verify-database}/contract*.ts`) — ~5 files.
+- **Parity test fixtures** (`test/integration/test/authoring/parity/**/contract.ts`) — ~15 files.
+- **Side-by-side test fixtures** (`test/integration/test/authoring/side-by-side/{postgres,mongo}/contract.ts`) — 2 files.
+- **Top-level integration fixtures** (`test/integration/test/{fixtures,sql-builder/fixtures,mongo/fixtures}/contract.ts` + `.../prisma-next.config.ts` + `mongo-cli-journeys/prisma-next.config.with-db.ts`) — ~6 files.
+- **Disallow-rule fixtures** (`test/integration/test/fixtures/cli/{disallowed-import,exact-prefix-import,custom-allowlist,valid-contract,valid-contract-default}.ts`) — VERIFY before migrating; these may deliberately exercise the verbose form to test the import-allowlist disallow rules. If a fixture's intent is "demonstrate a disallowed import" then leave it + add a comment; if it's just predates the facade then migrate.
+- **E2E framework fixtures** (`test/e2e/framework/test/fixtures/contract.ts`, `test/e2e/framework/test/sqlite/fixtures/contract.ts`, `test/e2e/framework/test/sqlite/migrations/harness.ts`) — 3 files.
+- **CLI recordings** (`packages/1-framework/3-tooling/cli/recordings/fixtures/contract-{base,additive}.ts`) — 2 files.
+- **Mongo runtime test** (`packages/2-mongo-family/7-runtime/test/query-builder.test.ts`) — 1 file (constructs a contract inline; may be deliberately testing the verbose form, verify intent).
+- **Test helpers** (`test/integration/test/utils/cli-test-helpers.ts`, `test/integration/test/family.schema-verify.helpers.ts`, `test/integration/utils/framework-components.ts`) — check usage; only migrate the parts that construct user-shaped contracts. Control-plane wiring stays on `/control` subpaths.
+- **Test files that inline-construct contracts** (`test/integration/test/contract-builder.test.ts`, `test/integration/test/contract-builder.types.test-d.ts`, `test/integration/test/dsl-type-inference.test-d.ts`, `test/integration/test/control-api.test.ts`, `test/integration/test/family.{introspect,schema-verify.*,verify-database.*,sign-database}.{test,integration.test}.ts`, `test/integration/test/referential-actions.integration.test.ts`, `test/integration/test/authoring/{paradedb-bm25-narrowing,mongo-pack-composition,callback-mode-terseness}.test.ts`, `test/integration/test/authoring/psl-index-type-options.integration.test.ts`, `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`) — these are tests, not fixtures; check each one's intent. Many are testing the wrap shape itself or the underlying `defineContract`; migrating them might invalidate the test. **Implementer judgment per file.**
+
+**"Done when":**
+
+- [ ] D5a landed.
+- [ ] Grep gate: `rg "@prisma-next/(family-(sql|mongo)|target-(postgres|sqlite|mongo))/(pack|control)" -g '!**/node_modules/**' -g '!**/dist/**' -g '!projects/**'` returns only:
+  - the facade source files that re-export from packs (`packages/3-extensions/{postgres,sqlite,mongo}/src/{exports/{family,target}.ts,contract/define-contract.ts}`),
+  - the facade test files that assert pack rejection via `@ts-expect-error` (`packages/3-extensions/{postgres,sqlite,mongo}/test/contract-builder/define-contract.test-d.ts`),
+  - cipherstash migration files (A7 exemption),
+  - disallow-rule fixtures left deliberately verbose (with explanatory comments),
+  - any test file deliberately exercising the verbose form (with explanatory comments).
+- [ ] `pnpm test:integration` clean (the 17 failures D4 surfaced are gone).
+- [ ] `pnpm test:e2e` clean.
+- [ ] `pnpm lint:deps` clean.
+- [ ] `pnpm fixtures:check` clean (if not pre-existing-env-broken).
+- [ ] Intent-validation: diff covers only test-fixture / test-file user-contract migration; no source change to packages.
+- [ ] FR9 fully satisfied.
+
+**Size.** M (mechanical, templated; if file fan-out genuinely exceeds 60 non-trivial diffs at dispatch time, escalate and re-split).
+
+**Tier.** Mid (some judgment required on which test fixtures are deliberately verbose vs need migration).
 
 **DoR confirmed.** [ ]
 
@@ -240,7 +287,7 @@ For Mongo examples, opportunistically apply the now-available `extensions` / `mi
 
 **"Done when":**
 
-- [ ] D1–D5 all landed.
+- [ ] D1–D5b all landed.
 - [ ] `rg 'TML-2526' -- skills/ docs/ packages/ examples/ test/ projects/` returns hits only inside `projects/facade-import-surface-completion/`.
 - [ ] `rg '@prisma-next/target-(postgres|sqlite)/migration' -g '!**/node_modules/**'` returns only:
   - internal target package source (`packages/3-targets/3-targets/{postgres,sqlite}/src/exports/migration.ts` and internal callers),
@@ -266,10 +313,10 @@ For Mongo examples, opportunistically apply the now-available `extensions` / `mi
 ```text
 D1 (postgres /migration + contract-builder wrap) ─┐
 D2 (mongo parity + ctrl + bson + cb-wrap + drop barrel) ─┤
-                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5 (examples + contract.ts) → D6 (docs)
+                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples + ext-pack contracts) → D5b (test fixtures) → D6 (docs)
 D3 (sqlite façade + contract-builder wrap) ───────┘
 ```
 
-D1, D2, D3 are independent — they can land in any order or in parallel commits within a single PR. D4 requires D1 + D3 (it switches both renderers; postgres + sqlite façade `/migration` must both resolve). D5 requires D1 + D2 + D3 (example apps + contract.ts files consume all three facades' new APIs and the wrapped `defineContract`). D6 requires everything else; it's the closing dispatch.
+D1, D2, D3 are independent — they can land in any order or in parallel commits within a single PR. D4 requires D1 + D3 (it switches both renderers; postgres + sqlite façade `/migration` must both resolve). D5a requires D1 + D2 + D3 (example apps + contract.ts files consume all three facades' new APIs and the wrapped `defineContract`). D5b requires D5a only to establish the migration pattern. D6 requires everything else; it's the closing dispatch.
 
 Each merged commit must keep `pnpm test:packages`, `pnpm fixtures:check`, and `pnpm lint:deps` green. The renderer switch is the only dispatch where multiple files change atomically; everything else is independently revertable.
