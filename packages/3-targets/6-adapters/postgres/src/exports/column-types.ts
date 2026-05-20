@@ -58,16 +58,19 @@ export function varcharColumn(length: number): ColumnTypeDescriptor & {
 export const int4Column = {
   codecId: PG_INT4_CODEC_ID,
   nativeType: 'int4',
+  traits: ['equality', 'order', 'numeric', 'autoincrement'],
 } as const satisfies ColumnTypeDescriptor;
 
 export const int2Column = {
   codecId: PG_INT2_CODEC_ID,
   nativeType: 'int2',
+  traits: ['equality', 'order', 'numeric', 'autoincrement'],
 } as const satisfies ColumnTypeDescriptor;
 
 export const int8Column = {
   codecId: PG_INT8_CODEC_ID,
   nativeType: 'int8',
+  traits: ['equality', 'order', 'numeric', 'autoincrement'],
 } as const satisfies ColumnTypeDescriptor;
 
 export const float4Column = {

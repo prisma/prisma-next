@@ -21,6 +21,7 @@ export type ColumnTypeDescriptor<TCodecId extends string = string> = {
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown> | undefined;
   readonly typeRef?: string;
+  readonly traits?: readonly CodecTrait[] | undefined;
 };
 
 /**

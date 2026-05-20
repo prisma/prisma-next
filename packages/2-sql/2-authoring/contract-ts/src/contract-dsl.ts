@@ -105,9 +105,7 @@ type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
 };
 
-type FieldDescriptorShape = ColumnTypeDescriptor & {
-  readonly traits?: readonly CodecTrait[];
-};
+type FieldDescriptorShape = ColumnTypeDescriptor;
 
 export type ScalarFieldState<
   CodecId extends string = string,

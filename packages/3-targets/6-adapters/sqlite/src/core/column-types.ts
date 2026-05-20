@@ -16,6 +16,7 @@ export const textColumn = {
 export const integerColumn = {
   codecId: SQLITE_INTEGER_CODEC_ID,
   nativeType: 'integer',
+  traits: ['equality', 'order', 'numeric', 'autoincrement'],
 } as const;
 
 export const realColumn = {
