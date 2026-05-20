@@ -53,7 +53,7 @@ M; ≤ 30 min wall-clock.
 
 ## Model tier
 
-Fast tier. Mechanical migration with strong DoD;
+Cheap. Mechanical migration with strong DoD;
 the capability premium isn't paying for anything here.
 
 ## Inputs
@@ -65,8 +65,8 @@ the capability premium isn't paying for anything here.
 
 ## Implementer + Reviewer
 
-- Implementer: implementer subagent (fast tier)
-- Reviewer: reviewer subagent (orchestrator tier, for verification rigour)
+- Implementer: implementer subagent (cheap)
+- Reviewer: reviewer subagent (orchestrator, for verification rigour)
 ```
 
 The well-shaped brief is verbose but unsurprising. The dispatch produced from it has nothing to interpret — every edge case is pre-named, every gate is explicit, scope-out is enumerated, the tier matches the shape. WIP-inspection has something sharp to check ("what did the implementer touch that wasn't in scope?"); the reviewer subagent has a sharp checklist; the operator returns to a dispatch whose outcome is predictable.
