@@ -86,7 +86,7 @@ const fixtureConfigSource = [
  */
 function rewriteImports(tsSource: string): string {
   return tsSource.replace(
-    "'@prisma-next/target-postgres/migration'",
+    "'@prisma-next/postgres/migration'",
     `'${targetPostgresMigrationExport}'`,
   );
 }

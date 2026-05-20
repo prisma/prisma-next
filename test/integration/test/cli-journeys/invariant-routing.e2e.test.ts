@@ -600,7 +600,7 @@ withTempDir(({ createTempDir }) => {
         expect(draftManifest.to).toBe(c1Hash);
 
         const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -749,7 +749,7 @@ MigrationCLI.run(import.meta.url, M);
         );
 
         const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
