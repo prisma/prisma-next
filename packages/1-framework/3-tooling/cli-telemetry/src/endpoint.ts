@@ -15,11 +15,19 @@ export const TELEMETRY_ENDPOINT_PATH = '/events';
  * affordance only — it lets the test suite spin up a mock HTTP server
  * on an ephemeral port and point the spawned sender at it. The override
  * is intentionally undocumented in user-facing material.
+ *
+ * Fail-open: a malformed override (typo in a dev shell, bad CI config)
+ * silently falls back to the production backend rather than throwing,
+ * matching the telemetry layer's broader silent-on-failure contract.
  */
 export function resolveTelemetryEndpoint(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): string {
   const override = env['PRISMA_NEXT_TELEMETRY_ENDPOINT'];
   const base = override !== undefined && override.length > 0 ? override : TELEMETRY_BACKEND_URL;
-  return new URL(TELEMETRY_ENDPOINT_PATH, base).toString();
+  try {
+    return new URL(TELEMETRY_ENDPOINT_PATH, base).toString();
+  } catch {
+    return new URL(TELEMETRY_ENDPOINT_PATH, TELEMETRY_BACKEND_URL).toString();
+  }
 }
