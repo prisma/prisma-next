@@ -131,7 +131,7 @@ describe.sequential('Schema verification after runner - integration', () => {
                       nativeType: 'int4',
                       codecId: 'pg/int4@1',
                       nullable: false,
-                      default: { kind: 'expression', expression: 'autoincrement()' },
+                      default: { kind: 'autoincrement' },
                     },
                     createdAt: {
                       nativeType: 'timestamptz',
