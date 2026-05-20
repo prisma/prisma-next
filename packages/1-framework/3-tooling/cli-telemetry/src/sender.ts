@@ -62,7 +62,7 @@ function exitClean(): void {
   process.exit(0);
 }
 
-process.on('message', (message: unknown) => {
+process.once('message', (message: unknown) => {
   if (!isParentToSenderPayload(message)) {
     debugLog('received malformed payload; exiting');
     exitClean();
