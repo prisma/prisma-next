@@ -4,6 +4,7 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { Contract } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import {
@@ -42,18 +43,23 @@ function createTestContract(
     targetFamily: 'sql',
     storage: {
       storageHash: 'sha256:test',
-      tables: Object.fromEntries(
-        Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
-          name,
-          {
-            columns,
-            primaryKey: { columns: ['id'] },
-            uniques,
-            indexes: [],
-            foreignKeys: [],
-          },
-        ]),
-      ),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: Object.fromEntries(
+            Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
+              name,
+              {
+                columns,
+                primaryKey: { columns: ['id'] },
+                uniques,
+                indexes: [],
+                foreignKeys: [],
+              },
+            ]),
+          ),
+        },
+      },
     },
     roots: {},
     models: {},
