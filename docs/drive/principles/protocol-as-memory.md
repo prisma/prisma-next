@@ -48,7 +48,7 @@ Both surfaces are **human-readable and human-runnable**, not just agent context 
 - Reference tasks your team uses to anchor t-shirt sizes. ("An S is roughly a one-package fixture regen, like the per-codec column rename in TML-2103.")
 - DoR / DoD items specific to your team. ("PR title must carry a Linear ticket prefix.")
 - Manual-QA conventions. ("For any slice touching the demo, run `pnpm demo` and check the version banner.")
-- Model-tier routing rules your team has worked out. ("Codemods over `**/test/**` → composer cheap-tier. API-design dispatches → Opus.")
+- Model-tier routing rules your team has worked out. ("Codemods over `**/test/**` → fast tier. API-design dispatches → thorough tier.")
 
 The test: **would another team using these same skills want this rule?**
 

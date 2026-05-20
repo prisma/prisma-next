@@ -53,7 +53,7 @@ M; ≤ 30 min wall-clock.
 
 ## Model tier
 
-Cheap (Sonnet/composer). Mechanical migration with strong DoD;
+Fast tier. Mechanical migration with strong DoD;
 the capability premium isn't paying for anything here.
 
 ## Inputs
@@ -65,7 +65,7 @@ the capability premium isn't paying for anything here.
 
 ## Implementer + Reviewer
 
-- Implementer: implementer subagent (cheap-tier composer)
+- Implementer: implementer subagent (fast tier)
 - Reviewer: reviewer subagent (orchestrator tier, for verification rigour)
 ```
 
