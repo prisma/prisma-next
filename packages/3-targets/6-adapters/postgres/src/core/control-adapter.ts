@@ -217,10 +217,46 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     schema = 'public',
   ): Promise<SqlSchemaIR> {
     const declaredNamespaces = extractContractNamespaceIds(contract);
-    if (declaredNamespaces.length > 0) {
-      return this.introspectNamespaces(driver, declaredNamespaces);
-    }
-    return this.introspectSchema(driver, schema);
+    const ir =
+      declaredNamespaces.length > 0
+        ? await this.introspectNamespaces(driver, declaredNamespaces)
+        : await this.introspectSchema(driver, schema);
+    // Capture the list of non-system schemas so downstream planners
+    // (e.g. `verifyPostgresNamespacePresence`) can determine which
+    // contract-declared namespaces need a `CREATE SCHEMA` before the
+    // table DDL.
+    const existingSchemas = await this.listExistingSchemas(driver);
+    const annotations = ir.annotations ?? {};
+    const pg = (annotations as { pg?: Record<string, unknown> }).pg ?? {};
+    return {
+      ...ir,
+      annotations: {
+        ...annotations,
+        pg: { ...pg, existingSchemas },
+      },
+    };
+  }
+
+  /**
+   * Lists every non-system schema present in the connected database.
+   * The introspection consumer (`verifyPostgresNamespacePresence`)
+   * treats the result as the authoritative ground truth — declared
+   * namespaces whose `ddlSchemaName` is missing from this list become
+   * `missing_schema` issues, and the planner emits the matching
+   * `CREATE SCHEMA` before table DDL.
+   */
+  private async listExistingSchemas(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+  ): Promise<readonly string[]> {
+    const result = await driver.query<{ nspname: string }>(
+      `SELECT nspname
+       FROM pg_catalog.pg_namespace
+       WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+         AND nspname NOT LIKE 'pg_temp_%'
+         AND nspname NOT LIKE 'pg_toast_temp_%'
+       ORDER BY nspname`,
+    );
+    return result.rows.map((row) => row.nspname);
   }
 
   /**

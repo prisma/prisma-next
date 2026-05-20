@@ -52,6 +52,7 @@ describe('PostgresControlAdapter', () => {
           pg: {
             schema: 'public',
             version: expect.any(String),
+            existingSchemas: [],
           },
         },
       });
