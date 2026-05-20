@@ -95,7 +95,7 @@ interface InstallReport {
  * structured CLI errors raised at every phase (input resolution, install,
  * emit) and renders them via the same UI surface as success output
  * (`--json` to stdout, human to stderr). Exit codes follow the documented
- * stable set in `./exit-codes.ts` (FR1.6) and the
+ * stable set in `./exit-codes.ts` and the
  * [Style Guide § Exit Codes](../../../../../../../docs/CLI%20Style%20Guide.md#exit-codes).
  *
  * Layered for testability: the action handler in `./index.ts` is
