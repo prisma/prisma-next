@@ -2,7 +2,7 @@
 
 This document defines the two **execution-layer roles** in the Drive framework — Orchestrator and Executor — and the layered mechanism that binds agents to those roles. It is the single discovery surface for the role distinction; a new contributor reading this document should need no other document to understand the role split, the binding layers, and the escape-hatch policy.
 
-### How this document is used
+## How this document is used
 
 **Workflow skill authors** read this document before writing or amending a `drive-*-workflow` skill body. It defines what a workflow skill's Orchestrator role declaration must say and which sections the skill body must carry (role declaration, DO-NOT list, escape-hatch policy, moment-of-action fail-safe).
 
@@ -120,7 +120,7 @@ The Orchestrator/Executor split is enforced through five independent, defence-in
 
 ```mermaid
 graph TD
-    A["Layer 1: Convention<br/>skill name → role<br/>e.g. drive-*-workflow → Orchestrator"]
+    A["Layer 1: Convention<br/>skill name to role<br/>e.g. drive-*-workflow to Orchestrator"]
     B["Layer 2: Prose reinforcement<br/>role declaration + DO-NOT list<br/>at top of every workflow skill body"]
     C["Layer 3: Dispatch templates<br/>role-binding prose carried into<br/>each Executor's context"]
     D["Layer 4: Artifact pattern<br/>Executors write to disk;<br/>Orchestrator reads condensed summary"]
@@ -208,7 +208,6 @@ The following actions constitute **execution** rather than coordination. An Orch
 | Reading raw test output inline | Condensed summary (pass/fail + failure lines) via artifact; not raw stream |
 | Inlining `git diff` output to reason over | Diff interpretation is a Reviewer task; Orchestrator reads the verdict |
 | Running `pnpm` commands directly | Build/test execution belongs in an Executor brief |
-| Reading heartbeat files for liveness (during dispatch) | This is Orchestrator-owned coordination — see escape-hatch note |
 
 **What the Orchestrator _may_ do directly:**
 - Read project-level artifacts it owns: `projects/<x>/spec.md`, `projects/<x>/plan.md`, `projects/<x>/subagent-registry.md`, `projects/<x>/reviews/code-review.md` (to read a verdict — not to execute the review itself).
