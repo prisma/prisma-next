@@ -37,6 +37,7 @@ import {
   AlterColumnTypeCall,
   CreateEnumTypeCall,
   CreateIndexCall,
+  CreateSchemaCall,
   CreateTableCall,
   DropColumnCall,
   DropConstraintCall,
@@ -76,7 +77,11 @@ function locateNamespaceTypeInStorage(storage: SqlStorage, typeName: string): un
 // ============================================================================
 
 const ISSUE_KIND_ORDER: Record<string, number> = {
-  // Types first
+  // Schemas first — the database container must exist before any DDL
+  // that targets it can run.
+  missing_schema: 1,
+
+  // Types next
   type_missing: 2,
   type_values_mismatch: 3,
   enum_values_changed: 3,
@@ -209,6 +214,16 @@ function mapIssueToCall(
   };
 
   switch (issue.kind) {
+    case 'missing_schema': {
+      const namespaceId = issue.namespaceId;
+      if (!namespaceId)
+        return notOk(
+          issueConflict('unsupportedOperation', 'Missing schema issue has no namespaceId'),
+        );
+      const ddlSchemaName = resolveDdlSchemaForNamespace(ctx, namespaceId);
+      return ok([new CreateSchemaCall(ddlSchemaName)]);
+    }
+
     case 'missing_table': {
       if (!issue.table)
         return notOk(

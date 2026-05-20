@@ -761,6 +761,104 @@ describe('planIssues', () => {
     });
   });
 
+  describe('missing_schema', () => {
+    function makeNamespacedContract(
+      namespaces: Record<string, { tables: Record<string, StorageTableInput> }>,
+    ): Contract<SqlStorage> {
+      const nsMap: Record<string, PostgresSchema> = {};
+      for (const [id, ns] of Object.entries(namespaces)) {
+        nsMap[id] = new PostgresSchema({ id, tables: ns.tables });
+      }
+      return {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: profileHash('sha256:test'),
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:contract'),
+          namespaces: nsMap,
+        }),
+        roots: {},
+        models: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+      };
+    }
+
+    it('translates missing_schema into a CreateSchemaCall classified as a dep', () => {
+      const userTable: StorageTableInput = {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+      const toContract = makeNamespacedContract({
+        auth: { tables: { user: userTable } },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_schema',
+          namespaceId: 'auth',
+          message: 'Schema "auth" is missing from database',
+        },
+        {
+          kind: 'missing_table',
+          table: 'user',
+          namespaceId: 'auth',
+          message: 'Table "user" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const calls = result.value.calls;
+      expect(calls[0]).toMatchObject({ factoryName: 'createSchema', schemaName: 'auth' });
+      const createSchemaIdx = calls.findIndex((c) => c.factoryName === 'createSchema');
+      const createTableIdx = calls.findIndex((c) => c.factoryName === 'createTable');
+      expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
+      expect(createTableIdx).toBeGreaterThanOrEqual(0);
+      expect(createSchemaIdx).toBeLessThan(createTableIdx);
+    });
+
+    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', () => {
+      const toContract = makeNamespacedContract({ auth: { tables: {} } });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_schema',
+          namespaceId: 'auth',
+          message: 'Schema "auth" is missing from database',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const call = result.value.calls[0]!;
+      expect(call.factoryName).toBe('createSchema');
+      const op = call.toOp();
+      expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
+    });
+  });
+
   describe('namespace coordinate on issues', () => {
     function makeMultiNamespaceContract(): Contract<SqlStorage> {
       const userTable: StorageTableInput = {
