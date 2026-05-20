@@ -4,9 +4,7 @@ import {
   jsonColumn,
   textColumn,
 } from '@prisma-next/adapter-sqlite/column-types';
-import sqlFamilyPack from '@prisma-next/family-sql/pack';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import sqlitePack from '@prisma-next/target-sqlite/pack';
+import { defineContract, field, model, rel } from '@prisma-next/sqlite/contract-builder';
 
 const User = model('User', {
   fields: {
@@ -61,8 +59,6 @@ const Item = model('Item', {
 }).sql({ table: 'items' });
 
 export const contract = defineContract({
-  family: sqlFamilyPack,
-  target: sqlitePack,
   capabilities: {
     sql: {
       lateral: false,
