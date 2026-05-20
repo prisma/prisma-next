@@ -2,6 +2,7 @@ export type {
   ComposedAuthoringHelpers,
   ContractInput,
   ContractModelBuilder,
+  ModelLike,
   ScalarFieldBuilder,
 } from '../contract-builder';
 export {
