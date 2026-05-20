@@ -1,6 +1,7 @@
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
+  createMongoContractSchema,
   MongoCollection,
   type MongoCollectionInput,
   type MongoContract,
@@ -8,7 +9,16 @@ import {
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { type as arktypeType } from 'arktype';
+import { type as arktypeType, type Type } from 'arktype';
+
+/**
+ * Hydration factory the Mongo family `ContractSerializer` invokes for
+ * every entry under a pack-contributed `storage.<ns>.<slotKey>` slot.
+ * Mirrors {@link import('../../../../../2-sql/9-family/src/core/ir/sql-contract-serializer-base').SqlNamespaceSlotHydrationFactory}
+ * for symmetry across the families. Mongo has no pack contributions
+ * today; the registry exists for future entity kinds.
+ */
+export type MongoNamespaceSlotHydrationFactory = (raw: unknown) => unknown;
 
 /**
  * Mongo family `ContractSerializer` abstract base. Owns the family-shared
@@ -34,6 +44,56 @@ import { type as arktypeType } from 'arktype';
 export abstract class MongoContractSerializerBase<TContract>
   implements ContractSerializer<TContract>
 {
+  private readonly namespaceSlotHydrationRegistry: ReadonlyMap<
+    string,
+    MongoNamespaceSlotHydrationFactory
+  >;
+  private readonly contractSchema: Type<unknown> | undefined;
+
+  constructor(
+    namespaceSlotHydrationRegistry?: ReadonlyMap<string, MongoNamespaceSlotHydrationFactory>,
+    validatorFragments?: ReadonlyMap<string, Type<unknown>>,
+  ) {
+    this.namespaceSlotHydrationRegistry = namespaceSlotHydrationRegistry ?? new Map();
+    // Mirrors the SQL base: only build a fragments-aware schema when
+    // pack contributions exist; otherwise the cached module-level
+    // default in `contract-schema.ts` covers the validation path.
+    this.contractSchema =
+      validatorFragments !== undefined && validatorFragments.size > 0
+        ? createMongoContractSchema(validatorFragments)
+        : undefined;
+  }
+
+  /**
+   * Hydrate one pack-contributed namespace slot through the registry
+   * keyed by `storageSlotKey`. Mirrors the SQL family helper so target
+   * serializer overrides have a single per-slot dispatch surface. No
+   * Mongo pack registers slots today; the helper exists for symmetry
+   * and as the substrate for future entity kinds.
+   */
+  protected hydrateMongoNamespaceSlot(
+    slotKey: string,
+    raw: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const hydrate = this.namespaceSlotHydrationRegistry.get(slotKey);
+    if (hydrate === undefined) {
+      return undefined;
+    }
+    const slotValue = raw[slotKey];
+    if (
+      slotValue === undefined ||
+      typeof slotValue !== 'object' ||
+      slotValue === null ||
+      Object.keys(slotValue as Record<string, unknown>).length === 0
+    ) {
+      return undefined;
+    }
+    const entries = slotValue as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(entries).map(([entryName, entry]) => [entryName, hydrate(entry)]),
+    );
+  }
+
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
     const validated = this.parseMongoContractStructure(json);
     return this.constructTargetContract(validated) as T;
@@ -63,7 +123,8 @@ export abstract class MongoContractSerializerBase<TContract>
    * subsystems and don't sit behind this SPI.
    */
   protected parseMongoContractStructure(json: unknown): MongoContract {
-    const parsed = MongoContractSchema(json);
+    const schema = this.contractSchema ?? MongoContractSchema;
+    const parsed = schema(json);
     if (parsed instanceof arktypeType.errors) {
       throw new Error(`Contract structural validation failed: ${parsed.summary}`);
     }
