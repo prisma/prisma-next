@@ -342,6 +342,7 @@ export function createSqlContractSchema(
     'roots?': 'Record<string, string>',
     models: type({ '[string]': ModelSchema }),
     'valueObjects?': 'Record<string, unknown>',
+    'domain?': 'unknown',
     storage,
     'execution?': ExecutionSchema,
   }) as Type<unknown>;
