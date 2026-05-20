@@ -65,6 +65,92 @@ function spawnSenderDirect(
   });
 }
 
+interface SilentSenderResult {
+  readonly exitCode: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+/**
+ * Spawn the sender with stdout + stderr piped into in-memory buffers so a
+ * test can assert on what the child wrote. The original failure-mode tests
+ * used `stdio: ['pipe', 'ignore', 'ignore', 'ipc']` which discarded the
+ * child's stderr entirely; this helper captures it so the test can pin AC8
+ * ("no telemetry-originating output appears on stdout or stderr in normal
+ * mode; output appears only under `PRISMA_NEXT_DEBUG=1`").
+ *
+ * Resolves on `exit` + both stdio streams reporting `end`. `close` is the
+ * usual way to wait for both, but the sender's IPC-disconnect-driven idle
+ * exit leaves the parent's ChildProcess in a state where `close` never
+ * fires (the IPC channel reference appears to linger on the parent side
+ * even after the child has exited and the stdio pipes have emitted `end`).
+ * Composing the three signals directly avoids that hang.
+ */
+function spawnSenderCapturingStdio(options: {
+  readonly payload?: ParentToSenderPayload;
+  readonly env: NodeJS.ProcessEnv;
+  readonly onSpawn?: (child: import('node:child_process').ChildProcess) => void;
+}): Promise<SilentSenderResult> {
+  return new Promise((resolveSender, reject) => {
+    const child = fork(SENDER_PATH, [], {
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+      env: options.env,
+    });
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutEnded = child.stdout === null;
+    let stderrEnded = child.stderr === null;
+    let exited = false;
+    let exitCode: number | null = null;
+    let settled = false;
+
+    const maybeResolve = (): void => {
+      if (settled || !exited || !stdoutEnded || !stderrEnded) return;
+      settled = true;
+      resolveSender({
+        exitCode,
+        stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+        stderr: Buffer.concat(stderrChunks).toString('utf-8'),
+      });
+    };
+
+    child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
+    child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+    child.stdout?.on('end', () => {
+      stdoutEnded = true;
+      maybeResolve();
+    });
+    child.stderr?.on('end', () => {
+      stderrEnded = true;
+      maybeResolve();
+    });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      exited = true;
+      exitCode = code;
+      maybeResolve();
+    });
+
+    if (options.payload !== undefined) {
+      child.send(options.payload);
+    }
+    options.onSpawn?.(child);
+  });
+}
+
+/**
+ * Returns a copy of the current process env with `PRISMA_NEXT_DEBUG` deleted
+ * (so the failure-mode tests assert silence under the default-off debug
+ * setting irrespective of whatever the developer's shell exports), then
+ * layers `extra` on top — callers explicitly opt in to debug by passing
+ * `{ PRISMA_NEXT_DEBUG: '1' }`.
+ */
+function envWithoutDebug(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env['PRISMA_NEXT_DEBUG'];
+  return { ...env, ...extra };
+}
+
 function envWithoutAgentMarkers(): NodeJS.ProcessEnv {
   const baseEnv = { ...process.env };
   for (const marker of AGENT_MARKERS) {
@@ -75,7 +161,10 @@ function envWithoutAgentMarkers(): NodeJS.ProcessEnv {
 
 describe('cli-telemetry end-to-end via telemetry backend', () => {
   it('forks the sender, the child POSTs the event, and the backend stores the wire shape', async () => {
-    await spawnSenderDirect(buildPayload());
+    const result = await spawnSenderCapturingStdio({
+      payload: buildPayload(),
+      env: envWithoutDebug(),
+    });
     const [row] = await harness.awaitRows(1);
 
     expect(row?.installationId).toBe('00000000-0000-4000-8000-000000000001');
@@ -89,6 +178,12 @@ describe('cli-telemetry end-to-end via telemetry backend', () => {
     expect(typeof row?.os).toBe('string');
     expect(typeof row?.arch).toBe('string');
     expect(row?.tsVersion).toBe('5.9.3');
+
+    // Happy-path silence: the child never writes to stdout or stderr when
+    // PRISMA_NEXT_DEBUG is unset, even when the POST succeeds.
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
   });
 
   it('transmits only flag names, never values or positionals', async () => {
@@ -149,32 +244,42 @@ describe('cli-telemetry end-to-end via telemetry backend', () => {
 });
 
 describe('cli-telemetry end-to-end — failure modes are silent', () => {
-  it('the sender swallows a network failure (parent never knows)', async () => {
+  it('the sender swallows a network failure (parent never knows) and stays silent', async () => {
     const payload = buildPayload({ endpoint: 'http://127.0.0.1:1/events' });
-    await new Promise<void>((resolveSender, reject) => {
-      const child = fork(SENDER_PATH, [], {
-        stdio: ['pipe', 'ignore', 'ignore', 'ipc'],
-      });
-      child.on('error', reject);
-      child.on('exit', (code) => {
-        expect(code).toBe(0);
-        resolveSender();
-      });
-      child.send(payload);
+    const result = await spawnSenderCapturingStdio({
+      payload,
+      env: envWithoutDebug(),
     });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
   });
 
-  it('the sender exits 0 when no payload is received within the idle timeout', async () => {
-    await new Promise<void>((resolveSender, reject) => {
-      const child = fork(SENDER_PATH, [], {
-        stdio: ['pipe', 'ignore', 'ignore', 'ipc'],
-      });
-      child.on('error', reject);
-      child.on('exit', (code) => {
-        expect(code).toBe(0);
-        resolveSender();
-      });
-      setTimeout(() => child.disconnect(), 50);
+  it('the sender exits 0 when no payload is received within the idle timeout, and stays silent', async () => {
+    const result = await spawnSenderCapturingStdio({
+      env: envWithoutDebug(),
+      onSpawn: (child) => {
+        setTimeout(() => child.disconnect(), 50);
+      },
     });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
   }, 10_000);
+
+  it('emits diagnostics to stderr under PRISMA_NEXT_DEBUG=1', async () => {
+    const payload = buildPayload({ endpoint: 'http://127.0.0.1:1/events' });
+    const result = await spawnSenderCapturingStdio({
+      payload,
+      env: envWithoutDebug({ PRISMA_NEXT_DEBUG: '1' }),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('');
+    // Debug-mode invariants: every diagnostic line carries the
+    // `[cli-telemetry]` prefix and the network failure surfaces as a
+    // `send failed` line so a future refactor that quietly removes the
+    // diagnostic path fails this test.
+    expect(result.stderr).toContain('[cli-telemetry]');
+    expect(result.stderr).toContain('send failed');
+  });
 });
