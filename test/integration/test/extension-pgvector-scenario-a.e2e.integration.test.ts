@@ -115,7 +115,7 @@ const APP_FIELD = 'embedding';
 const VECTOR_LENGTH = 3;
 
 function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlStorage> {
-  return familyInstance.deserializeContract(buildAppContractPojo(opts));
+  return familyInstance.deserializeContract(buildAppContractPojo(opts)) as Contract<SqlStorage>;
 }
 
 function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<SqlStorage> {
