@@ -212,30 +212,13 @@ function rewriteInsertRow(
   return result;
 }
 
-type UpdateSetValue = ColumnRef | ParamRef | PreparedParamRef;
-
-function rewriteUpdateSetValue(value: UpdateSetValue, rewriter: AstRewriter): UpdateSetValue {
-  switch (value.kind) {
-    case 'column-ref': {
-      const rewritten = rewriter.columnRef ? rewriter.columnRef(value) : value;
-      return rewritten.kind === 'column-ref' ? rewritten : value;
-    }
-    case 'param-ref': {
-      const rewritten = rewriter.paramRef ? rewriter.paramRef(value) : value;
-      return rewritten.kind === 'param-ref' ? rewritten : value;
-    }
-    case 'prepared-param-ref':
-      return rewriter.preparedParamRef ? rewriter.preparedParamRef(value) : value;
-  }
-}
-
 function rewriteUpdateSet(
-  set: Readonly<Record<string, UpdateSetValue>>,
+  set: Readonly<Record<string, AnyExpression>>,
   rewriter: AstRewriter,
-): Record<string, UpdateSetValue> {
-  const result: Record<string, UpdateSetValue> = {};
+): Record<string, AnyExpression> {
+  const result: Record<string, AnyExpression> = {};
   for (const [key, value] of Object.entries(set)) {
-    result[key] = rewriteUpdateSetValue(value, rewriter);
+    result[key] = value.rewrite(rewriter as ExpressionRewriter);
   }
   return result;
 }
@@ -1460,9 +1443,9 @@ export class DoNothingConflictAction extends InsertOnConflictAction {
 
 export class DoUpdateSetConflictAction extends InsertOnConflictAction {
   readonly kind = 'do-update-set' as const;
-  readonly set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>;
+  readonly set: Readonly<Record<string, AnyExpression>>;
 
-  constructor(set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>) {
+  constructor(set: Readonly<Record<string, AnyExpression>>) {
     super();
     this.set = frozenRecordCopy(set);
     this.freeze();
@@ -1493,9 +1476,7 @@ export class InsertOnConflict extends AstNode {
     return new InsertOnConflict(this.columns, new DoNothingConflictAction());
   }
 
-  doUpdateSet(
-    set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>,
-  ): InsertOnConflict {
+  doUpdateSet(set: Readonly<Record<string, AnyExpression>>): InsertOnConflict {
     return new InsertOnConflict(this.columns, new DoUpdateSetConflictAction(set));
   }
 }
@@ -1593,13 +1574,13 @@ export class InsertAst extends QueryAst {
 export class UpdateAst extends QueryAst {
   readonly kind = 'update' as const;
   readonly table: TableSource;
-  readonly set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>;
+  readonly set: Readonly<Record<string, AnyExpression>>;
   readonly where: AnyExpression | undefined;
   readonly returning: ReadonlyArray<ProjectionItem> | undefined;
 
   constructor(
     table: TableSource,
-    set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>> = {},
+    set: Readonly<Record<string, AnyExpression>> = {},
     where?: AnyExpression,
     returning?: ReadonlyArray<ProjectionItem>,
   ) {
@@ -1615,7 +1596,7 @@ export class UpdateAst extends QueryAst {
     return new UpdateAst(table);
   }
 
-  withSet(set: Readonly<Record<string, ColumnRef | ParamRef | PreparedParamRef>>): UpdateAst {
+  withSet(set: Readonly<Record<string, AnyExpression>>): UpdateAst {
     return new UpdateAst(this.table, set, this.where, this.returning);
   }
 
@@ -1639,9 +1620,7 @@ export class UpdateAst extends QueryAst {
   override collectParamRefs(): AnyParamRef[] {
     const refs: AnyParamRef[] = [];
     for (const value of Object.values(this.set)) {
-      if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
-        refs.push(value);
-      }
+      refs.push(...value.collectParamRefs());
     }
     if (this.where) {
       refs.push(...this.where.collectParamRefs());
