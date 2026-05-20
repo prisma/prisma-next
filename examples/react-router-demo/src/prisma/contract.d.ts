@@ -36,9 +36,6 @@ export type ProfileHash =
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 
 export type FieldOutputTypes = {
   readonly Post: {
@@ -102,7 +99,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };
@@ -142,7 +139,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };

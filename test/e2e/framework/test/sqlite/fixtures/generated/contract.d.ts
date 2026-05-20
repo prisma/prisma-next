@@ -23,9 +23,6 @@ export type ProfileHash =
 export type CodecTypes = SqliteTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = Record<string, never>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 
 export type FieldOutputTypes = {
   readonly Comment: {
@@ -152,7 +149,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'text';
                 readonly codecId: 'sqlite/text@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: "'unnamed'" };
+                readonly default: { readonly kind: 'expression'; readonly expression: "'unnamed'" };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };

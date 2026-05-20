@@ -24,9 +24,6 @@ export type ProfileHash =
 export type CodecTypes = SqliteTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = Record<string, never>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 
 export type FieldOutputTypes = {
   readonly Post: {
@@ -93,7 +90,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'text';
                 readonly codecId: 'sqlite/datetime@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };
@@ -139,7 +136,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'text';
                 readonly codecId: 'sqlite/datetime@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };

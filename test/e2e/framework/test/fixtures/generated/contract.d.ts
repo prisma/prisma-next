@@ -41,9 +41,6 @@ export type CodecTypes = PgTypes & PgVectorTypes & ArktypeJsonTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   PgVectorQueryOperationTypes<CodecTypes>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 
 export type FieldOutputTypes = {
   readonly Comment: {
@@ -182,7 +179,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: 'autoincrement()';
                 };
               };
@@ -200,7 +197,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
               readonly update_at: {
                 readonly nativeType: 'timestamptz';
@@ -220,7 +217,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: 'autoincrement()';
                 };
               };
@@ -269,7 +266,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: "'2024-01-15T10:30:00.000Z'::timestamp with time zone";
                 };
               };
@@ -277,7 +274,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };
@@ -292,7 +289,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: 'autoincrement()';
                 };
               };
@@ -301,7 +298,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/text@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: "'draft'::text";
                 };
               };
@@ -309,26 +306,26 @@ type ContractBase = ContractType<
                 readonly nativeType: 'int4';
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: '0' };
+                readonly default: { readonly kind: 'expression'; readonly expression: '0' };
               };
               readonly rating: {
                 readonly nativeType: 'float8';
                 readonly codecId: 'pg/float8@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: '3.14' };
+                readonly default: { readonly kind: 'expression'; readonly expression: '3.14' };
               };
               readonly active: {
                 readonly nativeType: 'bool';
                 readonly codecId: 'pg/bool@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'TRUE' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'TRUE' };
               };
               readonly big_count: {
                 readonly nativeType: 'int8';
                 readonly codecId: 'pg/int8@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: '9007199254740991';
                 };
               };
@@ -337,7 +334,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/jsonb@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: '\'{"key":"default"}\'::jsonb';
                 };
               };
@@ -346,7 +343,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/jsonb@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: '\'["alpha","beta"]\'::jsonb';
                 };
               };
@@ -363,7 +360,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: 'autoincrement()';
                 };
               };
@@ -434,7 +431,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: 'autoincrement()';
                 };
               };
@@ -452,7 +449,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
               readonly update_at: {
                 readonly nativeType: 'timestamptz';
@@ -482,7 +479,7 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/int4@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'function';
+                  readonly kind: 'expression';
                   readonly expression: 'autoincrement()';
                 };
               };
@@ -496,7 +493,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
               readonly update_at: {
                 readonly nativeType: 'timestamptz';
