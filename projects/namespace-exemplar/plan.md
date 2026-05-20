@@ -291,13 +291,13 @@ This is the largest surface — every consumer that walks `storage.tables[name]`
 - TS builder: `packages/2-sql/2-authoring/contract-ts/src/`.
 - Planner: `packages/3-targets/3-targets/postgres/src/core/migrations/issue-planner.ts` (and DDL renderer).
 - Verifier: `packages/2-sql/.../verify-sql-schema.ts`.
-- Tests: `psl-namespace-qualifier-routing.test.ts`, `psl-ts-namespace-parity.test.ts`, and an AC1 PGlite integration test under `test/integration/test/`.
+- Tests: `psl-namespace-qualifier-routing.test.ts`, `psl-ts-namespace-parity.test.ts`, and `packages/3-targets/6-adapters/postgres/test/migrations/cross-namespace-fk.integration.test.ts` (AC1).
 
 **Out of scope.** Example apps (D5.1).
 
 **DoD.**
 1. `pnpm test` for the affected packages clean.
-2. AC1 PGlite test (cross-namespace FK end-to-end) passes.
+2. AC1 integration test (`cross-namespace-fk.integration.test.ts`) passes.
 3. AC2 parity test passes.
 4. ≤4 commits.
 
@@ -307,7 +307,7 @@ This is the largest surface — every consumer that walks `storage.tables[name]`
 
 **Size:** M. **Time-box:** 30 min.
 
-**Goal.** Every example app emits cleanly under the new shape. `examples/prisma-next-demo` ships the 2-namespace contract (User in `auth`, Post/Task in `public`). `examples/multi-extension-monorepo` regenerates baseline migrations + `refs/head.json` against the new contract hashes (same recipe as the dead branch's hot-fix dispatch). AC5 multi-tenancy PGlite test passes.
+**Goal.** Every example app emits cleanly under the new shape. `examples/prisma-next-demo` stays single-namespace (runtime query qualification deferred to TML-2605). `examples/multi-extension-monorepo` regenerates baseline migrations + `refs/head.json` against the new contract hashes (same recipe as the dead branch's hot-fix dispatch). AC5 multi-tenancy PGlite test passes.
 
 **Files in scope.**
 - `examples/prisma-next-demo/**`.
@@ -403,7 +403,7 @@ Surface-area risks the orchestrator watches throughout the project:
 | Spec edit during execution contradicts a sibling FR | Any in-flight spec edit | Orchestrator runs the consistency-grep before committing the spec edit. |
 | Phase 3 consumer migration is bigger than 3×M | D3.* hits >30 min wall-clock | Split into D3.1a, D3.1b, etc. — never let a dispatch overrun the time-box without subdividing. |
 | Phase 2 emitter regen breaks a test we don't currently anticipate | D2.2 fails a non-emit test | Confirms a Phase 3 consumer fix is needed earlier; reorder by surfacing the offending consumer to D3.* immediately. |
-| Cross-namespace FK PGlite test (AC1) flakes under PGlite worker-pool contention | D4.2 / D5.1 surfaces ECONNRESET | Confirm reproduces on `main` (= baseline flake from the prior calibration entry); document as known issue; don't block landing. |
+| Cross-namespace FK integration test (AC1) flakes under PGlite worker-pool contention | D4.2 surfaces ECONNRESET | Confirm reproduces on `main` (= baseline flake from the prior calibration entry); document as known issue; don't block landing. |
 | Cherry-pick conflicts on the three carry-over commits | D5.2 finds a conflict | Skip the conflicting commit and document why; the carry-overs are scope-isolated, none of them is load-bearing for PR2's correctness. |
 | Subagent dies mid-dispatch without completion notification | § 3.15 from prior calibration | Already documented; orchestrator probes via transcript mtime + resume-as-probe, dispatches finisher. |
 | [PR #520 (TML-2536)](https://github.com/prisma/prisma-next/pull/520) merges during our execution | `git fetch` shows PR #520 SHAs landed on `origin/main` while our branch is in flight | Pause active dispatch; rebase our branch onto `origin/main` at a phase boundary (between D1.3/D2.1, between D2.2/D3.*, or between D4.2/D5.1 — never mid-phase). Conflict surface is small: (1) `packages/2-sql/1-core/contract/src/ir/sql-storage.ts` — fold our `tables`-field removal into PR #520's `normaliseTypeEntry` strip; (2) `packages/2-sql/9-family/src/core/ir/sql-contract-serializer-base.ts` — our new-shape deserializer inherits PR #520's strict-throw pattern; (3) `examples/prisma-next-demo/migrations/**` — re-regenerate demo snapshots under both changes. After rebase, re-run prior phases' DoD gates before proceeding. |

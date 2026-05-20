@@ -28,7 +28,7 @@ A single PR that:
 4. Lifts the TS builder `namespaces` declaration + per-model `namespace` field into the SQL DSL.
 5. Restructures `ForeignKey` IR to `{ source, target }` and renames `ForeignKeyReferences` → `ForeignKeyReference` (singular).
 6. Implements cross-namespace foreign keys end-to-end (PSL lowering, TS builder lowering, planner DDL, verifier dispatch).
-7. Demonstrates the feature live with a 2-namespace `prisma-next-demo` (User in `auth`, Post/Task in `public`, cross-namespace FK) and a multi-tenancy AC integration test (Postgres `namespace unbound { … }` + `search_path`).
+7. Verifies cross-namespace DDL emission via a dedicated integration test (`packages/3-targets/6-adapters/postgres/test/migrations/cross-namespace-fk.integration.test.ts`) and a multi-tenancy PGlite integration test (Postgres `namespace unbound { … }` + `search_path`). Runtime query qualification is deferred to [TML-2605](https://linear.app/prisma-company/issue/TML-2605); `examples/prisma-next-demo` stays single-namespace in this PR.
 
 ## At a glance
 
@@ -167,7 +167,7 @@ These are the load-bearing decisions for this PR. Anything not on this list is o
 
 ## Acceptance criteria
 
-- [x] **AC1. Two-namespace Postgres contract end-to-end.** A Postgres contract declares `namespaces: ['public', 'auth']` with User in `auth` and Post + Task in `public`. Emitter generates `contract.{json,d.ts}` with the canonical shape (`storage.namespaces.auth.tables.user`). Planner emits `CREATE SCHEMA "auth"`, then `CREATE TABLE "auth"."user" (…)`, then `CREATE TABLE "public"."post" (…)`, then `ALTER TABLE "public"."post" ADD CONSTRAINT … REFERENCES "auth"."user"("id")`. Verification against a live database with both schemas + the FK passes. Tested via PGlite in `examples/prisma-next-demo` and a matching integration test.
+- [x] **AC1. Two-namespace Postgres contract DDL emission.** A Postgres contract declares `namespaces: ['public', 'auth']` with User in `auth` and Post + Task in `public`. Emitter generates `contract.{json,d.ts}` with the canonical shape (`storage.namespaces.auth.tables.user`). For declared named-namespace storage entries, the planner emits `CREATE SCHEMA "auth"` before `CREATE TABLE "auth"."user" (…)`, then `CREATE TABLE "public"."post" (…)`, then `ALTER TABLE "public"."post" ADD CONSTRAINT … REFERENCES "auth"."user"("id")`. Verified by the dedicated integration test `packages/3-targets/6-adapters/postgres/test/migrations/cross-namespace-fk.integration.test.ts`. Runtime SQL DSL + ORM table identifier qualification is deferred to [TML-2605](https://linear.app/prisma-company/issue/TML-2605); `examples/prisma-next-demo` stays single-namespace in this PR.
 
 - [x] **AC2. TS builder + PSL round-trip parity for namespaces.** Authoring the same 2-namespace contract via PSL and via TS builder produces structurally equivalent `Contract` IR (same `storage.namespaces` keys, same per-namespace `tables` keys, same per-table column shapes, same FK source/target). Tested via a parity test (`psl-ts-namespace-parity.test.ts`).
 
