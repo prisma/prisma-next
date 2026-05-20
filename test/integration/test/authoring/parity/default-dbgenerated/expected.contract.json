@@ -31,31 +31,31 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__"
+        "id": "__unbound__",
+        "tables": {
+          "user": {
+            "columns": {
+              "id": {
+                "codecId": "pg/text@1",
+                "default": {
+                  "expression": "gen_random_uuid()",
+                  "kind": "function"
+                },
+                "nativeType": "text",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": ["id"]
+            },
+            "uniques": []
+          }
+        }
       }
     },
-    "storageHash": "sha256:bba7ac32190afede61dbef04946b269013611c2566cb51b2bfac3a75f9b0bba0",
-    "tables": {
-      "user": {
-        "columns": {
-          "id": {
-            "codecId": "pg/text@1",
-            "default": {
-              "expression": "gen_random_uuid()",
-              "kind": "function"
-            },
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": ["id"]
-        },
-        "uniques": []
-      }
-    }
+    "storageHash": "sha256:f83367183867bad124b5fc91b8913d1a1e36bccedfba80a471df5751201d63cc"
   },
   "capabilities": {
     "postgres": {
