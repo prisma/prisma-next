@@ -192,7 +192,7 @@ Pre-dispatch research that *is* dispatchable (would touch source or change diffs
 
 ---
 
-### Dispatch 5a: Example apps + extension-pack contracts migrate to façade form
+### Dispatch 5a: Example apps migrate to façade form (extension-pack contracts exempted, see A7)
 
 **Intent.** Migrate every user-authored TS file in `examples/` (and the two extension-pack `src/contract.ts` files) to façade form. Two surfaces:
 
@@ -205,7 +205,7 @@ For Mongo examples, opportunistically apply the now-available `extensions` / `mi
 
 - All `examples/*/prisma-next.config.ts` files (per D0 inventory, 13 files).
 - All `examples/*/prisma/contract.ts` files (per D0 grep, 4 files: `paradedb-demo`, `prisma-next-demo-sqlite`, `prisma-next-demo`, `react-router-demo`).
-- `packages/3-extensions/pgvector/src/contract.ts`, `packages/3-extensions/postgis/src/contract.ts` (extension-pack contracts).
+- ~~`packages/3-extensions/pgvector/src/contract.ts`, `packages/3-extensions/postgis/src/contract.ts`~~ (**dropped post-D5a R1**: Turbo build cycle `postgres → sql-builder → extension-pgvector → would-be postgres` makes the migration impossible without architectural refactor. Folded into A7's extension-pack exemption; see spec § A7 for details and the `@prisma-next/postgres-contract` extraction follow-up option).
 - `packages/3-extensions/sql-orm-client/test/fixtures/contract.ts` (test fixture — only migrate if doing so doesn't break the test's intent; if the fixture deliberately exercises the verbose form, leave + add a comment).
 - Any `examples/*/scripts/*.ts` or `examples/*/test/utils/*.ts` that imports from `@prisma-next/cli/control-api`, `@prisma-next/target-*/control`, etc. — verified by grep; in scope if the façade now exposes the equivalent surface (`createSqliteControlClient`, `createMongoControlClient`, `createPostgresControlClient`).
 
@@ -216,8 +216,8 @@ For Mongo examples, opportunistically apply the now-available `extensions` / `mi
 - [ ] Grep gate (contract): `rg "@prisma-next/(family-(sql|mongo)|target-(postgres|sqlite|mongo))/(pack|control)" examples/*/prisma/contract.ts packages/3-extensions/{pgvector,postgis}/src/contract.ts` returns zero hits.
 - [ ] `pnpm typecheck` clean for every example (filter per example or run the all-examples task).
 - [ ] `pnpm build` clean across the workspace.
-- [ ] Intent-validation: diff covers only `examples/**/{prisma-next.config.ts,prisma/contract.ts}` + the extension-pack contracts + (if applicable) a handful of control-side test helpers; no façade or framework source change.
-- [ ] FR9 partially satisfied (examples + extension-pack contracts only; D5b closes the test-fixture remainder).
+- [ ] Intent-validation: diff covers only `examples/**/{prisma-next.config.ts,prisma/contract.ts}` + (if applicable) a handful of control-side test helpers; no façade or framework source change. (Extension-pack contracts exempted post-discovery — see A7.)
+- [ ] FR9 partially satisfied (examples sweep complete; D5b closes the test-fixture remainder).
 
 **Size.** M.
 
@@ -255,6 +255,7 @@ Per the orchestrator's grep (run before D5a; re-grep to refresh before D5b dispa
   - the facade source files that re-export from packs (`packages/3-extensions/{postgres,sqlite,mongo}/src/{exports/{family,target}.ts,contract/define-contract.ts}`),
   - the facade test files that assert pack rejection via `@ts-expect-error` (`packages/3-extensions/{postgres,sqlite,mongo}/test/contract-builder/define-contract.test-d.ts`),
   - cipherstash migration files (A7 exemption),
+  - extension-pack `src/contract.ts` files (`pgvector`, `postgis`) — A7 exemption (Turbo cycle blocks migration without architectural refactor),
   - disallow-rule fixtures left deliberately verbose (with explanatory comments),
   - any test file deliberately exercising the verbose form (with explanatory comments).
 - [ ] `pnpm test:integration` clean (the 17 failures D4 surfaced are gone).
