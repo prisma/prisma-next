@@ -118,6 +118,9 @@ importers:
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      evlog:
+        specifier: ^1.9.0
+        version: 1.9.0
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*

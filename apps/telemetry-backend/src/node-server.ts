@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
+import { log } from './logger';
 import type {
   TelemetryRequestHandler,
   TelemetryServer,
@@ -81,7 +82,10 @@ async function handleNodeRequest(
     const handlerResponse = await handler(toWebRequest(request), handlerInfo);
     await writeResponse(handlerResponse, response);
   } catch (error) {
-    console.error('telemetry backend internal error', error);
+    log.error({
+      event: 'request-internal-error',
+      error: error instanceof Error ? error.message : String(error),
+    });
     if (response.writableEnded) {
       return;
     }
