@@ -72,7 +72,7 @@ These symptoms are not `PN-*` envelopes — route on the message text and chain 
 | Symptom | Next move |
 |---|---|
 | `TypeError: db.end is not a function` | The runtime client does not expose `db.end()` — that's the `node-postgres` pool API (`pool.end()`). The right call is `await db.close()`. See `prisma-next-runtime` § *Running as a script (teardown)*. |
-| Script hangs after queries print / process won't exit | On Postgres the façade-owned `pg.Pool` keeps the event loop alive. Call `await db.close()` before the script returns, or use `await using db = postgres<Contract>(...)`. See `prisma-next-runtime` § *Running as a script (teardown)*. |
+| Script hangs after queries print / process won't exit | On Postgres the façade-owned `pg.Pool` keeps the event loop alive. Call `await db.close()` before the script returns, or `await using db = postgres<Contract>(...)` at the top of a script module (do NOT put `await using` inside a request handler — block-scoped, would close per-request). See `prisma-next-runtime` § *Running as a script (teardown)*. |
 | `Error('Postgres client is closed')` / `Error('SQLite client is closed')` / `Error('Mongo client is closed')` | The client was closed via `db.close()` (terminal state). Remove the early `close()`, reorder so `close()` runs last after all queries, or construct a new `db` if reconnection is intended. See `prisma-next-runtime` § *Running as a script (teardown)*. |
 
 ## Routing — symptom and code → next move
