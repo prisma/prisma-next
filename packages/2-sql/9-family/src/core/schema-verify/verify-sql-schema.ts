@@ -6,7 +6,7 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
@@ -14,6 +14,7 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
@@ -24,7 +25,6 @@ import {
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks } from '../migrations/types';
@@ -1154,9 +1154,9 @@ function resolveContractColumnTypeMetadata(
  */
 function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
-    case 'literal':
-      return `literal(${formatLiteralValue(columnDefault.value)})`;
-    case 'function':
+    case 'autoincrement':
+      return 'autoincrement';
+    case 'expression':
       return columnDefault.expression;
   }
 }
@@ -1181,14 +1181,11 @@ function columnDefaultsEqual(
 ): boolean {
   // If no normalizer provided, fall back to direct string comparison
   if (!normalizer) {
-    if (contractDefault.kind === 'function') {
-      return contractDefault.expression === schemaDefault;
+    if (contractDefault.kind === 'autoincrement') {
+      return false;
     }
-    const normalizedValue = normalizeLiteralValue(contractDefault.value, nativeType);
-    if (typeof normalizedValue === 'string') {
-      return normalizedValue === schemaDefault || `'${normalizedValue}'` === schemaDefault;
-    }
-    return String(normalizedValue) === schemaDefault;
+    const expr = contractDefault.expression;
+    return expr === schemaDefault || `'${expr}'` === schemaDefault;
   }
 
   // Normalize the raw schema default using target-specific logic
@@ -1202,66 +1199,13 @@ function columnDefaultsEqual(
   if (contractDefault.kind !== normalizedSchema.kind) {
     return false;
   }
-  if (contractDefault.kind === 'literal' && normalizedSchema.kind === 'literal') {
-    const contractValue = normalizeLiteralValue(contractDefault.value, nativeType);
-    const schemaValue = normalizeLiteralValue(normalizedSchema.value, nativeType);
-    return literalValuesEqual(contractValue, schemaValue);
+  if (contractDefault.kind === 'autoincrement') {
+    return true;
   }
-  if (contractDefault.kind === 'function' && normalizedSchema.kind === 'function') {
-    // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
+  if (contractDefault.kind === 'expression' && normalizedSchema.kind === 'expression') {
+    // Normalize expressions for comparison (case-insensitive, whitespace-tolerant)
     const normalizeExpr = (expr: string) => expr.toLowerCase().replace(/\s+/g, '');
     return normalizeExpr(contractDefault.expression) === normalizeExpr(normalizedSchema.expression);
   }
   return false;
-}
-
-function isTemporalNativeType(nativeType?: string): boolean {
-  if (!nativeType) return false;
-  const normalized = nativeType.toLowerCase();
-  return normalized.includes('timestamp') || normalized === 'date';
-}
-
-function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (typeof value === 'string' && isTemporalNativeType(nativeType)) {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString();
-    }
-  }
-  return value;
-}
-
-function literalValuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
-    return canonicalStringify(a) === canonicalStringify(b);
-  }
-  if (typeof a === 'object' && a !== null && typeof b === 'string') {
-    try {
-      return canonicalStringify(a) === canonicalStringify(JSON.parse(b));
-    } catch {
-      return false;
-    }
-  }
-  if (typeof a === 'string' && typeof b === 'object' && b !== null) {
-    try {
-      return canonicalStringify(JSON.parse(a)) === canonicalStringify(b);
-    } catch {
-      return false;
-    }
-  }
-  return false;
-}
-
-function formatLiteralValue(value: unknown): string {
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (typeof value === 'string') {
-    return value;
-  }
-  return JSON.stringify(value);
 }
