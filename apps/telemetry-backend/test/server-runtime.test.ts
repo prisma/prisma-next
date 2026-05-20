@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveTelemetryBackendConfig, stopTelemetryBackend } from '../src/server-runtime';
+import {
+  resolveTelemetryBackendConfig,
+  shutdownExitCode,
+  stopTelemetryBackend,
+} from '../src/server-runtime';
 
 describe('resolveTelemetryBackendConfig', () => {
   it('honours PORT and RATE_LIMIT_RPM from the passed-in env (not process.env)', () => {
@@ -16,6 +20,16 @@ describe('resolveTelemetryBackendConfig', () => {
     const config = resolveTelemetryBackendConfig({ DATABASE_URL: 'postgres://test/test' });
     expect(config.port).toBe(8080);
     expect(config.requestsPerMinute).toBe(120);
+  });
+});
+
+describe('shutdownExitCode', () => {
+  it('returns 0 for a clean stopped result', () => {
+    expect(shutdownExitCode('stopped')).toBe(0);
+  });
+
+  it('returns 1 for a timed-out result so supervisors notice failed shutdowns', () => {
+    expect(shutdownExitCode('timed-out')).toBe(1);
   });
 });
 

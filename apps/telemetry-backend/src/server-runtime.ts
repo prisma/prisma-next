@@ -74,6 +74,15 @@ function shutdownTimeout(): Promise<'timed-out'> {
   });
 }
 
+/**
+ * Map a `stopTelemetryBackend` result to a process exit code. A `'timed-out'`
+ * shutdown returns `1` so process supervisors (systemd, Kubernetes, Prisma
+ * Compute) treat it as a failed shutdown rather than a clean exit.
+ */
+export function shutdownExitCode(result: 'stopped' | 'timed-out'): 0 | 1 {
+  return result === 'timed-out' ? 1 : 0;
+}
+
 export async function stopTelemetryBackend(
   server: TelemetryServer,
   app: TelemetryBackendShutdownTarget,
@@ -151,7 +160,7 @@ export async function runTelemetryBackendServer(
 
     let exitCode: 0 | 1 = 0;
     try {
-      await stopTelemetryBackend(server, app);
+      exitCode = shutdownExitCode(await stopTelemetryBackend(server, app));
     } catch (error) {
       exitCode = 1;
       log.error({
