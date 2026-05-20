@@ -1,6 +1,3 @@
-// Intentionally uses verbose mongo-contract-ts import: @prisma-next/mongo-runtime is a
-// dependency of @prisma-next/mongo (facade), so adding the facade as a devDep here
-// would create a circular build dependency.
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
   MongoContract,
@@ -13,7 +10,7 @@ import { acc, fn, mongoQuery } from '@prisma-next/mongo-query-builder';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
 import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { withMongod } from './setup';
+import { withMongod } from '../mongo/setup';
 
 type TestContract = MongoContract & {
   readonly models: {
