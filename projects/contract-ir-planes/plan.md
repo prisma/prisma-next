@@ -29,7 +29,7 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 
 **Depends on.** Nothing (foundation slice).
 
-**Linear:** TBD — new ticket *"S1.A — Substrate: two-plane IR primitives + entity coordinate + pack-contributed entity-kind mechanism"*.
+**Linear:** [TML-2622](https://linear.app/prisma-company/issue/TML-2622).
 
 **Validation gate:**
 
@@ -53,7 +53,7 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 
 **Depends on.** S1.A.
 
-**Linear:** TBD — *"S1.B — Migrate Postgres enum off framework-shared types slot"*.
+**Linear:** [TML-2623](https://linear.app/prisma-company/issue/TML-2623).
 
 **Validation gate:**
 
@@ -77,7 +77,7 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 
 **Depends on.** S1.B (consumes the descriptor mechanism + new IR shape).
 
-**Linear:** TBD — *"S1.C — Cross-reference encoding migration"*.
+**Linear:** [TML-2624](https://linear.app/prisma-company/issue/TML-2624).
 
 **Validation gate:**
 
@@ -105,7 +105,7 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 
 **Depends on.** S1.C (the new surface needs to be working everywhere before old shims come out).
 
-**Linear:** TBD — *"S1.D — Delete subsumed surfaces + close subsumed Linear tickets"*.
+**Linear:** [TML-2625](https://linear.app/prisma-company/issue/TML-2625).
 
 **Validation gate:**
 
@@ -127,7 +127,7 @@ Each slice's substrate is required by the next. The "could S1.B and S1.C paralle
 
 - [x] **PR #534 merged.** Required base; landed at commit `66da80f96`.
 - [ ] **EA timeline confirmed.** Pre-EA must-ship status of this sub-project depends on umbrella-level sequencing; see [`projects/target-extensible-ir-namespaces/plan.md`](../target-extensible-ir-namespaces/plan.md).
-- [ ] **Linear tickets for S1.A through S1.D.** Four tickets need creating under the existing Linear project before slice pickup begins. Created as part of the umbrella's Linear audit pass.
+- [x] **Linear tickets for S1.A through S1.D.** Created 2026-05-20: TML-2622 (S1.A), TML-2623 (S1.B), TML-2624 (S1.C), TML-2625 (S1.D). All four `relatedTo` TML-2584 (graph link without sub-issue hierarchy per the team's no-sub-issues rule).
 
 ## Project-DoD coverage map
 

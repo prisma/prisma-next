@@ -85,7 +85,12 @@ Within S1, S1's own plan defines parallelisation opportunities (Slices 4 + 5 are
 ## Dependencies (external)
 
 - [x] **PR #534 (TML-2520) merged.** Met at commit `66da80f96`. Required base for S1.
-- [ ] **Linear audit completed.** 21 tickets currently in the Linear project need triage: close duplicates, map survivors to S1's six internal slices + S2 + S3, create the six S1-internal-slice tickets that don't exist yet. Working through this in parallel with this plan's drafting; ticket-creation outputs feed S1's plan + S2/S3 slice specs.
+- [x] **Linear audit completed** 2026-05-20. Triage outcomes:
+  - **Mainline (refreshed descriptions):** TML-2584 (S1), TML-2605 (S2), TML-2550 (S3)
+  - **S1 internal slice tickets created:** TML-2622 (S1.A), TML-2623 (S1.B), TML-2624 (S1.C), TML-2625 (S1.D) — all `relatedTo` TML-2584
+  - **Subsumed by S1 (auto-close on slice PR merge):** TML-2579, TML-2580, TML-2582, TML-2545, TML-2563, TML-2586
+  - **Out-of-umbrella (stay in Linear project for discoverability):** TML-2537 (TML-2537 PSL substrate), TML-2541, TML-2542, TML-2543, TML-2540, TML-2513
+  - **No action needed:** TML-2583 (orthogonal; spec § non-goals already covers); previously-resolved TML-2459/2520/2521/2575/2576/2577/2578/2581
 - [ ] **Supabase initiative awareness.** The downstream Supabase integration consumes this umbrella's substrate. Coordinated at initiative-level — not a blocker for this umbrella, but the Supabase initiative's planning needs to know what S1 ships and when.
 
 ## Project-DoD coverage map
