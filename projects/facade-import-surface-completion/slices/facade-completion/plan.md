@@ -273,6 +273,72 @@ Per the orchestrator's grep (run before D5a; re-grep to refresh before D5b dispa
 
 ---
 
+### Dispatch 5c: Fix architectural layering — remove extension-pack devDeps from sql-builder, sql-orm-client, mongo-runtime
+
+**Intent.** D5a R1 surfaced and D5b R1 confirmed a recurring architectural pattern: in-monorepo packages have `devDependencies` on extension packs (or the mongo facade) for their test fixtures. Turbo treats devDeps as part of the build graph, which creates cycles preventing extension packs (and `mongo-runtime`'s test) from using the corresponding facade. Per operator direction, fix the actual layering violation: extension-pack composition tests live in `test/integration/`, not in package-level `test/` directories.
+
+Three cycles to break:
+
+- `@prisma-next/postgres` → `sql-builder` → `extension-pgvector` (devDep) → would-be `postgres`.
+- `@prisma-next/postgres` → `sql-orm-client` → `extension-pgvector` (devDep) → would-be `postgres`.
+- `@prisma-next/mongo` → `mongo-runtime` → would-be `mongo` (test fixture).
+
+**Files in play.**
+
+- **sql-builder** (3 files moved out): `test/playground/resolved-field-types.test-d.ts` + `test/fixtures/generated/contract.{json,d.ts}` → `test/integration/test/sql-builder/`. Drop `@prisma-next/extension-pgvector` from `packages/2-sql/4-lanes/sql-builder/package.json` devDeps.
+- **sql-orm-client** (~8 files moved out): `test/collection-mutation-defaults.test.ts`, `test/integration/{codec-async.test.ts,runtime-helpers.ts}`, `test/helpers.ts` (verify whether pgvector-specific), `test/fixtures/{contract.ts,prisma-next.config.ts,generated/contract.{json,d.ts}}` → `test/integration/test/sql-orm-client/`. Drop `extension-pgvector` + likely several other now-unused devDeps from `packages/3-extensions/sql-orm-client/package.json`.
+- **mongo-runtime** (1 file + maybe helpers): `packages/2-mongo-family/7-runtime/test/query-builder.test.ts` (the D5b verbose-with-comment file) → `test/integration/test/mongo-runtime/query-builder.test.ts`. Update mongo-runtime's package.json devDeps accordingly.
+- `test/integration/package.json` already deps on every extension pack + facade; should typecheck without further changes.
+- `pnpm-lock.yaml` refresh.
+
+**"Done when":**
+
+- [ ] D5b landed (✓ before dispatch).
+- [ ] All three cycles broken — `pnpm typecheck --filter @prisma-next/extension-pgvector` after experimentally adding `@prisma-next/postgres` as a devDep succeeds (revert the experimental devDep after verifying; the real migration is D5d).
+- [ ] All moved tests pass at their new location.
+- [ ] All three packages still typecheck + pass their remaining tests.
+- [ ] `pnpm lint:deps` clean.
+- [ ] `pnpm install` ran; lockfile reflects dep changes.
+- [ ] Intent-validation: diff covers `git mv`-ed files + package.json dep drops + lockfile refresh + minor import-path fixes inside moved files. NO contract.ts migrations (that's D5d), NO facade source changes.
+
+**Size.** M (~15 files moved + 3 package.json updates + lockfile; mostly `git mv` + small surgical dep edits).
+
+**Tier.** Mid (judgment needed on which sql-orm-client helpers are pgvector-specific vs generally useful; reasonable architectural reasoning required for destination paths).
+
+**DoR confirmed.** [ ]
+
+---
+
+### Dispatch 5d: Migrate previously-blocked contracts to facade form (post-cycle-break)
+
+**Intent.** With D5c's cycle break in place, complete the contract.ts migration that A7 had to temporarily exempt. Per the original D5 intent + operator direction (architectural fix over workaround), migrate the extension-pack contracts to the facade form. Revert the A7 extension I temporarily landed for extension-pack contracts.
+
+**Files in play.**
+
+- `packages/3-extensions/pgvector/src/contract.ts` — drop verbose imports, switch to `@prisma-next/postgres/contract-builder`'s `defineContract`, drop `family`/`target` args.
+- `packages/3-extensions/postgis/src/contract.ts` — same migration.
+- `packages/2-mongo-family/7-runtime/test/query-builder.test.ts` (now under `test/integration/test/mongo-runtime/`) — drop the verbose-with-comment, switch to `@prisma-next/mongo/contract-builder`.
+- `packages/3-extensions/{pgvector,postgis}/package.json` — add `@prisma-next/postgres` as dep (or devDep if contract.ts is only used at build/emit time, verify).
+- `projects/facade-import-surface-completion/spec.md` § A7 — revert the extension-pack-contracts extension I made during D5a R1 (the migration files exemption stays; the contracts exemption no longer applies). Update the orchestrator-decision-log line in code-review.md to reflect.
+
+**"Done when":**
+
+- [ ] D5c landed (✓ before dispatch).
+- [ ] `pnpm typecheck` clean for `pgvector`, `postgis`, `mongo-runtime`, `integration-tests`.
+- [ ] `pnpm test:packages` clean for the three packages.
+- [ ] `pnpm test:integration` for the moved mongo-runtime test passes.
+- [ ] Grep gate: `rg "@prisma-next/(family-(sql|mongo)|target-(postgres|sqlite|mongo))/(pack|control)" -g '!**/node_modules/**' -g '!**/dist/**' -g '!projects/**'` no longer matches `packages/3-extensions/{pgvector,postgis}/src/contract.ts` or the moved mongo-runtime test.
+- [ ] Spec § A7 reverted to the pre-D5a form (migration-files exemption only).
+- [ ] Intent-validation: 3 contract migrations + 2 package.json dep additions + spec revert; nothing else.
+
+**Size.** S (3 contract files + 2 package.json + 1 spec section).
+
+**Tier.** Cheap (mechanical now that cycle is broken).
+
+**DoR confirmed.** [ ]
+
+---
+
 ### Dispatch 6: Docs sweep + final lint/test/fixtures pass
 
 **Intent.** Flip every prose / example-code reference to the old specifier across docs, skills, and READMEs that the renderer dispatch leaves behind. Remove all TML-2526 references outside `projects/`. Final repo-wide lint + test + fixtures pass.
@@ -314,7 +380,7 @@ Per the orchestrator's grep (run before D5a; re-grep to refresh before D5b dispa
 ```text
 D1 (postgres /migration + contract-builder wrap) ─┐
 D2 (mongo parity + ctrl + bson + cb-wrap + drop barrel) ─┤
-                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples + ext-pack contracts) → D5b (test fixtures) → D6 (docs)
+                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples) → D5b (test fixtures) → D5c (break layering cycles) → D5d (migrate previously-blocked contracts) → D6 (docs)
 D3 (sqlite façade + contract-builder wrap) ───────┘
 ```
 
