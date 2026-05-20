@@ -141,7 +141,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     rmSync(tmpDir, { recursive: true, force: true });
   }, timeouts.databaseOperation);
 
-  it('scaffolds the per-target files (no agent-skill template — install handled by Prisma Next skills)', async () => {
+  it('scaffolds the per-target files (no skill template — install handled by Prisma Next skills)', async () => {
     const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: interactiveFlags(),
@@ -1481,12 +1481,12 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     const nextStepsText = nextSteps.join('\n');
     expect(nextStepsText).toContain('DATABASE_URL');
     expect(nextStepsText).toMatch(/(prisma-next|npx prisma-next) contract emit/);
-    // The agent-skill install was skipped (`install: false` →
+    // The skills install was skipped (`install: false` →
     // `--no-install`), so `nextSteps` must not claim it is registered.
     // The skip is surfaced via `warnings` with a manual-install hint.
     expect(nextStepsText).not.toContain('Prisma Next skills');
     const warnings = parsed['warnings'] as string[];
-    expect(warnings.join('\n')).toContain('Prisma Next agent-skill');
+    expect(warnings.join('\n')).toContain('Prisma Next skills');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {

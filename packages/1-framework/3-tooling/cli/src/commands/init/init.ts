@@ -82,7 +82,7 @@ interface InstallReport {
   /**
    * The package manager that actually ran. Equal to the detected `pm`
    * on the common path; differs when the FR7.2 pnpm → npm fallback
-   * fired, in which case it's `'npm'`. Threaded into the agent-skill
+   * fired, in which case it's `'npm'`. Threaded into the skills
    * install so the runner stays consistent with the install we just
    * ran — re-trying through `pnpm dlx` when `pnpm install` just failed
    * for workspace/catalog reasons would fail again for the same reason.
@@ -459,11 +459,11 @@ export async function runInit(
   let skillRegistered = false;
   if (!inputs.installProjectSkill) {
     warnings.push(
-      `Skipped Prisma Next agent-skill install (--no-skill). To install the skills later, run: ${manualProjectSkillSummary}`,
+      `Skipped Prisma Next skills install (--no-skill). To install the skills later, run: ${manualProjectSkillSummary}`,
     );
   } else if (install.skipped) {
     warnings.push(
-      `Skipped Prisma Next agent-skill install because --no-install was passed. After you run install manually, install the skills with: ${manualProjectSkillSummary}`,
+      `Skipped Prisma Next skills install because --no-install was passed. After you run install manually, install the skills with: ${manualProjectSkillSummary}`,
     );
   } else {
     const spinner = ui.spinner();
@@ -597,7 +597,7 @@ export function exitCodeForError(error: { readonly code: string }): number {
       return INIT_EXIT_EMIT_FAILED;
     case '5009': // invalid output document — internal bug in prisma-next
       return INIT_EXIT_INTERNAL_ERROR;
-    case '5013': // agent-skill install failed
+    case '5013': // skill install failed
       return INIT_EXIT_SKILL_INSTALL_FAILED;
     default:
       // Any unexpected code is treated as an internal bug rather than

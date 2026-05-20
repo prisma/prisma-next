@@ -238,7 +238,7 @@ export function errorInitEmitFailed(options: {
 }
 
 /**
- * The project-level agent-skill install (`npx skills add
+ * The project-level skills install (`npx skills add
  * prisma/prisma-next#v<version>`) failed after a successful dependency
  * install + emit. The project's scaffold remains on disk; the user
  * can either fix the underlying issue (network, registry, PATH) and
@@ -260,7 +260,7 @@ export function errorInitSkillInstallFailed(options: {
       'Either:\n' +
       `  - Re-run \`prisma-next init --no-skill${options.filesWritten.length > 0 ? ' --force' : ''}\` to skip the skill install for this run, or\n` +
       `  - Fix the underlying issue (network, npm registry, \`npx skills\` on PATH) and install manually:\n      ${options.skillInstallCommand}`,
-    docsUrl: 'https://prisma-next.dev/docs/cli/init#agent-skill',
+    docsUrl: 'https://prisma-next.dev/docs/cli/init#skills',
     meta: {
       filesWritten: options.filesWritten,
       skillInstallCommand: options.skillInstallCommand,
