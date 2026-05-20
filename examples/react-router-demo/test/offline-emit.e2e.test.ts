@@ -79,8 +79,12 @@ describe('react-router-demo offline emit (e2e)', () => {
     const reEmittedContract: unknown = JSON.parse(await readFile(contractJsonPath, 'utf-8'));
     expect(reEmittedContract).toMatchObject({
       storage: {
-        tables: {
-          user: { columns: { email: expect.anything() } },
+        namespaces: {
+          __unbound__: {
+            tables: {
+              user: { columns: { email: expect.anything() } },
+            },
+          },
         },
       },
     });

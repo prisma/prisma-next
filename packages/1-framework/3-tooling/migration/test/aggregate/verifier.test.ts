@@ -1,5 +1,6 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types';
 import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
@@ -28,7 +29,14 @@ function makeMember(args: {
   tables?: Record<string, unknown>;
 }): ContractSpaceMember {
   const tables = args.tables ?? {};
-  const contract = createSqlContract({ target: 'postgres', storage: { tables } });
+  const contract = createSqlContract({
+    target: 'postgres',
+    storage: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      },
+    },
+  });
   return {
     spaceId: args.spaceId,
     contract: contract as Contract,

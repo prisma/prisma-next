@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 
 describe('SqlContractSerializer edge cases', () => {
   it('handles storage with null tables', () => {
@@ -15,10 +16,10 @@ describe('SqlContractSerializer edge cases', () => {
       meta: {},
       roots: {},
       models: {},
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: null,
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
@@ -60,7 +61,7 @@ describe('SqlContractSerializer edge cases', () => {
           relations: null,
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -73,7 +74,7 @@ describe('SqlContractSerializer edge cases', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
@@ -92,7 +93,7 @@ describe('SqlContractSerializer edge cases', () => {
       meta: {},
       roots: {},
       models: {},
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           User: {
@@ -102,7 +103,7 @@ describe('SqlContractSerializer edge cases', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // This will fail validation, but normalization should handle it
@@ -133,7 +134,7 @@ describe('SqlContractSerializer edge cases', () => {
           },
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -146,7 +147,7 @@ describe('SqlContractSerializer edge cases', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
@@ -178,7 +179,7 @@ describe('SqlContractSerializer edge cases', () => {
           },
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -191,7 +192,7 @@ describe('SqlContractSerializer edge cases', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
@@ -234,7 +235,7 @@ describe('SqlContractSerializer edge cases', () => {
           },
         },
       },
-      storage: {
+      storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
           user: {
@@ -257,7 +258,7 @@ describe('SqlContractSerializer edge cases', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
     };
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });

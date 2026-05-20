@@ -37,25 +37,32 @@ describe('builder integration', () => {
     expect(contract).toMatchObject({
       target: 'postgres',
       targetFamily: 'sql',
-      storage: {
+      storage: expect.objectContaining({
         storageHash: 'sha256:test-core',
-        tables: expect.objectContaining({
-          user: expect.anything(),
+        namespaces: expect.objectContaining({
+          __unbound__: expect.objectContaining({
+            tables: expect.objectContaining({
+              user: expect.anything(),
+            }),
+          }),
         }),
-      },
+      }),
     });
-    const userTable = contract.storage.tables.user;
+    const userTable = contract.storage.namespaces.__unbound__.tables.user;
     expect(userTable).toBeDefined();
     expect(userTable?.columns).toMatchObject({
       id: expect.anything(),
       email: expect.anything(),
       createdAt: expect.anything(),
     });
-    expectTypeOf<keyof typeof contract.storage.tables>().toEqualTypeOf<'user'>();
+    expectTypeOf<
+      keyof typeof contract.storage.namespaces.__unbound__.tables
+    >().toEqualTypeOf<'user'>();
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     type IntCodecOutput = ContractCodecTypes['pg/int4@1']['output'];
     expectTypeOf<IntCodecOutput>().toEqualTypeOf<number>();
-    type ColumnMeta = (typeof contract)['storage']['tables']['user']['columns']['id'];
+    type ColumnMeta =
+      (typeof contract)['storage']['namespaces']['__unbound__']['tables']['user']['columns']['id'];
     expectTypeOf<ColumnMeta['codecId']>().toExtend<string>();
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
 
@@ -77,10 +84,10 @@ describe('builder integration', () => {
     expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
 
     // Verify table name is literal 'user', not string
-    expectTypeOf(contract.storage.tables).toHaveProperty('user');
+    expectTypeOf(contract.storage.namespaces.__unbound__.tables).toHaveProperty('user');
 
     // Verify column names are literal types
-    const userTableType = contract.storage.tables.user;
+    const userTableType = contract.storage.namespaces.__unbound__.tables.user;
     expectTypeOf(userTableType.columns).toHaveProperty('id');
     expectTypeOf(userTableType.columns).toHaveProperty('email');
     expectTypeOf(userTableType.columns).toHaveProperty('createdAt');
@@ -130,7 +137,7 @@ describe('builder integration', () => {
     });
 
     expect(contract.target).toBe('postgres');
-    expect(contract.storage.tables.user).toBeDefined();
+    expect(contract.storage.namespaces.__unbound__.tables.user).toBeDefined();
   });
 
   it('contract works with sql() function', () => {
@@ -237,10 +244,17 @@ describe('builder integration', () => {
     // Runtime checks
     expect(builderContract.target).toBe(fixtureContract.target);
     expect(builderContract.targetFamily).toBe(fixtureContract.targetFamily);
-    expect(builderContract.storage.tables.user.columns).toMatchObject({
-      id: { codecId: fixtureContract.storage.tables.user.columns.id.codecId },
-      email: { codecId: fixtureContract.storage.tables.user.columns.email.codecId },
-      createdAt: { codecId: fixtureContract.storage.tables.user.columns.createdAt.codecId },
+    expect(builderContract.storage.namespaces.__unbound__.tables.user.columns).toMatchObject({
+      id: {
+        codecId: fixtureContract.storage.namespaces.__unbound__.tables.user.columns.id.codecId,
+      },
+      email: {
+        codecId: fixtureContract.storage.namespaces.__unbound__.tables.user.columns.email.codecId,
+      },
+      createdAt: {
+        codecId:
+          fixtureContract.storage.namespaces.__unbound__.tables.user.columns.createdAt.codecId,
+      },
     });
     type ModelShape = {
       storage: { table: string; fields: Record<string, unknown> };
@@ -258,10 +272,16 @@ describe('builder integration', () => {
     expectTypeOf(builderContract.targetFamily).toEqualTypeOf<'sql'>();
 
     // Verify table and column types match
-    expectTypeOf(builderContract.storage.tables).toHaveProperty('user');
-    expectTypeOf(builderContract.storage.tables.user.columns).toHaveProperty('id');
-    expectTypeOf(builderContract.storage.tables.user.columns).toHaveProperty('email');
-    expectTypeOf(builderContract.storage.tables.user.columns).toHaveProperty('createdAt');
+    expectTypeOf(builderContract.storage.namespaces.__unbound__.tables).toHaveProperty('user');
+    expectTypeOf(builderContract.storage.namespaces.__unbound__.tables.user.columns).toHaveProperty(
+      'id',
+    );
+    expectTypeOf(builderContract.storage.namespaces.__unbound__.tables.user.columns).toHaveProperty(
+      'email',
+    );
+    expectTypeOf(builderContract.storage.namespaces.__unbound__.tables.user.columns).toHaveProperty(
+      'createdAt',
+    );
 
     // Verify model types match
     expectTypeOf(builderContract.models).toHaveProperty('User');
@@ -286,10 +306,14 @@ describe('builder integration', () => {
     });
 
     // Type checks - verify codecId is a string (TypeScript may widen literal types)
-    expectTypeOf(contract.storage.tables.user.columns.id.codecId).toExtend<string>();
-    expectTypeOf(contract.storage.tables.user.columns.email.codecId).toExtend<string>();
+    expectTypeOf(
+      contract.storage.namespaces.__unbound__.tables.user.columns.id.codecId,
+    ).toExtend<string>();
+    expectTypeOf(
+      contract.storage.namespaces.__unbound__.tables.user.columns.email.codecId,
+    ).toExtend<string>();
     // Runtime check that they match expected values
-    expect(contract.storage.tables.user.columns).toMatchObject({
+    expect(contract.storage.namespaces.__unbound__.tables.user.columns).toMatchObject({
       id: { codecId: 'pg/int4@1' },
       email: { codecId: 'pg/text@1' },
     });
@@ -310,7 +334,7 @@ describe('builder integration', () => {
       },
     });
     // Contract builds successfully - invalid codecId will cause errors at runtime
-    expect(contract.storage.tables.user.columns.id.codecId).toBe('invalid');
+    expect(contract.storage.namespaces.__unbound__.tables.user.columns.id.codecId).toBe('invalid');
   });
 
   describe('relation builder', () => {

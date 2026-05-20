@@ -1,23 +1,38 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  type PostgresEnumStorageEntry,
+  type SqlNamespaceTablesInput,
+  SqlStorage,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
+import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
+import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresEnumType } from '../../src/exports/types';
 
 function makeContract(
-  overrides: Partial<Contract<SqlStorage>['storage']> = {},
+  overrides: {
+    tables?: Record<string, StorageTableInput>;
+    types?: Record<string, PostgresEnumStorageEntry>;
+  } = {},
 ): Contract<SqlStorage> {
+  const unboundNs: SqlNamespaceTablesInput = {
+    id: UNBOUND_NAMESPACE_ID,
+    tables: overrides.tables ?? {},
+    ...(overrides.types !== undefined ? { types: overrides.types } : {}),
+  };
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
-      tables: {},
-      ...overrides,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},
     models: {},
@@ -743,6 +758,190 @@ describe('planIssues', () => {
       expect(ts).toContain('placeholder(');
       expect(ts).toContain('setNotNull(');
       expect(ts).toContain("from '@prisma-next/target-postgres/migration'");
+    });
+  });
+
+  describe('missing_schema', () => {
+    function makeNamespacedContract(
+      namespaces: Record<string, { tables: Record<string, StorageTableInput> }>,
+    ): Contract<SqlStorage> {
+      const nsMap: Record<string, PostgresSchema> = {};
+      for (const [id, ns] of Object.entries(namespaces)) {
+        nsMap[id] = new PostgresSchema({ id, tables: ns.tables });
+      }
+      return {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: profileHash('sha256:test'),
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:contract'),
+          namespaces: nsMap,
+        }),
+        roots: {},
+        models: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+      };
+    }
+
+    it('translates missing_schema into a CreateSchemaCall classified as a dep', () => {
+      const userTable: StorageTableInput = {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+      const toContract = makeNamespacedContract({
+        auth: { tables: { user: userTable } },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_schema',
+          namespaceId: 'auth',
+          message: 'Schema "auth" is missing from database',
+        },
+        {
+          kind: 'missing_table',
+          table: 'user',
+          namespaceId: 'auth',
+          message: 'Table "user" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const calls = result.value.calls;
+      expect(calls[0]).toMatchObject({ factoryName: 'createSchema', schemaName: 'auth' });
+      const createSchemaIdx = calls.findIndex((c) => c.factoryName === 'createSchema');
+      const createTableIdx = calls.findIndex((c) => c.factoryName === 'createTable');
+      expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
+      expect(createTableIdx).toBeGreaterThanOrEqual(0);
+      expect(createSchemaIdx).toBeLessThan(createTableIdx);
+    });
+
+    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', () => {
+      const toContract = makeNamespacedContract({ auth: { tables: {} } });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_schema',
+          namespaceId: 'auth',
+          message: 'Schema "auth" is missing from database',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const call = result.value.calls[0]!;
+      expect(call.factoryName).toBe('createSchema');
+      const op = call.toOp();
+      expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
+    });
+  });
+
+  describe('namespace coordinate on issues', () => {
+    function makeMultiNamespaceContract(): Contract<SqlStorage> {
+      const userTable: StorageTableInput = {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+      return {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: profileHash('sha256:test'),
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:multi-namespace-contract'),
+          namespaces: {
+            tenant_a: new PostgresSchema({ id: 'tenant_a', tables: { users: userTable } }),
+            tenant_b: new PostgresSchema({ id: 'tenant_b', tables: { users: userTable } }),
+          },
+        }),
+        roots: {},
+        models: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+      };
+    }
+
+    it('surfaces an explicit conflict when an issue carries a stale namespaceId not present in the contract', () => {
+      const toContract = makeMultiNamespaceContract();
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_table',
+          table: 'users',
+          namespaceId: 'tenant_c',
+          message: 'Table "users" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('expected conflict');
+      expect(result.failure).toHaveLength(1);
+      const conflict = result.failure[0]!;
+      expect(conflict.summary).toContain('users');
+      expect(conflict.summary).toContain('tenant_c');
+    });
+
+    it('emits correctly-qualified DDL when an issue carries a valid namespaceId', () => {
+      const toContract = makeMultiNamespaceContract();
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'missing_table',
+          table: 'users',
+          namespaceId: 'tenant_a',
+          message: 'Table "users" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const createTableCall = result.value.calls[0] as CreateTableCall;
+      expect(createTableCall.factoryName).toBe('createTable');
+      expect(createTableCall.tableName).toBe('users');
+      expect(createTableCall.schemaName).toBe('tenant_a');
     });
   });
 });

@@ -1,4 +1,4 @@
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 /**
  * Scenario A end-to-end against PGlite — pgvector contract-space
  * (project: extension-contract-spaces, M4 / T4.3).
@@ -68,7 +68,6 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -116,6 +115,10 @@ const APP_FIELD = 'embedding';
 const VECTOR_LENGTH = 3;
 
 function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlStorage> {
+  return familyInstance.deserializeContract(buildAppContractPojo(opts)) as Contract<SqlStorage>;
+}
+
+function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<SqlStorage> {
   const embeddingColumn: {
     readonly codecId: string;
     readonly nativeType: string;
@@ -140,19 +143,23 @@ function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlS
     profileHash: APP_PROFILE_HASH,
     storage: {
       storageHash: APP_CONTRACT_HASH,
-      tables: {
-        [APP_TABLE]: {
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            [APP_FIELD]: embeddingColumn,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            [APP_TABLE]: {
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                [APP_FIELD]: embeddingColumn,
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     },
     roots: {},
     models: {},

@@ -9,7 +9,7 @@ import { MongoValidator, type MongoValidatorInput } from './mongo-validator';
 /**
  * Hydration / construction input shape for {@link MongoCollection}.
  * Mirrors the on-disk storage JSON envelope exactly (the value held at
- * `contract.storage.collections[<name>]`) so the family-base
+ * `contract.storage.namespaces[<namespaceId>].collections[<name>]`) so the family-base
  * serializer's hydration walker can hand an arktype-validated literal
  * straight to `new`. Nested IR-class fields may be supplied as either
  * plain data literals (typical for JSON-derived input) or
@@ -22,8 +22,8 @@ export interface MongoCollectionInput {
 }
 
 /**
- * Mongo Contract IR node for a single collection entry in
- * `contract.storage.collections`. Lifted from the pre-M2R2
+ * Mongo Contract IR node for a single collection entry in a namespace's
+ * `collections` map. Lifted from the pre-M2R2
  * `MongoStorageCollection` storage interface to a class extending
  * `IRNodeBase` per FR18.
  *

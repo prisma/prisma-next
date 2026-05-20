@@ -2,6 +2,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
+import { unboundTables } from './unbound-tables';
 
 /**
  * Concrete contract type for these tests. Using the generic Contract<SqlStorage>
@@ -21,7 +23,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     meta: {},
     roots: {},
     models: {},
-    storage: {
+    storage: storageWithNamespacedTables({
       storageHash: 'sha256:test',
       tables: {
         User: {
@@ -34,14 +36,14 @@ describe('SqlContractSerializer parameterized type fields', () => {
           foreignKeys: [],
         },
       },
-    },
+    }),
   };
 
   describe('column typeParams', () => {
     it('accepts column with typeParams object', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             Embedding: {
@@ -60,18 +62,18 @@ describe('SqlContractSerializer parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
+      const vectorCol = unboundTables(result.storage)['Embedding']?.columns['vector'];
       expect(vectorCol?.typeParams).toEqual({ length: 1536 });
     });
 
     it('accepts column with empty typeParams object', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -89,22 +91,22 @@ describe('SqlContractSerializer parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      expect(result.storage.tables['User']?.columns['id']?.typeParams).toEqual({});
+      expect(unboundTables(result.storage)['User']?.columns['id']?.typeParams).toEqual({});
     });
 
     it('accepts column without typeParams (optional field)', () => {
       const result = validateSqlContractFully<TestContract>(baseContractInput);
-      expect(result.storage.tables['User']?.columns['id']?.typeParams).toBeUndefined();
+      expect(unboundTables(result.storage)['User']?.columns['id']?.typeParams).toBeUndefined();
     });
 
     it('rejects non-object typeParams', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -122,7 +124,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).toThrow(/typeParams/);
@@ -131,7 +133,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts array typeParams (array-vs-object validated by emitter)', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -149,7 +151,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).not.toThrow();
@@ -158,7 +160,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('rejects typeParams when typeRef is also present (mutually exclusive)', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             Embedding: {
@@ -186,7 +188,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               typeParams: { length: 1536 },
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).toThrow(
@@ -199,7 +201,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts column with typeRef string', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             Embedding: {
@@ -226,18 +228,18 @@ describe('SqlContractSerializer parameterized type fields', () => {
               typeParams: { length: 1536 },
             },
           },
-        },
+        }),
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
+      const vectorCol = unboundTables(result.storage)['Embedding']?.columns['vector'];
       expect(vectorCol?.typeRef).toBe('Vector1536');
     });
 
     it('rejects non-string typeRef', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -255,7 +257,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).toThrow(/typeRef/);
@@ -264,7 +266,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts typeRef pointing to non-existent key (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             Embedding: {
@@ -291,7 +293,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               typeParams: { length: 1536 },
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).not.toThrow();
@@ -300,7 +302,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts typeRef when storage.types is missing (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             Embedding: {
@@ -319,7 +321,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).not.toThrow();
@@ -475,7 +477,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts column with typeRef when codecId mismatches (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -502,7 +504,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               typeParams: { values: ['USER'] },
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).not.toThrow();
@@ -511,7 +513,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts column with typeRef when nativeType mismatches (cross-ref validated by emitter)', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -538,7 +540,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
               typeParams: { values: ['USER'] },
             },
           },
-        },
+        }),
       };
 
       expect(() => validateSqlContractFully<TestContract>(input)).not.toThrow();
@@ -547,7 +549,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
     it('accepts column with typeRef when codecId and nativeType both match', () => {
       const input = {
         ...baseContractInput,
-        storage: {
+        storage: storageWithNamespacedTables({
           storageHash: 'sha256:test',
           tables: {
             User: {
@@ -574,11 +576,11 @@ describe('SqlContractSerializer parameterized type fields', () => {
               typeParams: { values: ['USER'] },
             },
           },
-        },
+        }),
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      expect(result.storage.tables['User']?.columns['role']?.typeRef).toBe('Role');
+      expect(unboundTables(result.storage)['User']?.columns['role']?.typeRef).toBe('Role');
     });
   });
 });

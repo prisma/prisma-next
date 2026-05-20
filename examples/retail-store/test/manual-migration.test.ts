@@ -133,12 +133,13 @@ describe('hand-authored migration (backfill-product-status)', {
       // Synthetic-contract opt-out (paired with `strictVerification: false`):
       // this test isolates migration 3's apply mechanics against a real
       // driver, without first running migrations 1 + 2. We supply the
-      // minimum well-formed shape the verifier reads (`storage.collections`)
+      // minimum well-formed shape the verifier reads (`storage.namespaces`)
       // so it degrades to an empty-expected diff rather than failing on
       // peer collections (carts, orders, …) that the chain prerequisites
       // would normally create.
       const STORAGE_HASH =
         'sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65';
+      const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
       const result = await runner.execute({
         plan: {
           targetId: 'mongo',
@@ -146,7 +147,16 @@ describe('hand-authored migration (backfill-product-status)', {
           operations: JSON.parse(opsJson),
         },
         destinationContract: {
-          storage: { storageHash: STORAGE_HASH, collections: {} },
+          storage: {
+            storageHash: STORAGE_HASH,
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: {
+                id: UNBOUND_NAMESPACE_ID,
+                kind: 'mongo-namespace' as const,
+                collections: {},
+              },
+            },
+          },
         } as unknown as MongoContract,
         policy: ALL_POLICY,
         frameworkComponents: [],

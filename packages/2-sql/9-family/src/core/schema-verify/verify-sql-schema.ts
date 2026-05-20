@@ -20,6 +20,7 @@ import {
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
+  StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -128,7 +129,21 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
-  const storageTypes = (contract.storage.types ?? {}) as Readonly<
+  const allStorageTypesMap: Record<string, PostgresEnumStorageEntry | StorageTypeInstance> = {
+    ...((contract.storage.types ?? {}) as Record<
+      string,
+      PostgresEnumStorageEntry | StorageTypeInstance
+    >),
+  };
+  for (const ns of Object.values(contract.storage.namespaces)) {
+    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
+    if (nsTypes) {
+      for (const [k, v] of Object.entries(nsTypes)) {
+        allStorageTypesMap[k] = v;
+      }
+    }
+  }
+  const storageTypes = allStorageTypesMap as Readonly<
     Record<string, PostgresEnumStorageEntry | StorageTypeInstance>
   >;
   const { issues, rootChildren } = verifySchemaTables({
@@ -335,52 +350,73 @@ function verifySchemaTables(options: {
   } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
-  const contractTables = contract.storage.tables;
   const schemaTables = schema.tables;
+  const namespaceIds = Object.keys(contract.storage.namespaces).sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
 
-  for (const [tableName, contractTable] of Object.entries(contractTables)) {
-    const schemaTable = schemaTables[tableName];
-    const tablePath = `storage.tables.${tableName}`;
+  for (const namespaceId of namespaceIds) {
+    const ns = contract.storage.namespaces[namespaceId];
+    if (!ns) continue;
+    for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
+      if (!(contractTableRaw instanceof StorageTable)) {
+        throw new Error(
+          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.tables.${tableName}`,
+        );
+      }
+      const contractTable = contractTableRaw;
+      const schemaTable = schemaTables[tableName];
+      const tablePath = `storage.namespaces.${namespaceId}.tables.${tableName}`;
 
-    if (!schemaTable) {
-      issues.push({
-        kind: 'missing_table',
-        table: tableName,
-        message: `Table "${tableName}" is missing from database`,
+      if (!schemaTable) {
+        issues.push({
+          kind: 'missing_table',
+          table: tableName,
+          namespaceId,
+          message: `Table "${tableName}" is missing from database`,
+        });
+        rootChildren.push({
+          status: 'fail',
+          kind: 'table',
+          name: `table ${tableName}`,
+          contractPath: tablePath,
+          code: 'missing_table',
+          message: `Table "${tableName}" is missing`,
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        });
+        continue;
+      }
+
+      const tableChildren = verifyTableChildren({
+        contractTable,
+        schemaTable,
+        tableName,
+        namespaceId,
+        tablePath,
+        issues,
+        strict,
+        typeMetadataRegistry,
+        codecHooks,
+        storageTypes,
+        ...ifDefined('normalizeDefault', normalizeDefault),
+        ...ifDefined('normalizeNativeType', normalizeNativeType),
       });
-      rootChildren.push({
-        status: 'fail',
-        kind: 'table',
-        name: `table ${tableName}`,
-        contractPath: tablePath,
-        code: 'missing_table',
-        message: `Table "${tableName}" is missing`,
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
-      continue;
+      rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
     }
-
-    const tableChildren = verifyTableChildren({
-      contractTable,
-      schemaTable,
-      tableName,
-      tablePath,
-      issues,
-      strict,
-      typeMetadataRegistry,
-      codecHooks,
-      storageTypes,
-      ...ifDefined('normalizeDefault', normalizeDefault),
-      ...ifDefined('normalizeNativeType', normalizeNativeType),
-    });
-    rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
   }
 
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
-      if (!contractTables[tableName]) {
+      const claimed = namespaceIds.some(
+        (namespaceId) => contract.storage.namespaces[namespaceId]?.tables[tableName] !== undefined,
+      );
+      if (!claimed) {
+        // `namespaceId` is intentionally absent: an extra table exists in the
+        // live database but is not claimed by any contract namespace, so there
+        // is no contract coordinate to stamp here. Planners that consume this
+        // issue must handle the unstamped case (drop / quarantine by name).
         issues.push({
           kind: 'extra_table',
           table: tableName,
@@ -390,7 +426,7 @@ function verifySchemaTables(options: {
           status: 'fail',
           kind: 'table',
           name: `table ${tableName}`,
-          contractPath: `storage.tables.${tableName}`,
+          contractPath: `storage.namespaces.*.tables.${tableName}`,
           code: 'extra_table',
           message: `Extra table "${tableName}" found`,
           expected: undefined,
@@ -405,9 +441,10 @@ function verifySchemaTables(options: {
 }
 
 function verifyTableChildren(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
+  namespaceId: string;
   tablePath: string;
   issues: SchemaIssue[];
   strict: boolean;
@@ -421,6 +458,7 @@ function verifyTableChildren(options: {
     contractTable,
     schemaTable,
     tableName,
+    namespaceId,
     tablePath,
     issues,
     strict,
@@ -435,6 +473,7 @@ function verifyTableChildren(options: {
     contractTable,
     schemaTable,
     tableName,
+    namespaceId,
     tablePath,
     issues,
     strict,
@@ -452,6 +491,7 @@ function verifyTableChildren(options: {
       contractTable,
       schemaTable,
       tableName,
+      namespaceId,
       tablePath,
       issues,
       columnNodes,
@@ -463,6 +503,7 @@ function verifyTableChildren(options: {
       contractTable.primaryKey,
       schemaTable.primaryKey,
       tableName,
+      namespaceId,
       issues,
     );
     if (pkStatus === 'fail') {
@@ -494,6 +535,7 @@ function verifyTableChildren(options: {
     issues.push({
       kind: 'extra_primary_key',
       table: tableName,
+      namespaceId,
       message: 'Extra primary key found in database (not in contract)',
     });
     tableChildren.push({
@@ -518,6 +560,7 @@ function verifyTableChildren(options: {
       constraintFks,
       schemaTable.foreignKeys,
       tableName,
+      namespaceId,
       tablePath,
       issues,
       strict,
@@ -530,6 +573,7 @@ function verifyTableChildren(options: {
     schemaTable.uniques,
     schemaTable.indexes,
     tableName,
+    namespaceId,
     tablePath,
     issues,
     strict,
@@ -543,9 +587,9 @@ function verifyTableChildren(options: {
     .filter(
       (fk) =>
         fk.index === true &&
-        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.columns)),
+        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.source.columns)),
     )
-    .map((fk) => ({ columns: fk.columns }));
+    .map((fk) => ({ columns: fk.source.columns }));
   const allExpectedIndexes = [...contractTable.indexes, ...fkBackingIndexes];
 
   const indexStatuses = verifyIndexes(
@@ -553,6 +597,7 @@ function verifyTableChildren(options: {
     schemaTable.indexes,
     schemaTable.uniques,
     tableName,
+    namespaceId,
     tablePath,
     issues,
     strict,
@@ -563,9 +608,10 @@ function verifyTableChildren(options: {
 }
 
 function collectContractColumnNodes(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
+  namespaceId: string;
   tablePath: string;
   issues: SchemaIssue[];
   strict: boolean;
@@ -579,6 +625,7 @@ function collectContractColumnNodes(options: {
     contractTable,
     schemaTable,
     tableName,
+    namespaceId,
     tablePath,
     issues,
     strict,
@@ -598,6 +645,7 @@ function collectContractColumnNodes(options: {
       issues.push({
         kind: 'missing_column',
         table: tableName,
+        namespaceId,
         column: columnName,
         message: `Column "${tableName}"."${columnName}" is missing from database`,
       });
@@ -618,6 +666,7 @@ function collectContractColumnNodes(options: {
     columnNodes.push(
       verifyColumn({
         tableName,
+        namespaceId,
         columnName,
         contractColumn,
         schemaColumn,
@@ -637,19 +686,22 @@ function collectContractColumnNodes(options: {
 }
 
 function appendExtraColumnNodes(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
+  namespaceId: string;
   tablePath: string;
   issues: SchemaIssue[];
   columnNodes: SchemaVerificationNode[];
 }): void {
-  const { contractTable, schemaTable, tableName, tablePath, issues, columnNodes } = options;
+  const { contractTable, schemaTable, tableName, namespaceId, tablePath, issues, columnNodes } =
+    options;
   for (const [columnName, { nativeType }] of Object.entries(schemaTable.columns)) {
     if (!contractTable.columns[columnName]) {
       issues.push({
         kind: 'extra_column',
         table: tableName,
+        namespaceId,
         column: columnName,
         message: `Extra column "${tableName}"."${columnName}" found in database (not in contract)`,
       });
@@ -670,8 +722,9 @@ function appendExtraColumnNodes(options: {
 
 function verifyColumn(options: {
   tableName: string;
+  namespaceId: string;
   columnName: string;
-  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string];
+  contractColumn: StorageTable['columns'][string];
   schemaColumn: SqlSchemaIR['tables'][string]['columns'][string];
   columnPath: string;
   issues: SchemaIssue[];
@@ -684,6 +737,7 @@ function verifyColumn(options: {
 }): SchemaVerificationNode {
   const {
     tableName,
+    namespaceId,
     columnName,
     contractColumn,
     schemaColumn,
@@ -713,6 +767,7 @@ function verifyColumn(options: {
     issues.push({
       kind: 'type_mismatch',
       table: tableName,
+      namespaceId,
       column: columnName,
       expected: contractNativeType,
       actual: schemaNativeType,
@@ -768,6 +823,7 @@ function verifyColumn(options: {
     issues.push({
       kind: 'nullability_mismatch',
       table: tableName,
+      namespaceId,
       column: columnName,
       expected: String(contractColumn.nullable),
       actual: String(schemaColumn.nullable),
@@ -793,6 +849,7 @@ function verifyColumn(options: {
       issues.push({
         kind: 'default_missing',
         table: tableName,
+        namespaceId,
         column: columnName,
         expected: defaultDescription,
         message: `Column "${tableName}"."${columnName}" should have default ${defaultDescription} but database has no default`,
@@ -823,6 +880,7 @@ function verifyColumn(options: {
       issues.push({
         kind: 'default_mismatch',
         table: tableName,
+        namespaceId,
         column: columnName,
         expected: expectedDescription,
         actual: actualDescription,
@@ -845,6 +903,7 @@ function verifyColumn(options: {
     issues.push({
       kind: 'extra_default',
       table: tableName,
+      namespaceId,
       column: columnName,
       actual: schemaColumn.default,
       message: `Column "${tableName}"."${columnName}" has default ${schemaColumn.default} in database but contract specifies no default`,
@@ -1020,7 +1079,7 @@ function validateFrameworkComponentsForExtensions(
  * target-specific adapters (like Postgres) to provide their own expansion logic.
  */
 function renderExpectedNativeType(
-  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  contractColumn: StorageColumn,
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
   codecHooks: Map<string, CodecControlHooks>,
   context?: {

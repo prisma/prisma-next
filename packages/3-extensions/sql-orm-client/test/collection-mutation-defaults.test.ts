@@ -7,6 +7,7 @@ import { Collection } from '../src/collection';
 import { withReturningCapability } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContract } from './helpers';
+import { unboundTables } from './unbound-tables';
 
 // Synthetic 36-char Tag ids — Tag.id is typed `Char<36>` in the test contract.
 const TAG_ID_1 =
@@ -38,7 +39,7 @@ function buildTagWithUpdatedAtContract(): TestContract {
   const tagStorageFields = tagStorage['fields'] as Record<string, unknown>;
   tagStorageFields['updatedAt'] = { column: 'updated_at' };
 
-  const tagsTable = contract.storage.tables['tags'] as
+  const tagsTable = unboundTables(contract.storage)['tags'] as
     | { columns: Record<string, unknown> }
     | undefined;
   if (!tagsTable) {

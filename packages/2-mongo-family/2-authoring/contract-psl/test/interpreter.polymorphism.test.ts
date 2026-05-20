@@ -1,4 +1,5 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
@@ -37,6 +38,13 @@ const mongoCodecLookup: CodecLookup = {
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
 };
+
+function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, unknown> {
+  const storage = ir.storage as {
+    namespaces: Record<string, { collections: Record<string, unknown> }>;
+  };
+  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+}
 
 function interpret(schema: string) {
   const document = parsePslDocument({ schema, sourceId: 'test.prisma' });
@@ -376,8 +384,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as { collections: Record<string, unknown> };
-      expect(Object.keys(storage.collections)).toEqual(['tasks']);
+      expect(Object.keys(mongoCollectionsOf(ir))).toEqual(['tasks']);
     });
 
     it('merges variant indexes into base collection', () => {
@@ -401,18 +408,16 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<
-          string,
-          {
-            indexes?: Array<{
-              keys: Array<{ field: string; direction: number }>;
-              partialFilterExpression?: Record<string, unknown>;
-            }>;
-          }
-        >;
-      };
-      const tasksColl = storage.collections['tasks'];
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        {
+          indexes?: Array<{
+            keys: Array<{ field: string; direction: number }>;
+            partialFilterExpression?: Record<string, unknown>;
+          }>;
+        }
+      >;
+      const tasksColl = collections['tasks'];
       expect(tasksColl?.indexes).toBeDefined();
       const titleIdx = tasksColl?.indexes?.find((idx) => idx.keys.some((k) => k.field === 'title'));
       const severityIdx = tasksColl?.indexes?.find((idx) =>
@@ -446,18 +451,16 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<
-          string,
-          {
-            indexes?: Array<{
-              keys: Array<{ field: string; direction: number }>;
-              partialFilterExpression?: Record<string, unknown>;
-            }>;
-          }
-        >;
-      };
-      const tasksColl = storage.collections['tasks'];
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        {
+          indexes?: Array<{
+            keys: Array<{ field: string; direction: number }>;
+            partialFilterExpression?: Record<string, unknown>;
+          }>;
+        }
+      >;
+      const tasksColl = collections['tasks'];
       expect(tasksColl?.indexes).toBeDefined();
       const titleIdx = tasksColl?.indexes?.find((idx) => idx.keys.some((k) => k.field === 'title'));
       const severityIdx = tasksColl?.indexes?.find((idx) =>
@@ -489,18 +492,16 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<
-          string,
-          {
-            indexes?: Array<{
-              keys: Array<{ field: string; direction: number }>;
-              partialFilterExpression?: Record<string, unknown>;
-            }>;
-          }
-        >;
-      };
-      const severityIdx = storage.collections['tasks']?.indexes?.find((idx) =>
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        {
+          indexes?: Array<{
+            keys: Array<{ field: string; direction: number }>;
+            partialFilterExpression?: Record<string, unknown>;
+          }>;
+        }
+      >;
+      const severityIdx = collections['tasks']?.indexes?.find((idx) =>
         idx.keys.some((k) => k.field === 'severity'),
       );
       expect(severityIdx?.partialFilterExpression).toEqual({ active: true, type: 'bug' });
@@ -526,18 +527,16 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<
-          string,
-          {
-            indexes?: Array<{
-              keys: Array<{ field: string; direction: number }>;
-              partialFilterExpression?: Record<string, unknown>;
-            }>;
-          }
-        >;
-      };
-      const severityIdx = storage.collections['tasks']?.indexes?.find((idx) =>
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        {
+          indexes?: Array<{
+            keys: Array<{ field: string; direction: number }>;
+            partialFilterExpression?: Record<string, unknown>;
+          }>;
+        }
+      >;
+      const severityIdx = collections['tasks']?.indexes?.find((idx) =>
         idx.keys.some((k) => k.field === 'severity'),
       );
       expect(severityIdx?.partialFilterExpression).toEqual({ type: 'bug' });
@@ -635,10 +634,11 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
-      };
-      const validator = storage.collections['tasks']?.validator;
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        { validator?: { jsonSchema: Record<string, unknown> } }
+      >;
+      const validator = collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
       expect(schema).toHaveProperty('properties._id');
@@ -667,10 +667,11 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
-      };
-      const validator = storage.collections['tasks']?.validator;
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        { validator?: { jsonSchema: Record<string, unknown> } }
+      >;
+      const validator = collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
       expect(schema).toHaveProperty('oneOf');
@@ -701,10 +702,11 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      const storage = ir.storage as unknown as {
-        collections: Record<string, { validator?: { jsonSchema: Record<string, unknown> } }>;
-      };
-      const validator = storage.collections['tasks']?.validator;
+      const collections = mongoCollectionsOf(ir) as Record<
+        string,
+        { validator?: { jsonSchema: Record<string, unknown> } }
+      >;
+      const validator = collections['tasks']?.validator;
       expect(validator).toBeDefined();
       const schema = validator?.jsonSchema;
       expect(schema).toHaveProperty('properties._type');

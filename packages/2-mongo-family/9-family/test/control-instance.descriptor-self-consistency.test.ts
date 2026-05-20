@@ -2,6 +2,7 @@ import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { ContractSpace, ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
@@ -14,9 +15,14 @@ const TARGET = 'mongo' as const;
 const TARGET_FAMILY = 'mongo' as const;
 
 const fixtureStorageBody = {
-  collections: {
-    fixture_box: {
-      indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+  namespaces: {
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      collections: {
+        fixture_box: {
+          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+        },
+      },
     },
   },
 };

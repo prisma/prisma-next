@@ -30,6 +30,7 @@ import type {
   RuntimeExtensionDescriptor,
   RuntimeTargetDescriptor,
 } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import {
   type AnyExpression,
@@ -76,49 +77,54 @@ export const contract = new SqlContractSerializer().deserializeContract({
   meta: {},
   storage: {
     storageHash: 'sha256:cipherstash-operator-lowering-test-storage',
-    tables: {
-      [TABLE]: {
-        columns: {
-          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          [COLUMN]: {
-            codecId: CIPHERSTASH_STRING_CODEC_ID,
-            nativeType: EQL_V2_ENCRYPTED_TYPE,
-            nullable: true,
-          },
-          // Per-codec columns so the trait-dispatched operators
-          // can be exercised against each column type (the
-          // postgres renderer reads `nativeType` from the codec
-          // descriptor at lower time; the column is what gives
-          // the renderer the codec id to look up).
-          score: {
-            codecId: CIPHERSTASH_DOUBLE_CODEC_ID,
-            nativeType: EQL_V2_ENCRYPTED_TYPE,
-            nullable: true,
-          },
-          amount: {
-            codecId: CIPHERSTASH_BIGINT_CODEC_ID,
-            nativeType: EQL_V2_ENCRYPTED_TYPE,
-            nullable: true,
-          },
-          birthday: {
-            codecId: CIPHERSTASH_DATE_CODEC_ID,
-            nativeType: EQL_V2_ENCRYPTED_TYPE,
-            nullable: true,
-          },
-          enabled: {
-            codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
-            nativeType: EQL_V2_ENCRYPTED_TYPE,
-            nullable: true,
-          },
-          payload: {
-            codecId: CIPHERSTASH_JSON_CODEC_ID,
-            nativeType: EQL_V2_ENCRYPTED_TYPE,
-            nullable: true,
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: {
+          [TABLE]: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              [COLUMN]: {
+                codecId: CIPHERSTASH_STRING_CODEC_ID,
+                nativeType: EQL_V2_ENCRYPTED_TYPE,
+                nullable: true,
+              },
+              // Per-codec columns so the trait-dispatched operators
+              // can be exercised against each column type (the
+              // postgres renderer reads `nativeType` from the codec
+              // descriptor at lower time; the column is what gives
+              // the renderer the codec id to look up).
+              score: {
+                codecId: CIPHERSTASH_DOUBLE_CODEC_ID,
+                nativeType: EQL_V2_ENCRYPTED_TYPE,
+                nullable: true,
+              },
+              amount: {
+                codecId: CIPHERSTASH_BIGINT_CODEC_ID,
+                nativeType: EQL_V2_ENCRYPTED_TYPE,
+                nullable: true,
+              },
+              birthday: {
+                codecId: CIPHERSTASH_DATE_CODEC_ID,
+                nativeType: EQL_V2_ENCRYPTED_TYPE,
+                nullable: true,
+              },
+              enabled: {
+                codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
+                nativeType: EQL_V2_ENCRYPTED_TYPE,
+                nullable: true,
+              },
+              payload: {
+                codecId: CIPHERSTASH_JSON_CODEC_ID,
+                nativeType: EQL_V2_ENCRYPTED_TYPE,
+                nullable: true,
+              },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
   },

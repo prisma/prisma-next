@@ -1,3 +1,4 @@
+import { flatPslEnums, flatPslModels } from '@prisma-next/framework-components/psl-ast';
 import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -29,8 +30,8 @@ describe('sqlSchemaIrToPslAst', () => {
 
     const ast = sqlSchemaIrToPslAst(schemaIR);
     expect(ast.kind).toBe('document');
-    expect(ast.models).toHaveLength(1);
-    const model = ast.models[0];
+    expect(flatPslModels(ast)).toHaveLength(1);
+    const model = flatPslModels(ast)[0];
     expect(model?.name).toBe('User');
     const idField = model?.fields.find((f) => f.name === 'id');
     expect(idField?.attributes.some((a) => a.name === 'id')).toBe(true);
@@ -70,8 +71,8 @@ describe('sqlSchemaIrToPslAst', () => {
     });
 
     const ast = sqlSchemaIrToPslAst(schemaIR);
-    const userModel = ast.models.find((m) => m.name === 'User');
-    const postModel = ast.models.find((m) => m.name === 'Post');
+    const userModel = flatPslModels(ast).find((m) => m.name === 'User');
+    const postModel = flatPslModels(ast).find((m) => m.name === 'Post');
     const postsField = userModel?.fields.find((f) => f.name === 'posts');
     expect(postsField?.list).toBe(true);
     const userField = postModel?.fields.find((f) => f.name === 'user');
@@ -107,8 +108,8 @@ describe('sqlSchemaIrToPslAst', () => {
     });
 
     const ast = sqlSchemaIrToPslAst(schemaIR);
-    expect(ast.enums.map((e) => e.name)).toEqual(['RoleT']);
-    const enumModel = ast.models[0];
+    expect(flatPslEnums(ast).map((e) => e.name)).toEqual(['RoleT']);
+    const enumModel = flatPslModels(ast)[0];
     const roleField = enumModel?.fields.find((f) => f.name === 'role');
     expect(roleField?.typeName).toBe('RoleT');
   });
@@ -136,7 +137,7 @@ describe('sqlSchemaIrToPslAst', () => {
     });
 
     const ast = sqlSchemaIrToPslAst(schemaIR);
-    const tsField = ast.models[0]?.fields.find((f) => f.name === 'ts');
+    const tsField = flatPslModels(ast)[0]?.fields.find((f) => f.name === 'ts');
     const defaultAttr = tsField?.attributes.find((a) => a.name === 'default');
     expect(defaultAttr).toBeDefined();
     const arg = defaultAttr?.args[0];
@@ -159,7 +160,7 @@ describe('sqlSchemaIrToPslAst', () => {
     });
 
     const ast = sqlSchemaIrToPslAst(schemaIR);
-    const auditLog = ast.models.find((m) => m.name === 'AuditLog');
+    const auditLog = flatPslModels(ast).find((m) => m.name === 'AuditLog');
     expect(auditLog?.comment).toBe('// WARNING: This table has no primary key in the database');
   });
 
@@ -180,7 +181,7 @@ describe('sqlSchemaIrToPslAst', () => {
     });
 
     const ast = sqlSchemaIrToPslAst(schemaIR);
-    const user = ast.models.find((m) => m.name === 'User');
+    const user = flatPslModels(ast).find((m) => m.name === 'User');
     expect(user?.comment).toBeUndefined();
   });
 

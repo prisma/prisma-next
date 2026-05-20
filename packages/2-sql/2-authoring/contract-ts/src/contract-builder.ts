@@ -5,8 +5,10 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
+  SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { buildSqlContractFromDefinition } from './build-contract';
@@ -35,6 +37,7 @@ export { buildSqlContractFromDefinition } from './build-contract';
 type ModelLike = {
   readonly stageOne: {
     readonly modelName?: string;
+    readonly namespace?: string;
     readonly fields: Record<string, ScalarFieldBuilder>;
     readonly relations: Record<string, RelationBuilder<RelationState>>;
   };
@@ -54,6 +57,7 @@ type ContractDefinition<
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+  Namespaces extends readonly string[] | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -62,6 +66,8 @@ type ContractDefinition<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
+  readonly namespaces?: Namespaces;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
@@ -75,6 +81,7 @@ type ContractScaffold<
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
+  Namespaces extends readonly string[] | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -83,6 +90,8 @@ type ContractScaffold<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
+  readonly namespaces?: Namespaces;
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
 };
 
@@ -111,6 +120,126 @@ function validateTargetPackRef(
     throw new Error(
       `target pack "${target.id}" targets family "${target.familyId}" but contract family is "${family.familyId}".`,
     );
+  }
+}
+
+/**
+ * Per-target reserved namespace names enforced by `defineContract` for
+ * SQL family contracts. Two categories:
+ *
+ * 1. **IR sentinels** (`__unbound__`, `__unspecified__`) — reserved on
+ *    every SQL target. The double-underscore decoration marks them as
+ *    framework-reserved coordinates; user code must not declare them
+ *    explicitly.
+ * 2. **Target-specific PSL keywords** — Postgres reserves the bare
+ *    `unbound` identifier for the late-binding opt-in
+ *    (`namespace unbound { … }`) so the TS surface must reject it from
+ *    `defineContract({ namespaces })` lists. SQLite has no schema
+ *    concept and rejects every non-empty namespaces list outright;
+ *    callers should declare `namespaces: []` or omit the field.
+ */
+function validateNamespaceDeclarations(
+  target: TargetPackRef<'sql', string>,
+  namespaces: readonly string[] | undefined,
+): void {
+  if (!namespaces) {
+    return;
+  }
+
+  if (target.targetId === 'sqlite' && namespaces.length > 0) {
+    throw new Error(
+      `defineContract: SQLite contracts cannot declare namespaces (SQLite has no schema concept; emitted DDL is always unqualified). Received namespaces: [${namespaces
+        .map((name) => `"${name}"`)
+        .join(', ')}].`,
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const namespace of namespaces) {
+    if (namespace.length === 0) {
+      throw new Error('defineContract: namespace names cannot be empty.');
+    }
+    if (namespace.trim().length === 0) {
+      throw new Error(`defineContract: namespace name "${namespace}" cannot be whitespace-only.`);
+    }
+    if (namespace === '__unbound__' || namespace === '__unspecified__') {
+      throw new Error(
+        `defineContract: namespace name "${namespace}" is a reserved IR sentinel and cannot appear in the declared namespaces list.`,
+      );
+    }
+    if (target.targetId === 'postgres' && namespace === 'unbound') {
+      throw new Error(
+        `defineContract: namespace name "unbound" is reserved by Postgres for the late-binding opt-in (use \`namespace unbound { … }\` in PSL instead of declaring it as a regular schema).`,
+      );
+    }
+    if (seen.has(namespace)) {
+      throw new Error(`defineContract: namespaces list contains duplicate entry "${namespace}".`);
+    }
+    seen.add(namespace);
+  }
+}
+
+/**
+ * Per-model `namespace` validation paired with
+ * {@link validateNamespaceDeclarations}. Mirrors the reserved-name
+ * rules so the per-model surface stays consistent with the contract-
+ * level surface:
+ *
+ * - `__unbound__` / `__unspecified__` — reserved IR sentinels on
+ *   every SQL target.
+ * - `unbound` on Postgres — reserved for the PSL
+ *   `namespace unbound { … }` opt-in.
+ *
+ * Additionally enforces that each per-model `namespace` either
+ * references an entry in the contract's declared `namespaces` list or
+ * names the Postgres late-binding keyword (`unbound`) — the latter is
+ * not a "declared namespace" but is a legal opt-in only via PSL today,
+ * so the TS surface also rejects it on the per-model side and points
+ * authors at the PSL `namespace unbound { … }` block.
+ *
+ * The SQLite per-model `namespace` field is rejected outright (SQLite
+ * has no schema concept).
+ */
+function validatePerModelNamespaces(
+  target: TargetPackRef<'sql', string>,
+  namespaces: readonly string[] | undefined,
+  models: Record<string, ModelLike>,
+): void {
+  const declaredNamespaces = new Set<string>(namespaces ?? []);
+
+  for (const [modelKey, modelBuilder] of Object.entries(models)) {
+    const perModelNamespace = modelBuilder.stageOne.namespace;
+    if (perModelNamespace === undefined) {
+      continue;
+    }
+
+    if (target.targetId === 'sqlite') {
+      throw new Error(
+        `defineContract: model "${modelKey}" sets \`namespace: "${perModelNamespace}"\` but the target is SQLite (SQLite has no schema concept; remove the per-model \`namespace\` field).`,
+      );
+    }
+
+    if (perModelNamespace === '__unbound__' || perModelNamespace === '__unspecified__') {
+      throw new Error(
+        `defineContract: model "${modelKey}" sets \`namespace: "${perModelNamespace}"\` but that name is a reserved IR sentinel and cannot appear in user code.`,
+      );
+    }
+
+    if (target.targetId === 'postgres' && perModelNamespace === 'unbound') {
+      throw new Error(
+        `defineContract: model "${modelKey}" sets \`namespace: "unbound"\` but that name is reserved by Postgres for the late-binding opt-in (use \`namespace unbound { … }\` in PSL instead — there is no equivalent surface in the TS builder today).`,
+      );
+    }
+
+    if (!declaredNamespaces.has(perModelNamespace)) {
+      const hint =
+        declaredNamespaces.size > 0
+          ? ` Declared namespaces: [${[...declaredNamespaces].map((name) => `"${name}"`).join(', ')}].`
+          : ' The contract does not declare any namespaces; add `namespaces: ["…"]` to `defineContract` first.';
+      throw new Error(
+        `defineContract: model "${modelKey}" references namespace "${perModelNamespace}" but that name does not appear in the contract's declared \`namespaces\` list.${hint}`,
+      );
+    }
   }
 }
 
@@ -152,6 +281,12 @@ function buildContractFromDsl(
 ): ReturnType<typeof buildSqlContractFromDefinition> {
   validateTargetPackRef(definition.family, definition.target);
   validateExtensionPackRefs(definition.target, definition.extensionPacks);
+  validateNamespaceDeclarations(definition.target, definition.namespaces);
+  validatePerModelNamespaces(
+    definition.target,
+    definition.namespaces,
+    (definition.models ?? {}) as Record<string, ModelLike>,
+  );
 
   return buildSqlContractFromDefinition(
     buildContractDefinition(definition),
@@ -174,6 +309,7 @@ export function defineContract<
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+  const Namespaces extends readonly string[] | undefined = undefined,
 >(
   definition: ContractDefinition<
     Family,
@@ -184,7 +320,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >,
 ): SqlContractResult<
   ContractDefinition<
@@ -196,7 +333,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >
 >;
 export function defineContract<
@@ -214,6 +352,7 @@ export function defineContract<
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
+  const Namespaces extends readonly string[] | undefined = undefined,
 >(
   definition: ContractScaffold<
     Family,
@@ -222,7 +361,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >,
   factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
 ): SqlContractResult<
@@ -235,7 +375,8 @@ export function defineContract<
     Capabilities,
     Naming,
     StorageHash,
-    ForeignKeyDefaults
+    ForeignKeyDefaults,
+    Namespaces
   >
 >;
 export function defineContract(

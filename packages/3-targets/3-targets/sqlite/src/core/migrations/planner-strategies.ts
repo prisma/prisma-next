@@ -21,9 +21,11 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   SqlStorage,
+  StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
@@ -41,6 +43,37 @@ export interface StrategyContext {
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}
+
+/**
+ * Look up a storage table by its explicit namespace coordinate. Returns
+ * `undefined` when the namespace has no table by that name (or no such
+ * namespace exists). Callers that get `undefined` MUST treat it as an
+ * explicit conflict rather than silently falling back to a name-only
+ * walk across namespaces — the SQLite target currently has a single
+ * namespace, but this helper enforces the explicit-coordinate
+ * discipline so a future multi-namespace SQLite shape inherits the
+ * conflict-on-stale-coordinate behaviour the Postgres planner already
+ * has.
+ */
+export function tableAt(
+  storage: SqlStorage,
+  namespaceId: string,
+  tableName: string,
+): StorageTable | undefined {
+  return storage.namespaces[namespaceId]?.tables[tableName] as StorageTable | undefined;
+}
+
+/**
+ * Default namespace coordinate for an issue that does not carry one
+ * explicitly. Hand-crafted unit-test issues fall back to `__unbound__`,
+ * the only namespace any single-namespace contract carries —
+ * verifier-emitted issues for legacy single-namespace contracts already
+ * stamp this id explicitly. Typed structurally so issue variants
+ * without a `namespaceId` slot flow through to the same fallback.
+ */
+export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: string }): string {
+  return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
 }
 
 export type CallMigrationStrategy = (
@@ -91,7 +124,10 @@ function classifyIssue(issue: SchemaIssue): 'widening' | 'destructive' | null {
  * consumed are removed so `mapIssueToCall` doesn't double-handle them.
  */
 export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const byTable = new Map<string, { issues: SchemaIssue[]; hasDestructive: boolean }>();
+  const byTable = new Map<
+    string,
+    { issues: SchemaIssue[]; hasDestructive: boolean; namespaceId: string }
+  >();
   const consumed = new Set<SchemaIssue>();
 
   for (const issue of issues) {
@@ -105,7 +141,11 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
       entry.issues.push(issue);
       if (cls === 'destructive') entry.hasDestructive = true;
     } else {
-      byTable.set(table, { issues: [issue], hasDestructive: cls === 'destructive' });
+      byTable.set(table, {
+        issues: [issue],
+        hasDestructive: cls === 'destructive',
+        namespaceId: resolveNamespaceIdForIssue(issue),
+      });
     }
     consumed.add(issue);
   }
@@ -114,7 +154,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
 
   const calls: SqliteOpFactoryCall[] = [];
   for (const [tableName, entry] of byTable) {
-    const contractTable = ctx.toContract.storage.tables[tableName];
+    const contractTable = tableAt(ctx.toContract.storage, entry.namespaceId, tableName);
     const schemaTable = ctx.schema.tables[tableName];
     if (!contractTable || !schemaTable) continue;
     const operationClass: MigrationOperationClass = entry.hasDestructive
@@ -138,12 +178,12 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
     }
     for (const fk of contractTable.foreignKeys) {
       if (fk.index === false) continue;
-      const key = fk.columns.join(',');
+      const key = fk.source.columns.join(',');
       if (seenIndexColumnKeys.has(key)) continue;
       seenIndexColumnKeys.add(key);
       indexes.push({
-        name: defaultIndexName(tableName, fk.columns),
-        columns: fk.columns,
+        name: defaultIndexName(tableName, fk.source.columns),
+        columns: fk.source.columns,
       });
     }
 
@@ -206,7 +246,8 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
     // needs no backfill.
     if (issue.expected === 'true') continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[issue.column];
     if (!column || column.nullable === true) continue;
 
     calls.push(

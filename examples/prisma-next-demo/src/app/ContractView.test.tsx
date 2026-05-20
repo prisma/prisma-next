@@ -26,16 +26,22 @@ function buildContract(overrides?: Partial<Contract>): Contract {
     },
     storage: {
       storageHash: 'storage_hash',
-      tables: {
-        users: {
-          primaryKey: { columns: ['id'] },
-          columns: {
-            id: { nativeType: 'uuid', nullable: false, codecId: 'pg/uuid@1' },
-            email: { nativeType: 'text', nullable: false, codecId: 'pg/text@1' },
+      namespaces: {
+        __unbound__: {
+          id: '__unbound__',
+          kind: 'postgres-unbound-schema',
+          tables: {
+            users: {
+              primaryKey: { columns: ['id'] },
+              columns: {
+                id: { nativeType: 'uuid', nullable: false, codecId: 'pg/uuid@1' },
+                email: { nativeType: 'text', nullable: false, codecId: 'pg/text@1' },
+              },
+              foreignKeys: [],
+              uniques: [],
+              indexes: [],
+            },
           },
-          foreignKeys: [],
-          uniques: [],
-          indexes: [],
         },
       },
     },

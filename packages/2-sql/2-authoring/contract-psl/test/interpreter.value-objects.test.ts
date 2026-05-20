@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -121,13 +122,17 @@ model User {
     });
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        user: {
-          columns: {
-            homeAddress: {
-              nativeType: 'jsonb',
-              codecId: 'pg/jsonb@1',
-              nullable: true,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                homeAddress: {
+                  nativeType: 'jsonb',
+                  codecId: 'pg/jsonb@1',
+                  nullable: true,
+                },
+              },
             },
           },
         },
@@ -165,13 +170,17 @@ model User {
     });
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        user: {
-          columns: {
-            tags: {
-              nativeType: 'jsonb',
-              codecId: 'pg/jsonb@1',
-              nullable: false,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                tags: {
+                  nativeType: 'jsonb',
+                  codecId: 'pg/jsonb@1',
+                  nullable: false,
+                },
+              },
             },
           },
         },
@@ -214,13 +223,17 @@ model User {
     });
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        user: {
-          columns: {
-            addresses: {
-              nativeType: 'jsonb',
-              codecId: 'pg/jsonb@1',
-              nullable: false,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                addresses: {
+                  nativeType: 'jsonb',
+                  codecId: 'pg/jsonb@1',
+                  nullable: false,
+                },
+              },
             },
           },
         },

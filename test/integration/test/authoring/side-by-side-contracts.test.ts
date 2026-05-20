@@ -243,14 +243,19 @@ describe('side-by-side contract examples', () => {
 
       const stripValidatorFields = (contract: typeof normalizedTs) => {
         const storage = contract.storage as unknown as Record<string, unknown>;
-        const collections = storage['collections'] as Record<string, Record<string, unknown>>;
-        const stripped: Record<string, unknown> = {};
-        for (const [name, coll] of Object.entries(collections)) {
-          const { validator: _, ...rest } = coll;
-          stripped[name] = rest;
+        const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>>;
+        const strippedNamespaces: Record<string, unknown> = {};
+        for (const [nsId, ns] of Object.entries(namespaces)) {
+          const collections = ns['collections'] as Record<string, Record<string, unknown>>;
+          const strippedCollections: Record<string, unknown> = {};
+          for (const [name, coll] of Object.entries(collections)) {
+            const { validator: _, ...rest } = coll;
+            strippedCollections[name] = rest;
+          }
+          strippedNamespaces[nsId] = { ...ns, collections: strippedCollections };
         }
         const { storageHash: _sh, ...restStorage } = storage;
-        return { ...contract, storage: { ...restStorage, collections: stripped } };
+        return { ...contract, storage: { ...restStorage, namespaces: strippedNamespaces } };
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
@@ -266,14 +271,19 @@ describe('side-by-side contract examples', () => {
       const stripForComparison = (json: string) => {
         const parsed = JSON.parse(json) as Record<string, unknown>;
         const storage = parsed['storage'] as Record<string, unknown>;
-        const collections = storage['collections'] as Record<string, Record<string, unknown>>;
-        const strippedCollections: Record<string, unknown> = {};
-        for (const [name, coll] of Object.entries(collections)) {
-          const { validator: _, ...rest } = coll;
-          strippedCollections[name] = rest;
+        const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>>;
+        const strippedNamespaces: Record<string, unknown> = {};
+        for (const [nsId, ns] of Object.entries(namespaces)) {
+          const collections = ns['collections'] as Record<string, Record<string, unknown>>;
+          const strippedCollections: Record<string, unknown> = {};
+          for (const [name, coll] of Object.entries(collections)) {
+            const { validator: _, ...rest } = coll;
+            strippedCollections[name] = rest;
+          }
+          strippedNamespaces[nsId] = { ...ns, collections: strippedCollections };
         }
         const { storageHash: _sh, ...restStorage } = storage;
-        return { ...parsed, storage: { ...restStorage, collections: strippedCollections } };
+        return { ...parsed, storage: { ...restStorage, namespaces: strippedNamespaces } };
       };
       expect(stripForComparison(emittedTs.contractJson)).toEqual(
         stripForComparison(emittedPsl.contractJson),

@@ -59,6 +59,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { executeDbInit } from '@prisma-next/cli/control-api';
+import type { Contract } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import {
@@ -67,15 +68,13 @@ import {
 } from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { APP_USER_TABLE } from '../app/src/constants';
 import appContractJson from '../app/src/contract.json' with { type: 'json' };
 
-// The PSL-authored app contract is materialised at emit time; we JSON-import
-// it here rather than re-deriving via `defineContract(...)`.
-const appContract = appContractJson as unknown as Parameters<typeof executeDbInit>[0]['contract'];
 const APP_CONTRACT_HASH_VALUE = appContractJson.storage.storageHash;
 
 import {
@@ -138,6 +137,10 @@ function buildFamilyInstance(declarationOrder: 'natural' | 'reverse') {
     }),
   );
 }
+
+const appContract = buildFamilyInstance('natural').deserializeContract(
+  appContractJson,
+) as Contract<SqlStorage>;
 
 const frameworkComponents = [
   postgresTargetDescriptor,

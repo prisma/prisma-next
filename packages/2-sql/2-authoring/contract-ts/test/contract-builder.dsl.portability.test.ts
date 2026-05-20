@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
+import { unboundTables } from './unbound-tables';
 
 type PortableSqlCodecTypes = {
   readonly 'sql/char@1': { output: string };
@@ -91,7 +92,7 @@ describe('contract DSL portability coverage', () => {
   it('keeps portable contracts identical across postgres and sqlite target swaps', () => {
     const postgresContract = buildPortableContract(postgresTargetPack);
     const sqliteContract = buildPortableContract(sqliteTargetPack);
-    const postgresStorageTables = postgresContract.storage.tables as Record<
+    const postgresStorageTables = unboundTables(postgresContract.storage) as Record<
       string,
       { readonly columns: Record<string, unknown> }
     >;

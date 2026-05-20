@@ -50,8 +50,10 @@ import {
 } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
+  resolveNamespaceIdForIssue,
   type StrategyContext,
   sqlitePlannerStrategies,
+  tableAt,
 } from './planner-strategies';
 import { CONTROL_TABLE_NAMES } from './statement-builders';
 
@@ -239,8 +241,8 @@ export function toTableSpec(
     ...(u.name !== undefined ? { name: u.name } : {}),
   }));
   const foreignKeys: SqliteForeignKeySpec[] = table.foreignKeys.map((fk) => ({
-    columns: fk.columns,
-    references: { table: fk.references.table, columns: fk.references.columns },
+    columns: fk.source.columns,
+    references: { table: fk.target.tableName, columns: fk.target.columns },
     constraint: fk.constraint !== false,
     ...(fk.name !== undefined ? { name: fk.name } : {}),
     ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
@@ -297,12 +299,13 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
       }
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const namespaceId = resolveNamespaceIdForIssue(issue);
+      const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(
             'unsupportedOperation',
-            `Table "${issue.table}" reported missing but not found in destination contract`,
+            `Table "${issue.table}" in namespace "${namespaceId}" reported missing but not found in destination contract`,
           ),
         );
       }
@@ -316,9 +319,9 @@ function mapIssueToCall(
       }
       for (const fk of contractTable.foreignKeys) {
         if (fk.index === false) continue;
-        if (declaredIndexColumnKeys.has(fk.columns.join(','))) continue;
-        const indexName = defaultIndexName(issue.table, fk.columns);
-        calls.push(new CreateIndexCall(issue.table, indexName, fk.columns));
+        if (declaredIndexColumnKeys.has(fk.source.columns.join(','))) continue;
+        const indexName = defaultIndexName(issue.table, fk.source.columns);
+        calls.push(new CreateIndexCall(issue.table, indexName, fk.source.columns));
       }
       return ok(calls);
     }
@@ -329,7 +332,9 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
         );
       }
-      const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+      const namespaceId = resolveNamespaceIdForIssue(issue);
+      const contractTable2 = tableAt(ctx.toContract.storage, namespaceId, issue.table);
+      const column = contractTable2?.columns[issue.column];
       if (!column) {
         return notOk(
           issueConflict(
@@ -338,7 +343,7 @@ function mapIssueToCall(
           ),
         );
       }
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = contractTable2;
       const columnSpec = toColumnSpec(
         issue.column,
         column,
@@ -361,8 +366,9 @@ function mapIssueToCall(
           ),
         );
       }
+      const namespaceId = resolveNamespaceIdForIssue(issue);
       const columns = issue.expected.split(', ');
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(
@@ -371,11 +377,6 @@ function mapIssueToCall(
           ),
         );
       }
-      // Use the explicit-index name if one is declared for these columns;
-      // otherwise fall back to `defaultIndexName` (which is also what
-      // `verifySqlSchema` synthesizes for FK-backing indexes). Whether the
-      // missing index originates from `contractTable.indexes` or from an FK
-      // with `index: true` doesn't change the emitted DDL.
       const explicitIndex = contractTable.indexes.find(
         (idx) => idx.columns.join(',') === columns.join(','),
       );

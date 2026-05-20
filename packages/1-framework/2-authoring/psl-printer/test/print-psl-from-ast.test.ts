@@ -6,6 +6,11 @@ import type {
   PslSpan,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
+import {
+  flatPslEnums,
+  flatPslModels,
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+} from '@prisma-next/framework-components/psl-ast';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
@@ -31,27 +36,34 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'X',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
+              kind: 'model',
+              name: 'X',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+              ],
+              attributes: [],
               span: span(0),
             },
           ],
-          attributes: [],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('model X {\n  id Int @id');
@@ -61,29 +73,36 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'Foo',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
+              kind: 'model',
+              name: 'Foo',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+              ],
+              attributes: [
+                attr('model', 'map', [{ kind: 'positional', value: '"foo"', span: span(1) }], 2),
+              ],
               span: span(0),
             },
           ],
-          attributes: [
-            attr('model', 'map', [{ kind: 'positional', value: '"foo"', span: span(1) }], 2),
-          ],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('@@map("foo")');
@@ -104,36 +123,43 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'User',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
+              kind: 'model',
+              name: 'User',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+                {
+                  kind: 'field',
+                  name: 'role',
+                  typeName: 'Role',
+                  optional: false,
+                  list: false,
+                  attributes: [],
+                  span: span(1),
+                },
+              ],
+              attributes: [],
               span: span(0),
             },
-            {
-              kind: 'field',
-              name: 'role',
-              typeName: 'Role',
-              optional: false,
-              list: false,
-              attributes: [],
-              span: span(1),
-            },
           ],
-          attributes: [],
+          enums: [roleEnum],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [roleEnum],
-      compositeTypes: [],
       span: span(0),
     };
 
@@ -158,9 +184,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [],
-      compositeTypes: [],
+      namespaces: [],
       types: typesBlock,
       span: span(0),
     };
@@ -171,91 +195,98 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'Post',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
-              span: span(0),
-            },
-            {
-              kind: 'field',
-              name: 'authorId',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [],
-              span: span(1),
-            },
-            {
-              kind: 'field',
-              name: 'author',
-              typeName: 'User',
-              optional: false,
-              list: false,
-              attributes: [
-                attr(
-                  'field',
-                  'relation',
-                  [
-                    {
-                      kind: 'named',
-                      name: 'fields',
-                      value: '[authorId]',
-                      span: span(2),
-                    },
-                    {
-                      kind: 'named',
-                      name: 'references',
-                      value: '[id]',
-                      span: span(3),
-                    },
+              kind: 'model',
+              name: 'Post',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+                {
+                  kind: 'field',
+                  name: 'authorId',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [],
+                  span: span(1),
+                },
+                {
+                  kind: 'field',
+                  name: 'author',
+                  typeName: 'User',
+                  optional: false,
+                  list: false,
+                  attributes: [
+                    attr(
+                      'field',
+                      'relation',
+                      [
+                        {
+                          kind: 'named',
+                          name: 'fields',
+                          value: '[authorId]',
+                          span: span(2),
+                        },
+                        {
+                          kind: 'named',
+                          name: 'references',
+                          value: '[id]',
+                          span: span(3),
+                        },
+                      ],
+                      4,
+                    ),
                   ],
-                  4,
-                ),
+                  span: span(5),
+                },
               ],
-              span: span(5),
-            },
-          ],
-          attributes: [],
-          span: span(0),
-        },
-        {
-          kind: 'model',
-          name: 'User',
-          fields: [
-            {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
+              attributes: [],
               span: span(0),
             },
             {
-              kind: 'field',
-              name: 'posts',
-              typeName: 'Post',
-              optional: false,
-              list: true,
+              kind: 'model',
+              name: 'User',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+                {
+                  kind: 'field',
+                  name: 'posts',
+                  typeName: 'Post',
+                  optional: false,
+                  list: true,
+                  attributes: [],
+                  span: span(1),
+                },
+              ],
               attributes: [],
-              span: span(1),
+              span: span(0),
             },
           ],
-          attributes: [],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
 
@@ -266,9 +297,16 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [{ kind: 'model', name: 'Empty', fields: [], attributes: [], span: span(0) }],
-      enums: [],
-      compositeTypes: [],
+      namespaces: [
+        {
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [{ kind: 'model', name: 'Empty', fields: [], attributes: [], span: span(0) }],
+          enums: [],
+          compositeTypes: [],
+          span: span(0),
+        },
+      ],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toMatch(/model Empty \{\s*\}/s);
@@ -278,19 +316,26 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'OnlyAttrs',
-          fields: [],
-          attributes: [
-            attr('model', 'index', [{ kind: 'positional', value: '[a]', span: span(0) }], 1),
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
+            {
+              kind: 'model',
+              name: 'OnlyAttrs',
+              fields: [],
+              attributes: [
+                attr('model', 'index', [{ kind: 'positional', value: '[a]', span: span(0) }], 1),
+              ],
+              span: span(0),
+            },
           ],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('@@index([a])');
@@ -300,24 +345,31 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [
+      namespaces: [
         {
-          kind: 'enum',
-          name: 'StatusA',
-          values: [{ kind: 'enumValue', name: 'ok', span: span(0) }],
-          attributes: [],
-          span: span(0),
-        },
-        {
-          kind: 'enum',
-          name: 'StatusB',
-          values: [{ kind: 'enumValue', name: 'ok', span: span(1) }],
-          attributes: [],
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [
+            {
+              kind: 'enum',
+              name: 'StatusA',
+              values: [{ kind: 'enumValue', name: 'ok', span: span(0) }],
+              attributes: [],
+              span: span(0),
+            },
+            {
+              kind: 'enum',
+              name: 'StatusB',
+              values: [{ kind: 'enumValue', name: 'ok', span: span(1) }],
+              attributes: [],
+              span: span(0),
+            },
+          ],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      compositeTypes: [],
       span: span(0),
     };
     const text = printPslFromAst(ast);
@@ -329,19 +381,31 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [
+      namespaces: [
         {
-          kind: 'enum',
-          name: 'Status',
-          values: [{ kind: 'enumValue', name: 'Ok', span: span(0) }],
-          attributes: [
-            attr('enum', 'map', [{ kind: 'positional', value: '"db_status"', span: span(1) }], 2),
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [
+            {
+              kind: 'enum',
+              name: 'Status',
+              values: [{ kind: 'enumValue', name: 'Ok', span: span(0) }],
+              attributes: [
+                attr(
+                  'enum',
+                  'map',
+                  [{ kind: 'positional', value: '"db_status"', span: span(1) }],
+                  2,
+                ),
+              ],
+              span: span(0),
+            },
           ],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      compositeTypes: [],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -353,21 +417,28 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [
+      namespaces: [
         {
-          kind: 'enum',
-          name: 'Mixed',
-          values: [
-            { kind: 'enumValue', name: 'in-progress', span: span(0) },
-            { kind: 'enumValue', name: '123leading', span: span(1) },
-            { kind: 'enumValue', name: 'enum', span: span(2) },
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [
+            {
+              kind: 'enum',
+              name: 'Mixed',
+              values: [
+                { kind: 'enumValue', name: 'in-progress', span: span(0) },
+                { kind: 'enumValue', name: '123leading', span: span(1) },
+                { kind: 'enumValue', name: 'enum', span: span(2) },
+              ],
+              attributes: [],
+              span: span(0),
+            },
           ],
-          attributes: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      compositeTypes: [],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -383,20 +454,27 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [
+      namespaces: [
         {
-          kind: 'enum',
-          name: 'Dupes',
-          values: [
-            { kind: 'enumValue', name: 'foo bar', span: span(0) },
-            { kind: 'enumValue', name: 'foo-bar', span: span(1) },
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [
+            {
+              kind: 'enum',
+              name: 'Dupes',
+              values: [
+                { kind: 'enumValue', name: 'foo bar', span: span(0) },
+                { kind: 'enumValue', name: 'foo-bar', span: span(1) },
+              ],
+              attributes: [],
+              span: span(0),
+            },
           ],
-          attributes: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      compositeTypes: [],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -418,21 +496,28 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [
+      namespaces: [
         {
-          kind: 'enum',
-          name: 'Status',
-          values: [
-            { kind: 'enumValue', name: 'in-progress', span: span(0) },
-            { kind: 'enumValue', name: 'enum', span: span(1) },
-            { kind: 'enumValue', name: 'done', span: span(2) },
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [],
+          enums: [
+            {
+              kind: 'enum',
+              name: 'Status',
+              values: [
+                { kind: 'enumValue', name: 'in-progress', span: span(0) },
+                { kind: 'enumValue', name: 'enum', span: span(1) },
+                { kind: 'enumValue', name: 'done', span: span(2) },
+              ],
+              attributes: [],
+              span: span(0),
+            },
           ],
-          attributes: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      compositeTypes: [],
       span: span(0),
     };
 
@@ -440,7 +525,7 @@ describe('printPslFromAst', () => {
     const parsed = parsePslDocument({ schema: printed1, sourceId: 'r' });
     expect(parsed.ok).toBe(true);
 
-    const enumNode = parsed.ast.enums.find((e) => e.name === 'Status');
+    const enumNode = flatPslEnums(parsed.ast).find((e) => e.name === 'Status');
     expect(enumNode).toBeDefined();
     const valueShapes = enumNode?.values.map((v) => ({ name: v.name, mapName: v.mapName }));
     expect(valueShapes).toEqual([
@@ -459,52 +544,59 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'Doc',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
-              span: span(0),
-            },
-            {
-              kind: 'field',
-              name: 'nickname',
-              typeName: 'String',
-              optional: true,
-              list: false,
-              attributes: [
-                attr(
-                  'field',
-                  'map',
-                  [{ kind: 'positional', value: '"nick_name"', span: span(1) }],
-                  2,
-                ),
+              kind: 'model',
+              name: 'Doc',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+                {
+                  kind: 'field',
+                  name: 'nickname',
+                  typeName: 'String',
+                  optional: true,
+                  list: false,
+                  attributes: [
+                    attr(
+                      'field',
+                      'map',
+                      [{ kind: 'positional', value: '"nick_name"', span: span(1) }],
+                      2,
+                    ),
+                  ],
+                  span: span(0),
+                },
+                {
+                  kind: 'field',
+                  name: 'tags',
+                  typeName: 'String',
+                  optional: false,
+                  list: true,
+                  attributes: [],
+                  span: span(0),
+                },
               ],
-              span: span(0),
-            },
-            {
-              kind: 'field',
-              name: 'tags',
-              typeName: 'String',
-              optional: false,
-              list: true,
               attributes: [],
               span: span(0),
             },
           ],
-          attributes: [],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -516,29 +608,36 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'WithAttrs',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
+              kind: 'model',
+              name: 'WithAttrs',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+              ],
+              attributes: [
+                attr('model', 'index', [{ kind: 'positional', value: '[id]', span: span(1) }], 2),
+              ],
               span: span(0),
             },
           ],
-          attributes: [
-            attr('model', 'index', [{ kind: 'positional', value: '[id]', span: span(1) }], 2),
-          ],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -551,28 +650,35 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'Audit',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'id',
-              typeName: 'Int',
-              optional: false,
-              list: false,
-              attributes: [attr('field', 'id', [], 0)],
+              kind: 'model',
+              name: 'Audit',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'id',
+                  typeName: 'Int',
+                  optional: false,
+                  list: false,
+                  attributes: [attr('field', 'id', [], 0)],
+                  span: span(0),
+                },
+              ],
+              attributes: [],
               span: span(0),
+              comment: '// WARNING: legacy table',
             },
           ],
-          attributes: [],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
-          comment: '// WARNING: legacy table',
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     const out = printPslFromAst(ast);
@@ -584,9 +690,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [],
-      compositeTypes: [],
+      namespaces: [],
       types: {
         kind: 'types',
         declarations: [
@@ -617,33 +721,40 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'Account',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'balance',
-              typeName: 'Decimal',
-              typeConstructor: {
-                kind: 'typeConstructor',
-                path: ['Money'],
-                args: [{ kind: 'positional', value: '2', span: span(0) }],
-                span: span(0),
-              },
-              optional: false,
-              list: false,
+              kind: 'model',
+              name: 'Account',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'balance',
+                  typeName: 'Decimal',
+                  typeConstructor: {
+                    kind: 'typeConstructor',
+                    path: ['Money'],
+                    args: [{ kind: 'positional', value: '2', span: span(0) }],
+                    span: span(0),
+                  },
+                  optional: false,
+                  list: false,
+                  attributes: [],
+                  span: span(0),
+                },
+              ],
               attributes: [],
               span: span(0),
             },
           ],
-          attributes: [],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     expect(printPslFromAst(ast)).toContain('balance Money(2)');
@@ -653,9 +764,7 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [],
-      enums: [],
-      compositeTypes: [],
+      namespaces: [],
       types: {
         kind: 'types',
         declarations: [
@@ -683,27 +792,34 @@ describe('printPslFromAst', () => {
     const ast: PslDocumentAst = {
       kind: 'document',
       sourceId: 't',
-      models: [
+      namespaces: [
         {
-          kind: 'model',
-          name: 'Edge',
-          fields: [
+          kind: 'namespace',
+          name: UNSPECIFIED_PSL_NAMESPACE_ID,
+          models: [
             {
-              kind: 'field',
-              name: 'phantom',
-              typeName: '',
-              optional: false,
-              list: false,
+              kind: 'model',
+              name: 'Edge',
+              fields: [
+                {
+                  kind: 'field',
+                  name: 'phantom',
+                  typeName: '',
+                  optional: false,
+                  list: false,
+                  attributes: [],
+                  span: span(0),
+                },
+              ],
               attributes: [],
               span: span(0),
             },
           ],
-          attributes: [],
+          enums: [],
+          compositeTypes: [],
           span: span(0),
         },
       ],
-      enums: [],
-      compositeTypes: [],
       span: span(0),
     };
     expect(() => printPslFromAst(ast)).not.toThrow();
@@ -726,7 +842,7 @@ describe('printPslFromAst', () => {
     expect(parsed2.ok).toBe(true);
 
     const findMap = (ast: typeof parsed1.ast): string | undefined => {
-      const model = ast.models.find((m) => m.name === 'Doc');
+      const model = flatPslModels(ast).find((m) => m.name === 'Doc');
       const field = model?.fields.find((f) => f.name === 'body');
       const mapAttr = field?.attributes.find((a) => a.name === 'map' && a.target === 'field');
       const positional = mapAttr?.args.find((a) => a.kind === 'positional');
@@ -755,9 +871,97 @@ model Post {
     const printed = printPslFromAst(parsed1.ast);
     const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
     expect(parsed2.ok).toBe(true);
-    expect(parsed2.ast.models.length).toBe(parsed1.ast.models.length);
-    expect(parsed2.ast.models.map((m) => m.name).sort()).toEqual(
-      parsed1.ast.models.map((m) => m.name).sort(),
-    );
+    const models1 = flatPslModels(parsed1.ast);
+    const models2 = flatPslModels(parsed2.ast);
+    expect(models2.length).toBe(models1.length);
+    expect(models2.map((m) => m.name).sort()).toEqual(models1.map((m) => m.name).sort());
+  });
+
+  describe('namespace blocks', () => {
+    it('emits top-level declarations from the synthesised __unspecified__ bucket without a namespace wrapper', () => {
+      const source = `model A {
+  id Int @id
+}
+`;
+      const parsed = parsePslDocument({ schema: source, sourceId: 'r' });
+      expect(parsed.ok).toBe(true);
+      const printed = printPslFromAst(parsed.ast);
+      expect(printed).not.toMatch(/namespace\s+\w+\s*\{/);
+      expect(printed).toContain('model A {');
+    });
+
+    it('emits a named namespace block wrapping its declarations', () => {
+      const source = `namespace auth {
+  model User {
+    id Int @id
+  }
+
+  enum Role {
+    ADMIN
+    MEMBER
+  }
+}
+`;
+      const parsed = parsePslDocument({ schema: source, sourceId: 'r' });
+      expect(parsed.ok).toBe(true);
+      const printed = printPslFromAst(parsed.ast);
+      expect(printed).toMatch(/namespace auth \{/);
+      expect(printed).toMatch(/^ {2}model User \{/m);
+      expect(printed).toMatch(/^ {2}enum Role \{/m);
+      expect(printed.trimEnd().endsWith('}')).toBe(true);
+    });
+
+    it('round-trips a mixed top-level + namespaced schema through parser → printer → parser', () => {
+      const source = `model TopLevel {
+  id Int @id
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`;
+      const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
+      expect(parsed1.ok).toBe(true);
+      const printed = printPslFromAst(parsed1.ast);
+      const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
+      expect(parsed2.ok).toBe(true);
+      expect(parsed2.ast.namespaces.map((ns) => ns.name).sort()).toEqual(
+        parsed1.ast.namespaces.map((ns) => ns.name).sort(),
+      );
+      expect(
+        flatPslModels(parsed2.ast)
+          .map((m) => m.name)
+          .sort(),
+      ).toEqual(
+        flatPslModels(parsed1.ast)
+          .map((m) => m.name)
+          .sort(),
+      );
+    });
+  });
+
+  describe('namespace ordering and escape handling', () => {
+    it('sorts non-unspecified namespaces alphabetically', () => {
+      const source =
+        'namespace billing {\n  model Invoice {\n    id Int @id\n  }\n}\n\nnamespace auth {\n  model User {\n    id Int @id\n  }\n}\n';
+      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
+      expect(parsed.ok).toBe(true);
+      const printed = printPslFromAst(parsed.ast);
+      expect(printed.indexOf('namespace auth')).toBeLessThan(printed.indexOf('namespace billing'));
+    });
+
+    it('decodes carriage-return and preserves unknown escape sequences in enum @@map values', () => {
+      const source = `enum Status {\n  active\n  inactive\n\n  @@map("a\\rb\\zc")\n}\n`;
+      const parsed = parsePslDocument({ schema: source, sourceId: 't' });
+      expect(parsed.ok).toBe(true);
+      const printed = printPslFromAst(parsed.ast);
+      // Carriage return decodes to a literal CR (re-escapes to \r); the
+      // unrecognised \z escape is preserved verbatim then re-escaped (so the
+      // single backslash becomes \\). The exact bytes matter less than
+      // exercising both branches of unescapePslString.
+      expect(printed).toMatch(/@@map\("a\\rb\\\\zc"\)/);
+    });
   });
 });

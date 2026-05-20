@@ -1,5 +1,6 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -192,13 +193,16 @@ describe('value objects: end-to-end SQL pipeline', () => {
     expect(homeAddressField.type).toEqual({ kind: 'valueObject', name: 'Address' });
     expect(homeAddressField.nullable).toBe(false);
 
-    // SqlStorage type doesn't structurally overlap with this shape; use double-cast for test assertion
     const storage = contract.storage as unknown as {
-      tables: Record<string, { columns: Record<string, { nativeType: string }> }>;
+      namespaces: Record<
+        string,
+        { tables: Record<string, { columns: Record<string, { nativeType: string }> }> }
+      >;
     };
-    expect(storage.tables['user']).toBeDefined();
-    expect(storage.tables['user']!.columns['homeAddress']).toBeDefined();
-    expect(storage.tables['user']!.columns['homeAddress']!.nativeType).toBe('jsonb');
+    const userTable = storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['user'];
+    expect(userTable).toBeDefined();
+    expect(userTable!.columns['homeAddress']).toBeDefined();
+    expect(userTable!.columns['homeAddress']!.nativeType).toBe('jsonb');
   });
 });
 

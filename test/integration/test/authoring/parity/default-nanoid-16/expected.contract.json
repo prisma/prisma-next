@@ -33,31 +33,31 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__",
+        "tables": {
+          "user": {
+            "columns": {
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 16
+                }
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": ["id"]
+            },
+            "uniques": []
+          }
+        }
       }
     },
-    "storageHash": "sha256:573bf0cbf8b79a2cd26a6d9d750252d6d3d36cd96566f746c44ca7313eb53595",
-    "tables": {
-      "user": {
-        "columns": {
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 16
-            }
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": ["id"]
-        },
-        "uniques": []
-      }
-    }
+    "storageHash": "sha256:01d9c763a7df982f92a7e21f79cef04342f01359b9ac3e01b41910948b50e4d9"
   },
   "execution": {
     "executionHash": "sha256:5a3a18f251eb8c82d18de2823d2e08108d644bafc9b7d3a878548bd129b385ad",

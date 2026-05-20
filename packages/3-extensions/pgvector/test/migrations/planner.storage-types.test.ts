@@ -3,9 +3,8 @@ import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
@@ -56,25 +55,8 @@ describe('PostgresMigrationPlanner - storage types', () => {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              role: {
-                nativeType: 'role',
-                codecId: 'pg/enum@1',
-                nullable: false,
-                typeRef: 'Role',
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
         types: {
           Role: {
             kind: 'codec-instance',
@@ -83,8 +65,29 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['USER'] },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-      },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  role: {
+                    nativeType: 'role',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'Role',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      }),
       roots: {},
       models: {},
       capabilities: {},
@@ -144,9 +147,8 @@ describe('PostgresMigrationPlanner - storage types', () => {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        tables: {},
         types: {
           Role: {
             kind: 'codec-instance',
@@ -155,8 +157,8 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['USER'] },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-      },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+      }),
       roots: {},
       models: {},
       capabilities: {},
@@ -224,25 +226,8 @@ describe('PostgresMigrationPlanner - storage types', () => {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              kind: {
-                nativeType: 'UserKind',
-                codecId: 'pg/enum@1',
-                nullable: false,
-                typeRef: 'UserKind',
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
         types: {
           UserKind: {
             kind: 'codec-instance',
@@ -251,8 +236,29 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['ADMIN', 'USER'] },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-      },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  kind: {
+                    nativeType: 'UserKind',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'UserKind',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      }),
       roots: {},
       models: {},
       capabilities: {},
@@ -287,25 +293,8 @@ describe('PostgresMigrationPlanner - storage types', () => {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        tables: {
-          document: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              embedding: {
-                nativeType: 'vector',
-                codecId: 'pg/vector@1',
-                nullable: false,
-                typeRef: 'Embedding1536',
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
         types: {
           Embedding1536: {
             kind: 'codec-instance',
@@ -314,8 +303,29 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { length: 1536 },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-      },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              document: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  embedding: {
+                    nativeType: 'vector',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeRef: 'Embedding1536',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      }),
       roots: {},
       models: {},
       capabilities: {},
@@ -348,25 +358,8 @@ describe('PostgresMigrationPlanner - storage types', () => {
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        tables: {
-          document: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              embedding: {
-                nativeType: 'vector',
-                codecId: 'pg/vector@1',
-                nullable: false,
-                typeRef: 'Embedding1536',
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
         types: {
           Embedding1536: {
             kind: 'codec-instance',
@@ -375,8 +368,29 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { length: 1536 },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
-      },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              document: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  embedding: {
+                    nativeType: 'vector',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeRef: 'Embedding1536',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      }),
       roots: {},
       models: {},
       capabilities: {},

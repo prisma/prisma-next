@@ -5,7 +5,6 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
@@ -106,6 +105,16 @@ type DefinitionModels<Definition> = Definition extends {
     ? Present<Definition['models']>
     : Record<never, never>
   : Record<never, never>;
+
+type DefinitionNamespaces<Definition> = Definition extends {
+  readonly namespaces?: infer Names extends readonly string[];
+}
+  ? string[] extends Names
+    ? never
+    : readonly string[] extends Names
+      ? never
+      : Names[number]
+  : never;
 
 type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
@@ -499,8 +508,16 @@ type BuiltStorageTables<Definition> = {
     }>;
     readonly indexes: ReadonlyArray<Index>;
     readonly foreignKeys: ReadonlyArray<{
-      readonly columns: readonly string[];
-      readonly references: { readonly table: string; readonly columns: readonly string[] };
+      readonly source: {
+        readonly namespaceId: string;
+        readonly tableName: string;
+        readonly columns: readonly string[];
+      };
+      readonly target: {
+        readonly namespaceId: string;
+        readonly tableName: string;
+        readonly columns: readonly string[];
+      };
       readonly name?: string;
       readonly onDelete?: ReferentialAction;
       readonly onUpdate?: ReferentialAction;
@@ -521,11 +538,39 @@ type BuiltStorageTables<Definition> = {
     : Record<string, never>);
 };
 
+type BuiltStorageTypes<Definition> = {
+  readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends PostgresEnumStorageEntry
+    ? never
+    : K]: DefinitionTypes<Definition>[K];
+};
+
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly tables: BuiltStorageTables<Definition>;
-  readonly types: DefinitionTypes<Definition>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  readonly types: BuiltStorageTypes<Definition>;
+  // SQL contracts always carry a literal `__unbound__` namespace whose tables
+  // slot is narrowed to the actual built table shape so downstream DSL
+  // surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
+  // access without an optional-narrowing dance. The shape is described
+  // inline (rather than intersecting with `SqlStorage['namespaces']`) so
+  // its `Readonly<Record<string, Namespace>>` index signature doesn't
+  // collapse `keyof tables` to `string`. The literal object is still
+  // structurally assignable to `SqlStorage['namespaces']` because every
+  // value satisfies the framework `Namespace` interface.
+  readonly namespaces: {
+    readonly __unbound__: {
+      readonly id: '__unbound__';
+      readonly kind?: string;
+      readonly tables: BuiltStorageTables<Definition>;
+      readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+    };
+  } & {
+    readonly [Ns in Exclude<DefinitionNamespaces<Definition>, '__unbound__'>]: {
+      readonly id: Ns;
+      readonly kind?: string;
+      readonly tables: Record<never, never>;
+      readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+    };
+  };
 };
 
 type FieldOutputType<

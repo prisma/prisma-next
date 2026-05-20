@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
@@ -26,11 +27,21 @@ function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTab
   const uniqueIndexKeys = new Set(
     table.indexes.filter((i) => i.unique).map((i) => i.columns.join(',')),
   );
-  const fkKeys = new Set(
-    table.foreignKeys.map(
-      (fk) => `${fk.columns.join(',')}|${fk.referencedTable}|${fk.referencedColumns.join(',')}`,
-    ),
-  );
+  const fkKeys = new Set<string>();
+  for (const fk of table.foreignKeys) {
+    // Keys are JSON-encoded tuples so identifiers containing any character
+    // (including the column-list comma or pipe characters) cannot collide
+    // across structurally-distinct FKs. Unqualified keys are 3-tuples
+    // (cols, table, refCols); qualified keys are 4-tuples
+    // (cols, schema, table, refCols) — the arity difference makes the two
+    // key shapes fundamentally non-collidable.
+    fkKeys.add(JSON.stringify([fk.columns, fk.referencedTable, fk.referencedColumns]));
+    if (fk.referencedSchema !== undefined) {
+      fkKeys.add(
+        JSON.stringify([fk.columns, fk.referencedSchema, fk.referencedTable, fk.referencedColumns]),
+      );
+    }
+  }
   return { uniqueKeys, indexKeys, uniqueIndexKeys, fkKeys };
 }
 
@@ -48,7 +59,20 @@ export function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]):
 }
 
 export function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
+  // Mirror the encoding produced by buildSchemaTableLookup exactly:
+  // unqualified 3-tuple for unbound-namespace FKs, qualified 4-tuple for
+  // bound-namespace FKs.
+  if (fk.target.namespaceId === UNBOUND_NAMESPACE_ID) {
+    return lookup.fkKeys.has(
+      JSON.stringify([fk.source.columns, fk.target.tableName, fk.target.columns]),
+    );
+  }
   return lookup.fkKeys.has(
-    `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
+    JSON.stringify([
+      fk.source.columns,
+      fk.target.namespaceId,
+      fk.target.tableName,
+      fk.target.columns,
+    ]),
   );
 }

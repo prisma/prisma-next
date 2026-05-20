@@ -11,9 +11,7 @@ import type { PslDocumentAst } from '../src/control/psl-ast';
 const SYNTHETIC_AST: PslDocumentAst = {
   kind: 'document',
   sourceId: 'test',
-  models: [],
-  enums: [],
-  compositeTypes: [],
+  namespaces: [],
   span: {
     start: { offset: 0, line: 1, column: 1 },
     end: { offset: 0, line: 1, column: 1 },

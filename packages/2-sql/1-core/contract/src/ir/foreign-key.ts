@@ -1,12 +1,12 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { ForeignKeyReferences, type ForeignKeyReferencesInput } from './foreign-key-references';
+import { ForeignKeyReference, type ForeignKeyReferenceInput } from './foreign-key-reference';
 import { SqlNode } from './sql-node';
 
 export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
 export interface ForeignKeyInput {
-  readonly columns: readonly string[];
-  readonly references: ForeignKeyReferences | ForeignKeyReferencesInput;
+  readonly source: ForeignKeyReference | ForeignKeyReferenceInput;
+  readonly target: ForeignKeyReference | ForeignKeyReferenceInput;
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
@@ -19,14 +19,18 @@ export interface ForeignKeyInput {
 /**
  * SQL Contract IR node for a table-level foreign-key declaration.
  *
- * The nested `references` field is normalised to a
- * {@link ForeignKeyReferences} instance inside the constructor so
- * downstream walks see a uniform AST regardless of whether the input
- * was a JSON literal or an already-constructed class instance.
+ * Each FK carries explicit `source` and `target` {@link ForeignKeyReference}
+ * coordinates (namespace, table, columns). For single-namespace contracts the
+ * sentinel `UNBOUND_NAMESPACE_ID` appears on both sides.
+ *
+ * The nested references are normalised to {@link ForeignKeyReference}
+ * instances inside the constructor so downstream walks see a uniform AST
+ * regardless of whether the input was a JSON literal or an already-constructed
+ * class instance.
  */
 export class ForeignKey extends SqlNode {
-  readonly columns: readonly string[];
-  readonly references: ForeignKeyReferences;
+  readonly source: ForeignKeyReference;
+  readonly target: ForeignKeyReference;
   readonly constraint: boolean;
   readonly index: boolean;
   declare readonly name?: string;
@@ -35,11 +39,14 @@ export class ForeignKey extends SqlNode {
 
   constructor(input: ForeignKeyInput) {
     super();
-    this.columns = input.columns;
-    this.references =
-      input.references instanceof ForeignKeyReferences
-        ? input.references
-        : new ForeignKeyReferences(input.references);
+    this.source =
+      input.source instanceof ForeignKeyReference
+        ? input.source
+        : new ForeignKeyReference(input.source);
+    this.target =
+      input.target instanceof ForeignKeyReference
+        ? input.target
+        : new ForeignKeyReference(input.target);
     this.constraint = input.constraint;
     this.index = input.index;
     if (input.name !== undefined) this.name = input.name;

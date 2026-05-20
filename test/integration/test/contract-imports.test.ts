@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import type { EmitStackInput } from '@prisma-next/emitter';
 import { createTestContract, emit } from '@prisma-next/emitter/test/utils';
 import { extractCodecTypeImports, extractComponentIds } from '@prisma-next/family-sql/test-utils';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -110,32 +111,37 @@ describe('contract.d.ts imports resolution', () => {
           },
         },
         storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                createdAt: {
-                  codecId: 'pg/timestamptz@1',
-                  nativeType: 'timestamptz',
-                  nullable: false,
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                user: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                    createdAt: {
+                      codecId: 'pg/timestamptz@1',
+                      nativeType: 'timestamptz',
+                      nullable: false,
+                    },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+                post: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                    userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-            post: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -173,7 +179,9 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
 const _contract: Contract = {} as any;
 const _storage: Contract['storage'] = _contract.storage;
-const _tables: Contract['storage']['tables'] = _storage.tables;
+const _namespaces: Contract['storage']['namespaces'] = _storage.namespaces;
+const _tables: Contract['storage']['namespaces']['__unbound__']['tables'] =
+  _namespaces['__unbound__'].tables;
 
 // Verify we can access CodecTypes
 const _codecTypes: CodecTypes = {} as any;
@@ -182,7 +190,7 @@ const _codecTypes: CodecTypes = {} as any;
 const _sqlStorage: SqlStorage = _contract.storage;
 
 // Verify the contract type is correctly structured
-type UserTable = Contract['storage']['tables']['user'];
+type UserTable = Contract['storage']['namespaces']['__unbound__']['tables']['user'];
 type UserColumns = UserTable['columns'];
 type UserIdColumn = UserColumns['id'];
 `;
@@ -259,16 +267,21 @@ type UserIdColumn = UserColumns['id'];
           },
         },
         storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                user: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -297,7 +310,7 @@ type UserIdColumn = UserColumns['id'];
       expect(contractDtsContent).toContain("from '@prisma-next/target-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
-      const testFileContent = `import type { Contract, CodecTypes, Tables, Models } from './contract';
+      const testFileContent = `import type { Contract, CodecTypes, Namespaces, Models } from './contract';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -305,11 +318,12 @@ import contractJson from './contract.json' with { type: 'json' };
 const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
 // Verify we can access all exported types
-const _tables: Tables = contract.storage.tables;
+const _namespaces: Namespaces = contract.storage.namespaces;
+const _tables = _namespaces['__unbound__'].tables;
 const _models: Models = contract.models;
 
 // Verify we can access nested types
-type UserTable = Tables['user'];
+type UserTable = Namespaces['__unbound__']['tables']['user'];
 type UserColumns = UserTable['columns'];
 type UserIdColumn = UserColumns['id'];
 type UserIdCodecId = UserIdColumn['codecId'];

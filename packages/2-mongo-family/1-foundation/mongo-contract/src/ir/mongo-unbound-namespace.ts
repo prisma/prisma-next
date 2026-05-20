@@ -1,0 +1,25 @@
+import {
+  freezeNode,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
+import type { MongoCollection } from './mongo-collection';
+
+export class MongoUnboundNamespace extends NamespaceBase {
+  static readonly instance: MongoUnboundNamespace = new MongoUnboundNamespace();
+
+  readonly id = UNBOUND_NAMESPACE_ID;
+  readonly collections: Readonly<Record<string, MongoCollection>> = Object.freeze({});
+  declare readonly kind?: string;
+
+  private constructor() {
+    super();
+    Object.defineProperty(this, 'kind', {
+      value: 'mongo-namespace',
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    freezeNode(this);
+  }
+}

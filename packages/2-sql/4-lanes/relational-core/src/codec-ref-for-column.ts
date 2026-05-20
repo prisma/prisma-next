@@ -4,6 +4,7 @@ import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
   type SqlStorage,
+  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 
 /**
@@ -22,12 +23,31 @@ export function codecRefForStorageColumn(
   tableName: string,
   columnName: string,
 ): CodecRef | undefined {
-  const tableDef = storage.tables[tableName];
+  let tableDef: StorageTable | undefined;
+  for (const ns of Object.values(storage.namespaces)) {
+    const candidate = ns.tables[tableName] as StorageTable | undefined;
+    if (candidate !== undefined) {
+      tableDef = candidate;
+      break;
+    }
+  }
   if (!tableDef) return undefined;
   const columnDef = tableDef.columns[columnName];
   if (!columnDef) return undefined;
   if (columnDef.typeRef !== undefined) {
-    const instance = storage.types?.[columnDef.typeRef];
+    let instance: unknown = storage.types?.[columnDef.typeRef];
+    if (!instance) {
+      for (const ns of Object.values(storage.namespaces)) {
+        const nsTypes = (ns as { types?: Record<string, unknown> }).types;
+        if (nsTypes) {
+          const nsEntry = nsTypes[columnDef.typeRef];
+          if (nsEntry !== undefined) {
+            instance = nsEntry;
+            break;
+          }
+        }
+      }
+    }
     if (!instance) return undefined;
     if (isPostgresEnumStorageEntry(instance)) {
       // Canonical path: the entry is a live `PostgresEnumType` IR

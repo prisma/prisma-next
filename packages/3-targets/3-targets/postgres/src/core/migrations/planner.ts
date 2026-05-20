@@ -23,6 +23,7 @@ import { readExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
+import { verifyPostgresNamespacePresence } from './verify-postgres-namespaces';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -222,6 +223,18 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         readExistingEnumValues(schema, enumType.nativeType),
     };
     const verifyResult = verifySqlSchema(verifyOptions);
-    return verifyResult.schema.issues;
+    // Schema presence is a Postgres-specific concern (no equivalent in
+    // SQLite / Mongo), so the issue emission lives in the target layer
+    // rather than in the family verifier. Stitch it in here so a single
+    // `SchemaIssue[]` flows through `planIssues` and the planner emits
+    // CREATE SCHEMA in the dep bucket before any CreateTableCall.
+    const namespaceIssues = verifyPostgresNamespacePresence({
+      contract: options.contract,
+      schema: options.schema,
+    });
+    if (namespaceIssues.length === 0) {
+      return verifyResult.schema.issues;
+    }
+    return [...namespaceIssues, ...verifyResult.schema.issues];
   }
 }

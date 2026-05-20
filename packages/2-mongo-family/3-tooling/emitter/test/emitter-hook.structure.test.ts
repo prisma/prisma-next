@@ -1,6 +1,10 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
-import { createMongoContract } from './fixtures/create-mongo-contract';
+import {
+  createMongoContract,
+  namespacedMongoStorageFromCollections,
+} from './fixtures/create-mongo-contract';
 
 describe('mongoEmission.validateStructure', () => {
   it('passes for valid minimal contract', () => {
@@ -14,7 +18,7 @@ describe('mongoEmission.validateStructure', () => {
           storage: { collection: 'users' },
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).not.toThrow();
   });
@@ -26,11 +30,12 @@ describe('mongoEmission.validateStructure', () => {
     );
   });
 
-  it('throws for missing storage.collections', () => {
-    const contract = createMongoContract({ storage: {} });
-    expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'must have storage.collections',
-    );
+  it('throws for missing storage.namespaces', () => {
+    const contract = {
+      ...createMongoContract(),
+      storage: { storageHash: 'sha256:test' },
+    } as Contract;
+    expect(() => mongoEmission.validateStructure(contract)).toThrow('must have storage.namespaces');
   });
 
   it('throws when model references non-existent collection', () => {
@@ -44,10 +49,10 @@ describe('mongoEmission.validateStructure', () => {
           storage: { collection: 'users' },
         },
       },
-      storage: { collections: {} },
+      storage: namespacedMongoStorageFromCollections({}),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'references collection "users" which is not in storage.collections',
+      'references collection "users" which is not in storage.namespaces[..].collections',
     );
   });
 
@@ -59,7 +64,7 @@ describe('mongoEmission.validateStructure', () => {
           storage: { collection: 'users' },
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'missing required field "fields"',
@@ -76,7 +81,7 @@ describe('mongoEmission.validateStructure', () => {
           storage: { collection: 'users' },
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'missing required field "relations"',
@@ -102,7 +107,7 @@ describe('mongoEmission.validateStructure', () => {
           owner: 'User',
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'Owned model "Address" must not have storage.collection',
@@ -121,7 +126,7 @@ describe('mongoEmission.validateStructure', () => {
           owner: 'NonExistent',
         },
       },
-      storage: { collections: {} },
+      storage: namespacedMongoStorageFromCollections({}),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'declares owner "NonExistent" which does not exist',
@@ -150,7 +155,7 @@ describe('mongoEmission.validateStructure', () => {
           owner: 'User',
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).not.toThrow();
   });
@@ -177,7 +182,7 @@ describe('mongoEmission.validateStructure', () => {
           base: 'Task',
         },
       },
-      storage: { collections: { tasks: {} } },
+      storage: namespacedMongoStorageFromCollections({ tasks: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).not.toThrow();
   });
@@ -204,7 +209,7 @@ describe('mongoEmission.validateStructure', () => {
           base: 'Task',
         },
       },
-      storage: { collections: { tasks: {}, bugs: {} } },
+      storage: namespacedMongoStorageFromCollections({ tasks: {}, bugs: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       "must share its base's collection",
@@ -221,7 +226,7 @@ describe('mongoEmission.validateStructure', () => {
           relations: {},
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'missing required field "storage"',
@@ -240,7 +245,7 @@ describe('mongoEmission.validateStructure', () => {
           base: 'NonExistent',
         },
       },
-      storage: { collections: { tasks: {} } },
+      storage: namespacedMongoStorageFromCollections({ tasks: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'declares base "NonExistent" which does not exist',
@@ -266,7 +271,7 @@ describe('mongoEmission.validateStructure', () => {
           owner: 'User',
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'embed relation "addresses" to owned model "Address" but no matching storage.relations entry',
@@ -287,7 +292,7 @@ describe('mongoEmission.validateStructure', () => {
           },
         },
       },
-      storage: { collections: { users: {} } },
+      storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
       'storage.relations.addresses but no matching domain-level relation',

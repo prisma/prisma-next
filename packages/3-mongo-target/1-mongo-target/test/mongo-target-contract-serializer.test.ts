@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
   MongoCollection,
@@ -8,13 +9,46 @@ import {
 } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
-import { MongoTargetUnspecifiedDatabase } from '../src/core/mongo-target-database';
+import { MongoTargetUnboundDatabase } from '../src/core/mongo-target-database';
+
+function makeSingletonUnboundContractJson() {
+  return {
+    targetFamily: 'mongo' as const,
+    target: 'mongo',
+    profileHash: 'sha256:test',
+    roots: {},
+    storage: {
+      storageHash: 'sha256:test',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          kind: 'mongo-database',
+          collections: {},
+        },
+      },
+    },
+    models: {},
+  };
+}
 
 function makeValidContractJson() {
   return {
-    targetFamily: 'mongo',
+    targetFamily: 'mongo' as const,
+    target: 'mongo',
+    profileHash: 'sha256:test',
     roots: { items: 'Item' },
-    storage: { collections: { items: {} } },
+    storage: {
+      storageHash: 'sha256:test',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          kind: 'mongo-database',
+          collections: {
+            items: {},
+          },
+        },
+      },
+    },
     models: {
       Item: {
         fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
@@ -33,20 +67,18 @@ describe('MongoTargetContractSerializer', () => {
     expect(contract.storage).toBeInstanceOf(MongoStorage);
   });
 
-  it('default storage carries the __unspecified__ singleton namespace', () => {
+  it('default storage carries the __unbound__ singleton namespace', () => {
     const serializer = new MongoTargetContractSerializer();
-    const contract = serializer.deserializeContract(makeValidContractJson());
+    const contract = serializer.deserializeContract(makeSingletonUnboundContractJson());
 
-    expect(contract.storage.namespaces['__unspecified__']).toBe(
-      MongoTargetUnspecifiedDatabase.instance,
-    );
+    expect(contract.storage.namespaces['__unbound__']).toBe(MongoTargetUnboundDatabase.instance);
   });
 
   it('hydrates collections into MongoCollection IR-class instances', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
 
-    const items = contract.storage.collections['items'];
+    const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.collections['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
   });
@@ -57,39 +89,55 @@ describe('MongoTargetContractSerializer', () => {
     expect(() => serializer.deserializeContract(bad)).toThrow();
   });
 
-  it('serializeContract strips runtime-only storage.namespaces from the on-disk envelope', () => {
+  it('serializeContract emits canonical nested namespaces on disk', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     const json = serializer.serializeContract(contract) as {
       storage: Record<string, unknown>;
     };
-    expect(json.storage).not.toHaveProperty('namespaces');
-    expect(json.storage).toHaveProperty('collections');
+    expect(json.storage).toHaveProperty('namespaces');
+    expect(json.storage).not.toHaveProperty('collections');
+    const namespaces = json.storage['namespaces'] as Record<
+      string,
+      { collections: Record<string, unknown> }
+    >;
+    expect(namespaces[UNBOUND_NAMESPACE_ID]?.collections['items']).toMatchObject({
+      kind: 'mongo-collection',
+    });
   });
 
   describe('JSON round-trip fidelity', () => {
     function makeFullyPopulatedJson() {
       return {
-        targetFamily: 'mongo',
+        targetFamily: 'mongo' as const,
+        target: 'mongo',
+        profileHash: 'sha256:test',
         roots: { items: 'Item' },
         storage: {
-          collections: {
-            items: {
-              indexes: [
-                {
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                  collation: { locale: 'en', strength: 2 },
+          storageHash: 'sha256:test',
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              kind: 'mongo-database',
+              collections: {
+                items: {
+                  indexes: [
+                    {
+                      keys: [{ field: 'email', direction: 1 as const }],
+                      unique: true,
+                      collation: { locale: 'en', strength: 2 },
+                    },
+                  ],
+                  validator: {
+                    jsonSchema: { type: 'object' },
+                    validationLevel: 'strict' as const,
+                    validationAction: 'error' as const,
+                  },
+                  options: {
+                    collation: { locale: 'en', strength: 2 },
+                    changeStreamPreAndPostImages: { enabled: true },
+                  },
                 },
-              ],
-              validator: {
-                jsonSchema: { type: 'object' },
-                validationLevel: 'strict' as const,
-                validationAction: 'error' as const,
-              },
-              options: {
-                collation: { locale: 'en', strength: 2 },
-                changeStreamPreAndPostImages: { enabled: true },
               },
             },
           },
@@ -109,7 +157,7 @@ describe('MongoTargetContractSerializer', () => {
       const serializer = new MongoTargetContractSerializer();
       const contract = serializer.deserializeContract(makeFullyPopulatedJson());
 
-      const items = contract.storage.collections['items'];
+      const items = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.collections['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
       expect(items?.validator).toBeInstanceOf(MongoValidator);
@@ -124,18 +172,17 @@ describe('MongoTargetContractSerializer', () => {
       const out = serializer.serializeContract(contract);
 
       const reparsed = JSON.parse(JSON.stringify(out));
-      const collections = reparsed.storage.collections;
-      // IR-class kind discriminators are now present in the serialised
-      // JSON envelope; that's the on-disk shape going forward.
-      expect(collections.items.kind).toBe('mongo-collection');
-      expect(collections.items.indexes[0].kind).toBe('mongo-index');
-      expect(collections.items.validator.kind).toBe('mongo-validator');
-      expect(collections.items.options.kind).toBe('mongo-collection-options');
-      expect(collections.items.options.collation.kind).toBe('mongo-collation-options');
+      const items = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].collections.items;
+      expect(items.kind).toBe('mongo-collection');
+      expect(items.indexes[0].kind).toBe('mongo-index');
+      expect(items.validator.kind).toBe('mongo-validator');
+      expect(items.options.kind).toBe('mongo-collection-options');
+      expect(items.options.collation.kind).toBe('mongo-collation-options');
 
-      // Re-deserialising the emitted JSON yields the same class identity.
       const roundtripped = serializer.deserializeContract(reparsed);
-      expect(roundtripped.storage.collections['items']).toBeInstanceOf(MongoCollection);
+      expect(
+        roundtripped.storage.namespaces[UNBOUND_NAMESPACE_ID]?.collections['items'],
+      ).toBeInstanceOf(MongoCollection);
     });
   });
 });

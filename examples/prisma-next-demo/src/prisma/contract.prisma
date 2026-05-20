@@ -30,10 +30,10 @@ model User {
 }
 
 model Post {
-  id        String        @id @default(uuid())
+  id        String         @id @default(uuid())
   title     String
   userId    String
-  createdAt DateTime      @default(now())
+  createdAt DateTime       @default(now())
   embedding Embedding1536?
 
   user User @relation(fields: [userId], references: [id])
@@ -57,16 +57,15 @@ model Task {
 }
 
 model Bug {
-  severity    String
+  severity     String
   stepsToRepro String?
   @@base(Task, "bug")
   @@map("bug")
 }
 
 model Feature {
-  priority    String
+  priority      String
   targetRelease String?
   @@base(Task, "feature")
   @@map("feature")
 }
-

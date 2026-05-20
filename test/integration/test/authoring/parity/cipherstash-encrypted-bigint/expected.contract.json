@@ -44,37 +44,37 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__",
+        "tables": {
+          "user": {
+            "columns": {
+              "accountId": {
+                "codecId": "cipherstash/bigint@1",
+                "nativeType": "eql_v2_encrypted",
+                "nullable": false,
+                "typeParams": {
+                  "equality": true,
+                  "orderAndRange": true
+                }
+              },
+              "id": {
+                "codecId": "pg/int4@1",
+                "nativeType": "int4",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": ["id"]
+            },
+            "uniques": []
+          }
+        }
       }
     },
-    "storageHash": "sha256:18927c3f48d0a68aaea1256490d174dbe3d3d2e8c84e77528bfb60f9288dd9f9",
-    "tables": {
-      "user": {
-        "columns": {
-          "accountId": {
-            "codecId": "cipherstash/bigint@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
-            }
-          },
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": ["id"]
-        },
-        "uniques": []
-      }
-    }
+    "storageHash": "sha256:73209f1b4c69e0b60c2a2764d14577580e306833a75d8799f1293337efebdbfd"
   },
   "capabilities": {
     "postgres": {

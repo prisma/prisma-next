@@ -1,6 +1,14 @@
+import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import { SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
+import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import {
+  type SqlNamespaceTablesInput,
+  SqlStorage,
+  type SqlStorageTypeEntry,
+  StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
 
@@ -37,51 +45,20 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>,
   ) {}
 
-  deserializeContract(json: unknown): TContract {
+  deserializeContract<T extends TContract = TContract>(json: unknown): T {
     const validated = this.parseSqlContractStructure(json);
     const hydrated = this.hydrateSqlStorage(validated);
-    return this.constructTargetContract(hydrated);
+    return this.constructTargetContract(hydrated) as T;
   }
 
   serializeContract(contract: TContract): JsonObject {
-    // Targets that ship enumerable runtime-only fields must override
-    // this method (mirroring `MongoTargetContractSerializer.serializeContract`)
-    // to construct the persisted envelope explicitly; the default identity
-    // works only when every enumerable own property belongs in the JSON.
     return contract as unknown as JsonObject;
   }
 
-  /**
-   * Family-shared validation pipeline (delegates to
-   * `validateSqlContractFully` in `@prisma-next/sql-contract/validators`):
-   * structural arktype + framework-shared domain + SQL storage
-   * logical-consistency + SQL storage semantic + model ↔ storage
-   * reference checks. Subclasses override to add target-specific
-   * structural checks before hydration; the family default suffices
-   * for targets whose contract shape is the SQL-shared shape
-   * (Postgres, SQLite today).
-   */
   protected parseSqlContractStructure(json: unknown): Contract<SqlStorage> {
     return validateSqlContractFully<Contract<SqlStorage>>(json);
   }
 
-  /**
-   * Family-shared hydration walker. Lifts the validated flat-data
-   * `storage` subtree into the SQL Contract IR class hierarchy by
-   * constructing a single `SqlStorage` instance — its constructor
-   * cascades nested instantiation of `StorageTable`, `StorageColumn`,
-   * `PrimaryKey`, `UniqueConstraint`, `Index`, `ForeignKey`,
-   * `ForeignKeyReferences`, and `StorageTypeInstance`. The rest of the
-   * contract envelope (target identity, hashes, capabilities, models,
-   * meta, …) is JSON-clean primitive data and passes through unchanged.
-   *
-   * Polymorphic `storage.types` entries are normalised before the
-   * `SqlStorage` constructor runs: when an entry carries an enumerable
-   * string `kind`, the serializer looks up a pack-registered hydration
-   * factory for that discriminator and delegates reconstruction. Entries
-   * with no registered factory pass through unchanged (codec-typed JSON
-   * stays codec-typed until `SqlStorage` normalises it).
-   */
   protected hydrateSqlStorage(validated: Contract<SqlStorage>): Contract<SqlStorage> {
     const types = validated.storage.types;
     const hydratedTypes =
@@ -94,21 +71,61 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
           )
         : undefined;
 
+    const rawNamespaces = validated.storage.namespaces;
+    const hydratedNamespaces =
+      rawNamespaces !== undefined ? this.hydrateSqlNamespaceMap(rawNamespaces) : undefined;
+
     return {
       ...validated,
       storage: new SqlStorage({
-        ...validated.storage,
+        storageHash: validated.storage.storageHash,
         ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
+        ...(hydratedNamespaces !== undefined ? { namespaces: hydratedNamespaces } : {}),
       }),
     };
   }
 
-  /**
-   * Per-entry hydration dispatcher for `storage.types`. When `kind` is a
-   * string and the constructor registry supplies a factory for that key,
-   * the factory returns the hydrated `SqlStorageTypeEntry`. Otherwise the
-   * entry passes through unchanged for `SqlStorage` to normalise.
-   */
+  protected hydrateSqlNamespaceMap(
+    namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
+  ): Readonly<Record<string, Namespace | SqlNamespaceTablesInput>> {
+    return Object.fromEntries(
+      Object.entries(namespaces).map(([nsId, raw]) => [
+        nsId,
+        this.hydrateSqlNamespaceEntry(nsId, raw),
+      ]),
+    );
+  }
+
+  protected hydrateSqlNamespaceEntry(
+    nsId: string,
+    raw: Namespace | Record<string, unknown>,
+  ): Namespace | SqlNamespaceTablesInput {
+    if (raw instanceof NamespaceBase) {
+      return raw;
+    }
+    const obj = raw as {
+      id?: string;
+      tables?: Record<string, unknown>;
+      types?: Record<string, unknown>;
+    };
+    if (obj.types !== undefined && Object.keys(obj.types).length > 0) {
+      throw new ContractValidationError(
+        'Per-schema database types (e.g. postgres-enum) under storage.namespaces[..].types require PostgresContractSerializer.',
+        'structural',
+      );
+    }
+    const tables = Object.fromEntries(
+      Object.entries(obj.tables ?? {}).map(([tableName, table]) => [
+        tableName,
+        table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+      ]),
+    );
+    return {
+      id: obj.id ?? nsId,
+      tables,
+    };
+  }
+
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {
     if (typeof entry !== 'object' || entry === null) {
       return entry;
@@ -124,12 +141,6 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     return factory(entry);
   }
 
-  /**
-   * Target-specific construction hook. Defaults to identity; targets
-   * that need to wrap the hydrated contract (e.g. attach target-only
-   * derived fields, narrow the contract type to a target-specific
-   * subtype) override.
-   */
   protected constructTargetContract(hydrated: Contract<SqlStorage>): TContract {
     return hydrated as TContract;
   }

@@ -141,106 +141,107 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
+        "tables": {
+          "cafe": {
+            "columns": {
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "location": {
+                "codecId": "pg/geometry@1",
+                "nativeType": "geometry",
+                "nullable": false,
+                "typeRef": "WgsGeometry"
+              },
+              "name": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
+          },
+          "neighborhood": {
+            "columns": {
+              "boundary": {
+                "codecId": "pg/geometry@1",
+                "nativeType": "geometry",
+                "nullable": false,
+                "typeRef": "WgsGeometry"
+              },
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "name": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
+          },
+          "route": {
+            "columns": {
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "name": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "path": {
+                "codecId": "pg/geometry@1",
+                "nativeType": "geometry",
+                "nullable": false,
+                "typeRef": "WgsGeometry"
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
+          }
+        }
       }
     },
-    "storageHash": "sha256:6a2f3764720ac636d1d9bb48f2fbb00d6429d26498a168deb58ca6c9b1cb1d11",
-    "tables": {
-      "cafe": {
-        "columns": {
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 36
-            }
-          },
-          "location": {
-            "codecId": "pg/geometry@1",
-            "nativeType": "geometry",
-            "nullable": false,
-            "typeRef": "WgsGeometry"
-          },
-          "name": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
-      },
-      "neighborhood": {
-        "columns": {
-          "boundary": {
-            "codecId": "pg/geometry@1",
-            "nativeType": "geometry",
-            "nullable": false,
-            "typeRef": "WgsGeometry"
-          },
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 36
-            }
-          },
-          "name": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
-      },
-      "route": {
-        "columns": {
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 36
-            }
-          },
-          "name": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "path": {
-            "codecId": "pg/geometry@1",
-            "nativeType": "geometry",
-            "nullable": false,
-            "typeRef": "WgsGeometry"
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
-      }
-    },
+    "storageHash": "sha256:05692bcae4c7e37855a66f6bbd809676cfa57fc42fa985e465846615cc3c715f",
     "types": {
       "WgsGeometry": {
         "codecId": "pg/geometry@1",

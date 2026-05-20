@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Asterisk, TableAsterisk } from './column-reference';
-import type { Selection, TableToSelection } from './selection';
+import type { Selection, TableToSelection, UnboundTables } from './selection';
 import type { ExactlyOneProperty, IsNever, MergeObjects, Simplify } from './type-atoms';
 import type { PreviousFunctionReceivedBadInputError } from './type-errors';
 
@@ -14,7 +14,7 @@ import type { PreviousFunctionReceivedBadInputError } from './type-errors';
  */
 export class SelectBuilder<
   TContract extends Contract<SqlStorage>,
-  TTables extends Contract<SqlStorage>['storage']['tables'],
+  TTables extends UnboundTables<Contract<SqlStorage>>,
   TSelection extends Selection = never,
 > {
   // @ts-expect-error

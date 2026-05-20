@@ -3,6 +3,7 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
+import { unboundTables } from './unbound-tables';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -104,7 +105,7 @@ describe('value objects in contract definition builder', () => {
       codecLookup,
     );
 
-    expect(contract.storage.tables['invoice']?.columns['total']?.default).toEqual({
+    expect(unboundTables(contract.storage)['invoice']?.columns['total']?.default).toEqual({
       kind: 'literal',
       value: {
         amount: '12',
@@ -264,14 +265,8 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const storage = contract.storage as unknown as {
-      readonly tables: Record<
-        string,
-        { readonly columns: Record<string, { nativeType: string; codecId: string }> }
-      >;
-    };
-
-    expect(storage.tables['user']?.columns['home_address']).toMatchObject({
+    const tables = unboundTables(contract.storage);
+    expect(tables['user']?.columns['home_address']).toMatchObject({
       nativeType: 'jsonb',
       codecId: 'pg/jsonb@1',
       nullable: true,

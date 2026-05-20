@@ -1,4 +1,5 @@
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
@@ -7,6 +8,20 @@ import { createMockSpi } from './mock-spi';
 import { createTestContract, emit } from './utils';
 
 const mockSqlHook = createMockSpi();
+
+const emptySqlStorage = {
+  namespaces: {
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} },
+  },
+};
+
+function unboundNamespaceTables(tables: Record<string, unknown>) {
+  return {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
+  };
+}
 
 describe('emitter', () => {
   it('derives colocated artifact paths from contract.json output', () => {
@@ -59,20 +74,18 @@ describe('emitter', () => {
             relations: {},
           },
         },
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+        storage: unboundNamespaceTables({
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
         extensionPacks: {
           postgres: {
             version: '0.0.1',
@@ -95,7 +108,11 @@ describe('emitter', () => {
 
       const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
       const storage = contractJson['storage'] as Record<string, unknown>;
-      const tables = storage['tables'] as Record<string, unknown>;
+      const namespaces = storage['namespaces'] as Record<string, unknown>;
+      expect(namespaces).toBeDefined();
+      const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+      expect(unbound).toBeDefined();
+      const tables = unbound['tables'] as Record<string, unknown>;
       expect(tables).toBeDefined();
     },
     timeouts.typeScriptCompilation,
@@ -103,18 +120,16 @@ describe('emitter', () => {
 
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     });
 
     const options: EmitStackInput = {
@@ -129,19 +144,17 @@ describe('emitter', () => {
 
   it('tolerates codec namespaces not registered in extensionIds', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          data: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: unboundNamespaceTables({
+        data: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     });
 
     const options: EmitStackInput = {
@@ -156,18 +169,16 @@ describe('emitter', () => {
 
   it('handles missing extensionPacks field', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     });
 
     const options: EmitStackInput = {
@@ -182,18 +193,16 @@ describe('emitter', () => {
 
   it('handles empty packs array', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
     });
 
     const options: EmitStackInput = {
@@ -249,24 +258,22 @@ describe('emitter', () => {
 
   it('accepts canonical section keys when family validation allows them', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                codecId: 'pg/int4@1',
-                nativeType: 'int4',
-                nullable: false,
-                sourceId: 'schema.prisma',
-              },
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: {
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+              sourceId: 'schema.prisma',
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      } as unknown as Record<string, unknown>,
+      }),
     });
 
     const options: EmitStackInput = {
@@ -282,9 +289,7 @@ describe('emitter', () => {
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {},
-      },
+      storage: emptySqlStorage,
     });
 
     const mockHookNoTypeValidation = createMockSpi();
@@ -301,7 +306,7 @@ describe('emitter', () => {
 
   it('defaults codecTypeImports to empty array when omitted', async () => {
     const ir = createTestContract({
-      storage: { tables: {} },
+      storage: emptySqlStorage,
     });
 
     const options: EmitStackInput = {
@@ -314,7 +319,7 @@ describe('emitter', () => {
 
   it('passes parameterizedTypeImports and queryOperationTypeImports to generateContractDts', async () => {
     const ir = createTestContract({
-      storage: { tables: {} },
+      storage: emptySqlStorage,
     });
 
     const queryOperationTypeImports: TypesImportSpec[] = [
@@ -398,7 +403,7 @@ describe('emitter', () => {
     // unreachable from the emit path. This test pins the upstream
     // short-circuit: the SPI delegate must stay unobserved when the
     // contract has nothing to walk.
-    const ir = createTestContract({ storage: { tables: {} } });
+    const ir = createTestContract({ storage: emptySqlStorage });
 
     let resolverInvocations = 0;
     const hookWithResolver = createMockSpi({
@@ -449,7 +454,7 @@ describe('emitter', () => {
 
   it('emits execution clause when contract has execution section', async () => {
     const ir = createTestContract({
-      storage: { tables: {} },
+      storage: emptySqlStorage,
       execution: {
         executionHash: 'sha256:abc123',
         operations: {},

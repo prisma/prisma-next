@@ -14,8 +14,10 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
+  SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -998,6 +1000,7 @@ export class ContractModelBuilder<
   constructor(
     readonly stageOne: {
       readonly modelName?: ModelName;
+      readonly namespace?: string;
       readonly fields: Fields;
       readonly relations: Relations;
     },
@@ -1215,6 +1218,51 @@ export type ContractInput<
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly capabilities?: Capabilities;
+  /**
+   * Declared namespace coordinates the contract recognises. Per-model
+   * `namespace` references must reference an entry in this list (or the
+   * Postgres-specific late-binding keyword `unbound`). Reserved values:
+   *
+   * - `__unbound__` — IR sentinel for the late-binding slot.
+   * - `__unspecified__` — parser-synthesised AST bucket for top-level
+   *   declarations (not a real namespace).
+   * - `unbound` — Postgres-specific reserved keyword (the PSL surface
+   *   uses `namespace unbound { … }` to opt into late binding).
+   *
+   * SQLite contracts must declare an empty list (or omit the field) —
+   * SQLite has no schema concept and emits unqualified DDL.
+   *
+   * Populates `SqlStorage.namespaces` together with the
+   * {@link ContractInput.createNamespace} factory: each declared name
+   * (plus the framework-reserved `UNBOUND_NAMESPACE_ID` sentinel) is
+   * resolved through `createNamespace` and stored as the matching slot
+   * value. Models reference declared namespaces via their per-model
+   * `namespace` coordinate; entries that go unreferenced still occupy a
+   * slot so contracts that pre-declare schemas surface them on the live
+   * storage walk.
+   */
+  readonly namespaces?: readonly string[];
+  /**
+   * Target-supplied factory that materialises a `Namespace` concretion
+   * for a declared namespace coordinate. The SQL family layer is
+   * target-agnostic and cannot import concretions like
+   * `PostgresSchema` or `SqliteUnboundDatabase`; the factory is the
+   * seam by which target packs hand the family the right runtime
+   * representation.
+   *
+   * Called once per distinct namespace id discovered in the contract:
+   * each entry of {@link ContractInput.namespaces}, every
+   * `StorageTable.namespaceId` referenced by a model, and the
+   * framework `UNBOUND_NAMESPACE_ID` sentinel (always present so the
+   * late-bound slot stays available regardless of authoring choices).
+   *
+   * When omitted, the family layer falls back to its placeholder
+   * `SqlUnboundNamespace` singleton for the unbound slot and rejects
+   * any non-unbound coordinate — single-namespace contracts authored
+   * before targets ship their factory stay byte-stable; multi-namespace
+   * contracts must pass the factory through.
+   */
+  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
@@ -1229,6 +1277,7 @@ export function model<
   input: {
     readonly fields: Fields;
     readonly relations?: Relations;
+    readonly namespace?: string;
   },
 ): ContractModelBuilder<ModelName, Fields, Relations>;
 
@@ -1238,6 +1287,7 @@ export function model<
 >(input: {
   readonly fields: Fields;
   readonly relations?: Relations;
+  readonly namespace?: string;
 }): ContractModelBuilder<undefined, Fields, Relations>;
 
 export function model<
@@ -1250,10 +1300,12 @@ export function model<
     | {
         readonly fields: Fields;
         readonly relations?: Relations;
+        readonly namespace?: string;
       },
   maybeInput?: {
     readonly fields: Fields;
     readonly relations?: Relations;
+    readonly namespace?: string;
   },
 ): ContractModelBuilder<ModelName | undefined, Fields, Relations> {
   const input = typeof modelNameOrInput === 'string' ? maybeInput : modelNameOrInput;
@@ -1264,6 +1316,7 @@ export function model<
 
   return new ContractModelBuilder({
     ...(typeof modelNameOrInput === 'string' ? { modelName: modelNameOrInput } : {}),
+    ...(input.namespace !== undefined ? { namespace: input.namespace } : {}),
     fields: input.fields,
     relations: (input.relations ?? {}) as Relations,
   });

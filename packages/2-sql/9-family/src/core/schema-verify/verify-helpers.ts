@@ -7,6 +7,7 @@ import type {
   SchemaIssue,
   SchemaVerificationNode,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   ForeignKey,
   Index,
@@ -133,12 +134,14 @@ export function verifyPrimaryKey(
   contractPK: PrimaryKey,
   schemaPK: PrimaryKey | undefined,
   tableName: string,
+  namespaceId: string,
   issues: SchemaIssue[],
 ): 'pass' | 'fail' {
   if (!schemaPK) {
     issues.push({
       kind: 'primary_key_mismatch',
       table: tableName,
+      namespaceId,
       expected: contractPK.columns.join(', '),
       message: `Table "${tableName}" is missing primary key`,
     });
@@ -149,6 +152,7 @@ export function verifyPrimaryKey(
     issues.push({
       kind: 'primary_key_mismatch',
       table: tableName,
+      namespaceId,
       expected: contractPK.columns.join(', '),
       actual: schemaPK.columns.join(', '),
       message: `Table "${tableName}" has primary key mismatch: expected columns [${contractPK.columns.join(', ')}], got [${schemaPK.columns.join(', ')}]`,
@@ -173,6 +177,7 @@ export function verifyForeignKeys(
   contractFKs: readonly ForeignKey[],
   schemaFKs: readonly SqlForeignKeyIR[],
   tableName: string,
+  namespaceId: string,
   tablePath: string,
   issues: SchemaIssue[],
   strict: boolean,
@@ -181,12 +186,23 @@ export function verifyForeignKeys(
 
   // Check each contract FK exists in schema
   for (const contractFK of contractFKs) {
-    const fkPath = `${tablePath}.foreignKeys[${contractFK.columns.join(',')}]`;
+    const fkPath = `${tablePath}.foreignKeys[${contractFK.source.columns.join(',')}]`;
     const matchingFK = schemaFKs.find((fk) => {
+      // When the schema FK carries referencedSchema (populated by the Postgres
+      // adapter for cross-schema FKs), compare the full (namespace, table) pair
+      // against the contract FK's target coordinate. When referencedSchema is
+      // absent (same-schema FKs, older introspection, or hand-crafted test
+      // fixtures), fall back to table-name-only comparison so same-namespace
+      // contracts continue to verify correctly.
+      const tablesMatch =
+        fk.referencedSchema !== undefined && contractFK.target.namespaceId !== UNBOUND_NAMESPACE_ID
+          ? fk.referencedSchema === contractFK.target.namespaceId &&
+            fk.referencedTable === contractFK.target.tableName
+          : fk.referencedTable === contractFK.target.tableName;
       return (
-        arraysEqual(fk.columns, contractFK.columns) &&
-        fk.referencedTable === contractFK.references.table &&
-        arraysEqual(fk.referencedColumns, contractFK.references.columns)
+        arraysEqual(fk.columns, contractFK.source.columns) &&
+        tablesMatch &&
+        arraysEqual(fk.referencedColumns, contractFK.target.columns)
       );
     });
 
@@ -194,13 +210,14 @@ export function verifyForeignKeys(
       issues.push({
         kind: 'foreign_key_mismatch',
         table: tableName,
-        expected: `${contractFK.columns.join(', ')} -> ${contractFK.references.table}(${contractFK.references.columns.join(', ')})`,
-        message: `Table "${tableName}" is missing foreign key: ${contractFK.columns.join(', ')} -> ${contractFK.references.table}(${contractFK.references.columns.join(', ')})`,
+        namespaceId,
+        expected: `${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
+        message: `Table "${tableName}" is missing foreign key: ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
       });
       nodes.push({
         status: 'fail',
         kind: 'foreignKey',
-        name: `foreignKey(${contractFK.columns.join(', ')})`,
+        name: `foreignKey(${contractFK.source.columns.join(', ')})`,
         contractPath: fkPath,
         code: 'foreign_key_mismatch',
         message: 'Foreign key missing',
@@ -217,17 +234,18 @@ export function verifyForeignKeys(
         issues.push({
           kind: 'foreign_key_mismatch',
           table: tableName,
+          namespaceId,
           // Set indexOrConstraint so the planner classifies this as a non-additive
           // conflict (existing FK with wrong actions cannot be fixed additively).
-          indexOrConstraint: matchingFK.name ?? `fk(${contractFK.columns.join(',')})`,
+          indexOrConstraint: matchingFK.name ?? `fk(${contractFK.source.columns.join(',')})`,
           expected: combinedExpected,
           actual: combinedActual,
-          message: `Table "${tableName}" foreign key ${contractFK.columns.join(', ')} -> ${contractFK.references.table}: ${combinedMessage}`,
+          message: `Table "${tableName}" foreign key ${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}: ${combinedMessage}`,
         });
         nodes.push({
           status: 'fail',
           kind: 'foreignKey',
-          name: `foreignKey(${contractFK.columns.join(', ')})`,
+          name: `foreignKey(${contractFK.source.columns.join(', ')})`,
           contractPath: fkPath,
           code: 'foreign_key_mismatch',
           message: combinedMessage,
@@ -239,7 +257,7 @@ export function verifyForeignKeys(
         nodes.push({
           status: 'pass',
           kind: 'foreignKey',
-          name: `foreignKey(${contractFK.columns.join(', ')})`,
+          name: `foreignKey(${contractFK.source.columns.join(', ')})`,
           contractPath: fkPath,
           code: '',
           message: '',
@@ -255,10 +273,15 @@ export function verifyForeignKeys(
   if (strict) {
     for (const schemaFK of schemaFKs) {
       const matchingFK = contractFKs.find((fk) => {
+        const tablesMatch =
+          schemaFK.referencedSchema !== undefined && fk.target.namespaceId !== UNBOUND_NAMESPACE_ID
+            ? schemaFK.referencedSchema === fk.target.namespaceId &&
+              schemaFK.referencedTable === fk.target.tableName
+            : schemaFK.referencedTable === fk.target.tableName;
         return (
-          arraysEqual(fk.columns, schemaFK.columns) &&
-          fk.references.table === schemaFK.referencedTable &&
-          arraysEqual(fk.references.columns, schemaFK.referencedColumns)
+          arraysEqual(fk.source.columns, schemaFK.columns) &&
+          tablesMatch &&
+          arraysEqual(fk.target.columns, schemaFK.referencedColumns)
         );
       });
 
@@ -266,6 +289,7 @@ export function verifyForeignKeys(
         issues.push({
           kind: 'extra_foreign_key',
           table: tableName,
+          namespaceId,
           indexOrConstraint: schemaFK.name ?? `fk(${schemaFK.columns.join(',')})`,
           message: `Extra foreign key found in database (not in contract): ${schemaFK.columns.join(', ')} -> ${schemaFK.referencedTable}(${schemaFK.referencedColumns.join(', ')})`,
         });
@@ -303,6 +327,7 @@ export function verifyUniqueConstraints(
   schemaUniques: readonly SqlUniqueIR[],
   schemaIndexes: readonly SqlIndexIR[],
   tableName: string,
+  namespaceId: string,
   tablePath: string,
   issues: SchemaIssue[],
   strict: boolean,
@@ -327,6 +352,7 @@ export function verifyUniqueConstraints(
       issues.push({
         kind: 'unique_constraint_mismatch',
         table: tableName,
+        namespaceId,
         expected: contractUnique.columns.join(', '),
         message: `Table "${tableName}" is missing unique constraint: ${contractUnique.columns.join(', ')}`,
       });
@@ -369,6 +395,7 @@ export function verifyUniqueConstraints(
         issues.push({
           kind: 'extra_unique_constraint',
           table: tableName,
+          namespaceId,
           indexOrConstraint: schemaUnique.name ?? `unique(${schemaUnique.columns.join(',')})`,
           message: `Extra unique constraint found in database (not in contract): ${schemaUnique.columns.join(', ')}`,
         });
@@ -406,6 +433,7 @@ export function verifyIndexes(
   schemaIndexes: readonly SqlIndexIR[],
   schemaUniques: readonly SqlUniqueIR[],
   tableName: string,
+  namespaceId: string,
   tablePath: string,
   issues: SchemaIssue[],
   strict: boolean,
@@ -436,6 +464,7 @@ export function verifyIndexes(
       issues.push({
         kind: 'index_mismatch',
         table: tableName,
+        namespaceId,
         expected: contractIndex.columns.join(', '),
         message: `Table "${tableName}" is missing index: ${contractIndex.columns.join(', ')}`,
       });
@@ -484,6 +513,7 @@ export function verifyIndexes(
         issues.push({
           kind: 'extra_index',
           table: tableName,
+          namespaceId,
           indexOrConstraint: schemaIndex.name ?? `idx(${schemaIndex.columns.join(',')})`,
           message: `Extra index found in database (not in contract): ${schemaIndex.columns.join(', ')}`,
         });

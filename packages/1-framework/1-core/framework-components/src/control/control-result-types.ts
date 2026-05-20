@@ -38,6 +38,7 @@ export interface VerifyDatabaseResult {
 
 export interface BaseSchemaIssue {
   readonly kind:
+    | 'missing_schema'
     | 'missing_table'
     | 'missing_column'
     | 'extra_table'
@@ -59,6 +60,21 @@ export interface BaseSchemaIssue {
     | 'default_mismatch'
     | 'extra_default';
   readonly table?: string;
+  /**
+   * Namespace coordinate of the issue's subject (e.g. the schema a SQL
+   * table lives in). Populated by family verifiers that have the
+   * coordinate in scope when constructing the issue; absent for issues
+   * whose family has no namespace concept (e.g. Mongo collections) or
+   * whose subject isn't in any contract namespace (e.g. an extra-table
+   * issue raised for a table that exists in the live DB but not in the
+   * contract).
+   *
+   * Downstream planners trust this field as the authoritative subject
+   * coordinate and do not re-derive it by name lookup. A finer-grained
+   * structural split between framework-shared and family-specific issue
+   * fields is tracked under a follow-up ticket.
+   */
+  readonly namespaceId?: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;
   readonly typeName?: string;

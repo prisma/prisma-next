@@ -22,7 +22,7 @@ describe('demo contract visualization DX', () => {
     expect(contract.models).toBeDefined();
     expect(typeof contract.models).toBe('object');
     expect(contract.storage).toBeDefined();
-    expect(contract.storage.tables).toBeDefined();
+    expect(contract.storage.namespaces).toBeDefined();
     expect(contract.capabilities).toBeDefined();
     expect(typeof contract.capabilities).toBe('object');
     expect(contract.extensionPacks).toBeDefined();
@@ -61,8 +61,10 @@ describe('demo contract visualization DX', () => {
       expect(typeof m['relations']).toBe('object');
     }
 
-    for (const [, table] of Object.entries(contract.storage.tables)) {
-      expect(table.columns).toBeDefined();
+    for (const [, ns] of Object.entries(contract.storage.namespaces)) {
+      for (const [, table] of Object.entries(ns.tables)) {
+        expect(table.columns).toBeDefined();
+      }
     }
   });
 });

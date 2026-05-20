@@ -6,6 +6,7 @@ import type {
   ColumnReferenceOutOfContractError,
   TableAsterisk,
 } from './column-reference';
+import type { UnboundTables } from './selection';
 import type { TableReference, TableReferenceOutOfContractError } from './table-reference';
 
 /**
@@ -14,12 +15,12 @@ import type { TableReference, TableReferenceOutOfContractError } from './table-r
  * @template TContract The contract that describes the database.
  */
 export type Ref<TContract extends Contract<SqlStorage>> = {
-  readonly [TableName in keyof TContract['storage']['tables'] & string]: TableReference<
+  readonly [TableName in keyof UnboundTables<TContract> & string]: TableReference<
     TableName,
     TContract['storage']['storageHash']
   > & {
     readonly [ColumnName in Exclude<
-      keyof TContract['storage']['tables'][TableName]['columns'],
+      keyof UnboundTables<TContract>[TableName]['columns'],
       keyof TableReference
     > &
       string]: ColumnReference<ColumnName, TableName, TContract['storage']['storageHash']>;

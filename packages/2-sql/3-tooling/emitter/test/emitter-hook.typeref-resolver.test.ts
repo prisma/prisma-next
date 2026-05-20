@@ -3,12 +3,13 @@ import { generateContractDts } from '@prisma-next/emitter';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
-// Integration test for the typeRef-resolver path: exercise the real SQL emitter walk end-to-end. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → storage.tables[t].columns[c] → storage.types[ref].typeParams` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook.
+// Integration test for the typeRef-resolver path: exercise the real SQL emitter walk end-to-end. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → namespace tables → columns → storage.types[ref] or namespace.types[ref]` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook.
 
 function createContract(overrides: Partial<Contract>): Contract {
-  return {
-    targetFamily: 'sql',
+  const merged = {
+    targetFamily: 'sql' as const,
     target: 'test-db',
     models: {},
     roots: {},
@@ -16,9 +17,11 @@ function createContract(overrides: Partial<Contract>): Contract {
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:test',
+    profileHash: 'sha256:test' as const,
     ...overrides,
   };
+  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
+  return merged as Contract;
 }
 
 const testHashes = { storageHash: 'sha256:test', profileHash: 'sha256:test' };
@@ -42,7 +45,7 @@ function vectorCodecLookup(): CodecLookup {
 
 describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDts)', () => {
   it('renders typeRef-shaped parameterized columns via the codec descriptor', () => {
-    // Two columns share a named storage.types entry. The SQL emitter's resolveFieldTypeParams walk finds `Embedding1536`'s typeParams via `storage.fields[embedding].column → storage.tables.post.columns .embedding.typeRef → storage.types.Embedding1536.typeParams`, then the framework emit path renders the codec's output expression.
+    // Two columns share a named storage.types entry. The SQL emitter's resolveFieldTypeParams walk finds `Embedding1536`'s typeParams via `storage.fields[embedding].column → namespace tables → post.columns.embedding.typeRef → storage.types.Embedding1536.typeParams`, then the framework emit path renders the codec's output expression.
     const contract = createContract({
       models: {
         Post: {

@@ -213,35 +213,41 @@
     }
   },
   "storage": {
-    "collections": {
-      "tasks": {
-        "kind": "mongo-collection"
-      },
-      "users": {
-        "indexes": [
-          {
-            "keys": [
+    "namespaces": {
+      "__unbound__": {
+        "collections": {
+          "tasks": {
+            "kind": "mongo-collection"
+          },
+          "users": {
+            "indexes": [
               {
-                "direction": 1,
-                "field": "email"
+                "keys": [
+                  {
+                    "direction": 1,
+                    "field": "email"
+                  }
+                ],
+                "kind": "mongo-index",
+                "unique": true
               }
             ],
-            "kind": "mongo-index",
-            "unique": true
+            "kind": "mongo-collection",
+            "options": {
+              "collation": {
+                "kind": "mongo-collation-options",
+                "locale": "en",
+                "strength": 2
+              },
+              "kind": "mongo-collection-options"
+            }
           }
-        ],
-        "kind": "mongo-collection",
-        "options": {
-          "collation": {
-            "kind": "mongo-collation-options",
-            "locale": "en",
-            "strength": 2
-          },
-          "kind": "mongo-collection-options"
-        }
+        },
+        "id": "__unbound__",
+        "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:b09d2fcb1959b566aaa597d86d84e834db396431d5134a983ff3a600908c6786"
+    "storageHash": "sha256:4308e5a7e618a3f83baa45a5ac81c13f611b667e2963f11d5aa444ce9d3c7175"
   },
   "capabilities": {},
   "extensionPacks": {},

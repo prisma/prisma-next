@@ -1,6 +1,6 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { TEST_BOX_TABLE } from './constants';
 
@@ -8,19 +8,21 @@ const TARGET = 'postgres' as const;
 const TARGET_FAMILY = 'sql' as const;
 
 const storageBody = {
-  tables: {
-    [TEST_BOX_TABLE]: {
-      columns: {
-        x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-        y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-      },
-      uniques: [],
-      indexes: [],
-      foreignKeys: [],
-    },
-  },
   namespaces: {
-    [UNSPECIFIED_NAMESPACE_ID]: { id: UNSPECIFIED_NAMESPACE_ID },
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables: {
+        [TEST_BOX_TABLE]: {
+          columns: {
+            x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
   },
 };
 

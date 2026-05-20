@@ -26,14 +26,17 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlStorage,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '../postgres-enum-type';
+import { isPostgresSchema } from '../postgres-schema';
 import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
@@ -68,6 +71,74 @@ import {
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
 
 const REBUILD_SUFFIX = '__prisma_next_new';
+
+/**
+ * Look up a storage table by its explicit namespace coordinate. Returns
+ * `undefined` when the namespace has no table by that name (or no such
+ * namespace exists). Callers that get `undefined` MUST treat it as an
+ * explicit conflict — never silently fall back to a global default
+ * schema or a name-only walk, because that footgun would resolve a
+ * stale or duplicate table name to whichever namespace the iteration
+ * order surfaced first (a real data-loss hazard in multi-namespace
+ * contracts where two namespaces can carry the same table name).
+ */
+export function tableAt(
+  storage: SqlStorage,
+  namespaceId: string,
+  tableName: string,
+): StorageTable | undefined {
+  // Namespace.tables is typed as Record<string, IRNode> at the interface level;
+  // SQL family namespaces always hold StorageTable instances.
+  return storage.namespaces[namespaceId]?.tables[tableName] as StorageTable | undefined;
+}
+
+/**
+ * Default namespace coordinate for an issue that does not carry one
+ * explicitly. Hand-crafted unit-test issues and `extra_table` issues
+ * fall back to `__unbound__`, the only namespace any single-namespace
+ * contract carries — verifier-emitted issues for legacy
+ * single-namespace contracts already stamp this id explicitly. Typed
+ * structurally so issue variants without a `namespaceId` slot
+ * (e.g. `EnumValuesChangedIssue`) flow through to the same fallback.
+ */
+export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: string }): string {
+  return issue.namespaceId ?? UNBOUND_NAMESPACE_ID;
+}
+
+/**
+ * Resolve the DDL schema name for a namespace coordinate. Postgres-aware
+ * namespaces dispatch to their polymorphic `ddlSchemaName` override —
+ * named schemas return their own id and the unbound singleton projects
+ * to `'public'` (sibling-present) or the framework sentinel
+ * (sibling-absent). Legacy single-namespace contracts whose `__unbound__`
+ * slot is the framework-default `SqlUnboundNamespace` (rather than the
+ * Postgres-aware `PostgresUnboundSchema`) flow the coordinate through
+ * unchanged so downstream `qualifyTableName` resolves polymorphically.
+ */
+export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: string): string {
+  const namespace = ctx.toContract.storage.namespaces[namespaceId];
+  if (isPostgresSchema(namespace)) {
+    return namespace.ddlSchemaName(ctx.toContract.storage);
+  }
+  return namespaceId;
+}
+
+/**
+ * Finds a type entry by name across all namespace type registries.
+ * Namespace types (e.g. Postgres enums) live under
+ * `storage.namespaces[nsId].types`, not under `storage.types`.
+ */
+function locateNamespaceType(
+  storage: SqlStorage,
+  typeName: string,
+): PostgresEnumStorageEntry | undefined {
+  for (const ns of Object.values(storage.namespaces)) {
+    if (!('types' in ns) || ns.types == null) continue;
+    const entry = (ns.types as Record<string, PostgresEnumStorageEntry>)[typeName];
+    if (entry !== undefined) return entry;
+  }
+  return undefined;
+}
 
 // ============================================================================
 // Strategy types
@@ -120,12 +191,13 @@ export type CallMigrationStrategy = (
   | { kind: 'no_match' };
 
 function buildColumnSpec(
+  namespaceId: string,
   table: string,
   column: string,
   ctx: StrategyContext,
   overrides?: { nullable?: boolean },
 ) {
-  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -141,12 +213,13 @@ function buildColumnSpec(
 }
 
 function buildAlterTypeOptions(
+  namespaceId: string,
   table: string,
   column: string,
   ctx: StrategyContext,
   using?: string,
 ) {
-  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  const col = tableAt(ctx.toContract.storage, namespaceId, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -175,20 +248,22 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true || column.default !== undefined) continue;
 
     matched.push(issue);
-    const spec = buildColumnSpec(issue.table, issue.column, ctx, { nullable: true });
+    const spec = buildColumnSpec(namespaceId, issue.table, issue.column, ctx, { nullable: true });
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     calls.push(
-      new AddColumnCall(ctx.schemaName, issue.table, spec),
+      new AddColumnCall(schemaForTable, issue.table, spec),
       new DataTransformCall(
         `backfill-${issue.table}-${issue.column}`,
         `backfill-${issue.table}-${issue.column}:check`,
         `backfill-${issue.table}-${issue.column}:run`,
       ),
-      new SetNotNullCall(ctx.schemaName, issue.table, issue.column),
+      new SetNotNullCall(schemaForTable, issue.table, issue.column),
     );
   }
 
@@ -217,8 +292,13 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   for (const issue of issues) {
     if (issue.kind !== 'type_mismatch') continue;
     if (!issue.table || !issue.column) continue;
-    const fromColumn = ctx.fromContract?.storage.tables[issue.table]?.columns[issue.column];
-    const toColumn = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const fromColumn = ctx.fromContract
+      ? tableAt(ctx.fromContract.storage, namespaceId, issue.table)?.columns[issue.column]
+      : undefined;
+    const toColumn = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
+      issue.column
+    ];
     if (!fromColumn || !toColumn) continue;
     const fromType = fromColumn.nativeType;
     const toType = toColumn.nativeType;
@@ -226,9 +306,10 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     const isSafeWidening = SAFE_WIDENINGS.has(`${fromType}→${toType}`);
     if (!isSafeWidening && !dataAllowed) continue;
     matched.push(issue);
-    const alterOpts = buildAlterTypeOptions(issue.table, issue.column, ctx);
+    const alterOpts = buildAlterTypeOptions(namespaceId, issue.table, issue.column, ctx);
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     if (isSafeWidening) {
-      calls.push(new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts));
+      calls.push(new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts));
     } else {
       calls.push(
         new DataTransformCall(
@@ -236,7 +317,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
           `typechange-${issue.table}-${issue.column}:check`,
           `typechange-${issue.table}-${issue.column}:run`,
         ),
-        new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts),
+        new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts),
       );
     }
   }
@@ -261,18 +342,20 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
   for (const issue of issues) {
     if (issue.kind !== 'nullability_mismatch' || !issue.table || !issue.column) continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true) continue;
 
     matched.push(issue);
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
     calls.push(
       new DataTransformCall(
         `handle-nulls-${issue.table}-${issue.column}`,
         `handle-nulls-${issue.table}-${issue.column}:check`,
         `handle-nulls-${issue.table}-${issue.column}:run`,
       ),
-      new SetNotNullCall(ctx.schemaName, issue.table, issue.column),
+      new SetNotNullCall(schemaForTable, issue.table, issue.column),
     );
   }
 
@@ -289,7 +372,7 @@ function enumRebuildCallRecipe(
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toType = ctx.toContract.storage.types?.[typeName];
+  const toType = locateNamespaceType(ctx.toContract.storage, typeName);
   if (!toType) return [];
   const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
@@ -298,11 +381,14 @@ function enumRebuildCallRecipe(
     : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
-  const columnRefs: { table: string; column: string }[] = [];
-  for (const [tableName, table] of Object.entries(ctx.toContract.storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      if (column.typeRef === typeName) {
-        columnRefs.push({ table: tableName, column: columnName });
+  const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
+  for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
+    for (const [tableName, tableNode] of Object.entries(ns.tables)) {
+      const table = tableNode as StorageTable;
+      for (const [columnName, column] of Object.entries(table.columns)) {
+        if (column.typeRef === typeName) {
+          columnRefs.push({ namespaceId: nsId, table: tableName, column: columnName });
+        }
       }
     }
   }
@@ -311,12 +397,17 @@ function enumRebuildCallRecipe(
     new CreateEnumTypeCall(ctx.schemaName, tempName, desiredValues),
     ...columnRefs.map((ref) => {
       const using = `${ref.column}::text::${tempName}`;
-      return new AlterColumnTypeCall(ctx.schemaName, ref.table, ref.column, {
-        qualifiedTargetType: tempName,
-        formatTypeExpected: tempName,
-        rawTargetTypeForLabel: tempName,
-        using,
-      });
+      return new AlterColumnTypeCall(
+        resolveDdlSchemaForNamespace(ctx, ref.namespaceId),
+        ref.table,
+        ref.column,
+        {
+          qualifiedTargetType: tempName,
+          formatTypeExpected: tempName,
+          rawTargetTypeForLabel: tempName,
+          using,
+        },
+      );
     }),
     new DropEnumTypeCall(ctx.schemaName, nativeType),
     new RenameTypeCall(ctx.schemaName, tempName, nativeType),
@@ -360,7 +451,7 @@ function enumRebuildCallRecipe(
  * `CreateTableCall` that references the new enum.
  */
 export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage.types);
+  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage);
   if (enumTypes.size === 0) return { kind: 'no_match' };
 
   const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
@@ -447,15 +538,15 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   return { kind: 'match', issues: remaining, calls, recipe: emittedRebuildRecipe };
 };
 
-function collectPostgresEnumTypes(
-  storageTypes: SqlStorage['types'],
-): ReadonlyMap<string, PostgresEnumType> {
+function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
-  for (const [name, instance] of Object.entries(storageTypes ?? {}).sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    if (instance instanceof PostgresEnumType) {
-      result.set(name, instance);
+  for (const ns of Object.values(storage.namespaces)) {
+    if (!('types' in ns) || ns.types == null) continue;
+    const nsTypes = ns.types as Record<string, unknown>;
+    for (const [name, instance] of Object.entries(nsTypes).sort(([a], [b]) => a.localeCompare(b))) {
+      if (instance instanceof PostgresEnumType) {
+        result.set(name, instance);
+      }
     }
   }
   return result;
@@ -555,7 +646,8 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
-    const contractTable = ctx.toContract.storage.tables[issue.table];
+    const namespaceId = resolveNamespaceIdForIssue(issue);
+    const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
     const column = contractTable?.columns[issue.column];
     if (!column) continue;
 
@@ -579,11 +671,13 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
     matched.push(issue);
 
+    const schemaForTable = resolveDdlSchemaForNamespace(ctx, namespaceId);
+
     if (canUseSharedTempDefault && temporaryDefault !== null) {
       calls.push(
         new RawSqlCall(
           buildAddNotNullColumnWithTemporaryDefaultOperation({
-            schema: ctx.schemaName,
+            schema: schemaForTable,
             tableName: issue.table,
             columnName: issue.column,
             column,
@@ -596,16 +690,16 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
       continue;
     }
 
-    const qualified = qualifyTableName(ctx.schemaName, issue.table);
+    const qualified = qualifyTableName(schemaForTable, issue.table);
     calls.push(
       new RawSqlCall({
-        ...buildAddColumnOperationIdentity(ctx.schemaName, issue.table, issue.column),
+        ...buildAddColumnOperationIdentity(schemaForTable, issue.table, issue.column),
         operationClass: 'additive',
         precheck: [
           {
             description: `ensure column "${issue.column}" is missing`,
             sql: columnExistsCheck({
-              schema: ctx.schemaName,
+              schema: schemaForTable,
               table: issue.table,
               column: issue.column,
               exists: false,
@@ -633,7 +727,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
           {
             description: `verify column "${issue.column}" exists`,
             sql: columnExistsCheck({
-              schema: ctx.schemaName,
+              schema: schemaForTable,
               table: issue.table,
               column: issue.column,
             }),
@@ -641,7 +735,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
           {
             description: `verify column "${issue.column}" is NOT NULL`,
             sql: columnNullabilityCheck({
-              schema: ctx.schemaName,
+              schema: schemaForTable,
               table: issue.table,
               column: issue.column,
               nullable: false,
@@ -665,7 +759,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 // ============================================================================
 
 function canUseSharedTemporaryDefaultStrategy(options: {
-  readonly table: NonNullable<Contract<SqlStorage>['storage']['tables'][string]>;
+  readonly table: StorageTable;
   readonly schemaTable: SqlSchemaIR['tables'][string];
   readonly schemaLookup: ReturnType<typeof buildSchemaLookupMap> extends ReadonlyMap<
     string,
@@ -687,7 +781,8 @@ function canUseSharedTemporaryDefaultStrategy(options: {
   }
 
   for (const foreignKey of table.foreignKeys) {
-    if (foreignKey.constraint === false || !foreignKey.columns.includes(columnName)) continue;
+    if (foreignKey.constraint === false || !foreignKey.source.columns.includes(columnName))
+      continue;
     if (!schemaLookup || !hasForeignKey(schemaLookup, foreignKey)) return false;
   }
 

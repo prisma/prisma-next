@@ -6,7 +6,8 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -472,5 +473,83 @@ describe('TS and PSL authoring parity', () => {
       scalarTypeDescriptors: postgresTimestampScalarTypeDescriptors,
       authoringContributions: postgresTimestampAuthoringContributions,
     });
+  });
+
+  it('PSL and TS lower the same cross-namespace FK shape to identical contract IR', () => {
+    const pslDocument = parsePslDocument({
+      schema: `namespace auth {
+  model User {
+    id Int @id
+    posts Post[]
+  }
+}
+
+model Post {
+  id Int @id
+  authorId Int
+  author User @relation(fields: [authorId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const pslContract = interpretPslDocumentToSqlContract({
+      document: pslDocument,
+      target: portablePostgresTargetPack,
+      scalarTypeDescriptors,
+      controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+      authoringContributions,
+    });
+
+    expect(pslContract.ok).toBe(true);
+    if (!pslContract.ok) return;
+
+    const UserBase = model('User', {
+      namespace: 'auth',
+      fields: {
+        id: field.column(int4Column).id(),
+      },
+    }).sql({ table: 'user' });
+
+    const Post = model('Post', {
+      fields: {
+        id: field.column(int4Column).id(),
+        authorId: field.column(int4Column),
+      },
+      relations: { author: rel.belongsTo(UserBase, { from: 'authorId', to: 'id' }) },
+    }).sql(({ cols, constraints }) => ({
+      table: 'post',
+      foreignKeys: [constraints.foreignKey(cols.authorId, UserBase.refs.id)],
+    }));
+
+    const User = UserBase.relations({
+      posts: rel.hasMany(() => Post, { by: 'authorId' }),
+    });
+
+    const tsContract = defineContract({
+      family: sqlFamilyPack,
+      target: portablePostgresTargetPack,
+      namespaces: ['auth'],
+      models: { User, Post },
+    });
+
+    const pslStorage = pslContract.value.storage as SqlStorage;
+    const tsStorage = tsContract.storage as SqlStorage;
+    const pslFks: readonly ForeignKey[] =
+      pslStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
+    const tsFks: readonly ForeignKey[] =
+      tsStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
+
+    expect(tsFks.length).toBe(1);
+    expect(pslFks.length).toBe(1);
+    expect(tsFks[0]).toMatchObject({
+      source: { namespaceId: '__unbound__', tableName: 'post' },
+      target: { namespaceId: 'auth', tableName: 'user' },
+    });
+    expect(pslFks[0]).toMatchObject({
+      source: { namespaceId: '__unbound__', tableName: 'post' },
+      target: { namespaceId: 'auth', tableName: 'user' },
+    });
+    expect(tsFks).toEqual(pslFks);
   });
 });

@@ -2,7 +2,10 @@ import { generateContractDts } from '@prisma-next/emitter';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
-import { createMongoContract } from './fixtures/create-mongo-contract';
+import {
+  createMongoContract,
+  namespacedMongoStorageFromCollections,
+} from './fixtures/create-mongo-contract';
 
 const testHashes = { storageHash: 'test-storage-hash', profileHash: 'test-profile-hash' };
 
@@ -105,7 +108,7 @@ describe('mongoEmission.generateContractTypes', () => {
             storage: { collection: 'users' },
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain(
@@ -150,7 +153,7 @@ describe('mongoEmission.generateContractTypes', () => {
             storage: { collection: 'posts' },
           },
         },
-        storage: { collections: { users: {}, posts: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {}, posts: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain("readonly to: 'Post'");
@@ -171,7 +174,7 @@ describe('mongoEmission.generateContractTypes', () => {
             storage: { collection: 'users' },
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain("readonly collection: 'users'");
@@ -199,7 +202,7 @@ describe('mongoEmission.generateContractTypes', () => {
             owner: 'User',
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly Address: { readonly fields:');
@@ -225,7 +228,7 @@ describe('mongoEmission.generateContractTypes', () => {
             owner: 'Post',
           },
         },
-        storage: { collections: { posts: {} } },
+        storage: namespacedMongoStorageFromCollections({ posts: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain("readonly owner: 'Post'");
@@ -261,7 +264,7 @@ describe('mongoEmission.generateContractTypes', () => {
             base: 'Task',
           },
         },
-        storage: { collections: { tasks: {} } },
+        storage: namespacedMongoStorageFromCollections({ tasks: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain("discriminator: { readonly field: 'type' }");
@@ -292,7 +295,7 @@ describe('mongoEmission.generateContractTypes', () => {
             owner: 'User',
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain(
@@ -302,11 +305,12 @@ describe('mongoEmission.generateContractTypes', () => {
   });
 
   describe('storage generation', () => {
-    it('generates storage with collections', () => {
+    it('generates storage with namespaces and collections', () => {
       const contract = createMongoContract({
-        storage: { collections: { users: {}, posts: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {}, posts: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
+      expect(types).toContain('readonly namespaces:');
       expect(types).toContain('readonly collections:');
       expect(types).toContain('readonly users: Record<string, never>');
       expect(types).toContain('readonly posts: Record<string, never>');
@@ -314,16 +318,14 @@ describe('mongoEmission.generateContractTypes', () => {
 
     it('generates collection metadata for indexes and options', () => {
       const contract = createMongoContract({
-        storage: {
-          collections: {
-            users: {
-              indexes: [{ fields: { email: 1 }, options: { unique: true } }],
-              options: {
-                collation: { locale: 'en', strength: 2 },
-              },
+        storage: namespacedMongoStorageFromCollections({
+          users: {
+            indexes: [{ fields: { email: 1 }, options: { unique: true } }],
+            options: {
+              collation: { locale: 'en', strength: 2 },
             },
           },
-        },
+        }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly users: { readonly indexes:');
@@ -334,8 +336,8 @@ describe('mongoEmission.generateContractTypes', () => {
       );
     });
 
-    it('generates empty collections', () => {
-      const contract = createMongoContract({ storage: { collections: {} } });
+    it('generates empty collections map under the default namespace', () => {
+      const contract = createMongoContract({ storage: namespacedMongoStorageFromCollections({}) });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly collections: Record<string, never>');
     });
@@ -361,7 +363,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('export type AddressOutput =');
@@ -406,7 +408,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain(
@@ -437,7 +439,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain(
@@ -499,7 +501,7 @@ describe('mongoEmission.generateContractTypes', () => {
             storage: { collection: 'users' },
           },
         },
-        storage: { collections: { users: {} } },
+        storage: namespacedMongoStorageFromCollections({ users: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('export type FieldOutputTypes =');

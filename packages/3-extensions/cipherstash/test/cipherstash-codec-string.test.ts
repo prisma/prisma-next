@@ -26,6 +26,7 @@
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
@@ -40,6 +41,7 @@ function ctx(args: {
   tableName?: string;
   fieldName?: string;
 }): {
+  readonly namespaceId: string;
   readonly tableName: string;
   readonly fieldName: string;
   readonly priorField?: StorageColumn;
@@ -51,6 +53,7 @@ function ctx(args: {
     nullable: false,
   };
   return {
+    namespaceId: UNBOUND_NAMESPACE_ID,
     tableName: args.tableName ?? TABLE,
     fieldName: args.fieldName ?? FIELD,
     ...(args.prior !== undefined ? { priorField: { ...baseCol, ...args.prior } } : {}),

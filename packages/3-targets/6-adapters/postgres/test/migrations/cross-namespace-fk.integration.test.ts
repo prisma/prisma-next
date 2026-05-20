@@ -1,0 +1,192 @@
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  createDriver,
+  createTestDatabase,
+  emptySchema,
+  familyInstance,
+  frameworkComponents,
+  type PostgresControlDriver,
+  postgresTargetDescriptor,
+  testTimeout,
+} from './fixtures/runner-fixtures';
+
+/**
+ * AC1 — cross-namespace FK end-to-end via PGlite-backed Postgres.
+ *
+ * A 2-namespace contract (public.post → auth.user) exercises the full
+ * planner → DDL → verifier path for cross-namespace foreign keys.
+ */
+
+function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
+  return {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:cross-ns-fk'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:cross-ns-fk'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            post: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                author_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'post',
+                    columns: ['author_id'],
+                  },
+                  target: {
+                    namespaceId: 'auth',
+                    tableName: 'user',
+                    columns: ['id'],
+                  },
+                  constraint: true,
+                  index: false,
+                },
+              ],
+            },
+          },
+        },
+        auth: {
+          id: 'auth',
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      },
+    }),
+    roots: {},
+    models: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+}
+
+describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
+  let database: Awaited<ReturnType<typeof createTestDatabase>>;
+  let driver: PostgresControlDriver;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    driver = await createDriver(database.connectionString);
+  }, testTimeout);
+
+  afterAll(async () => {
+    if (driver) await driver.close();
+    if (database) await database.close();
+  }, testTimeout);
+
+  it(
+    'applies a cross-namespace FK contract, verifies the schema, and round-trips data',
+    async () => {
+      const contract = buildCrossNamespaceFkContract();
+
+      // Plan: schema is empty, contract has cross-namespace FK
+      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const planResult = planner.plan({
+        contract,
+        schema: emptySchema,
+        policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
+        frameworkComponents,
+        spaceId: APP_SPACE_ID,
+      });
+
+      expect(planResult.kind).toBe('success');
+      if (planResult.kind !== 'success') return;
+
+      // Confirm the plan emits CREATE SCHEMA "auth" before any DDL that
+      // targets that schema — closes the FR9 / AC1 gap where the
+      // database was missing the schema container at apply time.
+      const operationIds = planResult.plan.operations.map((op) => op.id);
+      const createSchemaIdx = operationIds.findIndex((id) => id === 'schema.auth');
+      expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
+
+      const allSql = planResult.plan.operations
+        .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
+        .map((step) => step.sql);
+
+      const createSchemaSql = allSql.find((s) => s.includes('CREATE SCHEMA'));
+      expect(createSchemaSql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
+
+      const fkDdl = allSql.find(
+        (s) => s.includes('REFERENCES') && s.toLowerCase().includes('auth'),
+      );
+      expect(fkDdl).toBeDefined();
+      expect(fkDdl).toContain('"auth"."user"');
+
+      // CREATE SCHEMA must precede every table DDL that targets auth.
+      const sqlByOpIdx = planResult.plan.operations.map((op) => ({
+        id: op.id,
+        sql: [...op.precheck, ...op.execute, ...op.postcheck].map((step) => step.sql).join('\n'),
+      }));
+      const createAuthUserIdx = sqlByOpIdx.findIndex((entry) =>
+        entry.sql.includes('CREATE TABLE "auth"."user"'),
+      );
+      expect(createAuthUserIdx).toBeGreaterThanOrEqual(0);
+      expect(createSchemaIdx).toBeLessThan(createAuthUserIdx);
+
+      // Apply all operations
+      for (const op of planResult.plan.operations) {
+        for (const step of [...op.precheck, ...op.execute, ...op.postcheck]) {
+          await driver.query(step.sql, step.params ?? []);
+        }
+      }
+
+      // Verify: introspect the live DB and compare against the contract
+      const introspected = await familyInstance.introspect({ driver, contract });
+      const verifyResult = familyInstance.verifySchema({
+        contract,
+        schema: introspected,
+        strict: false,
+        frameworkComponents,
+      });
+
+      if (!verifyResult.ok) {
+        throw new Error(
+          `verifySchema failed: ${JSON.stringify(verifyResult.schema.issues, null, 2)}`,
+        );
+      }
+      expect(verifyResult.ok).toBe(true);
+      expect(verifyResult.schema.counts.fail).toBe(0);
+
+      // Round-trip: insert into auth.user, then insert into public.post with a valid FK
+      await driver.query('INSERT INTO "auth"."user" (id) VALUES (1)');
+      await driver.query('INSERT INTO "post" (id, author_id) VALUES (1, 1)');
+
+      const rows = await driver.query<{ id: number; author_id: number }>(
+        'SELECT id, author_id FROM "post"',
+      );
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0]).toMatchObject({ id: 1, author_id: 1 });
+
+      // FK constraint is honored: inserting with a missing user should fail
+      await expect(
+        driver.query('INSERT INTO "post" (id, author_id) VALUES (2, 999)'),
+      ).rejects.toThrow();
+    },
+    testTimeout,
+  );
+});

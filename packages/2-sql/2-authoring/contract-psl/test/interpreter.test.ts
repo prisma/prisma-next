@@ -1,6 +1,6 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,6 +13,8 @@ import {
   postgresTarget,
   testEnumEntityContributions,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
+import { unboundTables } from './unbound-tables';
 
 const testIndexPack = {
   kind: 'extension',
@@ -57,12 +59,16 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
-      tables: {
-        user: {
-          columns: {
-            email: {
-              codecId: 'custom/text@1',
-              nativeType: 'custom_text',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                email: {
+                  codecId: 'custom/text@1',
+                  nativeType: 'custom_text',
+                },
+              },
             },
           },
         },
@@ -107,12 +113,16 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
-      tables: {
-        user: {
-          columns: {
-            slug: {
-              codecId: 'pg/text@1',
-              nativeType: 'text',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                slug: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                },
+              },
             },
           },
         },
@@ -181,13 +191,17 @@ model Comment {
     expect(result.value.target).toBe('postgres');
     expect(result.value.roots).toEqual({ user: 'User' });
     expect(result.value.storage).toMatchObject({
-      tables: {
-        user: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-            email: { codecId: 'pg/text@1', nativeType: 'text' },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                email: { codecId: 'pg/text@1', nativeType: 'text' },
+              },
+              primaryKey: { columns: ['id'] },
+            },
           },
-          primaryKey: { columns: ['id'] },
         },
       },
     });
@@ -223,20 +237,24 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        idlessThing: {
-          columns: {
-            email: { codecId: 'pg/text@1', nativeType: 'text' },
-            token: { codecId: 'pg/text@1', nativeType: 'text' },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            idlessThing: {
+              columns: {
+                email: { codecId: 'pg/text@1', nativeType: 'text' },
+                token: { codecId: 'pg/text@1', nativeType: 'text' },
+              },
+              uniques: [{ columns: ['email'] }],
+            },
           },
-          uniques: [{ columns: ['email'] }],
         },
       },
     });
     // `toMatchObject` with `primaryKey: undefined` requires the key to be
     // present — assert absence directly via a narrowed accessor instead.
-    const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['idlessThing']?.primaryKey).toBeUndefined();
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(unboundTables(storage)['idlessThing']?.primaryKey).toBeUndefined();
     expect(result.value.models).toMatchObject({
       IdlessThing: {
         storage: {
@@ -271,9 +289,13 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        compositeThing: {
-          primaryKey: { columns: ['email', 'token'] },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            compositeThing: {
+              primaryKey: { columns: ['email', 'token'] },
+            },
+          },
         },
       },
     });
@@ -301,11 +323,15 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        composite_thing: {
-          primaryKey: {
-            columns: ['email_address', 'api_token'],
-            name: 'composite_thing_pkey',
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            composite_thing: {
+              primaryKey: {
+                columns: ['email_address', 'api_token'],
+                name: 'composite_thing_pkey',
+              },
+            },
           },
         },
       },
@@ -356,44 +382,53 @@ model Post {
     expect(result.value.storage).toMatchObject({
       types: {
         Email: { codecId: 'pg/text@1', nativeType: 'text' },
-        Role: {
-          kind: 'postgres-enum',
-          name: 'Role',
-          nativeType: 'Role',
-          values: ['USER', 'ADMIN'],
-        },
       },
-      tables: {
-        user: {
-          columns: {
-            id: {
-              default: { kind: 'function', expression: 'autoincrement()' },
-            },
-            createdAt: {
-              default: { kind: 'function', expression: 'now()' },
-            },
-            isActive: {
-              default: { kind: 'literal', value: true },
-            },
-            nickname: {
-              nullable: true,
+      namespaces: {
+        public: {
+          types: {
+            Role: {
+              kind: 'postgres-enum',
+              name: 'Role',
+              nativeType: 'Role',
+              values: ['USER', 'ADMIN'],
             },
           },
         },
-        post: {
-          uniques: [{ columns: ['title', 'userId'] }],
-          indexes: [{ columns: ['userId'] }],
-          foreignKeys: [
-            {
-              columns: ['userId'],
-              references: {
-                table: 'user',
-                columns: ['id'],
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                id: {
+                  default: { kind: 'function', expression: 'autoincrement()' },
+                },
+                createdAt: {
+                  default: { kind: 'function', expression: 'now()' },
+                },
+                isActive: {
+                  default: { kind: 'literal', value: true },
+                },
+                nickname: {
+                  nullable: true,
+                },
               },
-              onDelete: 'cascade',
-              onUpdate: 'cascade',
             },
-          ],
+            post: {
+              uniques: [{ columns: ['title', 'userId'] }],
+              indexes: [{ columns: ['userId'] }],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'post',
+                    columns: ['userId'],
+                  },
+                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                  onDelete: 'cascade',
+                  onUpdate: 'cascade',
+                },
+              ],
+            },
+          },
         },
       },
     });
@@ -439,27 +474,39 @@ model Member {
 
     expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
     expect(result.value.storage).toMatchObject({
-      tables: {
-        org_team: {
-          columns: {
-            team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-          },
-          primaryKey: { columns: ['team_id'] },
-        },
-        team_member: {
-          columns: {
-            member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-            team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
-          },
-          primaryKey: { columns: ['member_id'] },
-          indexes: [{ columns: ['team_ref'] }],
-          uniques: [{ columns: ['team_ref', 'member_id'] }],
-          foreignKeys: [
-            {
-              columns: ['team_ref'],
-              references: { table: 'org_team', columns: ['team_id'] },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            org_team: {
+              columns: {
+                team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              },
+              primaryKey: { columns: ['team_id'] },
             },
-          ],
+            team_member: {
+              columns: {
+                member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              },
+              primaryKey: { columns: ['member_id'] },
+              indexes: [{ columns: ['team_ref'] }],
+              uniques: [{ columns: ['team_ref', 'member_id'] }],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'team_member',
+                    columns: ['team_ref'],
+                  },
+                  target: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'org_team',
+                    columns: ['team_id'],
+                  },
+                },
+              ],
+            },
+          },
         },
       },
     });
@@ -506,8 +553,8 @@ model AuditLog {
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      const storage = result.value.storage as SqlStorage;
-      expect(storage.tables['audit_log']?.primaryKey).toBeUndefined();
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(unboundTables(storage)['audit_log']?.primaryKey).toBeUndefined();
       expect(result.value.models).toMatchObject({
         AuditLog: { storage: { table: 'audit_log' } },
       });
@@ -533,11 +580,15 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
-        tables: {
-          order_item: {
-            primaryKey: {
-              columns: ['order_id', 'product_id'],
-              name: 'order_item_pkey',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            tables: {
+              order_item: {
+                primaryKey: {
+                  columns: ['order_id', 'product_id'],
+                  name: 'order_item_pkey',
+                },
+              },
             },
           },
         },
@@ -567,9 +618,13 @@ model OrderItem {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      tables: {
-        membership: {
-          primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            membership: {
+              primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+            },
+          },
         },
       },
     });
@@ -597,16 +652,20 @@ model OrderItem {
       if (!result.ok) return;
 
       expect(result.value.storage).toMatchObject({
-        tables: {
-          doc: {
-            indexes: [
-              {
-                columns: ['body'],
-                name: 'doc_body_bm25_idx',
-                type: 'bm25',
-                options: { key_field: 'id' },
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            tables: {
+              doc: {
+                indexes: [
+                  {
+                    columns: ['body'],
+                    name: 'doc_body_bm25_idx',
+                    type: 'bm25',
+                    options: { key_field: 'id' },
+                  },
+                ],
               },
-            ],
+            },
           },
         },
       });
@@ -631,9 +690,13 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
-        tables: {
-          doc: {
-            indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            tables: {
+              doc: {
+                indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+              },
+            },
           },
         },
       });
@@ -741,9 +804,143 @@ model OrderItem {
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.storage).toMatchObject({
-        tables: { doc: { indexes: [{ columns: ['body'] }] } },
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['doc']).toMatchObject({
+        indexes: [{ columns: ['body'] }],
       });
+    });
+  });
+
+  describe('per-target namespace resolution', () => {
+    it('Postgres leaves implicit top-level declarations on the late-bound default slot (TS/PSL byte parity for single-namespace contracts)', () => {
+      const document = parsePslDocument({
+        schema: `model User {
+  id Int @id
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      const table = unboundTables(storage)['user'];
+      expect(table).toBeDefined();
+      const json = JSON.parse(JSON.stringify(table)) as Record<string, unknown>;
+      expect(json).not.toHaveProperty('namespaceId');
+    });
+
+    it('Postgres lowers `namespace unbound { … }` to the late-binding sentinel slot', () => {
+      const document = parsePslDocument({
+        schema: `namespace unbound {
+  model Tenant {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      const tenant = unboundTables(storage)['tenant'];
+      expect(tenant).toBeDefined();
+      const json = JSON.parse(JSON.stringify(tenant)) as Record<string, unknown>;
+      expect(json).not.toHaveProperty('namespaceId');
+    });
+
+    it('Postgres lowers named `namespace auth { … }` to its eponymous schema slot', () => {
+      const document = parsePslDocument({
+        schema: `namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      const user = storage.namespaces['auth']?.tables['user'];
+      expect(user).toBeDefined();
+      expect(unboundTables(storage)['user']).toBeUndefined();
+      const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
+      expect(json).not.toHaveProperty('namespaceId');
+    });
+
+    it('Postgres accumulates enums declared across two namespace blocks with the same name', () => {
+      const document = parsePslDocument({
+        schema: `namespace tenant_a {
+  enum Status {
+    ACTIVE
+    INACTIVE
+  }
+}
+
+namespace tenant_a {
+  enum Tier {
+    FREE
+    PRO
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      const types = storage.namespaces['tenant_a']?.types ?? {};
+      expect(types).toHaveProperty('Status');
+      expect(types).toHaveProperty('Tier');
+    });
+
+    it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {
+      const document = parsePslDocument({
+        schema: `model Post {
+  id Int @id
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+
+namespace logs {
+  model AuditLog {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(unboundTables(storage)['post']).toBeDefined();
+      expect(storage.namespaces['auth']?.tables['user']).toBeDefined();
+      expect(storage.namespaces['logs']?.tables['auditLog']).toBeDefined();
+      expect(unboundTables(storage)['user']).toBeUndefined();
     });
   });
 });

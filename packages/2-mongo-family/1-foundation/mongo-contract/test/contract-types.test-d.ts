@@ -80,7 +80,12 @@ type ContractWithVO = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly collections: { readonly users: MongoCollection };
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly collections: { readonly users: MongoCollection };
+        };
+      };
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
     };
   },
@@ -137,7 +142,10 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
       readonly models: Record<string, never>;
       readonly valueObjects: Record<string, never>;
       readonly storage: {
-        readonly collections: Record<string, never>;
+        readonly namespaces: Record<
+          string,
+          { readonly id: string; readonly collections: Record<string, never> }
+        >;
         readonly storageHash: StorageHashBase<'sha256:s'>;
       };
     },
@@ -170,7 +178,10 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
       readonly models: Record<string, never>;
       readonly valueObjects: Record<string, never>;
       readonly storage: {
-        readonly collections: Record<string, never>;
+        readonly namespaces: Record<
+          string,
+          { readonly id: string; readonly collections: Record<string, never> }
+        >;
         readonly storageHash: StorageHashBase<'sha256:s'>;
       };
     },

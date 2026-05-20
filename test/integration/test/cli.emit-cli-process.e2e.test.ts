@@ -20,27 +20,31 @@ const fixtureSubdir = 'emit-command';
 type EmittedContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
-    readonly tables: {
-      readonly user: {
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            readonly nullable: false;
-          };
-          readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly tables: {
+          readonly user: {
+            readonly columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                readonly nullable: false;
+              };
+              readonly email: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+            };
+            readonly primaryKey: { readonly columns: readonly ['id'] };
+            readonly uniques: readonly [];
+            readonly indexes: readonly [];
+            readonly foreignKeys: readonly [];
           };
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
     };
-    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
   },
   {
     readonly User: {
@@ -124,8 +128,12 @@ describe('contract emit command (CLI process e2e)', () => {
         targetFamily: 'sql',
         target: 'postgres',
         storage: {
-          tables: {
-            user: expect.anything(),
+          namespaces: {
+            __unbound__: {
+              tables: {
+                user: expect.anything(),
+              },
+            },
           },
         },
       });
@@ -180,12 +188,11 @@ describe('contract emit command (CLI process e2e)', () => {
 
       expect(validatedContract.targetFamily).toBe(originalContract.targetFamily);
       expect(validatedContract.target).toBe(originalContract.target);
-      const tables = (validatedContract.storage as SqlStorage).tables as
+      const tables = (validatedContract.storage as SqlStorage).namespaces.__unbound__?.tables as
         | Record<string, unknown>
         | undefined;
-      const originalTables = (originalContract.storage as SqlStorage | undefined)?.tables as
-        | Record<string, unknown>
-        | undefined;
+      const originalTables = (originalContract.storage as SqlStorage | undefined)?.namespaces
+        .__unbound__?.tables as Record<string, unknown> | undefined;
       const userTable = tables?.['user'] as Record<string, unknown> | undefined;
       const originalUserTable = originalTables?.['user'] as Record<string, unknown> | undefined;
       if (userTable && originalUserTable) {

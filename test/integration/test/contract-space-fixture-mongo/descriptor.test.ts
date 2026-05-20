@@ -22,14 +22,16 @@ describe('test-mongo-contract-space fixture descriptor', () => {
   it('exposes a contractSpace whose contract declares the test_audit_event collection', () => {
     const space = mongoTestContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    expect(Object.keys(space!.contractJson.storage.collections)).toEqual([MONGO_TEST_COLLECTION]);
+    const ns = space!.contractJson.storage.namespaces['__unbound__'];
+    expect(Object.keys(ns!.collections)).toEqual([MONGO_TEST_COLLECTION]);
   });
 
   it('declares one unique index and one strict validator on the test collection', () => {
-    const collection =
-      mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson.storage.collections[
-        MONGO_TEST_COLLECTION
+    const ns =
+      mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson.storage.namespaces[
+        '__unbound__'
       ];
+    const collection = ns!.collections[MONGO_TEST_COLLECTION];
     expect(collection).toBeDefined();
     expect(collection!.indexes).toHaveLength(1);
     expect(collection!.indexes![0]).toMatchObject({ unique: true });

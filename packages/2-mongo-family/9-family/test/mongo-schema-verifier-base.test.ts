@@ -78,9 +78,9 @@ describe('MongoSchemaVerifierBase', () => {
     it('dispatches verifyNamespace for every namespace in storage', () => {
       const verifier = new RecordingVerifier();
 
-      verifier.verifySchema(buildOptions(['__unspecified__', 'auth']));
+      verifier.verifySchema(buildOptions(['__unbound__', 'auth']));
 
-      expect(verifier.dispatches.map((d) => d.namespaceId)).toEqual(['__unspecified__', 'auth']);
+      expect(verifier.dispatches.map((d) => d.namespaceId)).toEqual(['__unbound__', 'auth']);
     });
 
     it('dispatches namespaces in sorted order so issue ordering is stable', () => {
@@ -94,7 +94,7 @@ describe('MongoSchemaVerifierBase', () => {
     it('forwards contract + schema to every namespace hook', () => {
       const verifier = new RecordingVerifier();
 
-      verifier.verifySchema(buildOptions(['__unspecified__']));
+      verifier.verifySchema(buildOptions(['__unbound__']));
 
       expect(verifier.dispatches).toHaveLength(1);
       expect(verifier.dispatches[0]!.schemaTag).toBe('live-schema');
@@ -105,7 +105,7 @@ describe('MongoSchemaVerifierBase', () => {
     it('returns ok=true with no issues when namespaces yield no issues', () => {
       const verifier = new RecordingVerifier();
 
-      const result = verifier.verifySchema(buildOptions(['__unspecified__']));
+      const result = verifier.verifySchema(buildOptions(['__unbound__']));
 
       expect(result).toEqual({ ok: true, issues: [] });
     });
@@ -122,9 +122,9 @@ describe('MongoSchemaVerifierBase', () => {
         message: 'unexpected target-only collection',
       };
 
-      const verifier = new RecordingVerifier({ __unspecified__: [nsIssue] }, [targetIssue]);
+      const verifier = new RecordingVerifier({ __unbound__: [nsIssue] }, [targetIssue]);
 
-      const result = verifier.verifySchema(buildOptions(['__unspecified__']));
+      const result = verifier.verifySchema(buildOptions(['__unbound__']));
 
       expect(result.ok).toBe(false);
       expect(result.issues).toEqual([nsIssue, targetIssue]);

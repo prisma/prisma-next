@@ -9,6 +9,7 @@ import {
   type MigrationPlanner,
   type MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor, {
   postgresRenderDefault,
@@ -30,7 +31,7 @@ function createEmptyContract(): Contract<SqlStorage> {
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables: {},
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} } },
     }),
     roots: {},
     models: {},
@@ -60,7 +61,10 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       const fromContract: Contract<SqlStorage> = {
         ...createEmptyContract(),
-        storage: new SqlStorage({ storageHash: coreHash('sha256:from'), tables: {} }),
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:from'),
+          namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} } },
+        }),
       };
       const result = planner.plan({
         contract,

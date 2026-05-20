@@ -22,6 +22,7 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import { VECTOR_CODEC_ID } from '../src/core/constants';
@@ -46,7 +47,11 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
   it('exposes a contractSpace declaring the vector parameterised native type', () => {
     const space = pgvectorExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    expect(Object.keys(space!.contractJson.storage.tables)).toEqual([]);
+    const namespaces = space!.contractJson.storage.namespaces as Record<
+      string,
+      { readonly tables?: Record<string, unknown> }
+    >;
+    expect(Object.keys(namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {})).toEqual([]);
     expect(space!.contractJson.storage.types).toBeDefined();
     expect(space!.contractJson.storage.types?.[PGVECTOR_NATIVE_TYPE]).toMatchObject({
       codecId: VECTOR_CODEC_ID,

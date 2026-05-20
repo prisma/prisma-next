@@ -408,7 +408,7 @@ export function createTestContract(
     targetFamily: rest['targetFamily'] ?? 'sql',
     storage: rest['storage']
       ? new SqlStorage({ ...rest['storage'], storageHash: storageHashValue })
-      : new SqlStorage({ storageHash: storageHashValue, tables: {} }),
+      : new SqlStorage({ storageHash: storageHashValue }),
     models: rest['models'] ?? {},
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},

@@ -17,7 +17,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -28,10 +28,12 @@ import {
   applyFkDefaults,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
+  type SqlNamespaceTablesInput,
   SqlStorage,
-  SqlUnspecifiedNamespace,
+  type SqlStorageInput,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
+  type StorageTableInput,
   type StorageTypeInstance,
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -209,6 +211,71 @@ function buildDomainField(
   };
 }
 
+function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): Set<string> {
+  const ids = new Set<string>();
+  ids.add(UNBOUND_NAMESPACE_ID);
+  for (const id of definition.namespaces ?? []) {
+    if (id.length > 0) {
+      ids.add(id);
+    }
+  }
+  for (const model of definition.models) {
+    if (model.namespaceId !== undefined && model.namespaceId.length > 0) {
+      ids.add(model.namespaceId);
+    }
+  }
+  return ids;
+}
+
+const POSTGRES_ENUM_NAMESPACE_ID = 'public';
+
+function partitionStorageTypesForTarget(
+  targetId: string,
+  types: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
+  namespaceTypes?: Readonly<Record<string, Readonly<Record<string, PostgresEnumStorageEntry>>>>,
+): {
+  readonly documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  readonly namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>>;
+} {
+  const documentTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  const namespaceEnumTypesById: Record<string, Record<string, PostgresEnumStorageEntry>> = {};
+  for (const [name, entry] of Object.entries(types)) {
+    if (isPostgresEnumStorageEntry(entry)) {
+      if (targetId !== 'postgres') {
+        throw new Error(
+          `buildSqlContractFromDefinition: postgres enum "${name}" is only valid when target is "postgres" (got "${targetId}").`,
+        );
+      }
+      let slot = namespaceEnumTypesById[POSTGRES_ENUM_NAMESPACE_ID];
+      if (slot === undefined) {
+        slot = {};
+        namespaceEnumTypesById[POSTGRES_ENUM_NAMESPACE_ID] = slot;
+      }
+      slot[name] = entry;
+      continue;
+    }
+    documentTypes[name] = entry;
+  }
+  if (namespaceTypes !== undefined) {
+    for (const [nsId, enumsInNs] of Object.entries(namespaceTypes)) {
+      for (const [name, entry] of Object.entries(enumsInNs)) {
+        if (targetId !== 'postgres') {
+          throw new Error(
+            `buildSqlContractFromDefinition: postgres enum "${name}" is only valid when target is "postgres" (got "${targetId}").`,
+          );
+        }
+        let slot = namespaceEnumTypesById[nsId];
+        if (slot === undefined) {
+          slot = {};
+          namespaceEnumTypesById[nsId] = slot;
+        }
+        slot[name] = entry;
+      }
+    }
+  }
+  return { documentTypes, namespaceEnumTypesById };
+}
+
 export function buildSqlContractFromDefinition(
   definition: ContractDefinition,
   codecLookup?: CodecLookup,
@@ -217,7 +284,8 @@ export function buildSqlContractFromDefinition(
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
-  const storageTables: Record<string, StorageTable> = {};
+  const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
+  const tableNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const models: Record<string, ContractModel> = {};
   const roots: Record<string, string> = {};
@@ -276,6 +344,11 @@ export function buildSqlContractFromDefinition(
       }
     }
 
+    const namespaceId =
+      semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
+        ? semanticModel.namespaceId
+        : UNBOUND_NAMESPACE_ID;
+
     const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
       const targetModel = assertKnownTargetModel(
         modelsByName,
@@ -289,9 +362,18 @@ export function buildSqlContractFromDefinition(
         fk.references.table,
         'Foreign key',
       );
+      const targetNamespaceId =
+        fk.references.namespaceId ??
+        (targetModel.namespaceId !== undefined && targetModel.namespaceId.length > 0
+          ? targetModel.namespaceId
+          : UNBOUND_NAMESPACE_ID);
       return {
-        columns: fk.columns,
-        references: { table: fk.references.table, columns: fk.references.columns },
+        source: { namespaceId, tableName, columns: fk.columns },
+        target: {
+          namespaceId: targetNamespaceId,
+          tableName: fk.references.table,
+          columns: fk.references.columns,
+        },
         ...applyFkDefaults(
           {
             ...ifDefined('constraint', fk.constraint),
@@ -305,7 +387,15 @@ export function buildSqlContractFromDefinition(
       };
     });
 
-    storageTables[tableName] = {
+    const existingNs = tableNameToNamespaceId.get(tableName);
+    if (existingNs !== undefined && existingNs !== namespaceId) {
+      throw new Error(
+        `buildSqlContractFromDefinition: table "${tableName}" is mapped in namespace "${namespaceId}" but already exists in namespace "${existingNs}".`,
+      );
+    }
+    tableNameToNamespaceId.set(tableName, namespaceId);
+
+    const tableInput: StorageTableInput = {
       columns,
       uniques: (semanticModel.uniques ?? []).map((u) => ({
         columns: u.columns,
@@ -327,6 +417,18 @@ export function buildSqlContractFromDefinition(
           }
         : {}),
     };
+
+    let nsTables = tablesByNamespace[namespaceId];
+    if (nsTables === undefined) {
+      nsTables = {};
+      tablesByNamespace[namespaceId] = nsTables;
+    }
+    if (nsTables[tableName] !== undefined) {
+      throw new Error(
+        `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
+      );
+    }
+    nsTables[tableName] = new StorageTable(tableInput);
 
     // --- Build contract model ---
 
@@ -414,15 +516,39 @@ export function buildSqlContractFromDefinition(
       ];
     }),
   );
+  const { documentTypes, namespaceEnumTypesById } = partitionStorageTypesForTarget(
+    target,
+    storageTypes,
+    definition.namespaceTypes,
+  );
+  const namespaceCoordinateIds = collectStorageNamespaceCoordinateIds(definition);
+  for (const id of Object.keys(namespaceEnumTypesById)) {
+    namespaceCoordinateIds.add(id);
+  }
+  const { createNamespace } = definition;
+  const namespaces: Record<string, SqlNamespaceTablesInput | Namespace> = Object.fromEntries(
+    [...namespaceCoordinateIds].sort().map((id) => {
+      const enumTypes = namespaceEnumTypesById[id];
+      const nsInput: SqlNamespaceTablesInput = {
+        id,
+        tables: tablesByNamespace[id] ?? {},
+        ...ifDefined('types', enumTypes),
+      };
+      return [id, createNamespace ? createNamespace(nsInput) : nsInput];
+    }),
+  );
   const storageWithoutHash = {
-    tables: storageTables,
-    types: storageTypes,
-    namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+    types: documentTypes,
+    namespaces,
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
-    : computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
-  const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
+    : computeStorageHash({
+        target,
+        targetFamily,
+        storage: storageWithoutHash as Record<string, unknown>,
+      });
+  const storage = new SqlStorage({ ...storageWithoutHash, storageHash } as SqlStorageInput); // Builder types are wider than SqlStorageInput until SqlStorage normalises document types.
 
   const executionSection =
     executionDefaults.length > 0

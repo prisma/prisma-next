@@ -1,7 +1,9 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
+import { unboundTables } from './unbound-tables';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -128,10 +130,6 @@ describe('shared contract definition lowering', () => {
 
     const storage = contract.storage as {
       readonly types?: Record<string, unknown>;
-      readonly tables?: Record<
-        string,
-        { readonly primaryKey?: unknown; readonly foreignKeys?: unknown }
-      >;
     };
     const models = contract.models as Record<
       string,
@@ -149,17 +147,18 @@ describe('shared contract definition lowering', () => {
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });
-    expect(storage['tables']?.['app_user']?.primaryKey).toEqual({
+    expect(unboundTables(contract.storage)['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
     });
-    expect(storage['tables']?.['blog_post']?.foreignKeys).toEqual([
+    expect(unboundTables(contract.storage)['blog_post']?.foreignKeys).toEqual([
       {
-        columns: ['author_id'],
-        references: {
-          table: 'app_user',
-          columns: ['id'],
+        source: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          tableName: 'blog_post',
+          columns: ['author_id'],
         },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_author_id_fkey',
         constraint: true,
         index: true,
@@ -227,7 +226,7 @@ describe('shared contract definition lowering', () => {
       codecLookup,
     );
 
-    expect(contract.storage.tables['event']?.columns['scheduled_at']?.default).toEqual({
+    expect(unboundTables(contract.storage)['event']?.columns['scheduled_at']?.default).toEqual({
       kind: 'literal',
       value: '2025-01-01T00:00:00.000Z',
     });
@@ -362,5 +361,46 @@ describe('shared contract definition lowering', () => {
     ).toThrow(
       /Contract semantic validation failed:.*primary key column "id".*primary key columns must be NOT NULL/,
     );
+  });
+
+  it('routes namespaceTypes enums to storage.namespaces[nsId].types', () => {
+    const contract = buildSqlContractFromDefinition({
+      target: postgresTargetPack,
+      namespaceTypes: {
+        auth: {
+          user_type: {
+            kind: 'postgres-enum',
+            name: 'user_type',
+            nativeType: 'user_type',
+            values: ['admin', 'user'],
+            codecId: 'pg/enum@1',
+          },
+        },
+      },
+      models: [
+        {
+          modelName: 'User',
+          tableName: 'users',
+          namespaceId: 'auth',
+          fields: [
+            {
+              fieldName: 'id',
+              columnName: 'id',
+              descriptor: { codecId: 'pg/text@1', nativeType: 'text' },
+              nullable: false,
+            },
+          ],
+          id: { columns: ['id'] },
+        },
+      ],
+    });
+
+    const nsStorage = contract.storage as unknown as {
+      namespaces: Record<string, { types?: Record<string, unknown> }>;
+    };
+    expect(nsStorage.namespaces['auth']?.types).toMatchObject({
+      user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
+    });
+    expect(nsStorage.namespaces['public']?.types).toBeUndefined();
   });
 });

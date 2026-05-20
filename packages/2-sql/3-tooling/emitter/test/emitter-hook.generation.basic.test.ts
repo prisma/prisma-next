@@ -6,8 +6,10 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
 import { extractCodecTypeImports } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>
@@ -15,9 +17,9 @@ type TestDescriptor =
   | ControlExtensionDescriptor<'sql', string>;
 
 function createContract(overrides: Partial<Contract>): Contract {
-  return {
+  const merged = {
     schemaVersion: '1',
-    targetFamily: 'sql',
+    targetFamily: 'sql' as const,
     target: 'test-db',
     models: {},
     relations: {},
@@ -28,6 +30,8 @@ function createContract(overrides: Partial<Contract>): Contract {
     sources: {},
     ...overrides,
   };
+  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
+  return merged as Contract;
 }
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
@@ -448,8 +452,13 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
               },
             ],
           },
@@ -460,7 +469,7 @@ describe('sql-target-family-hook', () => {
     const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('foreignKeys: readonly');
     expect(types).toContain("readonly columns: readonly ['userId']");
-    expect(types).toContain("readonly table: 'user'");
+    expect(types).toContain("readonly tableName: 'user'");
     expect(types).toContain("readonly columns: readonly ['id']");
   });
 
@@ -489,8 +498,13 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
+                },
+
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
                 name: 'fk_post_user',
               },
             ],

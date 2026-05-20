@@ -8,7 +8,7 @@ import {
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
   type StorageTypeInstance,
   toStorageTypeInstance,
   type UniqueConstraint,
@@ -147,9 +147,10 @@ function convertIndex(index: Index): SqlIndexIR {
 
 function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
   return {
-    columns: fk.columns,
-    referencedTable: fk.references.table,
-    referencedColumns: fk.references.columns,
+    columns: fk.source.columns,
+    referencedTable: fk.target.tableName,
+    referencedSchema: fk.target.namespaceId,
+    referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
   };
 }
@@ -180,12 +181,12 @@ function convertTable(
   const fkBackingIndexes: SqlIndexIR[] = [];
   for (const fk of table.foreignKeys) {
     if (fk.index === false) continue;
-    const key = fk.columns.join(',');
+    const key = fk.source.columns.join(',');
     if (satisfiedIndexColumns.has(key)) continue;
     fkBackingIndexes.push({
-      columns: fk.columns,
+      columns: fk.source.columns,
       unique: false,
-      name: defaultIndexName(name, fk.columns),
+      name: defaultIndexName(name, fk.source.columns),
     });
     satisfiedIndexColumns.add(key);
   }
@@ -219,25 +220,38 @@ export function detectDestructiveChanges(
 
   const conflicts: MigrationPlannerConflict[] = [];
 
-  for (const tableName of Object.keys(from.tables)) {
-    if (!hasOwn(to.tables, tableName)) {
-      conflicts.push({
-        kind: 'tableRemoved',
-        summary: `Table "${tableName}" was removed`,
-      });
-      continue;
-    }
+  const namespaceIds = [
+    ...new Set([...Object.keys(from.namespaces), ...Object.keys(to.namespaces)]),
+  ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-    const toTable = to.tables[tableName] as StorageTable;
-    const fromTable = from.tables[tableName];
-    if (!fromTable) continue;
+  for (const namespaceId of namespaceIds) {
+    const fromNs = from.namespaces[namespaceId];
+    const toNs = to.namespaces[namespaceId];
+    const fromTables = fromNs?.tables;
+    if (!fromTables) continue;
 
-    for (const columnName of Object.keys(fromTable.columns)) {
-      if (!hasOwn(toTable.columns, columnName)) {
+    for (const tableName of Object.keys(fromTables)) {
+      const toTableRaw = toNs?.tables[tableName];
+      if (!(toTableRaw instanceof StorageTable)) {
         conflicts.push({
-          kind: 'columnRemoved',
-          summary: `Column "${tableName}"."${columnName}" was removed`,
+          kind: 'tableRemoved',
+          summary: `Table "${tableName}" was removed`,
         });
+        continue;
+      }
+      const toTable = toTableRaw;
+
+      const fromTableRaw = fromTables[tableName];
+      if (!(fromTableRaw instanceof StorageTable)) continue;
+      const fromTable = fromTableRaw;
+
+      for (const columnName of Object.keys(fromTable.columns)) {
+        if (!hasOwn(toTable.columns, columnName)) {
+          conflicts.push({
+            kind: 'columnRemoved',
+            summary: `Column "${tableName}"."${columnName}" was removed`,
+          });
+        }
       }
     }
   }
@@ -278,16 +292,40 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes = (storage.types ?? {}) as ResolvedStorageTypes;
+  const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
+    ...((storage.types ?? {}) as ResolvedStorageTypes),
+  };
+  for (const ns of Object.values(storage.namespaces)) {
+    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
+    if (nsTypes) {
+      for (const [k, v] of Object.entries(nsTypes)) {
+        allTypes[k] = v;
+      }
+    }
+  }
+  const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
-  for (const [tableName, tableDef] of Object.entries(storage.tables)) {
-    tables[tableName] = convertTable(
-      tableName,
-      tableDef,
-      storageTypes,
-      options.expandNativeType,
-      options.renderDefault,
-    );
+  for (const ns of Object.values(storage.namespaces)) {
+    for (const [tableName, tableDefRaw] of Object.entries(ns.tables)) {
+      if (!(tableDefRaw instanceof StorageTable)) {
+        throw new Error(
+          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.tables.${tableName}`,
+        );
+      }
+      const tableDef = tableDefRaw;
+      if (tables[tableName] !== undefined) {
+        throw new Error(
+          `contractToSchemaIR: duplicate SQL table name "${tableName}" across namespaces (ambiguous for flat SqlSchemaIR.tables).`,
+        );
+      }
+      tables[tableName] = convertTable(
+        tableName,
+        tableDef,
+        storageTypes,
+        options.expandNativeType,
+        options.renderDefault,
+      );
+    }
   }
 
   const annotations = deriveAnnotations(storage, options.annotationNamespace);
@@ -302,8 +340,19 @@ function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
-  const types = storage.types as ResolvedStorageTypes | undefined;
-  if (!types || Object.keys(types).length === 0) return undefined;
+  const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
+    ...((storage.types ?? {}) as ResolvedStorageTypes),
+  };
+  for (const ns of Object.values(storage.namespaces)) {
+    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
+    if (nsTypes) {
+      for (const [k, v] of Object.entries(nsTypes)) {
+        allTypes[k] = v;
+      }
+    }
+  }
+  const types = allTypes as ResolvedStorageTypes;
+  if (Object.keys(types).length === 0) return undefined;
   // Re-key by nativeType, normalising every variant to the codec-typed
   // annotation shape `{codecId, nativeType, typeParams}` produced by the
   // adapter introspector (`introspectPostgresEnumTypes` writes that shape;

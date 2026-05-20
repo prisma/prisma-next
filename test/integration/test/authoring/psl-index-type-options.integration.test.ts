@@ -31,16 +31,20 @@ describe('PSL @@index type and options — integration with real paradedb pack',
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
-      tables: {
-        doc: {
-          indexes: [
-            {
-              columns: ['body'],
-              name: 'doc_body_bm25_idx',
-              type: 'bm25',
-              options: { key_field: 'id' },
+      namespaces: {
+        __unbound__: {
+          tables: {
+            doc: {
+              indexes: [
+                {
+                  columns: ['body'],
+                  name: 'doc_body_bm25_idx',
+                  type: 'bm25',
+                  options: { key_field: 'id' },
+                },
+              ],
             },
-          ],
+          },
         },
       },
     });

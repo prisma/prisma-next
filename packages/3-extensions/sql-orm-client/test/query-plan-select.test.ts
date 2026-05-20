@@ -27,10 +27,11 @@ import { emptyState } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
 import { buildMixedPolyContract, isSelectAst } from './helpers';
+import { unboundTables } from './unbound-tables';
 
 function codecForColumn(table: string, column: string): string {
   const columnMeta = (
-    baseContract.storage.tables as Record<
+    unboundTables(baseContract.storage) as Record<
       string,
       { columns: Record<string, { codecId: string; nullable: boolean }> }
     >
@@ -355,14 +356,23 @@ describe('compileSelectWithIncludeStrategy', () => {
 
 describe('compileSelect MTI JOINs', () => {
   type AnyContract = {
-    storage: { tables: Record<string, { columns: Record<string, { codecId: string }> }> };
+    storage: {
+      namespaces: Record<
+        string,
+        { tables?: Record<string, { columns: Record<string, { codecId: string }> }> }
+      >;
+    };
   };
   function codecRefForColumn(
     contract: AnyContract,
     table: string,
     column: string,
   ): { codecId: string } | undefined {
-    const codecId = contract.storage.tables[table]?.columns[column]?.codecId;
+    const tables = unboundTables(contract.storage) as Record<
+      string,
+      { columns: Record<string, { codecId: string }> } | undefined
+    >;
+    const codecId = tables[table]?.columns[column]?.codecId;
     return codecId ? { codecId } : undefined;
   }
   function projectionFor(

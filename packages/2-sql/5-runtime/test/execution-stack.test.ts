@@ -107,7 +107,7 @@ describe('createExecutionStack', () => {
 
   it('creates an execution context from descriptors-only stack', () => {
     const contract = createTestContract({
-      storage: { tables: {} },
+      storage: {},
     });
 
     const context = createExecutionContext({

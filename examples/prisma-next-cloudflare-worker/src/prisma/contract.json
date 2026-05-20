@@ -379,234 +379,250 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
-      }
-    },
-    "storageHash": "sha256:15823d3626844985b4031c96aa28f09c9a50b00c88b0afa1f13a2543c4de7e4e",
-    "tables": {
-      "bug": {
-        "columns": {
-          "severity": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "stepsToRepro": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": true
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "uniques": []
-      },
-      "feature": {
-        "columns": {
-          "priority": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "targetRelease": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": true
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "uniques": []
-      },
-      "post": {
-        "columns": {
-          "createdAt": {
-            "codecId": "pg/timestamptz@1",
-            "default": {
-              "expression": "now()",
-              "kind": "function"
+      "__unbound__": {
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema",
+        "tables": {
+          "bug": {
+            "columns": {
+              "severity": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "stepsToRepro": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": true
+              }
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "foreignKeys": [],
+            "indexes": [],
+            "uniques": []
           },
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 36
-            }
+          "feature": {
+            "columns": {
+              "priority": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "targetRelease": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": true
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "uniques": []
           },
-          "title": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "userId": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [
-          {
-            "columns": [
-              "userId"
+          "post": {
+            "columns": {
+              "createdAt": {
+                "codecId": "pg/timestamptz@1",
+                "default": {
+                  "expression": "now()",
+                  "kind": "function"
+                },
+                "nativeType": "timestamptz",
+                "nullable": false
+              },
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "title": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "userId": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              }
+            },
+            "foreignKeys": [
+              {
+                "constraint": true,
+                "index": true,
+                "source": {
+                  "columns": [
+                    "userId"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "post"
+                },
+                "target": {
+                  "columns": [
+                    "id"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "user"
+                }
+              }
             ],
-            "constraint": true,
-            "index": true,
-            "references": {
+            "indexes": [],
+            "primaryKey": {
               "columns": [
                 "id"
-              ],
-              "table": "user"
-            }
-          }
-        ],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
-      },
-      "task": {
-        "columns": {
-          "createdAt": {
-            "codecId": "pg/timestamptz@1",
-            "default": {
-              "expression": "now()",
-              "kind": "function"
+              ]
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "uniques": []
           },
-          "description": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": true
-          },
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 36
-            }
-          },
-          "status": {
-            "codecId": "pg/text@1",
-            "default": {
-              "kind": "literal",
-              "value": "open"
+          "task": {
+            "columns": {
+              "createdAt": {
+                "codecId": "pg/timestamptz@1",
+                "default": {
+                  "expression": "now()",
+                  "kind": "function"
+                },
+                "nativeType": "timestamptz",
+                "nullable": false
+              },
+              "description": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": true
+              },
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "status": {
+                "codecId": "pg/text@1",
+                "default": {
+                  "kind": "literal",
+                  "value": "open"
+                },
+                "nativeType": "text",
+                "nullable": false
+              },
+              "title": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "type": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "userId": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              }
             },
-            "nativeType": "text",
-            "nullable": false
-          },
-          "title": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "type": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "userId": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [
-          {
-            "columns": [
-              "userId"
+            "foreignKeys": [
+              {
+                "constraint": true,
+                "index": true,
+                "source": {
+                  "columns": [
+                    "userId"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "task"
+                },
+                "target": {
+                  "columns": [
+                    "id"
+                  ],
+                  "namespaceId": "__unbound__",
+                  "tableName": "user"
+                }
+              }
             ],
-            "constraint": true,
-            "index": true,
-            "references": {
+            "indexes": [],
+            "primaryKey": {
               "columns": [
                 "id"
-              ],
-              "table": "user"
-            }
-          }
-        ],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
-      },
-      "user": {
-        "columns": {
-          "address": {
-            "codecId": "pg/jsonb@1",
-            "nativeType": "jsonb",
-            "nullable": true
-          },
-          "createdAt": {
-            "codecId": "pg/timestamptz@1",
-            "default": {
-              "expression": "now()",
-              "kind": "function"
+              ]
             },
-            "nativeType": "timestamptz",
-            "nullable": false
+            "uniques": []
           },
-          "displayName": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "email": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "id": {
-            "codecId": "sql/char@1",
-            "nativeType": "character",
-            "nullable": false,
-            "typeParams": {
-              "length": 36
-            }
-          },
-          "kind": {
+          "user": {
+            "columns": {
+              "address": {
+                "codecId": "pg/jsonb@1",
+                "nativeType": "jsonb",
+                "nullable": true
+              },
+              "createdAt": {
+                "codecId": "pg/timestamptz@1",
+                "default": {
+                  "expression": "now()",
+                  "kind": "function"
+                },
+                "nativeType": "timestamptz",
+                "nullable": false
+              },
+              "displayName": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "email": {
+                "codecId": "pg/text@1",
+                "nativeType": "text",
+                "nullable": false
+              },
+              "id": {
+                "codecId": "sql/char@1",
+                "nativeType": "character",
+                "nullable": false,
+                "typeParams": {
+                  "length": 36
+                }
+              },
+              "kind": {
+                "codecId": "pg/enum@1",
+                "nativeType": "user_type",
+                "nullable": false,
+                "typeRef": "user_type"
+              }
+            },
+            "foreignKeys": [],
+            "indexes": [],
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "uniques": []
+          }
+        }
+      },
+      "public": {
+        "id": "public",
+        "kind": "postgres-schema",
+        "tables": {},
+        "types": {
+          "user_type": {
             "codecId": "pg/enum@1",
+            "kind": "postgres-enum",
+            "name": "user_type",
             "nativeType": "user_type",
-            "nullable": false,
-            "typeRef": "user_type"
+            "values": [
+              "admin",
+              "user"
+            ]
           }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
+        }
       }
     },
-    "types": {
-      "user_type": {
-        "codecId": "pg/enum@1",
-        "kind": "postgres-enum",
-        "name": "user_type",
-        "nativeType": "user_type",
-        "values": [
-          "admin",
-          "user"
-        ]
-      }
-    }
+    "storageHash": "sha256:17efb9380d28aece136dac05fd18e62d63d164332bae788d13e3e4339b486839"
   },
   "execution": {
     "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",

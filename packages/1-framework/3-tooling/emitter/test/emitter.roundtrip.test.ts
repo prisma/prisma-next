@@ -1,4 +1,5 @@
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
@@ -7,24 +8,36 @@ import { createTestContract, emit } from './utils';
 
 const mockSqlHook = createMockSpi();
 
+function unboundNamespaceTables(tables: Record<string, unknown>) {
+  return {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+    },
+  };
+}
+
+function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<string, unknown> {
+  const namespaces = storage['namespaces'] as Record<string, unknown>;
+  const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+  return unbound['tables'] as Record<string, unknown>;
+}
+
 describe('emitter round-trip', () => {
   it(
     'round-trip with minimal IR',
     async () => {
       const ir = createTestContract({
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+        storage: unboundNamespaceTables({
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
         extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
@@ -99,38 +112,40 @@ describe('emitter round-trip', () => {
             relations: {},
           },
         },
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [{ columns: ['email'], name: 'user_email_key' }],
-              indexes: [{ columns: ['name'], name: 'user_name_idx' }],
-              foreignKeys: [],
+        storage: unboundNamespaceTables({
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              name: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
             },
-            post: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  columns: ['user_id'],
-                  references: { table: 'user', columns: ['id'] },
-                  name: 'post_user_id_fkey',
-                },
-              ],
-            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['email'], name: 'user_email_key' }],
+            indexes: [{ columns: ['name'], name: 'user_name_idx' }],
+            foreignKeys: [],
           },
-        },
+          post: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['user_id'],
+                },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                name: 'post_user_id_fkey',
+              },
+            ],
+          },
+        }),
         extensionPacks: {
           postgres: { version: '0.0.1' },
         },
@@ -170,21 +185,19 @@ describe('emitter round-trip', () => {
     'round-trip with nullable fields',
     async () => {
       const ir = createTestContract({
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
-                name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+        storage: unboundNamespaceTables({
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
+              name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-        },
+        }),
         extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
@@ -220,7 +233,7 @@ describe('emitter round-trip', () => {
 
       const parsed2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
       const storage = parsed2['storage'] as Record<string, unknown>;
-      const tables = storage['tables'] as Record<string, unknown>;
+      const tables = tablesFromCanonicalStorage(storage);
       const user = tables['user'] as Record<string, unknown>;
       const columns = user['columns'] as Record<string, unknown>;
       const id = columns['id'] as Record<string, unknown>;
@@ -235,19 +248,17 @@ describe('emitter round-trip', () => {
 
   it('round-trip with capabilities', async () => {
     const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+      storage: unboundNamespaceTables({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-      },
+      }),
       extensionPacks: {
         postgres: { version: '0.0.1' },
         pg: {},

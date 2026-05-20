@@ -1,5 +1,6 @@
 import type { Contract, ContractFieldType } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
 
 type ModelStorageFields = Record<string, { column?: string }>;
@@ -27,6 +28,12 @@ export interface PolymorphismInfo {
   readonly variants: ReadonlyMap<string, PolymorphismVariantInfo>;
   readonly variantsByValue: ReadonlyMap<string, PolymorphismVariantInfo>;
   readonly mtiVariants: readonly PolymorphismVariantInfo[];
+}
+
+function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
+  return contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[tableName] as
+    | StorageTable
+    | undefined;
 }
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
@@ -303,7 +310,7 @@ export function resolveUpsertConflictColumns(
   }
 
   const tableName = resolveModelTableName(contract, modelName);
-  const primaryKeyColumns = contract.storage.tables[tableName]?.primaryKey?.columns ?? [];
+  const primaryKeyColumns = unboundTable(contract, tableName)?.primaryKey?.columns ?? [];
   return [...primaryKeyColumns];
 }
 
@@ -319,14 +326,14 @@ export function resolveModelTableName(contract: Contract<SqlStorage>, modelName:
 }
 
 export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {
-  return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
+  return unboundTable(contract, tableName)?.primaryKey?.columns[0] ?? 'id';
 }
 
 export function resolveRowIdentityColumns(
   contract: Contract<SqlStorage>,
   tableName: string,
 ): readonly string[] {
-  const table = contract.storage.tables[tableName];
+  const table = unboundTable(contract, tableName);
   if (!table) {
     return [];
   }

@@ -54,15 +54,20 @@ function createParamTypesTestContract(
     roots: {},
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables: {
-        test: {
-          columns: options?.tableColumns ?? {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      namespaces: {
+        __unbound__: {
+          id: '__unbound__',
+          tables: {
+            test: {
+              columns: options?.tableColumns ?? {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       ...ifDefined('types', options?.types),

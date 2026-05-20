@@ -20,6 +20,7 @@ export type {
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
+  PslNamespace,
   PslPosition,
   PslSpan,
   PslTypeConstructorCall,

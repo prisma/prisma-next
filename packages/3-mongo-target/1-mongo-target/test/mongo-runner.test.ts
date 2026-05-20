@@ -232,7 +232,12 @@ function makeContract(profileHash: string): MongoContract {
   // `introspectSchema` stub produces a passing verify.
   return {
     profileHash,
-    storage: { storageHash: 'sha256:dest', collections: {} },
+    storage: {
+      storageHash: 'sha256:dest',
+      namespaces: {
+        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', collections: {} },
+      },
+    },
   } as unknown as MongoContract;
 }
 

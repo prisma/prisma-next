@@ -8,7 +8,11 @@ import type {
   PslNamedTypeDeclaration,
   PslTypeConstructorCall,
 } from '@prisma-next/framework-components/psl-ast';
-import type { PrintDocument } from './print-document';
+import {
+  flatPslModels,
+  UNSPECIFIED_PSL_NAMESPACE_ID,
+} from '@prisma-next/framework-components/psl-ast';
+import type { PrintDocument, PrintNamespaceSection } from './print-document';
 import { escapePslString } from './serialize-print-document';
 import type { PrinterEnum, PrinterField, PrinterModel, PrinterNamedType } from './types';
 
@@ -21,27 +25,57 @@ const DEFAULT_AST_PRINT_HEADER =
   '// Contract inferred from the live database schema. Edit as needed, then run `prisma-next contract emit`.';
 
 export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
-  const modelNames = new Set(ast.models.map((m) => m.name));
-  const deps = buildModelFkDeps(ast.models, modelNames);
-  const sortedModels = topologicalSortModels(ast.models, deps);
+  // FK dependencies are resolved across the whole document — a model in one
+  // namespace can reference a model in another, and the topo-sort needs to
+  // see every model to produce a stable order. After sorting, we re-bucket by
+  // namespace so each block prints with its own models in topo order.
+  const allModels = flatPslModels(ast);
+  const modelNames = new Set(allModels.map((m) => m.name));
+  const deps = buildModelFkDeps(allModels, modelNames);
+  const sortedModels = topologicalSortModels(allModels, deps);
+
+  const modelNamespaceIndex = new Map<string, string>();
+  for (const namespace of ast.namespaces) {
+    for (const model of namespace.models) {
+      modelNamespaceIndex.set(model.name, namespace.name);
+    }
+  }
 
   const namedTypes: PrinterNamedType[] = ast.types
     ? ast.types.declarations.map(namedTypeDeclarationToPrinterNamedType)
     : [];
 
-  const enums: PrinterEnum[] = ast.enums.map(enumToPrinterEnum);
+  const namespaceSections: PrintNamespaceSection[] = ast.namespaces.map((namespace) => {
+    const namespaceModels = sortedModels.filter(
+      (model) => modelNamespaceIndex.get(model.name) === namespace.name,
+    );
+    const printerModels = namespaceModels.map((m) => modelToPrinterModel(m));
+    const enums: PrinterEnum[] = namespace.enums.map(enumToPrinterEnum);
+    return {
+      name: namespace.name,
+      enums: enums.map((e) => ({
+        name: e.name,
+        mapName: e.mapName,
+        values: e.values,
+      })),
+      models: printerModels,
+    };
+  });
 
-  const printerModels = sortedModels.map((m) => modelToPrinterModel(m));
+  // Ensure the synthesised `__unspecified__` bucket sorts first so top-level
+  // declarations print before any `namespace { … }` blocks — matches what a
+  // user would write by hand.
+  namespaceSections.sort((a, b) => {
+    if (a.name === b.name) return 0;
+    if (a.name === UNSPECIFIED_PSL_NAMESPACE_ID) return -1;
+    if (b.name === UNSPECIFIED_PSL_NAMESPACE_ID) return 1;
+    return a.name.localeCompare(b.name);
+  });
 
   return {
     headerComment: DEFAULT_AST_PRINT_HEADER,
     namedTypes,
-    enums: enums.map((e) => ({
-      name: e.name,
-      mapName: e.mapName,
-      values: e.values,
-    })),
-    models: printerModels,
+    namespaces: namespaceSections,
   };
 }
 

@@ -17,8 +17,8 @@ import type { MongoTargetContract } from './mongo-target-contract';
  * `diffMongoSchemas`) so production verification behaviour is unchanged.
  *
  * Today's invariant: every Mongo contract carries exactly one
- * namespace (the unspecified singleton, materialised as
- * `MongoTargetUnspecifiedDatabase`), so the family-base namespace walk
+ * namespace (the unbound singleton, materialised as
+ * `MongoTargetUnboundDatabase`), so the family-base namespace walk
  * dispatches exactly once and the per-namespace body runs the existing
  * whole-schema diff. Future per-collection namespace assignment will
  * have this hook project the diff to the namespace's owned collections.

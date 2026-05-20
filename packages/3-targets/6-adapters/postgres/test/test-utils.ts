@@ -7,17 +7,26 @@
 
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import { SqlStorage, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  type SqlNamespaceTablesInput,
+  SqlStorage,
+  type StorageTableInput,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
-export function createTestContract(storage: Partial<SqlStorage> = {}): Contract<SqlStorage> {
-  const { storageHash, ...rest } = storage;
+export function createTestContract(
+  overrides: { tables?: Record<string, StorageTableInput>; storageHash?: string } = {},
+): Contract<SqlStorage> {
+  const unboundNs: SqlNamespaceTablesInput = {
+    id: UNBOUND_NAMESPACE_ID,
+    tables: overrides.tables ?? {},
+  };
   return createContract<SqlStorage>({
     storage: new SqlStorage({
-      tables: {},
-      types: {},
-      storageHash: storageHash ?? ('sha256:test' as never),
-      ...rest,
+      storageHash: (overrides.storageHash ?? 'sha256:test') as never,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
   });
 }
