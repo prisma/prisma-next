@@ -8,6 +8,7 @@ import {
   isExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { Type } from 'arktype';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -138,6 +139,39 @@ export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> 
   readonly output:
     | AuthoringEntityTypeTemplateOutput
     | AuthoringEntityTypeFactoryOutput<Input, Output>;
+  /**
+   * Family-shared storage slot where instances of this entity land
+   * inside the per-namespace envelope (e.g. `storage.<ns>.postgresEnums`).
+   * When set together with {@link hydrate} the family `ContractSerializer`
+   * dispatches the JSON→IR-class step generically through a per-slot
+   * registry instead of inlining a target-specific branch. When set
+   * together with {@link validatorSchema} the family validator folds
+   * the contributed schema into its per-namespace entry shape so the
+   * structural check covers pack-introduced slots.
+   *
+   * Omitted means the kind is authoring-only — instances flow through
+   * the existing framework-shared slot and the target's hand-rolled
+   * hydration path. Reserved slot names (a family's built-in slots,
+   * e.g. `'tables'` for SQL or `'collections'` for Mongo) are rejected
+   * at descriptor-collection time.
+   */
+  readonly storageSlotKey?: string;
+  /**
+   * Hydration factory invoked by the family `ContractSerializer` for
+   * each entry under {@link storageSlotKey}. Receives the raw JSON
+   * value (post-structural-validation) and returns the IR-class
+   * instance. Idempotent: already-class instances pass through unchanged
+   * is the caller's contract.
+   */
+  readonly hydrate?: (raw: unknown) => Output;
+  /**
+   * arktype schema fragment for one entry under {@link storageSlotKey}.
+   * The family validator composes contributed fragments into the
+   * per-namespace entry schema at validator construction time so the
+   * structural check covers pack-introduced slots without the family
+   * core hard-coding the schema.
+   */
+  readonly validatorSchema?: Type<unknown>;
 }
 
 export type AuthoringEntityTypeNamespace = {

@@ -17,7 +17,8 @@
     "@prisma-next/operations": "workspace:0.10.0",
     "@prisma-next/ts-render": "workspace:0.10.0",
     "@prisma-next/utils": "workspace:0.10.0",
-    "@standard-schema/spec": "^1.1.0"
+    "@standard-schema/spec": "^1.1.0",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:0.10.0",
