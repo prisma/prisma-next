@@ -337,6 +337,41 @@ Three cycles to break:
 
 **DoR confirmed.** ☑ (D5c landed; A7 extension reverted in spec.md; D5d brief written at `dispatches/d5d-brief.md`; first commit also resolves F4 carryover from D5c R1)
 
+**Outcome.** PARTIAL. Commits `bf3c3a9c3` (F4 fix) + `4bdab857b` (pgvector + postgis contract migrations) landed cleanly. Mongo-runtime test migration BLOCKED on F5/F3 (mongo facade wrap collapses `Models` generic — surfaced when the planned-mechanical mongo migration hit a wrap-signature bug). D5e queued to fix the wrap + complete the two remaining mongo migrations.
+
+---
+
+### Dispatch 5e: Fix mongo facade `defineContract` wrap + complete blocked mongo migrations (F3 + F5)
+
+**Intent.** D5d R1 closed F4 and migrated pgvector + postgis contracts but halted on the mongo-runtime test migration: `@prisma-next/mongo/contract-builder`'s `defineContract` wrap collapses the `Models` generic, so `PlanRow<typeof contract>` resolves model fields to `never`. This is the same root cause as F3 (the integration mongo fixture's discriminated-union + embedded-relation precision regression), which D5b documented but couldn't address inside its mechanical-migration scope. D5e is the orchestrator-led wrap fix that unblocks both. Structurally mirrors D1 R1→R2's postgres wrap fix (explicit `const` generic threading with covariant `ModelLike` constraint).
+
+**Files in play.**
+
+- `packages/3-extensions/mongo/src/contract/define-contract.ts` — rewrite both overloads to thread `const Models`, `const ValueObjects`, `const ExtensionPacks` (etc.) explicitly. Mirror the postgres pattern at `packages/3-extensions/postgres/src/contract/define-contract.ts` L25–101.
+- `packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts` (or wherever mongo authoring layer's model builder lives) — if `ContractModelBuilder` (or mongo equivalent) has a contravariant member (D1 R1 contravariance trap), export a covariant `MongoModelLike` interface and re-export it from the relevant `exports/contract-builder.ts`. Verify whether this is needed; if mongo's model builder is purely covariant, skip.
+- `packages/3-extensions/mongo/test/contract-builder/define-contract.test-d.ts` — add three positive type assertions: (a) inline `models: { User, Post }` definition form keeps `result.models.User.not.toBeNever()`; (b) factory form ditto; (c) **F3 regression**: discriminated-union model with embedded relation resolves `tasks[0].comments[0].createdAt` to its concrete type (not `never`).
+- `test/integration/test/mongo-runtime/query-builder.test.ts` — drop verbose imports + workaround comment, switch to `@prisma-next/mongo/contract-builder`, drop `family`/`target` args, keep all existing `expectTypeOf` assertions.
+- `test/integration/test/mongo/fixtures/contract.ts` — drop verbose-with-comment workaround, switch to `@prisma-next/mongo/contract-builder`, drop `family`/`target` args. Remove the F3-workaround comment.
+
+**"Done when":**
+
+- [ ] D5d landed (✓ before dispatch — partial, but the two contract migrations are committed).
+- [ ] `pnpm typecheck --filter @prisma-next/mongo --filter @prisma-next/mongo-contract-ts --filter @prisma-next/integration-tests` all pass.
+- [ ] `pnpm test --filter @prisma-next/mongo` passes — including new positive + regression type assertions in `define-contract.test-d.ts`.
+- [ ] `pnpm test:integration test/mongo-runtime/query-builder.test.ts` passes (the previously-blocked migration now typechecks AND `expectTypeOf<PlanRow>` resolves correctly).
+- [ ] `pnpm test:integration test/mongo/` covers the F3 fixture using the facade form.
+- [ ] `pnpm lint:deps` clean.
+- [ ] Grep gate: `rg "@prisma-next/(family-mongo|target-mongo)/(pack|control)" test/integration/test/mongo/ test/integration/test/mongo-runtime/` returns zero hits in the migrated files.
+- [ ] F3 closed and F5 closed in `reviews/code-review.md`.
+- [ ] No skips. No broad `as unknown as Record<string, unknown>` casts in test bodies. Narrow type-specific casts in the wrap implementation are acceptable when explained (mirror postgres's `as unknown as PostgresResult<...>` pattern — that's the single legitimate one).
+- [ ] Intent-validation: diff covers only the mongo wrap + 1-3 mongo authoring exports + mongo wrap test additions + 2 mongo test/fixture migrations. NO postgres/sqlite changes, NO pgvector/postgis touches, NO unrelated cleanup.
+
+**Size.** S–M (wrap rewrite is bounded — postgres pattern transposes line-for-line; the discriminated-union regression test is the riskiest novel piece because it's a type-level test that has to actually exercise the F3 symptom).
+
+**Tier.** Opus-medium (`claude-opus-4-7-thinking-medium`). Cross-package type threading + contravariance assessment + discriminated-union type-level test design = exactly the substantive-work floor SKILL.md establishes for non-mechanical type work. NOT composer-2.5-fast.
+
+**DoR confirmed.** ☑ (D5d's two committed contracts + F4 fix establish baseline; F3+F5 root cause analyzed; postgres pattern is the proven reference; D5e brief at `dispatches/d5e-brief.md`)
+
 ---
 
 ### Dispatch 6: Docs sweep + final lint/test/fixtures pass
@@ -380,10 +415,10 @@ Three cycles to break:
 ```text
 D1 (postgres /migration + contract-builder wrap) ─┐
 D2 (mongo parity + ctrl + bson + cb-wrap + drop barrel) ─┤
-                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples) → D5b (test fixtures) → D5c (break layering cycles) → D5d (migrate previously-blocked contracts) → D6 (docs)
+                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples) → D5b (test fixtures) → D5c (break layering cycles) → D5d (migrate pgvector+postgis contracts + F4 fix) → D5e (mongo wrap fix + blocked mongo migrations, resolves F3+F5) → D6 (docs)
 D3 (sqlite façade + contract-builder wrap) ───────┘
 ```
 
-D1, D2, D3 are independent — they can land in any order or in parallel commits within a single PR. D4 requires D1 + D3 (it switches both renderers; postgres + sqlite façade `/migration` must both resolve). D5a requires D1 + D2 + D3 (example apps + contract.ts files consume all three facades' new APIs and the wrapped `defineContract`). D5b requires D5a only to establish the migration pattern. D6 requires everything else; it's the closing dispatch.
+D1, D2, D3 are independent — they can land in any order or in parallel commits within a single PR. D4 requires D1 + D3 (it switches both renderers; postgres + sqlite façade `/migration` must both resolve). D5a requires D1 + D2 + D3 (example apps + contract.ts files consume all three facades' new APIs and the wrapped `defineContract`). D5b requires D5a only to establish the migration pattern. D5e requires D5d (was unplanned at slice-spec time; surfaced by D5d R1 halting on a mongo facade wrap-signature gap that's structurally identical to D1 R1's postgres bug). D6 requires everything else; it's the closing dispatch.
 
 Each merged commit must keep `pnpm test:packages`, `pnpm fixtures:check`, and `pnpm lint:deps` green. The renderer switch is the only dispatch where multiple files change atomically; everything else is independently revertable.
