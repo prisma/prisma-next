@@ -8,13 +8,6 @@ import { formatErrorJson, formatErrorOutput } from '../../utils/formatters/error
 import type { GlobalFlags } from '../../utils/global-flags';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
-  DEFAULT_AGENT_SKILL_SOURCES,
-  formatClaudeSkillInstallCommand,
-  formatSkillInstallCommand,
-  LEGACY_SKILL_FILE,
-  runProjectLevelSkillInstall,
-} from './agent-skill-install';
-import {
   detectPackageManager,
   formatAddArgs,
   formatAddDevArgs,
@@ -56,6 +49,13 @@ import {
 } from './output';
 import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './probe-db';
 import { findStaleArtefacts, removeDependency } from './reinit-cleanup';
+import {
+  DEFAULT_SKILL_SOURCES,
+  formatClaudeSkillInstallCommand,
+  formatSkillInstallCommand,
+  LEGACY_SKILL_FILE,
+  runProjectLevelSkillInstall,
+} from './skill-install';
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
 import { envExampleContent, envFileContent, MIN_SERVER_VERSION } from './templates/env';
 import { quickReferenceMd } from './templates/quick-reference';
@@ -451,7 +451,7 @@ export async function runInit(
   // potentially fails. We skip the install when the user passed
   // `--no-install` for the same reason — no `node_modules` means the
   // workspace isn't ready to consume the skill yet anyway.
-  const manualProjectSkillCommands = DEFAULT_AGENT_SKILL_SOURCES.flatMap((source) => [
+  const manualProjectSkillCommands = DEFAULT_SKILL_SOURCES.flatMap((source) => [
     formatSkillInstallCommand(install.effectivePm, source),
     formatClaudeSkillInstallCommand(install.effectivePm, source),
   ]);

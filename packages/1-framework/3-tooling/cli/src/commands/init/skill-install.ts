@@ -11,7 +11,7 @@ const exec = promisify(execFile);
  * upstream `skills add`. Each `SkillSource` joins this base with its
  * own subpath (and optional `#ref` for version-pinned clusters).
  */
-export const DEFAULT_AGENT_SKILL_BASE = 'prisma/prisma-next';
+export const DEFAULT_SKILL_BASE = 'prisma/prisma-next';
 
 /**
  * One discovery scope inside the Prisma Next monorepo. The CLI emits
@@ -35,7 +35,7 @@ export interface SkillSource {
   readonly description: string;
 }
 
-export const DEFAULT_AGENT_SKILL_SOURCES: readonly SkillSource[] = [
+export const DEFAULT_SKILL_SOURCES: readonly SkillSource[] = [
   {
     subpath: 'skills',
     ref: 'cli',
@@ -56,7 +56,7 @@ export const DEFAULT_AGENT_SKILL_SOURCES: readonly SkillSource[] = [
 /**
  * Test-only escape hatch for pinning the install base to a local
  * checkout. Production runs leave this unset, so installs always use
- * `DEFAULT_AGENT_SKILL_BASE`.
+ * `DEFAULT_SKILL_BASE`.
  *
  * When set to an absolute filesystem path (typical for tests), the
  * `#ref` fragment is dropped — local-path mode in upstream's CLI does
@@ -66,7 +66,7 @@ export const DEFAULT_AGENT_SKILL_SOURCES: readonly SkillSource[] = [
  */
 function resolveAgentSkillBase(): string {
   const override = process.env['PRISMA_NEXT_SKILLS_BASE']?.trim();
-  return override && override.length > 0 ? override : DEFAULT_AGENT_SKILL_BASE;
+  return override && override.length > 0 ? override : DEFAULT_SKILL_BASE;
 }
 
 function isLocalPath(base: string): boolean {
@@ -162,7 +162,7 @@ function commandToExec(command: string): {
 
 /**
  * Runs the project-level skill install for every source in
- * `DEFAULT_AGENT_SKILL_SOURCES`, in order. Returns
+ * `DEFAULT_SKILL_SOURCES`, in order. Returns
  * `{ ok: true, commands }` on success; throws a structured
  * `errorInitSkillInstallFailed` on the first failure (subsequent
  * sources are not attempted — the user opted into Prisma Next by
@@ -176,7 +176,7 @@ export async function runProjectLevelSkillInstall(ctx: {
   readonly filesWritten: readonly string[];
 }): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
   const commands: string[] = [];
-  const installCommands = DEFAULT_AGENT_SKILL_SOURCES.flatMap((source) => [
+  const installCommands = DEFAULT_SKILL_SOURCES.flatMap((source) => [
     formatSkillInstallCommand(ctx.pm, source),
     formatClaudeSkillInstallCommand(ctx.pm, source),
   ]);

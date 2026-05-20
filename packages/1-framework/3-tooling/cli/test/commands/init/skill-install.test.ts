@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
+import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
 import {
-  DEFAULT_AGENT_SKILL_BASE,
-  DEFAULT_AGENT_SKILL_SOURCES,
+  DEFAULT_SKILL_BASE,
+  DEFAULT_SKILL_SOURCES,
   formatClaudeSkillInstallCommand,
   formatSkillInstallCommand,
   formatSkillSourceUrl,
-} from '../../../src/commands/init/agent-skill-install';
-import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
+} from '../../../src/commands/init/skill-install';
 
 const PRESERVED_ENV = ['PRISMA_NEXT_SKILLS_BASE'] as const;
 
@@ -31,37 +31,31 @@ function withCleanEnv<T>(fn: () => T): T {
   }
 }
 
-const usageSource = DEFAULT_AGENT_SKILL_SOURCES.find((s) => s.subpath === 'skills');
-const upgradeSource = DEFAULT_AGENT_SKILL_SOURCES.find((s) => s.subpath === 'skills/upgrade');
-const extAuthorSource = DEFAULT_AGENT_SKILL_SOURCES.find(
-  (s) => s.subpath === 'skills/extension-author',
-);
+const usageSource = DEFAULT_SKILL_SOURCES.find((s) => s.subpath === 'skills');
+const upgradeSource = DEFAULT_SKILL_SOURCES.find((s) => s.subpath === 'skills/upgrade');
+const extAuthorSource = DEFAULT_SKILL_SOURCES.find((s) => s.subpath === 'skills/extension-author');
 
 if (!usageSource || !upgradeSource || !extAuthorSource) {
-  throw new Error('DEFAULT_AGENT_SKILL_SOURCES is missing expected entries');
+  throw new Error('DEFAULT_SKILL_SOURCES is missing expected entries');
 }
 
 describe('formatSkillSourceUrl', () => {
   it('pins the usage cluster to the CLI version', () => {
     withCleanEnv(() => {
-      expect(formatSkillSourceUrl(usageSource)).toBe(
-        `${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion}`,
-      );
+      expect(formatSkillSourceUrl(usageSource)).toBe(`${DEFAULT_SKILL_BASE}/skills#v${cliVersion}`);
     });
   });
 
   it('leaves the upgrade cluster unpinned (always tracks main)', () => {
     withCleanEnv(() => {
-      expect(formatSkillSourceUrl(upgradeSource)).toBe(
-        `${DEFAULT_AGENT_SKILL_BASE}/skills/upgrade`,
-      );
+      expect(formatSkillSourceUrl(upgradeSource)).toBe(`${DEFAULT_SKILL_BASE}/skills/upgrade`);
     });
   });
 
   it('leaves the extension-author cluster unpinned (always tracks main)', () => {
     withCleanEnv(() => {
       expect(formatSkillSourceUrl(extAuthorSource)).toBe(
-        `${DEFAULT_AGENT_SKILL_BASE}/skills/extension-author`,
+        `${DEFAULT_SKILL_BASE}/skills/extension-author`,
       );
     });
   });
@@ -84,14 +78,11 @@ describe('formatSkillSourceUrl', () => {
 
 describe('formatSkillInstallCommand', () => {
   it.each([
-    ['npm', `npx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['pnpm', `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['yarn', `yarn dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['bun', `bunx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    [
-      'deno',
-      `deno run -A npm:skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`,
-    ],
+    ['npm', `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['pnpm', `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['yarn', `yarn dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['bun', `bunx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['deno', `deno run -A npm:skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
   ] satisfies ReadonlyArray<
     readonly [PackageManager, string]
   >)('formats %s command with the version-pinned usage source', (pm, expected) => {
@@ -103,7 +94,7 @@ describe('formatSkillInstallCommand', () => {
   it('pnpm command for the upgrade source omits the #ref fragment', () => {
     withCleanEnv(() => {
       expect(formatSkillInstallCommand('pnpm', upgradeSource)).toBe(
-        `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills/upgrade --all`,
+        `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills/upgrade --all`,
       );
     });
   });
@@ -111,7 +102,7 @@ describe('formatSkillInstallCommand', () => {
   it('pnpm command for the extension-author source omits the #ref fragment', () => {
     withCleanEnv(() => {
       expect(formatSkillInstallCommand('pnpm', extAuthorSource)).toBe(
-        `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills/extension-author --all`,
+        `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills/extension-author --all`,
       );
     });
   });
@@ -121,23 +112,23 @@ describe('formatClaudeSkillInstallCommand', () => {
   it.each([
     [
       'npm',
-      `npx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+      `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
     ],
     [
       'pnpm',
-      `pnpm dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+      `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
     ],
     [
       'yarn',
-      `yarn dlx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+      `yarn dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
     ],
     [
       'bun',
-      `bunx skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+      `bunx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
     ],
     [
       'deno',
-      `deno run -A npm:skills@latest add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
+      `deno run -A npm:skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
     ],
   ] satisfies ReadonlyArray<
     readonly [PackageManager, string]
