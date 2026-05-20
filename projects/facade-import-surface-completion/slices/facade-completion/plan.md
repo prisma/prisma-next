@@ -305,7 +305,7 @@ Three cycles to break:
 
 **Tier.** Mid (judgment needed on which sql-orm-client helpers are pgvector-specific vs generally useful; reasonable architectural reasoning required for destination paths).
 
-**DoR confirmed.** [ ]
+**DoR confirmed.** ☑ (D5c R1 SATISFIED WITH FINDINGS [F4]; cycle independently verified broken by reviewer; F4 folded into D5d's first commit)
 
 ---
 
@@ -335,7 +335,7 @@ Three cycles to break:
 
 **Tier.** Cheap (mechanical now that cycle is broken).
 
-**DoR confirmed.** [ ]
+**DoR confirmed.** ☑ (D5c landed; A7 extension reverted in spec.md; D5d brief written at `dispatches/d5d-brief.md`; first commit also resolves F4 carryover from D5c R1)
 
 ---
 
