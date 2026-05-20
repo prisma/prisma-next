@@ -73,7 +73,7 @@ export interface ResolvedInitInputs {
    * project level after install + emit. True by default; `--no-skill`
    * sets it to `false`. The skill is always project-level (never
    * user-level / global) so its version stays locked to the project's
-   * Prisma Next version — see `agent-skill-install.ts`.
+   * Prisma Next version — see `skill-install.ts`.
    */
   readonly installProjectSkill: boolean;
 }

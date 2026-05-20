@@ -63,7 +63,7 @@ export function createInitCommand(): Command {
     'prisma-next init --yes --target mongodb --authoring typescript --json',
     'prisma-next init --yes --force --target postgres --authoring psl  # overwrite an existing scaffold',
     'prisma-next init --no-install                                       # skip pnpm/npm install + emit',
-    'prisma-next init --no-skill                                         # skip the agent-skill install (air-gapped / restricted env)',
+    'prisma-next init --no-skill                                         # skip the skills install (air-gapped / restricted env)',
   ]);
 
   return addGlobalOptions(command)
