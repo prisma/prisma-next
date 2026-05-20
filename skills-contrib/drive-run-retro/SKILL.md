@@ -13,7 +13,7 @@ metadata:
 
 > **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
 >
-> If the skill's body asks for work that requires reading source code, running builds/tests, or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+> **Exception for retro landing surfaces:** this skill's core outputs include writes to `drive/<category>/README.md` (project-context update) and canonical skill bodies (via `drive-update-skills`). These writes are part of the retro's definition of done and are explicitly permitted. If the skill's body asks for work that requires running builds/tests or writing files outside these permitted paths — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
 
 # Drive: Run Retro
 
