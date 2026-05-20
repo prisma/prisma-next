@@ -11,65 +11,61 @@ type Address {
   country String
 }
 
-namespace auth {
-  enum user_type {
-    admin
-    user
-  }
-
-  model User {
-    id          String    @id @default(uuid())
-    email       String
-    displayName String
-    createdAt   DateTime  @default(now())
-    kind        user_type
-    address     Address?
-    posts       public.Post[]
-    tasks       public.Task[]
-
-    @@map("user")
-  }
+enum user_type {
+  admin
+  user
 }
 
-namespace public {
-  model Post {
-    id        String         @id @default(uuid())
-    title     String
-    userId    String
-    createdAt DateTime       @default(now())
-    embedding Embedding1536?
+model User {
+  id          String    @id @default(uuid())
+  email       String
+  displayName String
+  createdAt   DateTime  @default(now())
+  kind        user_type
+  address     Address?
+  posts       Post[]
+  tasks       Task[]
 
-    user auth.User @relation(fields: [userId], references: [id])
+  @@map("user")
+}
 
-    @@map("post")
-  }
+model Post {
+  id        String         @id @default(uuid())
+  title     String
+  userId    String
+  createdAt DateTime       @default(now())
+  embedding Embedding1536?
 
-  model Task {
-    id          String   @id @default(uuid())
-    title       String
-    description String?
-    status      String   @default("open")
-    type        String
-    userId      String
-    createdAt   DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
 
-    user auth.User @relation(fields: [userId], references: [id])
+  @@map("post")
+}
 
-    @@discriminator(type)
-    @@map("task")
-  }
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  status      String   @default("open")
+  type        String
+  userId      String
+  createdAt   DateTime @default(now())
 
-  model Bug {
-    severity     String
-    stepsToRepro String?
-    @@base(Task, "bug")
-    @@map("bug")
-  }
+  user User @relation(fields: [userId], references: [id])
 
-  model Feature {
-    priority      String
-    targetRelease String?
-    @@base(Task, "feature")
-    @@map("feature")
-  }
+  @@discriminator(type)
+  @@map("task")
+}
+
+model Bug {
+  severity     String
+  stepsToRepro String?
+  @@base(Task, "bug")
+  @@map("bug")
+}
+
+model Feature {
+  priority      String
+  targetRelease String?
+  @@base(Task, "feature")
+  @@map("feature")
 }
