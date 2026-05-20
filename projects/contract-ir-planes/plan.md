@@ -22,7 +22,7 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 
 **Dispatches (within this slice):**
 
-1. **D1 — Framework primitives.** `domain` plane added to framework `Contract` type. Framework `Namespace` interface narrowed to `{ id, kind }`. Family-specific slots (`tables`, `collections`) move to family-shaped namespace types. `Storage.elementCoordinates()` polymorphic walk introduced. Callers updated to consume the narrowed interface (the only behavioural surface this dispatch touches).
+1. **D1 — Framework primitives.** `domain` plane added to framework `Contract` type. Framework `Namespace` interface narrowed to `{ id, kind }`. Family-specific slots (`tables`, `collections`) remain on family-shaped namespace types. Polymorphic free-function `elementCoordinates(storage)` walk introduced in `framework-components/ir` (dispatched on `Namespace.kind` via an inline lookup table that D2 replaces with the descriptor registry). The `Storage` interface itself stays unchanged — the walk is a free function, not a method (R1 attempted the method-on-interface design and broke emitted `contract.d.ts` byte-stability against `Contract<SqlStorage>` consumers; the R2 redirect to a free function preserves both polymorphism and structural assignability). Callers updated to consume the narrowed `Namespace` interface (the only behavioural surface this dispatch touches).
 2. **D2 — Descriptor mechanism + Postgres pack registration.** `AuthoringContributions.entityTypes` descriptor shape extended to carry storage-slot key + serializer hydration factory + validator schema fragment alongside the existing IR-class factory. Framework canonicalizer / serializer / validator dispatch through the descriptor registry generically. Postgres pack registers `postgresEnums` slot via the new descriptor. Old `storage.<ns>.types` slot remains writable; no on-disk contract changes.
 
 **Scope.** ~18-20 files total across the two dispatches. No on-disk contract changes.
@@ -90,14 +90,14 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 
 #### S1.D — Delete subsumed surfaces + close subsumed Linear tickets
 
-**Purpose.** Reap the cleanup. Delete `findSqlTable`, `assertUniqueSqlTableNames`, `extractStorageElementNames`, `SqlNamespacePayload`, `DEFAULT_NAMESPACES`, `normaliseNamespaceEntry`, `stripNamespaceKinds`, `UnboundTables<C>`. Replace remaining call sites with `Storage.elementCoordinates()` walks. Framework canonicalizer's SQL-specific paths replaced with the family-contribution hook. Subsumed Linear tickets ([TML-2579](https://linear.app/prisma-company/issue/TML-2579), [TML-2580](https://linear.app/prisma-company/issue/TML-2580), [TML-2582](https://linear.app/prisma-company/issue/TML-2582), and the three other subsumed tickets per § Project-DoD coverage map) marked Done via PR-merge GitHub integration when this slice's PR lands referencing the ticket identifiers.
+**Purpose.** Reap the cleanup. Delete `findSqlTable`, `assertUniqueSqlTableNames`, `extractStorageElementNames`, `SqlNamespacePayload`, `DEFAULT_NAMESPACES`, `normaliseNamespaceEntry`, `stripNamespaceKinds`, `UnboundTables<C>`. Replace remaining call sites with free-function `elementCoordinates(storage)` walks. Framework canonicalizer's SQL-specific paths replaced with the family-contribution hook. Subsumed Linear tickets ([TML-2579](https://linear.app/prisma-company/issue/TML-2579), [TML-2580](https://linear.app/prisma-company/issue/TML-2580), [TML-2582](https://linear.app/prisma-company/issue/TML-2582), and the three other subsumed tickets per § Project-DoD coverage map) marked Done via PR-merge GitHub integration when this slice's PR lands referencing the ticket identifiers.
 
 **Why a separate slice from the others.** Reviewers can focus on deletion correctness without conflating with structural changes. The deletions are also a quantitative signal — the grep gate is a separate PDoD check that doesn't belong inside a structural slice.
 
 **Dispatches (within this slice):**
 
 1. **D1 — Deletions.** Remove the eight subsumed surfaces.
-2. **D2 — Call-site updates.** Replace remaining callers with `Storage.elementCoordinates()` walks; framework canonicalizer's SQL-specific paths replaced with the family-contribution hook.
+2. **D2 — Call-site updates.** Replace remaining callers with free-function `elementCoordinates(storage)` walks; framework canonicalizer's SQL-specific paths replaced with the family-contribution hook.
 3. **D3 — Grep-gate verification.** `rg "findSqlTable|assertUniqueSqlTableNames|extractStorageElementNames|SqlNamespacePayload|DEFAULT_NAMESPACES|normaliseNamespaceEntry|stripNamespaceKinds|UnboundTables<C>"` in `packages/` and `examples/` returns zero matches.
 4. **D4 — Linear close-out references.** PR body references TML-2579, TML-2580, TML-2582, TML-2545, TML-2563, TML-2586 by identifier so GitHub integration auto-transitions them to the team's completed state on merge.
 
@@ -138,7 +138,7 @@ Each slice's substrate is required by the next. The "could S1.B and S1.C paralle
 | **PDoD3.** Postgres enum at `storage.<ns>.postgresEnums`; framework no longer references `'postgres-enum'` | S1.B (grep gate enforces) |
 | **PDoD4.** Cross-namespace references use object pairs | S1.C |
 | **PDoD5.** Framework `Namespace` narrowed; subsumed helpers deleted | S1.A (narrowing) + S1.D (deletions, grep gate enforces) |
-| **PDoD6.** `Storage.elementCoordinates()` consumed by planner/migration/validators | S1.A (introduces) + S1.D (consumed by retired sites' replacements) |
+| **PDoD6.** Polymorphic `elementCoordinates(storage)` walk consumed by planner/migration/validators | S1.A (introduces free function; D2 wires the descriptor registry) + S1.D (consumed by retired sites' replacements) |
 | **PDoD7.** `deserializeContract<T>(json): T` generic | S1.A (descriptor mechanism includes serializer hydration) |
 | **PDoD8.** Validation gates clean | Each slice's gate + final retro gate |
 | **PDoD9.** ADR migrated to `docs/architecture docs/adrs/` | Close-out task |

@@ -169,4 +169,4 @@ Pre-flight items the `drive-build-workflow` brief MUST include for each dispatch
 - [x] Affected packages identified for `pnpm build` cascade — D1 changes `packages/1-framework/1-core/framework-components` → downstream `pnpm build` of `packages/2-sql/1-core/contract`, `packages/2-mongo-family/1-foundation/mongo-contract`, `packages/2-sql/9-family`, `packages/3-targets/3-targets/postgres`; D2 changes `packages/1-framework/1-core/framework-components` (descriptor type) → same downstream cascade
 - [x] Fixture-regeneration decision: **none** for this slice (no on-disk shape change); `pnpm fixtures:check` is a "no drift permitted" gate
 - [x] Downstream package builds named as "done when" gates: SQL contract, Mongo contract, SQL family, Postgres target, Postgres adapter
-- [x] New public type addition: D1 adds `EntityCoordinate` and `Storage.elementCoordinates`; downstream typecheck named as gate
+- [x] New public type addition: D1 adds `EntityCoordinate` (type) and `elementCoordinates(storage)` (free function); the `Storage` interface itself stays unchanged; downstream typecheck named as gate
