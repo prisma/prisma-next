@@ -90,7 +90,7 @@ The reason the catch was clean: the load-bearing falsifier was named, the operat
 
 **Upstream candidate?** Yes — the *mechanism* (operator attaches prior finding mid-discussion → agent applies falsifier → plan revises before Linear mutation) is itself a reusable pattern. Worth documenting in `drive-plan-project` (or upstream equivalent) as "if a co-ship signal appears in your own plan prose, stop and collapse before proceeding to ticket creation."
 
-## 2026-05-20 · drive-build-workflow · gap
+## 2026-05-20 · drive-build-workflow · gap (Storage interface method vs free function)
 
 Implementer halted mid-R1 of S1.A D1 because adding a required `elementCoordinates(): Generator<EntityCoordinate>` method to the framework `Storage` interface broke `pnpm fixtures:check` and ~56 typecheck diagnostics across 29 emitted `contract.d.ts` files. Orchestrator's brief had treated the interface promotion as type-additive. The actual structural reality: every emitted `contract.d.ts` writes its storage block as a raw inline object-type literal (`ContractType<{ readonly namespaces: { … }, readonly storageHash: StorageHash, … }, …>`). That literal is consumed at runtime call sites typed `Contract<SqlStorage>`, where TypeScript checks `EmittedLiteralStorage extends SqlStorage`. Adding a required method to `Storage` changed `SqlStorage`'s structural type (because `SqlStorage implements Storage`); emitted literals carry no method members; the structural check failed at every consumption site. The byte-stability gate (S1.A SDoD1) then forbade re-emitting the 29 fixtures to add the method, so the dispatch was stuck. Operator pushback ("the walk function can take the contract as input and return coordinates — it doesn't have to be on the contract type itself") triggered a redirect: free function `elementCoordinates(storage)` exported alongside the unchanged `Storage` interface, dispatched on `Namespace.kind` via an inline lookup table (which D2 replaces with the descriptor registry). The redirect committed cleanly; D1-R2 landed with all gates green.
 
@@ -98,7 +98,7 @@ Implementer halted mid-R1 of S1.A D1 because adding a required `elementCoordinat
 
 **Upstream candidate?** Yes — the pattern (structural-typing consumers fix the interface's surface contract via their `T extends I` constraint; emitter-printed literals are *de facto* consumers of every interface their type-parameter encodes) generalises across any framework with `T extends I` runtime consumption + `.d.ts` emission. Worth promoting to the upstream skill's calibration material.
 
-## 2026-05-20 · drive-build-workflow · gap
+## 2026-05-20 · drive-build-workflow · gap (kind-narrowing cascade misses in test-d.ts)
 
 S1.A D1 R2 reviewer flagged that the orchestrator's `Namespace.kind` narrowing-cascade pre-enumeration (4 source-side `declare readonly kind?` flips + 1 emitter fallback + 1 `BuiltStorage` type literal) missed 6 additional cascade sites in `*.test-d.ts` and `test/fixtures/*.d.ts` files that handcraft inline `Contract<…>` storage literals. The implementer surfaced them at `pnpm typecheck` time and added the required `readonly kind: 'sql-namespace' | 'mongo-namespace'` lines mechanically; total diff went from the briefed ≤12-file intent to 18 files. Reviewer made an "in-spirit" call (the 6 surplus are pure cascade, not implicit refactoring) but flagged the brief-scoping gap.
 
@@ -106,7 +106,7 @@ S1.A D1 R2 reviewer flagged that the orchestrator's `Namespace.kind` narrowing-c
 
 **Upstream candidate?** Yes — applies to any TypeScript codebase where test-d files mirror emitter-produced shapes; the grep should be part of any substrate-narrowing brief's cascade survey.
 
-## 2026-05-20 · drive-build-workflow · gap
+## 2026-05-20 · drive-build-workflow · gap (plain-literal namespace path bypass)
 
 S1.A D1 R2 brief Step 8 ("remove the `?? '…'` fallback in any form" against `ns.kind` in the mongo emitter) implicitly assumed every namespace construction flows through the IR class hierarchy, where `Object.defineProperty(this, 'kind', { value: '…', enumerable: false })` runtime-materializes `kind` on the instance. The mongo contract-ts builder (`packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts`) violates that assumption: it constructs plain object literals for storage namespaces (`storageBody = { id, tables: {}, ... }`), no class instance, no defineProperty. Surfacing `kind` on those plain literals enumerably would change the storage-hash input and break `fixtures:check`. The implementer's workaround: a `mongoNamespaceKindForDts(ns)` helper in the emitter that resolves to `'mongo-namespace'` when the plain-literal namespace omits `kind`. Reviewer flagged as informational (not actionable rework) — the structural fix is to convert the mongo contract-ts builder to construct `new MongoStorage(…)` / `new MongoNamespacePayload(…)` so the non-enumerable runtime `kind` matches the IR class hierarchy. Slated for S1.D-neighbourhood follow-up; the helper is acceptable in-substrate-slice scope.
 
