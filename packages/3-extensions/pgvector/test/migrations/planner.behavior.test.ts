@@ -458,7 +458,7 @@ describe('NOT NULL column without default uses temporary default', () => {
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "active" bool DEFAULT true NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "active" bool DEFAULT (true) NOT NULL`,
     ]);
   });
 });
