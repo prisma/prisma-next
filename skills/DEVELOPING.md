@@ -1,6 +1,6 @@
 # Developing Prisma Next skills
 
-Contributor guide for the agent-skill cluster. If you are *using* the skills, read [`README.md`](./README.md) and stop here. If you are *authoring or maintaining* a skill in this cluster, read this file first.
+Contributor guide for the Prisma Next skills cluster. If you are *using* the skills, read [`README.md`](./README.md) and stop here. If you are *authoring or maintaining* a skill in this cluster, read this file first.
 
 ## What this cluster is
 
@@ -91,7 +91,7 @@ The exclusion list covers the three sanctioned sources of user-authored `@prisma
 
 When `TML-2526` lands, the framework renderer and the skill switch to `@prisma-next/postgres/migration` in lockstep. Until then, the framework-rendered-but-internal-imports case is the only sanctioned exception to façade-only imports — and the skill must name it as an exception, not normalise it.
 
-**Worked example — the contract skill re-audit.** Commit `e41f02c1b` (`docs(agent-skill): re-audit contract skill — façade-only imports`) rewrote every user-authored example in `prisma-next-contract/SKILL.md` against the façade. The `prisma-next.config.ts` example went from seven imports across `@prisma-next/{cli,adapter-postgres,driver-postgres,family-sql,target-postgres,sql-contract-psl}` to two imports from `@prisma-next/{postgres/config, extension-pgvector/control}`. The TS builder example moved off `@prisma-next/sql-contract-ts/contract-builder` onto `@prisma-next/postgres/contract-builder`, and uses `@prisma-next/postgres/family` and `@prisma-next/postgres/target` as the `family`/`target` packs (a less-obvious façade subpath worth knowing about). Read the diff for a before/after.
+**Worked example — the contract skill re-audit.** Commit `e41f02c1b` rewrote every user-authored example in `prisma-next-contract/SKILL.md` against the façade. The `prisma-next.config.ts` example went from seven imports across `@prisma-next/{cli,adapter-postgres,driver-postgres,family-sql,target-postgres,sql-contract-psl}` to two imports from `@prisma-next/{postgres/config, extension-pgvector/control}`. The TS builder example moved off `@prisma-next/sql-contract-ts/contract-builder` onto `@prisma-next/postgres/contract-builder`, and uses `@prisma-next/postgres/family` and `@prisma-next/postgres/target` as the `family`/`target` packs (a less-obvious façade subpath worth knowing about). Read the diff for a before/after.
 
 Commit `bf742221c` (`examples: migrate to @prisma-next/<target> façade imports`) does the same migration across nine example apps in `examples/`. Those apps are the canonical worked references; cite them when a skill needs a concrete example to point at.
 
