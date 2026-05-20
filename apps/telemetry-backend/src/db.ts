@@ -1,5 +1,5 @@
 import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './prisma/contract.d';
+import type { Contract } from './prisma/contract';
 import contractJson from './prisma/contract.json' with { type: 'json' };
 
 export type TelemetryDb = ReturnType<typeof postgres<Contract>>;
