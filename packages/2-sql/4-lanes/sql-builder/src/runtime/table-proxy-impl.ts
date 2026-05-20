@@ -155,8 +155,8 @@ export class TableProxyImpl<
     return this.#toJoined().outerFullJoin(other, on);
   }
 
-  insert(values: Record<string, unknown>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, values, this.ctx);
+  insert(rows: ReadonlyArray<Record<string, unknown>>): InsertQuery<QC, AvailableScope, EmptyRow> {
+    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, rows, this.ctx);
   }
 
   update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow> {

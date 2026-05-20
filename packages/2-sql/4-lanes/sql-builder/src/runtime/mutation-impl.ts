@@ -103,6 +103,32 @@ function evaluateWhere(
   return result.buildAst();
 }
 
+function buildParamRows(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  table: StorageTable,
+  tableName: string,
+  ctx: BuilderContext,
+): ReadonlyArray<Record<string, ParamRef>> {
+  const perRowParams: Array<Record<string, ParamRef>> = rows.map((rowValues) =>
+    buildParamValues(rowValues, table, tableName, 'create', ctx),
+  );
+
+  const columnUnion = new Set<string>();
+  for (const rowParams of perRowParams) {
+    for (const col of Object.keys(rowParams)) {
+      columnUnion.add(col);
+    }
+  }
+
+  return perRowParams.map((rowParams) => {
+    const filled: Record<string, ParamRef> = {};
+    for (const col of columnUnion) {
+      filled[col] = rowParams[col] ?? ParamRef.of(null);
+    }
+    return filled;
+  });
+}
+
 export class InsertQueryImpl<
     QC extends QueryContext = QueryContext,
     AvailableScope extends Scope = Scope,
@@ -114,7 +140,7 @@ export class InsertQueryImpl<
   readonly #tableName: string;
   readonly #table: StorageTable;
   readonly #scope: Scope;
-  readonly #values: Record<string, unknown>;
+  readonly #rows: ReadonlyArray<Record<string, unknown>>;
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
@@ -123,7 +149,7 @@ export class InsertQueryImpl<
     tableName: string,
     table: StorageTable,
     scope: Scope,
-    values: Record<string, unknown>,
+    rows: ReadonlyArray<Record<string, unknown>>,
     ctx: BuilderContext,
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
@@ -133,7 +159,7 @@ export class InsertQueryImpl<
     this.#tableName = tableName;
     this.#table = table;
     this.#scope = scope;
-    this.#values = values;
+    this.#rows = rows;
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
     this.#annotations = annotations;
@@ -153,7 +179,7 @@ export class InsertQueryImpl<
         this.#tableName,
         this.#table,
         this.#scope,
-        this.#values,
+        this.#rows,
         this.ctx,
         columns,
         newRowFields,
@@ -176,7 +202,7 @@ export class InsertQueryImpl<
       this.#tableName,
       this.#table,
       this.#scope,
-      this.#values,
+      this.#rows,
       this.ctx,
       this.#returningColumns,
       this.#rowFields,
@@ -188,15 +214,13 @@ export class InsertQueryImpl<
   }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
-    const paramValues = buildParamValues(
-      this.#values,
-      this.#table,
-      this.#tableName,
-      'create',
-      this.ctx,
-    );
+    if (this.#rows.length === 0) {
+      throw new Error('insert() called with an empty row array — at least one row is required');
+    }
 
-    let ast = InsertAst.into(TableSource.named(this.#tableName)).withValues(paramValues);
+    const paramRows = buildParamRows(this.#rows, this.#table, this.#tableName, this.ctx);
+
+    let ast = InsertAst.into(TableSource.named(this.#tableName)).withRows(paramRows);
 
     if (this.#returningColumns.length > 0) {
       ast = ast.withReturning(

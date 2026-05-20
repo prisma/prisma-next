@@ -132,12 +132,14 @@ export interface TableProxy<
   ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>>;
 
   insert(
-    values: ResolvedInsertValues<
-      C,
-      UnboundTables<C>[Name],
-      Name,
-      QC['codecTypes'],
-      ExtractFieldInputTypes<C>
+    rows: ReadonlyArray<
+      ResolvedInsertValues<
+        C,
+        UnboundTables<C>[Name],
+        Name,
+        QC['codecTypes'],
+        ExtractFieldInputTypes<C>
+      >
     >,
   ): InsertQuery<QC, AvailableScope, EmptyRow>;
 
