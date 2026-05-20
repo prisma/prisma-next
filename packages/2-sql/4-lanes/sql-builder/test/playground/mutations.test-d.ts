@@ -123,3 +123,31 @@ test('INSERT bare object form is a type error', () => {
   // @ts-expect-error — bare object is no longer accepted; wrap in array: insert([{ id: 1 }])
   db.users.insert({ id: 1 });
 });
+
+// UPDATE callback overload — type-level tests
+
+test('UPDATE callback overload type-checks with field reference', () => {
+  const result = db.users.update((f) => ({ name: f.name })).build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<Record<never, never>>>();
+});
+
+test('UPDATE callback overload type-checks with where and returning', () => {
+  const result = db.users
+    .update((f) => ({ name: f.name }))
+    .where((f, fns) => fns.eq(f.id, 1))
+    .returning('id', 'name')
+    .build();
+  expectTypeOf(result).toEqualTypeOf<SqlQueryPlan<{ id: number; name: string }>>();
+});
+
+// Negative type tests — callback overload must enforce codec compatibility
+test('UPDATE callback codec mismatch is a type error', () => {
+  // @ts-expect-error — f.name is a text expression; id expects a numeric expression
+  db.users.update((f) => ({ id: f.name }));
+});
+
+test('UPDATE callback aggregate function is a type error', () => {
+  db.users
+    // @ts-expect-error — count() is not in Functions (non-aggregate only); update callback cannot use aggregates
+    .update((_f, fns) => ({ name: fns.count() }));
+});
