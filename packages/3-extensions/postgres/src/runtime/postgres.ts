@@ -179,7 +179,12 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     const runtimeBinding = toRuntimeBinding(resolvedBinding, options);
     if (resolvedBinding.kind === 'url' && runtimeBinding.kind === 'pgPool') {
       const pool = runtimeBinding.pool;
-      ownedDispose = () => pool.end().then(() => undefined);
+      let disposed = false;
+      ownedDispose = async () => {
+        if (disposed) return;
+        disposed = true;
+        await pool.end().then(() => undefined);
+      };
     }
     connectPromise = runtimeDriver
       .connect(runtimeBinding)
@@ -189,9 +194,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       .catch(async (err) => {
         backgroundConnectError = err;
         connectPromise = undefined;
-        if (resolvedBinding.kind === 'url' && runtimeBinding.kind === 'pgPool') {
-          await runtimeBinding.pool.end().catch(() => undefined);
-        }
+        await ownedDispose?.().catch(() => undefined);
         throw err;
       });
     return connectPromise;

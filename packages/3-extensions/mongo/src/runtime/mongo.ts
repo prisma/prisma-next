@@ -222,10 +222,12 @@ export default function mongo<
       // nothing to close if the build never produced a runtime.
       try {
         await runtimePromise;
-        await ownedDispose?.();
       } catch {
-        // build failed; nothing to close.
+        // build failed; still attempt disposing any already-acquired owned driver.
       }
+      const dispose = ownedDispose;
+      ownedDispose = undefined;
+      await dispose?.();
     },
 
     [Symbol.asyncDispose](): Promise<void> {
