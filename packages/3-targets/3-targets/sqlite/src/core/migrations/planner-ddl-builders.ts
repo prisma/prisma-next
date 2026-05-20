@@ -69,7 +69,7 @@ export function buildColumnDefaultSql(
 
   switch (columnDefault.kind) {
     case 'autoincrement': {
-      if (!context || !context.isIntegerPrimaryKey) {
+      if (!context?.isIntegerPrimaryKey) {
         const columnPath = context ? `${context.tableName}.${context.columnName}` : '<unknown>';
         throw new Error(
           `Column "${columnPath}" has kind 'autoincrement' but is not an INTEGER PRIMARY KEY. ` +

@@ -1,12 +1,12 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ExecutionMutationDefaultPhases, JsonValue } from '@prisma-next/contract/types';
 import type {
+  AuthoringColumnDefault,
   AuthoringContributions,
   AuthoringEntityTypeDescriptor,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
-import type { AuthoringColumnDefault } from '@prisma-next/framework-components/authoring';
 import {
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
@@ -858,7 +858,7 @@ function tryRecogniseAutoincrementParseTime(input: {
     return { ok: true, value: undefined };
   }
   const traits = resolveCodecTraits(input.codecLookup, input.codecId);
-  if (!traits || !traits.includes('autoincrement')) {
+  if (!traits?.includes('autoincrement')) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
       message: `Field "${input.modelName}.${input.fieldName}" @default(autoincrement()) requires a codec with the "autoincrement" trait; codec "${input.codecId}" does not carry it.`,
