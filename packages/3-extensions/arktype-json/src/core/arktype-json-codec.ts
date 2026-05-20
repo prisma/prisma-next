@@ -241,7 +241,11 @@ export const arktypeJsonDescriptor = new ArktypeJsonDescriptor();
  */
 export function arktypeJsonColumn<S extends Type<unknown>>(
   schema: S,
-): ColumnSpec<ArktypeJsonCodecClass<S['infer']>, ArktypeJsonTypeParams> {
+): ColumnSpec<
+  ArktypeJsonCodecClass<S['infer']>,
+  ArktypeJsonTypeParams,
+  typeof arktypeJsonDescriptor.traits
+> {
   if (!isArktypeSchemaLike(schema)) {
     throw new Error(
       typeof schema !== 'function'
@@ -260,6 +264,7 @@ export function arktypeJsonColumn<S extends Type<unknown>>(
     arktypeJsonDescriptor.codecId,
     params,
     ARKTYPE_JSON_NATIVE_TYPE,
+    arktypeJsonDescriptor.traits,
   );
 }
 
