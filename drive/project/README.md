@@ -48,3 +48,18 @@ Index doc: `docs/<project>/README.md` (created at migration time).
 Transient artefacts (deleted at close, never migrated): `spec.md`, `plan.md`, `problem-statement.md`, `*-restructure.md`, `migration-plan.md`, `design-decisions.md` (decisions that needed preservation should already be ADRs by close-out), `retros.md`, `trial.md`, project-level `README.md`, `specs/`, `plans/`, `assets/` (unless explicitly tagged "keep").
 
 Ambiguous-by-default: anything not matching the rules above. `drive-close-project` surfaces these to the operator at classification time — never silently classified.
+
+## Audit-class deliverables under `projects/**/reviews/`
+
+The workspace `.gitignore` ignores `projects/**/reviews/` by default — review artefacts (`code-review.md`, `system-design-review.md`, `walkthrough.md`, reviewer scratchpads) are transient and local. Most projects keep them that way.
+
+A few project DoDs require a specific audit-class artefact to land **in PR history** instead of just on disk: a PII-zero audit checklist for a telemetry project, a security-review sign-off for a credentials-handling project, a license-audit roll-up for an external-dep adoption project. Those need to be tracked, and a naive `!projects/<project>/reviews/<file>` re-include underneath the existing rule will *not* work — git stops descending into a wholly-ignored directory, so re-includes inside it never fire.
+
+The fix is a two-line change to the workspace `.gitignore`:
+
+1. Replace `projects/**/reviews/` (ignores the directory itself) with `projects/**/reviews/*` (ignores the directory's contents but leaves the directory traversable). This is a pure relaxation: every file under every project's reviews folder remains ignored unless explicitly re-included.
+2. Add a narrow `!projects/<project>/reviews/<file>` re-include for each named artefact that needs PR-history persistence.
+
+The re-included files survive close-out only if their tracked copy is migrated out of `projects/<project>/reviews/` before the project workspace is deleted. The default close-out posture is **delete** — audit artefacts establish that the audit happened in PR history but are not preserved as steady-state docs. If a particular artefact should outlive close-out (e.g. it documents a precedent that future projects will rely on), migrate it explicitly to `docs/<project>/` or to a sibling `docs/` location at close-out time.
+
+Precedent: the cli-telemetry project's AC13 PII-zero audit checklist landed at `projects/cli-telemetry/reviews/ac13-audit.md` via this pattern, deleted at close-out per the default posture; the lesson lives on through this section.
