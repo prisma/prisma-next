@@ -1,3 +1,4 @@
+import { log } from './logger';
 import type { TelemetryServer, TelemetryServerStartOptions } from './server-runtime';
 
 export function startBunTelemetryServer(options: TelemetryServerStartOptions): TelemetryServer {
@@ -8,7 +9,10 @@ export function startBunTelemetryServer(options: TelemetryServerStartOptions): T
       return options.handler(request, remoteAddress !== undefined ? { remoteAddress } : undefined);
     },
     error(error): Response {
-      console.error('telemetry backend internal error', error);
+      log.error({
+        event: 'request-internal-error',
+        error: error instanceof Error ? error.message : String(error),
+      });
       return new Response('Internal Server Error', { status: 500 });
     },
   });

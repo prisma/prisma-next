@@ -1,5 +1,6 @@
 import { createTelemetryDb } from './db';
 import { createHandler, type HandlerInfo } from './handler';
+import { log } from './logger';
 import { createRequestsPerMinuteRateLimiter } from './rate-limiter';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -82,7 +83,7 @@ export async function stopTelemetryBackend(
     shutdownTimeout(),
   ]);
   if (result === 'timed-out') {
-    console.error(`telemetry backend shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms`);
+    log.error({ event: 'shutdown-timeout', timeoutMs: SHUTDOWN_TIMEOUT_MS });
   }
   return result;
 }
@@ -130,9 +131,11 @@ export async function runTelemetryBackendServer(
     throw error;
   }
 
-  console.log(
-    `telemetry backend listening on port ${server.port} (rate limit ${app.requestsPerMinute} req/min/IP)`,
-  );
+  log.info({
+    event: 'startup',
+    port: server.port,
+    requestsPerMinute: app.requestsPerMinute,
+  });
 
   let shuttingDown = false;
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
@@ -140,14 +143,17 @@ export async function runTelemetryBackendServer(
       return;
     }
     shuttingDown = true;
-    console.log(`received ${signal}; shutting down`);
+    log.info({ event: 'shutdown-requested', signal });
 
     let exitCode: 0 | 1 = 0;
     try {
       await stopTelemetryBackend(server, app);
     } catch (error) {
       exitCode = 1;
-      console.error('telemetry backend shutdown failed', error);
+      log.error({
+        event: 'shutdown-failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
     process.exit(exitCode);
   };
