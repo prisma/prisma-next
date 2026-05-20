@@ -413,5 +413,11 @@ export function defineContract(
   return buildContractFromDsl(builtDefinition);
 }
 
-export type { ComposedAuthoringHelpers, ContractInput, ContractModelBuilder, ScalarFieldBuilder };
+export type {
+  ComposedAuthoringHelpers,
+  ContractInput,
+  ContractModelBuilder,
+  ModelLike,
+  ScalarFieldBuilder,
+};
 export { field, model, rel };
