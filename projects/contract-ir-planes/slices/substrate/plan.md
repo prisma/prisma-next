@@ -14,26 +14,32 @@ Both dispatches are **M** per [`drive/calibration/sizing.md`](../../../../drive/
 
 ### Dispatch 1: Framework type primitives
 
-**Intent.** Add the type substrate the rest of the project consumes. Three additive type changes plus one narrowing:
+> **R2 redirect (2026-05-20):** R1 attempted to put `elementCoordinates()` on the `Storage` interface as a required method; structural assignability of emitted `contract.d.ts` literals against `Contract<SqlStorage>` consumers broke (the printed literal has no method members), surfacing as ~56 typecheck diagnostics across 29 fixtures and a `pnpm fixtures:check` byte-stability violation. R2 reframes the walk as a **free function** consuming any `Storage`-shaped value, dispatched on `Namespace.kind` via an inline lookup table. Interface stays unchanged; emitted literals keep satisfying every consumer; fixtures stay byte-stable. See dispatch brief for the revert-and-redo sequence.
 
-1. New `EntityCoordinate` type (`{ namespaceId, entityKind, entityName }`) + `Storage.elementCoordinates(): Generator<EntityCoordinate>` method on the framework `Storage` interface; implementations on `SqlStorage` and `MongoStorage` walking their built-in slots (`tables` / `collections`).
-2. Optional `domain` field added to the framework `Contract` type as `Record<string, Record<string, Record<string, unknown>>>`; canonicalizer's `TOP_LEVEL_ORDER` learns the new key.
-3. `Namespace` interface narrowing: `kind` promoted from optional on `IRNode` to required on `Namespace`. Concrete `NamespaceBase` subclasses change their `declare readonly kind?: string` to `declare readonly kind: string` (the runtime non-enumerable `Object.defineProperty` pattern stays intact).
+**Intent.** Add the type substrate the rest of the project consumes. Three additive type changes + one narrowing + one free helper:
 
-What stays the same: no on-disk contracts change. `storage.namespaces` shape unchanged. `models` / `valueObjects` / `roots` flat at root unchanged. `'postgres-enum'` literal sites unchanged. `extractStorageElementNames` migration-loader walker stays as-is (its replacement is S1.D's job).
+1. New `EntityCoordinate` type (`{ namespaceId, entityKind, entityName }`) co-located with `Storage` in `@prisma-next/framework-components/ir`.
+2. Free `elementCoordinates(storage)` helper exported from the same module — yields `Generator<EntityCoordinate>` over any `Storage`-shaped value; internally consults an inline `Map<namespaceKind, slotKeys>` lookup table to know which slots to walk per `ns.kind`. Hardcoded for `'sql-namespace'` → `[tables, types]` and `'mongo-namespace'` → `[collections]`; D2 replaces the inline table with the pack-contributed descriptor registry. **The `Storage` interface is unchanged** — no method added.
+3. Optional `domain` field added to the framework `Contract` type as `Record<string, Record<string, Record<string, unknown>>>`; canonicalizer's `TOP_LEVEL_ORDER` learns the new key.
+4. `Namespace` interface narrowing: `kind` promoted from optional on `IRNode` to required on `Namespace`. The four concrete `NamespaceBase` subclasses change their `declare readonly kind?: string` to `declare readonly kind: string` (the runtime non-enumerable `Object.defineProperty` pattern stays intact). One downstream `?? 'mongo-namespace'` fallback in the mongo emitter is removed (F2 cure). `BuiltStorage<Definition>`'s two namespace-literal `kind?: string` declarations tighten to `kind: string`.
+
+What stays the same: no on-disk contracts change. `storage.namespaces` shape unchanged. `models` / `valueObjects` / `roots` flat at root unchanged. `'postgres-enum'` literal sites unchanged. `extractStorageElementNames` migration-loader walker stays as-is (its replacement is S1.D's job). **The `Storage` interface itself is untouched** — no new method member.
 
 **Files in play.**
 
+- `packages/1-framework/1-core/framework-components/src/ir/storage.ts` — add `EntityCoordinate` type + inline `SLOT_KEYS_BY_NAMESPACE_KIND` table + free `elementCoordinates(storage)` function. **`Storage` interface unchanged.**
+- `packages/1-framework/1-core/framework-components/src/exports/ir.ts` — wire the `EntityCoordinate` type re-export and the `elementCoordinates` value re-export
 - `packages/1-framework/0-foundation/contract/src/contract-types.ts` — add `domain?` field to `Contract` interface
-- `packages/1-framework/0-foundation/contract/src/canonicalization.ts` — extend `TOP_LEVEL_ORDER` (L17–L31); SQL-specific `storage.namespaces.*` path checks left untouched
-- `packages/1-framework/1-core/framework-components/src/ir/namespace.ts` — narrow `Namespace` interface; tighten `NamespaceBase` declaration
-- `packages/1-framework/1-core/framework-components/src/ir/ir-node.ts` — `kind` on `IRNode` stays optional (only `Namespace` narrows); audit for consumers reading `kind?` defensively
-- `packages/1-framework/1-core/framework-components/src/ir/storage.ts` — add `EntityCoordinate` type (co-located per spec OQ1 working position) + `elementCoordinates()` signature
-- `packages/2-sql/1-core/contract/src/ir/sql-storage.ts` — implement `SqlStorage.elementCoordinates()`; update `SqlNamespacePayload`'s `declare readonly kind?: string` → required
-- `packages/2-mongo-family/1-foundation/mongo-contract/src/ir/mongo-storage.ts` — implement `MongoStorage.elementCoordinates()`; update `MongoNamespacePayload`'s `kind` declaration
-- `packages/3-targets/3-targets/postgres/src/core/postgres-schema.ts` (likely path; verify) — `PostgresSchema.kind` declaration if it shadows `Namespace.kind`
-- Any `SqlUnboundNamespace` / `MongoUnboundNamespace` singleton files — `kind` declaration update
-- Brand-check sites (4 files audited; verify `instanceof NamespaceBase` still discriminates): `sql-storage.ts`, `sql-contract-serializer-base.ts` (`packages/2-sql/9-family/src/core/ir/`), `postgres-contract-serializer.ts` (`packages/3-targets/3-targets/postgres/src/core/`), `mongo-storage.ts`
+- `packages/1-framework/0-foundation/contract/src/canonicalization.ts` — extend `TOP_LEVEL_ORDER` (L17–L31) with `'domain'`; SQL-specific `storage.namespaces.*` path checks left untouched
+- `packages/1-framework/1-core/framework-components/src/ir/namespace.ts` — narrow `Namespace.kind` to required; tighten `NamespaceBase` declaration
+- `packages/2-sql/1-core/contract/src/ir/sql-storage.ts` — `SqlNamespacePayload.declare readonly kind?: string` → required (no method body added)
+- `packages/2-sql/1-core/contract/src/ir/sql-unbound-namespace.ts` — `SqlUnboundNamespace.declare readonly kind?: string` → required
+- `packages/2-mongo-family/1-foundation/mongo-contract/src/ir/mongo-storage.ts` — `MongoNamespacePayload.declare readonly kind?: string` → required (no method body added)
+- `packages/2-mongo-family/1-foundation/mongo-contract/src/ir/mongo-unbound-namespace.ts` — `MongoUnboundNamespace.declare readonly kind?: string` → required
+- `packages/2-sql/2-authoring/contract-ts/src/contract-types.ts` (lines 567, 574) — tighten `BuiltStorage<Definition>`'s two `readonly kind?: string` namespace-literal lines to `readonly kind: string`
+- `packages/2-mongo-family/3-tooling/emitter/src/index.ts:56` — remove the `?? 'mongo-namespace'` fallback (F2 cure)
+- `packages/1-framework/1-core/framework-components/src/ir/ir-node.ts` — **NO change** (kind stays optional on IRNode; only Namespace narrows)
+- Audit-only (no edits expected): brand-check sites at `sql-storage.ts`, `sql-contract-serializer-base.ts` (`packages/2-sql/9-family/src/core/ir/`), `postgres-contract-serializer.ts` (`packages/3-targets/3-targets/postgres/src/core/`), `mongo-storage.ts`; defensive casts at `packages/2-sql/3-tooling/emitter/src/index.ts:421,429` and `packages/3-targets/3-targets/postgres/src/core/postgres-schema.ts:189`
 
 **Done when.**
 
@@ -45,9 +51,9 @@ What stays the same: no on-disk contracts change. `storage.namespaces` shape unc
 - [ ] Edge cases covered: `Namespace.kind` promotion (spec edge #1 — typecheck enforces), non-enumerable `Object.defineProperty` preservation (spec edge #2 — fixtures byte-stability), `instanceof NamespaceBase` brand-checks (spec edge #3 — typecheck + test:packages), `EntityCoordinate` field-order convention (spec edge #4 — type definition is the gate), `elementCoordinates()` iterator shape (spec edge #5 — type definition is the gate), `domain` plane unpopulated (spec edge #6 — typecheck + fixtures byte-stability)
 - [ ] Grep gates per [`drive/calibration/grep-library.md`](../../../../drive/calibration/grep-library.md) § IR substrate hygiene: `rg 'namespaceId\?:' packages/` zero new occurrences; `rg '\.namespaceId\s*\?\?' packages/` zero new occurrences; F1 dual-shape-relocated grep zero hits
 
-**Size.** M. ~10–12 files, type-additive with one targeted narrowing whose cascade is bounded by the brand-check survey (4 sites audited, none access `.kind`). The risk is type-system surprises in untouched packages — mitigated by `pnpm typecheck` as the first gate and by the cadence below.
+**Size.** M. ~10–12 files. Post-redirect the work is strictly mechanical: enumerated revert of R1's 8 unstaged files, then enumerated additive edits with verbatim type signatures + a pre-enumerated narrowing cascade (4 class declarations + 1 emitter fallback + 1 `BuiltStorage` type literal). The risk of type-system surprise in untouched packages is bounded by orchestrator-side grep enumeration (Step 9 of the brief) before `pnpm typecheck` is invoked.
 
-**Model tier.** Opus (substrate change per [`drive/calibration/model-tier.md`](../../../../drive/calibration/model-tier.md) row 1). Slug: `claude-opus-4-7-thinking-high` (medium tier unavailable to the orchestrator; team rule against sonnet/low; opus is the next tier up).
+**Model tier.** Composer-2.5 (slug: `composer-2.5-fast`). Per orchestrator routing rule (2026-05-20): aim for Composer-2.5 on implementation work when the dispatch is strictly bounded with no creative latitude. This dispatch qualifies — every file is enumerated, every edit is described literally, and hard escalation triggers (any of: cascade > 15 files, any fixture drift, any edit outside the enumerated files, any new `?? '…'` fallback against `ns.kind`, any modification of the `Storage` interface beyond co-locating `EntityCoordinate`) bound the dispatch. If any trigger fires, the orchestrator re-dispatches the residual on Opus 4.7 (`claude-opus-4-7-thinking-high`).
 
 **DoR confirmed.**
 
