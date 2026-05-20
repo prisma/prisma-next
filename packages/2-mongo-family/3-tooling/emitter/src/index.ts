@@ -3,6 +3,15 @@ import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
 
+const MONGO_NAMESPACE_KIND = 'mongo-namespace' as const;
+
+function mongoNamespaceKindForDts(ns: { readonly id: string; readonly kind?: string }): string {
+  if (typeof ns.kind === 'string') {
+    return ns.kind;
+  }
+  return MONGO_NAMESPACE_KIND;
+}
+
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
@@ -53,7 +62,7 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
     const collectionsType = generateMongoNamespaceCollectionsType(
       ns.collections as Readonly<Record<string, MongoCollection>>,
     );
-    const nsKind = ns.kind;
+    const nsKind = mongoNamespaceKindForDts(ns);
     parts.push(
       `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly kind: ${serializeValue(nsKind)}; readonly collections: ${collectionsType} }`,
     );

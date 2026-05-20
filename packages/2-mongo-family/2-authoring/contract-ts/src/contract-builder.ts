@@ -1516,11 +1516,19 @@ function buildContractFromDefinition<
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
-        kind: 'mongo-namespace',
         collections,
       },
     },
   };
+
+  const storage = {
+    ...storageBody,
+    storageHash: computeStorageHash({
+      target: definition.target.targetId,
+      targetFamily: definition.family.familyId,
+      storage: storageBody,
+    }),
+  } as unknown as MongoStorageShape<string>;
 
   const builtContract = {
     target: definition.target.targetId,
@@ -1528,14 +1536,7 @@ function buildContractFromDefinition<
     roots,
     models: builtModels,
     ...(Object.keys(builtValueObjects).length > 0 ? { valueObjects: builtValueObjects } : {}),
-    storage: {
-      ...storageBody,
-      storageHash: computeStorageHash({
-        target: definition.target.targetId,
-        targetFamily: definition.family.familyId,
-        storage: storageBody,
-      }),
-    },
+    storage,
     capabilities,
     extensionPacks: definition.extensionPacks ?? {},
     profileHash: computeProfileHash({
