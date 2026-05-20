@@ -62,7 +62,7 @@ jobs:
         working-directory: apps/telemetry-backend
         env:
           DATABASE_URL: ${{ secrets.TELEMETRY_DATABASE_URL_PRODUCTION }}
-        run: pnpm exec prisma-next migrate
+        run: pnpm run migrate
 
       - name: Deploy to Prisma Compute
         working-directory: apps/telemetry-backend
