@@ -1,9 +1,9 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { Collection } from '@prisma-next/sql-orm-client';
 import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { Collection } from '../../src/collection';
-import { withReturningCapability } from '../collection-fixtures';
-import { getTestContext, getTestContract } from '../helpers';
+import { withReturningCapability } from './collection-fixtures';
+import { getTestContext, getTestContract } from './helpers';
 import {
   createReturningTagsCollection,
   createReturningUsersCollection,

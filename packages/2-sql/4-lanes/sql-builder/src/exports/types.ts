@@ -1,4 +1,4 @@
-export type { AggregateFunctions, Expression, Functions } from '../expression';
+export type { AggregateFunctions, BooleanCodecType, Expression, Functions } from '../expression';
 export type { ResolveRow } from '../resolve';
 export type { GatedMethod, QueryContext, Scope, ScopeField, Subquery } from '../scope';
 export type { Db, TableProxyContract } from '../types/db';

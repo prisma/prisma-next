@@ -1,3 +1,4 @@
+import { Collection } from '@prisma-next/sql-orm-client';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
@@ -7,8 +8,7 @@ import {
   type SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { Collection } from '../../src/collection';
-import { getTestContext, getTestContract, isSelectAst } from '../helpers';
+import { getTestContext, getTestContract, isSelectAst } from './helpers';
 import {
   createPostsCollection,
   createUsersCollection,
@@ -61,7 +61,7 @@ function createUsersCollectionWithCapabilities(
   return new Collection({ runtime, context }, 'User');
 }
 
-type NumericPostField = import('../../src/types').NumericFieldNames<
+type NumericPostField = import('@prisma-next/sql-orm-client').NumericFieldNames<
   ReturnType<typeof getTestContract>,
   'Post'
 >;

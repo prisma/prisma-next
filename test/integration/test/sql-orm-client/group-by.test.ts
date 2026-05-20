@@ -1,6 +1,6 @@
 import { AggregateExpr, BinaryExpr, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { isSelectAst } from '../helpers';
+import { isSelectAst } from './helpers';
 import { createPostsCollection, timeouts, withCollectionRuntime } from './integration-helpers';
 import { seedPosts } from './runtime-helpers';
 

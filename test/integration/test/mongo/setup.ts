@@ -12,6 +12,37 @@ import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe } from 'vitest';
 
+export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {
+  const replSet = await MongoMemoryReplSet.create({
+    instanceOpts: [
+      { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+    ],
+    replSet: { count: 1, storageEngine: 'wiredTiger' },
+  });
+  const connectionUri = replSet.getUri();
+  const dbName = 'test';
+  const client = new MongoClient(connectionUri);
+  await client.connect();
+
+  const stack = createMongoExecutionStack({
+    target: mongoRuntimeTarget,
+    adapter: mongoRuntimeAdapter,
+  });
+  const context = createMongoExecutionContext({ contract: {}, stack });
+  const driver = await createMongoDriver(connectionUri, dbName);
+  const runtime = createMongoRuntime({ context, driver });
+
+  const ctx: MongodContext = { connectionUri, dbName, client, runtime };
+
+  try {
+    return await fn(ctx);
+  } finally {
+    await runtime.close();
+    await client.close();
+    await replSet.stop();
+  }
+}
+
 export interface MongodContext {
   readonly connectionUri: string;
   readonly dbName: string;

@@ -1,8 +1,8 @@
+import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
-import { Collection } from '../../src/collection';
-import { withReturningCapability } from '../collection-fixtures';
-import { buildMixedPolyContract, getTestContext, type TestContract } from '../helpers';
+import { withReturningCapability } from './collection-fixtures';
+import { buildMixedPolyContract, getTestContext, type TestContract } from './helpers';
 import { timeouts, withCollectionRuntime } from './integration-helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
 

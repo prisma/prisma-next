@@ -1,6 +1,6 @@
+import type { BooleanCodecType, Expression } from '@prisma-next/sql-builder/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { expectTypeOf, test } from 'vitest';
-import type { BooleanCodecType, Expression } from '../../src/expression';
 import { db } from './preamble';
 
 test('extension function in select expression', () => {
