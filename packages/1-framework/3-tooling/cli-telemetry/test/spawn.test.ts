@@ -81,14 +81,13 @@ describe('runTelemetry — gating decisions short-circuit before fork', () => {
     expect(runTelemetry(makeInputs())).toEqual({ spawned: false, reason: 'gated-off' });
   });
 
-  it('returns fork-failed when the sender path does not exist (every failure is swallowed)', () => {
+  it('returns spawned:true synchronously even when the sender path does not exist (child fails out-of-band, never throws)', () => {
     writeUserConfig({ enableTelemetry: true });
-    // fork() of a nonexistent path errors asynchronously on the child's
-    // exit; spawn returns spawned: true and the child fails out-of-band.
-    // What matters here is that the call returns synchronously and
-    // doesn't throw — we verify by calling and inspecting the return.
-    const result = runTelemetry(makeInputs());
-    expect(result.spawned === true || result.spawned === false).toBe(true);
+    // fork() of a nonexistent path does not throw — it spawns a child
+    // that errors asynchronously on its own exit, so runTelemetry
+    // returns `spawned: true` synchronously and the parent is never
+    // perturbed by the downstream failure.
+    expect(runTelemetry(makeInputs())).toEqual({ spawned: true });
   });
 });
 
