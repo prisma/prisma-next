@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { EMPTY_CONTRACT_HASH } from '../constants';
+import { MigrationToolsError } from '../errors';
 import { readMigrationsDir } from '../io';
 import { reconstructGraph } from '../migration-graph';
 import type { OnDiskMigrationPackage } from '../package';
@@ -10,6 +11,16 @@ import { APP_SPACE_ID, spaceMigrationDirectory } from '../space-layout';
 import { listContractSpaceDirectories } from '../verify-contract-spaces';
 import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractSpaceAggregate, ContractSpaceMember, HydratedMigrationGraph } from './types';
+
+function integrityDetail(error: unknown): string {
+  if (MigrationToolsError.is(error)) {
+    return error.why;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
 
 /**
  * Single declared extension entry the loader needs from `Config.extensionPacks`.
@@ -214,7 +225,7 @@ export async function loadContractSpaceAggregate(
       return notOk({
         kind: 'integrityFailure',
         spaceId: entry.id,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: integrityDetail(error),
       });
     }
 
@@ -225,7 +236,7 @@ export async function loadContractSpaceAggregate(
       return notOk({
         kind: 'validationFailure',
         spaceId: entry.id,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: integrityDetail(error),
       });
     }
 
@@ -248,7 +259,7 @@ export async function loadContractSpaceAggregate(
       return notOk({
         kind: 'integrityFailure',
         spaceId: entry.id,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: integrityDetail(error),
       });
     }
 
@@ -259,7 +270,7 @@ export async function loadContractSpaceAggregate(
       return notOk({
         kind: 'integrityFailure',
         spaceId: entry.id,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: integrityDetail(error),
       });
     }
 
