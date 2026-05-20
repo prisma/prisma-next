@@ -244,7 +244,7 @@ describe('PSL authoring → migration E2E', { timeout: timeouts.spinUpMongoMemor
       string,
       Record<string, Record<string, unknown>>
     >;
-    const postColl = storage['collections']?.['post'];
+    const postColl = storage['namespaces']?.['__unbound__']?.['collections']?.['post'];
     expect(postColl?.['indexes']).toBeDefined();
     expect(postColl?.['validator']).toBeDefined();
 
