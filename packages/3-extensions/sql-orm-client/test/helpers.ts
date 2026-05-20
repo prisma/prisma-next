@@ -1,14 +1,24 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import type {
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  type RuntimeParameterizedCodecDescriptor,
+  type SqlRuntimeExtensionDescriptor,
+} from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { RuntimeQueryable } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
+import { defineTestCodec } from './test-codec';
 
 export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
@@ -42,11 +52,52 @@ export function withCapabilities<TCaps extends Record<string, Record<string, boo
   return { ...contract, capabilities };
 }
 
+const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = (() => {
+  const factory: (params: { length: number }) => (ctx: CodecInstanceContext) => Codec = () => () =>
+    defineTestCodec({
+      typeId: 'pg/vector@1',
+      encode: (value: number[]) => value,
+      decode: (wire: number[]) => wire,
+    });
+
+  const vectorDescriptor: RuntimeParameterizedCodecDescriptor<{ length: number }> = {
+    codecId: 'pg/vector@1',
+    traits: ['equality'],
+    targetTypes: ['vector'],
+    paramsSchema: {
+      '~standard': {
+        version: 1,
+        vendor: 'test',
+        validate: (value) => ({ value: value as { length: number } }),
+      },
+    },
+    isParameterized: true,
+    factory,
+  };
+
+  const descriptors: ReadonlyArray<CodecDescriptor> = [
+    vectorDescriptor as unknown as CodecDescriptor,
+  ];
+
+  return {
+    kind: 'extension' as const,
+    id: 'pgvector-codec-stub',
+    version: '0.0.0',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    codecs: () => descriptors,
+    create() {
+      return { familyId: 'sql' as const, targetId: 'postgres' as const };
+    },
+  };
+})();
+
 const testContext: ExecutionContext<TestContract> = createExecutionContext({
   contract: baseTestContract,
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
+    extensionPacks: [pgVectorCodecStubExtension],
   }),
 });
 
