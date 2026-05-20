@@ -72,8 +72,13 @@ program.name('prisma-next').description('Prisma Next CLI').version(packageJson.v
 // Telemetry hook — fires at command start, before the action body
 // runs. Every failure mode is swallowed inside `runTelemetry`; the
 // hook never throws and never blocks long enough to be perceptible.
-program.hook('preAction', async (_thisCommand, actionCommand) => {
-  await fireTelemetryFromPreAction(actionCommand).catch(() => {
+//
+// Fire-and-forget: `fireTelemetryFromPreAction` `await`s a c12 config
+// load before forking the sender, so awaiting it here would block the
+// command's action body behind telemetry. Use `void` to dispatch in
+// parallel; the existing `.catch(() => {})` keeps errors swallowed.
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  void fireTelemetryFromPreAction(actionCommand).catch(() => {
     // defence-in-depth — runTelemetry already swallows internally.
   });
 });
