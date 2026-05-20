@@ -235,9 +235,13 @@ describe('react-router-demo smoke (e2e)', () => {
       const updatedContract: unknown = JSON.parse(await readFile(contractJsonPath, 'utf-8'));
       expect(updatedContract).toMatchObject({
         storage: {
-          tables: {
-            user: {
-              columns: { nickname: expect.anything() },
+          namespaces: {
+            __unbound__: {
+              tables: {
+                user: {
+                  columns: { nickname: expect.anything() },
+                },
+              },
             },
           },
         },
