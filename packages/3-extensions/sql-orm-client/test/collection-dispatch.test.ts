@@ -119,6 +119,171 @@ describe('collection-dispatch', () => {
     expect(runtime.executions).toHaveLength(1);
   });
 
+  it('dispatchCollectionRows() depth-2 nested include with emitted-shape capabilities fires a single SQL execution (TML-2594)', async () => {
+    // Regression guard for the TML-2594 fix: depth-2 includes used to
+    // unconditionally fall back to the multi-query strategy via the
+    // `hasNestedIncludes` arm of `dispatchWithIncludeStrategy`, regardless
+    // of the contract's declared capabilities. On an emitted-shape
+    // contract that advertises `postgres.lateral` + `postgres.jsonAgg`,
+    // a `users -> posts -> comments` tree should resolve in one SQL
+    // execution, not three (parent + posts + comments).
+    const contract = withEmittedSqlCapabilities(getTestContract());
+    const { collection, runtime } = createCollectionFor('User', contract);
+    const scoped = collection
+      .select('name')
+      .include('posts', (posts) => posts.select('title').include('comments'));
+
+    // The lateral builder produces one JSON column per top-level include;
+    // nested includes appear as nested JSON values (already parsed by
+    // JSON.parse inside the include payload — they are not stringified
+    // a second time). This shape mirrors what `json_array_agg` over a
+    // LATERAL JOIN with a nested LATERAL JOIN actually emits.
+    //
+    // The posts payload only carries `title` and `comments` because the
+    // SQL projection is restricted by `.select('title')` plus the nested
+    // aggregate column. Join keys (`posts.user_id`, `comments.post_id`)
+    // are referenced by WHERE clauses inside the lateral and never
+    // projected to the parent's result row.
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          posts:
+            '[{"title":"Post A","comments":[{"id":100,"body":"hi","post_id":10},{"id":101,"body":"there","post_id":10}]},{"title":"Post B","comments":[]}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    expect(rows).toEqual([
+      {
+        name: 'Alice',
+        posts: [
+          {
+            title: 'Post A',
+            comments: [
+              { id: 100, body: 'hi', postId: 10 },
+              { id: 101, body: 'there', postId: 10 },
+            ],
+          },
+          { title: 'Post B', comments: [] },
+        ],
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(1);
+  });
+
+  it('dispatchCollectionRows() depth-2 mixed cardinality (to-many -> to-one) fires a single SQL execution (TML-2594)', async () => {
+    // Same regression guard, but covers the to-one leg of the depth-2
+    // tree: `users -> posts -> author`. The lateral builder must
+    // recursively wire a nested LATERAL JOIN even when the inner edge
+    // collapses to a single object via `coerceSingleQueryIncludeResult`.
+    const contract = withEmittedSqlCapabilities(getTestContract());
+    const { collection, runtime } = createCollectionFor('User', contract);
+    const scoped = collection
+      .select('name')
+      .include('posts', (posts) => posts.select('title').include('author'));
+
+    // `.select('title')` on posts restricts the inner projection to
+    // `title` + the `author` aggregate column. `author` itself carries
+    // a full User row (no inner select) so all User columns appear.
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          posts:
+            '[{"title":"Post A","author":[{"id":1,"name":"Alice","email":"alice@example.com","invited_by_id":null,"address":null}]},{"title":"Post B","author":[]}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    expect(rows).toEqual([
+      {
+        name: 'Alice',
+        posts: [
+          {
+            title: 'Post A',
+            author: {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+            },
+          },
+          { title: 'Post B', author: null },
+        ],
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(1);
+  });
+
+  it('dispatchCollectionRows() depth-2 nested include with no capabilities stays on multi-query (TML-2594 fallback)', async () => {
+    // Counterpart to the lateral/correlated guards above: when the
+    // contract advertises neither `lateral` nor `jsonAgg`, multi-query
+    // remains the only correct strategy. Asserting the execution count
+    // here pins the fallback in place so a future refactor cannot
+    // silently route an uncapable contract through the single-query
+    // path (which would emit incompatible JSON aggregates).
+    const contract = withCapabilities(getTestContract(), {});
+    const { collection, runtime } = createCollectionFor('User', contract);
+    const scoped = collection.include('posts', (posts) => posts.include('comments'));
+
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null, address: null }],
+      [{ id: 10, title: 'Post A', user_id: 1, views: 1, embedding: null }],
+      [{ id: 100, body: 'hi', post_id: 10 }],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    expect(rows).toEqual([
+      {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        invitedById: null,
+        address: null,
+        posts: [
+          {
+            id: 10,
+            title: 'Post A',
+            userId: 1,
+            views: 1,
+            embedding: null,
+            comments: [{ id: 100, body: 'hi', postId: 10 }],
+          },
+        ],
+      },
+    ]);
+    // Parent + posts (IN-batched by user ids) + comments (IN-batched by
+    // post ids). 3 statements regardless of row count.
+    expect(runtime.executions).toHaveLength(3);
+  });
+
   it('dispatchCollectionRows() single-query path returns empty rows and releases scope', async () => {
     const contract = withSingleQueryCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);

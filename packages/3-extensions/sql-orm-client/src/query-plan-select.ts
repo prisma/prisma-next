@@ -210,10 +210,54 @@ function buildIncludeOrderArtifacts(
   };
 }
 
+/**
+ * Recursively build the join + projection artifacts for the nested
+ * includes attached to a child SELECT. Used by
+ * `buildIncludeChildRowsSelect` to wire depth-2+ aggregates into the
+ * inner SELECT at each level.
+ *
+ * Under the `lateral` strategy each nested include contributes one
+ * LEFT JOIN LATERAL plus one projection item that references the
+ * lateral alias. Under the `correlated` strategy each nested include
+ * contributes a single projection item whose expression is a
+ * correlated subquery; no joins are produced. The two cases are
+ * symmetric, which is why both paths share `buildIncludeChildRowsSelect`.
+ */
+function buildNestedIncludeArtifacts(
+  contract: Contract<SqlStorage>,
+  parentTableRef: string,
+  includes: readonly IncludeExpr[],
+  strategy: 'lateral' | 'correlated',
+): {
+  readonly joins: ReadonlyArray<JoinAst>;
+  readonly projections: ReadonlyArray<ProjectionItem>;
+} {
+  if (includes.length === 0) {
+    return { joins: [], projections: [] };
+  }
+
+  const joins: JoinAst[] = [];
+  const projections: ProjectionItem[] = [];
+
+  for (const nested of includes) {
+    if (strategy === 'lateral') {
+      const artifact = buildLateralIncludeArtifacts(contract, parentTableRef, nested);
+      joins.push(artifact.join);
+      projections.push(artifact.projection);
+      continue;
+    }
+    const artifact = buildCorrelatedIncludeProjection(contract, parentTableRef, nested);
+    projections.push(artifact.projection);
+  }
+
+  return { joins, projections };
+}
+
 function buildIncludeChildRowsSelect(
   contract: Contract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
+  strategy: 'lateral' | 'correlated',
 ): {
   readonly childRows: SelectAst;
   readonly childProjection: ReadonlyArray<ProjectionItem>;
@@ -225,7 +269,7 @@ function buildIncludeChildRowsSelect(
     include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
   const childTableRef = childTableAlias ?? include.relatedTableName;
   const rowsAlias = `${include.relationName}__rows`;
-  const childProjection = buildProjection(
+  const scalarProjection = buildProjection(
     contract,
     include.relatedTableName,
     childState.selectedFields,
@@ -245,8 +289,30 @@ function buildIncludeChildRowsSelect(
   );
   const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
+  // Recurse: each nested include produces either a LATERAL JOIN (under
+  // `lateral`) or a correlated subquery projection (under `correlated`).
+  // The nested aggregates are attached to *this* child SELECT, so they
+  // correlate against `childTableRef` — which may itself be an alias if
+  // the relation is self-referential.
+  const { joins: nestedJoins, projections: nestedProjections } = buildNestedIncludeArtifacts(
+    contract,
+    childTableRef,
+    childState.includes,
+    strategy,
+  );
+
+  // `childProjection` is the set of items that survive into the parent's
+  // JSON object — the scalar columns plus any nested-include aggregate
+  // columns. The hidden order-by projection is separate and is dropped
+  // before assembling the parent's json_object_expr.
+  const childProjection: ReadonlyArray<ProjectionItem> = [
+    ...scalarProjection,
+    ...nestedProjections,
+  ];
+
   let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
     .withProjection([...childProjection, ...hiddenOrderProjection])
+    .withJoins(nestedJoins)
     .withWhere(whereExpr);
 
   if (childOrderBy) {
@@ -286,6 +352,7 @@ function buildLateralIncludeArtifacts(
     contract,
     parentTableName,
     include,
+    'lateral',
   );
   const lateralAlias = `${include.relationName}_lateral`;
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
@@ -323,6 +390,7 @@ function buildCorrelatedIncludeProjection(
     contract,
     parentTableName,
     include,
+    'correlated',
   );
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>

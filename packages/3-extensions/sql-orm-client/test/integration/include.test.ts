@@ -687,6 +687,7 @@ describe('integration/include', () => {
           { id: 102, body: 'Comment C', postId: 11 },
         ]);
 
+        runtime.resetExecutions();
         const rows = await users
           .orderBy((user) => user.id.asc())
           .include('posts', (posts) =>
@@ -743,6 +744,191 @@ describe('integration/include', () => {
             ],
           },
         ]);
+        // TML-2594 acceptance: depth-2 on a lateral+jsonAgg-capable
+        // contract (the default postgres test contract) must collapse
+        // to a single SQL execution via nested LATERAL JOINs.
+        expect(runtime.executions).toHaveLength(1);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'depth-2 include uses correlated subqueries when only jsonAgg is enabled (TML-2594)',
+    async () => {
+      // jsonAgg without lateral → correlated strategy. Same acceptance
+      // criterion as the lateral case above: one round-trip, regardless
+      // of depth or row count, when the target advertises the capability.
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {
+          sql: { jsonAgg: true },
+        });
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+        await seedComments(runtime, [
+          { id: 100, body: 'Comment A', postId: 10 },
+          { id: 101, body: 'Comment B', postId: 10 },
+          { id: 102, body: 'Comment C', postId: 11 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts
+              .orderBy((post) => post.id.asc())
+              .include('comments', (comments) => comments.orderBy((c) => c.id.asc())),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [
+              {
+                id: 10,
+                title: 'Post A',
+                userId: 1,
+                views: 100,
+                embedding: null,
+                comments: [
+                  { id: 100, body: 'Comment A', postId: 10 },
+                  { id: 101, body: 'Comment B', postId: 10 },
+                ],
+              },
+              {
+                id: 11,
+                title: 'Post B',
+                userId: 1,
+                views: 200,
+                embedding: null,
+                comments: [{ id: 102, body: 'Comment C', postId: 11 }],
+              },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            address: null,
+            posts: [
+              {
+                id: 12,
+                title: 'Post C',
+                userId: 2,
+                views: 300,
+                embedding: null,
+                comments: [],
+              },
+            ],
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'depth-2 include falls back to multi-query when neither lateral nor jsonAgg is declared (TML-2594 fallback)',
+    async () => {
+      // Counterpart regression guard: empty capabilities → multi-query.
+      // The fix must not silently route an uncapable contract through
+      // the lateral/correlated builders — nested JSON aggregation would
+      // not lower to valid SQL on a target that lacks both flags.
+      // Expected shape: 1 parent SELECT + 1 IN-batched child SELECT per
+      // depth level. Independent of row count.
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollectionWithCapabilities(runtime, {});
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+        await seedComments(runtime, [
+          { id: 100, body: 'Comment A', postId: 10 },
+          { id: 101, body: 'Comment B', postId: 10 },
+          { id: 102, body: 'Comment C', postId: 11 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts
+              .orderBy((post) => post.id.asc())
+              .include('comments', (comments) => comments.orderBy((c) => c.id.asc())),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [
+              {
+                id: 10,
+                title: 'Post A',
+                userId: 1,
+                views: 100,
+                embedding: null,
+                comments: [
+                  { id: 100, body: 'Comment A', postId: 10 },
+                  { id: 101, body: 'Comment B', postId: 10 },
+                ],
+              },
+              {
+                id: 11,
+                title: 'Post B',
+                userId: 1,
+                views: 200,
+                embedding: null,
+                comments: [{ id: 102, body: 'Comment C', postId: 11 }],
+              },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            address: null,
+            posts: [
+              {
+                id: 12,
+                title: 'Post C',
+                userId: 2,
+                views: 300,
+                embedding: null,
+                comments: [],
+              },
+            ],
+          },
+        ]);
+        // Parent + posts (IN by user ids) + comments (IN by post ids).
+        // 3 statements regardless of row count, never N+1.
+        expect(runtime.executions).toHaveLength(3);
       });
     },
     timeouts.spinUpPpgDev,

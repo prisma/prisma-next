@@ -77,10 +77,14 @@ function dispatchWithIncludeStrategy<Row>(options: {
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
-  if (
-    hasNestedIncludes(options.state.includes) ||
-    hasComplexIncludeDescriptors(options.state.includes)
-  ) {
+  // Nested row includes (depth >= 2) are emitted recursively by the
+  // lateral / correlated builders — they no longer force a fallback to
+  // multi-query (TML-2594). Scalar (`count`/`sum`/...) and `combine()`
+  // descriptors still do, until TML-2595 lands the matching lowering;
+  // the recursive scan below catches them at any depth so a nested
+  // `count()` inside a row include doesn't accidentally hit the
+  // throw in `compileSelectWithIncludeStrategy`.
+  if (hasComplexIncludeDescriptors(options.state.includes)) {
     return dispatchWithMultiQueryIncludes<Row>(options);
   }
 
@@ -144,18 +148,10 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
 
       for (const parent of parentRows) {
         for (const include of state.includes) {
-          if (include.scalar || include.combine) {
-            throw new Error(
-              'single-query include strategy does not support scalar include selectors or combine()',
-            );
-          }
-          const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
-          const mappedChildren = rawChildren.map((childRow) =>
-            mapStorageRowToModelFields(contract, include.relatedModelName, childRow),
-          );
-          parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
-            mappedChildren,
-            include.cardinality,
+          parent.mapped[include.relationName] = decodeIncludePayload(
+            contract,
+            include,
+            parent.raw[include.relationName],
           );
         }
 
@@ -471,12 +467,59 @@ function uniqueValues(values: unknown[]): unknown[] {
   return [...new Set(values)];
 }
 
-function hasNestedIncludes(includes: readonly IncludeExpr[]): boolean {
-  return includes.some((include) => include.nested.includes.length > 0);
+function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
+  // Walks the include tree recursively. A nested scalar selector or
+  // combine() at any depth must gate the entire dispatch to multi-query
+  // until TML-2595 teaches the lateral/correlated builders to lower
+  // those descriptors. Without the recursion, a depth-2+ row include
+  // containing a depth-3 `count()` would fall through to
+  // `compileSelectWithIncludeStrategy` and hit its explicit `throw`.
+  return includes.some(
+    (include) =>
+      include.scalar !== undefined ||
+      include.combine !== undefined ||
+      hasComplexIncludeDescriptors(include.nested.includes),
+  );
 }
 
-function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
-  return includes.some((include) => include.scalar !== undefined || include.combine !== undefined);
+/**
+ * Decode a single-query include payload from a parent row's raw cell
+ * into the model-shaped value that downstream consumers see. Recurses
+ * through `include.nested.includes` so depth-2+ trees — emitted by the
+ * recursive lateral / correlated builders — are decoded symmetrically.
+ *
+ * The shape produced by the SQL side is one JSON column per top-level
+ * include; values nested inside that JSON are already-parsed JS values
+ * after the outer `JSON.parse`, so `parseIncludedRows` recognises both
+ * the string (top-level) and array (nested) forms.
+ */
+function decodeIncludePayload(
+  contract: Contract<SqlStorage>,
+  include: IncludeExpr,
+  raw: unknown,
+): Record<string, unknown>[] | Record<string, unknown> | null {
+  const rawChildren = parseIncludedRows(raw);
+  const mappedChildren = rawChildren.map((childRow) => {
+    const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
+    for (const nestedInclude of include.nested.includes) {
+      // Defence in depth: the dispatch gate filters scalar/combine at
+      // any depth via `hasComplexIncludeDescriptors`. This branch is
+      // unreachable in production but documents the contract the
+      // recursion relies on.
+      if (nestedInclude.scalar || nestedInclude.combine) {
+        throw new Error(
+          'single-query include strategy does not support nested scalar include selectors or combine()',
+        );
+      }
+      mapped[nestedInclude.relationName] = decodeIncludePayload(
+        contract,
+        nestedInclude,
+        mapped[nestedInclude.relationName],
+      );
+    }
+    return mapped;
+  });
+  return coerceSingleQueryIncludeResult(mappedChildren, include.cardinality);
 }
 
 function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {
