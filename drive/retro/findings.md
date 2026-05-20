@@ -10,8 +10,6 @@ Planned `db-close-teardown` as two slices (substrate facade changes; teaching sk
 
 **Upstream candidate?** Yes — the `co-ship` falsifier, the dispatch-vs-slice vocabulary, the "rules can be deliberate couplings" meta-lesson, and the rationale for binding slice to PR via review pressure are all upstream-worthy. Queue for the synthesis ticket.
 
-> **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
-
 ## 2026-05-20 · drive-run-retro · surprise
 
 Read-only reconnaissance (file `Read`, `Grep`, `Glob` on source) by the Orchestrator counts as drift even though intuition says reads are free. Symptom: orchestrator's broad-routing context fills with implementation detail; subsequent dispatch decisions degrade because the orchestrator reasons over fragments instead of structure. The DO-NOT enumeration in `drive/roles/README.md` lists read operations explicitly for this reason — counter-intuitive but correct.
