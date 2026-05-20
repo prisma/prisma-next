@@ -117,11 +117,11 @@ to publish; the deploy unit is the package directory tree (or the repo, scoped
 by the workspace filter).
 
 For Prisma Compute, the assigned `*.prisma.build` URL becomes the
-build-time constant the CLI client embeds. The deploy itself is out of
-scope for this milestone — when ready, push the package directory,
-provision a Postgres database, set the environment variables above,
-and `pnpm --filter @prisma-next/telemetry-backend start` (or its
-container equivalent — `bun run src/server.ts`) takes over.
+build-time constant the CLI client embeds. Deployment is performed
+separately: push the package directory, provision a Postgres database,
+set the environment variables above, and `pnpm --filter
+@prisma-next/telemetry-backend start` (or its container equivalent —
+`bun run src/server.ts`) takes over.
 
 Post-deploy verification:
 
