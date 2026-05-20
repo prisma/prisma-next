@@ -11,7 +11,11 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
+import type {
+  DefaultNormalizer,
+  NativeTypeNormalizer,
+  SchemaDefaultValueParser,
+} from './schema-verify/verify-sql-schema';
 
 /**
  * SQL control adapter interface for control-plane operations.
@@ -76,6 +80,15 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * with contract defaults (ColumnDefault objects) during schema verification.
    */
   readonly normalizeDefault?: DefaultNormalizer;
+
+  /**
+   * Optional target-specific parser that extracts the codec-comparable
+   * {@link JsonValue} out of a raw schema-side default expression. The
+   * verifier uses it to round-trip the introspected literal through the
+   * column's codec (`decodeJson` → `renderSqlLiteral`) and compare against
+   * the contract-side codec-rendered expression.
+   */
+  readonly parseSchemaDefaultValue?: SchemaDefaultValueParser;
 
   /**
    * Optional target-specific normalizer for schema native type names.

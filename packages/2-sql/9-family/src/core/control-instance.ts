@@ -19,6 +19,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   APP_SPACE_ID,
+  extractCodecLookup,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
@@ -533,7 +534,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         strict: options.strict,
         typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
+        codecLookup: extractCodecLookup(options.frameworkComponents),
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
+        ...ifDefined('parseSchemaDefaultValue', controlAdapter.parseSchemaDefaultValue),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
         ...ifDefined('resolveExistingEnumValues', controlAdapter.resolveExistingEnumValues),
       });
