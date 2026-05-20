@@ -424,7 +424,7 @@ describe('SqlContractSerializer logic validation', () => {
               codecId: 'pg/text@1',
               nativeType: 'text',
               nullable: false,
-              default: { kind: 'function', expression: 'gen_random_uuid()' },
+              default: { kind: 'expression', expression: 'gen_random_uuid()' },
             },
             title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
@@ -436,11 +436,11 @@ describe('SqlContractSerializer logic validation', () => {
       }),
     };
 
-    it('accepts function defaults without capability gating', () => {
+    it('accepts expression defaults without capability gating', () => {
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(baseContract)).not.toThrow();
     });
 
-    it('accepts multiple function defaults without capability gating', () => {
+    it('accepts multiple expression defaults and autoincrement sentinel without capability gating', () => {
       const contract = {
         ...baseContract,
         storage: sqlStorageFixture({
@@ -450,19 +450,19 @@ describe('SqlContractSerializer logic validation', () => {
                 codecId: 'pg/int4@1',
                 nativeType: 'int4',
                 nullable: false,
-                default: { kind: 'function', expression: 'autoincrement()' },
+                default: { kind: 'autoincrement' },
               },
               createdAt: {
                 codecId: 'pg/timestamptz@1',
                 nativeType: 'timestamptz',
                 nullable: false,
-                default: { kind: 'function', expression: 'now()' },
+                default: { kind: 'expression', expression: 'now()' },
               },
               externalId: {
                 codecId: 'pg/text@1',
                 nativeType: 'text',
                 nullable: false,
-                default: { kind: 'function', expression: 'gen_random_uuid()' },
+                default: { kind: 'expression', expression: 'gen_random_uuid()' },
               },
               title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
@@ -476,32 +476,7 @@ describe('SqlContractSerializer logic validation', () => {
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
-    it('ignores non-function defaults (literal)', () => {
-      const contract = {
-        ...baseContract,
-        storage: sqlStorageFixture({
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              status: {
-                codecId: 'pg/text@1',
-                nativeType: 'text',
-                nullable: false,
-                default: { kind: 'literal', value: 'draft' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        }),
-        // No capabilities needed for non-function defaults
-      };
-      expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
-    });
-
-    it('keeps ISO string defaults as strings for timestamp columns', () => {
+    it('preserves codec-rendered literal expressions on the column default', () => {
       const contract = {
         ...baseContract,
         storage: sqlStorageFixture({
@@ -512,7 +487,10 @@ describe('SqlContractSerializer logic validation', () => {
                 codecId: 'pg/timestamptz@1',
                 nativeType: 'timestamptz',
                 nullable: false,
-                default: { kind: 'literal', value: '2024-01-01T00:00:00.000Z' },
+                default: {
+                  kind: 'expression',
+                  expression: "'2024-01-01T00:00:00.000Z'::timestamptz",
+                },
               },
             },
             primaryKey: { columns: ['id'] },
@@ -525,10 +503,10 @@ describe('SqlContractSerializer logic validation', () => {
 
       const validated = validateSqlContractFully<Contract<SqlStorage>>(contract);
       const defaultValue = unboundTables(validated.storage)['Post']!.columns['createdAt']!.default;
-      if (defaultValue?.kind !== 'literal') {
-        throw new Error('Expected literal default');
+      if (defaultValue?.kind !== 'expression') {
+        throw new Error('Expected expression default');
       }
-      expect(defaultValue.value).toBe('2024-01-01T00:00:00.000Z');
+      expect(defaultValue.expression).toBe("'2024-01-01T00:00:00.000Z'::timestamptz");
     });
 
     it('throws for default with unsupported kind', () => {
@@ -555,7 +533,7 @@ describe('SqlContractSerializer logic validation', () => {
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
 
-    it('throws for default missing value', () => {
+    it('throws for legacy literal default shape (kind absent from new union)', () => {
       const contract = {
         ...baseContract,
         storage: sqlStorageFixture({
@@ -566,7 +544,7 @@ describe('SqlContractSerializer logic validation', () => {
                 codecId: 'pg/text@1',
                 nativeType: 'text',
                 nullable: false,
-                default: { kind: 'literal' },
+                default: { kind: 'literal', value: 'draft' },
               },
             },
             primaryKey: { columns: ['id'] },
@@ -579,7 +557,7 @@ describe('SqlContractSerializer logic validation', () => {
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
 
-    it('throws for default expression with non-string type', () => {
+    it('throws for expression default with non-string expression', () => {
       const contract = {
         ...baseContract,
         storage: sqlStorageFixture({
@@ -590,7 +568,7 @@ describe('SqlContractSerializer logic validation', () => {
                 codecId: 'pg/text@1',
                 nativeType: 'text',
                 nullable: false,
-                default: { kind: 'function', expression: 123 },
+                default: { kind: 'expression', expression: 123 },
               },
             },
             primaryKey: { columns: ['id'] },

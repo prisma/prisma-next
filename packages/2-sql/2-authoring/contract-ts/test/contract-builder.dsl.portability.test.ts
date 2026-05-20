@@ -103,7 +103,7 @@ describe('contract DSL portability coverage', () => {
       codecId: 'sql/timestamp@1',
       nativeType: 'timestamp',
       default: {
-        kind: 'function',
+        kind: 'expression',
         expression: 'CURRENT_TIMESTAMP',
       },
     });

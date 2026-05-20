@@ -177,21 +177,26 @@ describe('shared contract definition lowering', () => {
     });
   });
 
-  it('encodes literal defaults through codecLookup during storage lowering', () => {
+  it('renders literal defaults through codecLookup.renderSqlLiteral during storage lowering', () => {
     const codecLookup: CodecLookup = {
       get: (id) => {
         if (id !== 'pg/timestamptz@1') {
           return undefined;
         }
 
-        return {
+        const codec = {
           id,
           encode: async (value: unknown) => value,
           decode: async (wire: unknown) => wire,
           encodeJson: (value: unknown) =>
             value instanceof Date ? value.toISOString() : (value as string),
           decodeJson: (json: unknown) => new Date(json as string),
+          renderSqlLiteral: (value: unknown) =>
+            value instanceof Date
+              ? `'${value.toISOString()}'::timestamptz`
+              : `'${String(value)}'::timestamptz`,
         };
+        return codec as ReturnType<CodecLookup['get']>;
       },
       targetTypesFor: (id) => (id === 'pg/timestamptz@1' ? ['timestamptz'] : undefined),
       metaFor: () => undefined,
@@ -215,7 +220,7 @@ describe('shared contract definition lowering', () => {
                 },
                 nullable: false,
                 default: {
-                  kind: 'literal',
+                  kind: 'codecValue',
                   value: new Date('2025-01-01T00:00:00.000Z'),
                 },
               },
@@ -227,8 +232,8 @@ describe('shared contract definition lowering', () => {
     );
 
     expect(unboundTables(contract.storage)['event']?.columns['scheduled_at']?.default).toEqual({
-      kind: 'literal',
-      value: '2025-01-01T00:00:00.000Z',
+      kind: 'expression',
+      expression: "'2025-01-01T00:00:00.000Z'::timestamptz",
     });
   });
 
@@ -285,7 +290,7 @@ describe('shared contract definition lowering', () => {
                 },
                 nullable: false,
                 default: {
-                  kind: 'function',
+                  kind: 'expression',
                   expression: 'gen_random_uuid()',
                 },
                 executionDefaults: {

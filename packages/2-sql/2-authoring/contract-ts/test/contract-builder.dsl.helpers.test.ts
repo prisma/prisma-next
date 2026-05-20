@@ -274,7 +274,7 @@ describe('contract DSL helper vocabulary', () => {
       nativeType: 'timestamp',
       nullable: false,
       default: {
-        kind: 'function',
+        kind: 'expression',
         expression: 'CURRENT_TIMESTAMP',
       },
     });
@@ -628,7 +628,7 @@ describe('contract DSL helper vocabulary', () => {
       typeParams: { length: 36 },
     });
     expect(unboundTables(contract.storage)['audit_entry']!.columns['created_at']!.default).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'CURRENT_TIMESTAMP',
     });
   });
