@@ -12,7 +12,9 @@ export {
   isUniqueConstraintSatisfied,
 } from '../core/schema-verify/verify-helpers';
 export type {
+  DefaultNormalizer,
   NativeTypeNormalizer,
+  SchemaDefaultValueParser,
   VerifySqlSchemaOptions,
 } from '../core/schema-verify/verify-sql-schema';
 export { verifySqlSchema } from '../core/schema-verify/verify-sql-schema';

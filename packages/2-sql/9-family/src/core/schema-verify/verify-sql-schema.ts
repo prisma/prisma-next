@@ -6,7 +6,8 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   OperationContext,
@@ -54,6 +55,30 @@ export type DefaultNormalizer = (
 export type NativeTypeNormalizer = (nativeType: string) => string;
 
 /**
+ * Function type for parsing a raw schema-side SQL default expression into a
+ * codec-comparable {@link JsonValue}.
+ *
+ * Returns `undefined` when the raw expression is not a simple literal
+ * (e.g. function-form like `now()`, autoincrement `nextval(...)`); the
+ * verifier then falls back to the legacy normalizer-based string compare
+ * path for those cases.
+ *
+ * For literal forms, the parser strips the dialect's casts (`::type`),
+ * unquotes string literals, parses bare numerics / booleans, and normalises
+ * dialect-specific value shapes (e.g. Postgres's space-separated
+ * `'2024-01-15 10:30:00+00'` timestamps to ISO-8601 UTC) so the codec's
+ * strict `decodeJson` accepts the result.
+ *
+ * The verifier dispatches the returned value through `codec.decodeJson` →
+ * `codec.renderSqlLiteral` to produce a contract-canonical expression that
+ * compares cleanly against `contract.default.expression`.
+ */
+export type SchemaDefaultValueParser = (
+  rawDefault: string,
+  nativeType: string,
+) => JsonValue | undefined;
+
+/**
  * Options for the pure schema verification function.
  */
 export interface VerifySqlSchemaOptions {
@@ -99,6 +124,28 @@ export interface VerifySqlSchemaOptions {
     schema: SqlSchemaIR,
     enumType: PostgresEnumStorageEntry,
   ) => readonly string[] | null;
+  /**
+   * Codec-id-keyed lookup used by the codec-aware default comparison path.
+   *
+   * Threaded alongside {@link SchemaDefaultValueParser}: when both are
+   * supplied and the column carries a known `codecId`, the verifier
+   * round-trips the introspected literal through `codec.decodeJson` →
+   * `codec.renderSqlLiteral` and compares the canonical contract-side form
+   * against `contract.default.expression`. When either input is missing —
+   * or the column's codec is not in the lookup — the verifier falls back to
+   * the legacy {@link DefaultNormalizer} string-compare path.
+   *
+   * Production call sites (Postgres / SQLite planners and runners) build
+   * this via {@link extractCodecLookup} over the same `frameworkComponents`
+   * they already pass to the verifier.
+   */
+  readonly codecLookup?: CodecLookup;
+  /**
+   * Per-target parser that extracts the codec-comparable {@link JsonValue}
+   * out of a raw schema-side default expression. See
+   * {@link SchemaDefaultValueParser} for the contract.
+   */
+  readonly parseSchemaDefaultValue?: SchemaDefaultValueParser;
 }
 
 /**
@@ -121,6 +168,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     normalizeDefault,
     normalizeNativeType,
     resolveExistingEnumValues,
+    codecLookup,
+    parseSchemaDefaultValue,
   } = options;
   const startTime = Date.now();
 
@@ -155,6 +204,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
+    ...ifDefined('codecLookup', codecLookup),
+    ...ifDefined('parseSchemaDefaultValue', parseSchemaDefaultValue),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -337,6 +388,8 @@ function verifySchemaTables(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  codecLookup?: CodecLookup;
+  parseSchemaDefaultValue?: SchemaDefaultValueParser;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
   const {
     contract,
@@ -347,6 +400,8 @@ function verifySchemaTables(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    codecLookup,
+    parseSchemaDefaultValue,
   } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
@@ -402,6 +457,8 @@ function verifySchemaTables(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
+        ...ifDefined('codecLookup', codecLookup),
+        ...ifDefined('parseSchemaDefaultValue', parseSchemaDefaultValue),
       });
       rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
     }
@@ -453,6 +510,8 @@ function verifyTableChildren(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  codecLookup?: CodecLookup;
+  parseSchemaDefaultValue?: SchemaDefaultValueParser;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -467,6 +526,8 @@ function verifyTableChildren(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    codecLookup,
+    parseSchemaDefaultValue,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -482,6 +543,8 @@ function verifyTableChildren(options: {
     storageTypes,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
+    ...ifDefined('codecLookup', codecLookup),
+    ...ifDefined('parseSchemaDefaultValue', parseSchemaDefaultValue),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -620,6 +683,8 @@ function collectContractColumnNodes(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  codecLookup?: CodecLookup;
+  parseSchemaDefaultValue?: SchemaDefaultValueParser;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -634,6 +699,8 @@ function collectContractColumnNodes(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    codecLookup,
+    parseSchemaDefaultValue,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
@@ -678,6 +745,8 @@ function collectContractColumnNodes(options: {
         storageTypes,
         ...ifDefined('normalizeDefault', normalizeDefault),
         ...ifDefined('normalizeNativeType', normalizeNativeType),
+        ...ifDefined('codecLookup', codecLookup),
+        ...ifDefined('parseSchemaDefaultValue', parseSchemaDefaultValue),
       }),
     );
   }
@@ -734,6 +803,8 @@ function verifyColumn(options: {
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
+  codecLookup?: CodecLookup;
+  parseSchemaDefaultValue?: SchemaDefaultValueParser;
 }): SchemaVerificationNode {
   const {
     tableName,
@@ -748,6 +819,8 @@ function verifyColumn(options: {
     storageTypes,
     normalizeDefault,
     normalizeNativeType,
+    codecLookup,
+    parseSchemaDefaultValue,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
@@ -872,6 +945,10 @@ function verifyColumn(options: {
         schemaColumn.default,
         normalizeDefault,
         schemaNativeType,
+        resolvedContractColumn.codecId
+          ? codecLookup?.get(resolvedContractColumn.codecId)
+          : undefined,
+        parseSchemaDefaultValue,
       )
     ) {
       const expectedDescription = describeColumnDefault(contractColumn.default);
@@ -1162,24 +1239,187 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
 }
 
 /**
+ * Structural narrowing for SQL-family codecs that carry `renderSqlLiteral`.
+ * Mirrors the same shape used by the PSL parser (see
+ * `psl-column-resolution.ts` § `CodecWithRenderSqlLiteral`): the
+ * framework-level {@link CodecLookup} returns the narrower framework
+ * `Codec`, so the call site narrows structurally rather than depending on
+ * the SQL-family `Codec` interface from `sql-relational-core/ast`.
+ */
+interface CodecWithRenderSqlLiteral {
+  readonly id: string;
+  decodeJson(json: JsonValue): unknown;
+  renderSqlLiteral(value: unknown): string;
+}
+
+function hasRenderSqlLiteral(
+  codec: { decodeJson(json: JsonValue): unknown } | undefined,
+): codec is CodecWithRenderSqlLiteral {
+  return (
+    codec !== undefined &&
+    'renderSqlLiteral' in codec &&
+    typeof (codec as { renderSqlLiteral?: unknown }).renderSqlLiteral === 'function'
+  );
+}
+
+/**
+ * Case-insensitive, whitespace-tolerant SQL expression comparison.
+ *
+ * Two codec round-tripped forms may differ only in casing or whitespace
+ * (e.g. `TRUE` vs `true`, `'foo'::text` vs `'foo' :: text`) — the collapse
+ * pinned here is conservative enough that semantically equal forms compare
+ * equal while syntactically distinct forms (`'foo'` vs `'bar'`) do not.
+ */
+function expressionsEqual(a: string, b: string): boolean {
+  const normalise = (expr: string) => expr.toLowerCase().replace(/\s+/g, '');
+  return normalise(a) === normalise(b);
+}
+
+/**
+ * Structural equality for JSON-shaped typed values (objects + arrays +
+ * primitives). Used by the codec round-trip path so JSONB-style
+ * key-order-independent comparison succeeds when both sides decode to
+ * the same semantic value but the codec's `renderSqlLiteral`
+ * (e.g. `JSON.stringify`) is order-sensitive.
+ *
+ * Other codec output types fall back to JS `===` (handled in the
+ * primitive arm). `Date` instances compare by `.getTime()` so two Date
+ * values built from the same instant compare equal even when constructed
+ * via different string forms.
+ */
+function jsonValuesStructurallyEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  if (a instanceof Date && b instanceof Date) {
+    return a.getTime() === b.getTime();
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!jsonValuesStructurallyEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const aRecord = a as Record<string, unknown>;
+    const bRecord = b as Record<string, unknown>;
+    const aKeys = Object.keys(aRecord);
+    const bKeys = Object.keys(bRecord);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const key of aKeys) {
+      if (!Object.hasOwn(bRecord, key)) return false;
+      if (!jsonValuesStructurallyEqual(aRecord[key], bRecord[key])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
  * Compares a contract ColumnDefault against a schema raw default string for semantic equality.
  *
- * When a normalizer is provided, the raw schema default is first normalized to a ColumnDefault
- * before comparison. Without a normalizer, falls back to direct string comparison against
- * the contract expression.
+ * Three layers of comparison, in order:
  *
- * @param contractDefault - The expected default from the contract (normalized ColumnDefault)
- * @param schemaDefault - The raw default expression from the database (string)
- * @param normalizer - Optional target-specific normalizer to convert raw defaults
- * @param nativeType - The column's native type, passed to normalizer for context
+ * 1. **Codec round-trip.** When the column's codec is available in the
+ *    lookup AND the per-target {@link SchemaDefaultValueParser} extracts a
+ *    {@link JsonValue} out of the raw schema default, dispatch through
+ *    `codec.decodeJson(value)` → `codec.renderSqlLiteral(typed)` to produce
+ *    a contract-canonical expression. Compare that canonical form against
+ *    `contract.default.expression`. The codec is the canonical comparison
+ *    oracle — both sides go through `renderSqlLiteral` (the contract side
+ *    at emit time, the schema side here at verify time).
+ *
+ * 2. **Legacy normalizer.** When the codec round-trip is unavailable (no
+ *    codec, no parser, parser returned undefined, decodeJson threw),
+ *    fall back to the per-target {@link DefaultNormalizer} that converts
+ *    the raw schema default into a normalised {@link ColumnDefault} and
+ *    compares against the contract default with case-insensitive
+ *    whitespace-tolerant expression matching.
+ *
+ * 3. **Direct string compare.** When no normalizer is provided, compare
+ *    the contract expression directly against the raw schema string (with
+ *    a lenient bare-vs-quoted check for legacy fixtures).
+ *
+ * `kind: 'autoincrement'` always short-circuits to kind-equality on
+ * whichever side a normalised value is available (codec round-trip is
+ * skipped — codec is NOT invoked for autoincrement, matching the producer
+ * convention in `build-contract.ts` and `psl-column-resolution.ts`).
+ *
+ * @param contractDefault - The expected default from the contract.
+ * @param schemaDefault - The raw default expression from the database.
+ * @param normalizer - Optional target-specific normalizer to convert raw defaults.
+ * @param nativeType - The column's native type, passed to normalizer / parser for context.
+ * @param codec - Optional codec for the column (resolved via `codecLookup.get(codecId)`).
+ * @param valueParser - Optional per-target parser that extracts a JsonValue from the raw default.
  */
 function columnDefaultsEqual(
   contractDefault: ColumnDefault,
   schemaDefault: string,
   normalizer?: DefaultNormalizer,
   nativeType?: string,
+  codec?: { decodeJson(json: JsonValue): unknown } | undefined,
+  valueParser?: SchemaDefaultValueParser,
 ): boolean {
-  // If no normalizer provided, fall back to direct string comparison
+  // 1. Codec round-trip.
+  //
+  // Skipped for autoincrement contract defaults — codec is never invoked on
+  // the autoincrement arm (producer side: `build-contract.ts`,
+  // `psl-column-resolution.ts`). The autoincrement match flows through the
+  // normalizer path (which detects `nextval(...)` and produces `{ kind:
+  // 'autoincrement' }`).
+  if (contractDefault.kind === 'expression' && hasRenderSqlLiteral(codec) && valueParser) {
+    const schemaParsedValue = valueParser(schemaDefault, nativeType ?? '');
+    if (schemaParsedValue !== undefined) {
+      try {
+        const schemaTyped = codec.decodeJson(schemaParsedValue);
+        const schemaCanonical = codec.renderSqlLiteral(schemaTyped);
+        if (expressionsEqual(contractDefault.expression, schemaCanonical)) {
+          return true;
+        }
+        // Round-trip the contract-side expression through the same parser
+        // + codec so cases where the contract carries a literal whose
+        // codec re-render does NOT reproduce the contract expression
+        // verbatim (e.g. JSONB key-order: `'{"a":1,"b":2}'::jsonb` vs the
+        // codec's `JSON.stringify` output) still compare equal when both
+        // sides decode to the same typed value.
+        const contractParsedValue = valueParser(contractDefault.expression, nativeType ?? '');
+        if (contractParsedValue !== undefined) {
+          try {
+            const contractTyped = codec.decodeJson(contractParsedValue);
+            const contractCanonical = codec.renderSqlLiteral(contractTyped);
+            if (expressionsEqual(contractCanonical, schemaCanonical)) {
+              return true;
+            }
+            // Structural comparison on the typed values handles cases
+            // where the codec's `renderSqlLiteral` is order-sensitive on a
+            // structure that should be order-independent (the canonical
+            // example is JSONB: `JSON.stringify({a:1,b:2})` ≠
+            // `JSON.stringify({b:2,a:1})` even though the JSONB values are
+            // semantically equal). The structural compare is JSON-value
+            // shaped: the typed value reduces to a {@link JsonValue}-like
+            // tree when both sides went through `decodeJson` whose return
+            // is `JsonValue` or a JS-native value `JSON.stringify`-stable.
+            if (jsonValuesStructurallyEqual(contractTyped, schemaTyped)) {
+              return true;
+            }
+          } catch {
+            // contract side failed to round-trip; fall through.
+          }
+        }
+        // Both round-trips done; canonicals don't match — fall through to
+        // the normalizer path so the legacy compare can still rescue
+        // cases like `'draft'::text` vs `draft` that the codec's
+        // per-dialect cast wrapping would otherwise reject.
+      } catch {
+        // decodeJson threw — likely because the parsed value's shape
+        // doesn't satisfy the codec's strict input contract. Fall through
+        // to the normalizer path.
+      }
+    }
+  }
+
+  // 2/3. Legacy normalizer + direct string compare.
   if (!normalizer) {
     if (contractDefault.kind === 'autoincrement') {
       return false;
@@ -1203,9 +1443,7 @@ function columnDefaultsEqual(
     return true;
   }
   if (contractDefault.kind === 'expression' && normalizedSchema.kind === 'expression') {
-    // Normalize expressions for comparison (case-insensitive, whitespace-tolerant)
-    const normalizeExpr = (expr: string) => expr.toLowerCase().replace(/\s+/g, '');
-    return normalizeExpr(contractDefault.expression) === normalizeExpr(normalizedSchema.expression);
+    return expressionsEqual(contractDefault.expression, normalizedSchema.expression);
   }
   return false;
 }
