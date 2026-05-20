@@ -16,29 +16,27 @@ import {
   type UniqueConstraintInput,
 } from './types';
 
-type ColumnDefaultLiteral = {
-  readonly kind: 'literal';
-  readonly value: string | number | boolean | Record<string, unknown> | unknown[] | null;
-};
-type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
-const literalKindSchema = type("'literal'");
-const functionKindSchema = type("'function'");
+type ColumnDefaultExpression = { readonly kind: 'expression'; readonly expression: string };
+type ColumnDefaultAutoincrement = { readonly kind: 'autoincrement' };
+const expressionKindSchema = type("'expression'");
+const autoincrementKindSchema = type("'autoincrement'");
 const generatorKindSchema = type("'generator'");
 const generatorIdSchema = type('string').narrow((value, ctx) => {
   return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value) ? true : ctx.mustBe('a flat generator id');
 });
 
-export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
-  kind: literalKindSchema,
-  value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
-});
-
-export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>().type({
-  kind: functionKindSchema,
+export const ColumnDefaultExpressionSchema = type.declare<ColumnDefaultExpression>().type({
+  kind: expressionKindSchema,
   expression: 'string',
 });
 
-export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
+export const ColumnDefaultAutoincrementSchema = type.declare<ColumnDefaultAutoincrement>().type({
+  kind: autoincrementKindSchema,
+});
+
+export const ColumnDefaultSchema = ColumnDefaultExpressionSchema.or(
+  ColumnDefaultAutoincrementSchema,
+);
 
 const ExecutionMutationDefaultValueSchema = type({
   '+': 'reject',
@@ -300,10 +298,11 @@ const SqlContractSchema = type({
 });
 
 // NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
-// instead of type.declare<T>().type() because the ColumnDefault union's value field
-// includes bigint | Date (runtime-only types after decoding) which cannot be expressed
-// in Arktype's JSON validation DSL. The `as SqlStorage` cast in validateStorage() bridges
-// the gap between the JSON-safe Arktype output and the runtime TypeScript type.
+// instead of type.declare<T>().type() because the surrounding shapes carry
+// runtime-only branded fields (e.g. the branded `storageHash`) which cannot
+// be expressed in Arktype's JSON validation DSL. The `as SqlStorage` cast in
+// validateStorage() bridges the gap between the JSON-safe Arktype output and
+// the runtime TypeScript type.
 
 /**
  * Validates the structural shape of SqlStorage using Arktype.
@@ -622,9 +621,13 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
     }
 
     for (const [colName, column] of Object.entries(table.columns)) {
-      if (!column.nullable && column.default?.kind === 'literal' && column.default.value === null) {
+      if (
+        !column.nullable &&
+        column.default?.kind === 'expression' &&
+        column.default.expression.trim().toUpperCase() === 'NULL'
+      ) {
         throw new ContractValidationError(
-          `Namespace "${namespaceId}" table "${tableName}" column "${colName}" is NOT NULL but has a literal null default`,
+          `Namespace "${namespaceId}" table "${tableName}" column "${colName}" is NOT NULL but has a NULL default expression`,
           'storage',
         );
       }

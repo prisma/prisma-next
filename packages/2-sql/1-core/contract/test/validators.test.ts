@@ -127,6 +127,141 @@ describe('SQL contract validators', () => {
       } as unknown;
       expect(() => validateStorage(invalid)).toThrow(/either typeParams or typeRef, not both/);
     });
+
+    it('accepts column default with kind expression', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  createdAt: {
+                    nativeType: 'timestamptz',
+                    codecId: 'pg/timestamptz@1',
+                    nullable: false,
+                    default: { kind: 'expression', expression: 'NOW()' },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).not.toThrow();
+    });
+
+    it('accepts column default with kind autoincrement', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    default: { kind: 'autoincrement' },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).not.toThrow();
+    });
+
+    it('rejects legacy column default with kind literal', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  name: {
+                    nativeType: 'text',
+                    codecId: 'pg/text@1',
+                    nullable: false,
+                    default: { kind: 'literal', value: 'foo' },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).toThrow();
+    });
+
+    it('rejects legacy column default with kind function', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  createdAt: {
+                    nativeType: 'timestamptz',
+                    codecId: 'pg/timestamptz@1',
+                    nullable: false,
+                    default: { kind: 'function', expression: 'now()' },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).toThrow();
+    });
+
+    it('rejects column default expression with non-string expression value', () => {
+      const s = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  createdAt: {
+                    nativeType: 'timestamptz',
+                    codecId: 'pg/timestamptz@1',
+                    nullable: false,
+                    default: { kind: 'expression', expression: 42 },
+                  },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(s)).toThrow();
+    });
   });
 
   describe('validateModel', () => {
@@ -724,6 +859,38 @@ describe('SQL contract validators', () => {
         /non-existent column "user_uuid" in table "users"/,
       );
     });
+
+    it('rejects NOT NULL column with NULL default expression', () => {
+      const userTable = table({
+        name: {
+          nativeType: 'text',
+          codecId: 'pg/text@1',
+          nullable: false,
+          default: { kind: 'expression', expression: 'NULL' },
+        },
+      });
+      const c = createContract<SqlStorage>({
+        storage: unboundTables({ user: userTable }),
+      });
+      expect(() => validateSqlContractFully(c)).toThrow(
+        /NOT NULL but has a NULL default expression/,
+      );
+    });
+
+    it('accepts NULL default expression on a nullable column', () => {
+      const userTable = table({
+        name: {
+          nativeType: 'text',
+          codecId: 'pg/text@1',
+          nullable: true,
+          default: { kind: 'expression', expression: 'NULL' },
+        },
+      });
+      const c = createContract<SqlStorage>({
+        storage: unboundTables({ user: userTable }),
+      });
+      expect(() => validateSqlContractFully(c)).not.toThrow();
+    });
   });
 
   describe('validateStorageSemantics', () => {
@@ -830,7 +997,7 @@ describe('SQL contract validators', () => {
                 nativeType: 'int4',
                 codecId: 'pg/int4@1',
                 nullable: false,
-                default: { kind: 'literal', value: 0 },
+                default: { kind: 'expression', expression: '0' },
               },
             },
             { fks: [fk('post', ['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
