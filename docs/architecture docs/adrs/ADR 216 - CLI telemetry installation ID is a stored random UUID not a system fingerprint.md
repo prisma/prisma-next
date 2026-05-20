@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Recorded during the design of the CLI Telemetry project (see `projects/cli-telemetry/spec.md`). Promote to Accepted once that project's Phase 1 lands. This ADR scopes only the CLI usage telemetry installation identifier; it does not concern the existing runtime telemetry surface in [ADR 024 — Telemetry Schema](./ADR%20024%20-%20Telemetry%20Schema.md), which is an internal query-execution observability SPI with no client-stored identifier.
+Accepted. Phase 1 of the CLI Telemetry project has landed (Linear ticket `TML-2557`); [`docs/Telemetry.md`](../../Telemetry.md) is the user-facing reference for the installation ID's lifecycle and the consent surface this ADR scopes. This ADR scopes only the CLI usage telemetry installation identifier; it does not concern the existing runtime telemetry surface in [ADR 024 — Telemetry Schema](./ADR%20024%20-%20Telemetry%20Schema.md), which is an internal query-execution observability SPI with no client-stored identifier.
 
 ## At a glance
 
@@ -20,7 +20,7 @@ The trust posture is *we count installations — only those whose owners explici
 
 ## Context
 
-The CLI Telemetry project's Phase 1 (`projects/cli-telemetry/spec.md`) ships monthly-active-user (MAU) analytics for an OSS data tool. MAU requires per-machine deduplication: events from one developer's repeated invocations should collapse to one user. The choice of *what to use as the dedup key* is the load-bearing trust decision in the entire project.
+The CLI Telemetry project's Phase 1 ships monthly-active-user (MAU) analytics for an OSS data tool. MAU requires per-machine deduplication: events from one developer's repeated invocations should collapse to one user. The choice of *what to use as the dedup key* is the load-bearing trust decision in the entire project.
 
 Two compositions are available in the wild:
 
@@ -69,7 +69,7 @@ The disclosure-and-consent surface is the interactive `prisma-next init` prompt.
 
 ### Out of scope
 
-This ADR does not record the wire schema, the network endpoint, the backend storage, the field list, the sanitization rules for command/flag transmission, the subprocess isolation pattern, or the project's phase structure. Those live in the project spec (`projects/cli-telemetry/spec.md`) and, for the subprocess pattern, in [ADR 217 — CLI telemetry runs in a detached subprocess spawned at command start](./ADR%20217%20-%20CLI%20telemetry%20runs%20in%20a%20detached%20subprocess%20spawned%20at%20command%20start.md).
+This ADR does not record the wire schema, the network endpoint, the backend storage, the field list, the sanitization rules for command/flag transmission, the subprocess isolation pattern, or the project's phase structure. The user-facing surface (consent, storage, opt-out signals) is documented at [`docs/Telemetry.md`](../../Telemetry.md); the subprocess pattern is recorded in [ADR 217 — CLI telemetry runs in a detached subprocess spawned at command start](./ADR%20217%20-%20CLI%20telemetry%20runs%20in%20a%20detached%20subprocess%20spawned%20at%20command%20start.md).
 
 ## Consequences
 
@@ -100,4 +100,4 @@ This ADR does not record the wire schema, the network endpoint, the backend stor
 - **`/etc/machine-id` (Linux) / IORegistry UUID (macOS) / Windows MachineGuid.** OS-provided "anonymous machine identifier" values. Rejected for the same reasons as hashed MAC, with the added concern that these values often persist across OS reinstalls when system snapshots are restored, making the dedup "too sticky" relative to the actual install/uninstall lifecycle we want to track.
 - **Per-project `.prisma-next/installation-id`.** Rejected — inflates MAU per repo, leaks into VCS without a `.gitignore` entry the user must remember, complicates the consent story (does cloning a teammate's repo enrol you?).
 - **Random UUID stored in OS keychain (`keytar`-style).** Rejected — adds a heavyweight dependency and an OS-keychain dependency to a CLI that should run on minimal systems. Trust-equivalent to the file-based approach; complexity not justified.
-- **No identifier at all; report session count with CI excluded.** Discussed during design (`projects/cli-telemetry/spec.md`, design discussion synthesis). Sufficient for "is anyone using this" but not for MAU. Rejected because MAU is already on the EA-stage requirements list.
+- **No identifier at all; report session count with CI excluded.** Discussed during design as the "ship-the-band-aid-later" option. Sufficient for "is anyone using this" but not for MAU. Rejected because MAU is already on the EA-stage requirements list.
