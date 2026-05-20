@@ -516,44 +516,18 @@ function namedTypeField(
   });
 }
 
-/**
- * The framework-authoring preset surface resolves its `default` slot into
- * an upstream two-arm shape — a literal value or a SQL function-form
- * expression — before handing the preset output to the SQL DSL. The SQL
- * authoring layer is the place that decides how each arm lands in the
- * contract IR (literal → codec-rendered expression at emit time; function
- * → pass-through expression). The kind strings live in named constants so
- * the F1 grep gate ("no legacy IR ColumnDefault literal/function arms")
- * does not flag the preset-template surface, which is a separate concept.
- */
-const PRESET_DEFAULT_KIND_LITERAL = 'literal';
-const PRESET_DEFAULT_KIND_FUNCTION = 'function';
-
-type PresetResolvedDefault =
-  | { readonly kind: typeof PRESET_DEFAULT_KIND_LITERAL; readonly value: unknown }
-  | { readonly kind: typeof PRESET_DEFAULT_KIND_FUNCTION; readonly expression: string };
-
-function authoringDefaultFromPreset(preset: PresetResolvedDefault): AuthoredColumnDefault {
-  if (preset.kind === PRESET_DEFAULT_KIND_FUNCTION) {
-    return { kind: 'expression', expression: preset.expression };
-  }
-  return { kind: 'codecValue', value: preset.value };
-}
-
 export function buildFieldPreset(
   descriptor: AuthoringFieldPresetDescriptor,
   args: readonly unknown[],
   namedConstraintOptions?: NamedConstraintSpec,
 ): ScalarFieldBuilder {
   const preset = instantiateAuthoringFieldPreset(descriptor, args);
-  const presetDefault = preset.default as PresetResolvedDefault | undefined;
-  const authoredDefault = presetDefault ? authoringDefaultFromPreset(presetDefault) : undefined;
 
   return new ScalarFieldBuilder({
     kind: 'scalar',
     descriptor: preset.descriptor,
     nullable: preset.nullable,
-    ...ifDefined('default', authoredDefault),
+    ...ifDefined('default', preset.default),
     ...ifDefined('executionDefaults', preset.executionDefaults),
     ...(preset.id
       ? {
