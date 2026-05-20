@@ -228,7 +228,7 @@ describe('GroupedQuery.annotate', () => {
 describe('InsertQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
-      .users.insert({ name: 'Alice' })
+      .users.insert([{ name: 'Alice' }])
       .annotate(auditAnnotation({ actor: 'system' }))
       .build();
 
@@ -237,7 +237,7 @@ describe('InsertQuery.annotate', () => {
 
   it('accepts both-kind annotations', () => {
     const plan = db()
-      .users.insert({ name: 'Alice' })
+      .users.insert([{ name: 'Alice' }])
       .annotate(otelAnnotation({ traceId: 't-1' }))
       .build();
 
@@ -246,7 +246,7 @@ describe('InsertQuery.annotate', () => {
 
   it('survives across .returning(...) chaining', () => {
     const plan = db()
-      .users.insert({ name: 'Alice' })
+      .users.insert([{ name: 'Alice' }])
       .annotate(auditAnnotation({ actor: 'system' }))
       .returning('id', 'name')
       .build();
@@ -255,7 +255,7 @@ describe('InsertQuery.annotate', () => {
   });
 
   it('runtime gate rejects a read-only annotation forced through a cast', () => {
-    const builder = db().users.insert({ name: 'Alice' }) as unknown as {
+    const builder = db().users.insert([{ name: 'Alice' }]) as unknown as {
       annotate(annotation: unknown): unknown;
     };
     expect(() => builder.annotate(cacheAnnotation({ ttl: 60 }))).toThrow(

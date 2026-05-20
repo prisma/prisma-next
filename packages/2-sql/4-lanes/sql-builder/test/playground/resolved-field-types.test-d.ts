@@ -22,18 +22,20 @@ test('SELECT resolves parameterized Char column to concrete type via FieldOutput
 });
 
 test('INSERT accepts concrete input types via FieldInputTypes', () => {
-  db.posts.insert({
-    id: 1,
-    title: 'test',
-    user_id: 1,
-    views: 0,
-    embedding: [1, 2, 3] as unknown as Vector,
-  });
+  db.posts.insert([
+    {
+      id: 1,
+      title: 'test',
+      user_id: 1,
+      views: 0,
+      embedding: [1, 2, 3] as unknown as Vector,
+    },
+  ]);
 });
 
 test('INSERT returning resolves to concrete output types', () => {
   const result = db.posts
-    .insert({ id: 1, title: 'test', user_id: 1, views: 0 })
+    .insert([{ id: 1, title: 'test', user_id: 1, views: 0 }])
     .returning('id', 'embedding')
     .build();
   assertType<{ id: number; embedding: Vector | null }>(
