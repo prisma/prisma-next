@@ -403,8 +403,8 @@
           "createdAt": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "expression": "now()",
-              "kind": "function"
+              "kind": "expression",
+              "expression": "now()"
             },
             "nativeType": "timestamptz",
             "nullable": false
@@ -456,8 +456,8 @@
           "createdAt": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "expression": "now()",
-              "kind": "function"
+              "kind": "expression",
+              "expression": "now()"
             },
             "nativeType": "timestamptz",
             "nullable": false
@@ -478,8 +478,8 @@
           "status": {
             "codecId": "pg/text@1",
             "default": {
-              "kind": "literal",
-              "value": "open"
+              "kind": "expression",
+              "expression": "'open'"
             },
             "nativeType": "text",
             "nullable": false
@@ -527,8 +527,8 @@
           "createdAt": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "expression": "now()",
-              "kind": "function"
+              "kind": "expression",
+              "expression": "now()"
             },
             "nativeType": "timestamptz",
             "nullable": false
