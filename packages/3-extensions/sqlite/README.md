@@ -1,66 +1,96 @@
 # @prisma-next/sqlite
 
-Composition-root SQLite helper that builds a Prisma Next runtime client and exposes SQL, ORM, and schema query access.
+One-package SQLite setup for Prisma Next. Install this single package to get config, runtime, contract authoring, control-plane access, and migration helpers — no reach-ins to internal packages required.
 
 ## Package Classification
 
 - **Domain**: extensions
 - **Layer**: adapters
-- **Plane**: runtime
+- **Planes**: shared (config, contract-builder, migration), migration (control), runtime (runtime)
 
-## Overview
+## Quick Start
 
-`@prisma-next/sqlite/runtime` exposes a single `sqlite(...)` helper that composes the SQLite execution stack and returns query/runtime roots:
+```typescript
+// prisma-next.config.ts
+import { defineConfig } from '@prisma-next/sqlite/config';
 
-- `db.sql`
-- `db.orm`
-- `db.context`
-- `db.stack`
+export default defineConfig({
+  contract: './prisma/contract.prisma',
+  db: { connection: 'path/to/app.db' },
+});
+```
 
-Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
-Connection binding can be provided up front (`path`) or deferred via `db.connect(...)`.
+```typescript
+// prisma/contract.ts
+import { defineContract, field, model } from '@prisma-next/sqlite/contract-builder';
 
-## Responsibilities
+export default defineContract({
+  models: {
+    User: model('User', { fields: { id: field.id.uuidv4() } }),
+  },
+});
+```
 
-- Build a static SQLite execution stack from target, adapter, and driver descriptors
-- Build typed SQL surface from the execution context via `sql-query-builder-new`
-- Build ORM surface from the execution context
-- Normalize runtime binding input (file path or `:memory:`)
-- Lazily instantiate runtime resources on first `db.runtime()` or `db.connect(...)` call
-- Connect the internal SQLite driver through `db.connect(...)` or from initial binding options
-- Memoize runtime so repeated `db.runtime()` calls return one instance
+## Exports
+
+### `@prisma-next/sqlite/config`
+
+Simplified `defineConfig` that pre-wires all SQLite internals (family, target, adapter, driver, contract providers). Accepts `contract`, `db.connection`, `extensions`, and `migrations.dir`.
+
+```typescript
+import { defineConfig } from '@prisma-next/sqlite/config';
+
+export default defineConfig({
+  contract: './prisma/contract.prisma',
+  db: { connection: 'path/to/app.db' },
+  migrations: { dir: 'migrations/app' },
+});
+```
+
+### `@prisma-next/sqlite/contract-builder`
+
+TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, …). The `defineContract` facade pre-binds `family` and `target` — callers do not pass those fields.
+
+```typescript
+import { defineContract, field, model } from '@prisma-next/sqlite/contract-builder';
+
+export default defineContract({
+  models: {
+    User: model('User', { fields: { id: field.id.uuidv4() } }),
+  },
+});
+```
+
+### `@prisma-next/sqlite/control`
+
+Control-plane client factory. Collapses the family + target + adapter + driver wiring into a single call.
+
+```typescript
+import { createSqliteControlClient } from '@prisma-next/sqlite/control';
+
+const control = createSqliteControlClient({
+  connection: 'path/to/app.db',
+});
+await control.dbUpdate({ migrations: { dir: 'migrations/app' } });
+```
+
+### `@prisma-next/sqlite/migration`
+
+Re-exports all migration operation helpers from `@prisma-next/target-sqlite/migration` (`Migration`, `MigrationCLI`, `createTable`, `addColumn`, `dropTable`, `createIndex`, `dropIndex`, `dropColumn`, `recreateTable`, `dataTransform`, `placeholder`, `rawSql`).
+
+### `@prisma-next/sqlite/runtime`
+
+Composes the SQLite execution stack and returns typed query roots (`db.sql`, `db.orm`, `db.context`, `db.stack`).
 
 ## Dependencies
 
-- **`@prisma-next/sql-runtime`** for stack/context/runtime primitives
-- **`@prisma-next/framework-components`** for stack instantiation
-- **`@prisma-next/target-sqlite`** for target descriptor
-- **`@prisma-next/adapter-sqlite`** for adapter descriptor
-- **`@prisma-next/driver-sqlite`** for driver descriptor
-- **`@prisma-next/sql-builder`** for `sql(...)` query builder
-- **`@prisma-next/sql-relational-core`** for `schema(...)`
-- **`@prisma-next/sql-orm-client`** for `orm(...)`
-- **`@prisma-next/sql-contract`** for contract types (contract validation flows through the `ContractSerializer` SPI on the SQL family target descriptor; the `sqlite<Contract>(...)` facade wraps it)
+This package bundles all the transitive dependencies needed for a SQLite Prisma Next project:
 
-## Architecture
-
-```mermaid
-flowchart TD
-    App[App Code] --> Client["sqlite(...)"]
-    Client --> Static["Roots: sql orm context stack"]
-    Client --> Lazy["runtime()"]
-
-    Lazy --> Instantiate[instantiateExecutionStack]
-    Lazy --> Bind["Resolve binding: path or :memory:"]
-    Bind --> DB["DatabaseSync via node:sqlite"]
-    Lazy --> Runtime[createRuntime]
-
-    Runtime --> Target["@prisma-next/target-sqlite"]
-    Runtime --> Adapter["@prisma-next/adapter-sqlite"]
-    Runtime --> Driver["@prisma-next/driver-sqlite"]
-    Runtime --> SqlRuntime["@prisma-next/sql-runtime"]
-    Runtime --> ExecPlane["@prisma-next/framework-components/execution"]
-```
+- `@prisma-next/target-sqlite` (target descriptor + migration surface)
+- `@prisma-next/adapter-sqlite` (adapter descriptor)
+- `@prisma-next/driver-sqlite` (driver descriptor)
+- `@prisma-next/sql-contract-ts` (TypeScript contract authoring)
+- `@prisma-next/sql-contract` (contract type definitions)
 
 ## Related Docs
 
