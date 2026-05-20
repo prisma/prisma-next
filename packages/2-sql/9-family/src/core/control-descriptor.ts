@@ -20,6 +20,11 @@ export class SqlFamilyDescriptor
     field: sqlFamilyAuthoringFieldPresets,
     type: sqlFamilyAuthoringTypes,
   } as const;
+  // Family-reserved per-namespace storage slot. Pack contributions
+  // whose `AuthoringEntityTypeDescriptor.storageSlotKey` matches one
+  // of these are rejected at descriptor-collection time so a pack
+  // cannot accidentally claim the family's built-in slot.
+  readonly reservedStorageSlotKeys: ReadonlyArray<string> = ['tables'];
 
   create<TTargetId extends string>(
     stack: ControlStack<'sql', TTargetId>,
