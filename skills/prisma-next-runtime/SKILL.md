@@ -74,7 +74,7 @@ The concept: short scripts that connect, query, then expect the process to exit 
 // src/scripts/hello.ts
 import { db } from '../prisma/db';
 
-const created = await db.orm.User.insert({ email: 'alice@example.com', name: 'Alice' }).all();
+const created = await db.orm.User.create({ email: 'alice@example.com', name: 'Alice' });
 const read = await db.orm.User.first();
 console.log({ created, read });
 
@@ -86,7 +86,7 @@ await db.close();
 ```typescript
 // src/scripts/hello.ts — top-level await in a script module
 import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from '../prisma/contract';
+import type { Contract } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
 
 await using db = postgres<Contract>({ contractJson, url: process.env.DATABASE_URL! });
