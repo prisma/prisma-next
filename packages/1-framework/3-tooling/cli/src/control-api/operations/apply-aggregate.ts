@@ -178,6 +178,7 @@ export async function applyAggregate<TFamilyId extends string, TTargetId extends
       meta: {
         ...(runnerResult.failure.meta ?? {}),
         failingSpace: runnerResult.failure.failingSpace,
+        runnerErrorCode: runnerResult.failure.code,
       },
     });
   }

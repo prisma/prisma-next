@@ -80,9 +80,15 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
   }
 
   if (failure.code === 'RUNNER_FAILED') {
+    const runnerCode =
+      typeof failure.meta?.runnerErrorCode === 'string' ? failure.meta.runnerErrorCode : undefined;
+    const fix =
+      runnerCode === 'LEGACY_MARKER_SHAPE'
+        ? 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.'
+        : 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`';
     return errorRunnerFailed(failure.summary, {
       why: failure.why ?? 'Migration runner failed',
-      fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
+      fix,
       ...(failure.meta
         ? { meta: { code: 'RUNNER_FAILED', ...failure.meta } }
         : { meta: { code: 'RUNNER_FAILED' } }),

@@ -331,7 +331,7 @@ function wrapVerifyError(
   contractPathAbsolute: string,
   modeLabel: string,
 ): Result<never, CliStructuredError> {
-  if (error instanceof CliStructuredError) {
+  if (CliStructuredError.is(error)) {
     return notOk(error);
   }
   if (error instanceof ContractValidationError) {

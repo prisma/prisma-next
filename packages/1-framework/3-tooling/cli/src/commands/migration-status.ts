@@ -30,7 +30,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
-  type CliStructuredError,
+  CliStructuredError,
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
@@ -750,7 +750,11 @@ async function executeMigrationStatusCommand(
         // space has no marker", which is a different condition).
         allMarkers = null;
       }
-    } catch {
+    } catch (error) {
+      if (CliStructuredError.is(error)) {
+        await client.close();
+        return notOk(error);
+      }
       if (!flags.json && !flags.quiet) {
         ui.warn('Could not connect to database — showing offline status');
       }
