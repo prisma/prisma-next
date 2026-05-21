@@ -298,7 +298,7 @@
       "glob": "packages/3-extensions/postgres/src/exports/migration.ts",
       "domain": "extensions",
       "layer": "adapters",
-      "plane": "shared"
+      "plane": "migration"
     },
     {
       "glob": "packages/3-extensions/postgres/src/exports/family.ts",
