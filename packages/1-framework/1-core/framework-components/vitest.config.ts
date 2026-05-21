@@ -3,6 +3,12 @@ import { defineConfig } from 'vitest/config';
 
 const dist = (relativePath: string) => fileURLToPath(new URL(relativePath, import.meta.url));
 
+// Cross-family test wiring uses dist-path aliases because the natural devDep edge from
+// framework-components → sql-contract / mongo-contract creates a Turbo build cycle (family
+// packages already depend on framework-components). The aliases require the family packages'
+// dist/ to be built first; if you see cryptic vitest resolution errors after a clean checkout
+// or `pnpm clean`, run:
+//   pnpm --filter @prisma-next/sql-contract --filter @prisma-next/mongo-contract build
 export default defineConfig({
   resolve: {
     alias: {
@@ -10,9 +16,6 @@ export default defineConfig({
         '../../../2-mongo-family/1-foundation/mongo-contract/dist/index.mjs',
       ),
       '@prisma-next/sql-contract/types': dist('../../../2-sql/1-core/contract/dist/types.mjs'),
-      '#element-coordinates/postgres-schema': dist(
-        '../../../3-targets/3-targets/postgres/dist/types.mjs',
-      ),
     },
   },
   test: {

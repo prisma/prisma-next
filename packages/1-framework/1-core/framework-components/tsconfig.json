@@ -3,14 +3,17 @@
   "compilerOptions": {
     "rootDir": ".",
     "baseUrl": ".",
+    // Cross-family test wiring uses dist-path aliases because the natural devDep edge
+    // from framework-components → sql-contract / mongo-contract creates a Turbo build cycle
+    // (family packages already depend on framework-components). The aliases require the
+    // family packages' dist/ to be built first; if you see cryptic vitest resolution errors
+    // after a clean checkout or `pnpm clean`, run:
+    //   pnpm --filter @prisma-next/sql-contract --filter @prisma-next/mongo-contract build
     "paths": {
       "@prisma-next/mongo-contract": [
         "../../../2-mongo-family/1-foundation/mongo-contract/dist/index.d.mts"
       ],
-      "@prisma-next/sql-contract/types": ["../../../2-sql/1-core/contract/dist/types.d.mts"],
-      "#element-coordinates/postgres-schema": [
-        "../../../3-targets/3-targets/postgres/dist/types.d.mts"
-      ]
+      "@prisma-next/sql-contract/types": ["../../../2-sql/1-core/contract/dist/types.d.mts"]
     }
   },
   "include": ["src", "test", "*.config.*", "package.json"],
