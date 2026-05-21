@@ -7,6 +7,7 @@ import {
   formatAddArgs,
   formatAddDevArgs,
   formatRunCommand,
+  formatRunScriptCommand,
   hasProjectManifest,
 } from '../../../src/commands/init/detect-package-manager';
 
@@ -184,5 +185,27 @@ describe('formatAddDevArgs', () => {
 
   it('uses -D for other managers', () => {
     expect(formatAddDevArgs('npm', ['prisma-next'])).toEqual(['add', '-D', 'prisma-next']);
+  });
+});
+
+describe('formatRunScriptCommand', () => {
+  it('formats npm run for npm', () => {
+    expect(formatRunScriptCommand('npm', 'db:init')).toBe('npm run db:init');
+  });
+
+  it('formats pnpm run for pnpm', () => {
+    expect(formatRunScriptCommand('pnpm', 'dev')).toBe('pnpm run dev');
+  });
+
+  it('formats yarn run for yarn', () => {
+    expect(formatRunScriptCommand('yarn', 'dev')).toBe('yarn run dev');
+  });
+
+  it('formats bun run for bun', () => {
+    expect(formatRunScriptCommand('bun', 'dev')).toBe('bun run dev');
+  });
+
+  it('formats deno task for deno', () => {
+    expect(formatRunScriptCommand('deno', 'db:init')).toBe('deno task db:init');
   });
 });

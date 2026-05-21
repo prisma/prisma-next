@@ -12,6 +12,11 @@ import {
   variables as quickRefVars,
 } from '../../../src/commands/init/templates/quick-reference';
 import {
+  minimalProjectReadmeMd,
+  mongoVariables as readmeMongoVars,
+  postgresVariables as readmePostgresVars,
+} from '../../../src/commands/init/templates/readme';
+import {
   defaultTsConfig,
   mergeTsConfig,
   REQUIRED_COMPILER_OPTIONS,
@@ -523,6 +528,58 @@ describe('templates', () => {
     it('quick-reference-mongo.md placeholders match declared variables', () => {
       const mdVars = extractPlaceholders('quick-reference-mongo.md');
       expect(mdVars).toEqual(new Set(quickRefVars));
+    });
+
+    it('readme-minimal-postgres.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('readme-minimal-postgres.md');
+      expect(mdVars).toEqual(new Set(readmePostgresVars));
+    });
+
+    it('readme-minimal-mongo.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('readme-minimal-mongo.md');
+      expect(mdVars).toEqual(new Set(readmeMongoVars));
+    });
+  });
+
+  describe('minimalProjectReadmeMd', () => {
+    it('postgres: leads with db:init before dev', () => {
+      const md = minimalProjectReadmeMd('postgres', 'prisma/contract.prisma', 'my-app', 'npm');
+
+      expect(md).toMatch(/## First run/);
+      expect(md.indexOf('db:init')).toBeLessThan(md.indexOf('npm run dev'));
+      expect(md).not.toContain('Run the migration and seed scripts first');
+    });
+
+    it('mongo: leads with db:up before dev', () => {
+      const md = minimalProjectReadmeMd('mongo', 'prisma/contract.prisma', 'my-app', 'npm');
+
+      expect(md).toMatch(/## First run/);
+      expect(md.indexOf('db:up')).toBeLessThan(md.indexOf('npm run dev'));
+      expect(md).not.toContain('Run the migration and seed scripts first');
+    });
+
+    it('lists migration scripts under Available scripts, not First run', () => {
+      const md = minimalProjectReadmeMd('postgres', 'prisma/contract.prisma', 'my-app', 'npm');
+      const firstRunEnd = md.indexOf('## Available scripts');
+
+      expect(firstRunEnd).toBeGreaterThan(-1);
+      expect(md.slice(0, firstRunEnd)).not.toContain('migration:plan');
+      expect(md).toContain('## Available scripts');
+      expect(md).toContain('migration:plan');
+    });
+
+    describe('per-target snapshots', () => {
+      it('postgres readme is stable', () => {
+        expect(
+          minimalProjectReadmeMd('postgres', 'prisma/contract.prisma', 'my-app', 'pnpm'),
+        ).toMatchSnapshot();
+      });
+
+      it('mongo readme is stable', () => {
+        expect(
+          minimalProjectReadmeMd('mongo', 'prisma/contract.ts', 'my-app', 'pnpm'),
+        ).toMatchSnapshot();
+      });
     });
   });
 });

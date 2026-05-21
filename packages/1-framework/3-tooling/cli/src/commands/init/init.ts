@@ -59,6 +59,7 @@ import {
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
 import { envExampleContent, envFileContent, MIN_SERVER_VERSION } from './templates/env';
 import { quickReferenceMd } from './templates/quick-reference';
+import { minimalProjectReadmeMd } from './templates/readme';
 import { defaultTsConfig, mergeTsConfig, TsConfigParseError } from './templates/tsconfig';
 
 interface FileEntry {
@@ -347,6 +348,22 @@ export async function runInit(
         'No package.json found in the target directory; created a minimal one. Edit `name` / `version` to taste.',
       );
     }
+  }
+
+  if (existsSync(join(baseDir, 'src/index.ts'))) {
+    const rawName =
+      parsedPackageJson !== null && typeof parsedPackageJson['name'] === 'string'
+        ? parsedPackageJson['name']
+        : basename(baseDir);
+    filesToWrite.push({
+      path: 'README.md',
+      content: minimalProjectReadmeMd(
+        inputs.target,
+        inputs.schemaPath,
+        sanitisePackageName(rawName),
+        pm,
+      ),
+    });
   }
 
   // -----------------------------------------------------------------

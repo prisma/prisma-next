@@ -56,6 +56,21 @@ export function formatRunCommand(pm: PackageManager, bin: string, args: string):
   return `${pm} ${bin} ${args}`;
 }
 
+export function formatRunScriptCommand(pm: PackageManager, scriptName: string): string {
+  switch (pm) {
+    case 'deno':
+      return `deno task ${scriptName}`;
+    case 'bun':
+      return `bun run ${scriptName}`;
+    case 'pnpm':
+      return `pnpm run ${scriptName}`;
+    case 'yarn':
+      return `yarn run ${scriptName}`;
+    default:
+      return `npm run ${scriptName}`;
+  }
+}
+
 export function formatAddArgs(pm: PackageManager, packages: string[]): string[] {
   if (pm === 'deno') {
     return ['add', ...packages.map((p) => `npm:${p}`)];
