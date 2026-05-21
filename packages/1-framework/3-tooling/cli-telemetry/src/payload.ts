@@ -7,11 +7,16 @@ import { type } from 'arktype';
  * the project root the child uses to discover everything else. The
  * child probes its own process (runtime/os/arch, package manager, ts
  * version, agent) and reads the user's `prisma-next.config.*` via
- * c12 to derive `databaseTarget` and `extensions` — keeping the
- * c12 work off the parent's hot path eliminates the original
- * c12-await-in-preAction race against synchronous parent crashes
- * (see PR #556's design dialogue) at the cost of the child evaluating
- * user TS config code.
+ * c12 to derive `databaseTarget` and `extensions`.
+ *
+ * Loading c12 on the parent side would put a `loadConfig()` await on
+ * the command's hot path between gate resolution and `fork()`,
+ * opening a race against any CLI command that throws synchronously
+ * before that await resolves (the parent exits before forking the
+ * sender, and the telemetry event is lost). Moving the load into the
+ * detached child eliminates that race; the trade is that the child
+ * now evaluates user TS config code, so it's gated behind the same
+ * privacy checks the parent already resolved before forking.
  *
  * `databaseTarget` is an optional parent-side override for the
  * c12-derived value: the first-`init` invocation supplies the

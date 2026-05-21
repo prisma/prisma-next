@@ -15,7 +15,8 @@ import { readUserConfig, type UserConfig } from './user-config';
  * provided). `extensions` is deliberately absent: the detached child
  * loads `prisma-next.config.*` via c12 itself and derives the
  * extension-pack ids from the validated config — see the rationale
- * on `ParentToSenderPayload` and the PR #556 design dialogue.
+ * on `ParentToSenderPayload` for why c12 lives in the child rather
+ * than on the parent's hot path.
  *
  * `databaseTarget` is an optional parent-side override forwarded to
  * the child. Set by `fireTelemetryAfterInitConsent` (where the
