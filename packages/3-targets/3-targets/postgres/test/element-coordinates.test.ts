@@ -26,6 +26,7 @@ describe('elementCoordinates with PostgresSchema', () => {
 
     const coordinates = [...elementCoordinates(storage)];
     expect(coordinates).toContainEqual({
+      plane: 'storage',
       namespaceId: 'public',
       entityKind: 'tables',
       entityName: 'users',
