@@ -13,6 +13,8 @@ type CreateMigrationPlanCommand =
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   readFile: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
   loadMigrationPackages: vi.fn(),
   readRefs: vi.fn(),
   readRefSnapshot: vi.fn(),
@@ -22,12 +24,27 @@ const mocks = vi.hoisted(() => ({
   assertFrameworkComponentsCompatible: vi.fn(),
   extractSqlDdl: vi.fn(),
   createControlStack: vi.fn(),
+  runContractSpaceSeedPhase: vi.fn(),
+  buildContractSpaceAggregate: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-  return { ...actual, readFile: mocks.readFile };
+  return {
+    ...actual,
+    readFile: mocks.readFile,
+    mkdir: mocks.mkdir,
+    writeFile: mocks.writeFile,
+  };
 });
+
+vi.mock('../../src/utils/contract-space-seed-phase', () => ({
+  runContractSpaceSeedPhase: mocks.runContractSpaceSeedPhase,
+}));
+
+vi.mock('../../src/utils/contract-space-aggregate-loader', () => ({
+  buildContractSpaceAggregate: mocks.buildContractSpaceAggregate,
+}));
 
 vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfig,
@@ -129,18 +146,28 @@ function graphWithPriorMigration(fromHash: string): {
   return { bundles, graph: reconstructGraph(bundles) };
 }
 
-function setupBaseConfig(): void {
-  const planner = {
-    plan: vi.fn().mockReturnValue({
-      kind: 'success',
-      plan: {
-        operations: [
-          { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
-        ],
-        renderTypeScript: vi.fn().mockReturnValue('// migration.ts'),
-      },
-    }),
+function defaultPlannerSuccess(
+  operations: readonly { id: string; label: string; operationClass: string }[],
+) {
+  return {
+    kind: 'success' as const,
+    plan: {
+      operations,
+      renderTypeScript: vi.fn().mockReturnValue('// migration.ts'),
+    },
   };
+}
+
+function setupBaseConfig(
+  plannerPlan = vi
+    .fn()
+    .mockReturnValue(
+      defaultPlannerSuccess([
+        { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
+      ]),
+    ),
+): void {
+  const planner = { plan: plannerPlan };
   mocks.loadConfig.mockResolvedValue({
     family: {
       familyId: 'mongo',
@@ -165,6 +192,29 @@ function setupBaseConfig(): void {
   mocks.createControlStack.mockReturnValue({});
 }
 
+function setupAutoBaselineEmptyGraph(fromHash = OLD_HASH, toHash = NEW_HASH): void {
+  const planMock = vi
+    .fn()
+    .mockReturnValueOnce(
+      defaultPlannerSuccess([
+        { id: 'baseline.table', label: 'Create baseline table', operationClass: 'additive' },
+      ]),
+    )
+    .mockReturnValueOnce(
+      defaultPlannerSuccess([
+        { id: 'delta.table', label: 'Create delta table', operationClass: 'additive' },
+      ]),
+    );
+  setupBaseConfig(planMock);
+  mocks.readFile.mockResolvedValue(makeContractJson(toHash));
+  mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+  setupDbRefFromHash(fromHash);
+  mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+  mocks.writeMigrationPackage.mockResolvedValue(undefined);
+  mocks.copyFilesWithRename.mockResolvedValue(undefined);
+  mocks.extractSqlDdl.mockReturnValue([]);
+}
+
 describe('migration plan command', () => {
   let consoleOutput: string[];
   let cleanupMocks: () => void;
@@ -181,6 +231,17 @@ describe('migration plan command', () => {
     for (const mock of Object.values(mocks)) {
       mock.mockReset();
     }
+    mocks.runContractSpaceSeedPhase.mockResolvedValue({ seeded: [] });
+    mocks.buildContractSpaceAggregate.mockImplementation(async (inputs) => {
+      const loader = await vi.importActual<
+        typeof import('../../src/utils/contract-space-aggregate-loader')
+      >('../../src/utils/contract-space-aggregate-loader');
+      return loader.buildContractSpaceAggregate(
+        inputs as Parameters<typeof loader.buildContractSpaceAggregate>[0],
+      );
+    });
+    mocks.mkdir.mockResolvedValue(undefined);
+    mocks.writeFile.mockResolvedValue(undefined);
   }, timeouts.typeScriptCompilation);
 
   afterEach(() => {
@@ -203,7 +264,191 @@ describe('migration plan command', () => {
     vi.doUnmock('../../src/utils/framework-components');
     vi.doUnmock('../../src/control-api/operations/extract-sql-ddl');
     vi.doUnmock('@prisma-next/framework-components/control');
+    vi.doUnmock('../../src/utils/contract-space-seed-phase');
+    vi.doUnmock('../../src/utils/contract-space-aggregate-loader');
     vi.resetModules();
+  });
+
+  describe('auto-baseline emission', () => {
+    it('writes two app-space bundles with correct metadata on empty graph', async () => {
+      setupAutoBaselineEmptyGraph();
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json']);
+
+      expect(exitCode).toBe(0);
+      expect(mocks.writeMigrationPackage).toHaveBeenCalledTimes(2);
+
+      const baselineMeta = mocks.writeMigrationPackage.mock.calls[0]![1] as {
+        from: string | null;
+        to: string;
+      };
+      const deltaMeta = mocks.writeMigrationPackage.mock.calls[1]![1] as {
+        from: string | null;
+        to: string;
+      };
+      expect(baselineMeta.from).toBeNull();
+      expect(baselineMeta.to).toBe(OLD_HASH);
+      expect(deltaMeta.from).toBe(OLD_HASH);
+      expect(deltaMeta.to).toBe(NEW_HASH);
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result.baselineDir).toBeDefined();
+      expect(result.dir).toBeDefined();
+      expect(result.summary).toContain('Planned baseline +');
+      expect(result.baselineDir! < result.dir!).toBe(true);
+    });
+
+    it('returns noOp without writing bundles when fromHash equals toStorageHash', async () => {
+      setupAutoBaselineEmptyGraph(SAME_HASH, SAME_HASH);
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json']);
+
+      expect(exitCode).toBe(0);
+      expect(mocks.writeMigrationPackage).not.toHaveBeenCalled();
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result.noOp).toBe(true);
+    });
+
+    it('refuses without writing when baseline planner fails', async () => {
+      const planMock = vi.fn().mockReturnValueOnce({
+        kind: 'failure',
+        conflicts: [{ kind: 'unsupportedChange', summary: 'baseline blocked' }],
+      });
+      setupBaseConfig(planMock);
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      setupDbRefFromHash(OLD_HASH);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+
+      const command = createMigrationPlanCommand();
+      await expect(executeCommand(command, ['--json'])).rejects.toThrow('process.exit called');
+
+      expect(planMock).toHaveBeenCalledTimes(1);
+      expect(mocks.writeMigrationPackage).not.toHaveBeenCalled();
+    });
+
+    it('keeps baseline on disk when delta planner fails after baseline succeeded', async () => {
+      const planMock = vi
+        .fn()
+        .mockReturnValueOnce(
+          defaultPlannerSuccess([
+            { id: 'baseline.table', label: 'Baseline', operationClass: 'additive' },
+          ]),
+        )
+        .mockReturnValueOnce({
+          kind: 'failure',
+          conflicts: [{ kind: 'unsupportedChange', summary: 'delta blocked' }],
+        });
+      setupBaseConfig(planMock);
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      setupDbRefFromHash(OLD_HASH);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.mkdir.mockResolvedValue(undefined);
+      mocks.writeFile.mockResolvedValue(undefined);
+
+      const command = createMigrationPlanCommand();
+      await expect(executeCommand(command, ['--json'])).rejects.toThrow('process.exit called');
+
+      expect(planMock).toHaveBeenCalledTimes(2);
+      expect(mocks.writeMigrationPackage).toHaveBeenCalledTimes(1);
+      const baselineMeta = mocks.writeMigrationPackage.mock.calls[0]![1] as { from: string | null };
+      expect(baselineMeta.from).toBeNull();
+    });
+
+    it('runs seed phase once and writes only app-space bundles when extension packs are declared', async () => {
+      const planMock = vi
+        .fn()
+        .mockReturnValueOnce(
+          defaultPlannerSuccess([{ id: 'b', label: 'Baseline', operationClass: 'additive' }]),
+        )
+        .mockReturnValueOnce(
+          defaultPlannerSuccess([{ id: 'd', label: 'Delta', operationClass: 'additive' }]),
+        );
+      setupBaseConfig(planMock);
+      mocks.loadConfig.mockResolvedValue({
+        family: {
+          familyId: 'mongo',
+          create: vi.fn().mockReturnValue({ deserializeContract: (c: unknown) => c }),
+        },
+        target: {
+          id: 'mongo',
+          familyId: 'mongo',
+          targetId: 'mongo',
+          kind: 'target',
+          migrations: {
+            createPlanner: vi.fn().mockReturnValue({ plan: planMock }),
+            contractToSchema: vi.fn().mockReturnValue({}),
+          },
+        },
+        adapter: { kind: 'adapter', familyId: 'mongo', targetId: 'mongo' },
+        contract: { output: '/tmp/test/contract.json' },
+        migrations: { dir: '/tmp/test/migrations' },
+        extensionPacks: [
+          {
+            id: 'cipherstash',
+            contractSpace: {
+              contractJson: { v: 1 },
+              headRef: { hash: OLD_HASH, invariants: [] },
+              migrations: [],
+            },
+          },
+        ],
+      });
+      mocks.runContractSpaceSeedPhase.mockResolvedValue({
+        seeded: [
+          {
+            spaceId: 'cipherstash',
+            action: 'updated',
+            priorHash: null,
+            newHash: OLD_HASH,
+            newMigrationDirs: ['20260301_cipher'],
+          },
+        ],
+      });
+      const emptyGraph = reconstructGraph([]);
+      mocks.buildContractSpaceAggregate.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          targetId: 'mongo',
+          app: {
+            spaceId: 'app',
+            contract: JSON.parse(makeContractJson(NEW_HASH)),
+            headRef: { hash: NEW_HASH, invariants: [] },
+            migrations: { graph: emptyGraph, packagesByMigrationHash: new Map() },
+          },
+          extensions: [
+            {
+              spaceId: 'cipherstash',
+              contract: JSON.parse(makeContractJson(OLD_HASH)),
+              headRef: { hash: OLD_HASH, invariants: [] },
+              migrations: { graph: emptyGraph, packagesByMigrationHash: new Map() },
+            },
+          ],
+        },
+      });
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      setupDbRefFromHash(OLD_HASH);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json']);
+
+      expect(exitCode).toBe(0);
+      expect(mocks.runContractSpaceSeedPhase).toHaveBeenCalledTimes(1);
+      expect(mocks.writeMigrationPackage).toHaveBeenCalledTimes(2);
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result.emittedExtensionDirs).toEqual([
+        { spaceId: 'cipherstash', dirName: '20260301_cipher' },
+      ]);
+    });
   });
 
   describe('no-op short-circuit', () => {

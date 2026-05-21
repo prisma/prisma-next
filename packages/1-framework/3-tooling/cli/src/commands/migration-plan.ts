@@ -108,16 +108,119 @@ async function readPredecessorEndContract(
   }
 }
 
+async function writeSnapshotContractArtifacts(
+  packageDir: string,
+  contractJson: unknown,
+  contractDts: string,
+  artifactBasename: 'start-contract' | 'end-contract',
+): Promise<void> {
+  await mkdir(packageDir, { recursive: true });
+  const jsonContent = `${canonicalizeJson(contractJson)}\n`;
+  const dtsContent = contractDts.endsWith('\n') ? contractDts : `${contractDts}\n`;
+  await writeFile(join(packageDir, `${artifactBasename}.json`), jsonContent);
+  await writeFile(join(packageDir, `${artifactBasename}.d.ts`), dtsContent);
+}
+
 async function writeSnapshotStartContract(
   packageDir: string,
   contractJson: unknown,
   contractDts: string,
 ): Promise<void> {
-  await mkdir(packageDir, { recursive: true });
-  const jsonContent = `${canonicalizeJson(contractJson)}\n`;
-  const dtsContent = contractDts.endsWith('\n') ? contractDts : `${contractDts}\n`;
-  await writeFile(join(packageDir, 'start-contract.json'), jsonContent);
-  await writeFile(join(packageDir, 'start-contract.d.ts'), dtsContent);
+  await writeSnapshotContractArtifacts(packageDir, contractJson, contractDts, 'start-contract');
+}
+
+type PlannerSuccess = {
+  readonly plannedOps: readonly MigrationPlanOperation[];
+  readonly migrationTsContent: string;
+  readonly hasPlaceholders: boolean;
+};
+
+type TargetMigrationsApi = NonNullable<ReturnType<typeof getTargetMigrations>>;
+
+async function runPlannerLeg(
+  planner: ReturnType<TargetMigrationsApi['createPlanner']>,
+  migrations: TargetMigrationsApi,
+  frameworkComponents: ReturnType<typeof assertFrameworkComponentsCompatible>,
+  contract: Contract,
+  fromContract: Contract | null,
+  spaceId: string,
+): Promise<Result<PlannerSuccess, CliStructuredError>> {
+  const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
+  const plannerResult = planner.plan({
+    contract,
+    schema: fromSchema,
+    policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+    fromContract,
+    frameworkComponents,
+    spaceId,
+  });
+  if (plannerResult.kind === 'failure') {
+    return notOk(
+      errorMigrationPlanningFailed({
+        conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
+      }),
+    );
+  }
+
+  let plannedOps: readonly MigrationPlanOperation[] = [];
+  let hasPlaceholders = false;
+  try {
+    plannedOps = plannerResult.plan.operations;
+    if (plannedOps.length === 0) {
+      return notOk(
+        errorMigrationPlanningFailed({
+          conflicts: [
+            {
+              kind: 'unsupportedChange',
+              summary:
+                'Contract changed but planner produced no operations. ' +
+                'This indicates unsupported or ignored changes.',
+            },
+          ],
+        }),
+      );
+    }
+  } catch (e) {
+    if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
+      hasPlaceholders = true;
+    } else {
+      throw e;
+    }
+  }
+
+  return ok({
+    plannedOps,
+    migrationTsContent: plannerResult.plan.renderTypeScript(),
+    hasPlaceholders,
+  });
+}
+
+async function writePlannedMigrationPackage(
+  packageDir: string,
+  fromHash: string | null,
+  toHash: string,
+  createdAt: Date,
+  leg: PlannerSuccess,
+): Promise<void> {
+  const opsForWrite = leg.hasPlaceholders ? [] : leg.plannedOps;
+  const metadataWithInvariants: Omit<MigrationMetadata, 'migrationHash'> = {
+    from: fromHash,
+    to: toHash,
+    hints: {
+      used: [],
+      applied: [],
+      plannerVersion: '2.0.0',
+    },
+    labels: [],
+    providedInvariants: deriveProvidedInvariants(opsForWrite),
+    createdAt: createdAt.toISOString(),
+  };
+  const metadata: MigrationMetadata = {
+    ...metadataWithInvariants,
+    migrationHash: computeMigrationHash(metadataWithInvariants, opsForWrite),
+  };
+  await writeMigrationPackage(packageDir, metadata, opsForWrite);
+  await writeMigrationTs(packageDir, leg.migrationTsContent);
 }
 
 export interface MigrationPlanResult {
@@ -126,6 +229,7 @@ export interface MigrationPlanResult {
   readonly from: string | null;
   readonly to: string;
   readonly dir?: string;
+  readonly baselineDir?: string;
   /**
    * Extension-space migration packages materialised onto disk during this
    * `plan` run. Each entry names a `migrations/<spaceId>/<dirName>/`
@@ -252,6 +356,7 @@ async function executeMigrationPlanCommand(
   let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
   let snapshotStartContract: { contractJson: unknown; contractDts: string } | null = null;
+  let isAutoBaseline = false;
 
   try {
     const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
@@ -287,12 +392,14 @@ async function executeMigrationPlanCommand(
         };
         break;
       case 'auto-baseline':
-        // TODO(slice-3-dispatch-2): wire two-bundle emission for auto-baseline.
-        return notOk(
-          errorUnexpected('Auto-baseline emission not yet wired — Dispatch 2', {
-            why: 'The resolver determined auto-baseline is needed but emission is not yet implemented.',
-          }),
-        );
+        fromHash = resolutionResult.value.fromHash;
+        fromContract = resolutionResult.value.fromContract;
+        snapshotStartContract = {
+          contractJson: resolutionResult.value.contractJson,
+          contractDts: resolutionResult.value.contractDts,
+        };
+        isAutoBaseline = true;
+        break;
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
@@ -384,92 +491,144 @@ async function executeMigrationPlanCommand(
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
 
-  // Build manifest and write migration package
-  const timestamp = new Date();
-  const slug = options.name ?? 'migration';
-  const dirName = formatMigrationDirName(timestamp, slug);
-  const packageDir = join(appMigrationsDir, dirName);
-
-  const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
-    from: fromHash,
-    to: toStorageHash,
-    hints: {
-      used: [],
-      applied: [],
-      plannerVersion: '2.0.0',
-    },
-    labels: [],
-    createdAt: timestamp.toISOString(),
-  };
-
   try {
     const planner = migrations.createPlanner(familyInstance);
-    const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
-    const plannerResult = planner.plan({
-      contract: aggregate.app.contract,
-      schema: fromSchema,
-      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-      fromContract,
-      frameworkComponents,
-      spaceId: aggregate.app.spaceId,
-    });
-    if (plannerResult.kind === 'failure') {
-      return notOk(
-        errorMigrationPlanningFailed({
-          conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
-        }),
+
+    if (
+      isAutoBaseline &&
+      fromHash !== null &&
+      fromContract !== null &&
+      snapshotStartContract !== null
+    ) {
+      const baselineTimestamp = new Date();
+      const deltaTimestamp = new Date(baselineTimestamp.getTime() + 60_000);
+      const baselineDirName = formatMigrationDirName(baselineTimestamp, 'baseline');
+      const deltaDirName = formatMigrationDirName(deltaTimestamp, options.name ?? 'migration');
+      const baselinePackageDir = join(appMigrationsDir, baselineDirName);
+      const deltaPackageDir = join(appMigrationsDir, deltaDirName);
+
+      const baselineLeg = await runPlannerLeg(
+        planner,
+        migrations,
+        frameworkComponents,
+        fromContract,
+        null,
+        aggregate.app.spaceId,
       );
+      if (!baselineLeg.ok) {
+        return notOk(baselineLeg.failure);
+      }
+
+      await writePlannedMigrationPackage(
+        baselinePackageDir,
+        null,
+        fromHash,
+        baselineTimestamp,
+        baselineLeg.value,
+      );
+      await writeSnapshotContractArtifacts(
+        baselinePackageDir,
+        snapshotStartContract.contractJson,
+        snapshotStartContract.contractDts,
+        'end-contract',
+      );
+
+      const deltaLeg = await runPlannerLeg(
+        planner,
+        migrations,
+        frameworkComponents,
+        aggregate.app.contract,
+        fromContract,
+        aggregate.app.spaceId,
+      );
+      if (!deltaLeg.ok) {
+        return notOk(deltaLeg.failure);
+      }
+
+      await writePlannedMigrationPackage(
+        deltaPackageDir,
+        fromHash,
+        toStorageHash,
+        deltaTimestamp,
+        deltaLeg.value,
+      );
+      const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
+      await copyFilesWithRename(deltaPackageDir, [
+        { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
+        { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
+      ]);
+      await writeSnapshotStartContract(
+        deltaPackageDir,
+        snapshotStartContract.contractJson,
+        snapshotStartContract.contractDts,
+      );
+
+      const deltaOps = deltaLeg.value.hasPlaceholders ? [] : deltaLeg.value.plannedOps;
+      if (deltaLeg.value.hasPlaceholders) {
+        const result: MigrationPlanResult = {
+          ok: true,
+          noOp: false,
+          from: fromHash,
+          to: toStorageHash,
+          dir: relative(process.cwd(), deltaPackageDir),
+          baselineDir: relative(process.cwd(), baselinePackageDir),
+          operations: [],
+          emittedExtensionDirs,
+          pendingPlaceholders: true,
+          summary:
+            'Planned baseline + migration with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
+          timings: { total: Date.now() - startTime },
+        };
+        return ok(result);
+      }
+
+      const preview = hasOperationPreview(familyInstance)
+        ? familyInstance.toOperationPreview(deltaOps)
+        : undefined;
+      const result: MigrationPlanResult = {
+        ok: true,
+        noOp: false,
+        from: fromHash,
+        to: toStorageHash,
+        dir: relative(process.cwd(), deltaPackageDir),
+        baselineDir: relative(process.cwd(), baselinePackageDir),
+        operations: deltaOps.map((op) => ({
+          id: op.id,
+          label: op.label,
+          operationClass: op.operationClass,
+        })),
+        emittedExtensionDirs,
+        ...(preview !== undefined ? { preview } : {}),
+        summary: buildAutoBaselinePlanSummary(deltaOps.length, emittedExtensionDirs.length),
+        timings: { total: Date.now() - startTime },
+      };
+      return ok(result);
     }
 
-    // Accessing .operations triggers toOp() on each call. If any call
-    // is a DataTransformCall with an unfilled placeholder stub, toOp()
-    // throws PN-MIG-2001. We catch that here so the migration can still
-    // be scaffolded with `ops: []`; the user fills the placeholder, then
-    // re-runs `node migration.ts` to attest with the real ops.
-    let plannedOps: readonly MigrationPlanOperation[] = [];
-    let hasPlaceholders = false;
-    try {
-      plannedOps = plannerResult.plan.operations;
-      if (plannedOps.length === 0) {
-        return notOk(
-          errorMigrationPlanningFailed({
-            conflicts: [
-              {
-                kind: 'unsupportedChange',
-                summary:
-                  'Contract changed but planner produced no operations. ' +
-                  'This indicates unsupported or ignored changes.',
-              },
-            ],
-          }),
-        );
-      }
-    } catch (e) {
-      if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
-        hasPlaceholders = true;
-      } else {
-        throw e;
-      }
+    const timestamp = new Date();
+    const slug = options.name ?? 'migration';
+    const dirName = formatMigrationDirName(timestamp, slug);
+    const packageDir = join(appMigrationsDir, dirName);
+
+    const deltaLeg = await runPlannerLeg(
+      planner,
+      migrations,
+      frameworkComponents,
+      aggregate.app.contract,
+      fromContract,
+      aggregate.app.spaceId,
+    );
+    if (!deltaLeg.ok) {
+      return notOk(deltaLeg.failure);
     }
 
-    const migrationTsContent = plannerResult.plan.renderTypeScript();
-
-    // Always-attest: compute migrationHash over (metadata, ops). When
-    // placeholders blocked lowering, ops is `[]` and the hash is computed
-    // over the empty list — re-emitting after the user fills the placeholder
-    // produces a different hash (over the real ops). This is intentional;
-    // there is no on-disk "draft" state.
-    const opsForWrite = hasPlaceholders ? [] : plannedOps;
-    const metadataWithInvariants: Omit<MigrationMetadata, 'migrationHash'> = {
-      ...baseMetadata,
-      providedInvariants: deriveProvidedInvariants(opsForWrite),
-    };
-    const metadata: MigrationMetadata = {
-      ...metadataWithInvariants,
-      migrationHash: computeMigrationHash(metadataWithInvariants, opsForWrite),
-    };
-
-    await writeMigrationPackage(packageDir, metadata, opsForWrite);
+    await writePlannedMigrationPackage(
+      packageDir,
+      fromHash,
+      toStorageHash,
+      timestamp,
+      deltaLeg.value,
+    );
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
       { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
@@ -490,9 +649,8 @@ async function executeMigrationPlanCommand(
         snapshotStartContract.contractDts,
       );
     }
-    await writeMigrationTs(packageDir, migrationTsContent);
 
-    if (hasPlaceholders) {
+    if (deltaLeg.value.hasPlaceholders) {
       const result: MigrationPlanResult = {
         ok: true,
         noOp: false,
@@ -509,6 +667,7 @@ async function executeMigrationPlanCommand(
       return ok(result);
     }
 
+    const plannedOps = deltaLeg.value.plannedOps;
     const preview = hasOperationPreview(familyInstance)
       ? familyInstance.toOperationPreview(plannedOps)
       : undefined;
@@ -608,6 +767,17 @@ function buildPlanSummary(plannedOpsCount: number, emittedExtensionDirsCount: nu
   return `${base}; materialised ${emittedExtensionDirsCount} ${noun}`;
 }
 
+function buildAutoBaselinePlanSummary(
+  deltaOpsCount: number,
+  emittedExtensionDirsCount: number,
+): string {
+  const base = `Planned baseline + ${deltaOpsCount} operation(s)`;
+  if (emittedExtensionDirsCount === 0) return base;
+  const noun =
+    emittedExtensionDirsCount === 1 ? 'extension-space migration' : 'extension-space migrations';
+  return `${base}; materialised ${emittedExtensionDirsCount} ${noun}`;
+}
+
 export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFlags): string {
   const lines: string[] = [];
   const useColor = flags.color !== false;
@@ -687,6 +857,9 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
 
   lines.push(dim_(`from:   ${result.from}`));
   lines.push(dim_(`to:     ${result.to}`));
+  if (result.baselineDir) {
+    lines.push(dim_(`Baseline → ${result.baselineDir}`));
+  }
   if (result.dir) {
     lines.push(dim_(`App space → ${result.dir}`));
   }
@@ -704,8 +877,12 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
   // (`prisma-next migrate`) regardless of how many spaces were
   // materialised — `db update` is a dev-time convenience, not the
   // canonical replay step.
+  const reviewTarget =
+    result.baselineDir !== undefined && result.dir !== undefined
+      ? `${result.baselineDir} and ${result.dir}`
+      : (result.dir ?? '<dir>');
   lines.push(
-    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migrate')}.`,
+    `Next: review ${green_(reviewTarget)} if needed, then run ${green_('prisma-next migrate')}.`,
   );
 
   if (result.preview && result.preview.statements.length > 0) {
