@@ -14,7 +14,16 @@ import {
   validateSqlContractFully,
 } from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
-import type { Type } from 'arktype';
+import { type Type, type } from 'arktype';
+
+const NamespaceRawSchema = type({
+  id: 'string',
+  'kind?': 'string',
+});
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
 
@@ -121,11 +130,16 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const obj = raw as Record<string, unknown>;
-    const id = (obj['id'] as string | undefined) ?? nsId;
+    const rawRecord = isPlainRecord(raw) ? raw : {};
+    const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
+    const parsed = NamespaceRawSchema({ ...rawRecord, id });
+    if (parsed instanceof type.errors) {
+      const messages = parsed.map((p: { message: string }) => p.message).join('; ');
+      throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
+    }
     const result: Record<string, unknown> = { id };
 
-    for (const [propertyKey, slotValue] of Object.entries(obj)) {
+    for (const [propertyKey, slotValue] of Object.entries(parsed)) {
       if (propertyKey === 'id') continue;
       if (slotValue === null || typeof slotValue !== 'object') continue;
 
@@ -159,7 +173,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       }
     }
 
-    const typesRaw = obj['types'];
+    const typesRaw = rawRecord['types'];
     const hasUnhydratedPostgresEnumEntry =
       typesRaw !== undefined &&
       typeof typesRaw === 'object' &&
