@@ -166,8 +166,28 @@ const StorageTableSchema = type({
  */
 export { PostgresEnumTypeSchema };
 
+/**
+ * Composes a hardcoded family `fallback` schema with optional
+ * pack-contributed `fragments` keyed by the entry's `kind`
+ * discriminator. The composition is **additive**, not substitutive:
+ *
+ * - No fragments registered → entries are validated by `fallback`
+ *   alone (the unchanged baseline).
+ * - An entry's `kind` matches `fallbackKind` AND a fragment for that
+ *   kind is registered → the entry must pass **both** `fallback` and
+ *   the fragment. This preserves family-owned invariants (e.g. the
+ *   built-in `PostgresEnumType` shape) even when a pack contributes
+ *   its own schema for the same kind.
+ * - An entry's `kind` matches a registered fragment for some
+ *   non-fallback kind → the fragment alone validates the entry.
+ *   `fallback` is family-specific (validates a single hardcoded kind)
+ *   and would reject any other kind, so it does not apply here.
+ * - An entry's `kind` matches no fragment → fall through to
+ *   `fallback`.
+ */
 function namespaceSlotEntrySchema(
   fallback: Type<unknown>,
+  fallbackKind: string,
   fragments?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   if (fragments === undefined || fragments.size === 0) {
@@ -181,6 +201,12 @@ function namespaceSlotEntrySchema(
     if (typeof kind === 'string') {
       const fragment = fragments.get(kind);
       if (fragment !== undefined) {
+        if (kind === fallbackKind) {
+          const baseParsed = fallback(entry);
+          if (baseParsed instanceof type.errors) {
+            return ctx.reject({ expected: baseParsed.summary });
+          }
+        }
         const parsed = fragment(entry);
         if (parsed instanceof type.errors) {
           return ctx.reject({ expected: parsed.summary });
@@ -214,7 +240,9 @@ export function createNamespaceEntrySchema(
     id: 'string',
     'kind?': 'string',
     'tables?': type({ '[string]': StorageTableSchema }),
-    'types?': type({ '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, fragments) }),
+    'types?': type({
+      '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
+    }),
   }) as Type<unknown>;
 }
 
