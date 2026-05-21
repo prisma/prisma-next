@@ -17,6 +17,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { MutationDefaultsOp } from '@prisma-next/sql-relational-core/query-lane-context';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Expression, ExpressionBuilder } from '../expression';
 import type { ResolveRow } from '../resolve';
 import type { QueryContext, Scope, ScopeField } from '../scope';
@@ -136,7 +137,7 @@ export function buildSetExpressions(
     if (!(def.column in set)) {
       const column = table.columns[def.column];
       const codec = column ? codecRefFor(ctx, tableName, def.column) : undefined;
-      set[def.column] = ParamRef.of(def.value, codec ? { codec } : undefined);
+      set[def.column] = ParamRef.of(def.value, ifDefined('codec', codec));
     }
   }
   return set;
