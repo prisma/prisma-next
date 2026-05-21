@@ -78,7 +78,7 @@ exports[`help text snapshots > formats contract infer help 1`] = `
 │
 │ Examples:
 │   $ prisma-next contract infer --db $DATABASE_URL
-│   $ prisma-next contract infer --db $DATABASE_URL --output ./prisma/contract.prisma
+│   $ prisma-next contract infer --db $DATABASE_URL --output ./src/prisma/contract.prisma
 │   $ prisma-next contract infer --db $DATABASE_URL --json
 │
 │ Reads the live database schema and writes an inferred PSL contract to disk.
