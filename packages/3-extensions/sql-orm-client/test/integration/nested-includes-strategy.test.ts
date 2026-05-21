@@ -356,8 +356,8 @@ describe('integration/nested-includes/strategy', () => {
   // `hasNestedIncludes` early-return, the dispatch must still route any
   // tree carrying a scalar or `combine()` descriptor through multi-query
   // (the lateral / correlated builders explicitly throw on those
-  // descriptors). `hasComplexIncludeDescriptors` is recursive, so a
-  // nested scalar at depth 2 also gates the dispatch — catching the
+  // descriptors). `hasScalarOrCombineIncludeDescriptors` is recursive, so
+  // a nested scalar at depth 2 also gates the dispatch — catching the
   // case where a future refactor might assume only top-level scalars
   // need the gate.
   // ===========================================================================
@@ -401,9 +401,9 @@ describe('integration/nested-includes/strategy', () => {
       'nested scalar at depth 2 stays on multi-query under lateral capabilities (recursive gate)',
       async () => {
         // The fix in TML-2594 dropped the shallow `hasNestedIncludes`
-        // gate but tightened `hasComplexIncludeDescriptors` to recurse.
-        // This test pins that recursion: a `count()` at depth 2 must
-        // still gate the whole tree to multi-query, even though the
+        // gate but tightened `hasScalarOrCombineIncludeDescriptors` to
+        // recurse. This test pins that recursion: a `count()` at depth 2
+        // must still gate the whole tree to multi-query, even though the
         // outer include is row-shaped (which the lateral builder
         // otherwise handles).
         await withCollectionRuntime(async (runtime) => {

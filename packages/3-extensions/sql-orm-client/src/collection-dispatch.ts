@@ -92,7 +92,7 @@ function dispatchWithIncludeStrategy<Row>(options: {
   // applies distinct to scalar-only child rows before grandchildren are
   // joined, which is the semantically correct behavior we preserve.
   if (
-    hasComplexIncludeDescriptors(options.state.includes) ||
+    hasScalarOrCombineIncludeDescriptors(options.state.includes) ||
     hasNonLeafIncludeWithDistinct(options.state.includes)
   ) {
     return dispatchWithMultiQueryIncludes<Row>(options);
@@ -477,7 +477,7 @@ function uniqueValues(values: unknown[]): unknown[] {
   return [...new Set(values)];
 }
 
-function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
+function hasScalarOrCombineIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
   // Walks the include tree recursively. A nested scalar selector or
   // combine() at any depth must gate the entire dispatch to multi-query
   // until TML-2595 teaches the lateral/correlated builders to lower
@@ -488,7 +488,7 @@ function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean
     (include) =>
       include.scalar !== undefined ||
       include.combine !== undefined ||
-      hasComplexIncludeDescriptors(include.nested.includes),
+      hasScalarOrCombineIncludeDescriptors(include.nested.includes),
   );
 }
 
@@ -532,8 +532,8 @@ function decodeIncludePayload(
     const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
     for (const nestedInclude of include.nested.includes) {
       // Defence in depth: the dispatch gate filters scalar/combine at
-      // any depth via `hasComplexIncludeDescriptors`. This branch is
-      // unreachable in production but documents the contract the
+      // any depth via `hasScalarOrCombineIncludeDescriptors`. This branch
+      // is unreachable in production but documents the contract the
       // recursion relies on.
       if (nestedInclude.scalar || nestedInclude.combine) {
         throw new Error(

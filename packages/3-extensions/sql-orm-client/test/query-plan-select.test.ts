@@ -355,11 +355,11 @@ describe('compileSelectWithIncludeStrategy', () => {
 
   // Planner invariant: scalar / combine descriptors must be rejected at
   // every depth, not just the top level. The dispatch path already gates
-  // these via `hasComplexIncludeDescriptors` recursively, but the planner
-  // is exported and called directly by tests and rich-plan callers. Without
-  // recursive rejection here, a nested `count()` inside a row include
-  // would silently produce a malformed lateral / correlated plan instead
-  // of failing fast at the boundary.
+  // these via its own `hasScalarOrCombineIncludeDescriptors` recursively,
+  // but the planner is exported and called directly by tests and rich-plan
+  // callers. Without recursive rejection here, a nested `count()` inside a
+  // row include would silently produce a malformed lateral / correlated
+  // plan instead of failing fast at the boundary.
   it('rejects scalar include selectors nested inside row includes', () => {
     const { collection } = createCollection();
     const state = collection.include('posts', (posts) =>
