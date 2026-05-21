@@ -6,9 +6,9 @@
 
 ## At a glance
 
-Two dispatches, sequential. D1 lands the framework type primitives behind the rest of the project (no descriptor consumer yet). D2 extends the descriptor surface, wires generic dispatch through the family base, and registers the Postgres pack's `postgresEnums` slot. Slice ships as one PR.
+Three dispatches, sequential. D1 lands the framework type primitives behind the rest of the project (no descriptor consumer yet). D2 extends the descriptor surface, wires generic dispatch through the family base, and registers the Postgres pack's enum kind through the descriptor. **D3 lands the vocabulary + walk cleanup** that emerged when the user surfaced the "slot key" redundancy and the "walk doesn't need up-front knowledge" insight at slice-PR open time — the structural property walk replaces the lookup table; the `storageSlotKey` descriptor field and its dependent infrastructure (parallel slot registry, `reservedStorageSlotKeys`, collision validator) come back out; the kind-keyed registry becomes the single source of truth. Slice ships as one PR after D3.
 
-Both dispatches are **M** per [`drive/calibration/sizing.md`](../../../../drive/calibration/sizing.md). Both route to **Opus** per [`drive/calibration/model-tier.md`](../../../../drive/calibration/model-tier.md) — both are substrate / spec-interpretation work (the table's first row). Mechanical sub-portions inside each dispatch are still inside the dispatch's bounds; no sub-dispatch routes to a cheap tier.
+D1 + D2 are **M**; D3 is **M** (~13 files; bounded mechanical cleanup of D2's surface). All three route to **Opus** per [`drive/calibration/model-tier.md`](../../../../drive/calibration/model-tier.md) — substrate / spec-interpretation work. Mechanical sub-portions inside each dispatch are still inside the dispatch's bounds; no sub-dispatch routes to a cheap tier.
 
 ## Dispatch plan
 
@@ -124,13 +124,75 @@ What stays the same: the hardcoded SQL validator `'types?': type({ '[string]': P
 
 ---
 
+### Dispatch 3: Vocabulary cleanup + structural walk
+
+> **Why this dispatch exists (slice-PR-open pushback, 2026-05-21).** When the slice PR (#552) opened, the user flagged two compounding design issues inherited from D1's framing and propagated by D2's brief: (a) the term "slot key" is a redundant name for what the codebase already calls *entity kind* / *discriminator* — the descriptor's `storageSlotKey` field and the `entityKind` field in the lookup table carried the same string in every entry; (b) the family-name-keyed lookup table inside `elementCoordinates(storage)` (`SLOT_KEYS_BY_NAMESPACE_KIND`) hardcoded `'sql-namespace'` and `'mongo-namespace'` into the framework layer (layering violation) and silently failed for Postgres contracts (whose hydrated namespace `kind` is `'schema'`, not `'sql-namespace'`). The orchestrator-side root cause is recorded in `drive/retro/findings.md` under the 2026-05-21 entry: D2's brief inherited `storageSlotKey?` as a "decided" field from the slice plan and forbade the implementer from re-questioning it, suppressing the question that would have caught the redundancy at brief-assembly time. D3 lands the corrections before the slice's PR merges so the substrate ships clean.
+
+**Intent.** Replace `elementCoordinates`'s family-name-keyed lookup with a structural property walk over each namespace's own-enumerable entity-bearing properties. Drop the `storageSlotKey?` field from `AuthoringEntityTypeDescriptor`. Collapse the parallel `namespaceSlotHydrationRegistry` (added in D2) back into the existing `entityTypeRegistry` keyed by `discriminator` on both `SqlContractSerializerBase` and `MongoContractSerializerBase`. Drop `FamilyDescriptor.reservedStorageSlotKeys` (and its thread-through). Delete the `storageSlotKey`-collision validator and its unit test. Update Postgres pack to drop `storageSlotKey: 'types'`. Re-key validator-fragment composition on `discriminator`.
+
+What stays the same: the descriptor's `hydrate?` and `validatorSchema?` fields stay (still valuable, still used). The validator-composition surface stays (still folds contributed fragments; just keyed on `discriminator` now). The Postgres pack's enum descriptor still ships `hydrate` + `validatorSchema`. The hardcoded SQL `'types?'` validator slot stays (F1 additive coexistence — S1.B's job to drop it). No on-disk contract changes.
+
+**Files in play.** ~13 files.
+
+- `packages/1-framework/1-core/framework-components/src/ir/storage.ts` — replace `SLOT_KEYS_BY_NAMESPACE_KIND` + lookup-driven walk with structural property iteration; update `Namespace` JSDoc with the invariant the walk relies on
+- `packages/1-framework/1-core/framework-components/src/ir/namespace.ts` — JSDoc tightening for the structural-walk invariant
+- `packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts` — drop `storageSlotKey?` from `AuthoringEntityTypeDescriptor`; update `hydrate?` / `validatorSchema?` JSDoc to name `discriminator` as the registry key
+- `packages/1-framework/1-core/framework-components/src/shared/framework-components.ts` — drop `reservedStorageSlotKeys` export and `FamilyDescriptor.reservedStorageSlotKeys` field
+- `packages/1-framework/1-core/framework-components/src/control/control-stack.ts` — drop `reservedStorageSlotKeys` thread-through
+- `packages/1-framework/1-core/framework-components/test/control-stack.test.ts` — drop the `reservedStorageSlotKeys` test
+- `packages/2-sql/9-family/src/core/control-descriptor.ts` — remove `reservedStorageSlotKeys: ['tables']`
+- `packages/2-mongo-family/9-family/src/core/control-descriptor.ts` — remove `reservedStorageSlotKeys: ['collections']`
+- `packages/2-sql/9-family/src/core/ir/sql-contract-serializer-base.ts` — remove `namespaceSlotHydrationRegistry` constructor parameter / field / `hydrateNamespaceSlot` helper; update `hydrateSqlNamespaceEntry` to walk the raw envelope's own-enumerable properties (tables → hardcoded `StorageTable`; other entity-bearing properties → `entityTypeRegistry.get(entry.kind)`)
+- `packages/2-mongo-family/9-family/src/core/ir/mongo-contract-serializer-base.ts` — symmetric collapse
+- `packages/3-targets/3-targets/postgres/src/core/postgres-contract-serializer.ts` — update enum-branch delegation to look up by entry `kind` through the family-base registry instead of by slot key
+- `packages/3-targets/3-targets/postgres/src/core/authoring.ts` — drop `storageSlotKey: 'types'`
+- `packages/2-sql/1-core/contract/src/validators.ts` — drop the slot-key collision validator added in D2 step 8; re-key `createSqlContractSchema` fragment composition on `discriminator`
+- `packages/2-mongo-family/1-foundation/mongo-contract/src/contract-schema.ts` — symmetric re-key
+
+**Done when.**
+
+- [ ] `pnpm typecheck` clean — descriptor cleanup propagates; no `storageSlotKey` reference remains in `packages/`
+- [ ] `pnpm test:packages` green — entry hydration round-trips byte-identically through the single `entityTypeRegistry`; validator-composition no-op preserved for Mongo
+- [ ] `pnpm test:integration` green — **end-to-end Postgres path still hydrates enums correctly** through the registry; this is the load-bearing exemplar
+- [ ] `pnpm lint:deps` clean — structural walk removes the framework→family lookup-table layering violation; lint:deps should remain clean (verify via dry-run)
+- [ ] `pnpm fixtures:check` clean — **byte-stability gate holds**; no on-disk contract changes in this dispatch
+- [ ] Intent-validation: `rg 'storageSlotKey' packages/` returns zero hits; `rg 'reservedStorageSlotKeys' packages/` returns zero hits; `rg 'namespaceSlotHydrationRegistry' packages/` returns zero hits; `rg 'SLOT_KEYS_BY_NAMESPACE_KIND' packages/` returns zero hits
+- [ ] `Namespace` interface JSDoc declares the structural-walk invariant (every namespace concretion carries `id` + non-enumerable `kind` + entity-kind slot maps; no other own-enumerable data)
+- [ ] Walks Postgres-promoted `PostgresSchema` namespace (whose `kind === 'schema'`) correctly — previously crashed under `SLOT_KEYS_BY_NAMESPACE_KIND.get('schema') === undefined`; now walks its own-enumerable `tables` / `types` properties structurally
+- [ ] F1 dual-shape grep gate clean: `rg 'looksLikeFlat|normalizeStorageForHydration|stampNamespaceOnTable|normalizeStorageEnvelopeShape|isFlatTablesInput|isFlatTypesInput' packages/` returns zero hits
+
+**Size.** M. ~13 files; pure mechanical retirement of D2's slot-key surface plus the walk rewrite. No new design judgment — the design is fully settled by spec § Approach D3.
+
+**Model tier.** Opus (`claude-opus-4-7-thinking-high`). Substrate cleanup with TypeScript inference judgment on the collapsed registry shape + JSDoc invariant authoring. Composer-2.5 routed off because the per-property structural walk has a few edge cases (id skipping, kind auto-skipping by non-enumerability, defensive handling of pass-through `NamespaceBase` instances) where the implementer benefits from creative latitude on the helper boundary.
+
+**DoR confirmed.**
+
+- [x] Intent statement clear (vocabulary cleanup + structural walk; one paragraph above)
+- [x] Files in play named (~13 concrete paths)
+- [x] "Done when" gates explicit (typecheck / test:packages / test:integration / lint:deps / fixtures:check / grep gates / Postgres-promoted-namespace walk verification)
+- [x] Predicted size M (re-decomposition trigger: if the registry collapse requires new design judgment beyond what's described in spec § Approach D3, halt; surface)
+- [x] Failure modes considered: F1 (relocated dual shape — **directly relevant**; the validator composition stays additive, no replacement of the hardcoded path), F2 (constructor magic — N/A this dispatch; `kind`-required already in place from D1), F5 (destructive git — forbidden)
+- [x] Edge cases mapped to "Done when" gates
+- [x] No silent design decisions: spec OQ2 and OQ4 re-settled by D3; the spec's § Approach D3 enumerates every change
+
+**Brief overlay:**
+
+- Brief MUST forbid destructive git operations per F5
+- Brief MUST name the F1 grep gate explicitly
+- Brief MUST name the Postgres-promoted-namespace walk verification as a specific test (or assertion) — the previous lookup-table walk crashed for `kind === 'schema'`; the structural walk must succeed
+- Brief MUST instruct the implementer to update the `Namespace` interface JSDoc with the structural-walk invariant before changing the walk body
+
+---
+
 ## Sanity checks
 
-- [x] Each dispatch sized S/M (no L/XL); D1 has a re-decomposition trigger at >30 files cascaded
+- [x] Each dispatch sized S/M (no L/XL); D1 has a re-decomposition trigger at >30 files cascaded; D3 has a "halt on new design judgment" trigger
 - [x] Each "Done when" is binary + verifiable (specific commands; specific grep patterns; specific edge case references)
 - [x] Every slice-spec edge case mapped to a covering dispatch:
   - Edges #1, #2, #3, #4, #5, #6, #11 (fixtures:check byte-stability) → D1
-  - Edges #7 (Mongo no-op), #8, #9, #10 → D2
+  - Edges #7 (Mongo no-op), #8, #9 → D2; collision-validator edge from prior draft → **removed in D3** along with the validator itself
+  - New structural-walk-invariant edge (namespace concretions own-enumerable contents) → D3
+  - New Postgres-promoted-namespace walk edge (the `kind === 'schema'` crash the lookup table caused) → D3 (fixed by structural iteration)
   - Edge #12 (`deserializeContract<T>` cast site) → **explicitly deferred per spec** (not in slice; revisited at S1.D)
   - Edges #13 (`'postgres-schema'` kind discriminator) — explicitly out per spec
   - Edges #14, #15, #16, #17 — explicitly out per spec
@@ -155,7 +217,17 @@ D2 (Descriptor + Postgres registration) ──► commit ──► WIP inspectio
    │
    ├─ If `pnpm test:integration` regresses on Postgres enum: halt; debug
    │  before opening PR (enum hydration is the project's load-bearing exemplar)
-   └─ Else: open PR
+   └─ Else: proceed
+   │
+   ▼
+D3 (Vocabulary + structural walk cleanup) ──► commit ──► WIP inspection (≤ 5 min)
+   │
+   ├─ If grep gates fail (residual `storageSlotKey`, `reservedStorageSlotKeys`,
+   │  `namespaceSlotHydrationRegistry`, `SLOT_KEYS_BY_NAMESPACE_KIND`): halt;
+   │  finish the retirement before opening PR
+   ├─ If Postgres-promoted-namespace walk test fails: halt; debug the
+   │  structural iteration (the previous lookup table silently crashed here)
+   └─ Else: re-open the slice PR (or update existing PR) with D3 in scope
 ```
 
 ## Per-dispatch DoR overlay (team)
