@@ -35,6 +35,7 @@ import { BuilderBase, type BuilderContext, emptyState, tableToScope } from './bu
 import { JoinedTablesImpl } from './joined-tables-impl';
 import {
   buildParamValues,
+  buildSetExpressions,
   DeleteQueryImpl,
   evaluateUpdateCallback,
   InsertQueryImpl,
@@ -181,13 +182,14 @@ export class TableProxyImpl<
         this.#scope,
         this.ctx.queryOperationTypes,
       );
-      const defaults = buildParamValues({}, this.#table, this.#tableName, 'update', this.ctx);
-      return new UpdateQueryImpl(
+      const setExpressions = buildSetExpressions(
+        callbackExprs,
+        this.#table,
         this.#tableName,
-        this.#scope,
-        { ...defaults, ...callbackExprs },
+        'update',
         this.ctx,
       );
+      return new UpdateQueryImpl(this.#tableName, this.#scope, setExpressions, this.ctx);
     }
     const setExpressions = buildParamValues(
       setOrCallback,
