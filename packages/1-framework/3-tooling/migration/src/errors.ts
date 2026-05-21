@@ -1,5 +1,6 @@
 import { ifDefined } from '@prisma-next/utils/defined';
 import { basename, dirname, relative } from 'pathe';
+import type { MigrationGraph } from './graph';
 
 /**
  * Build the canonical "re-emit this package" remediation hint.
@@ -398,4 +399,18 @@ export function errorMigrationHashMismatch(
     fix: reemitHint(dir, 'or restore the directory from version control.'),
     details: { dir, storedHash, computedHash },
   });
+}
+
+export function errorHashNotInGraph(hash: string, graph: MigrationGraph): MigrationToolsError {
+  const reachableHashes = [...graph.nodes].sort();
+  const reachableList = reachableHashes.length > 0 ? reachableHashes.join(', ') : '(none)';
+  return new MigrationToolsError(
+    'MIGRATION.HASH_NOT_IN_GRAPH',
+    `Hash "${hash}" is not a node in the migration graph`,
+    {
+      why: `The migration graph contains nodes ${reachableList}; "${hash}" isn't one of them.`,
+      fix: `Pass a hash that's the from-or-to of an on-disk migration bundle, use --from with a graph-node hash, or run "prisma-next migration plan" to introduce it.`,
+      details: { hash, reachableHashes },
+    },
+  );
 }
