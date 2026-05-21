@@ -279,10 +279,22 @@ function buildIncludeChildRowsSelect(
     childState.selectedFields,
     childTableRef,
   );
+  // Self-relations rename the inner table source via `childTableAlias`,
+  // so any ColumnRef the user-supplied `orderBy` carries against the
+  // original `include.relatedTableName` is no longer in scope inside the
+  // child SELECT. Remap before lowering to the hidden order projection
+  // — mirrors the `filterTableName` remap `buildStateWhere` applies to
+  // the where clauses just below.
+  const remappedChildOrderBy =
+    childTableAlias && childState.orderBy
+      ? childState.orderBy.map((item) =>
+          item.rewrite(createTableRefRemapper(include.relatedTableName, childTableRef)),
+        )
+      : childState.orderBy;
   const { childOrderBy, hiddenOrderProjection, aggregateOrderBy } = buildIncludeOrderArtifacts(
     include.relationName,
     rowsAlias,
-    childState.orderBy,
+    remappedChildOrderBy,
   );
   const childWhere = buildStateWhere(contract, childTableRef, childState, {
     filterTableName: include.relatedTableName,
