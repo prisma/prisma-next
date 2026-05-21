@@ -458,12 +458,12 @@ export async function runInit(
   // framework relies on. A project-level failure is fatal
   // (`INIT_EXIT_SKILL_INSTALL_FAILED`).
   //
-  // Runs after install + emit because (1) `node_modules` is in place,
-  // so any consumers downstream are coherent, and (2) the user has
-  // seen the scaffolding succeed before this network-bound step
-  // potentially fails. We skip the install when the user passed
-  // `--no-install` for the same reason — no `node_modules` means the
-  // workspace isn't ready to consume the skill yet anyway.
+  // Runs after the install + emit phase when those steps are enabled,
+  // but is not coupled to them: the skills are pulled directly from
+  // the Prisma Next GitHub repo and do not require `node_modules`.
+  // `--no-install` therefore skips only dependency installation and
+  // contract emission; `--no-skill` is the explicit escape hatch for
+  // skipping skills.
   const manualProjectSkillCommands = DEFAULT_SKILL_SOURCES.flatMap((source) => [
     formatSkillInstallCommand(install.effectivePm, source),
     formatClaudeSkillInstallCommand(install.effectivePm, source),
@@ -473,10 +473,6 @@ export async function runInit(
   if (!inputs.installProjectSkill) {
     warnings.push(
       `Skipped Prisma Next skills install (--no-skill). To install the skills later, run: ${manualProjectSkillSummary}`,
-    );
-  } else if (install.skipped) {
-    warnings.push(
-      `Skipped Prisma Next skills install because --no-install was passed. After you run install manually, install the skills with: ${manualProjectSkillSummary}`,
     );
   } else {
     const spinner = ui.spinner();
