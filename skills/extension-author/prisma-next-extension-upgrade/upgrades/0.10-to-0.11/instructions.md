@@ -27,6 +27,19 @@ changes:
         - "mongoClient"
         - "@prisma-next/mongo"
       anyMatch: true
+  - id: insert-single-row-wrap-in-array
+    summary: Wrap single-row `.insert({...})` call sites in an array — `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - ".insert("
+      anyMatch: true
+  - id: insert-ast-with-values-to-with-rows
+    summary: Replace `InsertAst.withValues(assignments)` with `InsertAst.withRows([assignments])`. The `withValues` method is removed; `withRows` accepts an array of assignment maps.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - ".withValues("
 ---
 
 # 0.10 → 0.11 — Extension-author upgrade instructions
@@ -186,6 +199,75 @@ async close() {
 - **Close the `MongoClient` explicitly.** If your extension genuinely needs to share a `MongoClient` across multiple consumers (e.g. one client backs several `mongo()` facades, or the client is held in a higher-level connection-management seam), keep the `{ mongoClient }` binding and add `await someClient.close()` after your last facade is disposed.
 
 No script — the right migration depends on why your extension was sharing the client in the first place. Walk the call sites by hand.
+
+## `insert-single-row-wrap-in-array`
+
+Starting at the 0.11 release, the `.insert()` method on the SQL builder accepts **only** an array of row objects. The single-object overload that previously allowed `.insert({ field: value })` is removed.
+
+Before 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .insert({ field: value });
+// or via the query builder:
+db.sql.table.insert({ field: value }).build();
+```
+
+Starting at 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .insert([{ field: value }]);
+// or via the query builder:
+db.sql.table.insert([{ field: value }]).build();
+```
+
+Walk every `.ts` / `.tsx` file matched by the `detection.glob` above. For each call site that passes a plain object directly to `.insert(...)`, wrap the argument in an array:
+
+- `.insert(row)` → `.insert([row])`
+- `.insert({ field: value })` → `.insert([{ field: value }])`
+
+Variable references to a row object are safe to wrap directly:
+
+```ts
+// Before
+await runtime.execute(db.sql.table.insert(row).build());
+// After
+await runtime.execute(db.sql.table.insert([row]).build());
+```
+
+If a call site already passes an array (`.insert([row1, row2])`), it is already correct — leave it unchanged.
+
+TypeScript will surface bare-object call sites as `@ts-expect-error` mismatches after the bump, which is a reliable compile-time signal for every affected site.
+
+## `insert-ast-with-values-to-with-rows`
+
+Starting at the 0.11 release, the `InsertAst.withValues(assignments)` method is removed. Extensions that build `InsertAst` directly via the AST layer must switch to `InsertAst.withRows([assignments])`.
+
+Before 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .withValues(createAssignments.assignments)
+  .withOnConflict(onConflict);
+```
+
+Starting at 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .withRows([createAssignments.assignments])
+  .withOnConflict(onConflict);
+```
+
+The change is:
+- Replace `.withValues(expr)` with `.withRows([expr])` — the single-row overload is removed; `withRows` accepts an array of assignment maps.
+
+Walk every `.ts` / `.tsx` file matched by the `detection.glob` above. For each call site matching `.withValues(`, apply the replacement. The argument remains a single expression; it just needs to be wrapped in an array.
+
+### Validation
+
+After applying the rules above, run `pnpm typecheck && pnpm test` (or your extension's equivalent). `prisma-next-check-pins` should also pass — the pin set is unchanged for this transition; the breaking change is in the `InsertAst` builder method surface, not the dependency contract.
 
 ## Validation by execution
 
