@@ -2783,6 +2783,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:0.12.0
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/family-sql':
+        specifier: workspace:0.11.0
+        version: link:../9-family
       '@prisma-next/framework-components':
         specifier: workspace:0.12.0
         version: link:../../1-framework/1-core/framework-components

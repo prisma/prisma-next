@@ -3,6 +3,7 @@ import type {
   ExecutionMutationDefaultValue,
   JsonValue,
 } from '@prisma-next/contract/types';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import type {
   AnyCodecDescriptor,
   CodecDescriptor,
@@ -140,7 +141,25 @@ export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string
   create(): SqlRuntimeExtensionInstance<TTargetId>;
 }
 
+/**
+ * Runtime family descriptor for the SQL family. Mirrors the structural
+ * type of the value exported by `@prisma-next/family-sql/runtime` — the
+ * family package exports the descriptor as a default value without a
+ * named type alias, so this alias gives `SqlExecutionStack.family` a
+ * stable name to reference.
+ */
+export type SqlRuntimeFamilyDescriptor = typeof sqlRuntimeFamilyDescriptor;
+
 export interface SqlExecutionStack<TTargetId extends string = string> {
+  /**
+   * SQL-family contributor. Optional on the interface so existing stack
+   * literals continue to typecheck without a fanout edit; {@link
+   * createSqlExecutionStack} always populates this field with
+   * `sqlRuntimeFamilyDescriptor` from `@prisma-next/family-sql/runtime`,
+   * and {@link createExecutionContext} falls back to the same default
+   * when a literal stack omits it.
+   */
+  readonly family?: SqlRuntimeFamilyDescriptor;
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
@@ -156,6 +175,14 @@ export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omi
   >,
   'target' | 'adapter' | 'driver' | 'extensionPacks'
 > & {
+  /**
+   * SQL-family contributor — non-optional on the with-driver view because
+   * `createSqlExecutionStack` always sets it (defaulting to
+   * `sqlRuntimeFamilyDescriptor`). The base {@link SqlExecutionStack}
+   * keeps it optional to spare existing literal-stack call sites a
+   * fanout edit.
+   */
+  readonly family: SqlRuntimeFamilyDescriptor;
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
   readonly driver:
@@ -189,13 +216,24 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
     | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
+  /**
+   * SQL-family contributor. Defaults to `sqlRuntimeFamilyDescriptor`
+   * from `@prisma-next/family-sql/runtime`. There is exactly one SQL
+   * family today; the optional input exists so future family flavours
+   * (or test fixtures) can substitute a custom descriptor without
+   * touching the ~8 existing call sites.
+   */
+  readonly family?: SqlRuntimeFamilyDescriptor;
 }): SqlExecutionStackWithDriver<TTargetId> {
-  return createExecutionStack({
-    target: options.target,
-    adapter: options.adapter,
-    driver: options.driver,
-    extensionPacks: options.extensionPacks,
-  });
+  return {
+    ...createExecutionStack({
+      target: options.target,
+      adapter: options.adapter,
+      driver: options.driver,
+      extensionPacks: options.extensionPacks,
+    }),
+    family: options.family ?? sqlRuntimeFamilyDescriptor,
+  };
 }
 
 export type { ExecutionContext, TypeHelperRegistry };
@@ -807,6 +845,7 @@ export function createExecutionContext<
   };
 
   const contributors: Array<SqlStaticContributions & ComponentDescriptor<string>> = [
+    stack.family ?? sqlRuntimeFamilyDescriptor,
     stack.target,
     stack.adapter,
     ...stack.extensionPacks,
