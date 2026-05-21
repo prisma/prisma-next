@@ -225,92 +225,34 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Ambiguous authoring registry path "custom.Json"/);
   });
 
-  it('rejects pack-contributed storageSlotKey colliding with family-reserved slot', () => {
-    expect(() =>
-      assembleAuthoringContributions(
-        [
-          createDescriptor({
-            authoring: {
-              entityTypes: {
-                rogue: {
-                  kind: 'entity',
-                  discriminator: 'rogue-tables',
-                  storageSlotKey: 'tables',
-                  output: { factory: () => ({}) },
-                },
-              },
+  it('merges entityTypes namespaces from multiple descriptors', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            enum: {
+              kind: 'entity',
+              discriminator: 'postgres-enum',
+              hydrate: () => ({}),
+              output: { factory: () => ({}) },
             },
-          }),
-        ],
-        { reservedStorageSlotKeys: ['tables'] },
-      ),
-    ).toThrow(/storageSlotKey "tables".*collides with a family-reserved slot/);
-  });
-
-  it('rejects pack-contributed storageSlotKey colliding with collections slot', () => {
-    expect(() =>
-      assembleAuthoringContributions(
-        [
-          createDescriptor({
-            authoring: {
-              entityTypes: {
-                rogue: {
-                  kind: 'entity',
-                  discriminator: 'rogue-collections',
-                  storageSlotKey: 'collections',
-                  output: { factory: () => ({}) },
-                },
-              },
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'other',
+        authoring: {
+          entityTypes: {
+            demo: {
+              kind: 'entity',
+              discriminator: 'demo-entity',
+              output: { factory: () => ({}) },
             },
-          }),
-        ],
-        { reservedStorageSlotKeys: ['collections'] },
-      ),
-    ).toThrow(/storageSlotKey "collections".*collides with a family-reserved slot/);
-  });
-
-  it('accepts non-colliding storageSlotKey values', () => {
-    expect(() =>
-      assembleAuthoringContributions(
-        [
-          createDescriptor({
-            authoring: {
-              entityTypes: {
-                postgresEnums: {
-                  kind: 'entity',
-                  discriminator: 'postgres-enum',
-                  storageSlotKey: 'postgresEnums',
-                  output: { factory: () => ({}) },
-                },
-              },
-            },
-          }),
-        ],
-        { reservedStorageSlotKeys: ['tables'] },
-      ),
-    ).not.toThrow();
-  });
-
-  it('no-ops the collision check when reservedStorageSlotKeys is empty', () => {
-    expect(() =>
-      assembleAuthoringContributions(
-        [
-          createDescriptor({
-            authoring: {
-              entityTypes: {
-                anything: {
-                  kind: 'entity',
-                  discriminator: 'anything',
-                  storageSlotKey: 'tables',
-                  output: { factory: () => ({}) },
-                },
-              },
-            },
-          }),
-        ],
-        { reservedStorageSlotKeys: [] },
-      ),
-    ).not.toThrow();
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.entityTypes)).toEqual(['enum', 'demo']);
   });
 });
 
