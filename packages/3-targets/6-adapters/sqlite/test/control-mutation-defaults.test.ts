@@ -41,7 +41,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
     });
     expect(result).toMatchObject({
       ok: true,
-      value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'now()' } },
+      value: { kind: 'storage', defaultValue: { kind: 'expression', expression: 'now()' } },
     });
   });
 
@@ -52,7 +52,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
     });
     expect(result).toMatchObject({
       ok: true,
-      value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'now()' } },
+      value: { kind: 'storage', defaultValue: { kind: 'expression', expression: 'now()' } },
     });
   });
 
@@ -63,7 +63,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
     });
     expect(result).toMatchObject({
       ok: true,
-      value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'now()' } },
+      value: { kind: 'storage', defaultValue: { kind: 'expression', expression: 'now()' } },
     });
   });
 
@@ -74,7 +74,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
     });
     expect(result).toMatchObject({
       ok: true,
-      value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'random()' } },
+      value: { kind: 'storage', defaultValue: { kind: 'expression', expression: 'random()' } },
     });
   });
 });

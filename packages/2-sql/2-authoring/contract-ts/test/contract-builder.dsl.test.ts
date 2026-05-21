@@ -175,7 +175,7 @@ describe('contract DSL authoring surface', () => {
 
     const appUserColumns = storageTables['app_user']?.columns;
     expect(appUserColumns?.['created_at']?.default).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'now()',
     });
     expect(appUserColumns?.['role']?.typeRef).toBe('Role');

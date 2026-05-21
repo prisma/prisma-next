@@ -456,7 +456,7 @@ model Document {
                 columns: {
                   dbExpr: {
                     default: {
-                      kind: 'function',
+                      kind: 'expression',
                       expression: 'gen_random_uuid()',
                     },
                   },

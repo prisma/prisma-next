@@ -1,12 +1,8 @@
 import type {
-  ColumnDefault,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
-import {
-  isColumnDefaultLiteralInputValue,
-  isExecutionMutationDefaultValue,
-} from '@prisma-next/contract/types';
+import { isExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type AuthoringArgRef = {
@@ -59,19 +55,41 @@ export interface AuthoringTypeConstructorDescriptor {
   readonly output: AuthoringStorageTypeTemplate;
 }
 
-export interface AuthoringColumnDefaultTemplateLiteral {
-  readonly kind: 'literal';
-  readonly value: AuthoringTemplateValue;
-}
-
-export interface AuthoringColumnDefaultTemplateFunction {
-  readonly kind: 'function';
+/**
+ * Preset-template arm for a SQL expression default that bypasses codec
+ * dispatch entirely. Lowers directly to the contract IR's
+ * `{ kind: 'expression', expression }` shape.
+ */
+export interface AuthoringColumnDefaultTemplateExpression {
+  readonly kind: 'expression';
   readonly expression: AuthoringTemplateValue;
 }
 
+/**
+ * Preset-template arm for a target-mechanism default (Postgres
+ * SERIAL/IDENTITY, SQLite `INTEGER PRIMARY KEY AUTOINCREMENT`). Lowers to
+ * the contract IR's `{ kind: 'autoincrement' }` shape without invoking the
+ * codec; the DDL renderer relies on column-type emission for the
+ * semantics.
+ */
+export interface AuthoringColumnDefaultTemplateAutoincrement {
+  readonly kind: 'autoincrement';
+}
+
 export type AuthoringColumnDefaultTemplate =
-  | AuthoringColumnDefaultTemplateLiteral
-  | AuthoringColumnDefaultTemplateFunction;
+  | AuthoringColumnDefaultTemplateExpression
+  | AuthoringColumnDefaultTemplateAutoincrement;
+
+/**
+ * Resolved authoring-default shape produced by
+ * {@link instantiateAuthoringFieldPreset}. Structurally identical to the
+ * contract IR's `ColumnDefault`: presets declare either a SQL expression
+ * (bypasses codec dispatch entirely) or the `autoincrement` target-mechanism
+ * sentinel. Authoring consumers forward this shape directly to the emitter.
+ */
+export type AuthoringColumnDefault =
+  | { readonly kind: 'expression'; readonly expression: string }
+  | { readonly kind: 'autoincrement' };
 
 export interface AuthoringExecutionDefaultsTemplate {
   readonly onCreate?: AuthoringTemplateValue;
@@ -533,31 +551,19 @@ function resolveAuthoringStorageTypeTemplate(
 function resolveAuthoringColumnDefaultTemplate(
   template: AuthoringColumnDefaultTemplate,
   args: readonly unknown[],
-): ColumnDefault {
-  if (template.kind === 'literal') {
-    const value = resolveAuthoringTemplateValue(template.value, args);
-    if (value === undefined) {
-      throw new Error('Resolved authoring literal default must not be undefined');
-    }
-    if (!isColumnDefaultLiteralInputValue(value)) {
-      throw new Error(
-        `Resolved authoring literal default must be a JSON-serializable value or Date, received ${String(value)}`,
-      );
-    }
-    return {
-      kind: 'literal',
-      value,
-    };
+): AuthoringColumnDefault {
+  if (template.kind === 'autoincrement') {
+    return { kind: 'autoincrement' };
   }
 
   const expression = resolveAuthoringTemplateValue(template.expression, args);
   if (expression === undefined || (typeof expression === 'object' && expression !== null)) {
     throw new Error(
-      `Resolved authoring function default expression must resolve to a primitive, received ${String(expression)}`,
+      `Resolved authoring expression default must resolve to a primitive, received ${String(expression)}`,
     );
   }
   return {
-    kind: 'function',
+    kind: 'expression',
     expression: String(expression),
   };
 }
@@ -647,7 +653,7 @@ export function instantiateAuthoringFieldPreset(
     readonly typeParams?: Record<string, unknown>;
   };
   readonly nullable: boolean;
-  readonly default?: ColumnDefault;
+  readonly default?: AuthoringColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly id: boolean;
   readonly unique: boolean;

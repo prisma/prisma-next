@@ -1,6 +1,7 @@
-import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
+import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -10,16 +11,9 @@ import {
   detectDestructiveChanges,
 } from '../src/core/migrations/contract-to-schema-ir';
 
-const testRenderer: DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => {
-  if (def.kind === 'function') return def.expression;
-  const { value } = def;
-  if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (value === null) return 'NULL';
-  const json = JSON.stringify(value);
-  const isJsonColumn = column.nativeType === 'json' || column.nativeType === 'jsonb';
-  if (isJsonColumn) return `'${json}'::${column.nativeType}`;
-  return `'${json}'`;
+const testRenderer: DefaultRenderer = (def: ColumnDefault, _column: StorageColumn) => {
+  if (def.kind === 'autoincrement') return 'autoincrement()';
+  return def.expression;
 };
 
 function wrap(storage: SqlStorage): Contract<SqlStorage> {
@@ -284,7 +278,7 @@ describe('contractToSchemaIR', () => {
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character');
   });
 
-  it('converts literal column defaults', () => {
+  it('converts expression column defaults', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
@@ -295,7 +289,7 @@ describe('contractToSchemaIR', () => {
               columns: {
                 status: col({
                   nativeType: 'text',
-                  default: { kind: 'literal', value: 'active' },
+                  default: { kind: 'expression', expression: "'active'" },
                 }),
               },
             }),
@@ -308,55 +302,7 @@ describe('contractToSchemaIR', () => {
     expect(result.tables['T']!.columns['status']!.default).toBe("'active'");
   });
 
-  it('escapes single quotes in string literal defaults', () => {
-    const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                author: col({
-                  nativeType: 'text',
-                  default: { kind: 'literal', value: "O'Reilly" },
-                }),
-              },
-            }),
-          },
-        },
-      },
-    });
-
-    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.tables['T']!.columns['author']!.default).toBe("'O''Reilly'");
-  });
-
-  it('escapes repeated single quotes in string literal defaults', () => {
-    const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            T: table({
-              columns: {
-                textValue: col({
-                  nativeType: 'text',
-                  default: { kind: 'literal', value: "a'b''c" },
-                }),
-              },
-            }),
-          },
-        },
-      },
-    });
-
-    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.tables['T']!.columns['textValue']!.default).toBe("'a''b''''c'");
-  });
-
-  it('converts function column defaults', () => {
+  it('converts now() expression column defaults', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
@@ -367,7 +313,7 @@ describe('contractToSchemaIR', () => {
               columns: {
                 createdAt: col({
                   nativeType: 'timestamptz',
-                  default: { kind: 'function', expression: 'now()' },
+                  default: { kind: 'expression', expression: 'now()' },
                 }),
               },
             }),
@@ -378,6 +324,30 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.columns['createdAt']!.default).toBe('now()');
+  });
+
+  it('converts autoincrement column defaults', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            T: table({
+              columns: {
+                id: col({
+                  nativeType: 'int4',
+                  default: { kind: 'autoincrement' },
+                }),
+              },
+            }),
+          },
+        },
+      },
+    });
+
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
+    expect(result.tables['T']!.columns['id']!.default).toBe('autoincrement()');
   });
 
   it('omits default field when column has no default', () => {

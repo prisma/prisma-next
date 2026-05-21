@@ -6,6 +6,30 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 
+/**
+ * Standard-SQL escape for a single-quoted string literal.
+ *
+ * Doubles embedded single quotes (`O'Brien` -> `O''Brien`) and rejects embedded NULL bytes (`\0`) which most relational engines either truncate at or refuse outright. Backslashes pass through as literal characters — Postgres with `standard_conforming_strings` (the default since 9.1) and SQLite both treat backslashes literally inside `'…'` strings.
+ *
+ * The returned string excludes the wrapping quotes; callers concatenate them.
+ */
+export function escapeStandardSqlLiteral(value: string): string {
+  if (value.includes('\0')) {
+    throw new Error('SQL literal value cannot contain NULL bytes');
+  }
+  return value.replace(/'/g, "''");
+}
+
+/**
+ * Read the Postgres native type name (e.g. `'integer'`, `'character'`, `'character varying'`) from a codec descriptor's `meta` slot. Returns `undefined` when the descriptor carries no Postgres meta — used by SQL base codec renderers (which are dialect-neutral by name but render with a Postgres-style `::cast` suffix when aliased through a Postgres descriptor).
+ */
+export function readPostgresNativeTypeFromMeta(meta: unknown): string | undefined {
+  const m = meta as
+    | { readonly db?: { readonly sql?: { readonly postgres?: { readonly nativeType?: string } } } }
+    | undefined;
+  return m?.db?.sql?.postgres?.nativeType;
+}
+
 export const SQL_CHAR_CODEC_ID = 'sql/char@1' as const;
 export const SQL_VARCHAR_CODEC_ID = 'sql/varchar@1' as const;
 export const SQL_INT_CODEC_ID = 'sql/int@1' as const;

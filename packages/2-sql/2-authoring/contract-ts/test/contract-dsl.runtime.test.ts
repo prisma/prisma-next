@@ -41,10 +41,7 @@ const charColumn = columnDescriptor('sql/char@1', 'character');
 describe('contract DSL runtime helpers', () => {
   it('normalizes defaults, generated descriptors, relation helpers, and input detection', () => {
     const literalDefault = field.column(textColumn).default('draft').build();
-    const functionDefault = field
-      .column(textColumn)
-      .default({ kind: 'function', expression: 'now()' })
-      .build();
+    const functionDefault = field.column(textColumn).defaultSql('now()').build();
     const generated = field
       .generated({
         type: charColumn,
@@ -65,8 +62,8 @@ describe('contract DSL runtime helpers', () => {
 
     const lazyBelongsTo = rel.belongsTo(() => User, { from: 'id', to: 'id' }).build();
 
-    expect(literalDefault.default).toEqual({ kind: 'literal', value: 'draft' });
-    expect(functionDefault.default).toEqual({ kind: 'function', expression: 'now()' });
+    expect(literalDefault.default).toEqual({ kind: 'codecValue', value: 'draft' });
+    expect(functionDefault.default).toEqual({ kind: 'expression', expression: 'now()' });
     expect(generated.descriptor).toEqual({
       codecId: 'sql/char@1',
       nativeType: 'character',

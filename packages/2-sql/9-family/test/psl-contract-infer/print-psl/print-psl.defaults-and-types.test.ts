@@ -18,31 +18,31 @@ describe('printPsl', () => {
               name: 'id',
               nativeType: 'int4',
               nullable: false,
-              default: { kind: 'function', expression: 'autoincrement()' } as unknown as string,
+              default: { kind: 'autoincrement' } as unknown as string,
             },
             title: {
               name: 'title',
               nativeType: 'text',
               nullable: false,
-              default: { kind: 'literal', value: 'Untitled' } as unknown as string,
+              default: { kind: 'expression', expression: 'Untitled' } as unknown as string,
             },
             is_published: {
               name: 'is_published',
               nativeType: 'bool',
               nullable: false,
-              default: { kind: 'literal', value: false } as unknown as string,
+              default: { kind: 'expression', expression: 'false' } as unknown as string,
             },
             view_count: {
               name: 'view_count',
               nativeType: 'int4',
               nullable: false,
-              default: { kind: 'literal', value: 0 } as unknown as string,
+              default: { kind: 'expression', expression: '0' } as unknown as string,
             },
             created_at: {
               name: 'created_at',
               nativeType: 'timestamptz',
               nullable: false,
-              default: { kind: 'function', expression: 'now()' } as unknown as string,
+              default: { kind: 'expression', expression: 'now()' } as unknown as string,
             },
           },
           primaryKey: { columns: ['id'] },
@@ -58,9 +58,9 @@ describe('printPsl', () => {
 
       model Post {
         id          Int      @id @default(autoincrement())
-        title       String   @default("Untitled")
-        isPublished Boolean  @default(false) @map("is_published")
-        viewCount   Int      @default(0) @map("view_count")
+        title       String   @default(dbgenerated("Untitled"))
+        isPublished Boolean  @default(dbgenerated("false")) @map("is_published")
+        viewCount   Int      @default(dbgenerated("0")) @map("view_count")
         createdAt   DateTime @default(now()) @map("created_at")
 
         @@map("post")
@@ -363,7 +363,7 @@ describe('printPsl', () => {
               name: 'id',
               nativeType: 'uuid',
               nullable: false,
-              default: { kind: 'function', expression: 'gen_random_uuid()' } as unknown as string,
+              default: { kind: 'expression', expression: 'gen_random_uuid()' } as unknown as string,
             },
           },
           primaryKey: { columns: ['id'] },
@@ -462,7 +462,7 @@ describe('printPsl', () => {
               name: 'computed',
               nativeType: 'text',
               nullable: false,
-              default: { kind: 'function', expression: 'my_custom_func()' } as unknown as string,
+              default: { kind: 'expression', expression: 'my_custom_func()' } as unknown as string,
             },
             payload: {
               name: 'payload',
@@ -525,7 +525,7 @@ describe('printPsl', () => {
       "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Counter {
-        id BigInt @id @default(9223372036854776000)
+        id BigInt @id @default(dbgenerated("9223372036854775807"))
 
         @@map("counter")
       }

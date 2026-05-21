@@ -56,7 +56,7 @@ export function temporalAuthoringPresets<
       output: {
         codecId,
         nativeType,
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'expression', expression: 'now()' },
       },
     },
     updatedAt: {

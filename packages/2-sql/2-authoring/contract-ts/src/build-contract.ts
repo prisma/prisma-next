@@ -4,8 +4,6 @@ import {
   computeStorageHash,
 } from '@prisma-next/contract/hashing';
 import {
-  type ColumnDefault,
-  type ColumnDefaultLiteralInputValue,
   type Contract,
   type ContractField,
   type ContractModel,
@@ -13,7 +11,6 @@ import {
   type ContractValueObject,
   coreHash,
   type ExecutionMutationDefault,
-  type JsonValue,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -26,6 +23,7 @@ import {
 } from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
+  type ColumnDefault,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
@@ -45,34 +43,78 @@ import type {
   ModelNode,
   ValueObjectFieldNode,
 } from './contract-definition';
+import type { AuthoredColumnDefault } from './contract-dsl';
 
 type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
 
-function encodeDefaultLiteralValue(
-  value: ColumnDefaultLiteralInputValue,
-  codecId: string,
-  codecLookup?: CodecLookup,
-): JsonValue {
-  const codec = codecLookup?.get(codecId);
-  if (codec) {
-    return codec.encodeJson(value);
-  }
-  return value as JsonValue;
+/**
+ * Minimal local view of the SQL-codec interface — every codec resolved from
+ * a `CodecLookup` in a SQL-contract authoring context carries
+ * `renderSqlLiteral(value)` (per `@prisma-next/sql-contract` codec interface,
+ * homed in the relational-core lane). The framework-level `CodecLookup` is
+ * target-agnostic and types codecs as the narrower framework `Codec`, so the
+ * SQL-specific method is reachable via a structural narrowing at the call
+ * site rather than a wider workspace-level type dependency.
+ */
+interface CodecWithRenderSqlLiteral {
+  readonly id: string;
+  renderSqlLiteral(value: unknown): string;
 }
 
-function encodeColumnDefault(
-  defaultInput: ColumnDefault,
-  codecId: string,
+/**
+ * Translate the DSL-internal {@link AuthoredColumnDefault} into the contract
+ * IR's {@link ColumnDefault}. Dispatch table:
+ *
+ * - `autoincrement` arm → `{ kind: 'autoincrement' }`; the codec is NOT
+ *   invoked (the renderer relies on column-type SERIAL/IDENTITY/AUTOINCREMENT
+ *   semantics for the actual emission).
+ * - `expression` arm → `{ kind: 'expression', expression }`; the function-
+ *   form source passes through verbatim; the codec is NOT invoked.
+ * - `codecValue` arm with a `null` value:
+ *     - column is nullable → `{ kind: 'expression', expression: 'NULL' }`;
+ *       handled in a literal pass before the codec dispatches. Codec is NOT
+ *       invoked.
+ *     - column is NOT NULL → throw with a diagnostic naming the column path
+ *       (`table.column`) and the codec id. Codec is NOT invoked.
+ * - `codecValue` arm with any other value → `codec.renderSqlLiteral(value)`
+ *   → `{ kind: 'expression', expression: <result> }`. The codec is required;
+ *   we surface a clear error when it is missing.
+ */
+function emitColumnDefault(
+  authored: AuthoredColumnDefault,
+  context: {
+    readonly codecId: string;
+    readonly tableName: string;
+    readonly columnName: string;
+    readonly nullable: boolean;
+  },
   codecLookup?: CodecLookup,
 ): ColumnDefault {
-  if (defaultInput.kind === 'function') {
-    return { kind: 'function', expression: defaultInput.expression };
+  if (authored.kind === 'autoincrement') {
+    return { kind: 'autoincrement' };
+  }
+  if (authored.kind === 'expression') {
+    return { kind: 'expression', expression: authored.expression };
+  }
+  if (authored.value === null) {
+    if (!context.nullable) {
+      throw new Error(
+        `Column "${context.tableName}.${context.columnName}" (codec "${context.codecId}") is NOT NULL but a null literal was supplied to .default(...). Either mark the column .optional() or supply a non-null default.`,
+      );
+    }
+    return { kind: 'expression', expression: 'NULL' };
+  }
+  const codec = codecLookup?.get(context.codecId) as CodecWithRenderSqlLiteral | undefined;
+  if (!codec) {
+    throw new Error(
+      `Column "${context.tableName}.${context.columnName}" .default(...) requires a codec lookup that resolves codec "${context.codecId}" to render the literal value as a SQL expression; received ${codecLookup ? 'a lookup that does not know the codec' : 'no lookup at all'}.`,
+    );
   }
   return {
-    kind: 'literal',
-    value: encodeDefaultLiteralValue(defaultInput.value, codecId, codecLookup),
+    kind: 'expression',
+    expression: codec.renderSqlLiteral(authored.value),
   };
 }
 
@@ -148,12 +190,22 @@ const JSONB_NATIVE_TYPE = 'jsonb';
 
 function buildStorageColumn(
   field: FieldNode | ValueObjectFieldNode,
+  tableName: string,
   codecLookup?: CodecLookup,
 ): StorageColumn {
   if (isValueObjectField(field)) {
     const encodedDefault =
       field.default !== undefined
-        ? encodeColumnDefault(field.default, JSONB_CODEC_ID, codecLookup)
+        ? emitColumnDefault(
+            field.default,
+            {
+              codecId: JSONB_CODEC_ID,
+              tableName,
+              columnName: field.columnName,
+              nullable: field.nullable,
+            },
+            codecLookup,
+          )
         : undefined;
 
     return {
@@ -175,7 +227,16 @@ function buildStorageColumn(
   const codecId = field.descriptor.codecId;
   const encodedDefault =
     field.default !== undefined
-      ? encodeColumnDefault(field.default, codecId, codecLookup)
+      ? emitColumnDefault(
+          field.default,
+          {
+            codecId,
+            tableName,
+            columnName: field.columnName,
+            nullable: field.nullable,
+          },
+          codecLookup,
+        )
       : undefined;
 
   return {
@@ -319,7 +380,7 @@ export function buildSqlContractFromDefinition(
         }
       }
 
-      const column = buildStorageColumn(field, codecLookup);
+      const column = buildStorageColumn(field, tableName, codecLookup);
       columns[field.columnName] = column;
       fieldToColumn[field.fieldName] = field.columnName;
 

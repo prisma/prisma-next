@@ -1,1 +1,4 @@
-export { parseSqliteDefault } from '../core/default-normalizer';
+export {
+  parseSqliteDefault,
+  parseSqliteDefaultValue,
+} from '../core/default-normalizer';

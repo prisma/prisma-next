@@ -151,8 +151,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -211,8 +210,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -235,7 +233,7 @@
         }
       }
     },
-    "storageHash": "sha256:0dd598e2a231ab7b6d81a6d82aed7e54e2894e3f4036809a80e71191086834fa"
+    "storageHash": "sha256:5bfa8fda93d8540d8baf252e32d130da152f41c09e8f8929af050774c6309246"
   },
   "capabilities": {
     "postgres": {

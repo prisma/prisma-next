@@ -1,7 +1,6 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 
 const DEFAULT_FUNCTION_ATTRIBUTES: Readonly<Record<string, string>> = {
-  'autoincrement()': '@default(autoincrement())',
   'now()': '@default(now())',
 };
 
@@ -17,9 +16,9 @@ export function mapDefault(
   options?: DefaultMappingOptions,
 ): DefaultMappingResult {
   switch (columnDefault.kind) {
-    case 'literal':
-      return { attribute: `@default(${formatLiteralValue(columnDefault.value)})` };
-    case 'function': {
+    case 'autoincrement':
+      return { attribute: '@default(autoincrement())' };
+    case 'expression': {
       const attribute =
         options?.functionAttributes?.[columnDefault.expression] ??
         DEFAULT_FUNCTION_ATTRIBUTES[columnDefault.expression] ??
@@ -29,28 +28,4 @@ export function mapDefault(
         : { comment: `// Raw default: ${columnDefault.expression.replace(/[\r\n]+/g, ' ')}` };
     }
   }
-}
-
-function formatLiteralValue(value: unknown): string {
-  if (value === null) {
-    return 'null';
-  }
-
-  switch (typeof value) {
-    case 'boolean':
-    case 'number':
-      return String(value);
-    case 'string':
-      return quoteString(value);
-    default:
-      return quoteString(JSON.stringify(value));
-  }
-}
-
-function quoteString(str: string): string {
-  return `"${escapeString(str)}"`;
-}
-
-function escapeString(str: string): string {
-  return JSON.stringify(str).slice(1, -1);
 }

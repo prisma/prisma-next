@@ -100,6 +100,25 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-17, a family-sql M-sized migration dispatch apparently ran a setup cleanup (likely `git clean -fd`) that deleted an in-flight methodology project directory (~1500 lines of untracked docs). Survived only because the orchestrator had the content in conversation context and could re-write it.
 
+### F6. Closed-set typing that satisfies enumeration-only tests while violating open-set spec promise
+
+**Symptom.** The implementation types a value as a closed union of N concrete shapes (e.g. `string | number | Date | bigint | Uint8Array`). The tests exercise exactly those N shapes — strings, numbers, Dates, bigints, Uint8Arrays — and they compile, so the gate goes green. But the spec or NFR demands an *open set* defined by some structural extractor (a codec descriptor's `TInput`, a target's column-type contract, an extension-provided schema). Values outside the closed union but inside the extractor's range fail to compile despite the spec promising they will. The reviewer sees green tests + matching enumeration in the implementation and signs off; the orchestrator's intent-validation step does not probe whether the test set non-trivially exercises the spec's open-set promise.
+
+**Detection signal.**
+
+- The implementation's value-input type is a finite union literal (no `extends infer T`, no extractor at the type level).
+- Every test case's value is a member of the implementation's union literal — bytewise.
+- The spec or NFR uses words like "codec-defined", "target-defined", "extension-defined", "user-defined", "any shape the X admits", "open-set", "branded types".
+- Test names enumerate the spec's example list ("accepts string", "accepts number", "accepts Date") rather than probe the open-set property ("accepts an arbitrary branded type", "accepts an extension-owned class instance").
+
+**Mitigation.**
+
+- When a spec NFR / AC references "codec-defined / target-defined / extension-defined / branded" types, the test set must exercise **at least one type the implementation cannot enumerate** — a branded type, a synthetic codec's `TInput`, an extension-owned class instance, or any other value that fails to compile under the closed union and only compiles when the extractor is real.
+- The reviewer's checklist asks: "is at least one test case impossible to satisfy under a hand-coded closed union of the spec's example list?" If no — the test set is enumeration-only and the open-set promise is unverified.
+- The orchestrator's intent-validation step probes whether the test set is tautological: name each test case's value, name each implementation-union member, and check whether the two sets are identical. Identical sets are a red flag.
+
+**Reference incident.** 2026-05-21 D10. The SQL DSL `.default(value)` parameter was typed `SqlDslLiteralInput = ColumnDefaultLiteralInputValue | bigint | Uint8Array` (a closed enumeration). The existing AC test (`contract-builder.default.test-d.ts`) exercised exactly those shapes — a string, a number, `null`, an object, a `Date`, a `bigint`, a `Uint8Array` — all members of the closed union. The spec NFR2 said: "JS-native default values pass through without JSON round-trips in the TS DSL. Date, bigint, Buffer, Uint8Array, **and codec-defined branded types** are accepted by `.default(...)` directly, where the codec's `TInput` admits them." The reviewer passed the dispatch (D2 R1); the orchestrator's intent-validation step did not probe the codec-defined arm. Caught by the user reading the implementation. Fixed by replacing the closed union with `CodecInputForDescriptor<FieldDescriptor<State>>`, which reads the codec's `TInput` off the descriptor's `codecFactory` slot, and by adding branded-type / nominal-class test cases that fail to compile under the closed union.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

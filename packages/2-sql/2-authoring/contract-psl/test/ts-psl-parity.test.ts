@@ -34,7 +34,7 @@ const sqlFamilyPack = {
             codecId: 'sql/timestamp@1',
             nativeType: 'timestamp',
             default: {
-              kind: 'function',
+              kind: 'expression',
               expression: 'now()',
             },
           },
@@ -138,7 +138,7 @@ const sqliteTimestampTargetPack = {
             codecId: 'sqlite/datetime@1',
             nativeType: 'text',
             default: {
-              kind: 'function',
+              kind: 'expression',
               expression: 'now()',
             },
           },
@@ -188,7 +188,7 @@ const postgresTimestampTargetPack = {
             codecId: 'pg/timestamptz@1',
             nativeType: 'timestamptz',
             default: {
-              kind: 'function',
+              kind: 'expression',
               expression: 'now()',
             },
           },

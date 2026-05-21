@@ -46,6 +46,7 @@ import type {
 import {
   buildColumnDefaultSql,
   buildColumnTypeSql,
+  type ColumnDefaultContext,
   isInlineAutoincrementPrimaryKey,
 } from './planner-ddl-builders';
 import {
@@ -204,6 +205,7 @@ function isMissing(issue: SchemaIssue): boolean {
  * `StorageColumn` again — they deal in pre-rendered SQL fragments.
  */
 export function toColumnSpec(
+  tableName: string,
   name: string,
   column: StorageColumn,
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
@@ -213,7 +215,12 @@ export function toColumnSpec(
     column,
     storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   );
-  const defaultSql = buildColumnDefaultSql(column.default);
+  const context: ColumnDefaultContext = {
+    tableName,
+    columnName: name,
+    isIntegerPrimaryKey: inlineAutoincrementPrimaryKey,
+  };
+  const defaultSql = buildColumnDefaultSql(column.default, context);
   return {
     name,
     typeSql,
@@ -230,11 +237,18 @@ export function toColumnSpec(
  * renderer emits `INTEGER PRIMARY KEY AUTOINCREMENT` inline.
  */
 export function toTableSpec(
+  tableName: string,
   table: StorageTable,
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
 ): SqliteTableSpec {
   const columns: SqliteColumnSpec[] = Object.entries(table.columns).map(([name, column]) =>
-    toColumnSpec(name, column, storageTypes, isInlineAutoincrementPrimaryKey(table, name)),
+    toColumnSpec(
+      tableName,
+      name,
+      column,
+      storageTypes,
+      isInlineAutoincrementPrimaryKey(table, name),
+    ),
   );
   const uniques: SqliteUniqueSpec[] = table.uniques.map((u) => ({
     columns: u.columns,
@@ -309,7 +323,7 @@ function mapIssueToCall(
           ),
         );
       }
-      const tableSpec = toTableSpec(contractTable, ctx.storageTypes);
+      const tableSpec = toTableSpec(issue.table, contractTable, ctx.storageTypes);
       const calls: SqliteOpFactoryCall[] = [new CreateTableCall(issue.table, tableSpec)];
       const declaredIndexColumnKeys = new Set<string>();
       for (const index of contractTable.indexes) {
@@ -345,6 +359,7 @@ function mapIssueToCall(
       }
       const contractTable = contractTable2;
       const columnSpec = toColumnSpec(
+        issue.table,
         issue.column,
         column,
         ctx.storageTypes,

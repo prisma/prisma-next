@@ -1,10 +1,12 @@
 export type {
+  AutoincrementSentinel,
   ComposedAuthoringHelpers,
   ContractInput,
   ContractModelBuilder,
   ScalarFieldBuilder,
 } from '../contract-builder';
 export {
+  autoincrement,
   buildSqlContractFromDefinition,
   defineContract,
   field,

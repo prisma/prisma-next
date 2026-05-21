@@ -155,7 +155,7 @@
                 "codecId": "sqlite/datetime@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "text",
                 "nullable": false
@@ -217,7 +217,7 @@
                 "codecId": "sqlite/datetime@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "text",
                 "nullable": false
@@ -253,7 +253,7 @@
         }
       }
     },
-    "storageHash": "sha256:8ea47fc08b79e387a9136d5a4ac708723e4941a7b3cffe71d57ceca09229a486"
+    "storageHash": "sha256:2e6a5d2aa8394b2afb958a80fa950bc04c0fb8c6646afb4ceed34267b6f976bd"
   },
   "execution": {
     "executionHash": "sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae",

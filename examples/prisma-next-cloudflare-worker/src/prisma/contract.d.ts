@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:17efb9380d28aece136dac05fd18e62d63d164332bae788d13e3e4339b486839'>;
+  StorageHashBase<'sha256:335d19f9d862a812f18a5f040982b6157c3a606008db953e752aff28d23c5ba0'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -36,9 +36,6 @@ export type ProfileHash =
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 export type AddressOutput = {
   readonly street: CodecTypes['pg/text@1']['output'];
   readonly city: CodecTypes['pg/text@1']['output'];
@@ -187,7 +184,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };
@@ -233,8 +230,8 @@ type ContractBase = ContractType<
                 readonly codecId: 'pg/text@1';
                 readonly nullable: false;
                 readonly default: {
-                  readonly kind: 'literal';
-                  readonly value: DefaultLiteralValue<'pg/text@1', 'open'>;
+                  readonly kind: 'expression';
+                  readonly expression: "'open'::text";
                 };
               };
               readonly type: {
@@ -251,7 +248,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };
@@ -296,7 +293,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
               readonly kind: {
                 readonly nativeType: 'user_type';

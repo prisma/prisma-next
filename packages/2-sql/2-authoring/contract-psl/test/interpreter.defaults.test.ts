@@ -7,6 +7,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresCodecLookup,
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteScalarTypeDescriptors,
@@ -23,6 +24,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      codecLookup: postgresCodecLookup,
       ...input,
     });
   it('lowers supported default functions into execution and storage contract shapes', () => {
@@ -97,13 +99,13 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
                 },
                 dbExpr: {
                   default: {
-                    kind: 'function',
+                    kind: 'expression',
                     expression: 'gen_random_uuid()',
                   },
                 },
                 createdAt: {
                   default: {
-                    kind: 'function',
+                    kind: 'expression',
                     expression: 'now()',
                   },
                 },
@@ -217,13 +219,13 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
               columns: {
                 touchedAt: {
                   default: {
-                    kind: 'function',
+                    kind: 'expression',
                     expression: 'clock_timestamp()',
                   },
                 },
                 payload: {
                   default: {
-                    kind: 'function',
+                    kind: 'expression',
                     expression: "'{}'::jsonb",
                   },
                 },
@@ -246,7 +248,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
           output: {
             codecId: 'pg/timestamptz@1',
             nativeType: 'timestamptz',
-            default: { kind: 'function', expression: 'now()' },
+            default: { kind: 'expression', expression: 'now()' },
           },
         },
         updatedAt: {
@@ -272,7 +274,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
           output: {
             codecId: 'sqlite/datetime@1',
             nativeType: 'text',
-            default: { kind: 'function', expression: 'now()' },
+            default: { kind: 'expression', expression: 'now()' },
           },
         },
         updatedAt: {
@@ -311,7 +313,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     expect(unboundTables(storage)['timestamped']?.columns['createdAt']?.default).toEqual({
-      kind: 'function',
+      kind: 'expression',
       expression: 'now()',
     });
     expect(result.value.execution?.mutations.defaults).toEqual([
@@ -443,7 +445,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
               output: {
                 codecId: 'pg/text@1',
                 nativeType: 'text',
-                default: { kind: 'function', expression: "'synthetic-default'" },
+                default: { kind: 'expression', expression: "'synthetic-default'" },
               },
             },
           },
@@ -465,7 +467,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
                   nativeType: 'text',
                   nullable: false,
                   default: {
-                    kind: 'function',
+                    kind: 'expression',
                     expression: "'synthetic-default'",
                   },
                 },
@@ -552,7 +554,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
             output: {
               codecId: 'pg/text@1',
               nativeType: 'text',
-              default: { kind: 'function', expression: "'synthetic-default'" },
+              default: { kind: 'expression', expression: "'synthetic-default'" },
             },
           },
         },

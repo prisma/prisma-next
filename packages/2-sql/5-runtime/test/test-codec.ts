@@ -28,6 +28,7 @@ export function defineTestCodec<
     targetTypes?: readonly string[];
     encode: (value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>;
     decode: (wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
+    renderSqlLiteral?: (value: TInput) => string;
     traits?: TTraits;
   } & JsonRoundTripConfig<TInput>,
 ): Codec<Id, TTraits, TWire, TInput> {
@@ -38,6 +39,13 @@ export function defineTestCodec<
     encodeJson?: (value: TInput) => JsonValue;
     decodeJson?: (json: JsonValue) => TInput;
   };
+  const renderSqlLiteral =
+    config.renderSqlLiteral ??
+    ((_value: TInput): string => {
+      throw new Error(
+        `defineTestCodec(${config.typeId}): renderSqlLiteral is not configured. Tests that exercise SQL literal rendering must supply a renderSqlLiteral implementation.`,
+      );
+    });
   return {
     id: config.typeId,
     encode: (value, ctx) => {
@@ -56,5 +64,6 @@ export function defineTestCodec<
     },
     encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
     decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
+    renderSqlLiteral,
   } as Codec<Id, TTraits, TWire, TInput>;
 }

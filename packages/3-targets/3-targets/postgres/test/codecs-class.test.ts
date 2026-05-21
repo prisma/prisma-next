@@ -395,7 +395,9 @@ describe('codecs-class', () => {
 
     it('exposes traits and targetTypes for each codec', () => {
       expect(pgTextDescriptor.traits).toEqual(['equality', 'order', 'textual']);
-      expect(pgInt4Descriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(pgInt2Descriptor.traits).toEqual(['equality', 'order', 'numeric', 'autoincrement']);
+      expect(pgInt4Descriptor.traits).toEqual(['equality', 'order', 'numeric', 'autoincrement']);
+      expect(pgInt8Descriptor.traits).toEqual(['equality', 'order', 'numeric', 'autoincrement']);
       expect(pgBoolDescriptor.traits).toEqual(['equality', 'boolean']);
       expect(pgJsonDescriptor.traits).toEqual([]);
       expect(pgJsonbDescriptor.traits).toEqual(['equality']);

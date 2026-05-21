@@ -30,7 +30,9 @@ test('list entries extend AnyCodecDescriptor', () => {
 
 test('pgInt4Descriptor.traits is a readonly literal tuple, not widened', () => {
   type Traits = PgInt4Descriptor['traits'];
-  expectTypeOf<Traits>().toEqualTypeOf<readonly ['equality', 'order', 'numeric']>();
+  expectTypeOf<Traits>().toEqualTypeOf<
+    readonly ['equality', 'order', 'numeric', 'autoincrement']
+  >();
   expectTypeOf<Traits[number]>().toExtend<CodecTrait>();
 });
 
@@ -51,7 +53,7 @@ test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
   expectTypeOf<CodecTypes['pg/int4@1']>().toExtend<{
     readonly input: number;
     readonly output: number;
-    readonly traits: 'equality' | 'order' | 'numeric';
+    readonly traits: 'equality' | 'order' | 'numeric' | 'autoincrement';
   }>();
 
   expectTypeOf<CodecTypes['pg/varchar@1']>().toExtend<{

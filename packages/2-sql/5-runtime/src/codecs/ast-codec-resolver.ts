@@ -58,9 +58,11 @@ export function createAstCodecResolver(
           : ref,
       );
       const ctx = instanceContextFor(ref);
-      // The descriptor's `factory` is typed against its own `P`; the registry erases `P` to `unknown`, so callers narrow per codec id at the dispatch boundary. The descriptor's `paramsSchema` validates the input above before we forward it, so this narrow is safe by construction.
+      // The descriptor's `factory` is typed against its own `P`; the registry erases `P` to `unknown`, so callers narrow per codec id at the dispatch boundary. The descriptor's `paramsSchema` validates the input above before we forward it, so the param narrow is safe by construction. The cast routes through `unknown` because the framework `Codec` produced by an erased descriptor doesn't structurally carry the SQL family's required `renderSqlLiteral` method; every concrete SQL codec materialised here extends `SqlCodecImpl`, which enforces the method at the construction site.
       const codec = (
-        descriptor.factory as (params: unknown) => (ctx: SqlCodecInstanceContext) => Codec
+        descriptor.factory as unknown as (
+          params: unknown,
+        ) => (ctx: SqlCodecInstanceContext) => Codec
       )(validated)(ctx);
 
       cache.set(key, codec);

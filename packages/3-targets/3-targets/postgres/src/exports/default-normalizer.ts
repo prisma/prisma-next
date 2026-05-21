@@ -1,1 +1,4 @@
-export { parsePostgresDefault } from '../core/default-normalizer';
+export {
+  parsePostgresDefault,
+  parsePostgresDefaultValue,
+} from '../core/default-normalizer';

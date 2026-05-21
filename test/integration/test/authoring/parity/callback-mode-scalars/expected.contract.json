@@ -168,8 +168,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -225,7 +224,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -244,8 +243,7 @@
               "id": {
                 "codecId": "pg/int4@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int4",
                 "nullable": false
@@ -253,8 +251,8 @@
               "isActive": {
                 "codecId": "pg/bool@1",
                 "default": {
-                  "kind": "literal",
-                  "value": true
+                  "expression": "TRUE",
+                  "kind": "expression"
                 },
                 "nativeType": "bool",
                 "nullable": false
@@ -284,7 +282,7 @@
         }
       }
     },
-    "storageHash": "sha256:8fa256466ba485fa9d52edc98e76680a9afd7042e65db1fcbb35b8518cf9fd28",
+    "storageHash": "sha256:9fb852123286e17142dac46de6aca8d6d4e6bbd423fe8737b5395b7681a34a19",
     "types": {
       "Embedding": {
         "codecId": "pg/vector@1",

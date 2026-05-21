@@ -134,7 +134,7 @@ describe('default function registry', () => {
             value: {
               kind: 'storage',
               defaultValue: {
-                kind: 'function',
+                kind: 'expression',
                 expression: 'custom()',
               },
             },
@@ -170,7 +170,7 @@ describe('default function registry', () => {
             value: {
               kind: 'storage',
               defaultValue: {
-                kind: 'function',
+                kind: 'expression',
                 expression: 'custom()',
               },
             },
@@ -234,7 +234,7 @@ describe('default function registry', () => {
     expect(lowered.value).toMatchObject({
       kind: 'storage',
       defaultValue: {
-        kind: 'function',
+        kind: 'expression',
         expression: String.raw`nextval(\"public\".\"user_id_seq\")`,
       },
     });

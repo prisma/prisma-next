@@ -14,7 +14,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 };
 
 describe('value objects in contract definition builder', () => {
-  it('encodes value-object literal defaults through codecLookup during storage lowering', () => {
+  it('renders value-object literal defaults through codec.renderSqlLiteral during storage lowering', () => {
     const isMoneyValue = (value: unknown): value is { amount: number; currency: string } =>
       typeof value === 'object' &&
       value !== null &&
@@ -29,22 +29,20 @@ describe('value objects in contract definition builder', () => {
           return undefined;
         }
 
-        return {
+        const codec = {
           id,
           encode: async (value: unknown) => value,
           decode: async (wire: unknown) => wire,
-          encodeJson: (value: unknown) => {
+          encodeJson: (value: unknown) => value,
+          decodeJson: (json: unknown) => json,
+          renderSqlLiteral: (value: unknown) => {
             if (!isMoneyValue(value)) {
               throw new Error('Expected a Money value');
             }
-
-            return {
-              amount: value.amount.toString(),
-              currency: value.currency,
-            };
+            return `'${JSON.stringify({ amount: value.amount.toString(), currency: value.currency })}'::jsonb`;
           },
-          decodeJson: (json: unknown) => json,
         };
+        return codec as ReturnType<CodecLookup['get']>;
       },
       targetTypesFor: (id) => (id === 'pg/jsonb@1' ? ['jsonb'] : undefined),
       metaFor: () => undefined,
@@ -71,7 +69,7 @@ describe('value objects in contract definition builder', () => {
                 valueObjectName: 'Money',
                 nullable: false,
                 default: {
-                  kind: 'literal',
+                  kind: 'codecValue',
                   value: {
                     amount: 12,
                     currency: 'EUR',
@@ -106,11 +104,8 @@ describe('value objects in contract definition builder', () => {
     );
 
     expect(unboundTables(contract.storage)['invoice']?.columns['total']?.default).toEqual({
-      kind: 'literal',
-      value: {
-        amount: '12',
-        currency: 'EUR',
-      },
+      kind: 'expression',
+      expression: `'${JSON.stringify({ amount: '12', currency: 'EUR' })}'::jsonb`,
     });
   });
 

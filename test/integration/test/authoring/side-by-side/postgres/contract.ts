@@ -4,12 +4,18 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import {
+  autoincrement,
+  defineContract,
+  field,
+  model,
+  rel,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
 const UserBase = model('User', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     name: field.column(textColumn),
     email: field.column(textColumn),
     bio: field.column(textColumn).optional(),
@@ -18,7 +24,7 @@ const UserBase = model('User', {
 
 const Post = model('Post', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     authorId: field.column(int4Column),
     title: field.column(textColumn),
     publishedAt: field.column(timestamptzColumn).optional(),

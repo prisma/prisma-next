@@ -16,11 +16,11 @@ import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, extractCodecLookup } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
-import { parseSqliteDefault } from '../default-normalizer';
+import { parseSqliteDefault, parseSqliteDefaultValue } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 import {
@@ -158,6 +158,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         typeMetadataRegistry: this.family.typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
         normalizeDefault: parseSqliteDefault,
+        parseSchemaDefaultValue: parseSqliteDefaultValue,
+        codecLookup: extractCodecLookup(options.frameworkComponents),
         normalizeNativeType: normalizeSqliteNativeType,
       });
       if (!schemaVerifyResult.ok) {

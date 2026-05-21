@@ -1,7 +1,10 @@
 export type {
   AuthoringArgRef,
   AuthoringArgumentDescriptor,
+  AuthoringColumnDefault,
   AuthoringColumnDefaultTemplate,
+  AuthoringColumnDefaultTemplateAutoincrement,
+  AuthoringColumnDefaultTemplateExpression,
   AuthoringContributions,
   AuthoringEntityContext,
   AuthoringEntityTypeDescriptor,

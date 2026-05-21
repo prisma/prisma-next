@@ -163,7 +163,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
 
     // Flatten the contract table to a self-contained spec — the Call holds
     // pre-rendered SQL fragments only, no `StorageColumn` or `storageTypes`.
-    const tableSpec = toTableSpec(contractTable, ctx.storageTypes);
+    const tableSpec = toTableSpec(tableName, contractTable, ctx.storageTypes);
 
     const seenIndexColumnKeys = new Set<string>();
     const indexes: SqliteIndexSpec[] = [];

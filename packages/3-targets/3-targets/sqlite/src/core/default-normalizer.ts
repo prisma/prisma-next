@@ -7,17 +7,8 @@
  * `target-sqlite` reaching into `adapter-sqlite`.
  */
 
-import type { ColumnDefault } from '@prisma-next/contract/types';
-
-const NULL_PATTERN = /^NULL$/i;
-const INTEGER_PATTERN = /^-?\d+$/;
-const REAL_PATTERN = /^-?\d+\.\d+(?:[eE][+-]?\d+)?$/;
-const HEX_PATTERN = /^0[xX][\dA-Fa-f]+$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'$/;
-
-function isNumericLiteral(value: string): boolean {
-  return INTEGER_PATTERN.test(value) || REAL_PATTERN.test(value) || HEX_PATTERN.test(value);
-}
+import type { JsonValue } from '@prisma-next/contract/types';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 
 /**
  * Strips a single matched wrapping pair of outer parens from `s`. Conservative:
@@ -42,7 +33,7 @@ export function stripOuterParens(s: string): string {
 
 export function parseSqliteDefault(
   rawDefault: string,
-  nativeType?: string,
+  _nativeType?: string,
 ): ColumnDefault | undefined {
   let trimmed = rawDefault.trim();
 
@@ -62,31 +53,81 @@ export function parseSqliteDefault(
   // form for verification.
   const lower = trimmed.toLowerCase();
   if (lower === 'current_timestamp' || lower === "datetime('now')" || lower === 'datetime("now")') {
-    return { kind: 'function', expression: 'now()' };
+    return { kind: 'expression', expression: 'now()' };
   }
 
-  if (NULL_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: null };
+  return { kind: 'expression', expression: trimmed };
+}
+
+/**
+ * Extracts the codec-comparable {@link JsonValue} out of a raw SQLite
+ * column default expression (the value `pragma_table_info.dflt_value`
+ * returns). Mirror of `parsePostgresDefaultValue` in
+ * `target-postgres/src/core/default-normalizer.ts`; the verifier dispatches
+ * the returned {@link JsonValue} through the column's codec
+ * (`codec.decodeJson(...)` → `codec.renderSqlLiteral(...)`) and compares
+ * the result against the contract-side expression.
+ *
+ * Returns `undefined` for non-literal forms (`CURRENT_TIMESTAMP`,
+ * `datetime('now')`); the verifier falls back to the legacy normalizer
+ * path for those.
+ *
+ * SQLite is loose-typed at the storage layer: it stores affinities, not
+ * strict per-column types. The parser therefore relies on the `nativeType`
+ * hint to disambiguate quoted numerics from quoted strings.
+ */
+export function parseSqliteDefaultValue(
+  rawDefault: string,
+  nativeType: string,
+): JsonValue | undefined {
+  let trimmed = rawDefault.trim();
+
+  // Strip outer parens iteratively (SQLite wraps expressions like `(1)` in
+  // parens; the recreate-table postcheck builder mirrors this).
+  while (true) {
+    const stripped = stripOuterParens(trimmed).trim();
+    if (stripped === trimmed) break;
+    trimmed = stripped;
   }
 
-  // SQLite integers are 64-bit, so values outside the JS safe-integer range can't
-  // be faithfully represented as `number`. Mirror `parsePostgresDefault`'s bigint
-  // handling: parse as JS `number` when safe, fall back to the raw text otherwise.
-  if (isNumericLiteral(trimmed)) {
-    const num = Number(trimmed);
-    if (!Number.isFinite(num)) return undefined;
-    if (nativeType?.toLowerCase() === 'integer' && !Number.isSafeInteger(num)) {
-      return { kind: 'literal', value: trimmed };
+  const lower = trimmed.toLowerCase();
+  if (lower === 'current_timestamp' || lower === "datetime('now')" || lower === 'datetime("now")') {
+    return undefined;
+  }
+
+  // Boolean literals (SQLite supports both `1`/`0` and `true`/`false`).
+  if (/^true$/i.test(trimmed)) return true;
+  if (/^false$/i.test(trimmed)) return false;
+
+  // Numerics — bare or quoted-with-cast — on a numeric nativeType
+  // (SQLite's affinity is integer / real / numeric).
+  if (/^(?:int|bigint|smallint|numeric|real|float|double)/i.test(nativeType)) {
+    const numericMatch = trimmed.match(/^'?(-?\d+(?:\.\d+)?)'?$/);
+    if (numericMatch?.[1] !== undefined) {
+      const n = Number(numericMatch[1]);
+      if (Number.isFinite(n)) return n;
     }
-    return { kind: 'literal', value: num };
   }
 
-  const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
+  // JSON literals — SQLite's text-JSON columns store JSON as TEXT;
+  // `pragma_table_info.dflt_value` returns the quoted JSON literal.
+  if (/json/i.test(nativeType)) {
+    const stringMatch = trimmed.match(/^'((?:[^']|'')*)'$/);
+    if (stringMatch?.[1] !== undefined) {
+      try {
+        return JSON.parse(stringMatch[1].replace(/''/g, "'"));
+      } catch {
+        return undefined;
+      }
+    }
+  }
+
+  // Quoted strings — strip outer single quotes; SQLite uses `''` for
+  // embedded quotes (same as Postgres).
+  const stringMatch = trimmed.match(/^'((?:[^']|'')*)'$/);
   if (stringMatch?.[1] !== undefined) {
-    const unescaped = stringMatch[1].replace(/''/g, "'");
-    return { kind: 'literal', value: unescaped };
+    return stringMatch[1].replace(/''/g, "'");
   }
 
-  // Unrecognized expression — preserve as function
-  return { kind: 'function', expression: trimmed };
+  return undefined;
 }

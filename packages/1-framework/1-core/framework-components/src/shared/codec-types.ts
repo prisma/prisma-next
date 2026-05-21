@@ -2,7 +2,7 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
 
-export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
+export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual' | 'autoincrement';
 
 /**
  * Serializable codec identity carried by every codec-bearing AST node.

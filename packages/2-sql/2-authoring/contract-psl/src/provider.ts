@@ -93,6 +93,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
           target: options.target,
           authoringContributions: context.authoringContributions,
           scalarTypeDescriptors,
+          codecLookup: context.codecLookup,
           ...ifDefined(
             'composedExtensionPacks',
             context.composedExtensionPacks.length > 0

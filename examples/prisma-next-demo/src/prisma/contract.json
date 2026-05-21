@@ -433,7 +433,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -497,7 +497,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -518,8 +518,8 @@
               "status": {
                 "codecId": "pg/text@1",
                 "default": {
-                  "kind": "literal",
-                  "value": "open"
+                  "expression": "'open'::text",
+                  "kind": "expression"
                 },
                 "nativeType": "text",
                 "nullable": false
@@ -579,7 +579,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -638,7 +638,7 @@
         }
       }
     },
-    "storageHash": "sha256:7926114e786c1a8fcc103d295a0c7fe5eb414b669ebb5b06a1e816d0019cbe7f",
+    "storageHash": "sha256:c57aaba9595d32bbb3c0101fbf63b80efb91e20a4335b091c0977885d29831b8",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

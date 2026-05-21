@@ -3,7 +3,7 @@
  *
  * Each codec ships as three artifacts:
  *
- * 1. A `PgXCodec` class extending {@link CodecImpl} that wraps the module-level encode/decode/encodeJson/decodeJson constants exported from `codec-helpers.ts` (the single source of truth for non-trivial runtime conversions; trivial identity passthroughs are inlined). 2. A `PgXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, meta, and (where applicable)
+ * 1. A `PgXCodec` class extending {@link SqlCodecImpl} that wraps the module-level encode/decode/encodeJson/decodeJson constants exported from `codec-helpers.ts` (the single source of truth for non-trivial runtime conversions; trivial identity passthroughs are inlined). 2. A `PgXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, meta, and (where applicable)
  * the emit-path `renderOutputType`. 3. A per-codec column helper (`pgXColumn`) that calls `descriptor.factory(...)` directly and packages the result into a {@link ColumnSpec} via the framework {@link column} packager. The helper is tied to its descriptor with `satisfies ColumnHelperFor` (and `ColumnHelperForStrict` where the resolved codec type is well-defined).
  *
  * After TML-2357 this is the canonical source of Postgres codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers (and the parallel `byScalar`/`codecDescriptorDefinitions`/ `codecDescriptorList` collection exports) retired with the deletion sweep.
@@ -17,7 +17,6 @@ import {
   type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
@@ -26,6 +25,7 @@ import {
 } from '@prisma-next/framework-components/codec';
 import {
   SqlCharCodec,
+  SqlCodecImpl,
   SqlFloatCodec,
   SqlIntCodec,
   SqlVarcharCodec,
@@ -39,6 +39,7 @@ import {
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
+  escapePgLiteralBody,
   pgEnumRenderOutputType,
   pgIntervalDecode,
   pgJsonbDecode,
@@ -51,6 +52,7 @@ import {
   pgTimestampEncodeJson,
   pgTimestamptzDecodeJson,
   pgTimestamptzEncodeJson,
+  readPgNativeType,
   renderLength,
   renderPrecision,
 } from './codec-helpers';
@@ -98,6 +100,15 @@ const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 }) satisfies StandardSchemaV1<PrecisionParams>;
 
+/**
+ * Render a string value as a Postgres SQL literal with a `::<nativeType>` cast read from the codec descriptor's meta. The cast pins the column-type at the literal so the DDL `DEFAULT (<expr>)` clause is unambiguous regardless of the column's textual context.
+ */
+function renderPgQuotedLiteral(value: string, descriptor: AnyCodecDescriptor): string {
+  const nativeType = readPgNativeType(descriptor);
+  const quoted = `'${escapePgLiteralBody(value)}'`;
+  return nativeType ? `${quoted}::${nativeType}` : quoted;
+}
+
 const PG_TEXT_META = { db: { sql: { postgres: { nativeType: 'text' } } } } as const;
 const PG_INT4_META = { db: { sql: { postgres: { nativeType: 'integer' } } } } as const;
 const PG_INT2_META = { db: { sql: { postgres: { nativeType: 'smallint' } } } } as const;
@@ -121,7 +132,7 @@ const PG_INTERVAL_META = { db: { sql: { postgres: { nativeType: 'interval' } } }
 const PG_JSON_META = { db: { sql: { postgres: { nativeType: 'json' } } } } as const;
 const PG_JSONB_META = { db: { sql: { postgres: { nativeType: 'jsonb' } } } } as const;
 
-export class PgTextCodec extends CodecImpl<
+export class PgTextCodec extends SqlCodecImpl<
   typeof PG_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -139,6 +150,9 @@ export class PgTextCodec extends CodecImpl<
   decodeJson(json: JsonValue): string {
     return json as string;
   }
+  renderSqlLiteral(value: string): string {
+    return renderPgQuotedLiteral(value, this.descriptor);
+  }
 }
 
 export class PgTextDescriptor extends CodecDescriptorImpl<void> {
@@ -155,14 +169,20 @@ export class PgTextDescriptor extends CodecDescriptorImpl<void> {
 export const pgTextDescriptor = new PgTextDescriptor();
 
 export const pgTextColumn = () =>
-  column(pgTextDescriptor.factory(), pgTextDescriptor.codecId, undefined, 'text');
+  column(
+    pgTextDescriptor.factory(),
+    pgTextDescriptor.codecId,
+    undefined,
+    'text',
+    pgTextDescriptor.traits,
+  );
 
 pgTextColumn satisfies ColumnHelperFor<PgTextDescriptor>;
 pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
 
-export class PgInt4Codec extends CodecImpl<
+export class PgInt4Codec extends SqlCodecImpl<
   typeof PG_INT4_CODEC_ID,
-  readonly ['equality', 'order', 'numeric'],
+  readonly ['equality', 'order', 'numeric', 'autoincrement'],
   number,
   number
 > {
@@ -178,11 +198,14 @@ export class PgInt4Codec extends CodecImpl<
   decodeJson(json: JsonValue): number {
     return json as number;
   }
+  renderSqlLiteral(value: number): string {
+    return String(value);
+  }
 }
 
 export class PgInt4Descriptor extends CodecDescriptorImpl<void> {
   override readonly codecId = PG_INT4_CODEC_ID;
-  override readonly traits = ['equality', 'order', 'numeric'] as const;
+  override readonly traits = ['equality', 'order', 'numeric', 'autoincrement'] as const;
   override readonly targetTypes = ['int4'] as const;
   override readonly meta = PG_INT4_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
@@ -194,14 +217,20 @@ export class PgInt4Descriptor extends CodecDescriptorImpl<void> {
 export const pgInt4Descriptor = new PgInt4Descriptor();
 
 export const pgInt4Column = () =>
-  column(pgInt4Descriptor.factory(), pgInt4Descriptor.codecId, undefined, 'int4');
+  column(
+    pgInt4Descriptor.factory(),
+    pgInt4Descriptor.codecId,
+    undefined,
+    'int4',
+    pgInt4Descriptor.traits,
+  );
 
 pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
 pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;
 
-export class PgInt2Codec extends CodecImpl<
+export class PgInt2Codec extends SqlCodecImpl<
   typeof PG_INT2_CODEC_ID,
-  readonly ['equality', 'order', 'numeric'],
+  readonly ['equality', 'order', 'numeric', 'autoincrement'],
   number,
   number
 > {
@@ -217,11 +246,14 @@ export class PgInt2Codec extends CodecImpl<
   decodeJson(json: JsonValue): number {
     return json as number;
   }
+  renderSqlLiteral(value: number): string {
+    return String(value);
+  }
 }
 
 export class PgInt2Descriptor extends CodecDescriptorImpl<void> {
   override readonly codecId = PG_INT2_CODEC_ID;
-  override readonly traits = ['equality', 'order', 'numeric'] as const;
+  override readonly traits = ['equality', 'order', 'numeric', 'autoincrement'] as const;
   override readonly targetTypes = ['int2'] as const;
   override readonly meta = PG_INT2_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
@@ -233,14 +265,20 @@ export class PgInt2Descriptor extends CodecDescriptorImpl<void> {
 export const pgInt2Descriptor = new PgInt2Descriptor();
 
 export const pgInt2Column = () =>
-  column(pgInt2Descriptor.factory(), pgInt2Descriptor.codecId, undefined, 'int2');
+  column(
+    pgInt2Descriptor.factory(),
+    pgInt2Descriptor.codecId,
+    undefined,
+    'int2',
+    pgInt2Descriptor.traits,
+  );
 
 pgInt2Column satisfies ColumnHelperFor<PgInt2Descriptor>;
 pgInt2Column satisfies ColumnHelperForStrict<PgInt2Descriptor>;
 
-export class PgInt8Codec extends CodecImpl<
+export class PgInt8Codec extends SqlCodecImpl<
   typeof PG_INT8_CODEC_ID,
-  readonly ['equality', 'order', 'numeric'],
+  readonly ['equality', 'order', 'numeric', 'autoincrement'],
   number,
   number
 > {
@@ -256,11 +294,14 @@ export class PgInt8Codec extends CodecImpl<
   decodeJson(json: JsonValue): number {
     return json as number;
   }
+  renderSqlLiteral(value: number): string {
+    return String(value);
+  }
 }
 
 export class PgInt8Descriptor extends CodecDescriptorImpl<void> {
   override readonly codecId = PG_INT8_CODEC_ID;
-  override readonly traits = ['equality', 'order', 'numeric'] as const;
+  override readonly traits = ['equality', 'order', 'numeric', 'autoincrement'] as const;
   override readonly targetTypes = ['int8'] as const;
   override readonly meta = PG_INT8_META;
   override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
@@ -272,12 +313,18 @@ export class PgInt8Descriptor extends CodecDescriptorImpl<void> {
 export const pgInt8Descriptor = new PgInt8Descriptor();
 
 export const pgInt8Column = () =>
-  column(pgInt8Descriptor.factory(), pgInt8Descriptor.codecId, undefined, 'int8');
+  column(
+    pgInt8Descriptor.factory(),
+    pgInt8Descriptor.codecId,
+    undefined,
+    'int8',
+    pgInt8Descriptor.traits,
+  );
 
 pgInt8Column satisfies ColumnHelperFor<PgInt8Descriptor>;
 pgInt8Column satisfies ColumnHelperForStrict<PgInt8Descriptor>;
 
-export class PgFloat4Codec extends CodecImpl<
+export class PgFloat4Codec extends SqlCodecImpl<
   typeof PG_FLOAT4_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -295,6 +342,9 @@ export class PgFloat4Codec extends CodecImpl<
   decodeJson(json: JsonValue): number {
     return json as number;
   }
+  renderSqlLiteral(value: number): string {
+    return String(value);
+  }
 }
 
 export class PgFloat4Descriptor extends CodecDescriptorImpl<void> {
@@ -311,12 +361,18 @@ export class PgFloat4Descriptor extends CodecDescriptorImpl<void> {
 export const pgFloat4Descriptor = new PgFloat4Descriptor();
 
 export const pgFloat4Column = () =>
-  column(pgFloat4Descriptor.factory(), pgFloat4Descriptor.codecId, undefined, 'float4');
+  column(
+    pgFloat4Descriptor.factory(),
+    pgFloat4Descriptor.codecId,
+    undefined,
+    'float4',
+    pgFloat4Descriptor.traits,
+  );
 
 pgFloat4Column satisfies ColumnHelperFor<PgFloat4Descriptor>;
 pgFloat4Column satisfies ColumnHelperForStrict<PgFloat4Descriptor>;
 
-export class PgFloat8Codec extends CodecImpl<
+export class PgFloat8Codec extends SqlCodecImpl<
   typeof PG_FLOAT8_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -334,6 +390,9 @@ export class PgFloat8Codec extends CodecImpl<
   decodeJson(json: JsonValue): number {
     return json as number;
   }
+  renderSqlLiteral(value: number): string {
+    return String(value);
+  }
 }
 
 export class PgFloat8Descriptor extends CodecDescriptorImpl<void> {
@@ -350,12 +409,18 @@ export class PgFloat8Descriptor extends CodecDescriptorImpl<void> {
 export const pgFloat8Descriptor = new PgFloat8Descriptor();
 
 export const pgFloat8Column = () =>
-  column(pgFloat8Descriptor.factory(), pgFloat8Descriptor.codecId, undefined, 'float8');
+  column(
+    pgFloat8Descriptor.factory(),
+    pgFloat8Descriptor.codecId,
+    undefined,
+    'float8',
+    pgFloat8Descriptor.traits,
+  );
 
 pgFloat8Column satisfies ColumnHelperFor<PgFloat8Descriptor>;
 pgFloat8Column satisfies ColumnHelperForStrict<PgFloat8Descriptor>;
 
-export class PgBoolCodec extends CodecImpl<
+export class PgBoolCodec extends SqlCodecImpl<
   typeof PG_BOOL_CODEC_ID,
   readonly ['equality', 'boolean'],
   boolean,
@@ -373,6 +438,9 @@ export class PgBoolCodec extends CodecImpl<
   decodeJson(json: JsonValue): boolean {
     return json as boolean;
   }
+  renderSqlLiteral(value: boolean): string {
+    return value ? 'TRUE' : 'FALSE';
+  }
 }
 
 export class PgBoolDescriptor extends CodecDescriptorImpl<void> {
@@ -389,12 +457,18 @@ export class PgBoolDescriptor extends CodecDescriptorImpl<void> {
 export const pgBoolDescriptor = new PgBoolDescriptor();
 
 export const pgBoolColumn = () =>
-  column(pgBoolDescriptor.factory(), pgBoolDescriptor.codecId, undefined, 'bool');
+  column(
+    pgBoolDescriptor.factory(),
+    pgBoolDescriptor.codecId,
+    undefined,
+    'bool',
+    pgBoolDescriptor.traits,
+  );
 
 pgBoolColumn satisfies ColumnHelperFor<PgBoolDescriptor>;
 pgBoolColumn satisfies ColumnHelperForStrict<PgBoolDescriptor>;
 
-export class PgNumericCodec extends CodecImpl<
+export class PgNumericCodec extends SqlCodecImpl<
   typeof PG_NUMERIC_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   string | number,
@@ -411,6 +485,9 @@ export class PgNumericCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return renderPgQuotedLiteral(value, this.descriptor);
   }
 }
 
@@ -431,12 +508,18 @@ export class PgNumericDescriptor extends CodecDescriptorImpl<NumericParams> {
 export const pgNumericDescriptor = new PgNumericDescriptor();
 
 export const pgNumericColumn = (params: NumericParams) =>
-  column(pgNumericDescriptor.factory(params), pgNumericDescriptor.codecId, params, 'numeric');
+  column(
+    pgNumericDescriptor.factory(params),
+    pgNumericDescriptor.codecId,
+    params,
+    'numeric',
+    pgNumericDescriptor.traits,
+  );
 
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
 
-export class PgTimestampCodec extends CodecImpl<
+export class PgTimestampCodec extends SqlCodecImpl<
   typeof PG_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -453,6 +536,9 @@ export class PgTimestampCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): Date {
     return pgTimestampDecodeJson(json);
+  }
+  renderSqlLiteral(value: Date): string {
+    return renderPgQuotedLiteral(value.toISOString(), this.descriptor);
   }
 }
 
@@ -474,12 +560,18 @@ export class PgTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams> 
 export const pgTimestampDescriptor = new PgTimestampDescriptor();
 
 export const pgTimestampColumn = (params: PrecisionParams = {}) =>
-  column(pgTimestampDescriptor.factory(params), pgTimestampDescriptor.codecId, params, 'timestamp');
+  column(
+    pgTimestampDescriptor.factory(params),
+    pgTimestampDescriptor.codecId,
+    params,
+    'timestamp',
+    pgTimestampDescriptor.traits,
+  );
 
 pgTimestampColumn satisfies ColumnHelperFor<PgTimestampDescriptor>;
 pgTimestampColumn satisfies ColumnHelperForStrict<PgTimestampDescriptor>;
 
-export class PgTimestamptzCodec extends CodecImpl<
+export class PgTimestamptzCodec extends SqlCodecImpl<
   typeof PG_TIMESTAMPTZ_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -496,6 +588,9 @@ export class PgTimestamptzCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): Date {
     return pgTimestamptzDecodeJson(json);
+  }
+  renderSqlLiteral(value: Date): string {
+    return renderPgQuotedLiteral(value.toISOString(), this.descriptor);
   }
 }
 
@@ -522,12 +617,13 @@ export const pgTimestamptzColumn = (params: PrecisionParams = {}) =>
     pgTimestamptzDescriptor.codecId,
     params,
     'timestamptz',
+    pgTimestamptzDescriptor.traits,
   );
 
 pgTimestamptzColumn satisfies ColumnHelperFor<PgTimestamptzDescriptor>;
 pgTimestamptzColumn satisfies ColumnHelperForStrict<PgTimestamptzDescriptor>;
 
-export class PgTimeCodec extends CodecImpl<
+export class PgTimeCodec extends SqlCodecImpl<
   typeof PG_TIME_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -544,6 +640,9 @@ export class PgTimeCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return renderPgQuotedLiteral(value, this.descriptor);
   }
 }
 
@@ -565,12 +664,18 @@ export class PgTimeDescriptor extends CodecDescriptorImpl<PrecisionParams> {
 export const pgTimeDescriptor = new PgTimeDescriptor();
 
 export const pgTimeColumn = (params: PrecisionParams = {}) =>
-  column(pgTimeDescriptor.factory(params), pgTimeDescriptor.codecId, params, 'time');
+  column(
+    pgTimeDescriptor.factory(params),
+    pgTimeDescriptor.codecId,
+    params,
+    'time',
+    pgTimeDescriptor.traits,
+  );
 
 pgTimeColumn satisfies ColumnHelperFor<PgTimeDescriptor>;
 pgTimeColumn satisfies ColumnHelperForStrict<PgTimeDescriptor>;
 
-export class PgTimetzCodec extends CodecImpl<
+export class PgTimetzCodec extends SqlCodecImpl<
   typeof PG_TIMETZ_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -587,6 +692,9 @@ export class PgTimetzCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return renderPgQuotedLiteral(value, this.descriptor);
   }
 }
 
@@ -608,12 +716,18 @@ export class PgTimetzDescriptor extends CodecDescriptorImpl<PrecisionParams> {
 export const pgTimetzDescriptor = new PgTimetzDescriptor();
 
 export const pgTimetzColumn = (params: PrecisionParams = {}) =>
-  column(pgTimetzDescriptor.factory(params), pgTimetzDescriptor.codecId, params, 'timetz');
+  column(
+    pgTimetzDescriptor.factory(params),
+    pgTimetzDescriptor.codecId,
+    params,
+    'timetz',
+    pgTimetzDescriptor.traits,
+  );
 
 pgTimetzColumn satisfies ColumnHelperFor<PgTimetzDescriptor>;
 pgTimetzColumn satisfies ColumnHelperForStrict<PgTimetzDescriptor>;
 
-export class PgBitCodec extends CodecImpl<
+export class PgBitCodec extends SqlCodecImpl<
   typeof PG_BIT_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -630,6 +744,9 @@ export class PgBitCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return `B'${escapePgLiteralBody(value)}'`;
   }
 }
 
@@ -650,12 +767,18 @@ export class PgBitDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const pgBitDescriptor = new PgBitDescriptor();
 
 export const pgBitColumn = (params: LengthParams = {}) =>
-  column(pgBitDescriptor.factory(params), pgBitDescriptor.codecId, params, 'bit');
+  column(
+    pgBitDescriptor.factory(params),
+    pgBitDescriptor.codecId,
+    params,
+    'bit',
+    pgBitDescriptor.traits,
+  );
 
 pgBitColumn satisfies ColumnHelperFor<PgBitDescriptor>;
 pgBitColumn satisfies ColumnHelperForStrict<PgBitDescriptor>;
 
-export class PgVarbitCodec extends CodecImpl<
+export class PgVarbitCodec extends SqlCodecImpl<
   typeof PG_VARBIT_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -672,6 +795,9 @@ export class PgVarbitCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return `B'${escapePgLiteralBody(value)}'`;
   }
 }
 
@@ -692,12 +818,18 @@ export class PgVarbitDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const pgVarbitDescriptor = new PgVarbitDescriptor();
 
 export const pgVarbitColumn = (params: LengthParams = {}) =>
-  column(pgVarbitDescriptor.factory(params), pgVarbitDescriptor.codecId, params, 'bit varying');
+  column(
+    pgVarbitDescriptor.factory(params),
+    pgVarbitDescriptor.codecId,
+    params,
+    'bit varying',
+    pgVarbitDescriptor.traits,
+  );
 
 pgVarbitColumn satisfies ColumnHelperFor<PgVarbitDescriptor>;
 pgVarbitColumn satisfies ColumnHelperForStrict<PgVarbitDescriptor>;
 
-export class PgByteaCodec extends CodecImpl<
+export class PgByteaCodec extends SqlCodecImpl<
   typeof PG_BYTEA_CODEC_ID,
   readonly ['equality'],
   Uint8Array,
@@ -725,6 +857,9 @@ export class PgByteaCodec extends CodecImpl<
     }
     return new Uint8Array(decoded);
   }
+  renderSqlLiteral(value: Uint8Array): string {
+    return renderPgQuotedLiteral(`\\x${Buffer.from(value).toString('hex')}`, this.descriptor);
+  }
 }
 
 export class PgByteaDescriptor extends CodecDescriptorImpl<void> {
@@ -741,12 +876,18 @@ export class PgByteaDescriptor extends CodecDescriptorImpl<void> {
 export const pgByteaDescriptor = new PgByteaDescriptor();
 
 export const pgByteaColumn = () =>
-  column(pgByteaDescriptor.factory(), pgByteaDescriptor.codecId, undefined, 'bytea');
+  column(
+    pgByteaDescriptor.factory(),
+    pgByteaDescriptor.codecId,
+    undefined,
+    'bytea',
+    pgByteaDescriptor.traits,
+  );
 
 pgByteaColumn satisfies ColumnHelperFor<PgByteaDescriptor>;
 pgByteaColumn satisfies ColumnHelperForStrict<PgByteaDescriptor>;
 
-export class PgIntervalCodec extends CodecImpl<
+export class PgIntervalCodec extends SqlCodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
   readonly ['equality', 'order'],
   string | Record<string, unknown>,
@@ -763,6 +904,9 @@ export class PgIntervalCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    return renderPgQuotedLiteral(value, this.descriptor);
   }
 }
 
@@ -784,7 +928,13 @@ export class PgIntervalDescriptor extends CodecDescriptorImpl<PrecisionParams> {
 export const pgIntervalDescriptor = new PgIntervalDescriptor();
 
 export const pgIntervalColumn = (params: PrecisionParams = {}) =>
-  column(pgIntervalDescriptor.factory(params), pgIntervalDescriptor.codecId, params, 'interval');
+  column(
+    pgIntervalDescriptor.factory(params),
+    pgIntervalDescriptor.codecId,
+    params,
+    'interval',
+    pgIntervalDescriptor.traits,
+  );
 
 pgIntervalColumn satisfies ColumnHelperFor<PgIntervalDescriptor>;
 pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
@@ -793,7 +943,7 @@ const enumParamsSchema = arktype({
   'values?': 'string[]',
 });
 
-export class PgEnumCodec extends CodecImpl<
+export class PgEnumCodec extends SqlCodecImpl<
   typeof PG_ENUM_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -810,6 +960,10 @@ export class PgEnumCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): string {
     return json as string;
+  }
+  renderSqlLiteral(value: string): string {
+    // `pg/enum@1` is the only Postgres codec without a static `nativeType` on its descriptor — the enum type name is per-enum and lives on the column declaration, not on the codec id. Emit a bare quoted literal and rely on Postgres's column-context cast in DDL.
+    return `'${escapePgLiteralBody(value)}'`;
   }
 }
 
@@ -829,12 +983,18 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<EnumParams> {
 export const pgEnumDescriptor = new PgEnumDescriptor();
 
 export const pgEnumColumn = (params: EnumParams = {}) =>
-  column(pgEnumDescriptor.factory(params), pgEnumDescriptor.codecId, params, 'enum');
+  column(
+    pgEnumDescriptor.factory(params),
+    pgEnumDescriptor.codecId,
+    params,
+    'enum',
+    pgEnumDescriptor.traits,
+  );
 
 pgEnumColumn satisfies ColumnHelperFor<PgEnumDescriptor>;
 pgEnumColumn satisfies ColumnHelperForStrict<PgEnumDescriptor>;
 
-export class PgJsonCodec extends CodecImpl<
+export class PgJsonCodec extends SqlCodecImpl<
   typeof PG_JSON_CODEC_ID,
   readonly [],
   string | JsonValue,
@@ -852,6 +1012,9 @@ export class PgJsonCodec extends CodecImpl<
   decodeJson(json: JsonValue): JsonValue {
     return json;
   }
+  renderSqlLiteral(value: JsonValue): string {
+    return renderPgQuotedLiteral(JSON.stringify(value), this.descriptor);
+  }
 }
 
 export class PgJsonDescriptor extends CodecDescriptorImpl<void> {
@@ -868,12 +1031,18 @@ export class PgJsonDescriptor extends CodecDescriptorImpl<void> {
 export const pgJsonDescriptor = new PgJsonDescriptor();
 
 export const pgJsonColumn = () =>
-  column(pgJsonDescriptor.factory(), pgJsonDescriptor.codecId, undefined, 'json');
+  column(
+    pgJsonDescriptor.factory(),
+    pgJsonDescriptor.codecId,
+    undefined,
+    'json',
+    pgJsonDescriptor.traits,
+  );
 
 pgJsonColumn satisfies ColumnHelperFor<PgJsonDescriptor>;
 pgJsonColumn satisfies ColumnHelperForStrict<PgJsonDescriptor>;
 
-export class PgJsonbCodec extends CodecImpl<
+export class PgJsonbCodec extends SqlCodecImpl<
   typeof PG_JSONB_CODEC_ID,
   readonly ['equality'],
   string | JsonValue,
@@ -891,6 +1060,9 @@ export class PgJsonbCodec extends CodecImpl<
   decodeJson(json: JsonValue): JsonValue {
     return json;
   }
+  renderSqlLiteral(value: JsonValue): string {
+    return renderPgQuotedLiteral(JSON.stringify(value), this.descriptor);
+  }
 }
 
 export class PgJsonbDescriptor extends CodecDescriptorImpl<void> {
@@ -907,12 +1079,18 @@ export class PgJsonbDescriptor extends CodecDescriptorImpl<void> {
 export const pgJsonbDescriptor = new PgJsonbDescriptor();
 
 export const pgJsonbColumn = () =>
-  column(pgJsonbDescriptor.factory(), pgJsonbDescriptor.codecId, undefined, 'jsonb');
+  column(
+    pgJsonbDescriptor.factory(),
+    pgJsonbDescriptor.codecId,
+    undefined,
+    'jsonb',
+    pgJsonbDescriptor.traits,
+  );
 
 pgJsonbColumn satisfies ColumnHelperFor<PgJsonbDescriptor>;
 pgJsonbColumn satisfies ColumnHelperForStrict<PgJsonbDescriptor>;
 
-// `meta`. The factories instantiate the SQL-base codec class (`SqlCharCodec` etc.) passing `this` (the pg-alias descriptor) so `codec.id` resolves to the pg-alias codec id via `CodecImpl`'s `descriptor.codecId` proxy. ---------------------------------------------------------------------------
+// `meta`. The factories instantiate the SQL-base codec class (`SqlCharCodec` etc.) passing `this` (the pg-alias descriptor) so `codec.id` resolves to the pg-alias codec id via `SqlCodecImpl`'s `descriptor.codecId` proxy. ---------------------------------------------------------------------------
 
 const PG_CHAR_META = { db: { sql: { postgres: { nativeType: 'character' } } } } as const;
 const PG_VARCHAR_META = {
@@ -938,7 +1116,13 @@ export class PgCharDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const pgCharDescriptor = new PgCharDescriptor();
 
 export const pgCharColumn = (params: LengthParams = {}) =>
-  column(pgCharDescriptor.factory(params), pgCharDescriptor.codecId, params, 'character');
+  column(
+    pgCharDescriptor.factory(params),
+    pgCharDescriptor.codecId,
+    params,
+    'character',
+    pgCharDescriptor.traits,
+  );
 
 pgCharColumn satisfies ColumnHelperFor<PgCharDescriptor>;
 
@@ -964,6 +1148,7 @@ export const pgVarcharColumn = (params: LengthParams = {}) =>
     pgVarcharDescriptor.codecId,
     params,
     'character varying',
+    pgVarcharDescriptor.traits,
   );
 
 pgVarcharColumn satisfies ColumnHelperFor<PgVarcharDescriptor>;
@@ -982,7 +1167,13 @@ export class PgIntDescriptor extends CodecDescriptorImpl<void> {
 export const pgIntDescriptor = new PgIntDescriptor();
 
 export const pgIntColumn = () =>
-  column(pgIntDescriptor.factory(), pgIntDescriptor.codecId, undefined, 'int4');
+  column(
+    pgIntDescriptor.factory(),
+    pgIntDescriptor.codecId,
+    undefined,
+    'int4',
+    pgIntDescriptor.traits,
+  );
 
 pgIntColumn satisfies ColumnHelperFor<PgIntDescriptor>;
 
@@ -1000,7 +1191,13 @@ export class PgFloatDescriptor extends CodecDescriptorImpl<void> {
 export const pgFloatDescriptor = new PgFloatDescriptor();
 
 export const pgFloatColumn = () =>
-  column(pgFloatDescriptor.factory(), pgFloatDescriptor.codecId, undefined, 'float8');
+  column(
+    pgFloatDescriptor.factory(),
+    pgFloatDescriptor.codecId,
+    undefined,
+    'float8',
+    pgFloatDescriptor.traits,
+  );
 
 pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
 

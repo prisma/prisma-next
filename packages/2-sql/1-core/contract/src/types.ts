@@ -1,5 +1,40 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecTrait } from '@prisma-next/framework-components/codec';
 import type { ReferentialAction } from './ir/foreign-key';
+
+/**
+ * Storage-column default value, as it appears in the contract IR.
+ *
+ * Two shapes:
+ * - `{ kind: 'expression', expression }` — a SQL expression rendered by
+ *   the column's codec (`codec.renderSqlLiteral`) or by an authoring
+ *   escape hatch (e.g. PSL `@default(now())`, TS DSL `.defaultSql(...)`).
+ *   The expression is target-dialect-flavoured text; consumers emit it
+ *   verbatim under a `DEFAULT (...)` clause.
+ * - `{ kind: 'autoincrement' }` — a sentinel indicating that the column
+ *   draws its value from a target-specific auto-increment mechanism
+ *   (Postgres SERIAL/IDENTITY, SQLite `INTEGER PRIMARY KEY AUTOINCREMENT`).
+ *   Renderers emit no `DEFAULT` clause; the column-type emission carries
+ *   the semantics.
+ */
+export type ColumnDefault =
+  | { readonly kind: 'expression'; readonly expression: string }
+  | { readonly kind: 'autoincrement' };
+
+/**
+ * JSON-shaped literal value accepted by codecs at lowering time. Used
+ * by PSL lowering before `codec.decodeJson` materialises the codec's
+ * `TInput`.
+ */
+export type ColumnDefaultLiteralValue = JsonValue;
+
+/**
+ * JS-native literal accepted by TS DSL `.default(...)` before codec
+ * dispatch. Extends `ColumnDefaultLiteralValue` with `Date`, the one
+ * non-JSON-native value the literal pass tolerates ahead of
+ * `codec.renderSqlLiteral`.
+ */
+export type ColumnDefaultLiteralInputValue = ColumnDefaultLiteralValue | Date;
 
 export {
   ForeignKey,

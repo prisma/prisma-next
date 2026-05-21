@@ -1,8 +1,8 @@
 import type {
-  ColumnDefault,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import type { AuthoringColumnDefault } from '../shared/framework-authoring';
 
 interface SourcePosition {
   readonly offset: number;
@@ -43,7 +43,7 @@ export interface DefaultFunctionLoweringContext {
 }
 
 export type LoweredDefaultValue =
-  | { readonly kind: 'storage'; readonly defaultValue: ColumnDefault }
+  | { readonly kind: 'storage'; readonly defaultValue: AuthoringColumnDefault }
   | { readonly kind: 'execution'; readonly generated: ExecutionMutationDefaultValue };
 
 export type LoweredDefaultResult =

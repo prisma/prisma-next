@@ -1,4 +1,5 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { JsonValue } from '@prisma-next/contract/types';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 
 /**
  * Pre-compiled regex patterns for performance.
@@ -12,11 +13,6 @@ const TEXT_CAST_SUFFIX = /::text$/i;
 const NOW_LITERAL_PATTERN = /^'now'$/i;
 const UUID_PATTERN = /^gen_random_uuid\s*\(\s*\)$/i;
 const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
-const NULL_PATTERN = /^NULL(?:::.+)?$/i;
-const TRUE_PATTERN = /^true$/i;
-const FALSE_PATTERN = /^false$/i;
-const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
 
 /**
  * Returns the canonical expression for a timestamp default function, or undefined
@@ -64,68 +60,147 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
  */
 export function parsePostgresDefault(
   rawDefault: string,
-  nativeType?: string,
+  _nativeType?: string,
 ): ColumnDefault | undefined {
   const trimmed = rawDefault.trim();
-  const normalizedType = nativeType?.toLowerCase();
-  const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
 
   if (NEXTVAL_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'autoincrement()' };
+    return { kind: 'autoincrement' };
   }
 
   const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);
   if (canonicalTimestamp) {
-    return { kind: 'function', expression: canonicalTimestamp };
+    return { kind: 'expression', expression: canonicalTimestamp };
   }
 
   if (UUID_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'gen_random_uuid()' };
+    return { kind: 'expression', expression: 'gen_random_uuid()' };
   }
 
   if (UUID_OSSP_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'gen_random_uuid()' };
+    return { kind: 'expression', expression: 'gen_random_uuid()' };
   }
 
-  if (NULL_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: null };
+  return { kind: 'expression', expression: trimmed };
+}
+
+/**
+ * Matches an outer `::<type>` cast suffix (possibly quoted, possibly with
+ * length / precision parameters). Used by {@link parsePostgresDefaultValue}
+ * to strip the column-type cast before unquoting / number-parsing.
+ */
+const CAST_SUFFIX = /\s*::\s*(?:"[^"]+"|[\w\s]+)(?:\(\d+(?:,\d+)?\))?$/;
+
+/**
+ * Returns the SQL literal value with its outer `::<type>` cast stripped.
+ * Handles quoted enum/type names (`::"BillingState"`) and parameterised
+ * types (`::numeric(10,2)`).
+ */
+function stripOuterCast(s: string): string {
+  return s.replace(CAST_SUFFIX, '');
+}
+
+/**
+ * Extracts the codec-comparable {@link JsonValue} out of a raw Postgres
+ * column default expression (the value `pg_get_expr` returns).
+ *
+ * The verifier round-trips this {@link JsonValue} through the column's
+ * codec (`codec.decodeJson(...)` → `codec.renderSqlLiteral(...)`) and
+ * compares the result against the contract-side expression. The
+ * comparison is therefore codec-canonical: two textually different
+ * Postgres-canonical forms collapse to one contract-canonical form when
+ * they decode to the same typed value.
+ *
+ * Returns `undefined` for non-literal forms (function calls like `now()`,
+ * `nextval(...)`, `gen_random_uuid()`); the verifier falls back to the
+ * legacy normalizer-based string compare for those.
+ *
+ * Recognised literal forms:
+ *
+ * - Quoted strings (`'foo'`, `'it''s'`) with optional `::type` cast →
+ *   the unquoted string.
+ * - Bare numerics (`9007199254740991`, `3.14`) and quoted numerics
+ *   (`'9007199254740991'::bigint`) on a numeric `nativeType` → the
+ *   parsed number.
+ * - Boolean literals (`true`, `false`, case-insensitive) → the boolean.
+ * - Timestamp-typed literals: the inner string is parsed via `new Date`
+ *   and emitted in canonical ISO-8601 UTC form so the codec's strict
+ *   `decodeJson` accepts it. Both Postgres-canonical
+ *   `'2024-01-15 10:30:00+00'` and ISO-T forms collapse to the same JS
+ *   `Date`.
+ * - JSON / JSONB literals (`'{"key":"value"}'::jsonb`) → the parsed
+ *   `JsonValue`.
+ *
+ * Adversarial inputs are handled conservatively: malformed JSON returns
+ * `undefined`, invalid dates return `undefined`, etc. The verifier's
+ * fallback path picks them up.
+ */
+export function parsePostgresDefaultValue(
+  rawDefault: string,
+  nativeType: string,
+): JsonValue | undefined {
+  const trimmed = rawDefault.trim();
+
+  // Non-literal forms — short-circuit so the verifier falls back to the
+  // normalizer path (which detects autoincrement / timestamp functions).
+  if (
+    NEXTVAL_PATTERN.test(trimmed) ||
+    NOW_FUNCTION_PATTERN.test(trimmed) ||
+    CLOCK_TIMESTAMP_PATTERN.test(trimmed) ||
+    UUID_PATTERN.test(trimmed) ||
+    UUID_OSSP_PATTERN.test(trimmed) ||
+    canonicalizeTimestampDefault(trimmed) !== undefined
+  ) {
+    return undefined;
   }
 
-  if (TRUE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: true };
-  }
-  if (FALSE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: false };
-  }
+  const inner = stripOuterCast(trimmed);
 
-  if (NUMERIC_PATTERN.test(trimmed)) {
-    const num = Number(trimmed);
-    if (!Number.isFinite(num)) return undefined;
-    if (isBigInt && !Number.isSafeInteger(num)) {
-      return { kind: 'literal', value: trimmed };
+  // Timestamp-typed: parse via `new Date` and emit ISO-8601 UTC so the
+  // codec's strict `decodeJson` accepts the value. Both
+  // `'2024-01-15 10:30:00+00'` and `'2024-01-15T10:30:00.000Z'` collapse
+  // here.
+  if (/timestamp|date|time/i.test(nativeType)) {
+    const stringMatch = inner.match(/^'((?:[^']|'')*)'$/);
+    const candidate = stringMatch?.[1]?.replace(/''/g, "'") ?? inner;
+    const date = new Date(candidate);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
     }
-    return { kind: 'literal', value: num };
   }
 
-  const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
-  if (stringMatch?.[1] !== undefined) {
-    const unescaped = stringMatch[1].replace(/''/g, "'");
-    if (normalizedType === 'json' || normalizedType === 'jsonb') {
+  // Boolean literals
+  if (/^true$/i.test(inner)) return true;
+  if (/^false$/i.test(inner)) return false;
+
+  // Numerics — bare or quoted-with-cast — on a numeric nativeType.
+  if (/^(?:int|bigint|smallint|numeric|decimal|float|real|double|serial)/i.test(nativeType)) {
+    const numericMatch = inner.match(/^'?(-?\d+(?:\.\d+)?)'?$/);
+    if (numericMatch?.[1] !== undefined) {
+      const n = Number(numericMatch[1]);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+
+  // JSON / JSONB literals — parse the inner quoted body
+  if (/json/i.test(nativeType)) {
+    const stringMatch = inner.match(/^'((?:[^']|'')*)'$/);
+    if (stringMatch?.[1] !== undefined) {
       try {
-        return { kind: 'literal', value: JSON.parse(unescaped) };
+        return JSON.parse(stringMatch[1].replace(/''/g, "'"));
       } catch {
-        // Keep legacy behavior for malformed/non-JSON string content.
+        return undefined;
       }
     }
-    if (isBigInt && NUMERIC_PATTERN.test(unescaped)) {
-      const num = Number(unescaped);
-      if (Number.isSafeInteger(num)) {
-        return { kind: 'literal', value: num };
-      }
-      return { kind: 'literal', value: unescaped };
-    }
-    return { kind: 'literal', value: unescaped };
   }
 
-  return { kind: 'function', expression: trimmed };
+  // Quoted strings — strip outer quotes, unescape doubled single quotes.
+  const stringMatch = inner.match(/^'((?:[^']|'')*)'$/);
+  if (stringMatch?.[1] !== undefined) {
+    return stringMatch[1].replace(/''/g, "'");
+  }
+
+  // No recognised literal shape — let the verifier fall back to the
+  // legacy normalizer path.
+  return undefined;
 }

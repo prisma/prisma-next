@@ -1,6 +1,11 @@
 import { int4Column } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
+import {
+  autoincrement,
+  defineContract,
+  field,
+  model,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
 const embedding1536Type = {
@@ -19,7 +24,7 @@ export const contract = defineContract({
   models: {
     Document: model('Document', {
       fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
+        id: field.column(int4Column).default(autoincrement()).id(),
         embedding: field.namedType(embedding1536Type),
       },
     }).sql({ table: 'document' }),

@@ -20,7 +20,10 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
+import {
+  parsePostgresDefault,
+  parsePostgresDefaultValue,
+} from '@prisma-next/target-postgres/default-normalizer';
 import { readExistingEnumValues } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -55,6 +58,15 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * Used by schema verification to normalize raw defaults before comparison.
    */
   readonly normalizeDefault = parsePostgresDefault;
+
+  /**
+   * Target-specific parser that extracts the codec-comparable JsonValue
+   * out of a raw Postgres default expression. Threaded into
+   * `verifySqlSchema` so the verifier can round-trip introspected literals
+   * through the column's codec (`decodeJson` → `renderSqlLiteral`) and
+   * compare against the contract-side codec-rendered expression.
+   */
+  readonly parseSchemaDefaultValue = parsePostgresDefaultValue;
 
   /**
    * Target-specific normalizer for Postgres schema native type names.

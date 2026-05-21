@@ -9,6 +9,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresCodecLookup,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
@@ -34,6 +35,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
+      codecLookup: postgresCodecLookup,
       ...input,
     });
 
@@ -399,13 +401,13 @@ model Post {
             user: {
               columns: {
                 id: {
-                  default: { kind: 'function', expression: 'autoincrement()' },
+                  default: { kind: 'autoincrement' },
                 },
                 createdAt: {
-                  default: { kind: 'function', expression: 'now()' },
+                  default: { kind: 'expression', expression: 'now()' },
                 },
                 isActive: {
-                  default: { kind: 'literal', value: true },
+                  default: { kind: 'expression', expression: 'TRUE' },
                 },
                 nickname: {
                   nullable: true,

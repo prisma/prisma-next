@@ -15,12 +15,12 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, extractCodecLookup } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
-import { parsePostgresDefault } from '../default-normalizer';
+import { parsePostgresDefault, parsePostgresDefaultValue } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { readExistingEnumValues } from './enum-planning';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
@@ -187,6 +187,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         typeMetadataRegistry: this.family.typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
         normalizeDefault: parsePostgresDefault,
+        parseSchemaDefaultValue: parsePostgresDefaultValue,
+        codecLookup: extractCodecLookup(options.frameworkComponents),
         normalizeNativeType: normalizeSchemaNativeType,
         resolveExistingEnumValues: (schema, enumType) =>
           readExistingEnumValues(schema, enumType.nativeType),

@@ -21,9 +21,6 @@ export type {
 export type {
   $,
   Brand,
-  ColumnDefault,
-  ColumnDefaultLiteralInputValue,
-  ColumnDefaultLiteralValue,
   ContractMarkerRecord,
   DocCollection,
   DocIndex,
@@ -46,8 +43,6 @@ export type {
 export {
   coreHash,
   executionHash,
-  isColumnDefault,
-  isColumnDefaultLiteralInputValue,
   isExecutionMutationDefaultValue,
   profileHash,
 } from '../types';

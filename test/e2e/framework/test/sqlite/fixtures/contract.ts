@@ -4,9 +4,13 @@ import {
   jsonColumn,
   textColumn,
 } from '@prisma-next/adapter-sqlite/column-types';
+import sqliteAdapter from '@prisma-next/adapter-sqlite/control';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
+
+const sqliteCodecLookup = extractCodecLookup([sqliteAdapter]);
 
 const User = model('User', {
   fields: {
@@ -63,6 +67,7 @@ const Item = model('Item', {
 export const contract = defineContract({
   family: sqlFamilyPack,
   target: sqlitePack,
+  codecLookup: sqliteCodecLookup,
   capabilities: {
     sql: {
       lateral: false,

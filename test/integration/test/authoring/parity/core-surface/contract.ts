@@ -7,9 +7,19 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
+import {
+  autoincrement,
+  defineContract,
+  field,
+  model,
+  rel,
+} from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+
+const postgresCodecLookup = extractCodecLookup([postgresAdapter]);
 
 const types = {
   Email: {
@@ -23,7 +33,7 @@ const types = {
 
 const User = model('User', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     email: field.namedType(types.Email).unique(),
     role: field.namedType(types.Role),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
@@ -34,7 +44,7 @@ const User = model('User', {
 
 const Post = model('Post', {
   fields: {
-    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    id: field.column(int4Column).default(autoincrement()).id(),
     userId: field.column(int4Column),
     title: field.column(textColumn),
     rating: field.column(float8Column).optional(),
@@ -56,6 +66,7 @@ const Post = model('Post', {
 export const contract = defineContract({
   family: sqlFamily,
   target: postgresPack,
+  codecLookup: postgresCodecLookup,
   types,
   models: {
     User,

@@ -1,9 +1,4 @@
-import {
-  type ColumnDefaultLiteralInputValue,
-  type Contract,
-  coreHash,
-  profileHash,
-} from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -459,11 +454,11 @@ describe('NOT NULL column without default uses temporary default', () => {
       nativeType: 'bool',
       codecId: 'pg/bool@1',
       nullable: false,
-      default: { kind: 'literal', value: true },
+      default: { kind: 'expression', expression: 'true' },
     });
 
     expect(addCol.execute.map((step) => step.sql)).toEqual([
-      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "active" bool DEFAULT true NOT NULL`,
+      `ALTER TABLE ${qualifiedUserTable} ADD COLUMN "active" bool DEFAULT (true) NOT NULL`,
     ]);
   });
 });
@@ -608,7 +603,7 @@ function planAddColumn(
     nullable: boolean;
     typeParams?: Record<string, unknown>;
     typeRef?: string;
-    default?: { kind: 'literal'; value: ColumnDefaultLiteralInputValue };
+    default?: { kind: 'expression'; expression: string } | { kind: 'autoincrement' };
   },
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;

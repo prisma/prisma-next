@@ -1,6 +1,7 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type { ExecutionMutationDefaultPhases, JsonValue } from '@prisma-next/contract/types';
 import type {
+  AuthoringColumnDefault,
   AuthoringContributions,
   AuthoringEntityTypeDescriptor,
   AuthoringFieldPresetDescriptor,
@@ -15,6 +16,7 @@ import {
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup, CodecTrait } from '@prisma-next/framework-components/codec';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
@@ -25,6 +27,7 @@ import type {
   PslSpan,
   PslTypeConstructorCall,
 } from '@prisma-next/psl-parser';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import {
   lowerDefaultFunctionWithRegistry,
   parseDefaultFunctionCall,
@@ -313,6 +316,7 @@ export function instantiatePslFieldPreset(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
+  readonly codecLookup?: CodecLookup;
 }):
   | {
       readonly descriptor: ColumnDescriptor;
@@ -340,16 +344,21 @@ export function instantiatePslFieldPreset(input: {
   try {
     validateAuthoringHelperArguments(helperPath, input.descriptor.args, args);
     const instantiated = instantiateAuthoringFieldPreset(input.descriptor, args);
+    const presetCodecId = instantiated.descriptor.codecId;
+    const presetDefault: ColumnDefault | undefined =
+      instantiated.default !== undefined
+        ? emitFunctionFormColumnDefault(instantiated.default)
+        : undefined;
     return {
       descriptor: {
-        codecId: instantiated.descriptor.codecId,
+        codecId: presetCodecId,
         nativeType: instantiated.descriptor.nativeType,
         ...(instantiated.descriptor.typeParams !== undefined
           ? { typeParams: instantiated.descriptor.typeParams }
           : {}),
       },
       nullable: instantiated.nullable,
-      ...(instantiated.default !== undefined ? { default: instantiated.default } : {}),
+      ...(presetDefault !== undefined ? { default: presetDefault } : {}),
       ...(instantiated.executionDefaults !== undefined
         ? { executionDefaults: instantiated.executionDefaults }
         : {}),
@@ -396,6 +405,7 @@ export function resolveFieldTypeDescriptor(input: {
   readonly composedExtensions: ReadonlySet<string>;
   readonly familyId: string;
   readonly targetId: string;
+  readonly codecLookup?: CodecLookup;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
@@ -413,6 +423,7 @@ export function resolveFieldTypeDescriptor(input: {
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
         entityLabel: input.entityLabel,
+        ...(input.codecLookup !== undefined ? { codecLookup: input.codecLookup } : {}),
       });
       if (!instantiated) {
         return { ok: false, alreadyReported: true };
@@ -678,19 +689,132 @@ export function resolveDbNativeTypeAttribute(input: {
   }
 }
 
-export function parseDefaultLiteralValue(expression: string): ColumnDefault | undefined {
+/**
+ * Parse a PSL literal `@default(...)` argument into a `JsonValue`. PSL's
+ * scalar literal grammar is JSON-isomorphic for the values supported here
+ * — `null`, booleans, numbers, single- or double-quoted strings — so the
+ * parsed form is the codec's `decodeJson` input. Returns `undefined` when
+ * the expression is not a recognised literal (the caller falls through to
+ * the function-call branch).
+ */
+export function parseDefaultLiteralValue(expression: string): JsonValue | undefined {
   const trimmed = expression.trim();
-  if (trimmed === 'true' || trimmed === 'false') {
-    return { kind: 'literal', value: trimmed === 'true' };
+  if (trimmed === 'null') {
+    return null;
   }
-  const numericValue = Number(trimmed);
-  if (!Number.isNaN(numericValue) && trimmed.length > 0 && !/^(['"]).*\1$/.test(trimmed)) {
-    return { kind: 'literal', value: numericValue };
+  if (trimmed === 'true' || trimmed === 'false') {
+    return trimmed === 'true';
   }
   if (/^(['"]).*\1$/.test(trimmed)) {
-    return { kind: 'literal', value: unquoteStringLiteral(trimmed) };
+    return unquoteStringLiteral(trimmed);
+  }
+  const numericValue = Number(trimmed);
+  if (!Number.isNaN(numericValue) && trimmed.length > 0) {
+    return numericValue;
   }
   return undefined;
+}
+
+/**
+ * Local structural narrowing for codecs that expose their descriptor at
+ * runtime. The framework `Codec` interface (consumer surface) does not
+ * declare `descriptor`, but every concrete codec extends `CodecImpl` which
+ * carries it — so reading `codec.descriptor.traits` is the runtime path
+ * for trait introspection at the literal-default lowering boundary.
+ *
+ * Mirrors the same shape-narrowing pattern used by the TS DSL emitter
+ * (`packages/2-sql/2-authoring/contract-ts/src/build-contract.ts` —
+ * `CodecWithRenderSqlLiteral`).
+ */
+interface CodecWithDescriptorTraits {
+  readonly descriptor?: { readonly traits?: readonly CodecTrait[] };
+}
+
+/**
+ * Resolve the codec's runtime `traits` tuple for a given codec id, via
+ * `codecLookup.get(id)?.descriptor.traits`. Returns `undefined` when the
+ * lookup misses or the codec instance does not expose a descriptor (e.g.
+ * the layer-isolated test stubs in `contract-psl/test/fixtures.ts`).
+ */
+function resolveCodecTraits(
+  codecLookup: CodecLookup | undefined,
+  codecId: string,
+): readonly CodecTrait[] | undefined {
+  const codec = codecLookup?.get(codecId) as CodecWithDescriptorTraits | undefined;
+  return codec?.descriptor?.traits;
+}
+
+/**
+ * Translate the registry's storage-arm {@link AuthoringColumnDefault} into
+ * the contract IR's {@link ColumnDefault}. The `expression` and `autoincrement`
+ * arms pass through verbatim; both are structurally identical to the IR shape.
+ */
+function emitFunctionFormColumnDefault(authored: AuthoringColumnDefault): ColumnDefault {
+  if (authored.kind === 'autoincrement') {
+    return { kind: 'autoincrement' };
+  }
+  return { kind: 'expression', expression: authored.expression };
+}
+
+/**
+ * Mirror of the TS DSL emitter's structural narrowing for codecs that
+ * carry `renderSqlLiteral`. SQL-family codecs implement the method (per
+ * `@prisma-next/sql-contract`'s codec interface); the framework-level
+ * `CodecLookup` types codecs as the narrower framework `Codec`, so we
+ * narrow at the call site rather than depending on the SQL-family type.
+ */
+interface CodecWithRenderSqlLiteral {
+  readonly id: string;
+  readonly decodeJson: (json: JsonValue) => unknown;
+  renderSqlLiteral(value: unknown): string;
+}
+
+/**
+ * Special-case the `autoincrement()` function-form default at parse time
+ * so the trait-gate runs without consulting the registry. Returns:
+ *
+ * - `{ ok: true, value: { kind: 'autoincrement' } }` when the column's
+ *   codec carries the `'autoincrement'` trait. The codec is NOT invoked;
+ *   the DDL renderer's SERIAL/IDENTITY/AUTOINCREMENT column-type emission
+ *   carries the semantics.
+ * - `{ ok: true, value: undefined }` to short-circuit with a diagnostic
+ *   already pushed when the trait is absent.
+ * - `{ ok: false }` when the call is not the `autoincrement()` parse-time
+ *   shape — caller falls through to the registry branch.
+ */
+function tryRecogniseAutoincrementParseTime(input: {
+  readonly call: ReturnType<typeof parseDefaultFunctionCall>;
+  readonly modelName: string;
+  readonly fieldName: string;
+  readonly codecId: string;
+  readonly codecLookup: CodecLookup | undefined;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): { readonly ok: true; readonly value: ColumnDefault | undefined } | { readonly ok: false } {
+  if (!input.call || input.call.name !== 'autoincrement') {
+    return { ok: false };
+  }
+  if (input.call.args.length > 0) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: `Field "${input.modelName}.${input.fieldName}" @default(autoincrement()) does not accept arguments.`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: true, value: undefined };
+  }
+  const traits = resolveCodecTraits(input.codecLookup, input.codecId);
+  if (!traits?.includes('autoincrement')) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Field "${input.modelName}.${input.fieldName}" @default(autoincrement()) requires a codec with the "autoincrement" trait; codec "${input.codecId}" does not carry it.`,
+      sourceId: input.sourceId,
+      span: input.span,
+    });
+    return { ok: true, value: undefined };
+  }
+  return { ok: true, value: { kind: 'autoincrement' } };
 }
 
 export function lowerDefaultForField(input: {
@@ -698,9 +822,11 @@ export function lowerDefaultForField(input: {
   readonly fieldName: string;
   readonly defaultAttribute: PslAttribute;
   readonly columnDescriptor: ColumnDescriptor;
+  readonly nullable: boolean;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
+  readonly codecLookup?: CodecLookup;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
   readonly defaultValue?: ColumnDefault;
@@ -731,8 +857,68 @@ export function lowerDefaultForField(input: {
   }
 
   const literalDefault = parseDefaultLiteralValue(expressionEntry.value);
-  if (literalDefault) {
-    return { defaultValue: literalDefault };
+  if (literalDefault !== undefined) {
+    // Literal pass mirrored from the TS DSL emitter (build-contract.ts
+    // emitColumnDefault): `null` on a nullable column rewrites to the SQL
+    // `NULL` keyword without invoking the codec; `null` on a NOT NULL
+    // column is a hard diagnostic naming the column path + codec id +
+    // PSL `file:line`. The rule is duplicated rather than factored to
+    // keep diagnostic envelopes (Error vs ContractSourceDiagnostic) per
+    // surface.
+    if (literalDefault === null) {
+      if (!input.nullable) {
+        input.diagnostics.push({
+          code: 'PSL_INVALID_DEFAULT_VALUE',
+          message: `Field "${input.modelName}.${input.fieldName}" (codec "${input.columnDescriptor.codecId}") is NOT NULL but a null literal was supplied to @default(...). Either mark the field optional or supply a non-null default.`,
+          sourceId: input.sourceId,
+          span: input.defaultAttribute.span,
+        });
+        return {};
+      }
+      return { defaultValue: { kind: 'expression', expression: 'NULL' } };
+    }
+
+    const codec = input.codecLookup?.get(input.columnDescriptor.codecId) as
+      | CodecWithRenderSqlLiteral
+      | undefined;
+    if (!codec) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_VALUE',
+        message: `Field "${input.modelName}.${input.fieldName}" @default(...) requires codec "${input.columnDescriptor.codecId}" to render the literal value; no codec lookup is available.`,
+        sourceId: input.sourceId,
+        span: input.defaultAttribute.span,
+      });
+      return {};
+    }
+
+    let decoded: unknown;
+    try {
+      decoded = codec.decodeJson(literalDefault);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_VALUE',
+        message: `Field "${input.modelName}.${input.fieldName}" @default(${expressionEntry.value}) is not valid for codec "${input.columnDescriptor.codecId}": ${message}`,
+        sourceId: input.sourceId,
+        span: input.defaultAttribute.span,
+      });
+      return {};
+    }
+
+    try {
+      return {
+        defaultValue: { kind: 'expression', expression: codec.renderSqlLiteral(decoded) },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_VALUE',
+        message: `Field "${input.modelName}.${input.fieldName}" @default(${expressionEntry.value}) could not be rendered by codec "${input.columnDescriptor.codecId}": ${message}`,
+        sourceId: input.sourceId,
+        span: input.defaultAttribute.span,
+      });
+      return {};
+    }
   }
 
   const defaultFunctionCall = parseDefaultFunctionCall(expressionEntry.value, expressionEntry.span);
@@ -744,6 +930,20 @@ export function lowerDefaultForField(input: {
       span: input.defaultAttribute.span,
     });
     return {};
+  }
+
+  const autoincrementParseTime = tryRecogniseAutoincrementParseTime({
+    call: defaultFunctionCall,
+    modelName: input.modelName,
+    fieldName: input.fieldName,
+    codecId: input.columnDescriptor.codecId,
+    codecLookup: input.codecLookup,
+    sourceId: input.sourceId,
+    span: input.defaultAttribute.span,
+    diagnostics: input.diagnostics,
+  });
+  if (autoincrementParseTime.ok) {
+    return autoincrementParseTime.value ? { defaultValue: autoincrementParseTime.value } : {};
   }
 
   const lowered = lowerDefaultFunctionWithRegistry({
@@ -763,7 +963,7 @@ export function lowerDefaultForField(input: {
   }
 
   if (lowered.value.kind === 'storage') {
-    return { defaultValue: lowered.value.defaultValue };
+    return { defaultValue: emitFunctionFormColumnDefault(lowered.value.defaultValue) };
   }
 
   const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);

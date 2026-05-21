@@ -1,11 +1,13 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type { ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
   getAttribute,
@@ -55,6 +57,7 @@ export interface CollectResolvedFieldsInput {
   readonly targetId: string;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
+  readonly codecLookup?: CodecLookup;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -204,6 +207,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     targetId,
     defaultFunctionRegistry,
     generatorDescriptorById,
+    codecLookup,
     diagnostics,
     sourceId,
     scalarTypeDescriptors,
@@ -248,6 +252,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       composedExtensions,
       familyId,
       targetId,
+      ...(codecLookup !== undefined ? { codecLookup } : {}),
       diagnostics,
       sourceId,
       entityLabel: `Field "${model.name}.${field.name}"`,
@@ -332,9 +337,11 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           fieldName: field.name,
           defaultAttribute,
           columnDescriptor: descriptor,
+          nullable: Boolean(field.optional),
           generatorDescriptorById,
           sourceId,
           defaultFunctionRegistry,
+          ...(codecLookup !== undefined ? { codecLookup } : {}),
           diagnostics,
         })
       : {};

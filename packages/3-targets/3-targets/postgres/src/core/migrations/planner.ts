@@ -17,7 +17,8 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import { parsePostgresDefault } from '../default-normalizer';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
+import { parsePostgresDefault, parsePostgresDefaultValue } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { readExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
@@ -218,6 +219,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
+      parseSchemaDefaultValue: parsePostgresDefaultValue,
+      codecLookup: extractCodecLookup(options.frameworkComponents),
       normalizeNativeType: normalizeSchemaNativeType,
       resolveExistingEnumValues: (schema, enumType) =>
         readExistingEnumValues(schema, enumType.nativeType),

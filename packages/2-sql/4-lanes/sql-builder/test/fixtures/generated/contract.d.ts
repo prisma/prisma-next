@@ -40,9 +40,6 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   PgVectorQueryOperationTypes<CodecTypes>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 
 export type FieldOutputTypes = {
   readonly Article: { readonly id: Char<36>; readonly title: CodecTypes['pg/text@1']['output'] };

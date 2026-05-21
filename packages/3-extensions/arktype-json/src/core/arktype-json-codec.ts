@@ -16,13 +16,13 @@ import {
   type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnSpec,
   column,
 } from '@prisma-next/framework-components/codec';
 import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
+import { SqlCodecImpl } from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
@@ -156,7 +156,7 @@ function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {
   return expression.length > 0 ? expression : 'unknown';
 }
 
-export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
+export class ArktypeJsonCodecClass<TInferred> extends SqlCodecImpl<
   typeof ARKTYPE_JSON_CODEC_ID,
   readonly ['equality'],
   string | JsonValue,
@@ -183,6 +183,14 @@ export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
 
   decodeJson(json: JsonValue): TInferred {
     return validateSchema<TInferred>(this.schema, json);
+  }
+
+  renderSqlLiteral(value: TInferred): string {
+    const json = serializeWire(value);
+    if (json.includes('\0')) {
+      throw new Error('arktype-json literal cannot contain NULL bytes');
+    }
+    return `'${json.replace(/'/g, "''")}'::jsonb`;
   }
 }
 
@@ -233,7 +241,11 @@ export const arktypeJsonDescriptor = new ArktypeJsonDescriptor();
  */
 export function arktypeJsonColumn<S extends Type<unknown>>(
   schema: S,
-): ColumnSpec<ArktypeJsonCodecClass<S['infer']>, ArktypeJsonTypeParams> {
+): ColumnSpec<
+  ArktypeJsonCodecClass<S['infer']>,
+  ArktypeJsonTypeParams,
+  typeof arktypeJsonDescriptor.traits
+> {
   if (!isArktypeSchemaLike(schema)) {
     throw new Error(
       typeof schema !== 'function'
@@ -252,6 +264,7 @@ export function arktypeJsonColumn<S extends Type<unknown>>(
     arktypeJsonDescriptor.codecId,
     params,
     ARKTYPE_JSON_NATIVE_TYPE,
+    arktypeJsonDescriptor.traits,
   );
 }
 

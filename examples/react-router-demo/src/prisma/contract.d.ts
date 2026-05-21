@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:5d2b2c2468240c79ee5f380951267aa777888966aeba3bb19d573825189e7816'>;
+  StorageHashBase<'sha256:34be6468b5ac2a4785cb4b670ac355c919cce3011094b349655d607dfc9c581b'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:8c5eef43d2153fd832b8288ed2d8ffc9f5afb62908f8b4b7e6a4b7018444c41f'>;
 export type ProfileHash =
@@ -36,9 +36,6 @@ export type ProfileHash =
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
-type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
-  ? CodecTypes[CodecId]['output']
-  : _Encoded;
 
 export type FieldOutputTypes = {
   readonly Post: {
@@ -102,7 +99,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };
@@ -142,7 +139,7 @@ type ContractBase = ContractType<
                 readonly nativeType: 'timestamptz';
                 readonly codecId: 'pg/timestamptz@1';
                 readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                readonly default: { readonly kind: 'expression'; readonly expression: 'now()' };
               };
             };
             primaryKey: { readonly columns: readonly ['id'] };

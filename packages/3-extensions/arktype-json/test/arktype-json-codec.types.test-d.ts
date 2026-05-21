@@ -114,6 +114,10 @@ test('arktypeJsonColumn: result is ColumnSpec with typed codecFactory', () => {
   const ProductSchema = type({ name: 'string', price: 'number' });
   const col = arktypeJsonColumn(ProductSchema);
   expectTypeOf(col).toExtend<
-    ColumnSpec<ArktypeJsonCodecClass<{ name: string; price: number }>, ArktypeJsonTypeParams>
+    ColumnSpec<
+      ArktypeJsonCodecClass<{ name: string; price: number }>,
+      ArktypeJsonTypeParams,
+      typeof arktypeJsonDescriptor.traits
+    >
   >();
 });

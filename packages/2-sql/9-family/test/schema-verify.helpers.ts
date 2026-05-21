@@ -2,14 +2,10 @@
  * Shared test helpers for schema verification tests.
  */
 
-import {
-  type ColumnDefault,
-  type Contract,
-  profileHash,
-  type StorageHashBase,
-} from '@prisma-next/contract/types';
+import { type Contract, profileHash, type StorageHashBase } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 import {
   applyFkDefaults,
   type ReferentialAction,

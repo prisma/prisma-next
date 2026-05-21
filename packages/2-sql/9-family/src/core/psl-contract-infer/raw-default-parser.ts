@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault } from '@prisma-next/sql-contract/types';
 
 const NEXTVAL_PATTERN = /^nextval\s*\(/i;
 const NOW_FUNCTION_PATTERN = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP)$/i;
@@ -43,32 +43,32 @@ export function parseRawDefault(
   const normalizedType = nativeType?.toLowerCase();
 
   if (NEXTVAL_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'autoincrement()' };
+    return { kind: 'autoincrement' };
   }
 
   const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);
   if (canonicalTimestamp) {
-    return { kind: 'function', expression: canonicalTimestamp };
+    return { kind: 'expression', expression: canonicalTimestamp };
   }
 
   if (UUID_PATTERN.test(trimmed) || UUID_OSSP_PATTERN.test(trimmed)) {
-    return { kind: 'function', expression: 'gen_random_uuid()' };
+    return { kind: 'expression', expression: 'gen_random_uuid()' };
   }
 
   if (NULL_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: null };
+    return { kind: 'expression', expression: 'NULL' };
   }
 
   if (TRUE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: true };
+    return { kind: 'expression', expression: 'true' };
   }
 
   if (FALSE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: false };
+    return { kind: 'expression', expression: 'false' };
   }
 
   if (NUMERIC_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: Number(trimmed) };
+    return { kind: 'expression', expression: trimmed };
   }
 
   const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
@@ -76,16 +76,17 @@ export function parseRawDefault(
     const unescaped = stringMatch[1].replace(/''/g, "'");
     if (normalizedType === 'json' || normalizedType === 'jsonb') {
       if (JSON_CAST_SUFFIX.test(trimmed)) {
-        return { kind: 'function', expression: trimmed };
+        return { kind: 'expression', expression: trimmed };
       }
       try {
-        return { kind: 'literal', value: JSON.parse(unescaped) };
+        const parsed = JSON.parse(unescaped);
+        return { kind: 'expression', expression: JSON.stringify(parsed) };
       } catch {
         // Fall through to the string form for malformed/non-JSON values.
       }
     }
-    return { kind: 'literal', value: unescaped };
+    return { kind: 'expression', expression: unescaped };
   }
 
-  return { kind: 'function', expression: trimmed };
+  return { kind: 'expression', expression: trimmed };
 }

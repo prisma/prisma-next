@@ -1,5 +1,8 @@
 export type {
   CodecTypesOf,
+  ColumnDefault,
+  ColumnDefaultLiteralInputValue,
+  ColumnDefaultLiteralValue,
   ContractWithTypeMaps,
   ExtractCodecTypes,
   ExtractFieldInputTypes,
