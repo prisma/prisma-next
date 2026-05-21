@@ -317,29 +317,48 @@ const StorageCollectionSchema = type({
   'options?': MongoCollectionOptionsSchema,
 });
 
+function collectionEntrySchema(fragments?: ReadonlyMap<string, Type<unknown>>): Type<unknown> {
+  if (fragments === undefined || fragments.size === 0) {
+    return StorageCollectionSchema;
+  }
+  return type('unknown').narrow((entry, ctx) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      return ctx.mustBe('an object');
+    }
+    const kind = (entry as { kind?: unknown }).kind;
+    if (typeof kind === 'string') {
+      const fragment = fragments.get(kind);
+      if (fragment !== undefined) {
+        const parsed = fragment(entry);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: parsed.summary });
+        }
+        return true;
+      }
+    }
+    const parsed = StorageCollectionSchema(entry);
+    if (parsed instanceof type.errors) {
+      return ctx.reject({ expected: parsed.summary });
+    }
+    return true;
+  });
+}
+
 /**
  * Builds the per-namespace envelope schema for Mongo storage. Pack
- * contributions are folded in as optional `'<slotKey>?': type({
- * '[string]': fragment })` entries so the structural check covers
- * slots introduced outside the family core. Mongo today has no pack
- * contributions; the composition surface exists for symmetry with SQL
- * and as the substrate for future entity kinds.
+ * contributions are keyed by the descriptor's `discriminator` and
+ * validate each entry by matching the entry's `kind` field. Mongo today
+ * has no pack contributions; the composition surface exists for symmetry
+ * with SQL and as the substrate for future entity kinds.
  */
 export function createMongoNamespaceEnvelopeSchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
-  const slotEntries: Record<string, Type<unknown>> = {};
-  if (fragments) {
-    for (const [slotKey, fragment] of fragments) {
-      slotEntries[`${slotKey}?`] = type({ '[string]': fragment });
-    }
-  }
   return type({
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
-    'collections?': type({ '[string]': StorageCollectionSchema }),
-    ...slotEntries,
+    'collections?': type({ '[string]': collectionEntrySchema(fragments) }),
   }) as Type<unknown>;
 }
 

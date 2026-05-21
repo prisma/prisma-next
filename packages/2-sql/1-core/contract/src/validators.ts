@@ -166,35 +166,55 @@ const StorageTableSchema = type({
  */
 export { PostgresEnumTypeSchema };
 
+function namespaceSlotEntrySchema(
+  fallback: Type<unknown>,
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  if (fragments === undefined || fragments.size === 0) {
+    return fallback;
+  }
+  return type('unknown').narrow((entry, ctx) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      return ctx.mustBe('an object');
+    }
+    const kind = (entry as { kind?: unknown }).kind;
+    if (typeof kind === 'string') {
+      const fragment = fragments.get(kind);
+      if (fragment !== undefined) {
+        const parsed = fragment(entry);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: parsed.summary });
+        }
+        return true;
+      }
+    }
+    const parsed = fallback(entry);
+    if (parsed instanceof type.errors) {
+      return ctx.reject({ expected: parsed.summary });
+    }
+    return true;
+  });
+}
+
 /**
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
- * descriptor's `storageSlotKey` — are folded in as optional
- * `'<slotKey>?': type({ '[string]': fragment })` entries so the
- * structural check covers slots introduced outside the family core.
- *
- * The hardcoded `'types?'` slot is preserved unconditionally: it
- * coexists additively with any fragment a Postgres pack registers
- * under the same slot key today (both validate the same shape). The
- * full rename of `types` → `postgresEnums` lands later; until then,
- * the redundancy is the F1 cure (no relocated dual-shape probe).
+ * descriptor's `discriminator` — validate each entry by matching the
+ * entry's `kind` field. The hardcoded `'types?'` slot is preserved
+ * unconditionally: it coexists additively with any contributed fragment
+ * that validates the same shape today. The full rename of `types` →
+ * `postgresEnums` lands later; until then, the redundancy is the F1 cure
+ * (no relocated dual-shape probe).
  */
 export function createNamespaceEntrySchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
-  const slotEntries: Record<string, Type<unknown>> = {};
-  if (fragments) {
-    for (const [slotKey, fragment] of fragments) {
-      slotEntries[`${slotKey}?`] = type({ '[string]': fragment });
-    }
-  }
   return type({
     '+': 'reject',
     id: 'string',
     'kind?': 'string',
     'tables?': type({ '[string]': StorageTableSchema }),
-    'types?': type({ '[string]': PostgresEnumTypeSchema }),
-    ...slotEntries,
+    'types?': type({ '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, fragments) }),
   }) as Type<unknown>;
 }
 
