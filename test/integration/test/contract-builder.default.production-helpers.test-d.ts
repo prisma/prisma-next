@@ -34,3 +34,26 @@ describe('.default(autoincrement()) trait gating against production column helpe
     field.column(pgBoolColumn()).default(autoincrement());
   });
 });
+
+describe('.default(value) extracts codec TInput from production column helpers', () => {
+  test('pgTextColumn().default(string) compiles', () => {
+    field.column(pgTextColumn()).default('hello');
+  });
+
+  test('pgInt4Column().default(number) compiles', () => {
+    field.column(pgInt4Column()).default(42);
+  });
+
+  test('pgBoolColumn().default(boolean) compiles', () => {
+    field.column(pgBoolColumn()).default(true);
+  });
+
+  test('rejects values outside the codec TInput', () => {
+    // @ts-expect-error pg/text@1 codec TInput is string, not number
+    field.column(pgTextColumn()).default(42);
+    // @ts-expect-error pg/int4@1 codec TInput is number, not string
+    field.column(pgInt4Column()).default('not a number');
+    // @ts-expect-error pg/bool@1 codec TInput is boolean, not string
+    field.column(pgBoolColumn()).default('true');
+  });
+});
