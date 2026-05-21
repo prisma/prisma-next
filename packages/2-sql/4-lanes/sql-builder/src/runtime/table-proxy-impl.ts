@@ -174,7 +174,7 @@ export class TableProxyImpl<
       | ((
           fields: FieldProxy<AvailableScope>,
           fns: Functions<QC>,
-        ) => Record<string, Expression<ScopeField>>),
+        ) => Record<string, Expression<ScopeField> | undefined>),
   ): UpdateQuery<QC, AvailableScope, EmptyRow> {
     if (typeof setOrCallback === 'function') {
       const callbackExprs = evaluateUpdateCallback(

@@ -161,8 +161,11 @@ export interface TableProxy<
     >,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
-  update<Result extends ResolvedUpdateExpressions<UnboundTables<C>[Name]>>(
-    callback: (fields: FieldProxy<AvailableScope>, fns: Functions<QC>) => Result,
+  update(
+    callback: (
+      fields: FieldProxy<AvailableScope>,
+      fns: Functions<QC>,
+    ) => ResolvedUpdateExpressions<UnboundTables<C>[Name]>,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow>;

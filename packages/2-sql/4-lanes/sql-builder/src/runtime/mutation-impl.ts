@@ -63,7 +63,7 @@ type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
 export type UpdateSetCallback = (
   fields: ReturnType<typeof createFieldProxy>,
   fns: ReturnType<typeof createFunctions>,
-) => Record<string, Expression<ScopeField>>;
+) => Record<string, Expression<ScopeField> | undefined>;
 
 export function buildParamValues(
   values: Record<string, unknown>,
@@ -117,7 +117,9 @@ export function evaluateUpdateCallback(
   const result = callback(fieldProxy, fns as never);
   const set: Record<string, AstExpression> = {};
   for (const [col, expr] of Object.entries(result)) {
-    set[col] = expr.buildAst();
+    if (expr !== undefined) {
+      set[col] = expr.buildAst();
+    }
   }
   return set;
 }
