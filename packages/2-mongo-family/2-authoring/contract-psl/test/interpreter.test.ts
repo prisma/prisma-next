@@ -1,7 +1,7 @@
 import type { ContractField, ContractReferenceRelation } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { MongoCollection, MongoValidator } from '@prisma-next/mongo-contract';
+import { MongoCollection, MongoStorage, MongoValidator } from '@prisma-next/mongo-contract';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -799,8 +799,8 @@ describe('interpretPslDocumentToMongoContract', () => {
             storage: { collection: 'posts' },
           },
         },
-        storage: {
-          storageHash: expect.stringMatching(/^sha256:/),
+        storage: new MongoStorage({
+          storageHash: expect.stringMatching(/^sha256:/) as unknown as `sha256:${string}`,
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
@@ -841,7 +841,7 @@ describe('interpretPslDocumentToMongoContract', () => {
               },
             },
           },
-        },
+        }),
         extensionPacks: {},
         capabilities: {},
         meta: {},

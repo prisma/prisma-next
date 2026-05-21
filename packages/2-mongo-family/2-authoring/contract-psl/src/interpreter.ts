@@ -16,6 +16,7 @@ import {
   MongoCollection,
   MongoIndex,
   type MongoIndexKeyDirection,
+  MongoStorage,
 } from '@prisma-next/mongo-contract';
 import type {
   ParsePslDocumentResult,
@@ -1128,6 +1129,10 @@ export function interpretPslDocumentToMongoContract(
     },
   };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
+  const storage = new MongoStorage({
+    storageHash,
+    ...storageWithoutHash,
+  }) as Contract['storage'];
   const capabilities: Record<string, Record<string, boolean>> = {};
 
   return ok({
@@ -1136,7 +1141,7 @@ export function interpretPslDocumentToMongoContract(
     roots: polyResult.roots,
     models: polyResult.models,
     ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
-    storage: { ...storageWithoutHash, storageHash },
+    storage,
     extensionPacks: {},
     capabilities,
     profileHash: computeProfileHash({ target, targetFamily, capabilities }),

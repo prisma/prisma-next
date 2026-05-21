@@ -81,12 +81,18 @@ export type MongoNamespace = Namespace & {
 };
 
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {
-  readonly kind = 'mongo-storage' as const;
+  declare readonly kind: 'mongo-storage';
   readonly storageHash: StorageHashBase<THash>;
   readonly namespaces: Readonly<Record<string, MongoNamespace>>;
 
   constructor(input: MongoStorageInput<THash>) {
     super();
+    Object.defineProperty(this, 'kind', {
+      value: 'mongo-storage',
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
     this.storageHash = input.storageHash;
     this.namespaces = Object.freeze(
       Object.fromEntries(
