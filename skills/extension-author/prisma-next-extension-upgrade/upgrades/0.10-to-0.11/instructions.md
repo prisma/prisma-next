@@ -238,7 +238,7 @@ await runtime.execute(db.sql.table.insert([row]).build());
 
 If a call site already passes an array (`.insert([row1, row2])`), it is already correct — leave it unchanged.
 
-TypeScript will surface bare-object call sites as `@ts-expect-error` mismatches after the bump, which is a reliable compile-time signal for every affected site.
+TypeScript will report bare-object call sites as type errors after the bump, which is a reliable compile-time signal for every affected site.
 
 ## `insert-ast-with-values-to-with-rows`
 
