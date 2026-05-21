@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
-  type CliStructuredError,
+  CliStructuredError,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorUnexpected,
@@ -159,6 +159,7 @@ async function executeMigrationLogCommand(
       summary: `${entries.length} migration(s) applied`,
     });
   } catch (error) {
+    if (CliStructuredError.is(error)) return notOk(error);
     if (MigrationToolsError.is(error)) return notOk(mapMigrationToolsError(error));
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {

@@ -54,9 +54,15 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   }
 
   if (failure.code === 'RUNNER_FAILED') {
+    const runnerCode =
+      typeof failure.meta?.runnerErrorCode === 'string' ? failure.meta.runnerErrorCode : undefined;
+    const fix =
+      runnerCode === 'LEGACY_MARKER_SHAPE'
+        ? 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.'
+        : 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`';
     return errorRunnerFailed(failure.summary, {
       why: failure.why ?? 'Migration runner failed',
-      fix: 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`',
+      fix,
       ...ifDefined('meta', failure.meta),
     });
   }
