@@ -3623,6 +3623,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:0.10.0
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.10.0
+        version: link:../../1-framework/1-core/errors
       '@prisma-next/family-mongo':
         specifier: workspace:0.10.0
         version: link:../../2-mongo-family/9-family
@@ -3882,6 +3885,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:0.10.0
         version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.10.0
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/family-sql':
         specifier: workspace:0.10.0
         version: link:../../../2-sql/9-family
@@ -3928,9 +3934,6 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:0.10.0
         version: link:../../7-drivers/postgres
-      '@prisma-next/errors':
-        specifier: workspace:0.10.0
-        version: link:../../../1-framework/1-core/errors
       '@prisma-next/migration-tools':
         specifier: workspace:0.10.0
         version: link:../../../1-framework/3-tooling/migration
@@ -3967,6 +3970,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:0.10.0
         version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.10.0
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/family-sql':
         specifier: workspace:0.10.0
         version: link:../../../2-sql/9-family

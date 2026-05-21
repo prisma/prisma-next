@@ -1,4 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import {
   RawAggregateCommand,
   RawFindOneAndUpdateCommand,
@@ -8,6 +9,7 @@ import { type } from 'arktype';
 import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
+const MONGO_MARKER_COLLECTION = `_prisma_migrations marker documents in ${COLLECTION}`;
 
 /**
  * Marker doc shape.
@@ -50,6 +52,13 @@ function parseMongoMarkerDoc(doc: unknown): ContractMarkerRecord {
   };
 }
 
+function parseMongoMarkerDocSafely(doc: unknown, space: string): ContractMarkerRecord {
+  return parseMarkerRowSafely(doc, parseMongoMarkerDoc, {
+    space,
+    markerLocation: MONGO_MARKER_COLLECTION,
+  });
+}
+
 async function executeAggregate(db: Db, cmd: RawAggregateCommand): Promise<Document[]> {
   return db
     .collection(cmd.collection)
@@ -84,14 +93,18 @@ async function executeFindOneAndUpdate(
  * mechanism this enables.
  */
 export async function readMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
-  const cmd = new RawAggregateCommand(COLLECTION, [
-    { $match: { _id: space, space } },
-    { $limit: 1 },
-  ]);
-  const docs = await executeAggregate(db, cmd);
+  const markerContext = { space, markerLocation: MONGO_MARKER_COLLECTION };
+  const docs = await withMarkerReadErrorHandling(
+    () =>
+      executeAggregate(
+        db,
+        new RawAggregateCommand(COLLECTION, [{ $match: { _id: space, space } }, { $limit: 1 }]),
+      ),
+    markerContext,
+  );
   const doc = docs[0];
   if (!doc) return null;
-  return parseMongoMarkerDoc(doc);
+  return parseMongoMarkerDocSafely(doc, space);
 }
 
 /**
@@ -106,22 +119,29 @@ export async function readMarker(db: Db, space: string): Promise<ContractMarkerR
  * with a `space` field, which excludes ledger entries by construction.
  */
 export async function readAllMarkers(db: Db): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-  const cmd = new RawAggregateCommand(COLLECTION, [
-    {
-      $match: {
-        _id: { $type: 'string' },
-        space: { $type: 'string' },
-        $expr: { $eq: ['$_id', '$space'] },
-      },
-    },
-  ]);
-  const docs = await executeAggregate(db, cmd);
+  const markerContext = { space: 'app', markerLocation: MONGO_MARKER_COLLECTION };
+  const docs = await withMarkerReadErrorHandling(
+    () =>
+      executeAggregate(
+        db,
+        new RawAggregateCommand(COLLECTION, [
+          {
+            $match: {
+              _id: { $type: 'string' },
+              space: { $type: 'string' },
+              $expr: { $eq: ['$_id', '$space'] },
+            },
+          },
+        ]),
+      ),
+    markerContext,
+  );
   const out = new Map<string, ContractMarkerRecord>();
   for (const doc of docs) {
     const space = doc['space'];
     /* v8 ignore next -- @preserve type-narrowing guard: the $match stage above filters on `space: { $type: 'string' }`, so this branch is unreachable at runtime. The check exists so the `out.set(space, ...)` call below can accept `string`. */
     if (typeof space !== 'string') continue;
-    out.set(space, parseMongoMarkerDoc(doc));
+    out.set(space, parseMongoMarkerDocSafely(doc, space));
   }
   return out;
 }

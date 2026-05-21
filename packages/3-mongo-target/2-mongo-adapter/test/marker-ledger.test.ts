@@ -1,3 +1,4 @@
+import { CliStructuredError } from '@prisma-next/errors/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -92,10 +93,14 @@ describe('readMarker', () => {
       invariants: [1, 2, 3],
     });
 
-    await expect(readMarker(db, APP)).rejects.toThrow(/Invalid marker doc.*invariants/);
+    await expect(readMarker(db, APP)).rejects.toSatisfy((err: unknown) => {
+      expect(CliStructuredError.is(err)).toBe(true);
+      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+      return true;
+    });
   });
 
-  it('throws when invariants is present but not an array (storage corruption)', async () => {
+  it('throws PN-RUN-3005 when invariants is present but not an array (storage corruption)', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
@@ -105,7 +110,10 @@ describe('readMarker', () => {
       invariants: 'not-an-array',
     });
 
-    await expect(readMarker(db, APP)).rejects.toThrow(/Invalid marker doc.*invariants/);
+    await expect(readMarker(db, APP)).rejects.toSatisfy((err: unknown) => {
+      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+      return true;
+    });
   });
 
   it('partitions reads by space — a marker for one space is invisible to another', async () => {
