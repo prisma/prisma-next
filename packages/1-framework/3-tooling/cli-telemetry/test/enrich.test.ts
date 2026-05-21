@@ -191,23 +191,33 @@ describe('buildTelemetryEvent', () => {
  * `target.targetId` is the only structurally-significant variable
  * the telemetry projection cares about; `extensionPacks` defaults to
  * empty. Caller can override either via the parameters; pass a
- * pre-formed `extensionPacks` literal to inject specific ids.
+ * pre-formed `extensionPacks` literal to inject specific ids, or
+ * `omitExtensionPacks: true` to drop the field entirely (validator
+ * accepts the absent-field branch separately from the empty-array
+ * branch — useful for cases that mean to exercise the former).
  */
 function validConfigSource(
-  options: { readonly targetId?: string; readonly extensionPacksLiteral?: string } = {},
+  options: {
+    readonly targetId?: string;
+    readonly extensionPacksLiteral?: string;
+    readonly omitExtensionPacks?: boolean;
+  } = {},
 ): string {
   const targetId = options.targetId ?? 'postgres';
-  const extensionPacksLiteral = options.extensionPacksLiteral ?? '[]';
   const descriptor = (kind: string) =>
     `{ kind: '${kind}', id: '${targetId}', familyId: 'sql', targetId: '${targetId}', version: '0.0.1', create: () => ({}) }`;
-  return [
+  const lines = [
     'export default {',
     `  family: { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1', emission: {}, create: () => ({}) },`,
     `  target: ${descriptor('target')},`,
     `  adapter: ${descriptor('adapter')},`,
-    `  extensionPacks: ${extensionPacksLiteral},`,
-    '};\n',
-  ].join('\n');
+  ];
+  if (options.omitExtensionPacks !== true) {
+    const extensionPacksLiteral = options.extensionPacksLiteral ?? '[]';
+    lines.push(`  extensionPacks: ${extensionPacksLiteral},`);
+  }
+  lines.push('};\n');
+  return lines.join('\n');
 }
 
 describe('loadProjectConfig', () => {
@@ -239,8 +249,15 @@ describe('loadProjectConfig', () => {
     });
   });
 
-  it('returns empty extensions when extensionPacks is omitted from an otherwise valid config', async () => {
-    writeFileSync(join(projectDir, 'prisma-next.config.mjs'), validConfigSource());
+  it('returns empty extensions when extensionPacks is truly omitted from an otherwise valid config', async () => {
+    // Exercises the validator's absent-field branch, which is
+    // distinct from the empty-array branch. The projection collapses
+    // both to `extensions: []` via `(config.extensionPacks ?? []).map(…)`,
+    // but the validator paths differ — worth covering directly.
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      validConfigSource({ omitExtensionPacks: true }),
+    );
     expect(await loadProjectConfig(projectDir)).toEqual({
       databaseTarget: 'postgres',
       extensions: [],
