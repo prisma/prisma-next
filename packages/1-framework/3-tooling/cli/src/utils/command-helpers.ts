@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { DEFAULT_CONTRACT_OUTPUT } from '@prisma-next/config/config-types';
 import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { NoInvariantPathStructuralEdge } from '@prisma-next/migration-tools/errors';
@@ -99,7 +100,7 @@ export interface MigrationCommandOptions extends CommonCommandOptions {
 export function resolveContractPath(config: { contract?: { output?: string } }): string {
   return config.contract?.output
     ? resolve(config.contract.output)
-    : resolve('src/prisma/contract.json');
+    : resolve(DEFAULT_CONTRACT_OUTPUT);
 }
 
 /**

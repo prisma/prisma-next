@@ -40,7 +40,8 @@ export interface ContractConfig {
  * default; this constant is only reached by providers like `typescriptContract`
  * that hold an in-memory contract with no source path to anchor on.
  */
-export const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
+export const DEFAULT_PRISMA_DIR = 'src/prisma';
+export const DEFAULT_CONTRACT_OUTPUT = `${DEFAULT_PRISMA_DIR}/contract.json`;
 
 export function normalizeContractConfig(
   contract: ContractConfig,

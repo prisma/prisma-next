@@ -72,7 +72,7 @@ export function createInitCommand(): Command {
     .option('--authoring <style>', 'Schema authoring style: psl or typescript')
     .option(
       '--schema-path <path>',
-      'Where to write the starter schema (default: prisma/contract.prisma)',
+      'Where to write the starter schema (default: src/prisma/contract.prisma)',
     )
     .option('--force', 'Overwrite an existing scaffold without prompting')
     .option(

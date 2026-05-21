@@ -104,7 +104,7 @@ export function createContractInferCommand(): Command {
   );
   setCommandExamples(command, [
     'prisma-next contract infer --db $DATABASE_URL',
-    'prisma-next contract infer --db $DATABASE_URL --output ./prisma/contract.prisma',
+    'prisma-next contract infer --db $DATABASE_URL --output ./src/prisma/contract.prisma',
     'prisma-next contract infer --db $DATABASE_URL --json',
   ]);
   addGlobalOptions(command)
