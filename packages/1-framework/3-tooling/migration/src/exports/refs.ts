@@ -9,4 +9,10 @@ export {
   writeRef,
 } from '../refs';
 export type { ContractIR } from '../refs/snapshot';
-export { deleteRefSnapshot, readRefSnapshot, writeRefSnapshot } from '../refs/snapshot';
+export {
+  deleteRefPaired,
+  deleteRefSnapshot,
+  readRefSnapshot,
+  writeRefPaired,
+  writeRefSnapshot,
+} from '../refs/snapshot';

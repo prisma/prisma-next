@@ -3,7 +3,7 @@ import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
 import { errorInvalidRefFile, errorInvalidRefName } from '../errors';
-import { validateRefName } from '../refs';
+import { deleteRef, type RefEntry, validateRefName, writeRef } from '../refs';
 
 export interface ContractIR {
   readonly contract: unknown;
@@ -143,4 +143,24 @@ export async function deleteRefSnapshot(refsDir: string, name: string): Promise<
 
   await unlinkIfExists(snapshotJsonPath(refsDir, name));
   await unlinkIfExists(snapshotDtsPath(refsDir, name));
+}
+
+export async function writeRefPaired(
+  refsDir: string,
+  name: string,
+  entry: RefEntry,
+  snapshot: ContractIR,
+): Promise<void> {
+  await writeRefSnapshot(refsDir, name, snapshot);
+  try {
+    await writeRef(refsDir, name, entry);
+  } catch (error) {
+    await deleteRefSnapshot(refsDir, name);
+    throw error;
+  }
+}
+
+export async function deleteRefPaired(refsDir: string, name: string): Promise<void> {
+  await deleteRef(refsDir, name);
+  await deleteRefSnapshot(refsDir, name);
 }
