@@ -4243,6 +4243,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:0.10.0
         version: link:../../../packages/2-sql/1-core/schema-ir
+      '@prisma-next/sqlite':
+        specifier: workspace:0.9.0
+        version: link:../../../packages/3-extensions/sqlite
       '@prisma-next/target-postgres':
         specifier: workspace:0.10.0
         version: link:../../../packages/3-targets/3-targets/postgres
