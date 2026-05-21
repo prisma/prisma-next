@@ -211,14 +211,14 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       .mockReset()
       .mockResolvedValueOnce('postgres')
       .mockResolvedValueOnce('psl');
-    vi.mocked(clack.text).mockResolvedValueOnce('prisma/contract.prisma');
+    vi.mocked(clack.text).mockResolvedValueOnce('src/prisma/contract.prisma');
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const pslPromptCall = vi.mocked(clack.text).mock.calls[0]?.[0];
     expect(pslPromptCall?.validate).toBeDefined();
     const validatePsl = pslPromptCall?.validate as (v: string | undefined) => string | undefined;
-    expect(validatePsl('prisma/contract.ts')).toMatch(/\.prisma.*--authoring psl/);
-    expect(validatePsl('prisma/contract.prisma')).toBeUndefined();
+    expect(validatePsl('src/prisma/contract.ts')).toMatch(/\.prisma.*--authoring psl/);
+    expect(validatePsl('src/prisma/contract.prisma')).toBeUndefined();
 
     rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = mkdtempSync(join(tmpdir(), 'init-test-'));
@@ -228,13 +228,13 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       .mockReset()
       .mockResolvedValueOnce('postgres')
       .mockResolvedValueOnce('typescript');
-    vi.mocked(clack.text).mockResolvedValueOnce('prisma/contract.ts');
+    vi.mocked(clack.text).mockResolvedValueOnce('src/prisma/contract.ts');
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const tsPromptCall = vi.mocked(clack.text).mock.calls[0]?.[0];
     const validateTs = tsPromptCall?.validate as (v: string | undefined) => string | undefined;
-    expect(validateTs('prisma/contract.prisma')).toMatch(/\.ts.*--authoring typescript/);
-    expect(validateTs('prisma/contract.ts')).toBeUndefined();
+    expect(validateTs('src/prisma/contract.prisma')).toMatch(/\.ts.*--authoring typescript/);
+    expect(validateTs('src/prisma/contract.ts')).toBeUndefined();
   });
 
   it('exits PRECONDITION if a mismatched schema path bypasses the prompt validator (defence-in-depth)', async () => {
