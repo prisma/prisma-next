@@ -341,7 +341,23 @@ Three cycles to break:
 
 ---
 
-### Dispatch 5e: Fix mongo facade `defineContract` wrap + complete blocked mongo migrations (F3 + F5)
+### Dispatch 5e: ~~Fix mongo facade `defineContract` wrap + complete blocked mongo migrations (F3 + F5)~~ — DEFERRED to [TML-2633](https://linear.app/prisma-company/issue/TML-2633/mongo-facade-definecontract-wrap-collapses-inline-model-inference)
+
+**Outcome.** Pre-dispatch orchestrator investigation (2026-05-21) determined D5e's work shape exceeds this slice's scope and the composer-2.5-fast tier the operator authorized for the slice's remaining work. Three structural findings drove the deferral:
+
+1. Mongo's base `defineContract` does not expose `Models` as an explicit generic (sql does + sql exports `ModelLike`). Postgres's facade wrap pattern is NOT directly mirror-able — it would require changing the mongo authoring layer (1620-line `packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts`).
+2. The "contravariance trap" hypothesis from D1 R1 may not actually apply to mongo (`ModelBuilder.ref` uses method syntax → TS bivariance default). The actual root cause requires TS trace-resolution debugging, not pattern-mirroring.
+3. F5's symptom (inline-models `_id: never`) is broader than F3's discriminator+embedded edge case, suggesting whatever's collapsing inference is upstream of F3's specific pattern.
+
+D5e's stated scope (cross-package type threading + authoring-layer changes + discriminated-union regression test design) is genuinely substantive type-system work, not mechanical. Filing as a dedicated ticket lets a future implementer run the typescript investigation properly, with the wrap-fix + authoring-layer changes + regression test all in one focused PR.
+
+**In-tree workaround.** Two integration test files keep the verbose `@prisma-next/mongo-contract-ts/contract-builder` import — `test/integration/test/mongo/fixtures/contract.ts` (left verbose by D5b, comment already in tree) and `test/integration/test/mongo-runtime/query-builder.test.ts` (left verbose by D5d's halt, comment to be added by D6). See spec § A8.
+
+**F3 + F5 status.** Both findings transferred to TML-2633 as acceptance criteria. Closed in `code-review.md` with a "deferred to TML-2633" disposition rather than resolved.
+
+---
+
+### ~~Dispatch 5e (original brief, retained as historical reference)~~
 
 **Intent.** D5d R1 closed F4 and migrated pgvector + postgis contracts but halted on the mongo-runtime test migration: `@prisma-next/mongo/contract-builder`'s `defineContract` wrap collapses the `Models` generic, so `PlanRow<typeof contract>` resolves model fields to `never`. This is the same root cause as F3 (the integration mongo fixture's discriminated-union + embedded-relation precision regression), which D5b documented but couldn't address inside its mechanical-migration scope. D5e is the orchestrator-led wrap fix that unblocks both. Structurally mirrors D1 R1→R2's postgres wrap fix (explicit `const` generic threading with covariant `ModelLike` constraint).
 
@@ -386,11 +402,14 @@ Three cycles to break:
 - `packages/1-framework/3-tooling/cli/README.md` L1063 (paragraph describing the scaffolded migration's import line).
 - `docs/architecture docs/adrs/ADR 208 - Invariant-aware migration routing.md` L9 (illustrative-code example flips; the ADR's *decision* text stays as-is — it's historical).
 - Verify the three façade READMEs reflect their final shape after D1/D2/D3; touch up if anything stale.
+- **`test/integration/test/mongo-runtime/query-builder.test.ts`** — add an inline comment at the top of the file (above the imports) referencing TML-2633 and explaining why this file deliberately keeps the verbose `@prisma-next/mongo-contract-ts/contract-builder` import. Mirror the style of the existing comment in `test/integration/test/mongo/fixtures/contract.ts` (also referencing TML-2633 — see next bullet).
+- **`test/integration/test/mongo/fixtures/contract.ts`** — update its existing workaround comment to reference TML-2633 explicitly (the current comment describes the symptom but predates the ticket). Same minimal change pattern as `query-builder.test.ts`.
 
 **"Done when":**
 
-- [ ] D1–D5b all landed.
+- [ ] D1–D5d all landed (D5e deferred to TML-2633; not a blocker for D6).
 - [ ] `rg 'TML-2526' -- skills/ docs/ packages/ examples/ test/ projects/` returns hits only inside `projects/facade-import-surface-completion/`.
+- [ ] `rg 'TML-2633' -- test/integration/test/mongo/fixtures/contract.ts test/integration/test/mongo-runtime/query-builder.test.ts` returns one hit in each file (the workaround comments).
 - [ ] `rg '@prisma-next/target-(postgres|sqlite)/migration' -g '!**/node_modules/**'` returns only:
   - internal target package source (`packages/3-targets/3-targets/{postgres,sqlite}/src/exports/migration.ts` and internal callers),
   - extension-pack hand-authored migrations (`packages/3-extensions/{cipherstash,pgvector,postgis,paradedb}/migrations/**/migration.ts`) — deliberate per A7,
@@ -398,15 +417,15 @@ Three cycles to break:
   - pre-existing `examples/**/migrations/app/**/*.ts` files — deliberate per A7 (existing rendered output stays valid),
   - the parity tests in D1/D3 that explicitly bridge the two specifiers.
 - [ ] `pnpm lint:deps` clean.
-- [ ] `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e` clean.
+- [ ] `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e` clean (modulo any pre-existing environmental flakes — note unrelated TML-2631 mongo example contract.json validator drift is out of scope; if mongo tests fail with `storage.collections must be an object`, that's TML-2631, not D6).
 - [ ] `pnpm fixtures:check` clean.
-- [ ] Intent-validation: diff covers only docs / skills / READMEs; no source change.
+- [ ] Intent-validation: diff covers only docs / skills / READMEs + the two mongo test-file workaround comments; no source change.
 
 **Size.** S.
 
-**Tier.** Cheap.
+**Tier.** Cheap (`composer-2.5-fast`). Purely mechanical prose + comment edits with explicit file:line targets.
 
-**DoR confirmed.** [ ]
+**DoR confirmed.** ☑ (D5d's two committed contracts + F4 fix establish baseline; D5e formally deferred to TML-2633; spec § A8 + plan § D5e document the deferred state; D6 brief at `dispatches/d6-brief.md`)
 
 ---
 
@@ -415,7 +434,7 @@ Three cycles to break:
 ```text
 D1 (postgres /migration + contract-builder wrap) ─┐
 D2 (mongo parity + ctrl + bson + cb-wrap + drop barrel) ─┤
-                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples) → D5b (test fixtures) → D5c (break layering cycles) → D5d (migrate pgvector+postgis contracts + F4 fix) → D5e (mongo wrap fix + blocked mongo migrations, resolves F3+F5) → D6 (docs)
+                                                  ├→ D4 (renderer + IR-constant flip + test sweep) → D5a (examples) → D5b (test fixtures) → D5c (break layering cycles) → D5d (migrate pgvector+postgis contracts + F4 fix) → ~~D5e~~ deferred to [TML-2633](https://linear.app/prisma-company/issue/TML-2633) → D6 (docs + mongo workaround comments)
 D3 (sqlite façade + contract-builder wrap) ───────┘
 ```
 
