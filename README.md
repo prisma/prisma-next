@@ -16,313 +16,94 @@
 
 ---
 
-> **In Development (Pre-1.0)**: Prisma Next is an active engineering project and a public look at where Prisma is heading. It is not ready for production yet. Pre-1.0, expect breaking changes between minor versions, and only the latest minor receives security fixes. Don't build production applications on Prisma Next yet unless you are prepared to follow upgrades closely.
->
-> Prisma 7 remains the recommended version of Prisma for production applications.
+> **Prisma Next is currently in [Early Access](https://pris.ly/pn-ea)** and we're building it in the open with the community. APIs will still evolve as your feedback shapes them, so we don't recommend it for production workloads yet. Come along for the ride: star the repo, follow [@prisma on X](https://pris.ly/x), or read along on the [Prisma blog](https://www.prisma.io/blog).
 
-## Prisma Next at a glance
+**Prisma Next** is a TypeScript rewrite of Prisma ORM, designed to be **extensible**, **composable**, and **AI-agent friendly** by default. Read the full announcement: [The Next Evolution of Prisma ORM](https://pris.ly/pn-announcement).
 
-**Prisma Next** is a new foundation for Prisma ORM, rewritten fully in TypeScript to be **extensible** and **composable** by default.
-Read the full announcement: **[The Next Evolution of Prisma ORM](https://pris.ly/pn-announcement)**.
+## Prerequisites
 
-- **A TypeScript rewrite of Prisma ORM**: Rebuilt end-to-end to unlock new capabilities and a more composable architecture.
-- **Extensible by default**: Add extension packs in `prisma-next.config.ts` to unlock new schema attributes and new query capabilities.
-- **Two query APIs**:
-  - **ORM Client** (`db.orm`): model collections with fluent `where/include/select` composition
-  - **Query builder** (`db.sql`): type-safe SQL plan builder for when you want lower-level control
-- **Designed for AI-assisted workflows**: deterministic contracts, structured plans, stable diagnostics, and guardrails that help agents (and humans) iterate safely.
+- Node.js 24 or newer
+- A package manager (`npm`, `pnpm`, or `yarn`)
 
-## Getting Started
+## Getting started
 
-Drive it yourself, let your agent drive, or hand off mid-flow. Your workflow is up to you, and with Prisma Next you can delegate with confidence: the contract is verifiable, the diagnostics are structured, and the [agent skills](#use-it-with-your-ai-agent) below teach your editor's AI assistant how to drive the framework end-to-end.
+### 1. Scaffold a new project
 
-There are two ways in. Pick the one that matches where you're starting from.
-
-### Start from scratch
+The interactive scaffolder picks a JavaScript framework (Next.js, Vite, Hono, and others) and wires Prisma Next in with your chosen database (PostgreSQL or MongoDB):
 
 ```bash
 npm create prisma@next
 ```
 
-Use this for a brand-new app. The `create-prisma` scaffolder picks a JavaScript framework (Next.js, Vite, and others; the interactive prompt shows the current list), runs that framework's own scaffolder, and layers Prisma Next on top with the database of your choice (PostgreSQL or MongoDB). You finish with a runnable framework app, a wired-in Prisma Next scaffold, and the agent skills already registered.
+You finish with a runnable app, a starter contract, and the agent skills already registered.
 
-### Add to an existing project
+### 2. Or, add Prisma Next to an existing project
 
-```bash
-npx prisma-next@latest init
-```
-
-Use this when you already have a JavaScript or TypeScript project. `prisma-next init` writes `prisma-next.config.ts` at the repo root, scaffolds a starter contract and `db.ts` under `src/prisma/`, installs the runtime dependencies, emits the contract, and registers the agent skills. It does not touch your existing framework or build setup; how you wire `db` into your app is up to you.
-
-### Prerequisites
-
-- Node.js 24 or newer
-- PostgreSQL or MongoDB (pick during scaffolding)
-- A package manager (`npm`, `pnpm`, or `yarn`)
-
-### What gets written to disk
-
-Both commands produce the same Prisma Next scaffold inside your project. `npm create prisma@next` adds a framework around it; `prisma-next init` lays it down on its own.
-
-- `prisma-next.config.ts` at the repo root
-- `src/prisma/contract.prisma`: your schema source, with a starter `User` and `Post` model. PSL is the default; if you want a TypeScript builder (`contract.ts`) instead, pass `--authoring typescript` to `prisma-next init`, or pick TypeScript at the `create-prisma` prompt.
-- `src/prisma/contract.json` and `contract.d.ts`: emitted contract artefacts. Do not hand-edit; they are regenerated on every `contract emit`.
-- `src/prisma/db.ts`: the runtime entry point your app imports from.
-- `.env.example`: copy to `.env` and set `DATABASE_URL`.
-- `prisma-next.md`: a quick-reference card with the day-to-day commands.
-- Dependencies installed, `contract emit` run once, and the [agent skills](#use-it-with-your-ai-agent) registered with the agent runtimes you have on your machine (Claude Code, Cursor, Codex, and others). See [Use it with your AI agent](#use-it-with-your-ai-agent) for what the cluster contains and how it installs.
-
-### Next steps after scaffolding
-
-1. Set `DATABASE_URL` in `.env` (copy from `.env.example`). If you don't have a database yet, any local Postgres works: Docker, [Postgres.app](https://postgresapp.com), or a managed instance.
-2. Apply the contract to the database with `npx prisma-next db init`. This is a CLI subcommand (`db init`, not a re-run of the scaffold). It creates the tables, indexes, and constraints your contract describes, then writes a small `pn_meta_marker` row that records the contract hash. The marker is how Prisma Next detects drift between your contract and the live database before queries run.
-3. Write your first query (see [Your first query](#your-first-query) below), or hand the wheel to your editor's AI assistant. The skills are project-local and your editor's agent picks them up on its next prompt; no restart needed for Claude Code or Cursor.
-
-With `DATABASE_URL` set and `db init` run, you can also just ask your agent to build something for you:
-
-> *"Build me a small app that tracks the books I'm reading. Add a few records, and show me the list."*
-
-The `prisma-next-quickstart` skill takes it from there. If you get stuck, every `prisma-next` subcommand accepts `--help`, and the `prisma-next-debug` skill knows how to read the structured error envelopes the CLI emits.
-
-### Non-interactive runs (CI / agents)
-
-For `prisma-next init`, pass `--yes` plus your defaults:
-
-```bash
-npx prisma-next@latest init --yes --target postgres --authoring psl
-```
-
-The flags `init` accepts (run `prisma-next init --help` for the source of truth):
-
-- `--target <db>`: `postgres` or `mongodb`
-- `--authoring <style>`: `psl` (Prisma Schema Language) or `typescript` (programmatic builder)
-- `--schema-path <path>`: where to write the contract source
-- `--probe-db`: verify `DATABASE_URL` reachability and server version
-- `--no-install`: skip dependency install and the initial contract emit
-- `--no-skill`: skip the agent-skill install (air-gapped / restricted environments)
-
-`npm create prisma@next` is interactive by default; for non-interactive runs see the `create-prisma` package on npm for its current flag surface.
-
-### Or, explore the in-repo demo
-
-If you'd rather poke at a known-good example before scaffolding your own:
-
-```bash
-git clone https://github.com/prisma/prisma-next.git
-cd prisma-next
-pnpm install && pnpm build
-
-cd examples/prisma-next-demo
-# Create .env with your DATABASE_URL, then:
-pnpm emit && pnpm seed && pnpm start
-```
-
-For a more complete reference app, see the [Pokedex example](https://github.com/prisma/pokedex-prisma-next).
-
-## Your first query
-
-After scaffolding (either command above) and `db init`, your project has a starter schema, the emitted contract, and a typed `db` client ready to use.
-
-**The scaffolded schema** at `src/prisma/contract.prisma` (a `Post` model with a relation to `User` is also generated; trimmed here for clarity):
-
-```prisma
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-}
-```
-
-**The scaffolded client** at `src/prisma/db.ts` (generated for you; do not hand-edit; the MongoDB scaffold uses `@prisma-next/mongo/runtime` here instead):
-
-```typescript
-import postgres from '@prisma-next/postgres/runtime'
-import type { Contract } from './contract.d'
-import contractJson from './contract.json' with { type: 'json' }
-
-export const db = postgres<Contract>({
-  contractJson,
-  url: process.env['DATABASE_URL']!,
-})
-```
-
-**Your first query.** Save the snippet at `src/first-query.ts`:
-
-```typescript
-import 'dotenv/config'
-import { db } from './prisma/db'
-
-const users = await db.orm.User
-  .select('id', 'email')
-  .take(10)
-  .all()
-
-// users: Array<{ id: number; email: string }>
-console.log(users)
-```
-
-Run it with `tsx`:
-
-```bash
-npx tsx src/first-query.ts
-```
-
-Edit `contract.prisma`, run `npx prisma-next contract emit`, and the `db` types update in lockstep: query autocomplete, return types, capability checks, everything.
-
-## Use it with your AI agent
-
-Both `npm create prisma@next` and `prisma-next init` install the skill cluster, so you don't need to opt in. This section is here so you (and any agent reading the repo) know what's in your project and where to find it.
-
-Prisma Next ships with a cluster of **agent skills**: `SKILL.md` files that teach an LLM agent how to drive the framework end-to-end without re-deriving the API from documentation each turn. Each skill has a `description` field the agent runtime matches against the user's prompt, so the right skill loads at the right moment.
-
-| Skill | When the agent uses it |
-|---|---|
-| `prisma-next` | Router. Catches vague prompts and routes to a specific skill. |
-| `prisma-next-quickstart` | First-touch orientation, greenfield, and brownfield-DB adoption. |
-| `prisma-next-contract` | Authoring the contract (PSL, TS builder, no-emit). |
-| `prisma-next-migrations` | `db update`, `migration plan`, `migrate`, data transforms. |
-| `prisma-next-migration-review` | Deployment and concurrency review on merge. |
-| `prisma-next-queries` | ORM client, SQL DSL, raw SQL, TypedSQL. |
-| `prisma-next-runtime` | Wiring `db.ts`, middleware, env, connection. |
-| `prisma-next-build` | Build-system / dev-server integration (Vite plugin today). |
-| `prisma-next-debug` | Decoding structured error envelopes and PN-* codes. |
-| `prisma-next-feedback` | Hand a bug or feature request to the team. |
-
-The skills live inside your project (so they version-lock to your `prisma-next` deps) and are wired to whichever agent runtimes are present on your machine.
-
-**Already scaffolded and just need the skills re-registered?** This happens if you install a new agent runtime on your machine (say, switching from Cursor to Claude Code) after the initial scaffold, or if a teammate cloned the repo without running the scaffold. Run:
+Run this from your repo root:
 
 ```bash
 npx prisma-next@latest init
 ```
 
-When `prisma-next init` runs against a directory that's already been scaffolded, it skips file generation and just re-registers the skill cluster with whichever agent runtimes are now present. Your existing files are not disturbed.
+`prisma-next@latest init` writes `prisma-next.config.ts`, scaffolds a starter contract and `db.ts` under `src/prisma/`, installs the runtime, emits the contract, and registers the agent skills. It does not touch your framework or build setup.
 
-**Sources, structure, and authoring rules** live in [`skills/README.md`](./skills/README.md) and [`skills/DEVELOPING.md`](./skills/DEVELOPING.md). If you're an agent reading this README, that's where to look next.
+### 3. Use your AI agent for everything Prisma Next
 
-## Schema as a contract
+Both installers leave a top-level **`prisma-next.md`** primer at your project root for any agent to read first. `prisma-next@latest init` additionally materialises one **`SKILL.md`** per workflow in two places, so different agent runtimes can find them at their expected paths:
 
-Your schema becomes a **verifiable contract**: a deterministic artifact (`contract.json` plus TypeScript types) that describes which models, tables, and fields exist.
+- `.claude/skills/<skill-name>/SKILL.md` — picked up by Claude Code
+- `.agents/skills/<skill-name>/SKILL.md` — universal location for Cursor, Copilot Agent, and other runtimes
 
-- **Verify at runtime**: detect schema drift before a query runs
-- **Type your queries**: keep results and query operators fully type-safe
-- **Power tooling and agents**: contracts, plans, and diagnostics are structured data, easy to inspect, diff, and reason about
+A `skills-lock.json` at the project root tracks which skill versions are installed. Your editor's AI assistant auto-loads the right skill when your prompt matches.
 
-## Fluent query API
+Just describe what you want. For example:
 
-Queries remain readable and composable as they grow, with fully-typed autocompletion:
+> *"Add a `posts` model with a relation to `users`, then write a query that loads each user's three most recent posts."*
 
-```typescript
-const orders = await db.orders
-  .where({ userId: currentUserId })
-  .where((o) => o.status.in(['shipped', 'delivered']))
-  .include('shippingAddress')
-  .include('items', (item) =>
-    item.include('product', (product) =>
-      product
-        .include('category')
-        .include('images', (img) => img.where({ isPrimary: true }).take(1))
-        .include('reviews', (reviews) =>
-          reviews
-            .where((r) => r.rating.gte(4))
-            .orderBy((r) => r.createdAt.desc())
-            .take(3)
-            .include('author', (a) => a.select('name', 'avatar')),
-        ),
-    ),
-  )
-  .all()
-```
+The agent loads `prisma-next-contract` for the schema edit and `prisma-next-queries` for the read, then drives the change end-to-end.
 
-## Designed for AI-assisted workflows
+For the full catalogue and what each skill covers, see [`skills/README.md`](./skills/README.md).
 
-Every operation produces structured output that machines can understand. Compile-time guardrails catch mistakes before runtime, and machine-readable errors include stable codes and suggested fixes:
+## Found a bug, missing a feature, or have a question for the team?
 
-```typescript
-// Type error: update() requires where()
-await db.users.update({ active: false })
-```
+Ask your agent. The `prisma-next-feedback` skill drafts a structured GitHub issue or hands you a Prisma Discord link for live Q&A. You can review and confirm before anything is submitted.
 
-```json
-{
-  "code": "CAPABILITY_REQUIRED",
-  "message": "updateAll() requires 'returning' capability",
-  "fix": "Add 'returning' to contract capabilities or use updateCount()"
-}
-```
+## For extension authors
 
-## Extensibility (extension packs)
+Prisma Next has a minimal core. Everything around it, including Postgres support itself, is built on the same public SPI that's available to any author. If you've wanted to integrate your tool, your database, or your library with Prisma, this is the way in.
 
-Add an extension pack in `prisma-next.config.ts` to unlock new schema attributes and query operators. For example, `pgvector`:
+A few extensions already shipping:
 
-```ts
-// prisma-next.config.ts
-import { defineConfig } from '@prisma-next/cli/config-types'
-import pgvector from '@prisma-next/extension-pgvector/control'
+- **`@prisma-next/extension-pgvector`**: vector columns and similarity operators for semantic search.
+- **`@prisma-next/extension-paradedb`**: typed BM25 indexes with multiple tokenizers for full-text search.
+- **`@prisma-next/extension-postgis`**: geospatial types and queries.
+- **[`@cipherstash/prisma-next`](https://pris.ly/cipherstash-p-blog)**: searchable encryption and data-level access control.
 
-export default defineConfig({
-  // ...
-  extensionPacks: [pgvector],
-})
-```
+Want to ship your own? The **[Authoring Prisma Next Extensions](https://pris.ly/pn-extension-authors)** blog walks through the SPI, the layers your extension can hook into, and how the team features new extensions in the Prisma Next directory.
 
-```prisma
-model Document {
-  id        Int    @id
-  title     String
-  embedding Bytes  @pgvector.column(length: 1536)
-}
-```
+## Supported databases
 
-```typescript
-await posts
-  .where(p => p.embedding.cosineDistance(searchParam).lt(0.2))
-  .all()
-```
+Prisma Next ships first-class support for:
 
-## How It Works
+- **PostgreSQL** — the primary target and on track for GA
+- **MongoDB** — proves the framework works beyond SQL
 
-Prisma Next follows a three-step **contract-first** workflow:
-
-1. **Define** your schema in PSL (Prisma Schema Language)
-2. **Emit** a deterministic contract (JSON) and TypeScript types: no executable code generated
-3. **Query** using either `db.orm` (ORM Client) or `db.sql` (query builder), verified against the contract
-
-The contract is the single source of truth. It's diffable, hashable, and machine-readable.
-
-For architecture details, see [ARCHITECTURE.md](./ARCHITECTURE.md).
-
-## Status
-
-Prisma Next is in development. Here's what to expect:
-
-| Area                    | Status   |
-| ----------------------- | -------- |
-| Schema definition (PSL) | Working* |
-| Contract emission       | Working* |
-| SQL query DSL           | Working* |
-| ORM-style queries       | Working* |
-| Postgres adapter        | Working* |
-| Plugin system           | Working* |
-| Migrations              | Minimal  |
-| MySQL / SQLite          | Not yet  |
-
-(*) Working, but not feature-complete or production-ready. APIs are subject to breaking changes.
+SQLite is the next SQL target on deck, with MySQL to follow. See the [roadmap](./ROADMAP.md) for the full sequencing.
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, the test/lint/typecheck command set, DCO signoff, and PR expectations. For substantive changes please open an issue first so we can give you direction-fit feedback before you invest implementation time.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, commands, DCO signoff, and PR expectations. For substantive changes, please open an issue first so we can give direction-fit feedback before you invest implementation time.
 
-Security issues should not be filed as public issues. Please follow the Private Vulnerability Reporting flow described in [SECURITY.md](./SECURITY.md).
+Security issues: follow the Private Vulnerability Reporting flow in [SECURITY.md](./SECURITY.md). Please do not file them as public issues.
 
 ## Community
 
-- **Discord**: Join the conversation at [pris.ly/discord](https://pris.ly/discord)
-- **X**: Follow [@prisma](https://twitter.com/prisma) for updates
-- **Blog**: Read about our journey at [prisma.io/blog](https://www.prisma.io/blog)
+Built something with Prisma Next? Tag [@prisma](https://pris.ly/x) on X. The best community builds get a shout-out and a link here.
 
-Built something with Prisma Next? Tag [us on X](https://pris.ly/x). The best community builds get a shout-out from the Prisma account and a link in this README.
+- **Discord**: Talk to us in the [pris.ly/discord](https://pris.ly/discord) channel
+- **X**: [@prisma](https://pris.ly/x)
+- **Blog**: [prisma.io/blog](https://www.prisma.io/blog)
 
 ## License
 
-Prisma Next is licensed under [Apache 2.0](./LICENSE).
+Apache 2.0. See [LICENSE](./LICENSE).
