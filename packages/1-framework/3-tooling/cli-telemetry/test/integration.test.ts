@@ -255,17 +255,27 @@ describe('cli-telemetry end-to-end — failure modes are silent', () => {
     expect(result.stderr).toBe('');
   });
 
-  it('the sender exits 0 when no payload is received within the idle timeout, and stays silent', async () => {
-    const result = await spawnSenderCapturingStdio({
-      env: envWithoutDebug(),
-      onSpawn: (child) => {
-        setTimeout(() => child.disconnect(), 50);
-      },
-    });
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('');
-    expect(result.stderr).toBe('');
-  }, 10_000);
+  it(
+    'the sender exits 0 when no payload is received within the idle timeout, and stays silent',
+    async () => {
+      const result = await spawnSenderCapturingStdio({
+        env: envWithoutDebug(),
+        onSpawn: (child) => {
+          setTimeout(() => child.disconnect(), 50);
+        },
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe('');
+    },
+    // The sender's idle-exit timeout is ~3s (REQUEST_TIMEOUT_MS × 2).
+    // `databaseOperation` (5s base, scaled by `TEST_TIMEOUT_MULTIPLIER`)
+    // is the closest semantic helper exposed by `@prisma-next/test-utils`
+    // for an end-to-end operation that should finish within a few
+    // seconds; on CI with `TEST_TIMEOUT_MULTIPLIER=2` it becomes 10s,
+    // matching the previous hardcoded value.
+    timeouts.databaseOperation,
+  );
 
   it('emits diagnostics to stderr under PRISMA_NEXT_DEBUG=1', async () => {
     const payload = buildPayload({ endpoint: 'http://127.0.0.1:1/events' });
