@@ -205,6 +205,32 @@ export async function runInit(
     filesToDelete.push(LEGACY_SKILL_FILE);
   }
 
+  // When re-initialising, check for files from the legacy default 'prisma/'
+  // layout (the pre-src/prisma default). Warn so the user can clean them
+  // up manually — we never delete them here.
+  if (inputs.reinit && schemaDir !== 'prisma') {
+    const legacyDir = 'prisma'; // pre-fix default before src/prisma became canonical
+    const legacyFilenames = [
+      'contract.prisma',
+      'contract.ts',
+      'contract.json',
+      'contract.d.ts',
+      'db.ts',
+    ];
+    const presentLegacy = legacyFilenames
+      .map((f) => join(legacyDir, f))
+      .filter((rel) => existsSync(join(baseDir, rel)));
+    if (presentLegacy.length > 0) {
+      warnings.push(
+        [
+          'Legacy files from the previous default layout are still present in prisma/:',
+          ...presentLegacy.map((f) => `  ${f}`),
+          'These are no longer the default location (src/prisma/ is now canonical). Remove them manually once migrated.',
+        ].join('\n'),
+      );
+    }
+  }
+
   // FR3.2: a real `.env` is only written when the user opted in. Never
   // overwrite an existing `.env` — secrets live there and clobbering
   // them is the most damaging possible side-effect of `init`.
