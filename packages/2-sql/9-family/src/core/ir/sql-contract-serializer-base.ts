@@ -160,11 +160,18 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     }
 
     const typesRaw = obj['types'];
-    if (
+    const hasUnhydratedPostgresEnumEntry =
       typesRaw !== undefined &&
       typeof typesRaw === 'object' &&
       typesRaw !== null &&
-      Object.keys(typesRaw as Record<string, unknown>).length > 0 &&
+      Object.values(typesRaw as Record<string, unknown>).some(
+        (entry) =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          (entry as { kind?: unknown }).kind === 'postgres-enum',
+      );
+    if (
+      hasUnhydratedPostgresEnumEntry &&
       this.entityTypeRegistry.get('postgres-enum') === undefined
     ) {
       throw new ContractValidationError(
