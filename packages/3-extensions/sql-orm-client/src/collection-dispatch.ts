@@ -84,7 +84,17 @@ function dispatchWithIncludeStrategy<Row>(options: {
   // the recursive scan below catches them at any depth so a nested
   // `count()` inside a row include doesn't accidentally hit the
   // throw in `compileSelectWithIncludeStrategy`.
-  if (hasComplexIncludeDescriptors(options.state.includes)) {
+  //
+  // `distinct()` on a non-leaf include is also forced through multi-query:
+  // under the single-query strategies the child SELECT carries nested
+  // JSON aggregate columns, and `SELECT DISTINCT` over those fails on
+  // Postgres (`json` has no equality operator). The multi-query stitcher
+  // applies distinct to scalar-only child rows before grandchildren are
+  // joined, which is the semantically correct behavior we preserve.
+  if (
+    hasComplexIncludeDescriptors(options.state.includes) ||
+    hasNonLeafIncludeWithDistinct(options.state.includes)
+  ) {
     return dispatchWithMultiQueryIncludes<Row>(options);
   }
 
@@ -479,6 +489,25 @@ function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean
       include.scalar !== undefined ||
       include.combine !== undefined ||
       hasComplexIncludeDescriptors(include.nested.includes),
+  );
+}
+
+function hasNonLeafIncludeWithDistinct(includes: readonly IncludeExpr[]): boolean {
+  // Walks the include tree recursively. An include whose nested state
+  // carries both `distinct` and further nested includes cannot be
+  // lowered into the single-query strategies: the child SELECT would
+  // emit `SELECT DISTINCT <scalars>, json_agg(<nested>) FROM ...`,
+  // and Postgres rejects equality on `json`. Routing to multi-query
+  // applies distinct to scalar-only rows before grandchildren stitch
+  // in JS. `distinctOn` is intentionally not included here: Postgres
+  // only compares the `ON (...)` expressions for equality, so a
+  // hashable key column plus json projections is well-defined.
+  return includes.some(
+    (include) =>
+      (include.nested.distinct !== undefined &&
+        include.nested.distinct.length > 0 &&
+        include.nested.includes.length > 0) ||
+      hasNonLeafIncludeWithDistinct(include.nested.includes),
   );
 }
 

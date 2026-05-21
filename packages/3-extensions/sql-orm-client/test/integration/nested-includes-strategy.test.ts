@@ -427,4 +427,109 @@ describe('integration/nested-includes/strategy', () => {
       timeouts.spinUpPpgDev,
     );
   });
+
+  // ===========================================================================
+  // `distinct()` on a non-leaf include must stay on multi-query. Under the
+  // single-query strategies the child SELECT contains nested JSON aggregate
+  // columns, and Postgres cannot compare `json` values for the equality the
+  // bare `SELECT DISTINCT` requires ("could not identify an equality
+  // operator for type json"). The multi-query stitcher applies distinct to
+  // scalar-only child rows before grandchildren are joined, which is the
+  // semantically correct behavior we preserve here.
+  // ===========================================================================
+
+  describe('non-leaf includes with distinct() stay on multi-query', () => {
+    it(
+      'distinct() on a non-leaf include stays on multi-query under lateral capabilities',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'B', userId: 1, views: 2 },
+          ]);
+          await seedComments(runtime, [{ id: 100, body: 'c', postId: 10 }]);
+
+          // The reviewer's regression query for TML-2594 F01: `distinct`
+          // on the inner include alongside a nested row include. Under
+          // the lateral capability path, the unfixed planner would emit
+          // `SELECT DISTINCT <scalar cols>, json_agg(<comments>) FROM posts`
+          // which Postgres rejects. The dispatch gate is what keeps this
+          // routing through multi-query; asserting the execution count
+          // pins the gate so a future refactor cannot silently flip it.
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+          const rows = await users
+            .include('posts', (posts) =>
+              posts.select('title').distinct('title').include('comments'),
+            )
+            .orderBy((u) => u.id.asc())
+            .all();
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.posts).toHaveLength(2);
+          expect(rows[0]?.posts.map((p) => p.title).sort()).toEqual(['A', 'B']);
+          expect(runtime.executions.length).toBeGreaterThan(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct() on a non-leaf include stays on multi-query under correlated capabilities',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
+          await seedComments(runtime, [{ id: 100, body: 'c', postId: 10 }]);
+
+          // Same regression case under the jsonAgg / correlated path. The
+          // correlated builder reaches into the same `buildIncludeChildRowsSelect`
+          // helper, so the same `SELECT DISTINCT + json_agg(...)` failure
+          // mode applies — and the same dispatch gate must catch it.
+          const users = collectionWithCapabilities(runtime, 'User', CORRELATED_CAPABILITIES);
+          runtime.resetExecutions();
+          const rows = await users
+            .include('posts', (posts) =>
+              posts.select('title').distinct('title').include('comments'),
+            )
+            .all();
+
+          expect(rows[0]?.posts).toHaveLength(1);
+          expect(rows[0]?.posts[0]?.title).toBe('A');
+          expect(runtime.executions.length).toBeGreaterThan(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct() nested at depth 2 stays on multi-query (recursive gate)',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [
+            { id: 1, name: 'Root', email: 'root@example.com' },
+            { id: 2, name: 'Child', email: 'child@example.com', invitedById: 1 },
+          ]);
+          await seedPosts(runtime, [{ id: 10, title: 'A', userId: 2, views: 1 }]);
+          await seedComments(runtime, [{ id: 100, body: 'c', postId: 10 }]);
+
+          // The gate must recurse: a non-leaf include with `distinct` two
+          // levels deep is just as broken under single-query as one at
+          // depth 1. Mirrors the recursive shape of the TML-2595 gate.
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+          await users
+            .include('invitedUsers', (inv) =>
+              inv.include('posts', (posts) =>
+                posts.select('title').distinct('title').include('comments'),
+              ),
+            )
+            .all();
+          expect(runtime.executions.length).toBeGreaterThan(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

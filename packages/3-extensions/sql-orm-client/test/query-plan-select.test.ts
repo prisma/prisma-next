@@ -352,6 +352,42 @@ describe('compileSelectWithIncludeStrategy', () => {
       'single-query include strategy does not support scalar include selectors or combine()',
     );
   });
+
+  // Planner invariant: scalar / combine descriptors must be rejected at
+  // every depth, not just the top level. The dispatch path already gates
+  // these via `hasComplexIncludeDescriptors` recursively, but the planner
+  // is exported and called directly by tests and rich-plan callers. Without
+  // recursive rejection here, a nested `count()` inside a row include
+  // would silently produce a malformed lateral / correlated plan instead
+  // of failing fast at the boundary.
+  it('rejects scalar include selectors nested inside row includes', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.include('comments', (comments) => comments.count()),
+    ).state;
+
+    expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
+      'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  });
+
+  it('rejects combine() include descriptors nested inside row includes', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.include('comments', (comments) =>
+        comments.combine({
+          rows: comments.orderBy((c) => c.id.asc()),
+          total: comments.count(),
+        }),
+      ),
+    ).state;
+
+    expect(() =>
+      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
+    ).toThrow(
+      'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  });
 });
 
 describe('compileSelect MTI JOINs', () => {
