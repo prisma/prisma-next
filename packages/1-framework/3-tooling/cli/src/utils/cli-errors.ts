@@ -68,6 +68,59 @@ export {
   errorUnexpected,
 };
 
+export function errorPlanForgotTheFlag(
+  resolvedHash: string,
+  reachableRefs: ReadonlyArray<{ readonly name: string; readonly hash: string }>,
+  graphTipHash: string | null,
+): CliStructuredError {
+  const reachableList =
+    reachableRefs.length > 0
+      ? reachableRefs.map((r) => `${r.name} (${r.hash})`).join(', ')
+      : '(none)';
+  const refFix =
+    reachableRefs.length > 0
+      ? `Run migration plan with ${reachableRefs.map((r) => `--from ${r.name}`).join(' or ')}.`
+      : graphTipHash !== null
+        ? `Run migration plan --from ${graphTipHash}.`
+        : 'Commit pending migrations first, then run migration plan.';
+  return errorRuntime(`Resolved from-hash is not in the migration graph: ${resolvedHash}`, {
+    why: `The migration graph reaches ${reachableList}; resolved ${resolvedHash} isn't a graph node.`,
+    fix: refFix,
+    meta: {
+      code: 'MIGRATION.HASH_NOT_IN_GRAPH',
+      resolvedHash,
+      reachableRefs: reachableRefs.map((r) => r.name),
+      ...(graphTipHash !== null ? { graphTipHash } : {}),
+    },
+  });
+}
+
+export function errorSnapshotMissing(
+  identifier: string,
+  options?: { readonly viaRef?: boolean },
+): CliStructuredError {
+  const viaRef = options?.viaRef !== false;
+  const fix = viaRef
+    ? `Run "prisma-next db update --advance-ref ${identifier}" to repopulate the snapshot, or "prisma-next ref delete ${identifier}" to clear the orphan pointer.`
+    : `No contract source exists for hash "${identifier}" on an empty migration graph. Use --from with a ref name that has a paired snapshot, or run db update first.`;
+  return errorRuntime(
+    viaRef
+      ? `Ref "${identifier}" has no paired contract snapshot`
+      : `No contract source for from-hash "${identifier}"`,
+    {
+      why: viaRef
+        ? `Ref "${identifier}" exists but its paired snapshot files are missing.`
+        : `Hash "${identifier}" is not a graph node and no paired ref snapshot supplies a contract.`,
+      fix,
+      meta: {
+        code: 'MIGRATION.SNAPSHOT_MISSING',
+        identifier,
+        viaRef,
+      },
+    },
+  );
+}
+
 /**
  * Maps a `MigrationToolsError` raised by the migration-tools loader/graph
  * surface (`readMigrationPackage`, `readMigrationsDir`, `readRefs`,
