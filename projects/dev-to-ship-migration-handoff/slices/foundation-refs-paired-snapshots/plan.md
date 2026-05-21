@@ -117,7 +117,8 @@ Each grep gate expects **zero matches** to pass.
 |---|---|
 | `writeRefSnapshot` fails mid-write | Handle (no `.contract.json` / `.contract.d.ts` left; pointer not written). |
 | `writeRef` fails after snapshot wrote | Handle (rollback via `deleteRefSnapshot`). |
-| `.contract.d.ts` writes but `.contract.json` fails (or vice versa) | Handle (`writeRefSnapshot` cleans up the partial pair internally). |
+| `.contract.d.ts` writes but `.contract.json` fails (or vice versa) — intra-pair partial write at the snapshot boundary | **Already covered by Dispatch 1's `snapshot-failure.test.ts`** (the implementer delivered these tests in Dispatch 1; verify still passing in Dispatch 2 but don't duplicate). |
+| `readRefSnapshot` when `.contract.json` exists but `.contract.d.ts` is missing | **Handle (added in Dispatch 2 per orchestrator fold-in from R1 review).** `readRefSnapshot` throws `errorInvalidRefFile` (already implemented at `snapshot.ts` L126–134; add the missing test assertion in `snapshot.test.ts`). |
 | `deleteRefPaired` on a ref with no paired snapshot | Handle (idempotent; tolerates ENOENT on snapshot). |
 | `deleteRefPaired` on non-existent ref | Handle (throws `MIGRATION.UNKNOWN_REF` per existing `deleteRef`). |
 | Disk full (`ENOSPC`) mid-write | Handle (rollback path same as other write failures). |
