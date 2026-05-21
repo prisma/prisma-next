@@ -24,6 +24,11 @@
 // asserts both `runtime.executions.length === 1` (single execution) and the
 // full row tree (`expect(rows).toEqual([...])`) under explicit `.select(...)`
 // projections so the shapes are stable.
+//
+// Refinements (`orderBy` / `take` / `where` / multi-column distinct) and
+// edge cases (empty grandchildren, zero surviving distinct rows) live in
+// `./nested-includes-distinct-refinements.test.ts` to stay under the
+// per-file test-count threshold documented in `./nested-includes-helpers.ts`.
 
 import { describe, expect, it } from 'vitest';
 import { timeouts, withCollectionRuntime } from './helpers';
@@ -103,7 +108,8 @@ describe('integration/nested-includes/distinct', () => {
       async () => {
         // Same setup as the lateral variant; only capabilities differ. The
         // correlated builder reaches into the same `buildIncludeChildRowsSelect`
-        // helper, so the CTE shape must be uniform between the two strategies.
+        // helper, so the wrapped-subquery shape must be uniform between
+        // the two strategies.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [
@@ -162,9 +168,9 @@ describe('integration/nested-includes/distinct', () => {
       async () => {
         // Mixed cardinality at the leaf: the depth-2 grandchild is a
         // to-one belongsTo (post.author), which collapses to a single
-        // object rather than an array. The CTE projects the distinct
-        // post scalars + the join key for `author` (post.user_id), and
-        // the author subquery joins against that key.
+        // object rather than an array. The wrapper subquery projects the
+        // distinct post scalars + the join key for `author` (post.user_id),
+        // and the author subquery joins against that key.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [
             { id: 1, name: 'Alice', email: 'alice@example.com' },
@@ -259,10 +265,10 @@ describe('integration/nested-includes/distinct', () => {
   // Force-include of grandchild join keys.
   //
   // When the user `.select(...)`'s on the distinct level excludes the
-  // grandchild's `localColumn` (post.id for the comments include), the CTE
-  // must still pull that column into its projection so the grandchild
-  // correlated subquery can find its parent. The column is then stripped
-  // from the user-visible row shape.
+  // grandchild's `localColumn` (post.id for the comments include), the
+  // wrapper subquery must still pull that column into its projection so
+  // the grandchild correlated subquery can find its parent. The column
+  // is then stripped from the user-visible row shape.
   //
   // Mirror of `augmentSelectionForJoinColumns` + `stripHiddenMappedFields`
   // in the multi-query stitcher; if the new lowering forgets the force-
@@ -289,8 +295,8 @@ describe('integration/nested-includes/distinct', () => {
           runtime.resetExecutions();
 
           // `.select('title')` on posts omits post.id, but the grandchild
-          // `comments` include needs post.id for stitching. The CTE must
-          // force-include it and strip it from the visible row.
+          // `comments` include needs post.id for stitching. The wrapper
+          // must force-include it and strip it from the visible row.
           const rows = await users
             .select('name')
             .include('posts', (posts) =>
@@ -362,158 +368,8 @@ describe('integration/nested-includes/distinct', () => {
   });
 
   // ===========================================================================
-  // Refinements at the distinct level (orderBy / take / where / multi-column
-  // distinct) must compose correctly with the CTE lowering. Each refinement
-  // applies inside the distinct CTE before grandchildren attach.
-  // ===========================================================================
-
-  describe('distinct composes with refinements at the distinct level', () => {
-    it(
-      'distinct + orderBy + take applies inside the distinct CTE',
-      async () => {
-        // orderBy + take limit the distinct CTE to the first N rows.
-        // Grandchildren attach only to the surviving rows.
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          await seedPosts(runtime, [
-            { id: 10, title: 'A', userId: 1, views: 1 },
-            { id: 11, title: 'B', userId: 1, views: 2 },
-            { id: 12, title: 'C', userId: 1, views: 3 },
-          ]);
-          await seedComments(runtime, [
-            { id: 100, body: 'a1', postId: 10 },
-            { id: 101, body: 'b1', postId: 11 },
-            { id: 102, body: 'c1', postId: 12 },
-          ]);
-
-          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
-          runtime.resetExecutions();
-
-          const rows = await users
-            .select('name')
-            .include('posts', (posts) =>
-              posts
-                .select('id', 'title')
-                .distinct('title')
-                .orderBy((p) => p.title.asc())
-                .take(2)
-                .include('comments', (c) => c.select('body').orderBy((cc) => cc.id.asc())),
-            )
-            .all();
-
-          expect(runtime.executions).toHaveLength(1);
-          expect(rows).toEqual([
-            {
-              name: 'Alice',
-              posts: [
-                { id: 10, title: 'A', comments: [{ body: 'a1' }] },
-                { id: 11, title: 'B', comments: [{ body: 'b1' }] },
-              ],
-            },
-          ]);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'distinct + where() filters before deduping; grandchildren only attach to surviving rows',
-      async () => {
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          await seedPosts(runtime, [
-            { id: 10, title: 'Low', userId: 1, views: 10 },
-            { id: 11, title: 'High', userId: 1, views: 100 },
-          ]);
-          await seedComments(runtime, [
-            { id: 100, body: 'on low', postId: 10 },
-            { id: 101, body: 'on high', postId: 11 },
-          ]);
-
-          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
-          runtime.resetExecutions();
-
-          const rows = await users
-            .select('name')
-            .include('posts', (posts) =>
-              posts
-                .select('id', 'title')
-                .where((p) => p.views.gte(50))
-                .distinct('title')
-                .orderBy((p) => p.title.asc())
-                .include('comments', (c) => c.select('body')),
-            )
-            .all();
-
-          expect(runtime.executions).toHaveLength(1);
-          expect(rows).toEqual([
-            {
-              name: 'Alice',
-              posts: [{ id: 11, title: 'High', comments: [{ body: 'on high' }] }],
-            },
-          ]);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'distinct over multiple columns yields one row per unique tuple',
-      async () => {
-        // `.distinct('title', 'views')` applies DISTINCT over both columns
-        // (plus force-included join keys). Since each post differs by id
-        // anyway, all four survive; the test pins that multi-column
-        // distinct does not error and stitches grandchildren correctly.
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          await seedPosts(runtime, [
-            { id: 10, title: 'A', userId: 1, views: 1 },
-            { id: 11, title: 'A', userId: 1, views: 2 },
-            { id: 12, title: 'B', userId: 1, views: 1 },
-            { id: 13, title: 'B', userId: 1, views: 2 },
-          ]);
-          await seedComments(runtime, [
-            { id: 100, body: 'a1.v1', postId: 10 },
-            { id: 101, body: 'a1.v2', postId: 11 },
-            { id: 102, body: 'b1.v1', postId: 12 },
-            { id: 103, body: 'b1.v2', postId: 13 },
-          ]);
-
-          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
-          runtime.resetExecutions();
-
-          const rows = await users
-            .select('name')
-            .include('posts', (posts) =>
-              posts
-                .select('id', 'title', 'views')
-                .distinct('title', 'views')
-                .orderBy([(p) => p.title.asc(), (p) => p.views.asc()])
-                .include('comments', (c) => c.select('body')),
-            )
-            .all();
-
-          expect(runtime.executions).toHaveLength(1);
-          expect(rows).toEqual([
-            {
-              name: 'Alice',
-              posts: [
-                { id: 10, title: 'A', views: 1, comments: [{ body: 'a1.v1' }] },
-                { id: 11, title: 'A', views: 2, comments: [{ body: 'a1.v2' }] },
-                { id: 12, title: 'B', views: 1, comments: [{ body: 'b1.v1' }] },
-                { id: 13, title: 'B', views: 2, comments: [{ body: 'b1.v2' }] },
-              ],
-            },
-          ]);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
-
-  // ===========================================================================
   // Nested distinct shapes. `distinct()` can sit at any non-leaf level in
-  // the include tree; the CTE lowering recurses uniformly.
+  // the include tree; the wrapped-subquery lowering recurses uniformly.
   // ===========================================================================
 
   describe('nested distinct shapes', () => {
@@ -521,9 +377,10 @@ describe('integration/nested-includes/distinct', () => {
       'distinct at depth 2 (nested under a depth-1 row include) — single execution + shape',
       async () => {
         // Depth-3 tree, with `distinct()` on the depth-2 level rather than
-        // depth 1. The CTE shape must compose recursively: the outer
-        // lateral / correlated builder reaches into the inner one, which
-        // builds its own distinct CTE with its own grandchild join keys.
+        // depth 1. The wrapped-subquery shape must compose recursively: the
+        // outer lateral / correlated builder reaches into the inner one,
+        // which builds its own distinct wrapper with its own grandchild
+        // join keys.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [
             { id: 1, name: 'Root', email: 'root@example.com' },
@@ -589,9 +446,9 @@ describe('integration/nested-includes/distinct', () => {
       'distinct on a self-relation non-leaf — single execution + shape',
       async () => {
         // Self-relation aliasing must propagate through the recursion or
-        // the distinct CTE will reference the wrong physical table at
+        // the distinct wrapper will reference the wrong physical table at
         // depth 2. Asserting one execution pins both the alias
-        // propagation and the new CTE shape.
+        // propagation and the new wrapped-subquery shape.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [
             { id: 1, name: 'Root', email: 'root@example.com' },
@@ -629,84 +486,6 @@ describe('integration/nested-includes/distinct', () => {
               ],
             },
           ]);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
-
-  // ===========================================================================
-  // Edge cases at the leaves: zero grandchildren on a surviving distinct
-  // row, and zero surviving distinct rows after where()-filtering.
-  // ===========================================================================
-
-  describe('edge cases', () => {
-    it(
-      'distinct level with no grandchildren produces an empty array per surviving row',
-      async () => {
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          await seedPosts(runtime, [
-            { id: 10, title: 'A', userId: 1, views: 1 },
-            { id: 11, title: 'B', userId: 1, views: 2 },
-          ]);
-          // No comments seeded.
-
-          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
-          runtime.resetExecutions();
-
-          const rows = await users
-            .select('name')
-            .include('posts', (posts) =>
-              posts
-                .select('title')
-                .distinct('title')
-                .orderBy((p) => p.title.asc())
-                .include('comments', (c) => c.select('body')),
-            )
-            .all();
-
-          expect(runtime.executions).toHaveLength(1);
-          expect(rows).toEqual([
-            {
-              name: 'Alice',
-              posts: [
-                { title: 'A', comments: [] },
-                { title: 'B', comments: [] },
-              ],
-            },
-          ]);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'distinct level filtered to zero rows produces an empty distinct array',
-      async () => {
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
-          await seedComments(runtime, [{ id: 100, body: 'a1', postId: 10 }]);
-
-          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
-          runtime.resetExecutions();
-
-          // `where` filters out every post — `posts` should be `[]`, not
-          // emit a stray empty distinct object.
-          const rows = await users
-            .select('name')
-            .include('posts', (posts) =>
-              posts
-                .select('title')
-                .where((p) => p.views.gte(1_000))
-                .distinct('title')
-                .include('comments', (c) => c.select('body')),
-            )
-            .all();
-
-          expect(runtime.executions).toHaveLength(1);
-          expect(rows).toEqual([{ name: 'Alice', posts: [] }]);
         });
       },
       timeouts.spinUpPpgDev,

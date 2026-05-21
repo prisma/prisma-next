@@ -29,10 +29,8 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import {
-  hasNonLeafIncludeWithDistinct,
-  hasScalarOrCombineIncludeDescriptors,
-} from './include-tree-predicates';
+import { augmentSelectionForJoinColumns } from './collection-runtime';
+import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr } from './types';
 import { bindWhereExpr } from './where-binding';
@@ -273,12 +271,6 @@ function buildIncludeChildRowsSelect(
     include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
   const childTableRef = childTableAlias ?? include.relatedTableName;
   const rowsAlias = `${include.relationName}__rows`;
-  const scalarProjection = buildProjection(
-    contract,
-    include.relatedTableName,
-    childState.selectedFields,
-    childTableRef,
-  );
   // Self-relations rename the inner table source via `childTableAlias`,
   // so any ColumnRef the user-supplied `orderBy` carries against the
   // original `include.relatedTableName` is no longer in scope inside the
@@ -304,6 +296,43 @@ function buildIncludeChildRowsSelect(
     ColumnRef.of(parentTableName, include.localColumn),
   );
   const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+
+  // `distinct()` on a non-leaf include cannot be lowered as
+  // `SELECT DISTINCT <scalars>, json_agg(<grandchild>) FROM ...`:
+  // Postgres rejects equality on the `json` aggregate column. Instead,
+  // pre-aggregate distinct scalar children in a wrapped subquery — force-
+  // including the grandchild join keys so the outer aggregates can
+  // correlate back to the deduped rows — and attach grandchild aggregates
+  // onto that wrapped result. `DISTINCT` runs over scalar columns only,
+  // no `json` column is in scope, and the user-visible row shape stays
+  // bit-for-bit equivalent to the multi-query stitcher's output (which
+  // applies the same force-include + strip-hidden pattern in JS).
+  const isDistinctNonLeaf =
+    childState.distinct !== undefined &&
+    childState.distinct.length > 0 &&
+    childState.includes.length > 0;
+
+  if (isDistinctNonLeaf) {
+    return buildDistinctNonLeafChildRowsSelect({
+      contract,
+      include,
+      childTableAlias,
+      childTableRef,
+      rowsAlias,
+      childOrderBy,
+      hiddenOrderProjection,
+      aggregateOrderBy,
+      whereExpr,
+      strategy,
+    });
+  }
+
+  const scalarProjection = buildProjection(
+    contract,
+    include.relatedTableName,
+    childState.selectedFields,
+    childTableRef,
+  );
 
   // Recurse: each nested include produces either a LATERAL JOIN (under
   // `lateral`) or a correlated subquery projection (under `correlated`).
@@ -347,6 +376,112 @@ function buildIncludeChildRowsSelect(
   if (childState.offset !== undefined) {
     childRows = childRows.withOffset(childState.offset);
   }
+
+  return {
+    childRows,
+    childProjection,
+    rowsAlias,
+    aggregateOrderBy,
+  };
+}
+
+function buildDistinctNonLeafChildRowsSelect(options: {
+  readonly contract: Contract<SqlStorage>;
+  readonly include: IncludeExpr;
+  readonly childTableAlias: string | undefined;
+  readonly childTableRef: string;
+  readonly rowsAlias: string;
+  readonly childOrderBy: ReadonlyArray<OrderByItem> | undefined;
+  readonly hiddenOrderProjection: ReadonlyArray<ProjectionItem>;
+  readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
+  readonly whereExpr: AnyExpression;
+  readonly strategy: 'lateral' | 'correlated';
+}): {
+  readonly childRows: SelectAst;
+  readonly childProjection: ReadonlyArray<ProjectionItem>;
+  readonly rowsAlias: string;
+  readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
+} {
+  const {
+    contract,
+    include,
+    childTableAlias,
+    childTableRef,
+    rowsAlias,
+    childOrderBy,
+    hiddenOrderProjection,
+    aggregateOrderBy,
+    whereExpr,
+    strategy,
+  } = options;
+  const childState = include.nested;
+
+  // Mirror of `resolveRowsByParent` in `collection-dispatch.ts`: force-
+  // include every grandchild's `localColumn` into the distinct projection
+  // so the outer aggregates can join against the deduped rows. When the
+  // user's `.select(...)` already covers the join keys this is a no-op;
+  // when it doesn't (e.g. `.select('title').distinct('title').include('comments')`)
+  // the join keys appear inside the wrapper subquery only and are stripped
+  // from the user-visible projection in the outer SELECT.
+  const grandchildJoinColumns = childState.includes.map((nested) => nested.localColumn);
+  const { selectedForQuery } = augmentSelectionForJoinColumns(
+    childState.selectedFields,
+    grandchildJoinColumns,
+  );
+
+  // INNER: distinct scalar select with force-included join keys + hidden
+  // order-by projections. No nested aggregates — `DISTINCT` only sees
+  // scalar columns.
+  const innerScalarProjection = buildProjection(
+    contract,
+    include.relatedTableName,
+    selectedForQuery,
+    childTableRef,
+  );
+  let innerSelect = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+    .withProjection([...innerScalarProjection, ...hiddenOrderProjection])
+    .withWhere(whereExpr)
+    .withDistinct(true);
+  if (childOrderBy) {
+    innerSelect = innerSelect.withOrderBy(childOrderBy);
+  }
+  if (childState.limit !== undefined) {
+    innerSelect = innerSelect.withLimit(childState.limit);
+  }
+  if (childState.offset !== undefined) {
+    innerSelect = innerSelect.withOffset(childState.offset);
+  }
+
+  const distinctAlias = `${include.relationName}__distinct`;
+
+  // OUTER: user-visible scalar projection (using the original
+  // `selectedFields`, which strips any force-included hidden columns) +
+  // nested aggregates correlated against the distinct alias instead of
+  // the underlying table.
+  const outerScalarProjection = buildProjection(
+    contract,
+    include.relatedTableName,
+    childState.selectedFields,
+    distinctAlias,
+  );
+  const { joins: outerNestedJoins, projections: outerNestedProjections } =
+    buildNestedIncludeArtifacts(contract, distinctAlias, childState.includes, strategy);
+
+  // Forward hidden order columns from the inner distinct subquery to the
+  // outer SELECT so `aggregateOrderBy` (which still references `rowsAlias`)
+  // can resolve them when the outer wrap materialises `(childRows) AS rowsAlias`.
+  const outerHiddenOrderProjection = hiddenOrderProjection.map((proj) =>
+    ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias)),
+  );
+
+  const childProjection: ReadonlyArray<ProjectionItem> = [
+    ...outerScalarProjection,
+    ...outerNestedProjections,
+  ];
+
+  const childRows = SelectAst.from(DerivedTableSource.as(distinctAlias, innerSelect))
+    .withProjection([...childProjection, ...outerHiddenOrderProjection])
+    .withJoins(outerNestedJoins);
 
   return {
     childRows,
@@ -570,18 +705,6 @@ export function compileSelectWithIncludeStrategy(
   if (hasScalarOrCombineIncludeDescriptors(state.includes)) {
     throw new Error(
       'single-query include strategy does not support scalar include selectors or combine()',
-    );
-  }
-
-  // Same recursive shape as the scalar/combine gate above. A non-leaf
-  // `distinct()` cannot be lowered into the single-query strategies:
-  // the child SELECT would emit `SELECT DISTINCT <scalars>, json_agg(...)`,
-  // and Postgres rejects equality on `json`. The dispatch path routes
-  // these to multi-query; direct planner callers (tests, rich-plan
-  // consumers) fail fast here instead of building an invalid plan.
-  if (hasNonLeafIncludeWithDistinct(state.includes)) {
-    throw new Error(
-      'single-query include strategy does not support distinct() on a non-leaf include',
     );
   }
 

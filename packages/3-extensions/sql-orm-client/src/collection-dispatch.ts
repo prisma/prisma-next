@@ -31,10 +31,7 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
-import {
-  hasNonLeafIncludeWithDistinct,
-  hasScalarOrCombineIncludeDescriptors,
-} from './include-tree-predicates';
+import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
 import {
   compileRelationSelect,
   compileSelect,
@@ -83,22 +80,14 @@ function dispatchWithIncludeStrategy<Row>(options: {
 
   // Nested row includes (depth >= 2) are emitted recursively by the
   // lateral / correlated builders — they no longer force a fallback to
-  // multi-query (TML-2594). Scalar (`count`/`sum`/...) and `combine()`
-  // descriptors still do, until TML-2595 lands the matching lowering;
-  // the recursive scan below catches them at any depth so a nested
-  // `count()` inside a row include doesn't accidentally hit the
-  // throw in `compileSelectWithIncludeStrategy`.
-  //
-  // `distinct()` on a non-leaf include is also forced through multi-query:
-  // under the single-query strategies the child SELECT carries nested
-  // JSON aggregate columns, and `SELECT DISTINCT` over those fails on
-  // Postgres (`json` has no equality operator). The multi-query stitcher
-  // applies distinct to scalar-only child rows before grandchildren are
-  // joined, which is the semantically correct behavior we preserve.
-  if (
-    hasScalarOrCombineIncludeDescriptors(options.state.includes) ||
-    hasNonLeafIncludeWithDistinct(options.state.includes)
-  ) {
+  // multi-query (TML-2594). `distinct()` on a non-leaf include is also
+  // handled by the lateral / correlated builders via a wrapped-subquery
+  // lowering (TML-2656). Scalar (`count`/`sum`/...) and `combine()`
+  // descriptors still force multi-query until TML-2595 lands; the
+  // recursive scan below catches them at any depth so a nested
+  // `count()` inside a row include doesn't accidentally hit the throw
+  // in `compileSelectWithIncludeStrategy`.
+  if (hasScalarOrCombineIncludeDescriptors(options.state.includes)) {
     return dispatchWithMultiQueryIncludes<Row>(options);
   }
 

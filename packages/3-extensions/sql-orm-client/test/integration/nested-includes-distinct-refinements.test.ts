@@ -1,0 +1,244 @@
+// Integration coverage for `distinct()` on a non-leaf include combined
+// with refinements (`orderBy` / `take` / `where` / multi-column `distinct`)
+// and edge cases (empty grandchildren, zero surviving distinct rows).
+//
+// Linear: TML-2656.
+//
+// Split from `nested-includes-distinct.test.ts` for the reason documented
+// in `./nested-includes-helpers.ts` (per-file test-count threshold of the
+// prisma/dev PGlite infrastructure).
+
+import { describe, expect, it } from 'vitest';
+import { timeouts, withCollectionRuntime } from './helpers';
+import { collectionWithCapabilities, LATERAL_CAPABILITIES } from './nested-includes-helpers';
+import { seedComments, seedPosts, seedUsers } from './runtime-helpers';
+
+describe('integration/nested-includes/distinct/refinements', () => {
+  // ===========================================================================
+  // Refinements at the distinct level (orderBy / take / where / multi-column
+  // distinct) must compose correctly with the CTE lowering. Each refinement
+  // applies inside the distinct CTE before grandchildren attach.
+  // ===========================================================================
+
+  describe('distinct composes with refinements at the distinct level', () => {
+    it(
+      'distinct + orderBy + take applies inside the distinct CTE',
+      async () => {
+        // orderBy + take limit the distinct CTE to the first N rows.
+        // Grandchildren attach only to the surviving rows.
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'B', userId: 1, views: 2 },
+            { id: 12, title: 'C', userId: 1, views: 3 },
+          ]);
+          await seedComments(runtime, [
+            { id: 100, body: 'a1', postId: 10 },
+            { id: 101, body: 'b1', postId: 11 },
+            { id: 102, body: 'c1', postId: 12 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          const rows = await users
+            .select('name')
+            .include('posts', (posts) =>
+              posts
+                .select('id', 'title')
+                .distinct('title')
+                .orderBy((p) => p.title.asc())
+                .take(2)
+                .include('comments', (c) => c.select('body').orderBy((cc) => cc.id.asc())),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([
+            {
+              name: 'Alice',
+              posts: [
+                { id: 10, title: 'A', comments: [{ body: 'a1' }] },
+                { id: 11, title: 'B', comments: [{ body: 'b1' }] },
+              ],
+            },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct + where() filters before deduping; grandchildren only attach to surviving rows',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'Low', userId: 1, views: 10 },
+            { id: 11, title: 'High', userId: 1, views: 100 },
+          ]);
+          await seedComments(runtime, [
+            { id: 100, body: 'on low', postId: 10 },
+            { id: 101, body: 'on high', postId: 11 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          const rows = await users
+            .select('name')
+            .include('posts', (posts) =>
+              posts
+                .select('id', 'title')
+                .where((p) => p.views.gte(50))
+                .distinct('title')
+                .orderBy((p) => p.title.asc())
+                .include('comments', (c) => c.select('body')),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([
+            {
+              name: 'Alice',
+              posts: [{ id: 11, title: 'High', comments: [{ body: 'on high' }] }],
+            },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct over multiple columns yields one row per unique tuple',
+      async () => {
+        // `.distinct('title', 'views')` applies DISTINCT over both columns
+        // (plus force-included join keys). Since each post differs by id
+        // anyway, all four survive; the test pins that multi-column
+        // distinct does not error and stitches grandchildren correctly.
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'A', userId: 1, views: 2 },
+            { id: 12, title: 'B', userId: 1, views: 1 },
+            { id: 13, title: 'B', userId: 1, views: 2 },
+          ]);
+          await seedComments(runtime, [
+            { id: 100, body: 'a1.v1', postId: 10 },
+            { id: 101, body: 'a1.v2', postId: 11 },
+            { id: 102, body: 'b1.v1', postId: 12 },
+            { id: 103, body: 'b1.v2', postId: 13 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          const rows = await users
+            .select('name')
+            .include('posts', (posts) =>
+              posts
+                .select('id', 'title', 'views')
+                .distinct('title', 'views')
+                .orderBy([(p) => p.title.asc(), (p) => p.views.asc()])
+                .include('comments', (c) => c.select('body')),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([
+            {
+              name: 'Alice',
+              posts: [
+                { id: 10, title: 'A', views: 1, comments: [{ body: 'a1.v1' }] },
+                { id: 11, title: 'A', views: 2, comments: [{ body: 'a1.v2' }] },
+                { id: 12, title: 'B', views: 1, comments: [{ body: 'b1.v1' }] },
+                { id: 13, title: 'B', views: 2, comments: [{ body: 'b1.v2' }] },
+              ],
+            },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
+  // ===========================================================================
+  // Edge cases at the leaves: zero grandchildren on a surviving distinct
+  // row, and zero surviving distinct rows after where()-filtering.
+  // ===========================================================================
+
+  describe('edge cases', () => {
+    it(
+      'distinct level with no grandchildren produces an empty array per surviving row',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'B', userId: 1, views: 2 },
+          ]);
+          // No comments seeded.
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          const rows = await users
+            .select('name')
+            .include('posts', (posts) =>
+              posts
+                .select('title')
+                .distinct('title')
+                .orderBy((p) => p.title.asc())
+                .include('comments', (c) => c.select('body')),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([
+            {
+              name: 'Alice',
+              posts: [
+                { title: 'A', comments: [] },
+                { title: 'B', comments: [] },
+              ],
+            },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct level filtered to zero rows produces an empty distinct array',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
+          await seedComments(runtime, [{ id: 100, body: 'a1', postId: 10 }]);
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          // `where` filters out every post — `posts` should be `[]`, not
+          // emit a stray empty distinct object.
+          const rows = await users
+            .select('name')
+            .include('posts', (posts) =>
+              posts
+                .select('title')
+                .where((p) => p.views.gte(1_000))
+                .distinct('title')
+                .include('comments', (c) => c.select('body')),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([{ name: 'Alice', posts: [] }]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+});
