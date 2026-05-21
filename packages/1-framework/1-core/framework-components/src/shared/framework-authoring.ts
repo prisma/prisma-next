@@ -140,36 +140,20 @@ export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> 
     | AuthoringEntityTypeTemplateOutput
     | AuthoringEntityTypeFactoryOutput<Input, Output>;
   /**
-   * Family-shared storage slot where instances of this entity land
-   * inside the per-namespace envelope (e.g. `storage.<ns>.postgresEnums`).
-   * When set together with {@link hydrate} the family `ContractSerializer`
-   * dispatches the JSON→IR-class step generically through a per-slot
-   * registry instead of inlining a target-specific branch. When set
-   * together with {@link validatorSchema} the family validator folds
-   * the contributed schema into its per-namespace entry shape so the
-   * structural check covers pack-introduced slots.
-   *
-   * Omitted means the kind is authoring-only — instances flow through
-   * the existing framework-shared slot and the target's hand-rolled
-   * hydration path. Reserved slot names (a family's built-in slots,
-   * e.g. `'tables'` for SQL or `'collections'` for Mongo) are rejected
-   * at descriptor-collection time.
-   */
-  readonly storageSlotKey?: string;
-  /**
-   * Hydration factory invoked by the family `ContractSerializer` for
-   * each entry under {@link storageSlotKey}. Receives the raw JSON
-   * value (post-structural-validation) and returns the IR-class
-   * instance. Idempotent: already-class instances pass through unchanged
-   * is the caller's contract.
+   * Hydration factory the family `ContractSerializer` invokes for each
+   * entry whose envelope `kind` matches this descriptor's
+   * {@link discriminator}. Receives the raw JSON value
+   * (post-structural-validation) and returns the IR-class instance.
+   * Idempotent: already-class instances pass through unchanged is the
+   * caller's contract.
    */
   readonly hydrate?: (raw: unknown) => Output;
   /**
-   * arktype schema fragment for one entry under {@link storageSlotKey}.
-   * The family validator composes contributed fragments into the
-   * per-namespace entry schema at validator construction time so the
-   * structural check covers pack-introduced slots without the family
-   * core hard-coding the schema.
+   * arktype schema fragment for one entry whose envelope `kind` matches
+   * this descriptor's {@link discriminator}. The family validator composes
+   * contributed fragments into the per-namespace entry schema at
+   * validator construction time so the structural check covers
+   * pack-introduced kinds without the family core hard-coding the schema.
    */
   readonly validatorSchema?: Type<unknown>;
 }
@@ -360,42 +344,6 @@ function collectAuthoringLeafPaths(
     }
   }
   return paths;
-}
-
-/**
- * Walks the entity-type namespace tree and rejects any descriptor whose
- * `storageSlotKey` collides with one of the family's built-in
- * per-namespace slot names (e.g. `'tables'` for SQL, `'collections'`
- * for Mongo). Throws on the first collision with the path of the
- * offending descriptor included so authors can locate it quickly.
- *
- * No-op when `reservedStorageSlotKeys` is empty / undefined.
- */
-export function assertNoReservedStorageSlotKeyCollisions(
-  entityTypeNamespace: AuthoringEntityTypeNamespace,
-  reservedStorageSlotKeys: ReadonlyArray<string> | undefined,
-): void {
-  if (reservedStorageSlotKeys === undefined || reservedStorageSlotKeys.length === 0) {
-    return;
-  }
-  const reserved = new Set(reservedStorageSlotKeys);
-  const walk = (node: AuthoringEntityTypeNamespace, path: readonly string[]): void => {
-    for (const [key, value] of Object.entries(node)) {
-      const currentPath = [...path, key];
-      if (isAuthoringEntityTypeDescriptor(value)) {
-        if (value.storageSlotKey !== undefined && reserved.has(value.storageSlotKey)) {
-          throw new Error(
-            `Authoring entity descriptor "${currentPath.join('.')}" declares storageSlotKey "${value.storageSlotKey}", which collides with a family-reserved slot. Reserved slot names: ${reservedStorageSlotKeys.join(', ')}.`,
-          );
-        }
-        continue;
-      }
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        walk(value as AuthoringEntityTypeNamespace, currentPath);
-      }
-    }
-  };
-  walk(entityTypeNamespace, []);
 }
 
 export function assertNoCrossRegistryCollisions(

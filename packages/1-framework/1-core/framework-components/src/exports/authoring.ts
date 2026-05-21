@@ -18,7 +18,6 @@ export type {
 } from '../shared/framework-authoring';
 export {
   assertNoCrossRegistryCollisions,
-  assertNoReservedStorageSlotKeyCollisions,
   hasRegisteredFieldNamespace,
   instantiateAuthoringEntityType,
   instantiateAuthoringFieldPreset,
