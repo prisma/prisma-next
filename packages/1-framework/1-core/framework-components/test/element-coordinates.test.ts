@@ -1,15 +1,5 @@
-import { coreHash } from '@prisma-next/contract/types';
-import { MongoStorage } from '@prisma-next/mongo-contract';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { type EntityCoordinate, elementCoordinates } from '../src/ir/storage';
-
-const emptyTableInput = {
-  columns: {},
-  uniques: [],
-  indexes: [],
-  foreignKeys: [],
-} as const;
+import { type EntityCoordinate, elementCoordinates, type Storage } from '../src/ir/storage';
 
 function assertStoragePlaneCoordinates(coordinates: EntityCoordinate[]): void {
   expect(coordinates.length).toBeGreaterThan(0);
@@ -25,25 +15,41 @@ function assertStoragePlaneCoordinates(coordinates: EntityCoordinate[]): void {
 }
 
 describe('elementCoordinates', () => {
-  it('yields plane: storage for SQL namespace concretion', () => {
-    const storage = new SqlStorage({
-      storageHash: coreHash('sha256:element-coordinates-sql'),
+  it('walks a synthetic Storage literal structurally', () => {
+    const storage = {
       namespaces: {
-        app: { id: 'app', tables: { users: emptyTableInput } },
+        alpha: {
+          id: 'alpha',
+          kind: 'test-namespace',
+          widgets: { a: {}, b: {} },
+          gadgets: { x: {} },
+          skippedNull: null,
+          skippedScalar: 'ignored',
+        },
+        beta: {
+          id: 'beta',
+          kind: 'test-namespace',
+          tables: { users: {}, posts: {}, comments: {} },
+        },
       },
-    });
+    } as Storage;
 
-    assertStoragePlaneCoordinates([...elementCoordinates(storage)]);
-  });
+    const coordinates = [...elementCoordinates(storage)];
+    assertStoragePlaneCoordinates(coordinates);
 
-  it('yields plane: storage for Mongo namespace concretion', () => {
-    const storage = new MongoStorage({
-      storageHash: coreHash('sha256:element-coordinates-mongo'),
-      namespaces: {
-        app: { id: 'app', collections: { posts: {} } },
-      },
-    });
-
-    assertStoragePlaneCoordinates([...elementCoordinates(storage)]);
+    expect(coordinates).toEqual(
+      expect.arrayContaining([
+        { plane: 'storage', namespaceId: 'alpha', entityKind: 'widgets', entityName: 'a' },
+        { plane: 'storage', namespaceId: 'alpha', entityKind: 'widgets', entityName: 'b' },
+        { plane: 'storage', namespaceId: 'alpha', entityKind: 'gadgets', entityName: 'x' },
+        { plane: 'storage', namespaceId: 'beta', entityKind: 'tables', entityName: 'users' },
+        { plane: 'storage', namespaceId: 'beta', entityKind: 'tables', entityName: 'posts' },
+        { plane: 'storage', namespaceId: 'beta', entityKind: 'tables', entityName: 'comments' },
+      ]),
+    );
+    expect(coordinates).toHaveLength(6);
+    expect(coordinates.some((c) => c.entityKind === 'id')).toBe(false);
+    expect(coordinates.some((c) => c.entityKind === 'skippedNull')).toBe(false);
+    expect(coordinates.some((c) => c.entityKind === 'skippedScalar')).toBe(false);
   });
 });

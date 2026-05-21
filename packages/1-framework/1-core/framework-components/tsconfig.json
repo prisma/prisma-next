@@ -1,18 +1,7 @@
 {
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
-    "rootDir": ".",
-    "baseUrl": ".",
-    // Cross-family test wiring uses dist-path aliases because the natural devDep edge
-    // from framework-components → sql-contract / mongo-contract creates a Turbo build cycle
-    // (family packages already depend on framework-components). turbo.json declares the
-    // implicit build-order dependency so typecheck runs after sibling dist/ exists.
-    "paths": {
-      "@prisma-next/mongo-contract": [
-        "../../../2-mongo-family/1-foundation/mongo-contract/dist/index.d.mts"
-      ],
-      "@prisma-next/sql-contract/types": ["../../../2-sql/1-core/contract/dist/types.d.mts"]
-    }
+    "rootDir": "."
   },
   "include": ["src", "test", "*.config.*", "package.json"],
   "exclude": ["dist", "node_modules"]
