@@ -1,7 +1,25 @@
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
+/**
+ * Canonical address for a named entity in Contract IR / Schema IR.
+ *
+ * `plane` is `'domain' | 'storage'`: which top-level contract plane the
+ * entity lives on. Domain-side walks (once domain content is populated)
+ * yield `plane: 'domain'`; {@link elementCoordinates} over storage yields
+ * `plane: 'storage'`. A sibling `elementCoordinates(domain)` is not wired
+ * yet — domain-plane content lands in S1.C; the sibling walk lands there.
+ *
+ * Cross-plane references obey a directional invariant: domain → storage is
+ * allowed; storage → domain is forbidden. That rule is enforced by a
+ * separate validator, not by constraining this coordinate shape — the
+ * coordinate carries the axis the validator checks.
+ *
+ * Iteration order over namespace properties follows `Object.entries` order;
+ * consumers that depend on ordering must sort.
+ */
 export interface EntityCoordinate {
+  readonly plane: 'domain' | 'storage';
   readonly namespaceId: string;
   readonly entityKind: string;
   readonly entityName: string;
@@ -9,7 +27,8 @@ export interface EntityCoordinate {
 
 /**
  * Lazy walk over every named storage entity in a `Storage`-shaped
- * value, yielded as `(namespaceId, entityKind, entityName)` triples.
+ * value, yielded as {@link EntityCoordinate} tuples with
+ * `plane: 'storage'` (the parameter type binds the plane).
  *
  * Iterates each namespace's own-enumerable properties structurally.
  * Skips `id` (known scalar); `kind` is non-enumerable on namespace
@@ -23,7 +42,7 @@ export function* elementCoordinates(storage: Storage): Generator<EntityCoordinat
       if (entityKind === 'id') continue;
       if (slot === null || typeof slot !== 'object') continue;
       for (const entityName of Object.keys(slot)) {
-        yield { namespaceId, entityKind, entityName };
+        yield { plane: 'storage', namespaceId, entityKind, entityName };
       }
     }
   }
