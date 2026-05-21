@@ -192,12 +192,10 @@ async function resolveFromRefName(
 async function resolveFromHashProvenance(
   fromHash: string,
   input: ResolveFromForPlanInput,
-  refs: Refs,
+  _refs: Refs,
   explicitFromLabel?: string,
 ): Promise<Result<FromResolution, CliStructuredError>> {
   const { bundles, graph } = input;
-  const empty = graphIsEmpty(bundles);
-  const graphTip = findLatestMigration(graph)?.to ?? null;
 
   if (isGraphNode(fromHash, graph)) {
     return resolveGraphNodeFromBundle(
@@ -208,11 +206,9 @@ async function resolveFromHashProvenance(
     );
   }
 
-  if (empty) {
-    return notOk(errorSnapshotMissing(fromHash, { viaRef: false }));
-  }
-
-  return notOk(errorPlanForgotTheFlag(fromHash, getReachableRefs(refs, graph), graphTip));
+  throw new Error(
+    `resolveFromHashProvenance: non-graph-node hash ${fromHash} should be refused via looksLikeFullHash before this helper is called`,
+  );
 }
 
 export async function resolveFromForPlan(
