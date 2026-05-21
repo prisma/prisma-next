@@ -110,9 +110,9 @@ export function defineContract(
   },
 ): PostgresResult<TypesConstraint, ModelsConstraint, undefined, undefined> {
   const full = {
+    ...scaffold,
     family: sqlFamilyPack,
     target: postgresPack,
-    ...scaffold,
   } as ContractInput;
   if (factory !== undefined) {
     return baseDefineContract(
