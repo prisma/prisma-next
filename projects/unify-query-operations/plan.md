@@ -46,6 +46,12 @@ Project-DoD conditions are derived from the spec's `Acceptance Criteria` (AC1–
 
 Every AC has at least one delivering slice. Slices 1, 2, and 4 each have a unique AC anchor; slice 3 carries the lion's share because it's where the user-visible unification actually happens; slice 5 is the documentation close-out.
 
+## Delivery model
+
+**Single PR for the whole project** (decision 2026-05-21). Originally each slice was to land its own PR referencing TML-2354. The operator chose to defer PR opening until all five slices are review-clean on the branch — one large PR for the whole project rather than five small ones. Trade-off: review burden moves to the end (the PR will be the sum of all slices' diffs), but the branch state during execution stays linear and the slices don't have to be reviewable independently. The slice-PR sizing guidance ("reviewable in one sitting") no longer applies per slice; it applies to the cumulative branch at project close.
+
+**Implication for downstream slices:** slices 2-5's plans should drop their own "open PR" close-out steps. The PR-open happens once, at project close, via `create-pr` against the cumulative branch.
+
 ## Risks + open questions
 
 1. **Slice 3 size.** This slice deletes two legacy types, collapses two consumers, splits the orderBy accessor, and tightens cipherstash trait gating — all in one atomic change. The split is necessary because FR11 forbids backward-compat shims, and any intermediate state would either leak both surfaces simultaneously (asymmetric trait gating still in flight) or require a feature flag (forbidden). If review feedback judges the slice too large, the contingency is to split the orderBy-accessor work into a follow-up slice 3b, accepting a transient "WHERE accessor still has `.asc/.desc` leak" state until 3b lands. Resolve at slice-pickup time via `drive-plan-slice`.
