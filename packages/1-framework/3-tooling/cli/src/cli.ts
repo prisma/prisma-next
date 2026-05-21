@@ -324,14 +324,22 @@ program.addCommand(refCommand);
 // time to fork before the throw kills the parent. Hidden from help;
 // underscore prefix marks it as internal. Doesn't depend on any
 // project state, so it runs in any tempdir.
-const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
-  .description('Internal: deliberately throw for the telemetry e2e suite.')
-  .action(async () => {
-    await new Promise((settle) => setTimeout(settle, 200));
-    throw new Error('__telemetry-crash-test: intentional crash for e2e coverage');
-  });
-telemetryCrashTestCommand.configureHelp({ visibleCommands: () => [] });
-program.addCommand(telemetryCrashTestCommand, { hidden: true });
+//
+// Gated behind `PRISMA_NEXT_ENABLE_TEST_COMMANDS=1` so the command is
+// not even registered (and therefore not invocable) in shipped
+// binaries. `hidden: true` only filters the help output; without this
+// env gate the command would still be callable from production. The
+// e2e suite sets the env var when it spawns the CLI.
+if (process.env['PRISMA_NEXT_ENABLE_TEST_COMMANDS'] === '1') {
+  const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
+    .description('Internal: deliberately throw for the telemetry e2e suite.')
+    .action(async () => {
+      await new Promise((settle) => setTimeout(settle, 200));
+      throw new Error('__telemetry-crash-test: intentional crash for e2e coverage');
+    });
+  telemetryCrashTestCommand.configureHelp({ visibleCommands: () => [] });
+  program.addCommand(telemetryCrashTestCommand, { hidden: true });
+}
 
 // Create help command
 const helpCommand = new Command('help')

@@ -29,6 +29,12 @@ import { type BackendHarness, HARNESS_PATHS, sleep, startBackendHarness } from '
  * and `PRISMA_NEXT_DISABLE_TELEMETRY` / `DO_NOT_TRACK` /
  * `PRISMA_NEXT_DEBUG` are stripped so the gating layer behaves the way
  * it would on a real user machine.
+ *
+ * Row assertions in cases that seed a unique `installationId` use
+ * `awaitRowsForInstallation(...)` rather than the unscoped `awaitRows`.
+ * The detached sender from a prior case can land a row *after* the
+ * next case's `beforeEach` clearRows fires; an installationId-scoped
+ * poll eliminates that cross-test contamination by construction.
  */
 
 const CLI_BIN_PATH = HARNESS_PATHS.CLI_BIN_PATH;
@@ -121,6 +127,12 @@ function buildEnv(xdg: string): NodeJS.ProcessEnv {
     CI: 'false',
     XDG_CONFIG_HOME: xdg,
     PRISMA_NEXT_TELEMETRY_ENDPOINT: harness.endpointBase,
+    // Opt in to test-only CLI commands (currently the hidden
+    // `__telemetry-crash-test`). Outside this env var, the command is
+    // not even registered, so a shipped binary cannot dispatch it.
+    // Set unconditionally so every spawn (including `--help`) goes
+    // through the same env shape.
+    PRISMA_NEXT_ENABLE_TEST_COMMANDS: '1',
   };
 }
 
@@ -162,27 +174,31 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     seedConsent(xdgDir, installationId);
 
     await spawnCli(['__telemetry-crash-test'], { env: buildEnv(xdgDir), cwd: projectDir });
-    const rows = await harness.awaitRows(1);
+    const rows = await harness.awaitRowsForInstallation(installationId, 1);
 
     expect(rows[0]?.installationId).toBe(installationId);
     expect(rows[0]?.installationId).toMatch(V4_UUID);
     expect(rows[0]?.command).toBe('__telemetry-crash-test');
   });
 
-  it('a second CLI invocation reusing the same XDG_CONFIG_HOME produces a second row sharing the installationId', async () => {
+  it('a second CLI invocation reusing the same XDG_CONFIG_HOME produces a second row sharing the installationId', {
+    timeout: 15_000,
+  }, async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
     await spawnCli(['__telemetry-crash-test'], { env: buildEnv(xdgDir), cwd: projectDir });
     await spawnCli(['__telemetry-crash-test'], { env: buildEnv(xdgDir), cwd: projectDir });
-    const rows = await harness.awaitRows(2);
+    const rows = await harness.awaitRowsForInstallation(installationId, 2);
 
     expect(rows).toHaveLength(2);
     expect(rows[0]?.installationId).toBe(installationId);
     expect(rows[1]?.installationId).toBe(installationId);
   });
 
-  it('a CLI command that crashes after the preAction hook still results in a backend row', async () => {
+  it('a CLI command that crashes after the preAction hook still results in a backend row', {
+    timeout: 15_000,
+  }, async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
@@ -195,7 +211,7 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     // exits non-zero. The detached sender forked in the preAction hook
     // survives the parent crash — that's the invariant under test.
     expect(result.exitCode).not.toBe(0);
-    const rows = await harness.awaitRows(1);
+    const rows = await harness.awaitRowsForInstallation(installationId, 1);
     expect(rows[0]?.installationId).toBe(installationId);
   });
 });

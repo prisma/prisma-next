@@ -63,6 +63,20 @@ export interface BackendHarness {
   clearRows(): Promise<void>;
   readRows(): Promise<TelemetryEventRow[]>;
   awaitRows(expectedCount: number, timeoutMs?: number): Promise<TelemetryEventRow[]>;
+  /**
+   * Scoped variant of `awaitRows` that polls only rows whose
+   * `installationId` matches the supplied id. Use this in tests that
+   * seed a unique UUID per case: it eliminates cross-test contamination
+   * from a prior test's slow in-flight detached sender (a row arriving
+   * *after* the next test's `clearRows()`), which would otherwise
+   * inflate the row count past the strict-equality match in the
+   * unscoped variant and time out the test with no useful error.
+   */
+  awaitRowsForInstallation(
+    installationId: string,
+    expectedCount: number,
+    timeoutMs?: number,
+  ): Promise<TelemetryEventRow[]>;
   stop(): Promise<void>;
 }
 
@@ -233,9 +247,24 @@ export async function startBackendHarness(): Promise<BackendHarness> {
       return rows;
     });
 
+  const readRowsForInstallation = (installationId: string): Promise<TelemetryEventRow[]> =>
+    withClient(database.connectionString, async (client) => {
+      const { rows } = await client.query<TelemetryEventRow>(
+        'select "installationId", version, command, flags, "runtimeName", "runtimeVersion", os, arch, "packageManager", "databaseTarget", "tsVersion", agent, extensions from telemetry_event where "installationId" = $1 order by id asc',
+        [installationId],
+      );
+      return rows;
+    });
+
+  // Default exceeds vitest's 5s test timeout so a contamination-driven
+  // overshoot in the unscoped variant surfaces as the harness's own
+  // diagnostic ("expected N rows, found M") rather than vitest's
+  // opaque generic test-timeout. Tests that need an even longer fuse
+  // pass an explicit `timeoutMs` and pair it with `{ timeout: … }` on
+  // the `it(...)` declaration.
   const awaitRows = async (
     expectedCount: number,
-    timeoutMs = 5000,
+    timeoutMs = 8000,
   ): Promise<TelemetryEventRow[]> => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
@@ -249,11 +278,38 @@ export async function startBackendHarness(): Promise<BackendHarness> {
     throw new Error(`expected ${expectedCount} telemetry row(s), found ${rows.length}`);
   };
 
+  const awaitRowsForInstallation = async (
+    installationId: string,
+    expectedCount: number,
+    timeoutMs = 8000,
+  ): Promise<TelemetryEventRow[]> => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const rows = await readRowsForInstallation(installationId);
+      if (rows.length === expectedCount) {
+        return rows;
+      }
+      await sleep(25);
+    }
+    const rows = await readRowsForInstallation(installationId);
+    throw new Error(
+      `expected ${expectedCount} telemetry row(s) for installationId=${installationId}, found ${rows.length}`,
+    );
+  };
+
   const stop = async (): Promise<void> => {
     if (stopped) return;
     stopped = true;
     await stopBackend(backend);
   };
 
-  return { database, endpointBase, clearRows, readRows, awaitRows, stop };
+  return {
+    database,
+    endpointBase,
+    clearRows,
+    readRows,
+    awaitRows,
+    awaitRowsForInstallation,
+    stop,
+  };
 }
