@@ -7,52 +7,23 @@ export interface EntityCoordinate {
   readonly entityName: string;
 }
 
-const SLOT_KEYS_BY_NAMESPACE_KIND = new Map<
-  string,
-  ReadonlyArray<{ readonly slotKey: string; readonly entityKind: string }>
->([
-  [
-    'sql-namespace',
-    [
-      { slotKey: 'tables', entityKind: 'tables' },
-      { slotKey: 'types', entityKind: 'types' },
-    ],
-  ],
-  ['mongo-namespace', [{ slotKey: 'collections', entityKind: 'collections' }]],
-]);
-
 /**
  * Lazy walk over every named storage entity in a `Storage`-shaped
  * value, yielded as `(namespaceId, entityKind, entityName)` triples.
  *
- * Dispatch is keyed on each namespace's `kind` literal. The slot-key
- * table below is hardcoded for the two namespace kinds shipping
- * today (`'sql-namespace'`, `'mongo-namespace'`); the
- * pack-contributed descriptor registry replaces this lookup once it
- * lands. Unrecognised `kind` values throw with a diagnostic naming
- * the namespace id and the offending kind — silent skipping would
- * hide drift from the future verifier consumer.
+ * Iterates each namespace's own-enumerable properties structurally.
+ * Skips `id` (known scalar); `kind` is non-enumerable on namespace
+ * concretions and does not appear in `Object.entries`. For every other
+ * property whose value is a non-null object, yields one coordinate per
+ * entry key in that map. No family-specific slot vocabulary is required.
  */
 export function* elementCoordinates(storage: Storage): Generator<EntityCoordinate> {
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const slotKeys = SLOT_KEYS_BY_NAMESPACE_KIND.get(ns.kind);
-    if (slotKeys === undefined) {
-      throw new Error(
-        `elementCoordinates(): unrecognised namespace kind ${JSON.stringify(ns.kind)} ` +
-          `on namespace ${JSON.stringify(namespaceId)}. ` +
-          'Add a slot-key entry to SLOT_KEYS_BY_NAMESPACE_KIND, ' +
-          'or wait for the pack-contributed descriptor registry (D2).',
-      );
-    }
-    for (const { slotKey, entityKind } of slotKeys) {
-      // `Reflect.get` returns `unknown` and narrows naturally on the next line;
-      // avoids importing family-specific `Namespace` subtypes into the
-      // framework layer just to address a dynamic slot key.
-      const slot = Reflect.get(ns, slotKey);
-      if (slot !== undefined && slot !== null && typeof slot === 'object') {
-        for (const entityName of Object.keys(slot)) {
-          yield { namespaceId, entityKind, entityName };
-        }
+    for (const [entityKind, slot] of Object.entries(ns)) {
+      if (entityKind === 'id') continue;
+      if (slot === null || typeof slot !== 'object') continue;
+      for (const entityName of Object.keys(slot)) {
+        yield { namespaceId, entityKind, entityName };
       }
     }
   }
