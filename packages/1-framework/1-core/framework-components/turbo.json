@@ -1,0 +1,11 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@prisma-next/sql-contract#build", "@prisma-next/mongo-contract#build"]
+    },
+    "test": {
+      "dependsOn": ["@prisma-next/sql-contract#build", "@prisma-next/mongo-contract#build"]
+    }
+  }
+}
