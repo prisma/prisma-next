@@ -56,21 +56,6 @@ export interface AuthoringTypeConstructorDescriptor {
 }
 
 /**
- * Preset-template arm for a literal default value awaiting codec dispatch.
- * The preset declares the literal up-front (a `AuthoringTemplateValue` so
- * preset args can flow in); the SQL authoring layer materializes it through
- * `codec.renderSqlLiteral` at emit time, once the column's codec is known.
- *
- * Mirrors the DSL-internal `AuthoredColumnDefault.codecValue` arm so the
- * preset surface and the TS DSL surface feed the same authoring shape into
- * the emitter.
- */
-export interface AuthoringColumnDefaultTemplateCodecValue {
-  readonly kind: 'codecValue';
-  readonly value: AuthoringTemplateValue;
-}
-
-/**
  * Preset-template arm for a SQL expression default that bypasses codec
  * dispatch entirely. Lowers directly to the contract IR's
  * `{ kind: 'expression', expression }` shape.
@@ -92,22 +77,17 @@ export interface AuthoringColumnDefaultTemplateAutoincrement {
 }
 
 export type AuthoringColumnDefaultTemplate =
-  | AuthoringColumnDefaultTemplateCodecValue
   | AuthoringColumnDefaultTemplateExpression
   | AuthoringColumnDefaultTemplateAutoincrement;
 
 /**
  * Resolved authoring-default shape produced by
- * {@link instantiateAuthoringFieldPreset}. Distinct from the contract IR's
- * `ColumnDefault` — carries an extra `codecValue` arm holding a literal
- * value that has not yet been dispatched through `codec.renderSqlLiteral`.
- * Authoring consumers (SQL DSL `buildFieldPreset`, PSL preset resolver)
- * forward this through their emit path; the literal `codecValue` arm is
- * materialised to `{ kind: 'expression', expression }` once a codec is in
- * scope.
+ * {@link instantiateAuthoringFieldPreset}. Structurally identical to the
+ * contract IR's `ColumnDefault`: presets declare either a SQL expression
+ * (bypasses codec dispatch entirely) or the `autoincrement` target-mechanism
+ * sentinel. Authoring consumers forward this shape directly to the emitter.
  */
 export type AuthoringColumnDefault =
-  | { readonly kind: 'codecValue'; readonly value: unknown }
   | { readonly kind: 'expression'; readonly expression: string }
   | { readonly kind: 'autoincrement' };
 
@@ -568,50 +548,12 @@ function resolveAuthoringStorageTypeTemplate(
   };
 }
 
-function isAuthoringColumnDefaultCodecLiteralValue(value: unknown): boolean {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  ) {
-    return true;
-  }
-  if (value instanceof Date) {
-    return true;
-  }
-  if (Array.isArray(value)) {
-    return value.every(isAuthoringColumnDefaultCodecLiteralValue);
-  }
-  if (typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).every(
-      isAuthoringColumnDefaultCodecLiteralValue,
-    );
-  }
-  return false;
-}
-
 function resolveAuthoringColumnDefaultTemplate(
   template: AuthoringColumnDefaultTemplate,
   args: readonly unknown[],
 ): AuthoringColumnDefault {
   if (template.kind === 'autoincrement') {
     return { kind: 'autoincrement' };
-  }
-  if (template.kind === 'codecValue') {
-    const value = resolveAuthoringTemplateValue(template.value, args);
-    if (value === undefined) {
-      throw new Error('Resolved authoring literal default must not be undefined');
-    }
-    if (!isAuthoringColumnDefaultCodecLiteralValue(value)) {
-      throw new Error(
-        `Resolved authoring literal default must be a JSON-serializable value or Date, received ${String(value)}`,
-      );
-    }
-    return {
-      kind: 'codecValue',
-      value,
-    };
   }
 
   const expression = resolveAuthoringTemplateValue(template.expression, args);

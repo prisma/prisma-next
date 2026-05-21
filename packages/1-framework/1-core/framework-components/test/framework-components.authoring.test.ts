@@ -302,29 +302,7 @@ describe('authoring template resolution', () => {
     ).toThrow(/Resolved authoring expression default must resolve to a primitive/);
   });
 
-  it('rejects codecValue defaults that resolve to undefined', () => {
-    const descriptor = {
-      kind: 'fieldPreset',
-      output: {
-        codecId: 'test/text@1',
-        nativeType: 'text',
-        default: {
-          kind: 'codecValue',
-          value: {
-            kind: 'arg',
-            index: 0,
-            path: ['missing'],
-          },
-        },
-      },
-    } as const;
-
-    expect(() => instantiateAuthoringFieldPreset(descriptor, [{}])).toThrow(
-      /Resolved authoring literal default must not be undefined/,
-    );
-  });
-
-  it('resolves codecValue defaults and execution defaults from field presets', () => {
+  it('resolves expression defaults and execution defaults from field presets', () => {
     const descriptor = {
       kind: 'fieldPreset',
       output: {
@@ -337,13 +315,8 @@ describe('authoring template resolution', () => {
           },
         },
         default: {
-          kind: 'codecValue',
-          value: {
-            length: {
-              kind: 'arg',
-              index: 0,
-            },
-          },
+          kind: 'expression',
+          expression: 'gen_random_uuid()',
         },
         executionDefaults: {
           onCreate: {
@@ -370,10 +343,8 @@ describe('authoring template resolution', () => {
       },
       nullable: true,
       default: {
-        kind: 'codecValue',
-        value: {
-          length: 1536,
-        },
+        kind: 'expression',
+        expression: 'gen_random_uuid()',
       },
       executionDefaults: {
         onCreate: { kind: 'generator', id: 'vectorGenerated' },

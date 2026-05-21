@@ -4,7 +4,6 @@ export type {
   AuthoringColumnDefault,
   AuthoringColumnDefaultTemplate,
   AuthoringColumnDefaultTemplateAutoincrement,
-  AuthoringColumnDefaultTemplateCodecValue,
   AuthoringColumnDefaultTemplateExpression,
   AuthoringContributions,
   AuthoringEntityContext,
