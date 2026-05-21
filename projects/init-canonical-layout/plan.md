@@ -12,7 +12,7 @@ Single-slice project. One slice + one PR delivers the constant introduction, the
 
 ### Stack (deliver in order)
 
-1. **Slice `init-canonical-layout`** — move `prisma-next init`'s default scaffold from `prisma/` to canonical `src/prisma/`, consolidating the layout convention behind `DEFAULT_PRISMA_DIR`, adding `--reinit` detect-and-warn for legacy layouts, and sweeping stale text references. Scope:
+1. **Slice [`init-canonical-layout`](./slices/init-canonical-layout/spec.md)** — move `prisma-next init`'s default scaffold from `prisma/` to canonical `src/prisma/`, consolidating the layout convention behind `DEFAULT_PRISMA_DIR`, adding `--reinit` detect-and-warn for legacy layouts, and sweeping stale text references. Decomposed into two dispatches (D1 consolidation + sweep + test surface; D2 detect-and-warn) plus an operator manual-QA step — see the slice spec § Dispatch plan. Scope:
    - `packages/1-framework/1-core/config/src/config-types.ts` — introduce `DEFAULT_PRISMA_DIR`, re-express `DEFAULT_CONTRACT_OUTPUT` in terms of it.
    - `packages/1-framework/1-core/config/src/exports/config-types.ts` — export the new constant.
    - `packages/1-framework/3-tooling/cli/src/commands/init/templates/code-templates.ts` — `defaultSchemaPath` derives from `DEFAULT_PRISMA_DIR`.
