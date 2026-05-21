@@ -144,6 +144,7 @@ exports[`help text snapshots > formats db update help 1`] = `
 │                       default: false
 │ --to <contract>       Target contract reference (hash, prefix, ref name,
 │                       migration dir name, <dir>^, or ./path)
+│ --advance-ref <name>  Ref to advance to the post-command contract hash
 │
 │ Examples:
 │   $ prisma-next db update --db $DATABASE_URL

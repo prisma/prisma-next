@@ -1,3 +1,4 @@
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -10,6 +11,7 @@ import {
   errorRunnerFailed,
   errorRuntime,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
 import {
@@ -29,10 +31,18 @@ import {
   addMigrationCommandOptions,
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
+import {
+  buildRefAdvancementFields,
+  computeRefAdvancementName,
+  type RefAdvancementFields,
+  readContractIR,
+} from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
-type DbInitOptions = MigrationCommandOptions;
+interface DbInitOptions extends MigrationCommandOptions {
+  readonly advanceRef?: string;
+}
 
 /**
  * Maps a DbInitFailure to a CliStructuredError for consistent error handling.
@@ -128,7 +138,7 @@ async function executeDbInitCommand(
   // per-space precheck + marker-check helpers are no longer needed at
   // this surface. Marker-vs-on-disk drift surfaces through the planner's
   // graph-walk strategy.
-  const { migrationsDir } = resolveMigrationPaths(options.config, config);
+  const { migrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
 
   try {
     await client.connect(dbConnection);
@@ -143,6 +153,39 @@ async function executeDbInitCommand(
     // Handle failures by mapping to CLI structured error
     if (!result.ok) {
       return notOk(mapDbInitFailure(result.failure));
+    }
+
+    const advancementHash =
+      result.value.mode === 'apply'
+        ? (result.value.marker?.storageHash ?? result.value.destination.storageHash)
+        : result.value.destination.storageHash;
+
+    let refAdvancementFields: RefAdvancementFields = {
+      advancedRef: null,
+      plannedAdvanceRef: null,
+    };
+    if (
+      computeRefAdvancementName({
+        ...ifDefined('advanceRef', options.advanceRef),
+        ...ifDefined('db', options.db),
+      }) !== null
+    ) {
+      try {
+        const contractIR = await readContractIR(contractJson, contractPathAbsolute);
+        refAdvancementFields = await buildRefAdvancementFields({
+          ...ifDefined('advanceRef', options.advanceRef),
+          ...ifDefined('db', options.db),
+          refsDir,
+          contractIR,
+          mode: result.value.mode,
+          hash: advancementHash,
+        });
+      } catch (error) {
+        if (MigrationToolsError.is(error)) {
+          return notOk(mapMigrationToolsError(error));
+        }
+        throw error;
+      }
     }
 
     // Convert success result to CLI output format
@@ -179,6 +222,8 @@ async function executeDbInitCommand(
           }
         : {}),
       ...ifDefined('perSpace', result.value.perSpace),
+      advancedRef: refAdvancementFields.advancedRef,
+      plannedAdvanceRef: refAdvancementFields.plannedAdvanceRef,
       summary: result.value.summary,
       timings: { total: Date.now() - startTime },
     };
@@ -229,6 +274,7 @@ export function createDbInitCommand(): Command {
     'prisma-next db init --db $DATABASE_URL --dry-run',
   ]);
   addMigrationCommandOptions(command);
+  command.option('--advance-ref <name>', 'Ref to advance to the post-command contract hash');
   command.action(async (options: DbInitOptions) => {
     const flags = parseGlobalFlagsOrExit(options);
     const startTime = Date.now();
