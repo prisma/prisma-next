@@ -10,7 +10,7 @@ vi.mock('@clack/prompts', () => ({
   cancel: vi.fn(),
   isCancel: vi.fn(() => false),
   select: vi.fn(async () => 'postgres'),
-  text: vi.fn(async () => 'prisma/contract.prisma'),
+  text: vi.fn(async () => 'src/prisma/contract.prisma'),
   confirm: vi.fn(async () => true),
   note: vi.fn(),
   log: {
@@ -137,7 +137,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       .mockReset()
       .mockResolvedValueOnce('postgres')
       .mockResolvedValueOnce('psl');
-    vi.mocked(clack.text).mockResolvedValue('prisma/contract.prisma');
+    vi.mocked(clack.text).mockResolvedValue('src/prisma/contract.prisma');
     vi.mocked(clack.confirm).mockResolvedValue(true);
   }, timeouts.databaseOperation);
 
@@ -151,9 +151,9 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       flags: interactiveFlags(),
     });
     expect(exit).toBe(INIT_EXIT_OK);
-    expect(existsSync(join(tmpDir, 'prisma/contract.prisma'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.prisma'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'prisma/db.ts'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'src/prisma/db.ts'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma-next.md'))).toBe(true);
     // init must not emit `.agents/skills/prisma-next/SKILL.md`.
     expect(existsSync(join(tmpDir, '.agents/skills/prisma-next/SKILL.md'))).toBe(false);
@@ -164,7 +164,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
     expect(config).toContain("from '@prisma-next/postgres/config'");
-    expect(config).toContain('contract: "./prisma/contract.prisma"');
+    expect(config).toContain('contract: "./src/prisma/contract.prisma"');
     const imports = config.split('\n').filter((l) => l.includes("from '@prisma-next/"));
     expect(imports).toHaveLength(1);
   });
@@ -172,7 +172,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
   it('generates db.ts with single @prisma-next runtime import', async () => {
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
-    const db = readFileSync(join(tmpDir, 'prisma/db.ts'), 'utf-8');
+    const db = readFileSync(join(tmpDir, 'src/prisma/db.ts'), 'utf-8');
     const prismaNextImports = db.split('\n').filter((l) => l.includes("from '@prisma-next/"));
     expect(prismaNextImports).toHaveLength(1);
     expect(prismaNextImports[0]).toContain('@prisma-next/postgres/runtime');
@@ -181,7 +181,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
   it('generates PSL starter schema with User and Post models', async () => {
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
-    const schema = readFileSync(join(tmpDir, 'prisma/contract.prisma'), 'utf-8');
+    const schema = readFileSync(join(tmpDir, 'src/prisma/contract.prisma'), 'utf-8');
     expect(schema).toContain('model User');
     expect(schema).toContain('model Post');
   });
@@ -191,16 +191,16 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       .mockReset()
       .mockResolvedValueOnce('postgres')
       .mockResolvedValueOnce('typescript');
-    vi.mocked(clack.text).mockResolvedValue('prisma/contract.ts');
+    vi.mocked(clack.text).mockResolvedValue('src/prisma/contract.ts');
 
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
-    const schema = readFileSync(join(tmpDir, 'prisma/contract.ts'), 'utf-8');
+    const schema = readFileSync(join(tmpDir, 'src/prisma/contract.ts'), 'utf-8');
     expect(schema).toContain('defineContract');
     expect(schema).toContain("from '@prisma-next/postgres/contract-builder'");
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
-    expect(config).toContain('contract: "./prisma/contract.ts"');
+    expect(config).toContain('contract: "./src/prisma/contract.ts"');
   });
 
   it('the schema-path prompt rejects an extension that does not match the chosen authoring', async () => {
@@ -280,9 +280,9 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
   });
 
   it('overwrites all files when re-init is accepted', async () => {
-    mkdirSync(join(tmpDir, 'prisma'), { recursive: true });
+    mkdirSync(join(tmpDir, 'src/prisma'), { recursive: true });
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'old config');
-    writeFileSync(join(tmpDir, 'prisma/contract.prisma'), 'old schema');
+    writeFileSync(join(tmpDir, 'src/prisma/contract.prisma'), 'old schema');
 
     vi.mocked(clack.confirm).mockResolvedValue(true);
 
@@ -292,7 +292,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     expect(config).not.toBe('old config');
     expect(config).toContain("from '@prisma-next/postgres/config'");
 
-    const schema = readFileSync(join(tmpDir, 'prisma/contract.prisma'), 'utf-8');
+    const schema = readFileSync(join(tmpDir, 'src/prisma/contract.prisma'), 'utf-8');
     expect(schema).not.toBe('old schema');
     expect(schema).toContain('model User');
   });
@@ -694,8 +694,8 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
       flags: noninteractiveFlags(),
     });
     const gitattributes = readFileSync(join(tmpDir, '.gitattributes'), 'utf-8');
-    expect(gitattributes).toContain('prisma/contract.json linguist-generated');
-    expect(gitattributes).toContain('prisma/contract.d.ts linguist-generated');
+    expect(gitattributes).toContain('src/prisma/contract.json linguist-generated');
+    expect(gitattributes).toContain('src/prisma/contract.d.ts linguist-generated');
   });
 
   it('writes .gitattributes relative to a non-default --schema-path (FR3.4)', async () => {
@@ -964,18 +964,18 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
-    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{"stale":true}');
-    writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export type Contract = never;');
-    writeFileSync(join(tmpDir, 'prisma', 'end-contract.json'), '{"stale":true}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.json'), '{"stale":true}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.d.ts'), 'export type Contract = never;');
+    writeFileSync(join(tmpDir, 'src/prisma', 'end-contract.json'), '{"stale":true}');
 
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', force: true, install: false },
       flags: noninteractiveFlags(),
     });
 
-    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
-    expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
-    expect(existsSync(join(tmpDir, 'prisma/end-contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.d.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/end-contract.json'))).toBe(false);
   });
 
   it('does not delete unrelated files in the schema dir (FR9.1 boundary)', async () => {
@@ -983,18 +983,18 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
-    writeFileSync(join(tmpDir, 'prisma', 'seed.ts'), 'export {}');
-    writeFileSync(join(tmpDir, 'prisma', 'README.md'), '# notes');
-    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'seed.ts'), 'export {}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'README.md'), '# notes');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.json'), '{}');
 
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', force: true, install: false },
       flags: noninteractiveFlags(),
     });
 
-    expect(existsSync(join(tmpDir, 'prisma/seed.ts'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'prisma/README.md'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/seed.ts'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'src/prisma/README.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.json'))).toBe(false);
   });
 
   it('does not delete anything on a green-field init (FR9.1)', async () => {
@@ -1022,8 +1022,8 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
-    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
-    writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export {}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.json'), '{}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.d.ts'), 'export {}');
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
@@ -1038,7 +1038,7 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       });
       const parsed = JSON.parse(writes.join('').trim()) as { filesDeleted: string[] };
       expect(parsed.filesDeleted).toEqual(
-        expect.arrayContaining(['prisma/contract.json', 'prisma/contract.d.ts']),
+        expect.arrayContaining(['src/prisma/contract.json', 'src/prisma/contract.d.ts']),
       );
     } finally {
       spy.mockRestore();
@@ -1138,8 +1138,8 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
         2,
       ),
     );
-    writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export type Contract = unknown;');
-    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.d.ts'), 'export type Contract = unknown;');
+    writeFileSync(join(tmpDir, 'src/prisma', 'contract.json'), '{}');
 
     await runInitTest(tmpDir, {
       options: { target: 'mongodb', authoring: 'psl', force: true, install: false },
@@ -1150,8 +1150,8 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       dependencies: Record<string, string>;
     };
     expect(pkg.dependencies['@prisma-next/postgres']).toBeUndefined();
-    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
-    expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.d.ts'))).toBe(false);
   });
 
   it('idempotent .gitignore: partial entries are not duplicated on re-init (FR9.3)', async () => {
@@ -1233,7 +1233,7 @@ describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation
     expect(clack.select).not.toHaveBeenCalled();
     expect(clack.text).not.toHaveBeenCalled();
     expect(clack.confirm).not.toHaveBeenCalled();
-    expect(existsSync(join(tmpDir, 'prisma/contract.prisma'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.prisma'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
   });
 
@@ -1253,7 +1253,7 @@ describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation
       flags: noninteractiveFlags(),
     });
 
-    expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'src/prisma/contract.ts'))).toBe(true);
   });
 
   it('honours --schema-path (FR1.1)', async () => {
@@ -1603,7 +1603,7 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     expect(parsed['ok']).toBe(true);
     expect(parsed['target']).toBe('postgres');
     expect(parsed['authoring']).toBe('psl');
-    expect(parsed['schemaPath']).toBe('prisma/contract.prisma');
+    expect(parsed['schemaPath']).toBe('src/prisma/contract.prisma');
     expect(Array.isArray(parsed['filesWritten'])).toBe(true);
     expect((parsed['filesWritten'] as string[]).length).toBeGreaterThan(0);
     expect(parsed['packagesInstalled']).toMatchObject({ skipped: true });
@@ -1782,7 +1782,7 @@ describe('runInit pnpm → npm install fallback (FR7.2)', {
       expect(parsed.ok).toBe(false);
       expect(parsed.code).toBe('PN-CLI-5007');
       expect(parsed.meta.filesWritten).toEqual(
-        expect.arrayContaining(['prisma-next.config.ts', 'prisma/contract.prisma']),
+        expect.arrayContaining(['prisma-next.config.ts', 'src/prisma/contract.prisma']),
       );
       expect(parsed.meta.stderr.join('\n')).toMatch(/ENOTFOUND/);
     } finally {
