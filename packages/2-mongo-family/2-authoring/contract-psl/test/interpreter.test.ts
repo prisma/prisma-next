@@ -1,4 +1,8 @@
-import type { ContractField, ContractReferenceRelation } from '@prisma-next/contract/types';
+import type {
+  ContractField,
+  ContractReferenceRelation,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoCollection, MongoStorage, MongoValidator } from '@prisma-next/mongo-contract';
@@ -800,7 +804,9 @@ describe('interpretPslDocumentToMongoContract', () => {
           },
         },
         storage: new MongoStorage({
-          storageHash: expect.stringMatching(/^sha256:/) as unknown as `sha256:${string}`,
+          storageHash: expect.stringMatching(
+            /^sha256:/,
+          ) as unknown as StorageHashBase<`sha256:${string}`>,
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
