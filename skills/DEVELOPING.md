@@ -83,13 +83,12 @@ Anything that prints is a likely defect: a user-authored example is importing fr
 
 The exclusion list covers the three sanctioned sources of user-authored `@prisma-next/*` imports: target façades (`postgres`, `mongo`, `sqlite`), extension façades (`extension-<name>`), and build-tool plugin packages (`<bundler>-plugin-<purpose>`, e.g. `@prisma-next/vite-plugin-contract-emit`). Build-tool plugins are themselves one-package-per-integration façades — they ship their own public surface and are not internal to a target package.
 
-**The framework-rendered exception.** Some files in a user's project are written *by* the framework, not by the user — chiefly `migrations/<scope>/<timestamp>/migration.ts`, which `prisma-next migration create` renders. Those files currently import from `@prisma-next/target-postgres/migration` because the postgres façade does not yet expose a `/migration` subpath (tracked in Linear `TML-2526`). A skill describing those files should:
+**The framework-rendered exception.** Some files in a user's project are written *by* the framework, not by the user — chiefly `migrations/<scope>/<timestamp>/migration.ts`, which `prisma-next migration create` renders. Those files import from `@prisma-next/postgres/migration` (or `@prisma-next/sqlite/migration` for SQLite). A skill describing those files should:
 
 1. Make explicit that the imports are framework-managed.
 2. Not show those imports as if the user typed them.
-3. Route the gap to `prisma-next-feedback` and reference `TML-2526` in *What Prisma Next doesn't do yet*.
 
-When `TML-2526` lands, the framework renderer and the skill switch to `@prisma-next/postgres/migration` in lockstep. Until then, the framework-rendered-but-internal-imports case is the only sanctioned exception to façade-only imports — and the skill must name it as an exception, not normalise it.
+The framework-rendered migration scaffold uses the target façade's `/migration` subpath — the same façade-only convention as the rest of the project.
 
 **Worked example — the contract skill re-audit.** Commit `e41f02c1b` rewrote every user-authored example in `prisma-next-contract/SKILL.md` against the façade. The `prisma-next.config.ts` example went from seven imports across `@prisma-next/{cli,adapter-postgres,driver-postgres,family-sql,target-postgres,sql-contract-psl}` to two imports from `@prisma-next/{postgres/config, extension-pgvector/control}`. The TS builder example moved off `@prisma-next/sql-contract-ts/contract-builder` onto `@prisma-next/postgres/contract-builder`, and uses `@prisma-next/postgres/family` and `@prisma-next/postgres/target` as the `family`/`target` packs (a less-obvious façade subpath worth knowing about). Read the diff for a before/after.
 

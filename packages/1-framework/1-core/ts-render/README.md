@@ -42,7 +42,7 @@ class CreateTableCall extends TsExpression {
   }
 
   override importRequirements(): readonly ImportRequirement[] {
-    return [{ moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'createTable' }];
+    return [{ moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'createTable' }];
   }
 }
 ```
