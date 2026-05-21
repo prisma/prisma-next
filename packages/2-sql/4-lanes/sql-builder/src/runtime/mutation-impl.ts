@@ -60,12 +60,12 @@ function mergeWriteAnnotations(
 }
 
 type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
-type UpdateSetCallback = (
+export type UpdateSetCallback = (
   fields: ReturnType<typeof createFieldProxy>,
   fns: ReturnType<typeof createFunctions>,
 ) => Record<string, Expression<ScopeField>>;
 
-function buildParamValues(
+export function buildParamValues(
   values: Record<string, unknown>,
   table: StorageTable,
   tableName: string,
@@ -107,7 +107,7 @@ function evaluateWhere(
   return result.buildAst();
 }
 
-function evaluateUpdateCallback(
+export function evaluateUpdateCallback(
   callback: UpdateSetCallback,
   scope: Scope,
   queryOperationTypes: BuilderContext['queryOperationTypes'],
@@ -128,6 +128,10 @@ function buildParamRows(
   tableName: string,
   ctx: BuilderContext,
 ): ReadonlyArray<Record<string, ParamRef>> {
+  // SQLite renderInsert derives column order from the first row and throws on any
+  // row that is missing a column in that set. The builder must therefore normalise
+  // all rows to a uniform column union, filling absent columns with an explicit
+  // NULL ParamRef rather than leaving them absent.
   const perRowParams: Array<Record<string, ParamRef>> = rows.map((rowValues) =>
     buildParamValues(rowValues, table, tableName, 'create', ctx),
   );
@@ -264,51 +268,46 @@ export class UpdateQueryImpl<
   implements UpdateQuery<QC, AvailableScope, RowType>
 {
   readonly #tableName: string;
-  readonly #table: StorageTable;
   readonly #scope: Scope;
-  readonly #setValues: Record<string, unknown>;
-  readonly #setCallback: UpdateSetCallback | undefined;
-  readonly #whereCallbacks: readonly WhereCallback[];
+  readonly #setExpressions: Record<string, AstExpression>;
+  readonly #whereExprs: readonly AstExpression[];
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
     tableName: string,
-    table: StorageTable,
     scope: Scope,
-    setValues: Record<string, unknown>,
+    setExpressions: Record<string, AstExpression>,
     ctx: BuilderContext,
-    whereCallbacks: readonly WhereCallback[] = [],
+    whereExprs: readonly AstExpression[] = [],
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
-    setCallback?: UpdateSetCallback,
   ) {
     super(ctx);
     this.#tableName = tableName;
-    this.#table = table;
     this.#scope = scope;
-    this.#setValues = setValues;
-    this.#setCallback = setCallback;
-    this.#whereCallbacks = whereCallbacks;
+    this.#setExpressions = setExpressions;
+    this.#whereExprs = whereExprs;
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
     this.#annotations = annotations;
   }
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType> {
+    const fieldProxy = createFieldProxy(this.#scope);
+    const fns = createFunctions(this.ctx.queryOperationTypes);
+    const result = (expr as ExpressionBuilder<Scope, QueryContext>)(fieldProxy, fns as never);
     return new UpdateQueryImpl(
       this.#tableName,
-      this.#table,
       this.#scope,
-      this.#setValues,
+      this.#setExpressions,
       this.ctx,
-      [...this.#whereCallbacks, expr as unknown as WhereCallback],
+      [...this.#whereExprs, result.buildAst()],
       this.#returningColumns,
       this.#rowFields,
       this.#annotations,
-      this.#setCallback,
     );
   }
 
@@ -324,15 +323,13 @@ export class UpdateQueryImpl<
       }
       return new UpdateQueryImpl(
         this.#tableName,
-        this.#table,
         this.#scope,
-        this.#setValues,
+        this.#setExpressions,
         this.ctx,
-        this.#whereCallbacks,
+        this.#whereExprs,
         columns,
         newRowFields,
         this.#annotations,
-        this.#setCallback,
       ) as unknown as UpdateQuery<QC, AvailableScope, never>;
     },
   );
@@ -347,51 +344,23 @@ export class UpdateQueryImpl<
   ): UpdateQuery<QC, AvailableScope, RowType> {
     return new UpdateQueryImpl(
       this.#tableName,
-      this.#table,
       this.#scope,
-      this.#setValues,
+      this.#setExpressions,
       this.ctx,
-      this.#whereCallbacks,
+      this.#whereExprs,
       this.#returningColumns,
       this.#rowFields,
       mergeWriteAnnotations(
         this.#annotations,
         annotations as readonly AnnotationValue<unknown, OperationKind>[],
       ),
-      this.#setCallback,
     );
   }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
-    let setExpressions: Record<string, AstExpression>;
-
-    if (this.#setCallback) {
-      const callbackSet = evaluateUpdateCallback(
-        this.#setCallback,
-        this.#scope,
-        this.ctx.queryOperationTypes,
-      );
-      const defaults = buildParamValues({}, this.#table, this.#tableName, 'update', this.ctx);
-      setExpressions = { ...defaults, ...callbackSet };
-    } else {
-      setExpressions = buildParamValues(
-        this.#setValues,
-        this.#table,
-        this.#tableName,
-        'update',
-        this.ctx,
-      );
-    }
-
-    const whereExpr = combineWhereExprs(
-      this.#whereCallbacks.map((cb) =>
-        evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes),
-      ),
-    );
-
     let ast = UpdateAst.table(TableSource.named(this.#tableName))
-      .withSet(setExpressions)
-      .withWhere(whereExpr);
+      .withSet(this.#setExpressions)
+      .withWhere(combineWhereExprs(this.#whereExprs));
 
     if (this.#returningColumns.length > 0) {
       ast = ast.withReturning(

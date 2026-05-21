@@ -32,7 +32,13 @@ import type { LateralBuilder } from '../types/shared';
 import type { TableProxy } from '../types/table-proxy';
 import { BuilderBase, type BuilderContext, emptyState, tableToScope } from './builder-base';
 import { JoinedTablesImpl } from './joined-tables-impl';
-import { DeleteQueryImpl, InsertQueryImpl, UpdateQueryImpl } from './mutation-impl';
+import {
+  buildParamValues,
+  DeleteQueryImpl,
+  evaluateUpdateCallback,
+  InsertQueryImpl,
+  UpdateQueryImpl,
+} from './mutation-impl';
 import { SelectQueryImpl } from './query-impl';
 
 export class TableProxyImpl<
@@ -161,28 +167,27 @@ export class TableProxyImpl<
 
   update(setOrCallback: unknown): UpdateQuery<QC, AvailableScope, EmptyRow> {
     if (typeof setOrCallback === 'function') {
+      const callbackExprs = evaluateUpdateCallback(
+        setOrCallback as never,
+        this.#scope,
+        this.ctx.queryOperationTypes,
+      );
+      const defaults = buildParamValues({}, this.#table, this.#tableName, 'update', this.ctx);
       return new UpdateQueryImpl(
         this.#tableName,
-        this.#table,
         this.#scope,
-        {},
+        { ...defaults, ...callbackExprs },
         this.ctx,
-        [],
-        [],
-        {},
-        new Map(),
-        // UpdateSetCallback is module-private in mutation-impl; the function branch is
-        // guaranteed by the typeof check above, so the structural cast is sound.
-        setOrCallback as never,
       );
     }
-    return new UpdateQueryImpl(
-      this.#tableName,
-      this.#table,
-      this.#scope,
+    const setExpressions = buildParamValues(
       setOrCallback as Record<string, unknown>,
+      this.#table,
+      this.#tableName,
+      'update',
       this.ctx,
     );
+    return new UpdateQueryImpl(this.#tableName, this.#scope, setExpressions, this.ctx);
   }
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {
