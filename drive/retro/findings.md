@@ -2,6 +2,26 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-21 · drive-qa-run + agent self-discipline · friction
+
+I (running TML-2614 review/QA) reported three "pre-existing failures on `origin/main`" in the PR body and filed TML-2631 against one of them. **All three were operator-environment artefacts in my local worktree**, not real failures on `origin/main`:
+
+- 4× `mongo.e2e.test.ts` runtime failures — stale `dist/index.mjs` in `@prisma-next/mongo-contract` (pre-namespacing schema). Cleared by `pnpm --filter @prisma-next/mongo-contract --filter @prisma-next/family-mongo build`.
+- `mongo.types.test-d.ts` typecheck failure — same root cause (stale `dist/.d.mts` exports). Cleared by the same rebuild.
+- `postgres/test/psl-namespace-qualifier-routing.test.ts` typecheck failure — `@prisma-next/psl-parser` had been added as a `devDependency` of `@prisma-next/postgres` but never linked into `packages/3-extensions/postgres/node_modules/@prisma-next/`. Cleared by `pnpm install`.
+
+`AGENTS.md` already calls out the relevant hygiene ("After changing exported types in a workspace package consumed elsewhere, run that package's `pnpm build` to refresh `dist/*.d.mts`"). I didn't follow it after the rebase. The QA runner's pre-flight gate (`drive/qa/README.md § Standard pre-QA gate`) checks `pnpm typecheck && pnpm test:packages` but doesn't first force `pnpm install && pnpm build` — so it inherits whatever staleness the operator's worktree carries and reports it as if it were real product state. The failure mode is asymmetric: a stale dist is invisible (no warning that `dist/` predates the source), so the failure looks identical to a code bug.
+
+The misdiagnosis didn't get caught by me; it got caught by an independent investigator agent who read the schema source on `origin/main` and noticed the ticket's error wording was inconsistent with the on-disk schema shape. Without that pushback, TML-2631 would have absorbed a stranger's cycles on a non-bug, and the PR body's "Reviewer notes" would have continued misleading PR reviewers.
+
+**Suggested actions:**
+
+1. `drive-qa-run`'s pre-QA gate should explicitly run `pnpm install && pnpm build` (or document why it doesn't — turbo cache, time budget) before running typecheck/test. Any "pre-existing failure" claim should be paired with an `origin/main`-side verification (`git stash && git checkout origin/main && <reproduce> && git checkout - && git stash pop`) before the runner is allowed to record it as such in a report or PR body.
+2. `drive-pr-description`'s "Reviewer notes" section should refuse to record a claim of "pre-existing failure on `origin/main`" without a captured artefact of running the same test on `origin/main` and seeing it fail there too. If the operator skips that verification, the note should say "I did not verify this is pre-existing on `origin/main`" rather than implying verification.
+3. As an agent self-discipline note: any time I'm about to say "this is broken on `origin/main`," that's a high-confidence-required claim and the verification cost is small (one git checkout + one test run). The right default is to verify.
+
+**Upstream candidate?** Yes — high-leverage because the failure mode confidently misroutes attention to a non-bug.
+
 ## 2026-05-20 · drive-qa-plan · gap
 
 QA scenarios that "run a short script that imports `@prisma-next/<extension>`" need the script to live **inside a pnpm workspace member directory** (e.g. `packages/<x>/scratch/`, `examples/<x>/`, or a dedicated QA fixtures package). The QA runner's natural instinct is to drop the script into `/tmp/` and `pnpm exec tsx /tmp/script.ts` — which fails because `/tmp/` is outside the workspace, so `pnpm`'s resolution can't find `@prisma-next/*` and `tsx` can't resolve the imports. The TML-2614 QA run hit this on every script-shape scenario and the runner had to rewrite the steps mid-run; the surviving `manual-qa.md` still has step wording that points at `/tmp/` paths (logged as F-1 in the run report).
