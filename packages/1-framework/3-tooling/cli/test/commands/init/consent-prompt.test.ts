@@ -20,7 +20,7 @@ vi.mock('@clack/prompts', () => ({
   cancel: vi.fn(),
   isCancel: vi.fn(() => false),
   select: vi.fn(async () => 'postgres'),
-  text: vi.fn(async () => 'prisma/contract.prisma'),
+  text: vi.fn(async () => 'src/prisma/contract.prisma'),
   confirm: vi.fn(async () => true),
   note: vi.fn(),
   log: {
@@ -90,7 +90,7 @@ describe('telemetry consent prompt during `init`', () => {
       .mockReset()
       .mockResolvedValueOnce('postgres')
       .mockResolvedValueOnce('psl');
-    vi.mocked(clack.text).mockResolvedValue('prisma/contract.prisma');
+    vi.mocked(clack.text).mockResolvedValue('src/prisma/contract.prisma');
   });
 
   afterEach(() => {
