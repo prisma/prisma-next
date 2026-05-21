@@ -6,6 +6,7 @@ import type {
   ExpressionBuilder,
   ExtractScopeFields,
   FieldProxy,
+  Functions,
   WithField,
   WithFields,
 } from '../expression';
@@ -38,6 +39,7 @@ import {
   evaluateUpdateCallback,
   InsertQueryImpl,
   UpdateQueryImpl,
+  type UpdateSetCallback,
 } from './mutation-impl';
 import { SelectQueryImpl } from './query-impl';
 
@@ -165,10 +167,17 @@ export class TableProxyImpl<
     return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, rows, this.ctx);
   }
 
-  update(setOrCallback: unknown): UpdateQuery<QC, AvailableScope, EmptyRow> {
+  update(
+    setOrCallback:
+      | Record<string, unknown>
+      | ((
+          fields: FieldProxy<AvailableScope>,
+          fns: Functions<QC>,
+        ) => Record<string, Expression<ScopeField>>),
+  ): UpdateQuery<QC, AvailableScope, EmptyRow> {
     if (typeof setOrCallback === 'function') {
       const callbackExprs = evaluateUpdateCallback(
-        setOrCallback as never,
+        setOrCallback as UpdateSetCallback,
         this.#scope,
         this.ctx.queryOperationTypes,
       );
@@ -181,7 +190,7 @@ export class TableProxyImpl<
       );
     }
     const setExpressions = buildParamValues(
-      setOrCallback as Record<string, unknown>,
+      setOrCallback,
       this.#table,
       this.#tableName,
       'update',
