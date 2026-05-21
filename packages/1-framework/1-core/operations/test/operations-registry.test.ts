@@ -48,16 +48,16 @@ describe('OperationRegistry', () => {
     );
   });
 
-  it('throws when self has neither codecId nor traits', () => {
+  it('throws when self has none of codecId, traits, or any', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
       registry.register('bad', {
-        // @ts-expect-error — SelfSpec requires codecId or traits
+        // @ts-expect-error — SelfSpec requires codecId, traits, or any
         self: {},
         impl: noopImpl,
       }),
-    ).toThrow('Operation "bad" self has neither codecId nor traits');
+    ).toThrow('Operation "bad" self has none of codecId, traits, or any');
   });
 
   it('throws when self has an empty traits array', () => {
@@ -68,19 +68,56 @@ describe('OperationRegistry', () => {
         self: { traits: [] },
         impl: noopImpl,
       }),
-    ).toThrow('Operation "bad" self has neither codecId nor traits');
+    ).toThrow('Operation "bad" self has none of codecId, traits, or any');
   });
 
-  it('throws when self has both codecId and traits', () => {
+  it('throws when self combines codecId and traits', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
       registry.register('bad', {
-        // @ts-expect-error — SelfSpec disallows both codecId and traits
+        // @ts-expect-error — SelfSpec disallows combining codecId and traits
         self: { codecId: 'pg/text@1', traits: ['textual'] },
         impl: noopImpl,
       }),
-    ).toThrow('Operation "bad" self has both codecId and traits');
+    ).toThrow('Operation "bad" self combines codecId and traits');
+  });
+
+  it('accepts self with any: true', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register(
+        'fine',
+        descriptor({
+          self: { any: true },
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('throws when self combines any with codecId', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register('bad', {
+        // @ts-expect-error — SelfSpec disallows combining any with codecId
+        self: { any: true, codecId: 'pg/text@1' },
+        impl: noopImpl,
+      }),
+    ).toThrow('Operation "bad" self combines any with codecId or traits');
+  });
+
+  it('throws when self combines any with traits', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register('bad', {
+        // @ts-expect-error — SelfSpec disallows combining any with traits
+        self: { any: true, traits: ['textual'] },
+        impl: noopImpl,
+      }),
+    ).toThrow('Operation "bad" self combines any with codecId or traits');
   });
 
   it('accepts trait-only self', () => {

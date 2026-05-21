@@ -94,12 +94,18 @@ export type CodecTypesOf<T> = [T] extends [never]
  * Dispatch hint identifying the first-argument target of an operation.
  *
  * Used by ORM column helpers to decide whether an operation is reachable on a
- * field. Either names a concrete codec identity or a set of capability traits
- * that the field's codec must carry.
+ * field. Either names a concrete codec identity, a set of capability traits
+ * that the field's codec must carry, or `any: true` meaning the operation
+ * applies to every codec irrespective of traits.
+ *
+ * Keep arms in lock-step with `SelfSpec` in `@prisma-next/operations` (same
+ * arms, same order). The runtime registry validates the same exactly-one-set
+ * invariant the type-level discriminated union encodes.
  */
 export type QueryOperationSelfSpec =
-  | { readonly codecId: string; readonly traits?: never }
-  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never };
+  | { readonly codecId: string; readonly traits?: never; readonly any?: never }
+  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never; readonly any?: never }
+  | { readonly any: true; readonly codecId?: never; readonly traits?: never };
 
 /**
  * Structural shape an operation's impl must return: any value carrying a
