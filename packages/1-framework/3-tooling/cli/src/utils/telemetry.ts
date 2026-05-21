@@ -77,7 +77,11 @@ function senderPath(): string {
   return fileURLToPath(new URL(import.meta.resolve('@prisma-next/cli-telemetry/sender')));
 }
 
-function fireTelemetry(actionCommand: Command, userConfig: UserConfig): TelemetryRunOutcome {
+function fireTelemetry(
+  actionCommand: Command,
+  userConfig: UserConfig,
+  overrides: { readonly databaseTarget?: string | null } = {},
+): TelemetryRunOutcome {
   return runTelemetry({
     command: commanderSnapshotForTelemetry(actionCommand),
     version: CLI_VERSION,
@@ -86,6 +90,7 @@ function fireTelemetry(actionCommand: Command, userConfig: UserConfig): Telemetr
     isCI: isCI(),
     env: process.env,
     userConfig,
+    ...(overrides.databaseTarget !== undefined ? { databaseTarget: overrides.databaseTarget } : {}),
   });
 }
 
@@ -117,13 +122,19 @@ export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRun
  * exactly for that first affirmative answer; subsequent init runs skip
  * it because the prompt is not shown again.
  *
- * `databaseTarget` is no longer injected here: the detached child
- * loads `prisma-next.config.*` itself, and the config file does not
- * exist yet at the moment this fires (init creates it later in the
- * same run). The first-init telemetry event therefore reports
- * `databaseTarget: null`; subsequent invocations pick up the target
- * via c12. Accepted as part of the PR #556 design refactor.
+ * The child's c12 load would return `databaseTarget: null` for this
+ * specific invocation because `prisma-next.config.*` is not yet on
+ * disk (init writes it later in the same run). To preserve the
+ * prompt-chosen target in the first-init telemetry event, this
+ * helper forwards the value as a parent-side IPC override on
+ * `ParentToSenderPayload.databaseTarget` — the child consults the
+ * override first and falls back to its c12 result when absent.
  */
-export function fireTelemetryAfterInitConsent(actionCommand: Command): TelemetryRunOutcome {
-  return fireTelemetry(actionCommand, readUserConfig());
+export function fireTelemetryAfterInitConsent(
+  actionCommand: Command,
+  inputs: { readonly databaseTarget: string },
+): TelemetryRunOutcome {
+  return fireTelemetry(actionCommand, readUserConfig(), {
+    databaseTarget: inputs.databaseTarget,
+  });
 }

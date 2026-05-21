@@ -13,6 +13,32 @@ const SENDER_PATH = HARNESS_PATHS.SENDER_PATH;
 let harness: BackendHarness;
 let projectDir: string;
 
+/**
+ * Build a `prisma-next.config.mjs` source string with the minimum
+ * descriptor shape that `validateConfig` (from
+ * `@prisma-next/config/config-validation`) accepts. The integration
+ * test exercises the full c12 + validator pipeline in the detached
+ * child, so the fixture has to be structurally valid.
+ */
+function validConfigSource(extensionPackIds: readonly string[]): string {
+  const descriptor = (kind: string) =>
+    `{ kind: '${kind}', id: 'postgres', familyId: 'sql', targetId: 'postgres', version: '0.0.1', create: () => ({}) }`;
+  const packs = extensionPackIds
+    .map(
+      (id) =>
+        `{ kind: 'extension', id: '${id}', familyId: 'sql', targetId: 'postgres', version: '0.0.1', create: () => ({}) }`,
+    )
+    .join(', ');
+  return [
+    'export default {',
+    `  family: { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1', emission: {}, create: () => ({}) },`,
+    `  target: ${descriptor('target')},`,
+    `  adapter: ${descriptor('adapter')},`,
+    `  extensionPacks: [${packs}],`,
+    '};\n',
+  ].join('\n');
+}
+
 beforeAll(async () => {
   harness = await startBackendHarness();
   projectDir = mkdtempSync(join(tmpdir(), 'cli-telemetry-int-project-'));
@@ -20,13 +46,15 @@ beforeAll(async () => {
     join(projectDir, 'package.json'),
     JSON.stringify({ name: 'fixture', devDependencies: { typescript: '^5.9.3' } }),
   );
-  // The detached child reads `prisma-next.config.*` via c12 to derive
+  // The detached child reads `prisma-next.config.*` via c12 and runs
+  // it through `@prisma-next/config`'s `validateConfig` to derive
   // `databaseTarget` + `extensions`. The integration suite exercises
-  // the real c12 path; write a `.mjs` fixture (fastest c12 load) so the
-  // happy-path assertions on those fields stay end-to-end.
+  // the full pipeline; write a `.mjs` fixture that satisfies the
+  // canonical validator so the happy-path assertions on those fields
+  // stay end-to-end.
   writeFileSync(
     join(projectDir, 'prisma-next.config.mjs'),
-    `export default {\n  target: { targetId: 'postgres' },\n  extensionPacks: [{ id: 'pgvector' }, { id: 'paradedb' }],\n};\n`,
+    validConfigSource(['pgvector', 'paradedb']),
   );
 }, timeouts.spinUpPpgDev);
 
@@ -210,10 +238,7 @@ describe('cli-telemetry end-to-end via telemetry backend', () => {
     // the `finally` so the rest of the suite keeps seeing the default.
     const configPath = join(projectDir, 'prisma-next.config.mjs');
     const previous = readFileSync(configPath, 'utf-8');
-    writeFileSync(
-      configPath,
-      `export default {\n  target: { targetId: 'postgres' },\n  extensionPacks: [{ id: 'pgvector' }, { id: 'paradedb' }, { id: 'myorg-custom-ext' }],\n};\n`,
-    );
+    writeFileSync(configPath, validConfigSource(['pgvector', 'paradedb', 'myorg-custom-ext']));
     try {
       await spawnSenderDirect(buildPayload());
       const [row] = await harness.awaitRows(1);

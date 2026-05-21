@@ -104,8 +104,8 @@ export function createInitCommand(): Command {
         options,
         flags,
         canPrompt,
-        afterFirstTelemetryConsent: () => {
-          fireTelemetryAfterInitConsent(actionCommand);
+        afterFirstTelemetryConsent: (inputs) => {
+          fireTelemetryAfterInitConsent(actionCommand, { databaseTarget: inputs.target });
         },
       });
       process.exit(exitCode);
