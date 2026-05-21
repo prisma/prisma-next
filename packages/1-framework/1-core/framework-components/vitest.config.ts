@@ -5,10 +5,8 @@ const dist = (relativePath: string) => fileURLToPath(new URL(relativePath, impor
 
 // Cross-family test wiring uses dist-path aliases because the natural devDep edge from
 // framework-components → sql-contract / mongo-contract creates a Turbo build cycle (family
-// packages already depend on framework-components). The aliases require the family packages'
-// dist/ to be built first; if you see cryptic vitest resolution errors after a clean checkout
-// or `pnpm clean`, run:
-//   pnpm --filter @prisma-next/sql-contract --filter @prisma-next/mongo-contract build
+// packages already depend on framework-components). turbo.json declares the implicit
+// build-order dependency so tests run after sibling dist/ exists.
 export default defineConfig({
   resolve: {
     alias: {
