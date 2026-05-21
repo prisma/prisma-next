@@ -27,13 +27,6 @@ changes:
         - "mongoClient"
         - "@prisma-next/mongo"
       anyMatch: true
-  - id: sql-orm-client-nested-includes-single-query-at-depth-2
-    summary: SQL ORM client — nested includes at depth ≥ 2 now collapse to a single-query strategy on capable targets; non-leaf `.distinct()` combined with nested includes now throws at plan / dispatch time.
-    detection:
-      glob: "**/*.{ts,tsx}"
-      contains:
-        - "@prisma-next/sql-orm-client"
-      anyMatch: true
 ---
 
 # 0.10 → 0.11 — Extension-author upgrade instructions
@@ -194,30 +187,8 @@ async close() {
 
 No script — the right migration depends on why your extension was sharing the client in the first place. Walk the call sites by hand.
 
-## `sql-orm-client-nested-includes-single-query-at-depth-2`
-
-Starting at the 0.11 release, the SQL ORM client (`@prisma-next/sql-orm-client`) changes how it picks an include-execution strategy for nested includes.
-
-### Behaviour change
-
-Previously, any include tree of depth ≥ 2 was executed as a **multi-query** fan-out (one root query plus one follow-up query per nested level). Starting at 0.11, the client first attempts a **single-query** plan (`joinChain`-style nested-JSON aggregation) on capable SQL targets, and only falls back to multi-query when the target or the descriptor shape cannot honour the single-query plan.
-
-This is a bugfix that makes nested includes behave the way the documented surface already describes: fewer issued SQL statements per query on capable targets, identical row results, identical typed surface. No public API was renamed or removed.
-
-### Recursive scalar / combine gate
-
-The existing rejection of unsupported scalar selectors and `combine()` descriptors on nested includes is now applied recursively rather than only at the top level — the same predicate runs at every depth of the include tree. Trees that previously fell through to the multi-query path with a nested `count()` / `combine()` now route through the same recursion-aware multi-query gate.
-
-### Who is affected
-
-The small subset of extension authors who consume `compileSelectWithIncludeStrategy` directly to introspect plan shape may see different plans on capable targets at depth ≥ 2 (single-query JSON aggregate inside the root statement, instead of follow-up statements). Plan-shape assertions in such test suites may need updating, or — if a specific strategy must be exercised — pin the strategy explicitly in the test.
-
-### Validation
-
-After updating any plan-shape assertions or include-tree shapes flagged above, run `pnpm typecheck && pnpm test` (or your extension's equivalent). The pin set is unchanged for this transition; `prisma-next-check-pins` should pass without changes.
-
 ## Validation by execution
 
-These entries are prose-only (no scripts). The substrate diff on `packages/3-extensions/` is additive (new methods on the three official facades, plus the SQL ORM client nested-includes collapse) and the Mongo behaviour change documented above; the `namespace-kind-required-on-handcrafted-contract-literals` entry covers a type-only tightening with no runtime substrate transform. There is no codemod to apply against a reverted substrate — the framework changes *are* the new surfaces, and these instructions describe the consumer-side translation, not a substrate transform.
+These entries are prose-only (no scripts). The substrate diff on `packages/3-extensions/` is additive (new methods on the three official facades) plus the Mongo behaviour change documented above; the `namespace-kind-required-on-handcrafted-contract-literals` entry covers a type-only tightening with no runtime substrate transform. There is no codemod to apply against a reverted substrate — the framework changes *are* the new surfaces, and these instructions describe the consumer-side translation, not a substrate transform.
 
 The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry. The substantive verification of the consumer-facing translation lives in the published skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.
