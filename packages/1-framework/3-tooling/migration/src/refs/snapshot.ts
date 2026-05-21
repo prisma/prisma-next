@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
-import { errorInvalidRefFile, errorInvalidRefName } from '../errors';
+import { errorInvalidRefFile, errorInvalidRefName, MigrationToolsError } from '../errors';
 import { deleteRef, type RefEntry, validateRefName, writeRef } from '../refs';
 
 export interface ContractIR {
@@ -154,13 +154,35 @@ export async function writeRefPaired(
   await writeRefSnapshot(refsDir, name, snapshot);
   try {
     await writeRef(refsDir, name, entry);
-  } catch (error) {
-    await deleteRefSnapshot(refsDir, name);
-    throw error;
+  } catch (writeError) {
+    try {
+      await deleteRefSnapshot(refsDir, name);
+    } catch {
+      // Rollback failure is secondary; preserve the original writeRef error.
+    }
+    throw writeError;
   }
 }
 
+function isUnknownRefError(error: unknown): boolean {
+  return MigrationToolsError.is(error) && error.code === 'MIGRATION.UNKNOWN_REF';
+}
+
 export async function deleteRefPaired(refsDir: string, name: string): Promise<void> {
+  const snapshot = await readRefSnapshot(refsDir, name);
+
+  if (snapshot !== null) {
+    try {
+      await deleteRef(refsDir, name);
+    } catch (error) {
+      if (!isUnknownRefError(error)) {
+        throw error;
+      }
+    }
+    await deleteRefSnapshot(refsDir, name);
+    return;
+  }
+
   await deleteRef(refsDir, name);
   await deleteRefSnapshot(refsDir, name);
 }
