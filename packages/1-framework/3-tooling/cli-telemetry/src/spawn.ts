@@ -1,5 +1,6 @@
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveTelemetryEndpoint } from './endpoint';
 import { resolveGating } from './gating';
 import type { ParentToSenderPayload } from './payload';
@@ -31,9 +32,9 @@ export interface RunTelemetryInputs {
   /**
    * Optional parent-side override for the c12-derived database target,
    * forwarded verbatim to the child sender. Wins over the child's
-   * c12-derived value when present.
+   * c12-derived value when present; `undefined` means "no override".
    */
-  readonly databaseTarget?: string | null;
+  readonly databaseTarget?: string;
   /**
    * Path to the sender entry compiled into this package's `dist/`.
    * Resolved by the caller because the compiled sender lives at
@@ -97,7 +98,7 @@ export function runTelemetry(inputs: RunTelemetryInputs): TelemetryRunOutcome {
     flags: sanitised.flags,
     projectRoot: inputs.projectRoot,
     endpoint: resolveTelemetryEndpoint(env),
-    ...(inputs.databaseTarget !== undefined ? { databaseTarget: inputs.databaseTarget } : {}),
+    ...ifDefined('databaseTarget', inputs.databaseTarget),
   };
 
   try {

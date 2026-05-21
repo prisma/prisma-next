@@ -8,6 +8,7 @@ import {
   type TelemetryRunOutcome,
   type UserConfig,
 } from '@prisma-next/cli-telemetry';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { version as CLI_VERSION } from '../../package.json' with { type: 'json' };
 import { isCI } from './is-ci';
@@ -80,7 +81,7 @@ function senderPath(): string {
 function fireTelemetry(
   actionCommand: Command,
   userConfig: UserConfig,
-  overrides: { readonly databaseTarget?: string | null } = {},
+  overrides: { readonly databaseTarget?: string } = {},
 ): TelemetryRunOutcome {
   return runTelemetry({
     command: commanderSnapshotForTelemetry(actionCommand),
@@ -90,7 +91,7 @@ function fireTelemetry(
     isCI: isCI(),
     env: process.env,
     userConfig,
-    ...(overrides.databaseTarget !== undefined ? { databaseTarget: overrides.databaseTarget } : {}),
+    ...ifDefined('databaseTarget', overrides.databaseTarget),
   });
 }
 

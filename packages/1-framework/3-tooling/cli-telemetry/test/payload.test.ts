@@ -23,13 +23,23 @@ describe('isParentToSenderPayload', () => {
     expect(isParentToSenderPayload({ ...validPayload, databaseTarget: 'postgres' })).toBe(true);
   });
 
-  it('accepts a payload with the optional databaseTarget override set to null', () => {
-    expect(isParentToSenderPayload({ ...validPayload, databaseTarget: null })).toBe(true);
+  it('accepts a payload with the optional databaseTarget override omitted entirely (no override)', () => {
+    // `validPayload` doesn't carry `databaseTarget` to begin with; spelling
+    // out the invariant here so a future regression that flipped the field
+    // from optional to required would surface as a failed assertion.
+    const { ...withoutOverride } = validPayload;
+    expect('databaseTarget' in withoutOverride).toBe(false);
+    expect(isParentToSenderPayload(withoutOverride)).toBe(true);
   });
 
   it('rejects a payload whose databaseTarget override is the wrong type', () => {
     expect(isParentToSenderPayload({ ...validPayload, databaseTarget: 42 })).toBe(false);
     expect(isParentToSenderPayload({ ...validPayload, databaseTarget: ['postgres'] })).toBe(false);
+    // `null` is no longer a valid override value — the IPC channel uses
+    // `undefined` (field omitted) for the "no override" state. The wire-
+    // format `TelemetryEvent.databaseTarget` is still `string | null`,
+    // but that's a separate downstream shape.
+    expect(isParentToSenderPayload({ ...validPayload, databaseTarget: null })).toBe(false);
   });
 
   it('rejects non-objects', () => {
