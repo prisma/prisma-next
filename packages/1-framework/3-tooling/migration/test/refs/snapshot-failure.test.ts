@@ -32,7 +32,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-import { rm } from 'node:fs/promises';
+import { rm, unlink } from 'node:fs/promises';
 import { MigrationToolsError } from '../../src/errors';
 import { writeRef } from '../../src/refs';
 import { deleteRefPaired, writeRefPaired, writeRefSnapshot } from '../../src/refs/snapshot';
@@ -208,6 +208,17 @@ describe('deleteRefPaired cross-boundary recovery', () => {
 
   it('removes orphan snapshot when pointer is missing', async () => {
     await writeRefSnapshot(refsDir, 'staging', sampleContractIR());
+
+    await expect(deleteRefPaired(refsDir, 'staging')).resolves.toBeUndefined();
+
+    expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+  });
+
+  it('removes dts-only orphan when pointer and json are missing', async () => {
+    await writeRefSnapshot(refsDir, 'staging', sampleContractIR());
+    await unlink(snapshotJsonPath(refsDir, 'staging'));
 
     await expect(deleteRefPaired(refsDir, 'staging')).resolves.toBeUndefined();
 
