@@ -71,14 +71,23 @@ describe('integration/nested-includes/refinements', () => {
             )
             .all();
 
-          expect(rows[0]?.posts).toEqual([
+          expect(rows).toEqual([
             {
-              id: 11,
-              title: 'High',
-              userId: 1,
-              views: 100,
-              embedding: null,
-              comments: [{ id: 101, body: 'on high', postId: 11 }],
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [
+                {
+                  id: 11,
+                  title: 'High',
+                  userId: 1,
+                  views: 100,
+                  embedding: null,
+                  comments: [{ id: 101, body: 'on high', postId: 11 }],
+                },
+              ],
             },
           ]);
         });
@@ -114,8 +123,45 @@ describe('integration/nested-includes/refinements', () => {
             )
             .all();
 
-          expect(rows.map((r) => r.id)).toEqual([1, 2]);
-          expect(rows[1]?.posts[0]?.comments.map((c) => c.id)).toEqual([102, 101]);
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [
+                {
+                  id: 10,
+                  title: 'A',
+                  userId: 1,
+                  views: 2,
+                  embedding: null,
+                  comments: [{ id: 100, body: 'a1', postId: 10 }],
+                },
+              ],
+            },
+            {
+              id: 2,
+              name: 'Bob',
+              email: 'bob@example.com',
+              invitedById: null,
+              address: null,
+              posts: [
+                {
+                  id: 11,
+                  title: 'B',
+                  userId: 2,
+                  views: 1,
+                  embedding: null,
+                  comments: [
+                    { id: 102, body: 'b2', postId: 11 },
+                    { id: 101, body: 'b1', postId: 11 },
+                  ],
+                },
+              ],
+            },
+          ]);
         });
       },
       timeouts.spinUpPpgDev,
