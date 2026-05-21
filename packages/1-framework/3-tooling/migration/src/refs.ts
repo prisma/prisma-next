@@ -94,7 +94,9 @@ export async function readRefs(refsDir: string): Promise<Refs> {
     throw error;
   }
 
-  const jsonFiles = entries.filter((entry) => entry.endsWith('.json'));
+  const jsonFiles = entries.filter(
+    (entry) => entry.endsWith('.json') && !entry.endsWith('.contract.json'),
+  );
   const refs: Record<string, RefEntry> = {};
 
   for (const jsonFile of jsonFiles) {
