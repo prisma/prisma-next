@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { CliStructuredError } from '../src/control';
 import {
   errorDestructiveChanges,
   errorHashMismatch,
   errorMarkerMissing,
+  errorMarkerReadFailed,
   errorMarkerRequired,
+  errorMarkerRowCorrupt,
   errorRunnerFailed,
   errorRuntime,
   errorTargetMismatch,
+  parseMarkerRowSafely,
+  rethrowMarkerReadError,
+  withMarkerReadErrorHandling,
 } from '../src/execution';
 
 describe('Runtime Errors', () => {
@@ -133,5 +139,90 @@ describe('Runtime Errors', () => {
     expect(error.why).toBe('Custom why');
     expect(error.fix).toBe('Custom fix');
     expect(error.meta).toEqual({ key: 'value' });
+  });
+
+  it('errorMarkerRowCorrupt creates PN-RUN-3005 envelope', () => {
+    const error = errorMarkerRowCorrupt({
+      why: 'Invalid contract marker row: invariants must be string[]',
+      space: 'app',
+      markerLocation: 'prisma_contract.marker',
+    });
+    expect(error.toEnvelope().code).toBe('PN-RUN-3005');
+    expect(error.message).toBe('Marker row is corrupt or incompatible');
+    expect(error.fix).toContain('space "app"');
+    expect(error.fix).toContain('prisma-next db init');
+  });
+
+  it('errorMarkerReadFailed creates PN-RUN-3006 envelope', () => {
+    const error = errorMarkerReadFailed({
+      why: 'permission denied for table marker',
+      markerLocation: 'prisma_contract.marker',
+    });
+    expect(error.toEnvelope().code).toBe('PN-RUN-3006');
+    expect(error.message).toBe('Database error while reading contract marker');
+    expect(error.fix).toContain('SELECT permission');
+  });
+
+  it('rethrowMarkerReadError maps parse failures to PN-RUN-3005', () => {
+    expect(() =>
+      rethrowMarkerReadError(new Error('Invalid contract marker row: core_hash must be string'), {
+        space: 'app',
+        markerLocation: 'prisma_contract.marker',
+      }),
+    ).toThrow(CliStructuredError);
+
+    try {
+      rethrowMarkerReadError(new Error('Invalid contract marker row: core_hash must be string'), {
+        space: 'app',
+        markerLocation: 'prisma_contract.marker',
+      });
+    } catch (err) {
+      expect(CliStructuredError.is(err)).toBe(true);
+      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+    }
+  });
+
+  it('rethrowMarkerReadError maps driver failures to PN-RUN-3006', () => {
+    try {
+      rethrowMarkerReadError(new Error('permission denied for table marker'), {
+        space: 'app',
+        markerLocation: 'prisma_contract.marker',
+      });
+    } catch (err) {
+      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3006');
+    }
+  });
+
+  it('rethrowMarkerReadError rethrows existing CliStructuredError', () => {
+    const existing = errorMarkerMissing();
+    expect(() =>
+      rethrowMarkerReadError(existing, {
+        space: 'app',
+        markerLocation: 'prisma_contract.marker',
+      }),
+    ).toThrow(existing);
+  });
+
+  it('withMarkerReadErrorHandling wraps async query failures', async () => {
+    await expect(
+      withMarkerReadErrorHandling(
+        async () => {
+          throw new Error('connection reset');
+        },
+        { space: 'app', markerLocation: 'prisma_contract.marker' },
+      ),
+    ).rejects.toMatchObject({ code: '3006' });
+  });
+
+  it('parseMarkerRowSafely wraps parse failures', () => {
+    expect(() =>
+      parseMarkerRowSafely(
+        {},
+        () => {
+          throw new Error('Invalid contract marker row: invariants must be string[]');
+        },
+        { space: 'ext', markerLocation: '_prisma_marker' },
+      ),
+    ).toThrow(CliStructuredError);
   });
 });

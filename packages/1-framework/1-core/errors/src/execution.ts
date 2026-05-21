@@ -64,6 +64,88 @@ export function errorTargetMismatch(
 }
 
 /**
+ * Marker row exists but column values fail schema validation.
+ */
+export function errorMarkerRowCorrupt(options: {
+  readonly why: string;
+  readonly space: string;
+  readonly markerLocation: string;
+}): CliStructuredError {
+  return new CliStructuredError('3005', 'Marker row is corrupt or incompatible', {
+    domain: 'RUN',
+    why: options.why,
+    fix: `The ${options.markerLocation} row for space "${options.space}" contains invalid data. Delete the row and run \`prisma-next db init --db <url>\` to reinitialize.`,
+    meta: { space: options.space },
+  });
+}
+
+/**
+ * Driver-level failure while reading the contract marker table.
+ */
+export function errorMarkerReadFailed(options: {
+  readonly why: string;
+  readonly markerLocation: string;
+}): CliStructuredError {
+  return new CliStructuredError('3006', 'Database error while reading contract marker', {
+    domain: 'RUN',
+    why: options.why,
+    fix: `Check that the database user has SELECT permission on ${options.markerLocation}, then retry. If the error persists, inspect database connectivity and locks.`,
+  });
+}
+
+function isMarkerRowParseError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err.message.startsWith('Invalid contract marker row:') ||
+      err.message.startsWith('Invalid marker doc on'))
+  );
+}
+
+export function rethrowMarkerReadError(
+  err: unknown,
+  context: { readonly space: string; readonly markerLocation: string },
+): never {
+  if (CliStructuredError.is(err)) {
+    throw err;
+  }
+  if (isMarkerRowParseError(err)) {
+    throw errorMarkerRowCorrupt({
+      why: err.message,
+      space: context.space,
+      markerLocation: context.markerLocation,
+    });
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  throw errorMarkerReadFailed({
+    why: message,
+    markerLocation: context.markerLocation,
+  });
+}
+
+export async function withMarkerReadErrorHandling<T>(
+  operation: () => Promise<T>,
+  context: { readonly space: string; readonly markerLocation: string },
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (err) {
+    rethrowMarkerReadError(err, context);
+  }
+}
+
+export function parseMarkerRowSafely<T>(
+  row: unknown,
+  parse: (value: unknown) => T,
+  context: { readonly space: string; readonly markerLocation: string },
+): T {
+  try {
+    return parse(row);
+  } catch (err) {
+    rethrowMarkerReadError(err, context);
+  }
+}
+
+/**
  * Database marker is required but not found.
  * Used by commands that require a pre-existing marker as a precondition.
  */
