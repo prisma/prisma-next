@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Phase 1 of the CLI Telemetry project has landed (Linear ticket `TML-2557`); [`docs/Telemetry.md`](../../Telemetry.md) is the user-facing reference for the telemetry surface this ADR's subprocess pattern implements. This ADR is the engineering-architecture companion to [ADR 216 — CLI telemetry installation ID is a stored random UUID](./ADR%20216%20-%20CLI%20telemetry%20installation%20ID%20is%20a%20stored%20random%20UUID%20not%20a%20system%20fingerprint.md). It does not cover crash/error reporting, which is Phase 2 of the project and is expected to require a different isolation contract (synchronous-flush-before-exit rather than fire-and-forget).
+Accepted. CLI telemetry subprocess pattern is implemented as described in [`docs/Telemetry.md`](../../Telemetry.md), which is the user-facing reference for the telemetry surface this ADR scopes. This ADR is the engineering-architecture companion to [ADR 216 — CLI telemetry installation ID is a stored random UUID](./ADR%20216%20-%20CLI%20telemetry%20installation%20ID%20is%20a%20stored%20random%20UUID%20not%20a%20system%20fingerprint.md). It does not cover crash/error reporting, which is Phase 2 of the project and is expected to require a different isolation contract (synchronous-flush-before-exit rather than fire-and-forget).
 
 ## At a glance
 
