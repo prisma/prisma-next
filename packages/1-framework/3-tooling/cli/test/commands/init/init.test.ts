@@ -1240,6 +1240,68 @@ describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation
     expect(existsSync(join(tmpDir, 'db/db.ts'))).toBe(true);
   });
 
+  it('scaffolds when --authoring and --schema-path extensions match (psl + .prisma)', async () => {
+    const exit = await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'psl',
+        schemaPath: 'prisma/schema.prisma',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(existsSync(join(tmpDir, 'prisma/schema.prisma'))).toBe(true);
+  });
+
+  it('scaffolds when --authoring and --schema-path extensions match (typescript + .ts)', async () => {
+    const exit = await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'typescript',
+        schemaPath: 'prisma/contract.ts',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(true);
+  });
+
+  it('exits PRECONDITION when --authoring typescript is paired with a .prisma --schema-path', async () => {
+    const exit = await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'typescript',
+        schemaPath: 'prisma/schema.prisma',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(exit).toBe(INIT_EXIT_PRECONDITION);
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/schema.prisma'))).toBe(false);
+  });
+
+  it('exits PRECONDITION when --authoring psl is paired with a .ts --schema-path', async () => {
+    const exit = await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'psl',
+        schemaPath: 'prisma/contract.ts',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(exit).toBe(INIT_EXIT_PRECONDITION);
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(false);
+  });
+
   it('exits PRECONDITION when --target is missing in non-interactive mode (FR1.4)', async () => {
     const exit = await runInitTest(tmpDir, {
       options: { authoring: 'psl', install: false },
@@ -2279,7 +2341,7 @@ describe('exitCodeForError', () => {
   });
 
   it('maps user-facing precondition codes to PRECONDITION', () => {
-    for (const code of ['5002', '5003', '5004', '5005', '5010', '5011', '5012']) {
+    for (const code of ['5002', '5003', '5004', '5005', '5010', '5011', '5012', '5014']) {
       expect(exitCodeForError({ code })).toBe(INIT_EXIT_PRECONDITION);
     }
   });
