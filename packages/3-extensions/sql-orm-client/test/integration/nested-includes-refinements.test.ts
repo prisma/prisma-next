@@ -39,9 +39,27 @@ describe('integration/nested-includes/refinements', () => {
             )
             .all();
 
-          expect(rows[0]?.posts[0]?.comments).toEqual([
-            { id: 100, body: 'first', postId: 10 },
-            { id: 101, body: 'second', postId: 10 },
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [
+                {
+                  id: 10,
+                  title: 'P',
+                  userId: 1,
+                  views: 1,
+                  embedding: null,
+                  comments: [
+                    { id: 100, body: 'first', postId: 10 },
+                    { id: 101, body: 'second', postId: 10 },
+                  ],
+                },
+              ],
+            },
           ]);
         });
       },
@@ -237,8 +255,15 @@ describe('integration/nested-includes/refinements', () => {
 
           const rows = await users.include('posts', (posts) => posts.include('comments')).all();
 
-          expect(rows[0]?.posts).toEqual([
-            { id: 10, title: 'A', userId: 1, views: 1, embedding: null, comments: [] },
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [{ id: 10, title: 'A', userId: 1, views: 1, embedding: null, comments: [] }],
+            },
           ]);
         });
       },
@@ -266,8 +291,15 @@ describe('integration/nested-includes/refinements', () => {
             .include('posts', (posts) => posts.select('title').include('comments'))
             .all();
 
-          expect(rows[0]?.posts).toEqual([
-            { title: 'A', comments: [{ id: 100, body: 'hi', postId: 10 }] },
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [{ title: 'A', comments: [{ id: 100, body: 'hi', postId: 10 }] }],
+            },
           ]);
         });
       },
