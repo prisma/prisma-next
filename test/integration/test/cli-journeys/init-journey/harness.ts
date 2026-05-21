@@ -146,8 +146,24 @@ export async function createJourneyProject(
     writeMinimalPackageJson(dir);
 
     const target = cell.target === 'mongo' ? 'mongodb' : 'postgres';
+    // `--no-skill` is load-bearing: this journey verifies
+    // scaffold/install/emit/migrate only; skill registration is
+    // intentionally not exercised. Without the flag, project-level skill
+    // install pulls the `prisma/prisma-next/skills#v<cliVersion>` tag from
+    // GitHub, which does not exist for an in-development minor (the tag is
+    // only cut after publish), so every release-bump PR's CI goes red.
     const initResult = await runNode(
-      [CLI_BIN, 'init', '--target', target, '--authoring', cell.authoring, '--yes', '--no-install'],
+      [
+        CLI_BIN,
+        'init',
+        '--target',
+        target,
+        '--authoring',
+        cell.authoring,
+        '--yes',
+        '--no-install',
+        '--no-skill',
+      ],
       dir,
     );
 
