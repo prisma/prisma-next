@@ -76,9 +76,9 @@ describe('mergeGitignore (FR3.3)', () => {
 
 describe('requiredGitattributesLines (FR3.4)', () => {
   it('emits linguist-generated lines for the schema directory', () => {
-    const lines = requiredGitattributesLines('prisma', 'postgres');
-    expect(lines).toContain('prisma/contract.json linguist-generated');
-    expect(lines).toContain('prisma/contract.d.ts linguist-generated');
+    const lines = requiredGitattributesLines('src/prisma', 'postgres');
+    expect(lines).toContain('src/prisma/contract.json linguist-generated');
+    expect(lines).toContain('src/prisma/contract.d.ts linguist-generated');
   });
 
   it('includes forward-looking artefacts (Decision 5)', () => {
@@ -97,9 +97,9 @@ describe('requiredGitattributesLines (FR3.4)', () => {
   });
 
   it('strips a trailing slash from the schema directory', () => {
-    const lines = requiredGitattributesLines('prisma/', 'postgres');
-    expect(lines).toContain('prisma/contract.json linguist-generated');
-    expect(lines.every((line) => !line.startsWith('prisma//'))).toBe(true);
+    const lines = requiredGitattributesLines('src/prisma/', 'postgres');
+    expect(lines).toContain('src/prisma/contract.json linguist-generated');
+    expect(lines.every((line) => !line.startsWith('src/prisma//'))).toBe(true);
   });
 
   it('emits root-relative paths (no leading "./") when schemaDir is "."', () => {
@@ -111,7 +111,7 @@ describe('requiredGitattributesLines (FR3.4)', () => {
 });
 
 describe('mergeGitattributes (FR3.4)', () => {
-  const required = requiredGitattributesLines('prisma', 'postgres');
+  const required = requiredGitattributesLines('src/prisma', 'postgres');
 
   it('writes the full required line list when the file does not exist', () => {
     const result = mergeGitattributes(undefined, required);
@@ -122,13 +122,14 @@ describe('mergeGitattributes (FR3.4)', () => {
   });
 
   it('appends only the missing lines when some are already present', () => {
-    const existing = 'prisma/contract.json linguist-generated\n';
+    const existing = 'src/prisma/contract.json linguist-generated\n';
     const result = mergeGitattributes(existing, required);
     expect(result).not.toBeNull();
-    expect(result).toContain('prisma/contract.json linguist-generated');
-    expect(result).toContain('prisma/contract.d.ts linguist-generated');
+    expect(result).toContain('src/prisma/contract.json linguist-generated');
+    expect(result).toContain('src/prisma/contract.d.ts linguist-generated');
     // Pre-existing line should appear exactly once.
-    const occurrences = (result ?? '').split('prisma/contract.json linguist-generated').length - 1;
+    const occurrences =
+      (result ?? '').split('src/prisma/contract.json linguist-generated').length - 1;
     expect(occurrences).toBe(1);
   });
 
@@ -141,7 +142,7 @@ describe('mergeGitattributes (FR3.4)', () => {
     const existing = '*.lock binary\n';
     const result = mergeGitattributes(existing, required);
     expect(result).toContain('*.lock binary');
-    expect(result).toContain('prisma/contract.json linguist-generated');
+    expect(result).toContain('src/prisma/contract.json linguist-generated');
   });
 
   it('does not produce a leading blank line when the existing file is empty', () => {
