@@ -7,6 +7,8 @@ import type { ContractIR } from '../../src/refs/snapshot';
 const fsMocks = vi.hoisted(() => ({
   renameFailOnCall: null as number | null,
   renameCount: 0,
+  unlinkFailOnCall: null as number | null,
+  unlinkCount: 0,
 }));
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -19,6 +21,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
         throw new Error(`simulated rename failure on call ${fsMocks.renameCount}`);
       }
       return actual.rename(src, dest);
+    },
+    unlink: async (path: string) => {
+      fsMocks.unlinkCount += 1;
+      if (fsMocks.unlinkFailOnCall === fsMocks.unlinkCount) {
+        throw new Error(`simulated unlink failure on call ${fsMocks.unlinkCount}`);
+      }
+      return actual.unlink(path);
     },
   };
 });
@@ -77,6 +86,8 @@ describe('writeRefSnapshot partial-write cleanup', () => {
   beforeEach(async () => {
     fsMocks.renameCount = 0;
     fsMocks.renameFailOnCall = null;
+    fsMocks.unlinkCount = 0;
+    fsMocks.unlinkFailOnCall = null;
     refsDir = join(
       tmpdir(),
       `test-ref-snapshot-failure-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -118,6 +129,8 @@ describe('writeRefPaired cross-boundary failure handling', () => {
   beforeEach(async () => {
     fsMocks.renameCount = 0;
     fsMocks.renameFailOnCall = null;
+    fsMocks.unlinkCount = 0;
+    fsMocks.unlinkFailOnCall = null;
     refsDir = join(
       tmpdir(),
       `test-ref-paired-failure-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -153,6 +166,16 @@ describe('writeRefPaired cross-boundary failure handling', () => {
     expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
     expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
   });
+
+  it('preserves writeRef failure when rollback unlink also fails', async () => {
+    fsMocks.renameFailOnCall = 3;
+    fsMocks.unlinkFailOnCall = 1;
+    const input = sampleContractIR();
+
+    await expect(writeRefPaired(refsDir, 'staging', ENTRY_A, input)).rejects.toThrow(
+      'simulated rename failure on call 3',
+    );
+  });
 });
 
 describe('deleteRefPaired cross-boundary recovery', () => {
@@ -161,6 +184,8 @@ describe('deleteRefPaired cross-boundary recovery', () => {
   beforeEach(async () => {
     fsMocks.renameCount = 0;
     fsMocks.renameFailOnCall = null;
+    fsMocks.unlinkCount = 0;
+    fsMocks.unlinkFailOnCall = null;
     refsDir = join(
       tmpdir(),
       `test-ref-paired-delete-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -181,7 +206,17 @@ describe('deleteRefPaired cross-boundary recovery', () => {
     expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
   });
 
-  it('throws MIGRATION.UNKNOWN_REF when the pointer is missing', async () => {
+  it('removes orphan snapshot when pointer is missing', async () => {
+    await writeRefSnapshot(refsDir, 'staging', sampleContractIR());
+
+    await expect(deleteRefPaired(refsDir, 'staging')).resolves.toBeUndefined();
+
+    expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+  });
+
+  it('throws MIGRATION.UNKNOWN_REF when both pointer and snapshot are missing', async () => {
     await expect(deleteRefPaired(refsDir, 'missing')).rejects.toSatisfy((error) => {
       expect(MigrationToolsError.is(error)).toBe(true);
       expect((error as MigrationToolsError).code).toBe('MIGRATION.UNKNOWN_REF');
