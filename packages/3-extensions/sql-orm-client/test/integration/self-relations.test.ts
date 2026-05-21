@@ -98,7 +98,20 @@ describe('integration/self-relations', () => {
           )
           .all();
 
-        expect(rows[0]?.invitedUsers.map((u) => u.id)).toEqual([4, 3, 2]);
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            invitedUsers: [
+              { id: 4, name: 'Dan', email: 'dan@example.com', invitedById: 1, address: null },
+              { id: 3, name: 'Cara', email: 'cara@example.com', invitedById: 1, address: null },
+              { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1, address: null },
+            ],
+          },
+        ]);
 
         // The hidden order projection inside the inner rows-subselect
         // must reference the aliased child table, not the original
