@@ -4,6 +4,8 @@ import {
   type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
 import {
+  type AuthoringEntityContext,
+  type AuthoringEntityTypeFactoryOutput,
   type AuthoringEntityTypeNamespace,
   isAuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
@@ -15,6 +17,7 @@ import {
 import type {
   SqlNamespaceTablesInput,
   SqlStorage,
+  SqlStorageTypeEntry,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { JsonObject } from '@prisma-next/utils/json';
@@ -22,6 +25,21 @@ import type { Type } from 'arktype';
 import { postgresAuthoringEntityTypes } from './authoring';
 import type { PostgresEnumType } from './postgres-enum-type';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+
+const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
+  family: 'sql',
+  target: 'postgres',
+};
+
+function isAuthoringEntityTypeFactoryOutput(
+  output: unknown,
+): output is AuthoringEntityTypeFactoryOutput<unknown, unknown> {
+  return (
+    typeof output === 'object' &&
+    output !== null &&
+    typeof (output as AuthoringEntityTypeFactoryOutput).factory === 'function'
+  );
+}
 
 /**
  * Walks a pack's entity-type namespace tree and emits the maps the
@@ -37,8 +55,12 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
   const walk = (node: AuthoringEntityTypeNamespace): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
-        if (value.hydrate !== undefined) {
-          entityTypeRegistry.set(value.discriminator, value.hydrate as SqlEntityHydrationFactory);
+        if (isAuthoringEntityTypeFactoryOutput(value.output)) {
+          const { factory } = value.output;
+          entityTypeRegistry.set(
+            value.discriminator,
+            (raw) => factory(raw, POSTGRES_AUTHORING_CTX) as SqlStorageTypeEntry,
+          );
         }
         if (value.validatorSchema !== undefined) {
           validatorFragments.set(value.discriminator, value.validatorSchema);
