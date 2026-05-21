@@ -155,21 +155,23 @@ export function createHandler(deps: HandlerDeps) {
     }
 
     const plan = deps.db.sql.telemetry_event
-      .insert({
-        installationId: parsed.installationId,
-        version: parsed.version,
-        command: parsed.command,
-        flags: parsed.flags,
-        runtimeName: parsed.runtimeName,
-        runtimeVersion: parsed.runtimeVersion,
-        os: parsed.os,
-        arch: parsed.arch,
-        packageManager: parsed.packageManager,
-        databaseTarget: parsed.databaseTarget,
-        tsVersion: parsed.tsVersion,
-        agent: parsed.agent,
-        extensions: parsed.extensions,
-      })
+      .insert([
+        {
+          installationId: parsed.installationId,
+          version: parsed.version,
+          command: parsed.command,
+          flags: parsed.flags,
+          runtimeName: parsed.runtimeName,
+          runtimeVersion: parsed.runtimeVersion,
+          os: parsed.os,
+          arch: parsed.arch,
+          packageManager: parsed.packageManager,
+          databaseTarget: parsed.databaseTarget,
+          tsVersion: parsed.tsVersion,
+          agent: parsed.agent,
+          extensions: parsed.extensions,
+        },
+      ])
       .build();
 
     // TODO: use prepared statements once they are implemented for inserts.
