@@ -153,6 +153,18 @@ describe('readRefSnapshot', () => {
       return true;
     });
   });
+
+  it('throws when contract json exists but contract dts is missing', async () => {
+    const jsonPath = snapshotJsonPath(refsDir, 'staging');
+    const dtsPath = snapshotDtsPath(refsDir, 'staging');
+    await fs.mkdir(refsDir, { recursive: true });
+    await fs.writeFile(jsonPath, `${canonicalizeJson(sampleContractIR().contract)}\n`);
+
+    await expect(readRefSnapshot(refsDir, 'staging')).rejects.toSatisfy((error) => {
+      expectInvalidRefFile(error, dtsPath);
+      return true;
+    });
+  });
 });
 
 describe('deleteRefSnapshot', () => {

@@ -24,10 +24,14 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 import { rm } from 'node:fs/promises';
-import { writeRefSnapshot } from '../../src/refs/snapshot';
+import { MigrationToolsError } from '../../src/errors';
+import { writeRef } from '../../src/refs';
+import { deleteRefPaired, writeRefPaired, writeRefSnapshot } from '../../src/refs/snapshot';
 
 const HASH_A = `sha256:${'a'.repeat(64)}`;
 const PROFILE_HASH = `sha256:${'c'.repeat(64)}`;
+
+const ENTRY_A = { hash: HASH_A, invariants: [] as string[] };
 
 function sampleContractIR(): ContractIR {
   return {
@@ -61,6 +65,10 @@ function snapshotJsonPath(refsDir: string, name: string): string {
 
 function snapshotDtsPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.contract.d.ts`);
+}
+
+function refPointerPath(refsDir: string, name: string): string {
+  return join(refsDir, `${name}.json`);
 }
 
 describe('writeRefSnapshot partial-write cleanup', () => {
@@ -101,5 +109,83 @@ describe('writeRefSnapshot partial-write cleanup', () => {
 
     expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
     expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+  });
+});
+
+describe('writeRefPaired cross-boundary failure handling', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    fsMocks.renameCount = 0;
+    fsMocks.renameFailOnCall = null;
+    refsDir = join(
+      tmpdir(),
+      `test-ref-paired-failure-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+  });
+
+  afterEach(async () => {
+    await rm(refsDir, { recursive: true, force: true });
+  });
+
+  it('leaves no pointer when writeRefSnapshot fails before writeRef', async () => {
+    fsMocks.renameFailOnCall = 1;
+    const input = sampleContractIR();
+
+    await expect(writeRefPaired(refsDir, 'staging', ENTRY_A, input)).rejects.toThrow(
+      'simulated rename failure on call 1',
+    );
+
+    expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+  });
+
+  it('rolls back snapshot when writeRef fails after writeRefSnapshot succeeded', async () => {
+    fsMocks.renameFailOnCall = 3;
+    const input = sampleContractIR();
+
+    await expect(writeRefPaired(refsDir, 'staging', ENTRY_A, input)).rejects.toThrow(
+      'simulated rename failure on call 3',
+    );
+
+    expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+  });
+});
+
+describe('deleteRefPaired cross-boundary recovery', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    fsMocks.renameCount = 0;
+    fsMocks.renameFailOnCall = null;
+    refsDir = join(
+      tmpdir(),
+      `test-ref-paired-delete-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+  });
+
+  afterEach(async () => {
+    await rm(refsDir, { recursive: true, force: true });
+  });
+
+  it('recovers partial state when pointer exists without a paired snapshot', async () => {
+    await writeRef(refsDir, 'staging', ENTRY_A);
+
+    await expect(deleteRefPaired(refsDir, 'staging')).resolves.toBeUndefined();
+
+    expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
+    expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+  });
+
+  it('throws MIGRATION.UNKNOWN_REF when the pointer is missing', async () => {
+    await expect(deleteRefPaired(refsDir, 'missing')).rejects.toSatisfy((error) => {
+      expect(MigrationToolsError.is(error)).toBe(true);
+      expect((error as MigrationToolsError).code).toBe('MIGRATION.UNKNOWN_REF');
+      return true;
+    });
   });
 });
