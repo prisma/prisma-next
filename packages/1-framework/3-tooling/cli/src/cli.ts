@@ -320,8 +320,8 @@ program.addCommand(refCommand);
 // Test-only hidden command used by `cli-telemetry`'s `cli-e2e.test.ts`
 // to verify that telemetry still lands when a CLI command crashes
 // mid-execution. The preAction hook fires the detached sender as
-// `void`-d work; the action body's 200ms sleep gives the sender enough
-// time to fork before the throw kills the parent. Hidden from help;
+// `void`-d work; the action body sleeps long enough for the sender to
+// fork before the throw kills the parent. Hidden from help;
 // underscore prefix marks it as internal. Doesn't depend on any
 // project state, so it runs in any tempdir.
 //
@@ -330,11 +330,28 @@ program.addCommand(refCommand);
 // binaries. `hidden: true` only filters the help output; without this
 // env gate the command would still be callable from production. The
 // e2e suite sets the env var when it spawns the CLI.
+//
+// The sleep needs to comfortably exceed the worst-case wall-clock for
+// `fireTelemetryFromPreAction` to reach `child_process.fork()`. That
+// path is async — it awaits a c12 `loadConfig()` that walks the
+// project tree looking for `prisma-next.config.ts` — and on cold CI
+// containers the I/O can take 1–1.5s. 2000ms gives ~500ms of
+// headroom on top of that; locally it costs ~2s per crash-test case,
+// which the e2e suite is sized to absorb.
+//
+// A more invariant-respecting fix is to refactor
+// `fireTelemetryFromPreAction` to call `fork()` first and feed c12's
+// result into `child.send()` once both are ready — that would shrink
+// the race window to a single syscall and protect production users
+// against CLI commands that throw synchronously before any action
+// body runs. Tracked as a follow-up; out of scope for this PR's
+// close-out.
+const TELEMETRY_CRASH_TEST_SLEEP_MS = 2000;
 if (process.env['PRISMA_NEXT_ENABLE_TEST_COMMANDS'] === '1') {
   const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
     .description('Internal: deliberately throw for the telemetry e2e suite.')
     .action(async () => {
-      await new Promise((settle) => setTimeout(settle, 200));
+      await new Promise((settle) => setTimeout(settle, TELEMETRY_CRASH_TEST_SLEEP_MS));
       throw new Error('__telemetry-crash-test: intentional crash for e2e coverage');
     });
   telemetryCrashTestCommand.configureHelp({ visibleCommands: () => [] });

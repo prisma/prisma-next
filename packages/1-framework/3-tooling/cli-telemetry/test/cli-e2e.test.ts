@@ -169,7 +169,14 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     expect(await harness.readRows()).toHaveLength(0);
   });
 
-  it('a CLI command with seeded consent emits one backend row carrying the stored installationId', async () => {
+  // `{ timeout: 8_000 }` accommodates the 2s sleep in
+  // `__telemetry-crash-test`'s action body (which exists to outlast the
+  // c12 `loadConfig()` walk so the detached sender's `fork()` reliably
+  // completes before the parent throws). A single spawn lands
+  // comfortably; the multi-spawn cases below get a 15s pin.
+  it('a CLI command with seeded consent emits one backend row carrying the stored installationId', {
+    timeout: 8_000,
+  }, async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
@@ -207,9 +214,11 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
       cwd: projectDir,
     });
 
-    // The hidden command throws after a 200ms sleep, so the parent always
-    // exits non-zero. The detached sender forked in the preAction hook
-    // survives the parent crash — that's the invariant under test.
+    // The hidden command sleeps long enough for the preAction-spawned
+    // detached sender to fork, then throws — so the parent always
+    // exits non-zero while the child outlives it. The detached
+    // sender's survival across the parent crash is the invariant
+    // under test.
     expect(result.exitCode).not.toBe(0);
     const rows = await harness.awaitRowsForInstallation(installationId, 1);
     expect(rows[0]?.installationId).toBe(installationId);

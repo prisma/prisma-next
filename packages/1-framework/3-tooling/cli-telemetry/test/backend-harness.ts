@@ -57,6 +57,20 @@ interface BackendProcess {
   readonly stderr: string[];
 }
 
+/**
+ * Snapshot of the backend child-process state at the moment a test
+ * helper observed a failure. Surfaced inside timeout-error messages so
+ * a CI-only flake produces an actionable diagnostic instead of an
+ * opaque "expected N rows, found 0".
+ */
+export interface BackendDiagnostics {
+  readonly alive: boolean;
+  readonly pid: number | null;
+  readonly exitCode: number | null;
+  /** First 4 KiB of accumulated stderr; "" when the process is still alive. */
+  readonly stderr: string;
+}
+
 export interface BackendHarness {
   readonly database: DevDatabase;
   readonly endpointBase: string;
@@ -71,12 +85,24 @@ export interface BackendHarness {
    * *after* the next test's `clearRows()`), which would otherwise
    * inflate the row count past the strict-equality match in the
    * unscoped variant and time out the test with no useful error.
+   *
+   * Timeout-error messages include `BackendDiagnostics` plus the total
+   * unfiltered row count so a CI failure distinguishes "no rows at
+   * all" (backend dead / sender never POSTed) from "rows for other
+   * installations but not this one" (contamination of a shape this
+   * variant was designed to neutralise).
    */
   awaitRowsForInstallation(
     installationId: string,
     expectedCount: number,
     timeoutMs?: number,
   ): Promise<TelemetryEventRow[]>;
+  /**
+   * Probe the backend subprocess. Cheap (`kill(pid, 0)` is a no-op
+   * signal that only checks deliverability); safe to call inside
+   * timeout-error paths.
+   */
+  getBackendDiagnostics(): BackendDiagnostics;
   stop(): Promise<void>;
 }
 
@@ -219,13 +245,37 @@ async function stopBackend(backend: BackendProcess): Promise<void> {
   });
 }
 
+// The dev Postgres' default `databaseIdleTimeoutMillis` (1000ms in
+// `@prisma-next/test-utils`) is too aggressive for this suite: any
+// backend pg-pool connection that idles past one second between test
+// cases gets killed server-side, which the production driver's pool
+// surfaces as an unhandled `'error'` event and crashes the backend
+// process (Node's default behaviour for emitter `'error'` events with
+// no listener). Cases that sleep ≥2s in the parent CLI (e.g. the
+// `__telemetry-crash-test` action body, which holds the parent open
+// long enough for the detached sender to fork) reliably trip this.
+//
+// 60_000ms comfortably exceeds any single test file's wall-clock so
+// no idle connection gets reaped during a run. Teardown is fast
+// regardless — `harness.stop()` and `database.close()` don't wait on
+// idle reapers.
+//
+// Production-side follow-up: `packages/3-targets/7-drivers/postgres/
+// src/postgres-driver.ts`'s `createBoundDriverFromBinding` constructs
+// `new Pool(...)` without attaching an `'error'` listener, so real
+// users whose database ends an idle connection (RDS proxy timeout,
+// network blip, etc.) would also crash. Worth its own ticket.
+const DEV_DB_IDLE_TIMEOUT_MS = 60_000;
+
 /**
  * Spin up the backend lifecycle and return handles for assertion + teardown.
  * Caller owns the returned harness and must `await harness.stop()` (typically
  * inside `afterAll`) before the database handle is closed.
  */
 export async function startBackendHarness(): Promise<BackendHarness> {
-  const database = await createDevDatabase();
+  const database = await createDevDatabase({
+    databaseIdleTimeoutMillis: DEV_DB_IDLE_TIMEOUT_MS,
+  });
   await initializeBackendSchema(database);
   const port = await freePort();
   const endpointBase = `http://127.0.0.1:${port}`;
@@ -233,6 +283,31 @@ export async function startBackendHarness(): Promise<BackendHarness> {
   await waitForBackendReady(backend, endpointBase);
 
   let stopped = false;
+
+  const getBackendDiagnostics = (): BackendDiagnostics => {
+    const pid = backend.child.pid ?? null;
+    const exitCode = backend.child.exitCode;
+    const stillExiting = exitCode === null && backend.child.signalCode === null;
+    let alive = stillExiting;
+    if (alive && pid !== null) {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        alive = false;
+      }
+    }
+    const stderrText = alive ? '' : backend.stderr.join('').slice(0, 4000);
+    return { alive, pid, exitCode, stderr: stderrText };
+  };
+
+  const formatDiagnostics = (diag: BackendDiagnostics): string => {
+    if (diag.alive) {
+      return `backend alive (pid ${diag.pid ?? '?'})`;
+    }
+    const exitDesc = diag.exitCode === null ? 'signalled or unknown' : `exitCode ${diag.exitCode}`;
+    const stderrTail = diag.stderr.length > 0 ? `; stderr head: ${diag.stderr}` : '';
+    return `backend exited (pid ${diag.pid ?? '?'}, ${exitDesc})${stderrTail}`;
+  };
 
   const clearRows = (): Promise<void> =>
     withClient(database.connectionString, async (client) => {
@@ -275,7 +350,8 @@ export async function startBackendHarness(): Promise<BackendHarness> {
       await sleep(25);
     }
     const rows = await readRows();
-    throw new Error(`expected ${expectedCount} telemetry row(s), found ${rows.length}`);
+    const diag = formatDiagnostics(getBackendDiagnostics());
+    throw new Error(`expected ${expectedCount} telemetry row(s), found ${rows.length}; ${diag}`);
   };
 
   const awaitRowsForInstallation = async (
@@ -291,9 +367,17 @@ export async function startBackendHarness(): Promise<BackendHarness> {
       }
       await sleep(25);
     }
+    // Failure path: include the unfiltered row count (distinguishes
+    // "no rows at all" from "rows for other installations") and a
+    // backend liveness/stderr snapshot. The two signals together name
+    // the most common failure modes: backend crashed mid-test, sender
+    // never POSTed, or cross-test contamination of a shape the scoped
+    // poll was supposed to neutralise.
     const rows = await readRowsForInstallation(installationId);
+    const totalRows = (await readRows()).length;
+    const diag = formatDiagnostics(getBackendDiagnostics());
     throw new Error(
-      `expected ${expectedCount} telemetry row(s) for installationId=${installationId}, found ${rows.length}`,
+      `expected ${expectedCount} telemetry row(s) for installationId=${installationId}, found ${rows.length} (total rows across all installations: ${totalRows}); ${diag}`,
     );
   };
 
@@ -310,6 +394,7 @@ export async function startBackendHarness(): Promise<BackendHarness> {
     readRows,
     awaitRows,
     awaitRowsForInstallation,
+    getBackendDiagnostics,
     stop,
   };
 }
