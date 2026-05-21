@@ -41,4 +41,4 @@ check.
 `drive-build-workflow`. The omission is structural, not specific to
 this team's repo.
 
-See [`projects/facade-import-surface-completion/retros.md` § 2026-05-21](../../projects/facade-import-surface-completion/retros.md) for the full retro.
+See [drive/retro/findings.md § 2026-05-21](../retro/findings.md) for the related retro finding.
