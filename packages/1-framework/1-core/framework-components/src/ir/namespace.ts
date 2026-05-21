@@ -43,6 +43,19 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
  * `tables`, Mongo contributes `collections`, future families pick their
  * own native idiom). Generic consumers walking "all named entries" go
  * through a family-typed namespace, not the framework `Namespace`.
+ *
+ * Every namespace concretion (e.g. `SqlNamespacePayload`,
+ * `MongoNamespacePayload`, target-promoted namespaces like
+ * `PostgresSchema`) carries exactly: `id` (enumerable string), `kind`
+ * (non-enumerable string discriminator set via `Object.defineProperty`),
+ * and one or more entity-kind slot maps — each an own-enumerable property
+ * whose key is the entity kind (`tables`, `types`, `collections`,
+ * target-pack-contributed slot names) and whose value is a
+ * `Record<entityName, EntityIRClass>`. No other own-enumerable data lives
+ * on a namespace; non-entity computed data lives on the surrounding storage
+ * or contract IR. The framework's `elementCoordinates(storage)` walk relies
+ * on this invariant to enumerate entities structurally without
+ * family-specific knowledge.
  */
 export interface Namespace extends IRNode {
   readonly id: string;
