@@ -1,4 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -28,6 +29,8 @@ import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { introspectPostgresEnumTypes } from './enum-control-hooks';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
+
+const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -98,27 +101,34 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: ControlDriverInstance<'sql', 'postgres'>,
     space: string,
   ): Promise<ContractMarkerRecord | null> {
-    const exists = await driver.query(
-      `select 1
+    const markerContext = { space, markerLocation: POSTGRES_MARKER_TABLE };
+    const exists = await withMarkerReadErrorHandling(
+      () =>
+        driver.query(
+          `select 1
        from information_schema.tables
        where table_schema = $1 and table_name = $2`,
-      ['prisma_contract', 'marker'],
+          ['prisma_contract', 'marker'],
+        ),
+      markerContext,
     );
     if (exists.rows.length === 0) {
       return null;
     }
 
-    const result = await driver.query<{
-      core_hash: string;
-      profile_hash: string;
-      contract_json: unknown | null;
-      canonical_version: number | null;
-      updated_at: Date | string;
-      app_tag: string | null;
-      meta: unknown | null;
-      invariants: readonly string[];
-    }>(
-      `select
+    const result = await withMarkerReadErrorHandling(
+      () =>
+        driver.query<{
+          core_hash: string;
+          profile_hash: string;
+          contract_json: unknown | null;
+          canonical_version: number | null;
+          updated_at: Date | string;
+          app_tag: string | null;
+          meta: unknown | null;
+          invariants: readonly string[];
+        }>(
+          `select
          core_hash,
          profile_hash,
          contract_json,
@@ -129,12 +139,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          invariants
        from prisma_contract.marker
        where space = $1`,
-      [space],
+          [space],
+        ),
+      markerContext,
     );
 
     const row = result.rows[0];
     if (!row) return null;
-    return parseContractMarkerRow(row);
+    return parseMarkerRowSafely(row, parseContractMarkerRow, markerContext);
   }
 
   /**
@@ -146,28 +158,35 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   async readAllMarkers(
     driver: ControlDriverInstance<'sql', 'postgres'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const exists = await driver.query(
-      `select 1
+    const markerContext = { space: 'app', markerLocation: POSTGRES_MARKER_TABLE };
+    const exists = await withMarkerReadErrorHandling(
+      () =>
+        driver.query(
+          `select 1
        from information_schema.tables
        where table_schema = $1 and table_name = $2`,
-      ['prisma_contract', 'marker'],
+          ['prisma_contract', 'marker'],
+        ),
+      markerContext,
     );
     if (exists.rows.length === 0) {
       return new Map();
     }
 
-    const result = await driver.query<{
-      space: string;
-      core_hash: string;
-      profile_hash: string;
-      contract_json: unknown | null;
-      canonical_version: number | null;
-      updated_at: Date | string;
-      app_tag: string | null;
-      meta: unknown | null;
-      invariants: readonly string[];
-    }>(
-      `select
+    const result = await withMarkerReadErrorHandling(
+      () =>
+        driver.query<{
+          space: string;
+          core_hash: string;
+          profile_hash: string;
+          contract_json: unknown | null;
+          canonical_version: number | null;
+          updated_at: Date | string;
+          app_tag: string | null;
+          meta: unknown | null;
+          invariants: readonly string[];
+        }>(
+          `select
          space,
          core_hash,
          profile_hash,
@@ -178,11 +197,19 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          meta,
          invariants
        from prisma_contract.marker`,
+        ),
+      markerContext,
     );
 
     const rows = new Map<string, ContractMarkerRecord>();
     for (const row of result.rows) {
-      rows.set(row.space, parseContractMarkerRow(row));
+      rows.set(
+        row.space,
+        parseMarkerRowSafely(row, parseContractMarkerRow, {
+          space: row.space,
+          markerLocation: POSTGRES_MARKER_TABLE,
+        }),
+      );
     }
     return rows;
   }

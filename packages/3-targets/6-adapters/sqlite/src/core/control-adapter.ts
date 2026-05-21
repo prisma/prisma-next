@@ -1,4 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
@@ -22,6 +23,27 @@ import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-typ
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
 import type { SqliteContract } from './types';
+
+const SQLITE_MARKER_TABLE = '_prisma_marker';
+
+/**
+ * SQLite stores arrays as JSON-encoded TEXT (no native array type), so the
+ * driver returns `invariants` as a string. Decode before delegating to the
+ * shared row schema, which expects `string[]`. A non-JSON value here is a
+ * corrupt row and surfaces as `Invalid contract marker row: …` via the
+ * typed-envelope wrapper.
+ */
+function decodeSqliteMarkerRow<T extends { invariants: unknown }>(row: T): T {
+  if (typeof row.invariants !== 'string') return row;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.invariants);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Invalid contract marker row: invariants is not valid JSON: ${detail}`);
+  }
+  return { ...row, invariants: parsed };
+}
 
 // PRAGMA result row types
 type PragmaTableInfoRow = {
@@ -93,25 +115,31 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     driver: ControlDriverInstance<'sql', 'sqlite'>,
     space: string,
   ): Promise<ContractMarkerRecord | null> {
-    const exists = await driver.query(
-      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
-      ['_prisma_marker'],
+    const markerContext = { space, markerLocation: SQLITE_MARKER_TABLE };
+    const exists = await withMarkerReadErrorHandling(
+      () =>
+        driver.query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
+          '_prisma_marker',
+        ]),
+      markerContext,
     );
     if (exists.rows.length === 0) {
       return null;
     }
 
-    const result = await driver.query<{
-      core_hash: string;
-      profile_hash: string;
-      contract_json: unknown | null;
-      canonical_version: number | null;
-      updated_at: Date | string;
-      app_tag: string | null;
-      meta: unknown | null;
-      invariants: unknown;
-    }>(
-      `SELECT
+    const result = await withMarkerReadErrorHandling(
+      () =>
+        driver.query<{
+          core_hash: string;
+          profile_hash: string;
+          contract_json: unknown | null;
+          canonical_version: number | null;
+          updated_at: Date | string;
+          app_tag: string | null;
+          meta: unknown | null;
+          invariants: unknown;
+        }>(
+          `SELECT
          core_hash,
          profile_hash,
          contract_json,
@@ -122,17 +150,18 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
          invariants
        FROM _prisma_marker
        WHERE space = ?`,
-      [space],
+          [space],
+        ),
+      markerContext,
     );
 
     const row = result.rows[0];
     if (!row) return null;
-    // SQLite stores arrays as JSON-encoded TEXT (no native array type), so
-    // the driver returns `invariants` as a string. Decode before delegating
-    // to the shared row schema, which expects `string[]`.
-    const invariants =
-      typeof row.invariants === 'string' ? (JSON.parse(row.invariants) as unknown) : row.invariants;
-    return parseContractMarkerRow({ ...row, invariants });
+    return parseMarkerRowSafely(
+      row,
+      (raw) => parseContractMarkerRow(decodeSqliteMarkerRow(raw)),
+      markerContext,
+    );
   }
 
   /**
@@ -143,26 +172,32 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   async readAllMarkers(
     driver: ControlDriverInstance<'sql', 'sqlite'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const exists = await driver.query(
-      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
-      ['_prisma_marker'],
+    const markerContext = { space: 'app', markerLocation: SQLITE_MARKER_TABLE };
+    const exists = await withMarkerReadErrorHandling(
+      () =>
+        driver.query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, [
+          '_prisma_marker',
+        ]),
+      markerContext,
     );
     if (exists.rows.length === 0) {
       return new Map();
     }
 
-    const result = await driver.query<{
-      space: string;
-      core_hash: string;
-      profile_hash: string;
-      contract_json: unknown | null;
-      canonical_version: number | null;
-      updated_at: Date | string;
-      app_tag: string | null;
-      meta: unknown | null;
-      invariants: unknown;
-    }>(
-      `SELECT
+    const result = await withMarkerReadErrorHandling(
+      () =>
+        driver.query<{
+          space: string;
+          core_hash: string;
+          profile_hash: string;
+          contract_json: unknown | null;
+          canonical_version: number | null;
+          updated_at: Date | string;
+          app_tag: string | null;
+          meta: unknown | null;
+          invariants: unknown;
+        }>(
+          `SELECT
          space,
          core_hash,
          profile_hash,
@@ -173,15 +208,19 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
          meta,
          invariants
        FROM _prisma_marker`,
+        ),
+      markerContext,
     );
 
     const rows = new Map<string, ContractMarkerRecord>();
     for (const row of result.rows) {
-      const invariants =
-        typeof row.invariants === 'string'
-          ? (JSON.parse(row.invariants) as unknown)
-          : row.invariants;
-      rows.set(row.space, parseContractMarkerRow({ ...row, invariants }));
+      rows.set(
+        row.space,
+        parseMarkerRowSafely(row, (raw) => parseContractMarkerRow(decodeSqliteMarkerRow(raw)), {
+          space: row.space,
+          markerLocation: SQLITE_MARKER_TABLE,
+        }),
+      );
     }
     return rows;
   }

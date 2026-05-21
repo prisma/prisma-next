@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import type { CliStructuredError } from '@prisma-next/errors/control';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { describe, expect, it } from 'vitest';
@@ -197,5 +198,38 @@ describe('normalizeSqliteNativeType', () => {
     expect(normalizeSqliteNativeType('INTEGER')).toBe('integer');
     expect(normalizeSqliteNativeType('TEXT')).toBe('text');
     expect(normalizeSqliteNativeType('  REAL  ')).toBe('real');
+  });
+});
+
+describe('SqliteControlAdapter.readMarker', () => {
+  it('throws PN-RUN-3005 when marker row fails validation', async () => {
+    const driver = createMemoryDriver();
+    driver.db.exec(`
+      CREATE TABLE _prisma_marker (
+        space TEXT PRIMARY KEY,
+        core_hash TEXT NOT NULL,
+        profile_hash TEXT NOT NULL,
+        contract_json TEXT,
+        canonical_version INTEGER,
+        updated_at TEXT NOT NULL,
+        app_tag TEXT,
+        meta TEXT NOT NULL DEFAULT '{}',
+        invariants TEXT NOT NULL DEFAULT '[]'
+      )
+    `);
+    driver.db.exec(`
+      INSERT INTO _prisma_marker (
+        space, core_hash, profile_hash, updated_at, meta, invariants
+      ) VALUES (
+        'app', 'sha256:abc', 'sha256:def', '2024-01-01T00:00:00.000Z', '{}', 'not-an-array'
+      )
+    `);
+
+    const adapter = new SqliteControlAdapter();
+    await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
+      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+      return true;
+    });
+    await driver.close();
   });
 });

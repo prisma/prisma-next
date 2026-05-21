@@ -1,3 +1,4 @@
+import { CliStructuredError } from '@prisma-next/errors/control';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
@@ -1638,6 +1639,98 @@ describe('PostgresControlAdapter', () => {
     it('returns undefined for a null or empty input', () => {
       expect(parsePgReloptions(null, 'item_body_idx')).toBeUndefined();
       expect(parsePgReloptions([], 'item_body_idx')).toBeUndefined();
+    });
+  });
+
+  describe('readMarker', () => {
+    const validMarkerRow = {
+      core_hash: 'sha256:abc',
+      profile_hash: 'sha256:def',
+      contract_json: null,
+      canonical_version: null,
+      updated_at: new Date('2024-01-01T00:00:00Z'),
+      app_tag: null,
+      meta: {},
+      invariants: [] as const,
+    };
+
+    it('returns null when marker table is absent', async () => {
+      const adapter = new PostgresControlAdapter();
+      const driver = createMockDriver([{ match: includes('information_schema.tables'), rows: [] }]);
+      await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
+    });
+
+    it('returns null when marker table exists but row is absent', async () => {
+      const adapter = new PostgresControlAdapter();
+      const driver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
+        { match: includes('from prisma_contract.marker'), rows: [] },
+      ]);
+      await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
+    });
+
+    it('throws PN-RUN-3005 when marker row fails validation', async () => {
+      const adapter = new PostgresControlAdapter();
+      const driver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
+        {
+          match: includes('from prisma_contract.marker'),
+          rows: [{ ...validMarkerRow, invariants: null }],
+        },
+      ]);
+
+      await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
+        expect(CliStructuredError.is(err)).toBe(true);
+        expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+        return true;
+      });
+    });
+
+    it('throws PN-RUN-3006 when marker read query fails', async () => {
+      const adapter = new PostgresControlAdapter();
+      const driver: ControlDriverInstance<'sql', 'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async (sql: string) => {
+          if (sql.includes('information_schema.tables')) {
+            return { rows: [{ '?column?': 1 }] };
+          }
+          throw new Error('permission denied for table marker');
+        },
+        close: async () => {},
+      };
+
+      await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
+        expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3006');
+        return true;
+      });
+    });
+  });
+
+  describe('readAllMarkers', () => {
+    it('throws PN-RUN-3005 on first corrupt row', async () => {
+      const adapter = new PostgresControlAdapter();
+      const driver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ '?column?': 1 }] },
+        {
+          match: includes('from prisma_contract.marker'),
+          rows: [
+            {
+              space: 'app',
+              core_hash: 'sha256:abc',
+              profile_hash: 'sha256:def',
+              contract_json: null,
+              canonical_version: null,
+              updated_at: new Date('2024-01-01T00:00:00Z'),
+              app_tag: null,
+              meta: {},
+              invariants: 'not-an-array',
+            },
+          ],
+        },
+      ]);
+
+      await expect(adapter.readAllMarkers(driver)).rejects.toMatchObject({ code: '3005' });
     });
   });
 });
