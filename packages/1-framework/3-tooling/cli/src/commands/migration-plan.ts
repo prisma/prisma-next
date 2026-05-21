@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
@@ -8,6 +8,7 @@ import {
   type MigrationPlanOperation,
   type OperationPreview,
 } from '@prisma-next/framework-components/control';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
@@ -17,10 +18,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
-import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
-import { readRefs } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
@@ -34,7 +32,6 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
   mapMigrationToolsError,
-  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -52,6 +49,7 @@ import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { resolveFromForPlan } from '../utils/plan-resolution';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -108,6 +106,18 @@ async function readPredecessorEndContract(
       { where: { path } },
     );
   }
+}
+
+async function writeSnapshotStartContract(
+  packageDir: string,
+  contractJson: unknown,
+  contractDts: string,
+): Promise<void> {
+  await mkdir(packageDir, { recursive: true });
+  const jsonContent = `${canonicalizeJson(contractJson)}\n`;
+  const dtsContent = contractDts.endsWith('\n') ? contractDts : `${contractDts}\n`;
+  await writeFile(join(packageDir, 'start-contract.json'), jsonContent);
+  await writeFile(join(packageDir, 'start-contract.d.ts'), dtsContent);
 }
 
 export interface MigrationPlanResult {
@@ -236,62 +246,61 @@ async function executeMigrationPlanCommand(
   }
   const toStorageHash = rawStorageHash;
 
-  // Read existing migrations and determine "from" contract
+  const { refsDir } = resolveMigrationPaths(options.config, config);
+
   let fromContract: Contract | null = null;
   let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
+  let snapshotStartContract: { contractJson: unknown; contractDts: string } | null = null;
 
   try {
     const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
 
-    if (options.from) {
-      const refs = await readRefs(resolveMigrationPaths(options.config, config).refsDir);
-      const refResult = parseContractRef(options.from, { graph, refs });
-      if (!refResult.ok) {
-        return notOk(mapRefResolutionError(refResult.failure));
-      }
-      fromHash = refResult.value.hash;
-      const matchingBundle = bundles.find((p) => p.metadata.to === fromHash);
-      if (!matchingBundle) {
+    const resolutionResult = await resolveFromForPlan({
+      optionsFrom: options.from,
+      refsDir,
+      bundles,
+      graph,
+      familyInstance,
+      readBundleEndContract: (migrationDir) =>
+        readPredecessorEndContract(migrationDir, familyInstance),
+    });
+
+    if (!resolutionResult.ok) {
+      return notOk(resolutionResult.failure);
+    }
+
+    switch (resolutionResult.value.kind) {
+      case 'greenfield':
+        break;
+      case 'graph-node':
+        fromHash = resolutionResult.value.fromHash;
+        fromContract = resolutionResult.value.fromContract;
+        fromContractSourceDir = resolutionResult.value.sourceDir;
+        break;
+      case 'snapshot':
+        fromHash = resolutionResult.value.fromHash;
+        fromContract = resolutionResult.value.fromContract;
+        snapshotStartContract = {
+          contractJson: resolutionResult.value.contractJson,
+          contractDts: resolutionResult.value.contractDts,
+        };
+        break;
+      case 'auto-baseline':
+        // TODO(slice-3-dispatch-2): wire two-bundle emission for auto-baseline.
         return notOk(
-          errorUnexpected(
-            `No migration bundle found for --from "${options.from}" (resolved hash: ${fromHash})`,
-            {
-              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${fromHash}.`,
-              fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
-            },
-          ),
+          errorUnexpected('Auto-baseline emission not yet wired — Dispatch 2', {
+            why: 'The resolver determined auto-baseline is needed but emission is not yet implemented.',
+          }),
         );
-      }
-      fromContractSourceDir = matchingBundle.dirPath;
-      fromContract = await readPredecessorEndContract(fromContractSourceDir, familyInstance);
-    } else {
-      const latestMigration = findLatestMigration(graph);
-      if (latestMigration) {
-        fromHash = latestMigration.to;
-        const leafPkg = bundles.find(
-          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
-        );
-        if (leafPkg) {
-          fromContractSourceDir = leafPkg.dirPath;
-          fromContract = await readPredecessorEndContract(fromContractSourceDir, familyInstance);
-        }
-      }
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
-    // `readPredecessorEndContract` raises a `CliStructuredError` directly
-    // for the missing-snapshot case so the operator gets a precise
-    // why/fix; pass it through unchanged rather than re-wrapping.
     if (CliStructuredError.is(error)) {
       return notOk(error);
     }
-    // Wrap unexpected (non-MigrationToolsError) failures from the migration
-    // load phase in a structured CLI envelope. Letting them throw would
-    // bypass `handleResult()` and crash the command — see CLI structured-
-    // errors guideline (CliStructuredError + Result pattern).
     const message = error instanceof Error ? error.message : String(error);
     return notOk(
       errorUnexpected(message, {
@@ -474,6 +483,12 @@ async function executeMigrationPlanCommand(
         { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
         { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
       ]);
+    } else if (snapshotStartContract !== null) {
+      await writeSnapshotStartContract(
+        packageDir,
+        snapshotStartContract.contractJson,
+        snapshotStartContract.contractDts,
+      );
     }
     await writeMigrationTs(packageDir, migrationTsContent);
 
