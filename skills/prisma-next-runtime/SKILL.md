@@ -1,6 +1,6 @@
 ---
 name: prisma-next-runtime
-description: Wire the Prisma Next runtime — `db.ts` setup using `postgres<Contract>(...)` from `@prisma-next/postgres/runtime`, middleware composition (telemetry from `@prisma-next/middleware-telemetry`; lints and budgets), `DATABASE_URL` config, per-environment branching, switching between Postgres and Mongo façades. Use for db.ts, postgres(), mongo(), middleware, telemetry, lints, budgets, DATABASE_URL, .env, connection pool, poolOptions, dev vs prod config, transactions, db.transaction, read replicas, multi-database.
+description: Wire the Prisma Next runtime — `db.ts` setup using `postgres<Contract>(...)` from `@prisma-next/postgres/runtime`, middleware composition (telemetry from `@prisma-next/middleware-telemetry`; lints and budgets), `DATABASE_URL` config, per-environment branching, switching between Postgres and Mongo façades. Use for db.ts, postgres(), mongo(), middleware, telemetry, lints, budgets, DATABASE_URL, .env, connection pool, poolOptions, dev vs prod config, transactions, db.transaction, read replicas, multi-database, script won't exit, hangs, close connection, db.end, db.close, pool.end, [Symbol.asyncDispose], await using.
 ---
 
 # Prisma Next — Runtime (`db.ts` Wiring)
@@ -16,7 +16,8 @@ This skill covers the **runtime entry point** — `db.ts` — and how to compose
 - User wants per-environment config (dev vs prod, multi-region).
 - User wants to switch between the Postgres and Mongo façades.
 - User wants to wrap operations in `db.transaction(...)`.
-- User mentions: *db.ts, postgres(), mongo(), middleware, telemetry, lints, budgets, DATABASE_URL, .env, connection pool, poolOptions, dev vs prod, transactions, read replicas, multi-database*.
+- User is running a one-off script (`tsx my-script.ts`, Node CLI, CI task) and the process won't exit after queries finish, or they need script teardown (`db.close()`, `await using`).
+- User mentions: *db.ts, postgres(), mongo(), middleware, telemetry, lints, budgets, DATABASE_URL, .env, connection pool, poolOptions, dev vs prod, transactions, read replicas, multi-database, script won't exit, hangs, db.close, db.end, close connection, pool.end, await using*.
 
 ## When Not to Use
 
@@ -62,6 +63,77 @@ Three things to know:
 - **`url` is optional at construct time.** If `DATABASE_URL` is not set when `db.ts` loads, the factory still returns a client; you can call `await db.connect({ url })` later. The factory throws lazily — only when a runtime is actually needed.
 
 The Mongo façade has the same shape — `import mongo from '@prisma-next/mongo/runtime'` — and the same `db` surface.
+
+## Workflow — Running as a script (teardown)
+
+The concept: short scripts that connect, query, then expect the process to exit will **hang on Postgres** because the façade-owned `pg.Pool` keeps Node's event loop alive. The data round-trip succeeds; the script never exits. Call `await db.close()` before the script returns (or use `await using` **at the top of a script module** so teardown runs when the module exits — see the block-scope warning below for why this matters).
+
+**Plain shape** — export `db` from `db.ts`, import it in the script, close at the end:
+
+```typescript
+// src/scripts/hello.ts
+import { db } from '../prisma/db';
+
+const created = await db.orm.User.create({ email: 'alice@example.com', name: 'Alice' });
+const read = await db.orm.User.first();
+console.log({ created, read });
+
+await db.close();
+```
+
+**TS 5.2+ idiomatic shape** — construct the client at the **top of a script module** and let `[Symbol.asyncDispose]` call `close()` when the module exits:
+
+```typescript
+// src/scripts/hello.ts — top-level await in a script module
+import postgres from '@prisma-next/postgres/runtime';
+import type { Contract } from '../prisma/contract.d';
+import contractJson from '../prisma/contract.json' with { type: 'json' };
+
+await using db = postgres<Contract>({ contractJson, url: process.env.DATABASE_URL! });
+
+const user = await db.orm.User.first();
+console.log(user);
+// db.close() runs automatically when the script module exits.
+```
+
+### `await using` is **block-scoped** — do not put it inside a request handler
+
+This is the most important rule in this section. `await using db = postgres(...)` disposes when the *enclosing block* exits. In a script module, that block is the module body and disposal fires at process exit — fine. In a request handler, the enclosing block is the handler function, so disposal fires **after every request** — a fresh `pg.Pool` per call, TCP-connect storm, hot loop tearing connections up and down.
+
+```typescript
+// DO NOT do this — closes the pool after every request.
+app.get('/users', async (req, res) => {
+  await using db = postgres<Contract>({ contractJson, url: process.env.DATABASE_URL! });
+  const users = await db.orm.User.all();
+  res.json(users);
+});
+```
+
+The right server pattern is a **module-level singleton** in `db.ts`, imported by handlers, never closed during the process lifetime:
+
+```typescript
+// src/prisma/db.ts — constructed once, lives for the process
+export const db = postgres<Contract>({ contractJson, url: process.env.DATABASE_URL });
+
+// src/routes/users.ts
+import { db } from '../prisma/db';
+
+app.get('/users', async (req, res) => {
+  const users = await db.orm.User.all();
+  res.json(users);
+});
+```
+
+Servers (HTTP handlers, workers in a request loop) **do not call `db.close()`** at all in steady state. The pool stays open for the process lifetime. `db.close()` and `await using` are for short-lived scripts — `tsx my-script.ts`, Node CLI commands, CI tasks, one-off seed runs — not for code that runs inside a request loop.
+
+**Semantics:**
+
+- **`close()` is idempotent.** Calling it twice is a no-op.
+- **`close()` is terminal.** There is no reconnect on a closed `db` — construct a new client if you need another connection. After close, `db.runtime()`, `db.connect(...)`, `db.transaction(...)`, and `db.prepare(...)` reject with `Error('<target> client is closed')` (e.g. `'Postgres client is closed'`, `'SQLite client is closed'`, `'Mongo client is closed'`).
+- **`close()` does not abort in-flight queries.** `await` outstanding work before calling `close()`. Async iterators from `db.runtime().execute(plan)` and `PreparedStatement` handles held after `close()` fail on their next call.
+- **Ownership.** `close()` releases only what the façade constructed (`pg.Pool` from `{ url }`, `MongoClient` from `{ url }` / `{ uri, dbName }`, SQLite handle from `{ path }`). If you supplied your own `pg.Pool` / `pg.Client` (Postgres `pg:` option), `mongodb.MongoClient` (Mongo `mongoClient:` option), or a pre-built `binding`, `db.close()` does **not** touch those — you own their lifecycle.
+
+**`db.end()` does not exist.** The universal `node-postgres` name is `pool.end()` on a `pg.Pool`; the Prisma Next runtime client is not a `pg.Pool`. The right call is `await db.close()`.
 
 ## Workflow — Telemetry middleware
 
@@ -234,6 +306,7 @@ The runtime side (this skill) is the same regardless: `db.ts` reads `contract.js
 5. **Importing middleware from a non-existent façade subpath.** `@prisma-next/postgres/middleware` does *not* exist. Telemetry comes from `@prisma-next/middleware-telemetry`; lints / budgets come from `@prisma-next/sql-runtime` today (see *What Prisma Next doesn't do yet*).
 6. **Confabulating lint / budget option names.** Lints take `severities` (with the six keys above), not `requireWhere` / `maxRowsWithoutLimit`. Budgets use `maxLatencyMs` (not `maxDurationMs`) plus `maxRows` / `defaultTableRows` / `tableRows`. When in doubt, read the source.
 7. **Switching targets without re-emitting.** The contract artefacts are target-shaped; emit after the target change.
+8. **Script hangs after queries finish on Postgres.** The `pg.Pool` keeps Node's event loop alive. Solution: `await db.close()` before the script returns, or `await using db = postgres<Contract>(...)` at the top of a script module. Do not put `await using db = postgres(...)` inside a request handler — it's block-scoped and would close the pool after every request. The right server pattern is a module-level singleton in `db.ts` that lives for the process lifetime.
 
 ## What Prisma Next doesn't do yet
 

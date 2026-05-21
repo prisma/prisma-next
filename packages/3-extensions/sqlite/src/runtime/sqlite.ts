@@ -48,6 +48,8 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
     declaration: D,
     callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
+  close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
 }
 
 export interface SqliteOptionsBase {
@@ -113,7 +115,10 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
   let connectPromise: Promise<void> | undefined;
+  let closePromise: Promise<void> | undefined;
   let backgroundConnectError: unknown;
+  let closed = false;
+  let ownedDispose: (() => Promise<void>) | undefined;
 
   const connectDriver = async (resolvedBinding: SqliteBinding): Promise<void> => {
     if (driverConnected) return;
@@ -133,6 +138,10 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   };
 
   const getRuntime = (): Runtime => {
+    if (closed) {
+      throw new Error('SQLite client is closed');
+    }
+
     if (backgroundConnectError !== undefined) {
       throw backgroundConnectError;
     }
@@ -148,6 +157,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     }
 
     const driver = driverDescriptor.create();
+    ownedDispose = () => driver.close();
     runtimeDriver = driver;
     if (binding !== undefined) {
       void connectDriver(binding).catch(() => undefined);
@@ -182,6 +192,10 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     context,
     stack,
     async connect(bindingInput) {
+      if (closed) {
+        throw new Error('SQLite client is closed');
+      }
+
       if (driverConnected || connectPromise) {
         throw new Error('SQLite client already connected');
       }
@@ -218,6 +232,20 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
+    },
+
+    close(): Promise<void> {
+      if (closePromise) return closePromise;
+      closed = true;
+      closePromise = (async () => {
+        await connectPromise?.catch(() => undefined);
+        await ownedDispose?.();
+      })();
+      return closePromise;
+    },
+
+    [Symbol.asyncDispose](): Promise<void> {
+      return this.close();
     },
   };
 }

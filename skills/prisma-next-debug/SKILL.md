@@ -1,6 +1,6 @@
 ---
 name: prisma-next-debug
-description: Read a Prisma Next structured error envelope and route to the right recovery — code, domain, severity, why, fix, meta. Use for error, exception, my emit failed, my query won't typecheck, my query crashed, my migration won't apply, MIGRATION.HASH_MISMATCH, BUDGET.ROWS_EXCEEDED, BUDGET.TIME_EXCEEDED, RUNTIME.ABORTED, PLAN.HASH_MISMATCH, CONTRACT.MARKER_MISSING, PN-RUN-3001, PN-RUN-3002, PN-RUN-3030, PN-MIG-2001, PN-CLI-4011, PN-SCHEMA-0001, drift, capability missing, planner conflict, prisma studio, EXPLAIN, query log.
+description: Read a Prisma Next structured error envelope and route to the right recovery — code, domain, severity, why, fix, meta. Use for error, exception, my emit failed, my query won't typecheck, my query crashed, my migration won't apply, MIGRATION.HASH_MISMATCH, BUDGET.ROWS_EXCEEDED, BUDGET.TIME_EXCEEDED, RUNTIME.ABORTED, PLAN.HASH_MISMATCH, CONTRACT.MARKER_MISSING, PN-RUN-3001, PN-RUN-3002, PN-RUN-3030, PN-MIG-2001, PN-CLI-4011, PN-SCHEMA-0001, drift, capability missing, planner conflict, prisma studio, EXPLAIN, query log, db.end, db.close, script won't exit, hangs, close connection, pool.end, client is closed.
 ---
 
 # Prisma Next — Debug
@@ -64,6 +64,16 @@ Some commands re-wrap a downstream error into a `PN-RUN-3000` (`errorRuntime`) e
 ### How to ask for the full envelope
 
 If the user only pasted the human summary, ask for `--json` output (machine envelope) or re-run with `-v` (CLI prints the full structured fields). `--json` and `-v` are global flags on every CLI command.
+
+## Routing — script teardown and closed client
+
+These symptoms are not `PN-*` envelopes — route on the message text and chain to `prisma-next-runtime` § *Running as a script (teardown)*.
+
+| Symptom | Next move |
+|---|---|
+| `TypeError: db.end is not a function` | The runtime client does not expose `db.end()` — that's the `node-postgres` pool API (`pool.end()`). The right call is `await db.close()`. See `prisma-next-runtime` § *Running as a script (teardown)*. |
+| Script hangs after queries print / process won't exit | On Postgres the façade-owned `pg.Pool` keeps the event loop alive. Call `await db.close()` before the script returns, or `await using db = postgres<Contract>(...)` at the top of a script module (do NOT put `await using` inside a request handler — block-scoped, would close per-request). See `prisma-next-runtime` § *Running as a script (teardown)*. |
+| `Error('Postgres client is closed')` / `Error('SQLite client is closed')` / `Error('Mongo client is closed')` | The client was closed via `db.close()` (terminal state). Remove the early `close()`, reorder so `close()` runs last after all queries, or construct a new `db` if reconnection is intended. See `prisma-next-runtime` § *Running as a script (teardown)*. |
 
 ## Routing — symptom and code → next move
 
