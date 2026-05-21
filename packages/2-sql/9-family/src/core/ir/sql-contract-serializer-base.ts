@@ -19,15 +19,6 @@ import type { Type } from 'arktype';
 export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
 
 /**
- * Hydration factory the family `ContractSerializer` invokes for every
- * entry under a pack-contributed `storage.<ns>.<slotKey>` slot. The
- * factory receives the raw JSON value (post-structural-validation) and
- * returns the IR-class instance. Already-class instances passed in
- * pass through unchanged is the caller's contract (idempotent).
- */
-export type SqlNamespaceSlotHydrationFactory = (raw: unknown) => unknown;
-
-/**
  * SQL family `ContractSerializer` abstract base. Carries the SQL-shared
  * deserialization pipeline:
  *
@@ -54,18 +45,12 @@ export type SqlNamespaceSlotHydrationFactory = (raw: unknown) => unknown;
 export abstract class SqlContractSerializerBase<TContract extends Contract<SqlStorage>>
   implements ContractSerializer<TContract>
 {
-  private readonly namespaceSlotHydrationRegistry: ReadonlyMap<
-    string,
-    SqlNamespaceSlotHydrationFactory
-  >;
   private readonly contractSchema: Type<unknown> | undefined;
 
   constructor(
-    private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>,
-    namespaceSlotHydrationRegistry?: ReadonlyMap<string, SqlNamespaceSlotHydrationFactory>,
+    private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory> = new Map(),
     validatorFragments?: ReadonlyMap<string, Type<unknown>>,
   ) {
-    this.namespaceSlotHydrationRegistry = namespaceSlotHydrationRegistry ?? new Map();
     // Only build a fragments-aware contract schema when pack contributions
     // exist. The cached module-level default in `validators.ts` covers the
     // no-contributions case and avoids per-instance schema compilation.
@@ -136,68 +121,65 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const obj = raw as {
-      id?: string;
-      tables?: Record<string, unknown>;
-      types?: Record<string, unknown>;
-    };
-    const hydratedTypes = this.hydrateNamespaceSlot('types', obj);
+    const obj = raw as Record<string, unknown>;
+    const id = (obj['id'] as string | undefined) ?? nsId;
+    const result: Record<string, unknown> = { id };
+
+    for (const [propertyKey, slotValue] of Object.entries(obj)) {
+      if (propertyKey === 'id') continue;
+      if (slotValue === null || typeof slotValue !== 'object') continue;
+
+      if (propertyKey === 'tables') {
+        result['tables'] = Object.fromEntries(
+          Object.entries(slotValue as Record<string, unknown>).map(([tableName, table]) => [
+            tableName,
+            table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+          ]),
+        );
+        continue;
+      }
+
+      const hydratedSlot = Object.fromEntries(
+        Object.entries(slotValue as Record<string, unknown>).map(([entryName, entry]) => {
+          if (typeof entry !== 'object' || entry === null) {
+            return [entryName, entry];
+          }
+          const kind = (entry as { kind?: unknown }).kind;
+          if (typeof kind === 'string') {
+            const factory = this.entityTypeRegistry.get(kind);
+            if (factory !== undefined) {
+              return [entryName, factory(entry)];
+            }
+          }
+          return [entryName, entry];
+        }),
+      );
+      if (Object.keys(hydratedSlot).length > 0) {
+        result[propertyKey] = hydratedSlot;
+      }
+    }
+
+    const typesRaw = obj['types'];
     if (
-      obj.types !== undefined &&
-      Object.keys(obj.types).length > 0 &&
-      hydratedTypes === undefined
+      typesRaw !== undefined &&
+      typeof typesRaw === 'object' &&
+      typesRaw !== null &&
+      Object.keys(typesRaw as Record<string, unknown>).length > 0 &&
+      this.entityTypeRegistry.get('postgres-enum') === undefined
     ) {
       throw new ContractValidationError(
         'Per-schema database types (e.g. postgres-enum) under storage.namespaces[..].types require PostgresContractSerializer.',
         'structural',
       );
     }
-    const tables = Object.fromEntries(
-      Object.entries(obj.tables ?? {}).map(([tableName, table]) => [
-        tableName,
-        table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
-      ]),
-    );
-    return {
-      id: obj.id ?? nsId,
-      tables,
-      ...(hydratedTypes !== undefined
-        ? { types: hydratedTypes as NonNullable<SqlNamespaceTablesInput['types']> }
-        : {}),
-    };
-  }
 
-  /**
-   * Hydrate one pack-contributed namespace slot through the registry
-   * keyed by `storageSlotKey`. Returns the per-entry-name hydrated map
-   * when the registry knows the slot AND the raw envelope carries
-   * non-empty entries; returns `undefined` otherwise. Concrete target
-   * serializer overrides of {@link hydrateSqlNamespaceEntry} can reuse
-   * this helper to keep the per-slot dispatch identical to the family
-   * default while wrapping the result in a target-specific namespace
-   * class.
-   */
-  protected hydrateNamespaceSlot(
-    slotKey: string,
-    raw: Record<string, unknown>,
-  ): Record<string, unknown> | undefined {
-    const hydrate = this.namespaceSlotHydrationRegistry.get(slotKey);
-    if (hydrate === undefined) {
-      return undefined;
-    }
-    const slotValue = raw[slotKey];
-    if (
-      slotValue === undefined ||
-      typeof slotValue !== 'object' ||
-      slotValue === null ||
-      Object.keys(slotValue as Record<string, unknown>).length === 0
-    ) {
-      return undefined;
-    }
-    const entries = slotValue as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(entries).map(([entryName, entry]) => [entryName, hydrate(entry)]),
-    );
+    const tables = (result['tables'] ?? {}) as Record<string, StorageTable>;
+    const types = result['types'] as NonNullable<SqlNamespaceTablesInput['types']> | undefined;
+    return {
+      id,
+      tables,
+      ...(types !== undefined ? { types } : {}),
+    };
   }
 
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {
