@@ -128,28 +128,7 @@ function buildParamRows(
   tableName: string,
   ctx: BuilderContext,
 ): ReadonlyArray<Record<string, ParamRef>> {
-  // SQLite renderInsert derives column order from the first row and throws on any
-  // row that is missing a column in that set. The builder must therefore normalise
-  // all rows to a uniform column union, filling absent columns with an explicit
-  // NULL ParamRef rather than leaving them absent.
-  const perRowParams: Array<Record<string, ParamRef>> = rows.map((rowValues) =>
-    buildParamValues(rowValues, table, tableName, 'create', ctx),
-  );
-
-  const columnUnion = new Set<string>();
-  for (const rowParams of perRowParams) {
-    for (const col of Object.keys(rowParams)) {
-      columnUnion.add(col);
-    }
-  }
-
-  return perRowParams.map((rowParams) => {
-    const filled: Record<string, ParamRef> = {};
-    for (const col of columnUnion) {
-      filled[col] = rowParams[col] ?? ParamRef.of(null);
-    }
-    return filled;
-  });
+  return rows.map((rowValues) => buildParamValues(rowValues, table, tableName, 'create', ctx));
 }
 
 export class InsertQueryImpl<

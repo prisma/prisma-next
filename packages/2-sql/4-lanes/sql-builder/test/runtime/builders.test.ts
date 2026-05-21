@@ -517,7 +517,7 @@ describe('INSERT multi-row', () => {
     expect(params).toHaveLength(6); // id + name + email (default) for each of 2 rows
   });
 
-  it('multi-row with differing column sets computes column union and fills NULL for absent columns', () => {
+  it('multi-row with differing column sets passes each row through with its own columns only', () => {
     const d = db();
     const plan = d.users
       .insert([
@@ -529,18 +529,12 @@ describe('INSERT multi-row', () => {
     expect(ast.kind).toBe('insert');
     if (ast.kind !== 'insert') throw new Error('expected insert');
     expect(ast.rows).toHaveLength(2);
-    // both rows should have the same column set: id, name, email
-    const cols0 = Object.keys(ast.rows[0]!).sort();
-    const cols1 = Object.keys(ast.rows[1]!).sort();
-    expect(cols0).toEqual(['email', 'id', 'name']);
-    expect(cols1).toEqual(['email', 'id', 'name']);
-    // row 0 is missing email — should be NULL param
-    expect(ast.rows[0]!['email']!.kind).toBe('param-ref');
-    // row 1 is missing name — should be NULL param
-    expect(ast.rows[1]!['name']!.kind).toBe('param-ref');
+    // each row carries exactly the columns the caller supplied — no cross-row fill
+    expect(Object.keys(ast.rows[0]!).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(ast.rows[1]!).sort()).toEqual(['email', 'id']);
   });
 
-  it('multi-row with defaults hook: column union includes defaulted columns from any row', () => {
+  it('multi-row with defaults hook: each row gets its own defaults independently', () => {
     const spy = vi.fn((args: { values: Record<string, unknown> }) => {
       if ('id' in args.values && (args.values['id'] as number) === 1) {
         return [{ column: 'email', value: 'default@x.com' }];
@@ -564,11 +558,9 @@ describe('INSERT multi-row', () => {
     const ast = plan.ast;
     if (ast.kind !== 'insert') throw new Error('expected insert');
     expect(ast.rows).toHaveLength(2);
-    // email was injected by defaults for row 0 — both rows should have it in column union
+    // row 0 got email from defaults; row 1 did not — no cross-row fill
     expect(Object.keys(ast.rows[0]!).sort()).toEqual(['email', 'id', 'name']);
-    expect(Object.keys(ast.rows[1]!).sort()).toEqual(['email', 'id', 'name']);
-    // row 1 did not get email from defaults — should be NULL param
-    expect(ast.rows[1]!['email']!.kind).toBe('param-ref');
+    expect(Object.keys(ast.rows[1]!).sort()).toEqual(['id', 'name']);
   });
 });
 
