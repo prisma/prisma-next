@@ -365,7 +365,7 @@ export function sanitizeErrorMessage(message: string, connectionUrl?: string): s
 
 /**
  * Registers the global CLI options shared by every command:
- * --json, -q/--quiet, -v/--verbose, --trace, --color, --no-color,
+ * --format, --json, -q/--quiet, -v/--verbose, --trace, --color, --no-color,
  * --interactive, --no-interactive, -y/--yes.
  *
  * Also sets up the styled help formatter.
@@ -378,7 +378,11 @@ export function addGlobalOptions(command: Command): Command {
         return formatCommandHelp({ command: cmd, flags });
       },
     })
-    .option('--json', 'Output as JSON')
+    .option(
+      '--format <pretty|json>',
+      'Output format (default: pretty, or json when stdout is not a TTY)',
+    )
+    .option('--json', 'Output as JSON (alias for --format json)')
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
     .option('--trace', 'Trace output: deep internals, stack traces')

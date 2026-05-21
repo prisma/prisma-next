@@ -3,7 +3,9 @@
 exports[`help text snapshots > formats contract emit help 1`] = `
 "prisma-next emit → Emit your contract artifacts
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
@@ -30,7 +32,9 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 exports[`help text snapshots > formats contract emit help with no color 1`] = `
 "prisma-next emit → Emit your contract artifacts
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
@@ -57,7 +61,9 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 exports[`help text snapshots > formats contract infer help 1`] = `
 "prisma-next infer → Infer a PSL contract from the live database schema
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
@@ -85,7 +91,9 @@ exports[`help text snapshots > formats contract infer help 1`] = `
 exports[`help text snapshots > formats db schema help 1`] = `
 "prisma-next schema → Inspect the live database schema
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
@@ -115,7 +123,9 @@ exports[`help text snapshots > formats db schema help 1`] = `
 exports[`help text snapshots > formats db update help 1`] = `
 "prisma-next update → Update your database schema to match your contract
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
@@ -148,7 +158,9 @@ exports[`help text snapshots > formats db update help 1`] = `
 exports[`help text snapshots > formats db verify help 1`] = `
 "prisma-next verify → Check whether the database marker and live schema match your contract
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
