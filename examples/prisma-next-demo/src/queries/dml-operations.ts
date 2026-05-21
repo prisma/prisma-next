@@ -1,7 +1,7 @@
 import { db } from '../prisma/db';
 
 export async function insertUser(email: string) {
-  const plan = db.sql.user.insert({ email }).returning('id', 'email').build();
+  const plan = db.sql.user.insert([{ email }]).returning('id', 'email').build();
   const rows = await db.runtime().execute(plan);
   return rows[0] ?? null;
 }

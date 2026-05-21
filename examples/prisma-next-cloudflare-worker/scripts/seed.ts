@@ -20,25 +20,29 @@ async function main() {
 
   await runtime.execute(
     db.sql.user
-      .insert({
-        email: 'alice@example.com',
-        displayName: 'Alice',
-        createdAt: new Date('2026-04-01T00:00:00.000Z'),
-        kind: 'admin',
-        address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
-      })
+      .insert([
+        {
+          email: 'alice@example.com',
+          displayName: 'Alice',
+          createdAt: new Date('2026-04-01T00:00:00.000Z'),
+          kind: 'admin',
+          address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
+        },
+      ])
       .build(),
   );
 
   await runtime.execute(
     db.sql.user
-      .insert({
-        email: 'bob@example.com',
-        displayName: 'Bob',
-        createdAt: new Date('2026-04-02T00:00:00.000Z'),
-        kind: 'user',
-        address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
-      })
+      .insert([
+        {
+          email: 'bob@example.com',
+          displayName: 'Bob',
+          createdAt: new Date('2026-04-02T00:00:00.000Z'),
+          kind: 'user',
+          address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
+        },
+      ])
       .build(),
   );
 
@@ -65,11 +69,13 @@ async function main() {
   for (let i = 0; i < 5; i++) {
     await runtime.execute(
       db.sql.post
-        .insert({
-          title: `Alice post ${i + 1}`,
-          userId: alice.id,
-          createdAt: new Date(Date.UTC(2026, 3, 10 + i)),
-        })
+        .insert([
+          {
+            title: `Alice post ${i + 1}`,
+            userId: alice.id,
+            createdAt: new Date(Date.UTC(2026, 3, 10 + i)),
+          },
+        ])
         .build(),
     );
   }
@@ -77,11 +83,13 @@ async function main() {
   for (let i = 0; i < 3; i++) {
     await runtime.execute(
       db.sql.post
-        .insert({
-          title: `Bob post ${i + 1}`,
-          userId: bob.id,
-          createdAt: new Date(Date.UTC(2026, 3, 20 + i)),
-        })
+        .insert([
+          {
+            title: `Bob post ${i + 1}`,
+            userId: bob.id,
+            createdAt: new Date(Date.UTC(2026, 3, 20 + i)),
+          },
+        ])
         .build(),
     );
   }

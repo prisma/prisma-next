@@ -5,6 +5,7 @@ import type {
   ExtractQueryOperationTypes,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import type { Expression, FieldProxy, Functions } from '../expression';
 import type {
   DefaultScope,
   EmptyRow,
@@ -111,6 +112,13 @@ type ResolvedUpdateValues<
   FieldInputs extends Record<string, Record<string, unknown>>,
 > = ResolvedInsertValues<C, Table, TableName, CT, FieldInputs>;
 
+type ResolvedUpdateExpressions<Table extends StorageTable> = {
+  [K in keyof Table['columns']]?: Expression<{
+    codecId: Table['columns'][K]['codecId'];
+    nullable: boolean;
+  }>;
+};
+
 type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
   readonly codecTypes: ExtractCodecTypes<C>;
   readonly capabilities: C['capabilities'];
@@ -132,12 +140,14 @@ export interface TableProxy<
   ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>>;
 
   insert(
-    values: ResolvedInsertValues<
-      C,
-      UnboundTables<C>[Name],
-      Name,
-      QC['codecTypes'],
-      ExtractFieldInputTypes<C>
+    rows: ReadonlyArray<
+      ResolvedInsertValues<
+        C,
+        UnboundTables<C>[Name],
+        Name,
+        QC['codecTypes'],
+        ExtractFieldInputTypes<C>
+      >
     >,
   ): InsertQuery<QC, AvailableScope, EmptyRow>;
 
@@ -149,6 +159,13 @@ export interface TableProxy<
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
     >,
+  ): UpdateQuery<QC, AvailableScope, EmptyRow>;
+
+  update(
+    callback: (
+      fields: FieldProxy<AvailableScope>,
+      fns: Functions<QC>,
+    ) => ResolvedUpdateExpressions<UnboundTables<C>[Name]>,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow>;

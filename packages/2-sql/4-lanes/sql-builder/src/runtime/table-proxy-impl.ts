@@ -6,6 +6,7 @@ import type {
   ExpressionBuilder,
   ExtractScopeFields,
   FieldProxy,
+  Functions,
   WithField,
   WithFields,
 } from '../expression';
@@ -32,7 +33,15 @@ import type { LateralBuilder } from '../types/shared';
 import type { TableProxy } from '../types/table-proxy';
 import { BuilderBase, type BuilderContext, emptyState, tableToScope } from './builder-base';
 import { JoinedTablesImpl } from './joined-tables-impl';
-import { DeleteQueryImpl, InsertQueryImpl, UpdateQueryImpl } from './mutation-impl';
+import {
+  buildParamValues,
+  buildSetExpressions,
+  DeleteQueryImpl,
+  evaluateUpdateCallback,
+  InsertQueryImpl,
+  UpdateQueryImpl,
+  type UpdateSetCallback,
+} from './mutation-impl';
 import { SelectQueryImpl } from './query-impl';
 
 export class TableProxyImpl<
@@ -155,12 +164,41 @@ export class TableProxyImpl<
     return this.#toJoined().outerFullJoin(other, on);
   }
 
-  insert(values: Record<string, unknown>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, values, this.ctx);
+  insert(rows: ReadonlyArray<Record<string, unknown>>): InsertQuery<QC, AvailableScope, EmptyRow> {
+    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, rows, this.ctx);
   }
 
-  update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow> {
-    return new UpdateQueryImpl(this.#tableName, this.#table, this.#scope, set, this.ctx);
+  update(
+    setOrCallback:
+      | Record<string, unknown>
+      | ((
+          fields: FieldProxy<AvailableScope>,
+          fns: Functions<QC>,
+        ) => Record<string, Expression<ScopeField> | undefined>),
+  ): UpdateQuery<QC, AvailableScope, EmptyRow> {
+    if (typeof setOrCallback === 'function') {
+      const callbackExprs = evaluateUpdateCallback(
+        setOrCallback as UpdateSetCallback,
+        this.#scope,
+        this.ctx.queryOperationTypes,
+      );
+      const setExpressions = buildSetExpressions(
+        callbackExprs,
+        this.#table,
+        this.#tableName,
+        'update',
+        this.ctx,
+      );
+      return new UpdateQueryImpl(this.#tableName, this.#scope, setExpressions, this.ctx);
+    }
+    const setExpressions = buildParamValues(
+      setOrCallback,
+      this.#table,
+      this.#tableName,
+      'update',
+      this.ctx,
+    );
+    return new UpdateQueryImpl(this.#tableName, this.#scope, setExpressions, this.ctx);
   }
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {

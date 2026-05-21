@@ -79,7 +79,7 @@ describe('e2e: sql-builder on SQLite', { timeout: timeouts.databaseOperation }, 
         const row = await runtime
           .execute(
             db.users
-              .insert({ id: 100, name: 'Test', email: 'test@example.com' })
+              .insert([{ id: 100, name: 'Test', email: 'test@example.com' }])
               .returning('id', 'name')
               .build(),
           )
@@ -121,7 +121,7 @@ describe('e2e: sql-builder on SQLite', { timeout: timeouts.databaseOperation }, 
     it('delete with WHERE and RETURNING', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
         await runtime.execute(
-          db.users.insert({ id: 999, name: 'Temp', email: 'temp@example.com' }).build(),
+          db.users.insert([{ id: 999, name: 'Temp', email: 'temp@example.com' }]).build(),
         );
         const deleted = await runtime
           .execute(
@@ -144,22 +144,26 @@ describe('e2e: sql-builder on SQLite', { timeout: timeouts.databaseOperation }, 
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
         await runtime.execute(
           db.typed_rows
-            .insert({
-              id: 1,
-              active: 1,
-              created_at: new Date('2024-01-01T00:00:00.000Z'),
-              label: 'a',
-            })
+            .insert([
+              {
+                id: 1,
+                active: 1,
+                created_at: new Date('2024-01-01T00:00:00.000Z'),
+                label: 'a',
+              },
+            ])
             .build(),
         );
         await runtime.execute(
           db.typed_rows
-            .insert({
-              id: 2,
-              active: 0,
-              created_at: new Date('2024-06-15T12:00:00.000Z'),
-              label: 'b',
-            })
+            .insert([
+              {
+                id: 2,
+                active: 0,
+                created_at: new Date('2024-06-15T12:00:00.000Z'),
+                label: 'b',
+              },
+            ])
             .build(),
         );
 
@@ -177,12 +181,14 @@ describe('e2e: sql-builder on SQLite', { timeout: timeouts.databaseOperation }, 
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
         await runtime.execute(
           db.typed_rows
-            .insert({
-              id: 1,
-              active: 1,
-              created_at: new Date('2024-01-01T00:00:00.000Z'),
-              label: 'a',
-            })
+            .insert([
+              {
+                id: 1,
+                active: 1,
+                created_at: new Date('2024-01-01T00:00:00.000Z'),
+                label: 'a',
+              },
+            ])
             .build(),
         );
 
@@ -201,13 +207,15 @@ describe('e2e: sql-builder on SQLite', { timeout: timeouts.databaseOperation }, 
         const jsonData = { nested: { key: 'value' }, list: [1, 2, 3] };
         await runtime.execute(
           db.typed_rows
-            .insert({
-              id: 3,
-              active: 1,
-              created_at: new Date('2024-01-01T00:00:00.000Z'),
-              metadata: jsonData,
-              label: 'c',
-            })
+            .insert([
+              {
+                id: 3,
+                active: 1,
+                created_at: new Date('2024-01-01T00:00:00.000Z'),
+                metadata: jsonData,
+                label: 'c',
+              },
+            ])
             .build(),
         );
 
@@ -248,7 +256,7 @@ describe('e2e: sql-builder on SQLite', { timeout: timeouts.databaseOperation }, 
     it('returning is available (sql.returning: true)', async () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ db }) => {
         expectTypeOf(
-          db.users.insert({ id: 1, name: 'a', email: 'a@a.com' }).returning,
+          db.users.insert([{ id: 1, name: 'a', email: 'a@a.com' }]).returning,
         ).not.toBeNever();
       });
     });

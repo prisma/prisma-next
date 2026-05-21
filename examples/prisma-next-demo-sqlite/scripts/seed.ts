@@ -23,21 +23,25 @@ async function main() {
   try {
     await runtime.execute(
       db.sql.user
-        .insert({
-          email: 'alice@example.com',
-          displayName: 'Alice',
-          createdAt: new Date(),
-        })
+        .insert([
+          {
+            email: 'alice@example.com',
+            displayName: 'Alice',
+            createdAt: new Date(),
+          },
+        ])
         .build(),
     );
 
     await runtime.execute(
       db.sql.user
-        .insert({
-          email: 'bob@example.com',
-          displayName: 'Bob',
-          createdAt: new Date(),
-        })
+        .insert([
+          {
+            email: 'bob@example.com',
+            displayName: 'Bob',
+            createdAt: new Date(),
+          },
+        ])
         .build(),
     );
 
@@ -67,13 +71,17 @@ async function main() {
     console.log(`Created user: ${bob.email} (id: ${bob.id})`);
 
     await runtime.execute(
-      db.sql.post.insert({ title: 'First Post', userId: alice.id, createdAt: new Date() }).build(),
+      db.sql.post
+        .insert([{ title: 'First Post', userId: alice.id, createdAt: new Date() }])
+        .build(),
     );
     await runtime.execute(
-      db.sql.post.insert({ title: 'Second Post', userId: alice.id, createdAt: new Date() }).build(),
+      db.sql.post
+        .insert([{ title: 'Second Post', userId: alice.id, createdAt: new Date() }])
+        .build(),
     );
     await runtime.execute(
-      db.sql.post.insert({ title: 'Third Post', userId: bob.id, createdAt: new Date() }).build(),
+      db.sql.post.insert([{ title: 'Third Post', userId: bob.id, createdAt: new Date() }]).build(),
     );
 
     console.log('Seed completed successfully!');

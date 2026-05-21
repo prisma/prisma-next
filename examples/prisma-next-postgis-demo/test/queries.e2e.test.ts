@@ -39,13 +39,13 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
     runtime = await db.connect({ url: TEST_DATABASE_URL });
 
     for (const cafe of cafes) {
-      await runtime.execute(db.sql.cafe.insert(cafe).build());
+      await runtime.execute(db.sql.cafe.insert([cafe]).build());
     }
     for (const hood of neighborhoods) {
-      await runtime.execute(db.sql.neighborhood.insert(hood).build());
+      await runtime.execute(db.sql.neighborhood.insert([hood]).build());
     }
     for (const route of routes) {
-      await runtime.execute(db.sql.route.insert(route).build());
+      await runtime.execute(db.sql.route.insert([route]).build());
     }
   }, timeouts.spinUpPpgDev);
 

@@ -87,11 +87,13 @@ export async function createPost(
     if (!profile) throw new HttpError(404, 'Profile not found');
 
     const insertPlan = tx.sql.post
-      .insert({
-        authorId: profile.id,
-        title: input.title,
-        body: input.body,
-      })
+      .insert([
+        {
+          authorId: profile.id,
+          title: input.title,
+          body: input.body,
+        },
+      ])
       .returning('id', 'createdAt')
       .build();
     const [row] = await tx.runtime().execute(insertPlan);

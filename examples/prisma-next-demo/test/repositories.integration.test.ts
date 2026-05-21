@@ -153,7 +153,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const user of users) {
-    await runtime.execute(db.user.insert(user).build());
+    await runtime.execute(db.user.insert([user]).build());
   }
 
   const posts = [
@@ -190,7 +190,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    await runtime.execute(db.post.insert(post).build());
+    await runtime.execute(db.post.insert([post]).build());
   }
 }
 
@@ -228,7 +228,7 @@ async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    await runtime.execute(db.post.insert(post).build());
+    await runtime.execute(db.post.insert([post]).build());
   }
 }
 
