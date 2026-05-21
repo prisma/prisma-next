@@ -548,19 +548,19 @@ export function compileRelationSelect(
  * Planner invariant: scalar reducers (`count` / `sum` / ...) and
  * `combine()` descriptors cannot be lowered into the lateral / correlated
  * single-query strategies (TML-2595). The dispatch path already gates
- * these recursively via `hasComplexIncludeDescriptors`, but the planner
- * is an exported helper called directly by tests and rich-plan callers,
- * so it must enforce the same invariant at every depth — not only at
- * the top level — or a nested `count()` inside a row include would
- * silently produce a malformed plan instead of failing fast at the
- * boundary.
+ * these recursively via its own `hasScalarOrCombineIncludeDescriptors`,
+ * but the planner is an exported helper called directly by tests and
+ * rich-plan callers, so it must enforce the same invariant at every
+ * depth — not only at the top level — or a nested `count()` inside a
+ * row include would silently produce a malformed plan instead of
+ * failing fast at the boundary.
  */
-function hasScalarOrCombineIncludeAnywhere(includes: readonly IncludeExpr[]): boolean {
+function hasScalarOrCombineIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
   return includes.some(
     (include) =>
       include.scalar !== undefined ||
       include.combine !== undefined ||
-      hasScalarOrCombineIncludeAnywhere(include.nested.includes),
+      hasScalarOrCombineIncludeDescriptors(include.nested.includes),
   );
 }
 
@@ -571,7 +571,7 @@ export function compileSelectWithIncludeStrategy(
   strategy: 'lateral' | 'correlated',
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  if (hasScalarOrCombineIncludeAnywhere(state.includes)) {
+  if (hasScalarOrCombineIncludeDescriptors(state.includes)) {
     throw new Error(
       'single-query include strategy does not support scalar include selectors or combine()',
     );
