@@ -200,31 +200,17 @@ Starting at the 0.11 release, the SQL ORM client (`@prisma-next/sql-orm-client`)
 
 ### Behaviour change
 
-Previously, any include tree of depth ≥ 2 was executed as a **multi-query** fan-out (one root query plus one follow-up query per nested level). Starting at 0.11, the client first attempts a **single-query** plan (`joinChain`-style nested-JSON aggregation) on capable SQL targets, and only falls back to multi-query when the target or the descriptor shape cannot honour the single-query plan. The new collapse applies to both seams:
+Previously, any include tree of depth ≥ 2 was executed as a **multi-query** fan-out (one root query plus one follow-up query per nested level). Starting at 0.11, the client first attempts a **single-query** plan (`joinChain`-style nested-JSON aggregation) on capable SQL targets, and only falls back to multi-query when the target or the descriptor shape cannot honour the single-query plan.
 
-- `dispatchWithIncludeStrategy(...)` — the runtime dispatcher.
-- `compileSelectWithIncludeStrategy(...)` — the exported planner that builds a rich plan without executing it (used by tests and by extensions that consume the plan directly).
+This is a bugfix that makes nested includes behave the way the documented surface already describes: fewer issued SQL statements per query on capable targets, identical row results, identical typed surface. No public API was renamed or removed.
 
-External callers see fewer issued SQL statements per query on capable targets, identical row results, and identical typed surface. No public API was renamed or removed.
+### Recursive scalar / combine gate
 
-### New safety gate
-
-The collapse refuses two descriptor shapes that the old multi-query path silently tolerated. Both gates apply recursively at every depth of the include tree, on both seams above:
-
-1. **Non-leaf `.distinct()` combined with nested includes.** A `.distinct()` clause sitting on an include that itself carries further includes (`nested.distinct?.length > 0 && nested.includes.length > 0`) now throws a clear error rather than emitting an invalid `SELECT DISTINCT ..., <nested json aggregate>` plan. The shared predicate `hasNonLeafIncludeWithDistinct` (in `src/include-tree-predicates.ts`) is the single source of truth used by both seams.
-2. **Unsupported scalar / combine descriptors on nested includes.** The existing scalar/combine rejection is now applied recursively rather than only at the top level — the same predicate runs at every depth.
+The existing rejection of unsupported scalar selectors and `combine()` descriptors on nested includes is now applied recursively rather than only at the top level — the same predicate runs at every depth of the include tree. Trees that previously fell through to the multi-query path with a nested `count()` / `combine()` now route through the same recursion-aware multi-query gate.
 
 ### Who is affected
 
-Most extension authors who consume `@prisma-next/sql-orm-client` as a black-box query runner see no source-level change required: the public types are unchanged, and the strategy is picked internally.
-
-You will need to adjust assertions or expectations if your extension:
-
-- **Builds a planner / introspects the plan returned by `compileSelectWithIncludeStrategy`.** Plans for depth ≥ 2 include trees on capable targets now have the single-query shape (nested JSON aggregate inside the root statement) rather than the prior multi-query shape (one root statement plus follow-ups). Tests that asserted on statement counts, statement shapes, or fan-out behaviour need to be updated to match the new shape, or to pin the strategy explicitly if the test specifically targets multi-query behaviour.
-- **Previously relied on the silent multi-query fallback** for include trees that combined a non-leaf `.distinct()` with nested includes. Those trees now throw a `single-query include strategy does not support distinct() on a non-leaf include` error at plan / dispatch time. The fix is to remove the `.distinct()` from the non-leaf level (move it to the root collection or to a leaf include) or to restructure the include tree so `.distinct()` only sits on a leaf.
-- **Previously relied on the silent multi-query fallback** for include trees that combined unsupported scalar / combine descriptors with nested includes. The same restructuring applies — keep the unsupported descriptors at the top level, or accept the new throw and restructure.
-
-There is no codemod for this change. The behaviour shift is observable only in tests and planner-consuming code; source-level fixes are local and case-specific (rearrange the include tree, update plan-shape assertions, or pin the desired strategy in the test).
+The small subset of extension authors who consume `compileSelectWithIncludeStrategy` directly to introspect plan shape may see different plans on capable targets at depth ≥ 2 (single-query JSON aggregate inside the root statement, instead of follow-up statements). Plan-shape assertions in such test suites may need updating, or — if a specific strategy must be exercised — pin the strategy explicitly in the test.
 
 ### Validation
 
