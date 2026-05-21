@@ -44,7 +44,6 @@ export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
     discriminator: 'postgres-enum',
-    hydrate: (raw: unknown) => new PostgresEnumType(raw as PostgresEnumTypeInput),
     validatorSchema: PostgresEnumTypeSchema,
     output: {
       factory: (input: PostgresEnumTypeInput): PostgresEnumStorageEntry =>

@@ -233,7 +233,6 @@ describe('assembleAuthoringContributions', () => {
             enum: {
               kind: 'entity',
               discriminator: 'postgres-enum',
-              hydrate: () => ({}),
               output: { factory: () => ({}) },
             },
           },

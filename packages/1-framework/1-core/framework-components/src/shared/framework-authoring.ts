@@ -140,20 +140,15 @@ export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> 
     | AuthoringEntityTypeTemplateOutput
     | AuthoringEntityTypeFactoryOutput<Input, Output>;
   /**
-   * Hydration factory the family `ContractSerializer` invokes for each
-   * entry whose envelope `kind` matches this descriptor's
-   * {@link discriminator}. Receives the raw JSON value
-   * (post-structural-validation) and returns the IR-class instance.
-   * Idempotent: already-class instances pass through unchanged is the
-   * caller's contract.
-   */
-  readonly hydrate?: (raw: unknown) => Output;
-  /**
    * arktype schema fragment for one entry whose envelope `kind` matches
    * this descriptor's {@link discriminator}. The family validator composes
    * contributed fragments into the per-namespace entry schema at
    * validator construction time so the structural check covers
    * pack-introduced kinds without the family core hard-coding the schema.
+   *
+   * Hydration uses {@link AuthoringEntityTypeFactoryOutput.factory}
+   * directly — the wire shape conforms structurally to the factory's
+   * `Input` after `validatorSchema` validates it.
    */
   readonly validatorSchema?: Type<unknown>;
 }
