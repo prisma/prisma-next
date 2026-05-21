@@ -107,9 +107,9 @@ export function defineContract(
   },
 ): SqliteResult<TypesConstraint, ModelsConstraint, undefined, undefined> {
   const full = {
+    ...scaffold,
     family: sqlFamilyPack,
     target: sqlitePack,
-    ...scaffold,
   } as ContractInput;
   if (factory !== undefined) {
     return baseDefineContract(
