@@ -29,7 +29,10 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import { hasNonLeafIncludeWithDistinct } from './include-tree-predicates';
+import {
+  hasNonLeafIncludeWithDistinct,
+  hasScalarOrCombineIncludeDescriptors,
+} from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr } from './types';
 import { bindWhereExpr } from './where-binding';
@@ -543,26 +546,6 @@ export function compileRelationSelect(
     offset: undefined,
     filters: [bindWhereExpr(contract, inFilter), ...nestedState.filters],
   });
-}
-
-/**
- * Planner invariant: scalar reducers (`count` / `sum` / ...) and
- * `combine()` descriptors cannot be lowered into the lateral / correlated
- * single-query strategies (TML-2595). The dispatch path already gates
- * these recursively via its own `hasScalarOrCombineIncludeDescriptors`,
- * but the planner is an exported helper called directly by tests and
- * rich-plan callers, so it must enforce the same invariant at every
- * depth — not only at the top level — or a nested `count()` inside a
- * row include would silently produce a malformed plan instead of
- * failing fast at the boundary.
- */
-function hasScalarOrCombineIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
-  return includes.some(
-    (include) =>
-      include.scalar !== undefined ||
-      include.combine !== undefined ||
-      hasScalarOrCombineIncludeDescriptors(include.nested.includes),
-  );
 }
 
 export function compileSelectWithIncludeStrategy(

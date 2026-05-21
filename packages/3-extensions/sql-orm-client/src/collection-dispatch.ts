@@ -31,7 +31,10 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
-import { hasNonLeafIncludeWithDistinct } from './include-tree-predicates';
+import {
+  hasNonLeafIncludeWithDistinct,
+  hasScalarOrCombineIncludeDescriptors,
+} from './include-tree-predicates';
 import {
   compileRelationSelect,
   compileSelect,
@@ -476,21 +479,6 @@ async function resolveScalarByParent(
 
 function uniqueValues(values: unknown[]): unknown[] {
   return [...new Set(values)];
-}
-
-function hasScalarOrCombineIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
-  // Walks the include tree recursively. A nested scalar selector or
-  // combine() at any depth must gate the entire dispatch to multi-query
-  // until TML-2595 teaches the lateral/correlated builders to lower
-  // those descriptors. Without the recursion, a depth-2+ row include
-  // containing a depth-3 `count()` would fall through to
-  // `compileSelectWithIncludeStrategy` and hit its explicit `throw`.
-  return includes.some(
-    (include) =>
-      include.scalar !== undefined ||
-      include.combine !== undefined ||
-      hasScalarOrCombineIncludeDescriptors(include.nested.includes),
-  );
 }
 
 /**
