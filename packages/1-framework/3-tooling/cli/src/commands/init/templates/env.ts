@@ -40,7 +40,14 @@ function envPlaceholderBody(target: TargetId): string {
   if (target === 'postgres') {
     lines.push('DATABASE_URL="postgresql://user:password@localhost:5432/mydb"');
   } else {
-    lines.push('DATABASE_URL="mongodb://localhost:27017/mydb"');
+    lines.push(
+      '# Standalone local mongod / `docker run mongo:7` — no replica set required for first-run queries.',
+    );
+    lines.push(
+      '# Transactions and change streams need a replica set; add ?replicaSet=... only after initiating one.',
+    );
+    lines.push('');
+    lines.push('DATABASE_URL="mongodb://user:password@localhost:27017/mydb"');
   }
   lines.push('');
   return lines.join('\n');
