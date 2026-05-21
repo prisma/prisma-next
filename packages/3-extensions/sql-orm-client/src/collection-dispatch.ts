@@ -382,8 +382,22 @@ async function resolveRowsByParent(
   state: CollectionState,
   parentJoinValues: readonly unknown[],
 ): Promise<Map<unknown, Record<string, unknown>[]>> {
+  // Multi-query stitching reads `child.raw[grandchildInclude.localColumn]`
+  // for every immediate include in `state.includes` to bucket children by
+  // join value. A user-supplied `.select(...)` on the child that omits any
+  // of those join columns would silently yield `undefined` for the join
+  // value, producing empty nested arrays at depth >= 2. Force every
+  // direct nested include's `localColumn` into the child's selected set
+  // alongside `include.targetColumn` so the stitcher always sees a
+  // defined join value. The next level of recursion (when grandchild
+  // stitching itself dispatches through `resolveRowsByParent`) repeats
+  // this same augmentation for its own children.
+  const nestedJoinColumns = state.includes.map((nested) => nested.localColumn);
+  const requiredChildColumns = Array.from(
+    new Set<string>([include.targetColumn, ...nestedJoinColumns]),
+  );
   const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
-    augmentSelectionForJoinColumns(state.selectedFields, [include.targetColumn]);
+    augmentSelectionForJoinColumns(state.selectedFields, requiredChildColumns);
 
   const childCompiled = compileRelationSelect(
     contract,

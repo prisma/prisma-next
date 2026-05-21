@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { createUsersCollection, timeouts, withCollectionRuntime } from './helpers';
+import { collectionWithCapabilities } from './nested-includes-helpers';
 import { seedComments, seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/nested-includes/refinements', () => {
@@ -238,6 +239,35 @@ describe('integration/nested-includes/refinements', () => {
 
           expect(rows[0]?.posts).toEqual([
             { id: 10, title: 'A', userId: 1, views: 1, embedding: null, comments: [] },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'select() on depth-1 child omitting the grandchild join column still stitches depth-2 results (regression: descendant localColumn force)',
+      async () => {
+        // Multi-query fallback path: stitching reads
+        // `child.raw[grandchildInclude.localColumn]` to bucket children.
+        // If `resolveRowsByParent` does not force the grandchild's
+        // `localColumn` (Post.id, for the comments include) into the
+        // child's `selectedForQuery` when the user's `.select(...)`
+        // omits it, the join lookup reads `undefined` and the depth-2
+        // arrays come back empty.
+        await withCollectionRuntime(async (runtime) => {
+          const users = collectionWithCapabilities(runtime, 'User', {});
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
+          await seedComments(runtime, [{ id: 100, body: 'hi', postId: 10 }]);
+
+          const rows = await users
+            .orderBy((u) => u.id.asc())
+            .include('posts', (posts) => posts.select('title').include('comments'))
+            .all();
+
+          expect(rows[0]?.posts).toEqual([
+            { title: 'A', comments: [{ id: 100, body: 'hi', postId: 10 }] },
           ]);
         });
       },
