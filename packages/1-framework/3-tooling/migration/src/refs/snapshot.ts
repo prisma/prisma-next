@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
@@ -168,10 +168,18 @@ function isUnknownRefError(error: unknown): boolean {
   return MigrationToolsError.is(error) && error.code === 'MIGRATION.UNKNOWN_REF';
 }
 
-export async function deleteRefPaired(refsDir: string, name: string): Promise<void> {
-  const snapshot = await readRefSnapshot(refsDir, name);
+async function snapshotFilesExist(refsDir: string, name: string): Promise<boolean> {
+  if (!validateRefName(name)) {
+    throw errorInvalidRefName(name);
+  }
 
-  if (snapshot !== null) {
+  const paths = [snapshotJsonPath(refsDir, name), snapshotDtsPath(refsDir, name)];
+  const checks = await Promise.allSettled(paths.map((filePath) => access(filePath)));
+  return checks.some((result) => result.status === 'fulfilled');
+}
+
+export async function deleteRefPaired(refsDir: string, name: string): Promise<void> {
+  if (await snapshotFilesExist(refsDir, name)) {
     try {
       await deleteRef(refsDir, name);
     } catch (error) {
