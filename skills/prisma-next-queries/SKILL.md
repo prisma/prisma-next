@@ -1,6 +1,6 @@
 ---
 name: prisma-next-queries
-description: Write Prisma Next queries — pick a lane (`db.orm.<Model>` for CRUD and includes, `db.sql.<table>` SQL builder for set-builder shapes the ORM doesn't express), filter / project / sort / paginate, eager-load relations with `.include(...)`, transactions via `db.transaction(...)`, aggregates via `.aggregate(...)`. Use for query, where, select, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client, db.close, script, script won't exit, hangs, close connection, db.end, pool.end, await using. Also covers result consumption (`.all()` is a Thenable — just `await` it; no `collect()` / `toArray()` helper needed), single-consumption semantics (`RUNTIME.ITERATOR_CONSUMED`), aggregate nullability (`count` returns `number`, `sum/avg/min/max` return `number | null` per SQL semantics), range conditions (chain `.where()` clauses or use `and(...)` — there is no `.between(...)`), and **target-specific ORM addressing — SQL targets key `db.orm` by model name (`db.orm.User`); MongoDB keys it by the collection's storage name from `@@map(...)`, falling back to the lowercased model name (`db.orm.users` / `db.orm.user`)**.
+description: Write Prisma Next queries for Postgres or Mongo — pick a lane (Postgres `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>` + `db.query.from(...)` pipeline builder), filter / project / sort / paginate, eager-load relations with `.include(...)`, Postgres transactions via `db.transaction(...)`, Postgres ORM aggregates via `.aggregate(...)`, Mongo aggregations via the query builder. Use for query, where, match, select, project, orderBy, take, skip, include, eager load, lookup, first, all, count, aggregate, group, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client, db.close, script, script won't exit, hangs, close connection, db.end, pool.end, await using, variant, polymorphism. Also covers result consumption (`.all()` is a Thenable — just `await` it; no `collect()` / `toArray()` helper needed), single-consumption semantics (`RUNTIME.ITERATOR_CONSUMED`), Postgres aggregate nullability (`count` returns `number`, `sum/avg/min/max` return `number | null` per SQL semantics), and range conditions (Postgres chain `.where()` clauses or use `and(...)` — there is no `.between(...)`).
 ---
 
 # Prisma Next — Queries
@@ -27,14 +27,21 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 
 ## Key Concepts
 
-Prisma Next ships **two** query lanes on top of one contract today, both reached through the same `db` value from `src/prisma/db.ts` (which the `@prisma-next/<target>/runtime` façade returns):
+Prisma Next ships **two query lanes** per target on the same `db` value from `src/prisma/db.ts`. Check the runtime import (`@prisma-next/postgres/runtime` vs `@prisma-next/mongo/runtime`) before picking examples — the lane names and shapes differ.
 
-- **`db.orm.<Model>`** — the ORM. Model-shaped (`db.orm.User` on SQL targets; on MongoDB, the key is the collection's storage name — see the *MongoDB ORM addressing* note below), fluent (`.where(...).select(...).orderBy(...).all()`), fully typed against `Contract`. Default lane for CRUD with relations.
-- **`db.sql.<table>`** — the SQL builder. Table-shaped (`db.sql.user`, lowercase by storage name), produces a *plan* you execute through the runtime. Use when the ORM is too high-level — explicit `JOIN`, computed projections that aren't model fields, set operations, window functions.
+**Postgres** (`postgres<Contract>(...)` from `@prisma-next/postgres/runtime`):
 
-The two lanes share the same contract, the same connection, and the same transaction context — they compose cleanly. Reach for the ORM first; drop to `db.sql` when the ORM is too high-level. The lane choice is local: a single query function picks one lane, not the whole app.
+- **`db.orm.<Model>`** — ORM, PascalCase model name (`db.orm.User`). Fluent `.where(...).select(...).orderBy(...).all()`, fully typed against `Contract`. Default lane for CRUD with relations.
+- **`db.sql.<table>`** — SQL builder, lowercase storage name (`db.sql.user`). Produces a *plan* executed via `db.runtime().execute(plan)`. Use when the ORM is too high-level — explicit `JOIN`, computed projections, set operations, window functions.
 
-**Lane decision table:**
+**Mongo** (`mongo<Contract>(...)` from `@prisma-next/mongo/runtime`):
+
+- **`db.orm.<root>`** — ORM, lowercased plural contract root (`db.orm.users`, `db.orm.posts`). Same fluent chaining; `.where({ field: value })` object equality is the idiomatic filter form.
+- **`db.query`** — typed aggregation-pipeline builder. Start with `db.query.from('<root>')`, chain `.match(...)` / `.project(...)` / `.group(...)` / `.lookup(...)`, terminal with `.build()`. Execute via `(await db.runtime()).execute(plan)`.
+
+Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
+
+**Postgres lane decision table:**
 
 | Need | Choose | Why |
 |---|---|---|
@@ -46,9 +53,19 @@ The two lanes share the same contract, the same connection, and the same transac
 | Complex `JOIN`, set operation, window function | **SQL builder** | The ORM doesn't express arbitrary joins. |
 | Postgres-specific feature (`LATERAL`, `FILTER`, custom aggregates) | **SQL builder**, falling back to extension operators when the extension provides them | DSL first; extensions can contribute operators (`postgis`, `pgvector`, `cipherstash`). |
 
-> **MongoDB ORM addressing.** On `@prisma-next/mongo`, `db.orm` is keyed by the collection's **storage name** — never the PSL model name. So `model User { … @@map("users") }` is reached at `db.orm.users`; a model without `@@map` falls back to the lowercased model name (`model User { … }` → `db.orm.user`). Verified against runtime: `db.orm.User` is always `undefined` on MongoDB. Once you've used the right key, every method below (`.where`, `.select`, `.include`, `.first`, `.all`, `.create`, `.update`, `.delete`, `.aggregate`, `.transaction`) behaves the same as on SQL targets — so when reading the SQL-target examples that follow, mentally rewrite `db.orm.User` → `db.orm.<collection>` for Mongo. The SQL builder lane (`db.sql.<table>`) does not apply to MongoDB targets.
+**Mongo lane decision table:**
 
-## Workflow — ORM reads
+| Need | Choose | Why |
+|---|---|---|
+| Standard CRUD with reference relations | **ORM (`db.orm.<root>`)** | Collection-shaped; object `.where({ ... })`; `.create` / `.update` / `.delete` / `.upsert`. |
+| Eager-load a reference relation | **ORM `.include('<relation>')`** | Lowers to `$lookup`; composes with `.where` / `.select` / `.orderBy` / `.take`. |
+| Polymorphic root (discriminated variants) | **ORM `.variant('<VariantName>')`** | Narrows to one variant and injects the discriminator filter. |
+| Field-level Mongo updates (`$push`, `$inc`, dot-path `$set`) | **ORM `.update((f) => [f.field.inc(1)])`** | Field-accessor callback; plain-object `.update({ ... })` for whole-field replacement. |
+| Aggregation pipeline (group, facet, `$lookup` with reshaping) | **Query builder (`db.query.from(...)`)** | Full pipeline surface; typed row shape through `.build()`. |
+| Typed cross-collection join in a pipeline | **Query builder `.lookup((from) => from('users').on(...).as('author'))`** | `$lookup` with compile-time foreign-root checking. |
+| Bulk writes with pipeline semantics | **Query builder write terminals** (`.insertOne`, `.updateMany`, `.findOneAndUpdate`, `.upsertOne`, …) | Filtered writes after `.match(...)`; plans execute through the runtime. |
+
+## Workflow — ORM reads (Postgres)
 
 The concept: `db.orm.<Model>` returns a *collection* you compose method-by-method. Each call returns a new collection (immutable chaining); the terminal verb (`.all()` / `.first()` / `.count()` / `.aggregate(...)`) issues the query. Predicates are lambdas over a field proxy: `u.field.<op>(value)`.
 
@@ -140,7 +157,7 @@ await db.orm.Post
 
 ### Consuming the result: `await`, `.toArray()`, or `for await`
 
-Critical to get right early — `.all()` returns an **`AsyncIterableResult<Row>`**, which is *both* a `PromiseLike<Row[]>` and an `AsyncIterable<Row>`. That means three consumption forms all work, and the canonical one is the shortest:
+Critical to get right early — on **both Postgres and Mongo**, `.all()` returns an **`AsyncIterableResult<Row>`**, which is *both* a `PromiseLike<Row[]>` and an `AsyncIterable<Row>`. That means three consumption forms all work, and the canonical one is the shortest:
 
 ```typescript
 const users = await db.orm.User.select('id', 'email').all();
@@ -189,7 +206,46 @@ const b = users;
 
 If you've seen `collect(...)` / `toArray(...)` helpers in a codebase wrapping `.all()`, they're vestigial — `await` does the same thing for free. Remove them when you touch the surrounding code.
 
-## Workflow — Eager-loading relations (`.include`)
+## Workflow — ORM reads (Mongo)
+
+The concept matches Postgres — `db.orm.<root>` returns a collection you compose method-by-method — but roots are **lowercased plurals** from the emitted contract (`users`, `posts`, not `User` / `Post`), and filters are usually **object equality**:
+
+```typescript
+// src/queries/users.ts — adjust the relative import to match file depth.
+import { db } from '../prisma/db';
+
+// All users.
+const users = await db.orm.users.all();
+
+// Single row by equality filter.
+const alice = await db.orm.users.where({ email: 'alice@example.com' }).first();
+
+// Projection, sort, pagination — same chaining as Postgres.
+const recent = await db.orm.posts
+  .select('title', 'authorId', 'createdAt')
+  .orderBy({ createdAt: -1 })
+  .take(10)
+  .all();
+```
+
+**`.where(...)`** accepts a plain object whose keys are model field names and values are compared with equality (codec-aware — `ObjectId` fields accept string ids from the contract). Chain multiple `.where({ ... })` calls to AND-compose filters.
+
+For operators the object form doesn't cover (`.in([...])`, range comparisons, nested logic), pass a `MongoFilterExpr` — today that means importing filter helpers from `@prisma-next/mongo-query-ast/execution` (a façade-completeness gap; see *What Prisma Next doesn't do yet*). Prefer the object form whenever equality suffices.
+
+**Polymorphic roots.** When the contract declares variants on a model, narrow before querying:
+
+```typescript
+const articles = await db.orm.posts.variant('Article').all();
+const tutorials = await db.orm.posts.variant('Tutorial').where({ authorId }).all();
+```
+
+**Sorting and pagination.** `.orderBy({ field: 1 | -1 })` (Mongo sort directions). `.take(n)` maps to `$limit`; `.skip(n)` maps to `$skip`.
+
+**`.first()` vs `.all()`.** `.first()` issues a limit-1 read; `.all()` returns every matching document. There is no `.first({ pk })` shorthand on Mongo — filter on `_id` explicitly: `.where({ _id: id }).first()`.
+
+Mongo `.all()` returns the same `AsyncIterableResult` shape as Postgres — `await db.orm.users.all()` yields an array; see *Consuming the result* below (applies to both targets).
+
+## Workflow — Eager-loading relations (`.include`) — Postgres
 
 The concept: `.include('<relation>', (branch) => branch.<chain>)` adds a relation branch to the parent query. The branch is its own collection — compose `.where` / `.select` / `.orderBy` / `.take` on it just like the parent.
 
@@ -209,7 +265,21 @@ await db.orm.User
 
 Nested `1:N → 1:N` includes (e.g. `User → posts → comments`) require the contract to advertise the `lateral` + `jsonAgg` capabilities for the active target. The Postgres adapter advertises both by default, so most apps get this for free; if the type system rejects a nested include with a *missing capability* error, route to `prisma-next-contract` to add the required capability declarations and use `prisma-next-queries` for query-shape guidance.
 
-## Workflow — ORM writes
+## Workflow — Eager-loading relations (`.include`) — Mongo
+
+Mongo reference relations eager-load through the same `.include('<relation>')` surface; the ORM lowers to `$lookup`:
+
+```typescript
+const posts = await db.orm.posts
+  .include('author')
+  .orderBy({ createdAt: -1 })
+  .all();
+// → Array<{ title, authorId, createdAt, author: { name, email, ... } }>
+```
+
+Relation names match the contract's `@relation` field names. Nested includes follow the same chaining rules as the parent collection.
+
+## Workflow — ORM writes (Postgres)
 
 ```typescript
 // Create — returns the inserted row.
@@ -243,7 +313,47 @@ await db.orm.User
 
 The ORM returns inserted / updated rows by default. The `.returning(...)` selector lives on the SQL builder (next section), where you build a plan and execute it explicitly.
 
-## Workflow — Aggregates
+## Workflow — ORM writes (Mongo)
+
+Mongo mutations require a preceding `.where(...)` filter (except `.create` / `.createAll`). Updates accept either a partial document or a field-accessor callback for Mongo operators:
+
+```typescript
+// Create — returns the row with server-assigned `_id`.
+const user = await db.orm.users.create({
+  name: 'Alice',
+  email: 'alice@example.com',
+  bio: null,
+  address: null,
+});
+
+// Update one — plain object replaces top-level fields.
+await db.orm.users.where({ _id: user._id }).update({ bio: 'Writer' });
+
+// Update one — field operations ($push, $inc, dot-path $set).
+await db.orm.users
+  .where({ _id: user._id })
+  .update((u) => [u.tags.push('admin'), u.loginCount.inc(1)]);
+
+// Update many / delete many — iterate or count.
+const updated = await db.orm.users
+  .where({ bio: null })
+  .updateAll({ bio: 'filled' });
+for await (const row of updated) { /* each modified doc */ }
+
+await db.orm.users.where({ _id: user._id }).delete();
+
+// Upsert — filter via .where(), split create vs update branches.
+await db.orm.users.where({ email: 'alice@example.com' }).upsert({
+  create: { name: 'Alice', email: 'alice@example.com', bio: null, address: null },
+  update: { bio: 'Editor' },
+});
+```
+
+**Count-only terminals.** `.createCount(...)`, `.updateCount(...)`, `.deleteCount()` return numbers without re-reading full documents — useful for bulk operations where you only need the modified count.
+
+**Upsert + dot-path.** The upsert `update` callback cannot use dot-path field operations — use top-level field replacement in the upsert branch or a separate `.update((u) => [...])` call.
+
+## Workflow — Aggregates (Postgres)
 
 ```typescript
 const totals = await db.orm.User.aggregate((aggregate) => ({
@@ -290,7 +400,31 @@ const safe = revenue.total ?? 0;   // ← apply at the consumption site, not in 
 
 If `?? 0` is showing up on every aggregate, that's a signal you're calling `sum` (or peers) over potentially-empty filters — which is exactly when SQL returns NULL. The pattern is correct; the typing is honest.
 
-## Workflow — SQL builder (`db.sql.<table>`)
+## Workflow — Aggregates (Mongo)
+
+The Mongo ORM does not expose `.aggregate(...)` / `.groupBy(...)`. Express aggregations through **`db.query`** — the pipeline builder — with `.group(...)` and accumulator helpers:
+
+```typescript
+import { acc } from '@prisma-next/mongo-query-builder';
+
+const runtime = await db.runtime();
+const plan = db.query
+  .from('posts')
+  .match((f) => f.authorId.eq(authorId))
+  .group((f) => ({
+    _id: f.kind,
+    postCount: acc.count(),
+    latest: acc.max(f.createdAt),
+  }))
+  .sort({ postCount: -1 })
+  .build();
+
+const byKind = await runtime.execute(plan);
+```
+
+Import `acc` and expression helpers (`fn`) from `@prisma-next/mongo-query-builder` when building computed pipeline stages.
+
+## Workflow — SQL builder (`db.sql.<table>`) — Postgres
 
 The concept: `db.sql.<table>` is a table-shaped builder that produces a *plan*. The plan is a serialisable description of the query (AST + parameters); you execute it through the runtime with `db.runtime().execute(plan)`. The builder gives you the lanes the ORM doesn't express — explicit `JOIN`, arbitrary expression projection, target-specific operations through extension helpers — without dropping to raw SQL.
 
@@ -358,7 +492,71 @@ db.sql.post
   .build();
 ```
 
-## Workflow — Transactions
+## Workflow — Query builder (`db.query`) — Mongo
+
+The concept: `db.query.from('<root>')` starts a typed aggregation-pipeline chain. Terminal methods produce a `MongoQueryPlan`; execute it through the runtime:
+
+```typescript
+// src/queries/analytics.ts
+import { acc, fn } from '@prisma-next/mongo-query-builder';
+import { db } from '../prisma/db';
+
+const runtime = await db.runtime();
+
+// Read pipeline — match, project, sort, limit.
+const plan = db.query
+  .from('posts')
+  .match((f) => f.authorId.eq(authorId))
+  .sort({ createdAt: -1 })
+  .limit(10)
+  .project('title', 'authorId', 'createdAt')
+  .build();
+const recent = await runtime.execute(plan);
+
+// Cross-collection join ($lookup).
+const withAuthor = db.query
+  .from('posts')
+  .lookup((from) =>
+    from('users')
+      .on((local, foreign) => ({
+        local: local.authorId,
+        foreign: foreign._id,
+      }))
+      .as('author'),
+  )
+  .build();
+const rows = await runtime.execute(withAuthor);
+```
+
+**Filters — `.match(...)`.** Callback form: `.match((f) => f.status.eq('active'))`. Filters AND-compose across chained `.match(...)` calls. Field accessors support property access (`f.email`), callable dot paths (`f('address.city').eq('NYC')`), and `f.rawPath('path')` for migration/backfill paths outside the current contract.
+
+**Write terminals on the builder.** After `.from('users')` or `.from('users').match(...)`, use insert/update/delete terminals:
+
+```typescript
+await runtime.execute(
+  db.query.from('users').insertOne({ name: 'Alice', email: 'a@e.com', bio: null }),
+);
+
+await runtime.execute(
+  db.query
+    .from('users')
+    .match((f) => f.name.eq('Alice'))
+    .updateMany((f) => [f.bio.set('filled')]),
+);
+
+await runtime.execute(
+  db.query
+    .from('users')
+    .match((f) => f.email.eq('a@e.com'))
+    .findOneAndUpdate((f) => [f.bio.set('updated')], { returnDocument: 'after' }),
+);
+```
+
+Update callbacks return arrays of field operations (`.set`, `.inc`, `.push`, `.pull`, …). Pipeline-style updates use `f.stage.set(...)` inside an aggregation chain, then `.updateMany()` with no callback.
+
+**Plans vs ORM.** The ORM's `.create` / `.update` / `.all` issue queries directly. Don't pass ORM collections to `runtime.execute` — that entry point is for `db.query` plans (and migration/runtime internals).
+
+## Workflow — Transactions (Postgres)
 
 The concept: `db.transaction(fn)` opens a transaction and passes a `tx` context to the callback. `tx.orm` and `tx.sql` mirror `db.orm` / `db.sql` but ride the same transaction; `tx.execute(plan)` executes a SQL-builder plan within it. The transaction commits on the callback's successful return and rolls back on any thrown error.
 
@@ -379,9 +577,11 @@ await db.transaction(async (tx) => {
 
 The callback's return value passes through `db.transaction(...)`. Capture inserted ids out of the callback and use them downstream after commit.
 
+**Mongo:** the `@prisma-next/mongo/runtime` façade does not expose `db.transaction(...)` today. Multi-document atomicity requires MongoDB transactions on a replica set via the driver — not yet wrapped in the Prisma Next façade. Route to *What Prisma Next doesn't do yet* / `prisma-next-feedback` if the user needs this.
+
 ## Running queries from a short script
 
-When the user is running a one-off `tsx my-script.ts` (not a long-lived server), call `await db.close()` at the end so the process exits cleanly — especially on Postgres, where the façade-owned pool otherwise keeps Node's event loop alive. See `prisma-next-runtime` § *Running as a script (teardown)* for the full pattern including `await using`.
+When the user is running a one-off `tsx my-script.ts` (not a long-lived server), call `await db.close()` at the end so the process exits cleanly — on Postgres the façade-owned pool keeps Node's event loop alive; on Mongo the façade-owned `MongoClient` does the same. See `prisma-next-runtime` § *Running as a script (teardown)* for the full pattern including `await using`.
 
 ```typescript
 // src/scripts/seed.ts
@@ -397,19 +597,23 @@ await db.close();
 
 ## Common Pitfalls
 
-1. **Reaching for `db.sql` when `db.orm` would have done.** The ORM covers most CRUD shapes; the SQL builder is the seam for the shapes it doesn't. Default to the ORM.
-2. **Using `.all()` when you wanted one row.** `.all()` issues no implicit `LIMIT`. Use `.first()` (issues `LIMIT 1`) or `.first({ pk })`.
-3. **Writing a `collect()` / `toArray()` helper to convert `.all()` to an array.** `.all()` returns an `AsyncIterableResult<Row>` which *is* a `PromiseLike<Row[]>` — `await collection.all()` directly yields `Row[]`. The helpers some codebases ship are vestigial. See *Consuming the result*.
-4. **Consuming an `AsyncIterableResult` twice.** Each result is single-use. The second consumer throws `RUNTIME.ITERATOR_CONSUMED`. Buffer once into a variable and reuse the variable.
-5. **Coalescing `count()` with `?? 0` "just in case".** `count()` is `number`, not `number | null` — the runtime already substitutes `0` for the empty case. The `?? 0` belongs on `sum` / `avg` / `min` / `max`, whose `number | null` shape is faithful to SQL semantics over empty result sets.
-6. **Reaching for `.between(a, b)` on a field proxy.** It doesn't exist. Either chain `.where((m) => m.field.gte(a)).where((m) => m.field.lte(b))` or use `and(m.field.gte(a), m.field.lte(b))` inside one `.where()` clause.
-7. **Importing `and` / `or` / `not` from a façade subpath.** The combinators currently live in `@prisma-next/sql-orm-client` — an internal package. See *What Prisma Next doesn't do yet*.
-8. **Trying to `db.sql.from(tables.user)`.** That surface does not exist. The builder is table-shaped: `db.sql.<tableName>.select(...)`. There is no `db.schema.tables` either.
-9. **Trying to `db.execute(plan)` directly.** Plans execute through the runtime: `db.runtime().execute(plan)`. Inside a transaction, use `tx.execute(plan)`.
-10. **Setting `capabilities: { includeMany: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
-11. **Confabulating a `db.sql.raw(...)`, TypedSQL, or `.stream()` surface.** None of those exist today. See *What Prisma Next doesn't do yet*.
-12. **Mixing the ORM mutation return with `db.execute(plan)`.** The ORM's terminal verbs (`.create`, `.update`, `.delete`, `.first`, `.all`, `.aggregate`) issue the query themselves and return rows. Don't pass the builder to `db.runtime().execute(...)` — that's for SQL-builder plans.
-13. **Top-N grouped queries written as `groupBy(...).aggregate(...).sort().slice()` in JS.** That's a fallback because the grouped collection doesn't expose `.orderBy(...)` / `.take(...)` (see *What PN doesn't do yet*). Fine at small cardinalities; for genuinely large grouped result sets, drop to `db.sql.<table>` and write `GROUP BY` + `ORDER BY` + `LIMIT` against the table directly.
+1. **Using Postgres examples on a Mongo project (or vice versa).** Check `db.ts`: `@prisma-next/postgres/runtime` → `db.orm.User` + `db.sql.user`; `@prisma-next/mongo/runtime` → `db.orm.users` + `db.query.from('users')`. There is no `db.sql` on Mongo.
+2. **Reaching for the lower-level lane when the ORM would have done.** The ORM covers most CRUD shapes; drop to `db.sql` / `db.query` only for shapes the ORM can't express. Default to the ORM.
+3. **Using `.all()` when you wanted one row.** `.all()` issues no implicit limit. Use `.first()` (Postgres also has `.first({ pk })`) or filter + `.first()` on Mongo.
+4. **Writing a `collect()` / `toArray()` helper to convert `.all()` to an array.** `.all()` returns an `AsyncIterableResult<Row>` which *is* a `PromiseLike<Row[]>` — `await collection.all()` directly yields `Row[]`. The helpers some codebases ship are vestigial. See *Consuming the result*.
+5. **Consuming an `AsyncIterableResult` twice.** Each result is single-use. The second consumer throws `RUNTIME.ITERATOR_CONSUMED`. Buffer once into a variable and reuse the variable.
+6. **Coalescing `count()` with `?? 0` "just in case" (Postgres ORM aggregates).** `count()` is `number`, not `number | null` — the runtime already substitutes `0` for the empty case. The `?? 0` belongs on `sum` / `avg` / `min` / `max`, whose `number | null` shape is faithful to SQL semantics over empty result sets.
+7. **Reaching for `.between(a, b)` on a Postgres field proxy.** It doesn't exist. Either chain `.where((m) => m.field.gte(a)).where((m) => m.field.lte(b))` or use `and(m.field.gte(a), m.field.lte(b))` inside one `.where()` clause.
+8. **Importing `and` / `or` / `not` from a Postgres façade subpath.** The combinators currently live in `@prisma-next/sql-orm-client` — an internal package. See *What Prisma Next doesn't do yet*.
+9. **Trying to `db.sql.from(tables.user)` (Postgres).** That surface does not exist. The builder is table-shaped: `db.sql.<tableName>.select(...)`. There is no `db.schema.tables` either.
+10. **Trying to `db.execute(plan)` directly (Postgres).** Plans execute through the runtime: `db.runtime().execute(plan)`. Inside a transaction, use `tx.execute(plan)`. On Mongo, `(await db.runtime()).execute(plan)`.
+11. **Setting `capabilities: { includeMany: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
+12. **Confabulating a `db.sql.raw(...)`, TypedSQL, or `.stream()` surface (Postgres).** None of those exist today. See *What Prisma Next doesn't do yet*.
+13. **Mixing the ORM mutation return with `runtime.execute(plan)`.** ORM terminals issue the query themselves and return rows. `runtime.execute` is for SQL-builder / query-builder plans.
+14. **Top-N grouped queries written as `groupBy(...).aggregate(...).sort().slice()` in JS (Postgres).** That's a fallback because the grouped collection doesn't expose `.orderBy(...)` / `.take(...)`. Fine at small cardinalities; for large grouped result sets, drop to `db.sql.<table>`.
+15. **Calling Mongo ORM `.update()` / `.delete()` without `.where()`.** Mutations other than `.create` / `.createAll` require a filter — the compiler enforces this at the type level where possible.
+16. **Using PascalCase model names on Mongo ORM.** Roots are lowercased plurals from the contract (`db.orm.users`, not `db.orm.User`).
+17. **Expecting Postgres-style lambda `.where((u) => u.email.eq(...))` on Mongo ORM.** Prefer object equality `.where({ email: '...' })`; richer operators need `MongoFilterExpr` helpers (façade gap today).
 
 ## What Prisma Next doesn't do yet
 
@@ -419,27 +623,43 @@ await db.close();
 - **TypedSQL (`.sql` files compiled into typed callables).** Not implemented. Workaround: stick to the SQL builder; for repeated queries, extract a function that returns the built plan and call `db.runtime().execute(plan)` at the call site. If you want a `.sql`-file compile path, file a feature request via `prisma-next-feedback`.
 - **`EXPLAIN` / query-plan inspection.** Prisma Next does not expose an `.explain()` method. Workaround: connect a `pg.Pool` you control via the runtime's `pg:` binding (see `prisma-next-runtime`) and issue `EXPLAIN ANALYZE` through it. If you want a first-class plan-inspection surface, file a feature request via `prisma-next-feedback`.
 - **Streaming large result sets.** No `.stream()` cursor today. Workaround: paginate via `.skip(n).take(m)` for moderate sizes; for very large sets, hold a `pg.Client` from the runtime's `pg:` binding and stream through it directly. If you want a built-in streaming surface, file a feature request via `prisma-next-feedback`.
-- **Multi-statement batching (Prisma-7-style `db.$transaction([call1, call2])`).** Prisma Next runs each call sequentially. Workaround: wrap atomically-related work in `db.transaction(async (tx) => { ... })`. If you want batch-as-array semantics, file a feature request via `prisma-next-feedback`.
+- **Multi-statement batching (Prisma-7-style `db.$transaction([call1, call2])`).** Prisma Next runs each call sequentially. Workaround: wrap atomically-related work in `db.transaction(async (tx) => { ... })` on Postgres. If you want batch-as-array semantics, file a feature request via `prisma-next-feedback`.
+- **Mongo façade transactions.** `@prisma-next/mongo/runtime` does not expose `db.transaction(...)`. Multi-document atomicity is not yet wrapped in the Prisma Next Mongo façade. Workaround: use the MongoDB driver's session API directly if you control the client binding (`mongoClient:` option). File a feature request via `prisma-next-feedback` if you need a first-class façade surface.
+- **Mongo ORM aggregates.** No `.aggregate(...)` / `.groupBy(...)` on `db.orm.<root>`. Workaround: express aggregations through `db.query.from(...).group(...).build()` and `runtime.execute(plan)`.
+- **Mongo filter helpers on the façade.** Rich filters (`.in`, ranges, boolean composition) currently import from `@prisma-next/mongo-query-ast/execution` (`MongoFieldFilter`, etc.) — not yet re-exported on `@prisma-next/mongo/runtime`. Workaround: use object equality `.where({ field: value })` where possible; import from the internal package only when necessary. Tracked alongside façade-completeness gaps in Linear `TML-2526`.
 - **Automatic N+1 detection.** Prisma Next does not warn when an `.include(...)` is missing. Workaround: be deliberate about `.include(...)` in code review; the `lints` middleware (see `prisma-next-runtime`) catches the more common authoring slips (missing `WHERE` on a `DELETE` / `UPDATE`, missing `LIMIT` on a `SELECT`).
 
 ## Reference Files
 
 This skill is intentionally body-only. The authoritative surfaces are:
 
-- The example queries under [`examples/prisma-next-demo/src/orm-client/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/orm-client) and [`examples/prisma-next-demo/src/queries/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/queries) — the canonical worked references for ORM and SQL-builder shapes respectively.
-- The ORM client source under `packages/3-extensions/sql-orm-client/src/` for the full collection method surface.
-- The SQL builder source under `packages/2-sql/4-lanes/sql-builder/src/` for the builder method surface.
+**Postgres**
+
+- Example queries under [`examples/prisma-next-demo/src/orm-client/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/orm-client) and [`examples/prisma-next-demo/src/queries/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/queries) — canonical ORM and SQL-builder shapes.
+- ORM client source under `packages/3-extensions/sql-orm-client/src/`.
+- SQL builder source under `packages/2-sql/4-lanes/sql-builder/src/`.
+
+**Mongo**
+
+- Example queries under [`examples/mongo-demo/src/server.ts`](https://github.com/prisma/prisma-next/tree/main/examples/mongo-demo/src/server.ts) — ORM reads, `.include`, `.variant`, and pipeline DSL via `db.query`.
+- Integration tests under `examples/mongo-demo/test/` (`blog.test.ts`, `crud-lifecycle.test.ts`, `query-builder-writes.test.ts`).
+- Query builder README under `packages/2-mongo-family/5-query-builders/query-builder/README.md`.
+- ORM collection surface under `packages/2-mongo-family/5-query-builders/orm/src/collection.ts`.
 
 ## Checklist
 
-- [ ] Chose the right lane (ORM by default; SQL builder for set-builder shapes the ORM doesn't express).
-- [ ] Used `.first()` / `.first({ pk })` for single-row reads — not `.all()`.
+- [ ] Confirmed the active target from `db.ts` before choosing lane names (`User` vs `users`, `db.sql` vs `db.query`).
+- [ ] Chose the right lane (ORM by default; lower-level builder for shapes the ORM doesn't express).
+- [ ] Used `.first()` / `.first({ pk })` (Postgres) or `.where({ ... }).first()` (Mongo) for single-row reads — not `.all()`.
 - [ ] Consumed `.all()` with plain `await` (not a `collect()` / `toArray()` helper). Used `for await` only when streaming is actually wanted, and never iterated the same result twice.
-- [ ] Coalesced `sum` / `avg` / `min` / `max` results with `?? 0` (or similar) at the consumption site when zero-fill is desired — did NOT coalesce `count()`, which is `number`.
-- [ ] Expressed ranges as chained `.where(...)` clauses or a single `and(...)` clause — did NOT reach for a non-existent `.between(...)` operator.
-- [ ] For ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the façade gap to the user.
-- [ ] Executed SQL-builder plans via `db.runtime().execute(plan)` (or `tx.execute(plan)` inside a transaction).
-- [ ] Wrapped multi-statement work in `db.transaction(async (tx) => { ... })` where atomicity matters.
+- [ ] Coalesced Postgres `sum` / `avg` / `min` / `max` results with `?? 0` at the consumption site when zero-fill is desired — did NOT coalesce `count()`, which is `number`.
+- [ ] Expressed Postgres ranges as chained `.where(...)` clauses or a single `and(...)` clause — did NOT reach for a non-existent `.between(...)` operator.
+- [ ] For Postgres ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the façade gap to the user.
+- [ ] Executed Postgres SQL-builder plans via `db.runtime().execute(plan)` (or `tx.execute(plan)` inside a transaction).
+- [ ] Executed Mongo query-builder plans via `(await db.runtime()).execute(plan)`.
+- [ ] Wrapped multi-statement Postgres work in `db.transaction(async (tx) => { ... })` where atomicity matters — did NOT confabulate `db.transaction` on Mongo.
 - [ ] Did NOT confabulate `db.sql.raw`, TypedSQL, `.stream()`, `db.batch`, `.between(...)`, a `capabilities` field on `defineConfig`, or a `db.sql.from(tables.user)` API — routed to *What Prisma Next doesn't do yet* / `prisma-next-feedback` instead.
-- [ ] For top-N grouped aggregates at meaningful scale, dropped to `db.sql.<table>` rather than JS-side sort + slice over `groupBy(...).aggregate(...)`.
-- [ ] Did NOT use the SQL builder for something the ORM cleanly expresses.
+- [ ] Did NOT use `db.sql` on a Mongo project or `db.query` where the Postgres SQL builder is meant.
+- [ ] For top-N grouped aggregates at meaningful scale on Postgres, dropped to `db.sql.<table>` rather than JS-side sort + slice over `groupBy(...).aggregate(...)`.
+- [ ] For Mongo aggregations, used `db.query.from(...).group(...)` rather than a non-existent ORM `.aggregate(...)`.
+- [ ] Did NOT use the lower-level builder for something the ORM cleanly expresses.
