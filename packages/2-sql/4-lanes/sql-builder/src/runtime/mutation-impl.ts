@@ -122,13 +122,22 @@ export function evaluateUpdateCallback(
   return set;
 }
 
-function buildParamRows(
-  rows: ReadonlyArray<Record<string, unknown>>,
+export function buildSetExpressions(
+  exprs: Record<string, AstExpression>,
   table: StorageTable,
   tableName: string,
+  op: MutationDefaultsOp,
   ctx: BuilderContext,
-): ReadonlyArray<Record<string, ParamRef>> {
-  return rows.map((rowValues) => buildParamValues(rowValues, table, tableName, 'create', ctx));
+): Record<string, AstExpression> {
+  const set: Record<string, AstExpression> = { ...exprs };
+  for (const def of ctx.applyMutationDefaults({ op, table: tableName, values: exprs })) {
+    if (!(def.column in set)) {
+      const column = table.columns[def.column];
+      const codec = column ? codecRefFor(ctx, tableName, def.column) : undefined;
+      set[def.column] = ParamRef.of(def.value, codec ? { codec } : undefined);
+    }
+  }
+  return set;
 }
 
 export class InsertQueryImpl<
@@ -220,7 +229,9 @@ export class InsertQueryImpl<
       throw new Error('insert() called with an empty row array — at least one row is required');
     }
 
-    const paramRows = buildParamRows(this.#rows, this.#table, this.#tableName, this.ctx);
+    const paramRows = this.#rows.map((rowValues) =>
+      buildParamValues(rowValues, this.#table, this.#tableName, 'create', this.ctx),
+    );
 
     let ast = InsertAst.into(TableSource.named(this.#tableName)).withRows(paramRows);
 
