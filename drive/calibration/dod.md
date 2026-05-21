@@ -68,7 +68,7 @@ In addition to the canonical slice DoD:
 - [ ] No unresolved 🛑 Blocker findings.
 - [ ] Script names **both** consumer audiences (see [`patterns.md § Consumer audiences`](./patterns.md#consumer-audiences)) where relevant — OR explicit "N/A — no user-observable change" with a one-line rationale.
 
-#### Slice-close ritual (added 2026-05-21 from `projects/facade-import-surface-completion/retros.md`)
+#### Slice-close ritual (added 2026-05-21 retro)
 
 The orchestrator MUST walk the slice spec's `## Slice Definition of Done` checklist verbatim before handing off to the PR-opening skill, marking each item ✓ / ✗ / N/A-with-rationale. A `READY FOR PR` reviewer verdict in `reviews/code-review.md` covers reviewer-scope items (typically SDoD1-SDoD3 + the validation-gate items) but **does not** cover items the reviewer cannot see — manual-QA (the QA-side items above), `projects/`-reference scrubs in long-lived files, or any other team-specific overlay item. Treating "reviewer SATISFIED" as proxy for "DoD satisfied" is a known orchestrator failure mode in this codebase; the explicit checklist walk is the calibration that prevents it.
 
