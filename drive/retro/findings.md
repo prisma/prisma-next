@@ -2,6 +2,40 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-21 · drive-run-retro · boundary
+
+First in-anger use of `drive-run-retro` in this trial, triggered by an
+operator-flagged surprise (orchestrator skipped `drive-qa-plan` +
+`drive-qa-run` before opening PR #557 on the TML-2526
+facade-completion slice). The skill itself worked end-to-end —
+triggering, root-causing, landing-surface selection, the trial
+findings-recording protocol, and the project's retros.md entry all
+slotted in cleanly. The retro's diagnostic lens (proximate vs. root,
+upstream-vs-downstream of the protocol) landed the lesson at the
+right level: a tightening of `drive-build-workflow § Post-conditions`
+rather than "the orchestrator should be more careful."
+
+The friction the skill surfaced is a `boundary` issue between
+`drive-build-workflow` (the workflow whose post-conditions declare
+"branch is ready for PR-opening skill") and the team's PR-opening
+skill (`create-pr` in this repo). The handoff is currently implicit:
+the build workflow declares ready, the PR-opening skill assumes ready,
+and the slice-DoD checklist walk falls between them. The retro flagged
+this gap (canonical body should land it; see the matching
+`drive/qa/findings.md` entry for the suggested action), but the
+finding itself is about a boundary the retro skill helped expose
+without owning the fix.
+
+**Suggested action:** when the canonical tightening of
+`drive-build-workflow § Post-conditions` lands, cross-reference
+this finding and the QA-side one in the same skill-update commit so
+the boundary is unambiguously closed from both sides.
+
+**Upstream candidate?** Yes for the suggested action; no for
+`drive-run-retro` itself — the skill behaved well.
+
+See [`projects/facade-import-surface-completion/retros.md` § 2026-05-21](../../projects/facade-import-surface-completion/retros.md) for the full retro.
+
 ## 2026-05-21 · drive-qa-run + agent self-discipline · friction
 
 I (running TML-2614 review/QA) reported three "pre-existing failures on `origin/main`" in the PR body and filed TML-2631 against one of them. **All three were operator-environment artefacts in my local worktree**, not real failures on `origin/main`:
