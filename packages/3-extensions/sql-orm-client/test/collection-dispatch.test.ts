@@ -248,7 +248,7 @@ describe('collection-dispatch', () => {
 
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null, address: null }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 1, embedding: null }],
+      [{ id: 10, title: 'Post A', user_id: 1, views: 1 }],
       [{ id: 100, body: 'hi', post_id: 10 }],
     ]);
 
@@ -273,7 +273,6 @@ describe('collection-dispatch', () => {
             title: 'Post A',
             userId: 1,
             views: 1,
-            embedding: null,
             comments: [{ id: 100, body: 'hi', postId: 10 }],
           },
         ],
