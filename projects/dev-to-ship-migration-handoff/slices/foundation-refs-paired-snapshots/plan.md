@@ -120,8 +120,9 @@ Each grep gate expects **zero matches** to pass.
 | `.contract.d.ts` writes but `.contract.json` fails (or vice versa) — intra-pair partial write at the snapshot boundary | **Already covered by Dispatch 1's `snapshot-failure.test.ts`** (the implementer delivered these tests in Dispatch 1; verify still passing in Dispatch 2 but don't duplicate). |
 | `readRefSnapshot` when `.contract.json` exists but `.contract.d.ts` is missing | **Handle (added in Dispatch 2 per orchestrator fold-in from R1 review).** `readRefSnapshot` throws `errorInvalidRefFile` (already implemented at `snapshot.ts` L126–134; add the missing test assertion in `snapshot.test.ts`). |
 | `deleteRefPaired` on a ref with no paired snapshot | Handle (idempotent; tolerates ENOENT on snapshot). |
-| `deleteRefPaired` — pointer missing, snapshot present (orphan recovery) | **Handle (R2 fold-in from Dispatch 2 R1 review).** Self-healing: delete the orphan snapshot, return success. Implementation must check snapshot presence before throwing UNKNOWN_REF; only throw when BOTH pointer and snapshot are missing. |
-| `deleteRefPaired` — pointer missing AND snapshot missing (genuine non-existent ref) | Handle (throws `MIGRATION.UNKNOWN_REF`). |
+| `deleteRefPaired` — pointer missing, json-orphan present | **Handle (R2 fold-in).** Self-healing: presence probe sees json; delete orphan, return success. |
+| `deleteRefPaired` — pointer missing, dts-only orphan present | **Handle (R3 fold-in from Dispatch 2 R2 review).** Self-healing: presence probe must check BOTH `.contract.json` AND `.contract.d.ts`; delete the dts orphan, return success. Closes a gap where the json-only probe false-negatived on dts-only orphan states (which could arise from a failed cascade inside `deleteRefSnapshot` where json unlink succeeded but dts unlink failed). |
+| `deleteRefPaired` — pointer missing, no snapshot files at all (genuine non-existent ref) | Handle (throws `MIGRATION.UNKNOWN_REF`). |
 | Disk full (`ENOSPC`) mid-write | Handle (rollback path same as other write failures). |
 | Concurrent `writeRefPaired` on same ref | Explicitly out (no file locking; tested-as-undefined). |
 
