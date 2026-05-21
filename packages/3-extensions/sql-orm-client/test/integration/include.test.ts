@@ -754,7 +754,7 @@ describe('integration/include', () => {
   );
 
   it(
-    'depth-2 include uses correlated subqueries when only jsonAgg is enabled (TML-2594)',
+    'depth-2 include uses correlated subqueries when only jsonAgg is enabled',
     async () => {
       // jsonAgg without lateral → correlated strategy. Same acceptance
       // criterion as the lateral case above: one round-trip, regardless
@@ -843,7 +843,7 @@ describe('integration/include', () => {
   );
 
   it(
-    'depth-2 include falls back to multi-query when neither lateral nor jsonAgg is declared (TML-2594 fallback)',
+    'depth-2 include falls back to multi-query when neither lateral nor jsonAgg is declared',
     async () => {
       // Counterpart regression guard: empty capabilities → multi-query.
       // The fix must not silently route an uncapable contract through
