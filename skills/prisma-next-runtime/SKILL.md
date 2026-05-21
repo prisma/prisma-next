@@ -62,7 +62,7 @@ Three things to know:
 - **`with { type: 'json' }` is required.** Node's ESM JSON-import-attribute spec. Without it, the import errors.
 - **`url` is optional at construct time.** If `DATABASE_URL` is not set when `db.ts` loads, the factory still returns a client; you can call `await db.connect({ url })` later. The factory throws lazily — only when a runtime is actually needed.
 
-The Mongo façade has the same shape — `import mongo from '@prisma-next/mongo/runtime'` — and the same `db` surface.
+The Mongo façade has the same construction shape — `import mongo from '@prisma-next/mongo/runtime'` — and the same `db.connect(...)` / `db.close()` / `db.transaction(...)` lifecycle methods. **The ORM surface differs in one place: keys.** On Mongo, `db.orm` is keyed by the collection's storage name (from `@@map(...)`, or the lowercased model name if no `@@map` is set), not by the PSL model name — so `model User { … @@map("users") }` is reached at `db.orm.users`, not `db.orm.User`. The SQL builder lane (`db.sql.<table>`) doesn't exist on Mongo at all (`db.sql` is `undefined`). See `prisma-next-queries` § *MongoDB ORM addressing* for the full rule and a rewrite recipe for SQL-target examples.
 
 ## Workflow — Running as a script (teardown)
 
