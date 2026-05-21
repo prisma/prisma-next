@@ -119,7 +119,7 @@ describe('collection-dispatch', () => {
     expect(runtime.executions).toHaveLength(1);
   });
 
-  it('dispatchCollectionRows() depth-2 nested include with emitted-shape capabilities fires a single SQL execution (TML-2594)', async () => {
+  it('dispatchCollectionRows() depth-2 nested include with emitted-shape capabilities fires a single SQL execution', async () => {
     // Regression guard for the TML-2594 fix: depth-2 includes used to
     // unconditionally fall back to the multi-query strategy via the
     // `hasNestedIncludes` arm of `dispatchWithIncludeStrategy`, regardless
@@ -181,7 +181,7 @@ describe('collection-dispatch', () => {
     expect(runtime.executions).toHaveLength(1);
   });
 
-  it('dispatchCollectionRows() depth-2 mixed cardinality (to-many -> to-one) fires a single SQL execution (TML-2594)', async () => {
+  it('dispatchCollectionRows() depth-2 mixed cardinality (to-many -> to-one) fires a single SQL execution', async () => {
     // Same regression guard, but covers the to-one leg of the depth-2
     // tree: `users -> posts -> author`. The lateral builder must
     // recursively wire a nested LATERAL JOIN even when the inner edge
@@ -235,7 +235,7 @@ describe('collection-dispatch', () => {
     expect(runtime.executions).toHaveLength(1);
   });
 
-  it('dispatchCollectionRows() depth-2 nested include with no capabilities stays on multi-query (TML-2594 fallback)', async () => {
+  it('dispatchCollectionRows() depth-2 nested include with no capabilities stays on multi-query', async () => {
     // Counterpart to the lateral/correlated guards above: when the
     // contract advertises neither `lateral` nor `jsonAgg`, multi-query
     // remains the only correct strategy. Asserting the execution count
