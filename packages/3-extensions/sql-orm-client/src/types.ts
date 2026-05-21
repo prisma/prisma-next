@@ -229,22 +229,25 @@ type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op 
   : never;
 
 /**
- * Tests whether an operation's `self` dispatch hint reaches a field with the given codec identity. Codec hints match by identity; trait hints match when every required trait is present in the field codec's trait set.
+ * Tests whether an operation's `self` dispatch hint reaches a field with the given codec identity. The `any: true` arm matches every field codec; codec hints match by identity; trait hints match when every required trait is present in the field codec's trait set.
  */
 type OpMatchesField<Op, CodecId extends string, CT extends Record<string, unknown>> = Op extends {
   readonly self: infer Self;
 }
-  ? Self extends { readonly codecId: CodecId }
+  ? // `any: true` is the most permissive arm; handled first for documentation-of-intent, not for correctness — the discriminated union ensures mutual exclusion.
+    Self extends { readonly any: true }
     ? true
-    : Self extends { readonly traits: infer RequiredTraits extends readonly string[] }
-      ? CodecId extends keyof CT
-        ? CT[CodecId] extends { readonly traits: infer FieldTraits }
-          ? [RequiredTraits[number]] extends [FieldTraits]
-            ? true
+    : Self extends { readonly codecId: CodecId }
+      ? true
+      : Self extends { readonly traits: infer RequiredTraits extends readonly string[] }
+        ? CodecId extends keyof CT
+          ? CT[CodecId] extends { readonly traits: infer FieldTraits }
+            ? [RequiredTraits[number]] extends [FieldTraits]
+              ? true
+              : false
             : false
           : false
         : false
-      : false
   : false;
 
 type FieldOperations<

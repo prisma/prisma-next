@@ -70,6 +70,10 @@ export function createModelAccessor<
           registerOp(descriptor.codecId, op);
         }
       }
+    } else if (self.any === true) {
+      for (const descriptor of context.codecDescriptors.values()) {
+        registerOp(descriptor.codecId, op);
+      }
     }
   }
 
