@@ -172,21 +172,6 @@ export function checkContractComponentRequirements(
 export interface FamilyDescriptor<TFamilyId extends string> extends ComponentDescriptor<'family'> {
   /** The family identifier (e.g., 'sql', 'document') */
   readonly familyId: TFamilyId;
-
-  /**
-   * Storage-slot keys reserved by the family for its built-in
-   * per-namespace slots (e.g. `'tables'` for the SQL family;
-   * `'collections'` for the Mongo family). Pack-contributed
-   * `AuthoringEntityTypeDescriptor.storageSlotKey` values are rejected
-   * at descriptor-collection time if they collide with this list —
-   * catches authoring bugs (e.g. a pack accidentally claiming the
-   * family's tables/collections slot) before the contributions reach
-   * the validator or the serializer.
-   *
-   * Families without per-namespace slots leave this undefined; no
-   * collision check runs for those.
-   */
-  readonly reservedStorageSlotKeys?: ReadonlyArray<string>;
 }
 
 /**

@@ -91,7 +91,6 @@ export type {
 } from '../control/control-spaces';
 export { APP_SPACE_ID } from '../control/control-spaces';
 export type {
-  AssembleAuthoringContributionsOptions,
   AssembledAuthoringContributions,
   ControlStack,
   CreateControlStackInput,
