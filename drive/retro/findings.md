@@ -34,8 +34,6 @@ the boundary is unambiguously closed from both sides.
 **Upstream candidate?** Yes for the suggested action; no for
 `drive-run-retro` itself — the skill behaved well.
 
-See [`projects/facade-import-surface-completion/retros.md` § 2026-05-21](../../projects/facade-import-surface-completion/retros.md) for the full retro.
-
 ## 2026-05-21 · drive-qa-run + agent self-discipline · friction
 
 I (running TML-2614 review/QA) reported three "pre-existing failures on `origin/main`" in the PR body and filed TML-2631 against one of them. **All three were operator-environment artefacts in my local worktree**, not real failures on `origin/main`:
