@@ -82,6 +82,8 @@ export interface MigrationCommandResult {
    * into a single ambiguous list. See {@link AggregatePerSpaceExecutionEntry}.
    */
   readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
+  readonly plannedAdvanceRef?: { readonly name: string; readonly hash: string } | null;
   readonly summary: string;
   readonly timings: {
     readonly total: number;
@@ -206,6 +208,15 @@ export function formatMigrationPlanOutput(
   if (result.plan?.destination) {
     lines.push('');
     lines.push(`${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`);
+  }
+
+  if (result.plannedAdvanceRef) {
+    lines.push('');
+    lines.push(
+      formatDimText(
+        `Would advance ref "${result.plannedAdvanceRef.name}" → ${result.plannedAdvanceRef.hash}`,
+      ),
+    );
   }
 
   // Statement preview (any family that implements OperationPreviewCapable)
@@ -469,6 +480,12 @@ export function formatMigrationApplyOutput(
     // Timings in verbose mode
     if (isVerbose(flags, 1)) {
       lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    }
+
+    if (result.advancedRef) {
+      lines.push(
+        formatDimText(`Advanced ref "${result.advancedRef.name}" → ${result.advancedRef.hash}`),
+      );
     }
   }
 
