@@ -1,3 +1,8 @@
+// Intentionally uses verbose mongo-contract-ts import: @prisma-next/mongo/contract-builder's
+// defineContract wrap loses inline-model inference precision when consumers use
+// mongoQuery<typeof contract> chains (PlanRow row shapes collapse to _id: never / count: never).
+// Tracked at https://linear.app/prisma-company/issue/TML-2633 — migrate to the facade form
+// once TML-2633 lands.
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
   MongoContract,
