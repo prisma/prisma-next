@@ -389,8 +389,22 @@ describe('integration/nested-includes/strategy', () => {
             )
             .all();
 
-          expect(rows[0]?.posts.total).toBe(2);
-          expect(rows[0]?.posts.items).toHaveLength(2);
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: {
+                items: [
+                  { id: 10, title: 'A', userId: 1, views: 1, embedding: null },
+                  { id: 11, title: 'B', userId: 1, views: 2, embedding: null },
+                ],
+                total: 2,
+              },
+            },
+          ]);
           expect(runtime.executions.length).toBeGreaterThan(1);
         });
       },
@@ -420,7 +434,16 @@ describe('integration/nested-includes/strategy', () => {
             .include('posts', (posts) => posts.include('comments', (c) => c.count()))
             .all();
 
-          expect(rows[0]?.posts[0]?.comments).toBe(2);
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [{ id: 10, title: 'A', userId: 1, views: 1, embedding: null, comments: 2 }],
+            },
+          ]);
           expect(runtime.executions.length).toBeGreaterThan(1);
         });
       },
