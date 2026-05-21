@@ -345,25 +345,10 @@ export function instantiatePslFieldPreset(input: {
     validateAuthoringHelperArguments(helperPath, input.descriptor.args, args);
     const instantiated = instantiateAuthoringFieldPreset(input.descriptor, args);
     const presetCodecId = instantiated.descriptor.codecId;
-    let presetDefault: ColumnDefault | undefined;
-    if (instantiated.default !== undefined) {
-      const lowered = emitFunctionFormColumnDefault(
-        instantiated.default,
-        {
-          modelName: input.entityLabel,
-          fieldName: helperPath,
-          codecId: presetCodecId,
-          span: input.call.span,
-          sourceId: input.sourceId,
-        },
-        input.codecLookup,
-        input.diagnostics,
-      );
-      if (!lowered) {
-        return undefined;
-      }
-      presetDefault = lowered;
-    }
+    const presetDefault: ColumnDefault | undefined =
+      instantiated.default !== undefined
+        ? emitFunctionFormColumnDefault(instantiated.default)
+        : undefined;
     return {
       descriptor: {
         codecId: presetCodecId,
@@ -761,52 +746,14 @@ function resolveCodecTraits(
 
 /**
  * Translate the registry's storage-arm {@link AuthoringColumnDefault} into
- * the contract IR's {@link ColumnDefault}. Mirrors the TS DSL emitter's
- * dispatch table — the `codecValue` arm flows through
- * `codec.renderSqlLiteral`; the `expression` and `autoincrement` arms pass
- * through verbatim. Returns `undefined` and pushes a diagnostic when the
- * `codecValue` arm needs a codec but none is reachable.
+ * the contract IR's {@link ColumnDefault}. The `expression` and `autoincrement`
+ * arms pass through verbatim; both are structurally identical to the IR shape.
  */
-function emitFunctionFormColumnDefault(
-  authored: AuthoringColumnDefault,
-  context: {
-    readonly modelName: string;
-    readonly fieldName: string;
-    readonly codecId: string;
-    readonly span: PslSpan;
-    readonly sourceId: string;
-  },
-  codecLookup: CodecLookup | undefined,
-  diagnostics: ContractSourceDiagnostic[],
-): ColumnDefault | undefined {
+function emitFunctionFormColumnDefault(authored: AuthoringColumnDefault): ColumnDefault {
   if (authored.kind === 'autoincrement') {
     return { kind: 'autoincrement' };
   }
-  if (authored.kind === 'expression') {
-    return { kind: 'expression', expression: authored.expression };
-  }
-  const codec = codecLookup?.get(context.codecId) as CodecWithRenderSqlLiteral | undefined;
-  if (!codec) {
-    diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Field "${context.modelName}.${context.fieldName}" @default(...) requires codec "${context.codecId}" to render the literal value; no codec lookup is available.`,
-      sourceId: context.sourceId,
-      span: context.span,
-    });
-    return undefined;
-  }
-  try {
-    return { kind: 'expression', expression: codec.renderSqlLiteral(authored.value) };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Field "${context.modelName}.${context.fieldName}" @default(...) value is not valid for codec "${context.codecId}": ${message}`,
-      sourceId: context.sourceId,
-      span: context.span,
-    });
-    return undefined;
-  }
+  return { kind: 'expression', expression: authored.expression };
 }
 
 /**
@@ -1016,19 +963,7 @@ export function lowerDefaultForField(input: {
   }
 
   if (lowered.value.kind === 'storage') {
-    const emitted = emitFunctionFormColumnDefault(
-      lowered.value.defaultValue,
-      {
-        modelName: input.modelName,
-        fieldName: input.fieldName,
-        codecId: input.columnDescriptor.codecId,
-        span: expressionEntry.span,
-        sourceId: input.sourceId,
-      },
-      input.codecLookup,
-      input.diagnostics,
-    );
-    return emitted ? { defaultValue: emitted } : {};
+    return { defaultValue: emitFunctionFormColumnDefault(lowered.value.defaultValue) };
   }
 
   const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);
