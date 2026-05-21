@@ -232,7 +232,7 @@ describe('telemetry consent prompt during `init`', () => {
     const afterFirstTelemetryConsent = vi.fn();
 
     const firstExit = await runInit(projectDir, {
-      options: { ...initOptions, install: false },
+      options: { ...initOptions, install: false, skill: false },
       flags: interactiveFlags(),
       canPrompt: true,
       afterFirstTelemetryConsent,
@@ -243,7 +243,7 @@ describe('telemetry consent prompt during `init`', () => {
     expect(afterFirstTelemetryConsent.mock.calls[0]?.[0].enableTelemetry).toBe(true);
 
     const secondExit = await runInit(projectDir, {
-      options: { ...initOptions, force: true, install: false },
+      options: { ...initOptions, force: true, install: false, skill: false },
       flags: interactiveFlags(),
       canPrompt: true,
       afterFirstTelemetryConsent,
@@ -267,7 +267,7 @@ describe('telemetry consent prompt during `init`', () => {
     );
 
     const exitCode = await runInit(projectDir, {
-      options: { ...initOptions, install: false },
+      options: { ...initOptions, install: false, skill: false },
       flags: interactiveFlags(),
       canPrompt: true,
       afterFirstTelemetryConsent,

@@ -417,7 +417,25 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
   it('with --no-install skips dependency installation and emit', async () => {
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
-    expect(execFile).not.toHaveBeenCalled();
+    const dependencyInstallCalls = vi
+      .mocked(execFile)
+      .mock.calls.filter(([, args]) =>
+        (args as string[]).some((arg) =>
+          ['@prisma-next/postgres', 'dotenv', 'prisma-next', '@types/node'].includes(arg),
+        ),
+      );
+    expect(dependencyInstallCalls).toHaveLength(0);
+    expect(
+      vi.mocked(execFile).mock.calls.some(([, args]) => {
+        const commandArgs = args as string[];
+        return (
+          commandArgs.includes('skills@latest') &&
+          commandArgs.includes('add') &&
+          commandArgs.some((arg) => arg.includes('/skills#v')) &&
+          commandArgs.includes('--all')
+        );
+      }),
+    ).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
     expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
   });
@@ -1481,12 +1499,11 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     const nextStepsText = nextSteps.join('\n');
     expect(nextStepsText).toContain('DATABASE_URL');
     expect(nextStepsText).toMatch(/(prisma-next|npx prisma-next) contract emit/);
-    // The skills install was skipped (`install: false` →
-    // `--no-install`), so `nextSteps` must not claim it is registered.
-    // The skip is surfaced via `warnings` with a manual-install hint.
-    expect(nextStepsText).not.toContain('Prisma Next skills');
+    // `--no-install` only skips dependency install + emit. Skills are
+    // installed independently unless `--no-skill` is passed.
+    expect(nextStepsText).toContain('Prisma Next skills');
     const warnings = parsed['warnings'] as string[];
-    expect(warnings.join('\n')).toContain('Prisma Next skills');
+    expect(warnings.join('\n')).not.toContain('Skipped Prisma Next skills');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {
@@ -2100,6 +2117,13 @@ describe('runInit hostile inputs (FR6)', { timeout: timeouts.databaseOperation }
     tmpDir = mkdtempSync(join(tmpdir(), 'init-hostile-'));
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
     vi.clearAllMocks();
+    vi.mocked(execFile).mockImplementation(
+      (_cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+        const callback = cb as (err: null) => void;
+        callback(null);
+        return undefined as never;
+      },
+    );
   }, timeouts.databaseOperation);
 
   afterEach(() => {
