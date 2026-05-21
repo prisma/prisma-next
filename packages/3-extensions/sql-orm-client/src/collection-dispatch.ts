@@ -31,6 +31,7 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
+import { hasNonLeafIncludeWithDistinct } from './include-tree-predicates';
 import {
   compileRelationSelect,
   compileSelect,
@@ -489,25 +490,6 @@ function hasScalarOrCombineIncludeDescriptors(includes: readonly IncludeExpr[]):
       include.scalar !== undefined ||
       include.combine !== undefined ||
       hasScalarOrCombineIncludeDescriptors(include.nested.includes),
-  );
-}
-
-function hasNonLeafIncludeWithDistinct(includes: readonly IncludeExpr[]): boolean {
-  // Walks the include tree recursively. An include whose nested state
-  // carries both `distinct` and further nested includes cannot be
-  // lowered into the single-query strategies: the child SELECT would
-  // emit `SELECT DISTINCT <scalars>, json_agg(<nested>) FROM ...`,
-  // and Postgres rejects equality on `json`. Routing to multi-query
-  // applies distinct to scalar-only rows before grandchildren stitch
-  // in JS. `distinctOn` is intentionally not included here: Postgres
-  // only compares the `ON (...)` expressions for equality, so a
-  // hashable key column plus json projections is well-defined.
-  return includes.some(
-    (include) =>
-      (include.nested.distinct !== undefined &&
-        include.nested.distinct.length > 0 &&
-        include.nested.includes.length > 0) ||
-      hasNonLeafIncludeWithDistinct(include.nested.includes),
   );
 }
 

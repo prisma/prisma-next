@@ -29,6 +29,7 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
+import { hasNonLeafIncludeWithDistinct } from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr } from './types';
 import { bindWhereExpr } from './where-binding';
@@ -574,6 +575,18 @@ export function compileSelectWithIncludeStrategy(
   if (hasScalarOrCombineIncludeDescriptors(state.includes)) {
     throw new Error(
       'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  }
+
+  // Same recursive shape as the scalar/combine gate above. A non-leaf
+  // `distinct()` cannot be lowered into the single-query strategies:
+  // the child SELECT would emit `SELECT DISTINCT <scalars>, json_agg(...)`,
+  // and Postgres rejects equality on `json`. The dispatch path routes
+  // these to multi-query; direct planner callers (tests, rich-plan
+  // consumers) fail fast here instead of building an invalid plan.
+  if (hasNonLeafIncludeWithDistinct(state.includes)) {
+    throw new Error(
+      'single-query include strategy does not support distinct() on a non-leaf include',
     );
   }
 

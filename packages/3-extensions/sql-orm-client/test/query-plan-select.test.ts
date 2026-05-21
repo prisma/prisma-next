@@ -388,6 +388,34 @@ describe('compileSelectWithIncludeStrategy', () => {
       'single-query include strategy does not support scalar include selectors or combine()',
     );
   });
+
+  // Planner invariant: a non-leaf `distinct()` cannot be lowered into
+  // the lateral / correlated strategies — the child SELECT would emit
+  // `SELECT DISTINCT <scalars>, json_agg(<nested>)` and Postgres rejects
+  // equality on `json`. The dispatch path routes these to multi-query;
+  // the exported planner must fail fast at every depth so direct callers
+  // (tests, rich-plan consumers) don't build an invalid plan.
+  it('rejects distinct() on a non-leaf include at the top level', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.select('title').distinct('title').include('comments'),
+    ).state;
+
+    expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
+      'single-query include strategy does not support distinct() on a non-leaf include',
+    );
+  });
+
+  it('rejects distinct() on a non-leaf include nested at depth 2', () => {
+    const { collection } = createCollection();
+    const state = collection.include('invitedUsers', (inv) =>
+      inv.include('posts', (posts) => posts.select('title').distinct('title').include('comments')),
+    ).state;
+
+    expect(() =>
+      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
+    ).toThrow('single-query include strategy does not support distinct() on a non-leaf include');
+  });
 });
 
 describe('compileSelect MTI JOINs', () => {
