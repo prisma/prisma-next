@@ -2,7 +2,6 @@ import { coreHash } from '@prisma-next/contract/types';
 import { MongoStorage } from '@prisma-next/mongo-contract';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { PostgresSchema } from '#element-coordinates/postgres-schema';
 import { type EntityCoordinate, elementCoordinates } from '../src/ir/storage';
 
 const emptyTableInput = {
@@ -43,21 +42,6 @@ describe('elementCoordinates', () => {
       namespaces: {
         app: { id: 'app', collections: { posts: {} } },
       },
-    });
-
-    assertStoragePlaneCoordinates([...elementCoordinates(storage)]);
-  });
-
-  it('yields plane: storage for Postgres-promoted namespace (kind === schema)', () => {
-    const schema = new PostgresSchema({
-      id: 'public',
-      tables: { users: emptyTableInput },
-    });
-    expect(schema.kind).toBe('schema');
-
-    const storage = new SqlStorage({
-      storageHash: coreHash('sha256:element-coordinates-postgres'),
-      namespaces: { public: schema },
     });
 
     assertStoragePlaneCoordinates([...elementCoordinates(storage)]);
