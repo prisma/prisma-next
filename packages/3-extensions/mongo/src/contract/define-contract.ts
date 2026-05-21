@@ -79,9 +79,9 @@ export function defineContract(
   MongoDefinitionInput & { readonly family: MongoFamilyPack; readonly target: MongoTargetPack }
 > {
   const full = {
+    ...definition,
     family: mongoFamilyPack,
     target: mongoTargetPack,
-    ...definition,
   } as ContractDefinition<MongoFamilyPack, MongoTargetPack>;
 
   if (factory !== undefined) {
