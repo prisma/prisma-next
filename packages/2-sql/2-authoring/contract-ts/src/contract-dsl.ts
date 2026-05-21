@@ -6,6 +6,7 @@ import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
 import type {
+  Codec,
   CodecLookup,
   CodecTrait,
   ColumnTypeDescriptor,
@@ -148,25 +149,50 @@ type FieldDescriptor<State extends AnyScalarFieldState> = State extends {
   : never;
 
 /**
- * JS-native literal values accepted by `.default(value)` on the TS DSL.
- * Widens {@link ColumnDefaultLiteralInputValue} (the IR's pre-codec input
- * envelope) with `bigint` and `Uint8Array` — values that flow directly
- * into `codec.renderSqlLiteral` without a JSON round-trip at the TS DSL
- * surface. `Buffer` extends `Uint8Array` in Node so it lands here too.
- * The IR's `ColumnDefaultLiteralValue = JsonValue` remains narrower; the
- * DSL widening only affects what `.default(...)` accepts before codec
- * dispatch.
+ * Open fallback shape for `.default(value)` when the field descriptor
+ * carries no codec reference at the type level (e.g. raw
+ * {@link ColumnTypeDescriptor} shapes produced by ad-hoc or test
+ * helpers). Widens {@link ColumnDefaultLiteralInputValue} (the IR's
+ * pre-codec input envelope) with `bigint` and `Uint8Array`. Production
+ * column helpers (`column(...)`) surface a `codecFactory` slot, so they
+ * resolve through {@link CodecInputForDescriptor} instead and the
+ * codec's own `TInput` decides what compiles.
  */
-type SqlDslLiteralInput = ColumnDefaultLiteralInputValue | bigint | Uint8Array;
+type SqlDslLiteralInputFallback = ColumnDefaultLiteralInputValue | bigint | Uint8Array;
+
+/**
+ * Extract the codec's `TInput` from a field descriptor that carries a
+ * `codecFactory` slot — the shape produced by the framework `column()`
+ * packager. The factory's return type is the codec instance; the
+ * codec's fourth generic is `TInput`. When the descriptor surfaces no
+ * codec slot (e.g. a bare {@link ColumnTypeDescriptor}), this resolves
+ * to {@link SqlDslLiteralInputFallback} so legacy authoring sites keep
+ * the broad pre-codec literal surface.
+ *
+ * The factory parameter list is typed `never[]` so the extractor is
+ * agnostic to whether the descriptor's factory takes `void` or a params
+ * record — only the return type matters.
+ */
+export type CodecInputForDescriptor<D> = D extends {
+  readonly codecFactory: (...args: never[]) => infer R;
+}
+  ? R extends Codec<string, readonly CodecTrait[], unknown, infer TInput>
+    ? TInput
+    : SqlDslLiteralInputFallback
+  : SqlDslLiteralInputFallback;
 
 /**
  * Compute the `.default(value)` parameter for a column builder state.
- * Combines the literal-input shape with the trait-gated autoincrement
- * sentinel; columns whose descriptor lacks the `'autoincrement'` trait
- * see only the literal arm.
+ * Combines the descriptor-resolved codec input with the trait-gated
+ * autoincrement sentinel; columns whose descriptor lacks the
+ * `'autoincrement'` trait see only the codec-input arm. The codec's
+ * own `TInput` is the open-set source of truth for what
+ * `.default(...)` accepts: branded types, extension-owned classes, and
+ * any other shape the codec admits all compile via this seam without
+ * the DSL enumerating them.
  */
 export type DefaultInputForState<State extends AnyScalarFieldState> =
-  | SqlDslLiteralInput
+  | CodecInputForDescriptor<FieldDescriptor<State>>
   | AllowAutoincrement<FieldDescriptor<State>>;
 
 type HasNamedConstraintId<State extends AnyScalarFieldState> =
