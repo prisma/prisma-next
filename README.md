@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pris.ly/discord">Discord</a>  |  <a href="https://twitter.com/prisma">X</a>  |  <a href="https://pris.ly/pn-anouncement">Blog Post</a>  |  <a href="./ARCHITECTURE.md">Architecture</a>
+  <a href="https://pris.ly/discord">Discord</a>  |  <a href="https://twitter.com/prisma">X</a>  |  <a href="https://pris.ly/pn-announcement">Blog Post</a>  |  <a href="./ARCHITECTURE.md">Architecture</a>
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 ## Prisma Next at a glance
 
 **Prisma Next** is a new foundation for Prisma ORM, rewritten fully in TypeScript to be **extensible** and **composable** by default.
-Read the full announcement: **[The Next Evolution of Prisma ORM](https://pris.ly/pn-anouncement)**.
+Read the full announcement: **[The Next Evolution of Prisma ORM](https://pris.ly/pn-announcement)**.
 
 - **A TypeScript rewrite of Prisma ORM**: Rebuilt end-to-end to unlock new capabilities and a more composable architecture.
 - **Extensible by default**: Add extension packs in `prisma-next.config.ts` to unlock new schema attributes and new query capabilities.
@@ -38,21 +38,21 @@ Drive it yourself, let your agent drive, or hand off mid-flow. Your workflow is 
 
 There are two ways in. Pick the one that matches where you're starting from.
 
-### Starting fresh: `create-prisma`
+### Start from scratch
 
 ```bash
-npx create-prisma@next
+npm create prisma@next
 ```
 
-Use this when you want a new app from scratch. `create-prisma` picks a JavaScript framework (Next.js, Vite, and others; see `npx create-prisma@next --help` for the current list), runs that framework's own scaffolder, and layers Prisma Next on top with the database of your choice (PostgreSQL or MongoDB). When it finishes you have a runnable framework app plus the Prisma Next scaffold and agent skills already wired in.
+Use this for a brand-new app. The `create-prisma` scaffolder picks a JavaScript framework (Next.js, Vite, and others; the interactive prompt shows the current list), runs that framework's own scaffolder, and layers Prisma Next on top with the database of your choice (PostgreSQL or MongoDB). You finish with a runnable framework app, a wired-in Prisma Next scaffold, and the agent skills already registered.
 
-### Adding to an existing project: `prisma-next init`
+### Add to an existing project
 
 ```bash
 npx prisma-next@latest init
 ```
 
-Use this when you already have a JavaScript or TypeScript project and just want to introduce Prisma Next into it. `prisma-next init` writes `prisma-next.config.ts` at the repo root, scaffolds a starter contract and `db.ts` under `src/prisma/`, installs the runtime deps, emits the contract, and registers the agent skills. It does not touch your existing framework or build setup; how you call `db` from your app is up to you.
+Use this when you already have a JavaScript or TypeScript project. `prisma-next init` writes `prisma-next.config.ts` at the repo root, scaffolds a starter contract and `db.ts` under `src/prisma/`, installs the runtime dependencies, emits the contract, and registers the agent skills. It does not touch your existing framework or build setup; how you wire `db` into your app is up to you.
 
 ### Prerequisites
 
@@ -62,7 +62,7 @@ Use this when you already have a JavaScript or TypeScript project and just want 
 
 ### What gets written to disk
 
-Both commands produce the same Prisma Next scaffold inside your project. `create-prisma` adds a framework around it; `prisma-next init` lays it down on its own.
+Both commands produce the same Prisma Next scaffold inside your project. `npm create prisma@next` adds a framework around it; `prisma-next init` lays it down on its own.
 
 - `prisma-next.config.ts` at the repo root
 - `src/prisma/contract.prisma`: your schema source, with a starter `User` and `Post` model. PSL is the default; if you want a TypeScript builder (`contract.ts`) instead, pass `--authoring typescript` to `prisma-next init`, or pick TypeScript at the `create-prisma` prompt.
@@ -75,7 +75,7 @@ Both commands produce the same Prisma Next scaffold inside your project. `create
 ### Next steps after scaffolding
 
 1. Set `DATABASE_URL` in `.env` (copy from `.env.example`). If you don't have a database yet, any local Postgres works: Docker, [Postgres.app](https://postgresapp.com), or a managed instance.
-2. Apply the contract to the database: `npx prisma-next db init`. This is a CLI subcommand (`db init`, not a re-run of the scaffold). It creates the tables, indexes, and constraints your contract describes, then writes a small `pn_meta_marker` row that records the contract hash. The marker is how Prisma Next detects drift between your contract and the live database before queries run.
+2. Apply the contract to the database with `npx prisma-next db init`. This is a CLI subcommand (`db init`, not a re-run of the scaffold). It creates the tables, indexes, and constraints your contract describes, then writes a small `pn_meta_marker` row that records the contract hash. The marker is how Prisma Next detects drift between your contract and the live database before queries run.
 3. Write your first query (see [Your first query](#your-first-query) below), or hand the wheel to your editor's AI assistant. The skills are project-local and your editor's agent picks them up on its next prompt; no restart needed for Claude Code or Cursor.
 
 With `DATABASE_URL` set and `db init` run, you can also just ask your agent to build something for you:
@@ -101,7 +101,7 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 - `--no-install`: skip dependency install and the initial contract emit
 - `--no-skill`: skip the agent-skill install (air-gapped / restricted environments)
 
-For `create-prisma`, run `npx create-prisma@next --help` for the full flag surface (framework, database, package manager, and so on).
+`npm create prisma@next` is interactive by default; for non-interactive runs see the `create-prisma` package on npm for its current flag surface.
 
 ### Or, explore the in-repo demo
 
@@ -171,7 +171,7 @@ Edit `contract.prisma`, run `npx prisma-next contract emit`, and the `db` types 
 
 ## Use it with your AI agent
 
-Both `create-prisma` and `prisma-next init` install the skill cluster, so you don't need to opt in. This section is here so you (and any agent reading the repo) know what's in your project and where to find it.
+Both `npm create prisma@next` and `prisma-next init` install the skill cluster, so you don't need to opt in. This section is here so you (and any agent reading the repo) know what's in your project and where to find it.
 
 Prisma Next ships with a cluster of **agent skills**: `SKILL.md` files that teach an LLM agent how to drive the framework end-to-end without re-deriving the API from documentation each turn. Each skill has a `description` field the agent runtime matches against the user's prompt, so the right skill loads at the right moment.
 
