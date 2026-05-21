@@ -97,6 +97,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
+      - name: Check working tree is clean
+        run: pnpm check:clean-tree
 
   test:
     name: Test
@@ -142,6 +144,8 @@ jobs:
         run: pnpm test:packages
       - name: Test examples
         run: pnpm test:examples
+      - name: Check working tree is clean
+        run: pnpm check:clean-tree
 
   test-e2e:
     name: E2E Tests
@@ -175,6 +179,8 @@ jobs:
         run: pnpm build
       - name: Run E2E tests
         run: pnpm test:e2e
+      - name: Check working tree is clean
+        run: pnpm check:clean-tree
 
   test-integration:
     name: Integration Tests
@@ -208,6 +214,8 @@ jobs:
         run: pnpm build
       - name: Run Integration tests
         run: pnpm test:integration
+      - name: Check working tree is clean
+        run: pnpm check:clean-tree
 
   coverage:
     name: Coverage
@@ -241,3 +249,5 @@ jobs:
         run: pnpm build
       - name: Generate coverage and report
         run: node scripts/coverage-report.mjs
+      - name: Check working tree is clean
+        run: pnpm check:clean-tree
