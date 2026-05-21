@@ -33,7 +33,7 @@ After this project the contract is symmetric, namespace-everywhere, and pack-ext
     "auth":   { "tables": { "user": { /* … */ } } },
     "public": {
       "tables":       { "post": { /* … */ } },
-      "postgresEnums": { "user_role": {
+      "enum": { "user_role": {
         "kind": "postgres-enum",
         "name": "user_role",
         "nativeType": "user_role",
@@ -51,7 +51,7 @@ Three structural moves combine to deliver this:
 
 1. **Two planes** (`domain`, `storage`) replace the flat-at-root model/relation/types siblings.
 2. **Uniform shape** `<plane>.<ns>.<entityKind>.<entityName>` — no `"namespaces"` indirection segment at either plane.
-3. **Pack-contributed entity-kind slots** — `postgresEnums` is a slot the Postgres pack contributes via the framework's existing `AuthoringContributions.entityTypes` surface; the framework-shared `storage.<ns>.types` slot is deleted as a load-bearing surface (the per-target codec-alias / value-binding `domain.<ns>.types` stays; the storage-side `types` was always the leak).
+3. **Pack-contributed entity-kind slots** — `enum` is a slot the Postgres pack contributes via the framework's existing `AuthoringContributions.entityTypes` surface (named per the *essence + singular* convention recorded in ADR Decision 5 — `enum`, not `postgresEnums`, not `enums`); the framework-shared `storage.<ns>.types` slot is deleted as a load-bearing surface (the per-target codec-alias / value-binding `domain.<ns>.types` stays; the storage-side `types` was always the leak).
 
 The single canonical addressing primitive becomes the **entity coordinate** `(namespaceId, entityKind, entityName)`. Every consumer of the IR — migration disjoint calculation, planner diffing, validator collision checks, cross-plane references — addresses entities by this tuple, replacing today's mixed bag of `(namespaceId, tableName)` pairs, `findSqlTable(contract, name)` global-scan helpers, and string-keyed flat lookups.
 
@@ -97,8 +97,8 @@ Post-merge code review on PR #534 surfaced a list of smaller cleanups — `Unbou
 - **Entity coordinate primitive.** `(namespaceId, entityKind, entityName)` exposed via a polymorphic free-function `elementCoordinates(storage)` walk; consumers (planner diff, migration disjoint calc, validators, cross-plane references) adopt the coordinate.
 - **Cross-reference encoding.** Object pairs for `relation.to`, `model.base`, `roots[*]`, FK references, and any other cross-entity reference site.
 - **Framework `Namespace` interface narrowed** to `{ id, kind }`. Family-specific slots (`tables`, `collections`) move to family-shaped namespace types. SQL family namespace type is `Namespace & { tables, [...packContributedSlots] }`.
-- **Pack-contributed entity-kind mechanism.** `AuthoringContributions.entityTypes` extended to carry: IR-class factory (already present), storage-slot key (new), serializer hydration registration (new), validator schema contribution (new). Postgres pack contributes `postgresEnums` slot via this mechanism.
-- **Framework-shared `storage.namespaces.<ns>.types` slot deleted** as a load-bearing surface. Enum entries move to `storage.<ns>.postgresEnums.<name>`. The framework-shared `domain.<ns>.types` slot stays for codec aliases / value bindings (the domain-side `types` was never the leak).
+- **Pack-contributed entity-kind mechanism.** `AuthoringContributions.entityTypes` extended to carry: IR-class factory (already present), serializer hydration registration (new), validator schema contribution (new). The descriptor's existing `discriminator` field is the single coordinate; no separate `storageSlotKey` field. Postgres pack contributes its `enum` slot via this mechanism (slot key named per the *essence + singular* convention — see ADR Decision 5).
+- **Framework-shared `storage.namespaces.<ns>.types` slot deleted** as a load-bearing surface. Enum entries move to `storage.<ns>.enum.<name>`. The framework-shared `domain.<ns>.types` slot stays for codec aliases / value bindings (the domain-side `types` was never the leak).
 - **IR construction discipline.** `SqlStorage` / `MongoStorage` constructors accept only fully-constructed `Namespace` instances; no POJO normalisation, no default singleton injection. All convenience lives in the authoring layer.
 - **`createNamespace` factory moves** onto the target pack contribution surface; removed from user-facing `defineContract` arguments.
 - **Serializer rewrite.** `kind` no longer in JSON; class identity resolved from `(targetFamily, target)` + position. `stripNamespaceKinds` deleted. Hydration registry consumes pack-contributed entity-kind descriptors generically.
@@ -180,7 +180,7 @@ Five settled design decisions drive the implementation. The Decision Log below r
 
 ### D5 — Pack-contributed entity-kind mechanism
 
-**Decision.** Target packs contribute new entity kinds through the framework-level `AuthoringContributions.entityTypes` surface, extended to carry storage-slot key + serializer hydration registration + validator schema contribution alongside the existing IR-class factory. The framework-shared `storage.<ns>.types` slot is removed as a load-bearing surface; enum entries move to a pack-contributed `storage.<ns>.postgresEnums` slot.
+**Decision.** Target packs contribute new entity kinds through the framework-level `AuthoringContributions.entityTypes` surface, extended to carry serializer hydration registration + validator schema contribution alongside the existing IR-class factory; the descriptor's existing `discriminator` field is the single coordinate the family base looks up by, with no separate `storageSlotKey` field. The framework-shared `storage.<ns>.types` slot is removed as a load-bearing surface; enum entries move to a pack-contributed `storage.<ns>.enum` slot (named per the *essence + singular* convention; see ADR Decision 5).
 
 The framework retains hardcoded built-in kinds (`tables` for SQL, `collections` for Mongo) — these guarantee a stable family-shape contract for consumers, and retrofitting them onto the descriptor mechanism is a large job that delivers no user value. The dual-surface (hardcoded built-ins + descriptor-driven contributed kinds) is deliberate paid debt; it could be migrated later if a concrete need emerges.
 
@@ -239,7 +239,7 @@ User-facing affordances live in the separate `postgres-enum-finishing` project. 
 
 - [ ] **PDoD1.** All slices in `projects/contract-ir-planes/plan.md` delivered or explicitly deferred (in `projects/contract-ir-planes/deferred.md`).
 - [ ] **PDoD2.** All in-tree contracts (`examples/*/src/prisma/contract.json` + all migration bookends + `test/fixtures/**`) follow the canonical shape: `contract.{domain, storage}.<ns>.<entityKind>.<entityName>`. Verified by `pnpm fixtures:check` and a shape-assertion test.
-- [ ] **PDoD3.** Postgres enum emitted as a Postgres-pack-contributed entity at `contract.storage.<ns>.postgresEnums.<name>`. The framework-shared `storage.<ns>.types` slot no longer accepts enum entries (slot deleted as a load-bearing surface, or retained but typed against `never`). The IR class hierarchy shows the Postgres pack contributes the `postgresEnum` entity kind via `AuthoringContributions.entityTypes`. No hardcoded `'postgres-enum'` paths or codec-hook hacks remain in framework or SQL-family packages (audit: `rg "'postgres-enum'"` returns hits only in `packages/3-targets/3-targets/postgres/**` and `packages/3-targets/6-adapters/postgres/**`, plus the test fixtures that exercise the kind).
+- [ ] **PDoD3.** Postgres enum emitted as a Postgres-pack-contributed entity at `contract.storage.<ns>.enum.<name>`. The framework-shared `storage.<ns>.types` slot no longer accepts enum entries (slot deleted as a load-bearing surface, or retained but typed against `never`). The IR class hierarchy shows the Postgres pack contributes the `'postgres-enum'` entity kind via `AuthoringContributions.entityTypes`. No hardcoded `'postgres-enum'` paths or codec-hook hacks remain in framework or SQL-family packages (audit: `rg "'postgres-enum'"` returns hits only in `packages/3-targets/3-targets/postgres/**` and `packages/3-targets/6-adapters/postgres/**`, plus the test fixtures that exercise the kind).
 - [ ] **PDoD4.** Cross-namespace references everywhere use object pairs. `relation.to`, `model.base`, `roots[*]`, FK targets. Round-trip through serializer + deserializer preserves the shape. Verified by a serialization round-trip test on each shape.
 - [ ] **PDoD5.** Framework `Namespace` interface declares only `{ id, kind }`. SQL and Mongo family namespace types extend it with family-specific slots. `assertUniqueSqlTableNames`, `findSqlTable`, `extractStorageElementNames`, `SqlNamespacePayload`, `DEFAULT_NAMESPACES`, `normaliseNamespaceEntry`, `stripNamespaceKinds`, `UnboundTables<C>` deleted; grep gate clean.
 - [ ] **PDoD6.** Polymorphic free-function `elementCoordinates(storage)` walk implemented; planner diff, migration disjoint calc, validator collision checks consume it. Verified by replacing the existing per-consumer entity-lookup helpers and showing test green.
@@ -256,7 +256,7 @@ User-facing affordances live in the separate `postgres-enum-finishing` project. 
 - **FR3.** Cross-namespace references use object pairs (`{ namespace, model }` / `{ namespace, table, columns }`). No dot-qualified strings. No implicit same-namespace resolution.
 - **FR4.** Framework `Namespace` interface exposes `{ id, kind }`. Family-specific slots (`tables`, `collections`) live on family-shaped namespace types.
 - **FR5.** Target packs contribute new entity kinds through `AuthoringContributions.entityTypes`, supplying: storage-slot key, IR-class factory, serializer hydration factory, validator schema contribution.
-- **FR6.** Postgres enum entries are stored at `contract.storage.<ns>.postgresEnums.<name>`. The framework-shared `storage.<ns>.types` slot does not accept enums.
+- **FR6.** Postgres enum entries are stored at `contract.storage.<ns>.enum.<name>`. The framework-shared `storage.<ns>.types` slot does not accept enums.
 - **FR7.** IR constructors accept only fully-constructed `Namespace` instances; no POJO normalisation, no default-singleton injection.
 - **FR8.** Serializer omits `kind` from emitted JSON namespace entries. Deserializer resolves class identity from `(targetFamily, target)` + position + pack-contributed kind registry.
 - **FR9.** `deserializeContract<T>(json): T` generic at the family interface.
@@ -283,7 +283,7 @@ User-facing affordances live in the separate `postgres-enum-finishing` project. 
 
 These are implementer degrees of freedom; settle during execution.
 
-1. **Exact slot key naming.** `postgresEnums` vs `postgres_enums` vs `pgEnums` vs `enums`. Working position: **`postgresEnums`** — camelCase per existing pattern; namespaced by target name for symmetry with future `postgresPolicies` / `postgresRoles`.
+1. **Exact slot key naming.** Settled at *essence + singular* per artefact-review architect finding A08 (recorded 2026-05-21). Slot key for Postgres enum is **`enum`** (not `postgresEnums`, not `enums`). The slot key matches the entity-kind essence; the descriptor's `discriminator` (`'postgres-enum'`) carries the contributor identity. Singular form is future-compatible with a planned cleanup that retires the existing plural slots (`tables` → `table`, etc.) into the same convention; pack contributions don't pay the migration when that cleanup lands. ADR Decision 5 carries the rule. Future pack-contributed slot names (`policy`, `role`, `materializedView`, …) follow the same convention.
 2. **Deprecation shim during migration window.** Whether `storage.<ns>.types` stays readable for one release (writes go to new slot) or hard-cut at restructure. Working position: **hard-cut** — A6 is the load-bearing assumption; if A6 holds, deprecation shim is wasted work.
 3. **`EntityKindDescriptor` naming in code.** Extend `AuthoringEntityTypeDescriptor` (existing) vs introduce parallel `EntityKindDescriptor` concept. Working position: **extend the existing type** to avoid introducing a parallel concept.
 4. **`elementCoordinates(storage)` return shape.** Plain array vs iterator vs typed stream. Working position: **iterator (`Generator<EntityCoordinate>`)** — large contracts shouldn't materialise the full coordinate list; iterator is cheap and consumers usually filter. **Settled in S1.A D1: free-function `elementCoordinates(storage): Generator<EntityCoordinate>`.**

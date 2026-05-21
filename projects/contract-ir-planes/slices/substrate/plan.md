@@ -6,9 +6,9 @@
 
 ## At a glance
 
-Three dispatches, sequential. D1 lands the framework type primitives behind the rest of the project (no descriptor consumer yet). D2 extends the descriptor surface, wires generic dispatch through the family base, and registers the Postgres pack's enum kind through the descriptor. **D3 lands the vocabulary + walk cleanup** that emerged when the user surfaced the "slot key" redundancy and the "walk doesn't need up-front knowledge" insight at slice-PR open time — the structural property walk replaces the lookup table; the `storageSlotKey` descriptor field and its dependent infrastructure (parallel slot registry, `reservedStorageSlotKeys`, collision validator) come back out; the kind-keyed registry becomes the single source of truth. Slice ships as one PR after D3.
+Four dispatches, sequential. D1 lands the framework type primitives behind the rest of the project (no descriptor consumer yet). D2 extends the descriptor surface, wires generic dispatch through the family base, and registers the Postgres pack's enum kind through the descriptor. **D3 lands the vocabulary + walk cleanup** that emerged when the user surfaced the "slot key" redundancy and the "walk doesn't need up-front knowledge" insight at slice-PR open time — the structural property walk replaces the lookup table; the `storageSlotKey` descriptor field and its dependent infrastructure (parallel slot registry, `reservedStorageSlotKeys`, collision validator) come back out; the kind-keyed registry becomes the single source of truth. **D4 lands the artefact-review cleanup**: extends `EntityCoordinate` with a `plane: 'domain' | 'storage'` axis (A03; substrate, free now while there are no consumers), locks the slot-key naming convention to *essence + singular* (A08), and lands the planning-artefact text edits from the architect + principal-engineer reviews (A05 plane symmetric extensibility; A07 ADR Decision 5 rejected-alternative; F09 project plan Risk #5). Slice ships as one PR after D4.
 
-D1 + D2 are **M**; D3 is **M** (~13 files; bounded mechanical cleanup of D2's surface). All three route to **Opus** per [`drive/calibration/model-tier.md`](../../../../drive/calibration/model-tier.md) — substrate / spec-interpretation work. Mechanical sub-portions inside each dispatch are still inside the dispatch's bounds; no sub-dispatch routes to a cheap tier.
+D1 + D2 are **M**; D3 is **M** (~13 files; bounded mechanical cleanup of D2's surface); D4 is **S/M** (~5 files; substrate code for the plane axis + a test + four planning-artefact text edits). D1–D3 routed to **Opus**; D4 routes to **Composer-2.5** — bounded mechanical work with a fully-settled brief is exactly the substrate Composer-2.5 calibration recommends.
 
 ## Dispatch plan
 
@@ -184,6 +184,63 @@ What stays the same: the descriptor's `hydrate?` and `validatorSchema?` fields s
 
 ---
 
+### Dispatch 4: Coordinate plane axis + artefact-review cleanup
+
+> **Why this dispatch exists (artefact-review pre-PR, 2026-05-21).** The architect + principal-engineer artefact reviews (under `projects/contract-ir-planes/reviews/artifacts-pre-d3/`) surfaced four substrate-altitude concerns the operator picked to settle now while there are no consumers to migrate: A03 (the coordinate is plane-blind; gain a `plane` axis), A05 (ADR Decision 1 frames asymmetric extensibility but both planes will be pack-extensible), A07 (ADR Decision 5 reads as if the descriptor surface was always-decided; the `storageSlotKey` excursion is invisible at ADR altitude), A08 (slot-key naming OQ1 — lock to *essence + singular* before S1.B ships the first pack contribution). F09 — the project plan's risk register is missing the "inherited decisions propagate without challenge" risk surface that produced D3's churn.
+>
+> The substrate rename (A01: existing `tables` → `table`, etc.) and the namespace-concretion `.entries` redirect (A02b) are explicitly **out of scope for D4** — they're ~150-call-site cascades + ~50–80 fixture regens; deferred to standalone Linear tickets (`relatedTo: ['TML-2584']`). D4 locks the new convention so future pack contributions don't grow the eventual rename cost.
+
+**Intent.** Two code touches + four planning-artefact text edits:
+
+1. **Code: `EntityCoordinate` gains a `plane: 'domain' | 'storage'` axis.** Type extended in `packages/1-framework/1-core/framework-components/src/ir/storage.ts`. `elementCoordinates(storage)` yields tuples with `plane: 'storage'` (the parameter type binds the plane; future `elementCoordinates(domain)` siblings yield `plane: 'domain'`). JSDoc on `EntityCoordinate` explains the axis and the domain → storage directional reference invariant the axis enables (encoded as a separate validator; not in coord shape).
+2. **Code: a test** in `packages/1-framework/1-core/framework-components/test/` asserts the walk emits coordinates carrying `plane: 'storage'` for SQL, Mongo, and Postgres-promoted namespaces.
+3. **Doc: ADR Decision 1 reframe (A05).** Already landed via orchestrator's pre-dispatch artefact edits (no implementer action — listed for completeness).
+4. **Doc: ADR Decision 5 rejected-alternative + slot-key convention (A07 + A08).** Already landed via orchestrator's pre-dispatch artefact edits.
+5. **Doc: project plan Risk #5 (F09).** Already landed via orchestrator's pre-dispatch artefact edits.
+6. **Doc: project spec OQ1 lock + `postgresEnums` → `enum` propagation (A08).** Already landed via orchestrator's pre-dispatch artefact edits.
+
+What stays the same: no on-disk contract changes; no descriptor surface changes; no namespace concretion class shape changes; no consumer call-site cascade (zero consumers of `EntityCoordinate` today per the PE pass's F02/PDoD6 verification).
+
+**Files in play.** ~5 code + 1 test.
+
+- `packages/1-framework/1-core/framework-components/src/ir/storage.ts` — extend `EntityCoordinate` with `plane: 'domain' | 'storage'`; populate `plane: 'storage'` in `elementCoordinates(storage)` yields; JSDoc the axis and the directional-reference invariant
+- `packages/1-framework/1-core/framework-components/src/exports/ir.ts` — no API change (the type is re-exported by name; the axis addition is additive)
+- `packages/1-framework/1-core/framework-components/test/element-coordinates.test.ts` (new or extend existing) — assert SQL/Mongo/Postgres walks all emit `plane: 'storage'`
+- Adapter touchpoints: any internal cast / type assertion that consumed `EntityCoordinate` (likely none today; verify via `rg "EntityCoordinate" packages/`)
+
+**Done when.**
+
+- [ ] `pnpm typecheck` clean — type extension propagates; no consumer broken (verified: zero consumers pre-D4)
+- [ ] `pnpm test:packages` green — new walk test passes; pre-existing element-coordinate tests still pass
+- [ ] `pnpm lint:deps` clean — no layering shift
+- [ ] `pnpm fixtures:check` clean — byte-stability gate holds (no on-disk shape change)
+- [ ] Walk test asserts SQL, Mongo, **and** Postgres-promoted (`PostgresSchema`, `kind === 'schema'`) namespaces all yield coordinates with `plane: 'storage'` — three concretions in one test
+- [ ] `rg "EntityCoordinate" packages/` enumerates every consumer; brief-author confirms zero or trivial-cast-update cascade before dispatch lands
+- [ ] JSDoc on `EntityCoordinate` mentions: (a) `plane` axis values; (b) sibling `elementCoordinates(domain)` to come with S1.C; (c) domain → storage directional-reference invariant is a separate validator, not encoded in the coord
+
+**Size.** S/M. ~5 files; substrate type extension + one test; planning-artefact text edits already landed pre-dispatch.
+
+**Model tier.** Composer-2.5 (`composer-2.5-fast`). Bounded mechanical: type extension + test addition. No design judgment (design is fully settled by spec § Approach D4 + ADR Decision 3). Composer-2.5 is the right tier per [`drive/calibration/model-tier.md`](../../../../drive/calibration/model-tier.md) — small dispatches whose boundaries are strict.
+
+**DoR confirmed.**
+
+- [x] Intent statement clear (plane axis on coord + walk test; planning-artefact text edits pre-landed)
+- [x] Files in play named (~5 concrete paths + test)
+- [x] "Done when" gates explicit (typecheck / test:packages / lint:deps / fixtures:check / walk-test for three concretions / consumer enumeration)
+- [x] Predicted size S/M (re-decomposition trigger: if `EntityCoordinate` consumer enumeration returns > 5 sites, halt; surface)
+- [x] Failure modes considered: F2 (constructor magic — N/A this dispatch), F5 (destructive git — forbidden), F6 (inherited "decided" fields — N/A; design fully settled by the artefact reviews)
+- [x] No silent design decisions: A03 axis shape settled at `{ plane, namespaceId, entityKind, entityName }`; A08 OQ1 settled at *essence + singular*; both recorded in ADR Decision 3 + Decision 5
+
+**Brief overlay:**
+
+- Brief MUST forbid destructive git operations per F5
+- Brief MUST instruct the implementer NOT to rename existing slot names (`tables` etc.) — A01 is explicitly deferred to a standalone ticket
+- Brief MUST instruct the implementer NOT to introduce a `.entries` redirect on namespace concretions — A02(b) is explicitly deferred to a standalone ticket
+- Brief MUST cite the architect-review (A03) + PE-review (F02 cross-link on namespace concretions enumeration) findings for context
+- Brief MUST require the walk test to cover SQL + Mongo + Postgres-promoted (`PostgresSchema`) concretions in one test, asserting `plane: 'storage'` for all
+
+---
+
 ## Sanity checks
 
 - [x] Each dispatch sized S/M (no L/XL); D1 has a re-decomposition trigger at >30 files cascaded; D3 has a "halt on new design judgment" trigger
@@ -227,7 +284,16 @@ D3 (Vocabulary + structural walk cleanup) ──► commit ──► WIP inspect
    │  finish the retirement before opening PR
    ├─ If Postgres-promoted-namespace walk test fails: halt; debug the
    │  structural iteration (the previous lookup table silently crashed here)
-   └─ Else: re-open the slice PR (or update existing PR) with D3 in scope
+   └─ Else: proceed
+   │
+   ▼
+D4 (Coordinate plane axis + artefact-review cleanup) ──► commit ──► WIP inspection (≤ 5 min)
+   │
+   ├─ If `rg "EntityCoordinate" packages/` returns > 5 consumer sites: halt;
+   │  re-decompose into D4a (type extension) + D4b (consumer migration)
+   ├─ If walk test fails on any of SQL/Mongo/Postgres concretions: halt;
+   │  debug — the structural walk plus `plane: 'storage'` must hold uniformly
+   └─ Else: re-open the slice PR (or update existing PR) with D4 in scope
 ```
 
 ## Per-dispatch DoR overlay (team)
