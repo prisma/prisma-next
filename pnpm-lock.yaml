@@ -2254,9 +2254,6 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.10.0
         version: link:../1-foundation/mongo-contract
-      '@prisma-next/mongo-contract-ts':
-        specifier: workspace:0.10.0
-        version: link:../2-authoring/contract-ts
       '@prisma-next/mongo-query-builder':
         specifier: workspace:0.10.0
         version: link:../5-query-builders/query-builder
@@ -2710,9 +2707,6 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:0.10.0
         version: link:../../../3-targets/6-adapters/postgres
-      '@prisma-next/extension-pgvector':
-        specifier: workspace:0.10.0
-        version: link:../../../3-extensions/pgvector
       '@prisma-next/ids':
         specifier: workspace:0.10.0
         version: link:../../../1-framework/2-authoring/ids
@@ -3036,6 +3030,9 @@ importers:
       '@prisma-next/adapter-mongo':
         specifier: workspace:0.10.0
         version: link:../../3-mongo-target/2-mongo-adapter
+      '@prisma-next/cli':
+        specifier: workspace:0.10.0
+        version: link:../../1-framework/3-tooling/cli
       '@prisma-next/config':
         specifier: workspace:0.10.0
         version: link:../../1-framework/1-core/config
@@ -3220,7 +3217,7 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../1-framework/1-core/operations
       '@prisma-next/postgres':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../postgres
       '@prisma-next/sql-contract-ts':
         specifier: workspace:0.10.0
@@ -3296,7 +3293,7 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../1-framework/1-core/operations
       '@prisma-next/postgres':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../postgres
       '@prisma-next/sql-contract-ts':
         specifier: workspace:0.10.0
@@ -3441,9 +3438,6 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:0.10.0
         version: link:../../3-targets/7-drivers/postgres
-      '@prisma-next/extension-pgvector':
-        specifier: workspace:0.10.0
-        version: link:../pgvector
       '@prisma-next/family-sql':
         specifier: workspace:0.10.0
         version: link:../../2-sql/9-family
@@ -3487,10 +3481,10 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../3-targets/6-adapters/sqlite
       '@prisma-next/cli':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../1-framework/3-tooling/cli
       '@prisma-next/config':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../1-framework/1-core/config
       '@prisma-next/contract':
         specifier: workspace:0.10.0
@@ -3511,10 +3505,10 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../2-sql/1-core/contract
       '@prisma-next/sql-contract-psl':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../2-sql/2-authoring/contract-psl
       '@prisma-next/sql-contract-ts':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../2-sql/2-authoring/contract-ts
       '@prisma-next/sql-orm-client':
         specifier: workspace:0.10.0
@@ -3529,7 +3523,7 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../3-targets/3-targets/sqlite
       '@prisma-next/utils':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../1-framework/0-foundation/utils
       pathe:
         specifier: ^2.0.3
@@ -4244,7 +4238,7 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../../packages/2-sql/1-core/schema-ir
       '@prisma-next/sqlite':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../../packages/3-extensions/sqlite
       '@prisma-next/target-postgres':
         specifier: workspace:0.10.0
@@ -4329,7 +4323,7 @@ importers:
         specifier: workspace:0.10.0
         version: link:../../packages/1-framework/3-tooling/migration
       '@prisma-next/mongo':
-        specifier: workspace:0.9.0
+        specifier: workspace:0.10.0
         version: link:../../packages/3-extensions/mongo
       '@prisma-next/mongo-codec':
         specifier: workspace:0.10.0
@@ -4578,6 +4572,8 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.20.0
+
+  test/integration/test/fixtures/cli/cli-integration-test-app/test-1779279070575-8m5zmabtv2s: {}
 
   test/integration/test/fixtures/cli/cli-test-app:
     dependencies:
