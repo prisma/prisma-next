@@ -484,14 +484,28 @@ describe('integration/nested-includes/strategy', () => {
           runtime.resetExecutions();
           const rows = await users
             .include('posts', (posts) =>
-              posts.select('title').distinct('title').include('comments'),
+              posts
+                .select('title')
+                .distinct('title')
+                .orderBy((p) => p.title.asc())
+                .include('comments'),
             )
             .orderBy((u) => u.id.asc())
             .all();
 
-          expect(rows).toHaveLength(1);
-          expect(rows[0]?.posts).toHaveLength(2);
-          expect(rows[0]?.posts.map((p) => p.title).sort()).toEqual(['A', 'B']);
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [
+                { title: 'A', comments: [{ id: 100, body: 'c', postId: 10 }] },
+                { title: 'B', comments: [] },
+              ],
+            },
+          ]);
           expect(runtime.executions.length).toBeGreaterThan(1);
         });
       },
@@ -518,8 +532,16 @@ describe('integration/nested-includes/strategy', () => {
             )
             .all();
 
-          expect(rows[0]?.posts).toHaveLength(1);
-          expect(rows[0]?.posts[0]?.title).toBe('A');
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: [{ title: 'A', comments: [{ id: 100, body: 'c', postId: 10 }] }],
+            },
+          ]);
           expect(runtime.executions.length).toBeGreaterThan(1);
         });
       },
@@ -542,13 +564,42 @@ describe('integration/nested-includes/strategy', () => {
           // depth 1. Mirrors the recursive shape of the TML-2595 gate.
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
           runtime.resetExecutions();
-          await users
+          const rows = await users
+            .orderBy((u) => u.id.asc())
             .include('invitedUsers', (inv) =>
               inv.include('posts', (posts) =>
                 posts.select('title').distinct('title').include('comments'),
               ),
             )
             .all();
+
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Root',
+              email: 'root@example.com',
+              invitedById: null,
+              address: null,
+              invitedUsers: [
+                {
+                  id: 2,
+                  name: 'Child',
+                  email: 'child@example.com',
+                  invitedById: 1,
+                  address: null,
+                  posts: [{ title: 'A', comments: [{ id: 100, body: 'c', postId: 10 }] }],
+                },
+              ],
+            },
+            {
+              id: 2,
+              name: 'Child',
+              email: 'child@example.com',
+              invitedById: 1,
+              address: null,
+              invitedUsers: [],
+            },
+          ]);
           expect(runtime.executions.length).toBeGreaterThan(1);
         });
       },
