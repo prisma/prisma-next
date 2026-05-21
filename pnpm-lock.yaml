@@ -1574,6 +1574,9 @@ importers:
 
   packages/1-framework/3-tooling/cli-telemetry:
     dependencies:
+      '@prisma-next/config':
+        specifier: workspace:0.10.0
+        version: link:../../1-core/config
       arktype:
         specifier: 'catalog:'
         version: 2.2.0

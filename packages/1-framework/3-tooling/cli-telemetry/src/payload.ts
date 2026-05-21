@@ -7,10 +7,17 @@ import { type } from 'arktype';
  * the project root the child uses to discover everything else. The
  * child probes its own process (runtime/os/arch, package manager, ts
  * version, agent) and reads the user's `prisma-next.config.*` via
- * c12 to derive `databaseTarget` and `extensions` — keeping those
- * fields off the wire eliminates the original c12-await-in-preAction
- * race against synchronous parent crashes (see PR #556's design
- * dialogue) at the cost of the child evaluating user TS config code.
+ * c12 to derive `databaseTarget` and `extensions` — keeping the
+ * c12 work off the parent's hot path eliminates the original
+ * c12-await-in-preAction race against synchronous parent crashes
+ * (see PR #556's design dialogue) at the cost of the child evaluating
+ * user TS config code.
+ *
+ * `databaseTarget` is an optional parent-side override for the
+ * c12-derived value: the first-`init` invocation supplies the
+ * prompt-chosen target via this field because the config file does
+ * not yet exist on disk at that moment. Every other invocation
+ * leaves it unset and the child's c12 load determines the value.
  *
  * Both sides version-couple on this shape because the IPC carrier is
  * structured-cloned by Node and there's no on-wire compat to maintain.
@@ -29,6 +36,14 @@ export interface ParentToSenderPayload {
   readonly projectRoot: string;
   /** Resolved endpoint URL (already includes the `/events` path). */
   readonly endpoint: string;
+  /**
+   * Optional parent-side override for the c12-derived database target.
+   * Set by `fireTelemetryAfterInitConsent` (the first-`init` path,
+   * where the config file is about to be written but doesn't exist
+   * yet); unset by `fireTelemetryFromPreAction` (steady state, child
+   * resolves the value via c12).
+   */
+  readonly databaseTarget?: string | null;
 }
 
 /**
@@ -52,6 +67,7 @@ export const parentToSenderPayloadSchema = type({
   flags: stringArray,
   projectRoot: requiredString,
   endpoint: requiredString,
+  'databaseTarget?': type.string.or('null'),
 });
 
 export function isParentToSenderPayload(value: unknown): value is ParentToSenderPayload {

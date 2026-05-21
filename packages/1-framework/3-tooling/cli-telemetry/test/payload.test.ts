@@ -19,6 +19,19 @@ describe('isParentToSenderPayload', () => {
     expect(isParentToSenderPayload({ ...validPayload, flags: [] })).toBe(true);
   });
 
+  it('accepts a payload with the optional databaseTarget override set to a string', () => {
+    expect(isParentToSenderPayload({ ...validPayload, databaseTarget: 'postgres' })).toBe(true);
+  });
+
+  it('accepts a payload with the optional databaseTarget override set to null', () => {
+    expect(isParentToSenderPayload({ ...validPayload, databaseTarget: null })).toBe(true);
+  });
+
+  it('rejects a payload whose databaseTarget override is the wrong type', () => {
+    expect(isParentToSenderPayload({ ...validPayload, databaseTarget: 42 })).toBe(false);
+    expect(isParentToSenderPayload({ ...validPayload, databaseTarget: ['postgres'] })).toBe(false);
+  });
+
   it('rejects non-objects', () => {
     expect(isParentToSenderPayload(null)).toBe(false);
     expect(isParentToSenderPayload(undefined)).toBe(false);

@@ -11,10 +11,15 @@ import { readUserConfig, type UserConfig } from './user-config';
  * start. The CLI is responsible for stitching commander's result and
  * the project root together; the telemetry module does no I/O of its
  * own except for the user-config read (skipped when `userConfig` is
- * provided). `databaseTarget` and `extensions` are deliberately
- * absent: the detached child loads `prisma-next.config.*` via c12
- * itself — see the rationale on `ParentToSenderPayload` and the
- * PR #556 design dialogue.
+ * provided). `extensions` is deliberately absent: the detached child
+ * loads `prisma-next.config.*` via c12 itself and derives the
+ * extension-pack ids from the validated config — see the rationale
+ * on `ParentToSenderPayload` and the PR #556 design dialogue.
+ *
+ * `databaseTarget` is an optional parent-side override forwarded to
+ * the child. Set by `fireTelemetryAfterInitConsent` (where the
+ * config file does not yet exist on disk); left unset by the
+ * preAction-hook path so the child's c12 load supplies the value.
  */
 export interface RunTelemetryInputs {
   /** Sanitised commander snapshot — see `CommanderResultShape`. */
@@ -23,6 +28,12 @@ export interface RunTelemetryInputs {
   readonly version: string;
   /** Absolute path of the project root (typically `process.cwd()`). */
   readonly projectRoot: string;
+  /**
+   * Optional parent-side override for the c12-derived database target,
+   * forwarded verbatim to the child sender. Wins over the child's
+   * c12-derived value when present.
+   */
+  readonly databaseTarget?: string | null;
   /**
    * Path to the sender entry compiled into this package's `dist/`.
    * Resolved by the caller because the compiled sender lives at
@@ -86,6 +97,7 @@ export function runTelemetry(inputs: RunTelemetryInputs): TelemetryRunOutcome {
     flags: sanitised.flags,
     projectRoot: inputs.projectRoot,
     endpoint: resolveTelemetryEndpoint(env),
+    ...(inputs.databaseTarget !== undefined ? { databaseTarget: inputs.databaseTarget } : {}),
   };
 
   try {
