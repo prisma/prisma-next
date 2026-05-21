@@ -2850,6 +2850,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:0.12.0
         version: link:../../1-framework/1-core/operations
+      '@prisma-next/sql-builder':
+        specifier: workspace:0.11.0
+        version: link:../4-lanes/sql-builder
       '@prisma-next/sql-contract':
         specifier: workspace:0.12.0
         version: link:../1-core/contract

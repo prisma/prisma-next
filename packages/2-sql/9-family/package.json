@@ -27,6 +27,7 @@
     "@prisma-next/sql-runtime": "workspace:0.12.0",
     "@prisma-next/sql-schema-ir": "workspace:0.12.0",
     "@prisma-next/utils": "workspace:0.12.0",
+    "@prisma-next/sql-builder": "workspace:0.11.0",
     "arktype": "^2.2.0"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "./control-adapter": "./dist/control-adapter.mjs",
     "./ir": "./dist/ir.mjs",
     "./migration": "./dist/migration.mjs",
+    "./operation-types": "./dist/operation-types.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",
