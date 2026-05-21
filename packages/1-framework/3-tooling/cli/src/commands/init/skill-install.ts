@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from './detect-package-manager';
@@ -127,6 +130,69 @@ export function formatClaudeSkillInstallCommand(pm: PackageManager, source: Skil
   return formatPackageManagerCommand(pm, args);
 }
 
+/**
+ * `skills add --all` should cover Windsurf, but upstream skips project-local
+ * Windsurf symlinks when `.windsurf/` does not already exist. Run the explicit
+ * Windsurf install when a Windsurf session or install is detected so skills land
+ * under `.windsurf/skills/` without asking users to create that folder first.
+ */
+export function formatWindsurfSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
+  const args = [
+    'skills@latest',
+    'add',
+    formatSkillSourceUrl(source),
+    '--agent',
+    'windsurf',
+    '--skill',
+    "'*'",
+    '-y',
+  ];
+  return formatPackageManagerCommand(pm, args);
+}
+
+function isTruthyEnvMarker(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  const normalised = raw.trim().toLowerCase();
+  if (normalised === '' || normalised === '0' || normalised === 'false') return false;
+  return true;
+}
+
+/**
+ * Best-effort Windsurf detection for project-level skill install. Matches the
+ * upstream `skills` CLI's Windsurf install probe and the `WINDSURF` session
+ * marker used elsewhere in the CLI toolchain.
+ */
+export function isWindsurfDetected(ctx: {
+  readonly baseDir: string;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly homeDir?: string;
+}): boolean {
+  const env = ctx.env ?? process.env;
+  if (isTruthyEnvMarker(env['WINDSURF'])) return true;
+  if (existsSync(join(ctx.baseDir, '.windsurf'))) return true;
+  const home = ctx.homeDir ?? homedir();
+  return existsSync(join(home, '.codeium', 'windsurf'));
+}
+
+/**
+ * Ordered skill-install commands for one init run. Exported for unit tests.
+ */
+export function resolveProjectSkillInstallCommands(
+  pm: PackageManager,
+  ctx: {
+    readonly baseDir: string;
+    readonly env?: NodeJS.ProcessEnv;
+    readonly homeDir?: string;
+  },
+): readonly string[] {
+  const windsurfDetected = isWindsurfDetected(ctx);
+  return DEFAULT_SKILL_SOURCES.flatMap((source) => [
+    formatSkillInstallCommand(pm, source),
+    formatClaudeSkillInstallCommand(pm, source),
+    ...(windsurfDetected ? [formatWindsurfSkillInstallCommand(pm, source)] : []),
+  ]);
+}
+
 function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {
   switch (pm) {
     case 'pnpm':
@@ -176,10 +242,9 @@ export async function runProjectLevelSkillInstall(ctx: {
   readonly filesWritten: readonly string[];
 }): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
   const commands: string[] = [];
-  const installCommands = DEFAULT_SKILL_SOURCES.flatMap((source) => [
-    formatSkillInstallCommand(ctx.pm, source),
-    formatClaudeSkillInstallCommand(ctx.pm, source),
-  ]);
+  const installCommands = resolveProjectSkillInstallCommands(ctx.pm, {
+    baseDir: ctx.baseDir,
+  });
 
   for (const command of installCommands) {
     const { file, args } = commandToExec(command);
