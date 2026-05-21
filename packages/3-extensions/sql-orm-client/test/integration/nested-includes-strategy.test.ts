@@ -362,7 +362,7 @@ describe('integration/nested-includes/strategy', () => {
   // need the gate.
   // ===========================================================================
 
-  describe('coexistence with TML-2595 (scalar/combine still on multi-query)', () => {
+  describe('coexistence with scalar/combine gate (still on multi-query)', () => {
     it(
       'top-level combine() stays on multi-query under lateral capabilities',
       async () => {
