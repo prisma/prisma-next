@@ -33,7 +33,7 @@ function debugLog(message: string, error?: unknown): void {
 }
 
 async function postEvent(payload: ParentToSenderPayload): Promise<void> {
-  const event = buildTelemetryEventFromProcess(payload);
+  const event = await buildTelemetryEventFromProcess(payload);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {

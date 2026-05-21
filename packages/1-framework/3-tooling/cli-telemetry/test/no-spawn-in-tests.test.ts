@@ -47,8 +47,6 @@ describe('test runs short-circuit the telemetry path', () => {
     const result = runTelemetry({
       command: commandInput,
       version: '0.9.0',
-      databaseTarget: 'postgres',
-      extensions: [],
       projectRoot: process.cwd(),
       senderPath: '/never/used',
       isCI: false,
@@ -61,8 +59,6 @@ describe('test runs short-circuit the telemetry path', () => {
     runTelemetry({
       command: commandInput,
       version: '0.9.0',
-      databaseTarget: 'postgres',
-      extensions: [],
       projectRoot: process.cwd(),
       senderPath: '/never/used',
       isCI: false,

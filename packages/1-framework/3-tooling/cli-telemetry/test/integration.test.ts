@@ -1,5 +1,5 @@
 import { fork } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
@@ -19,6 +19,14 @@ beforeAll(async () => {
   writeFileSync(
     join(projectDir, 'package.json'),
     JSON.stringify({ name: 'fixture', devDependencies: { typescript: '^5.9.3' } }),
+  );
+  // The detached child reads `prisma-next.config.*` via c12 to derive
+  // `databaseTarget` + `extensions`. The integration suite exercises
+  // the real c12 path; write a `.mjs` fixture (fastest c12 load) so the
+  // happy-path assertions on those fields stay end-to-end.
+  writeFileSync(
+    join(projectDir, 'prisma-next.config.mjs'),
+    `export default {\n  target: { targetId: 'postgres' },\n  extensionPacks: [{ id: 'pgvector' }, { id: 'paradedb' }],\n};\n`,
   );
 }, timeouts.spinUpPpgDev);
 
@@ -42,8 +50,6 @@ function buildPayload(overrides: Partial<ParentToSenderPayload> = {}): ParentToS
     version: '0.9.0',
     command: 'migration new',
     flags: ['name', 'dry-run'],
-    databaseTarget: 'postgres',
-    extensions: ['pgvector', 'paradedb'],
     projectRoot: projectDir,
     endpoint: `${harness.endpointBase}/events`,
     ...overrides,
@@ -198,12 +204,23 @@ describe('cli-telemetry end-to-end via telemetry backend', () => {
     expect(serialised).not.toMatch(/\/Users\/alice\/secrets/);
   });
 
-  it('round-trips a string[] of declared extension-pack ids verbatim', async () => {
-    await spawnSenderDirect(
-      buildPayload({ extensions: ['pgvector', 'paradedb', 'myorg-custom-ext'] }),
+  it('round-trips a string[] of declared extension-pack ids verbatim from prisma-next.config', async () => {
+    // Override the suite's shared fixture for this test so the child's
+    // c12 load resolves a different extension-pack set. Restored in
+    // the `finally` so the rest of the suite keeps seeing the default.
+    const configPath = join(projectDir, 'prisma-next.config.mjs');
+    const previous = readFileSync(configPath, 'utf-8');
+    writeFileSync(
+      configPath,
+      `export default {\n  target: { targetId: 'postgres' },\n  extensionPacks: [{ id: 'pgvector' }, { id: 'paradedb' }, { id: 'myorg-custom-ext' }],\n};\n`,
     );
-    const [row] = await harness.awaitRows(1);
-    expect(row?.extensions).toEqual(['pgvector', 'paradedb', 'myorg-custom-ext']);
+    try {
+      await spawnSenderDirect(buildPayload());
+      const [row] = await harness.awaitRows(1);
+      expect(row?.extensions).toEqual(['pgvector', 'paradedb', 'myorg-custom-ext']);
+    } finally {
+      writeFileSync(configPath, previous);
+    }
   });
 
   it('populates the agent field from the child env', async () => {

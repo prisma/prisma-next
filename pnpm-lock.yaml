@@ -1577,6 +1577,9 @@ importers:
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      c12:
+        specifier: ^3.3.4
+        version: 3.3.4(magicast@0.5.2)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3

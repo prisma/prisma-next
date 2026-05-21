@@ -70,17 +70,18 @@ const program = new Command();
 program.name('prisma-next').description('Prisma Next CLI').version(packageJson.version);
 
 // Telemetry hook — fires at command start, before the action body
-// runs. Every failure mode is swallowed inside `runTelemetry`; the
-// hook never throws and never blocks long enough to be perceptible.
-//
-// Fire-and-forget: `fireTelemetryFromPreAction` `await`s a c12 config
-// load before forking the sender, so awaiting it here would block the
-// command's action body behind telemetry. Use `void` to dispatch in
-// parallel; the existing `.catch(() => {})` keeps errors swallowed.
+// runs. Synchronous by construction: `fireTelemetryFromPreAction`
+// resolves gates (cheap), then `fork()`s the detached sender. The
+// fork is enqueued before the action body runs at all, so the child
+// survives even when the action throws synchronously. The try/catch
+// is defence-in-depth — `runTelemetry` already swallows every failure
+// mode internally and returns an outcome instead of throwing.
 program.hook('preAction', (_thisCommand, actionCommand) => {
-  void fireTelemetryFromPreAction(actionCommand).catch(() => {
+  try {
+    fireTelemetryFromPreAction(actionCommand);
+  } catch {
     // defence-in-depth — runTelemetry already swallows internally.
-  });
+  }
 });
 
 // Override version option description to match capitalization style
@@ -319,34 +320,19 @@ program.addCommand(refCommand);
 
 // Test-only hidden command used by `cli-telemetry`'s `cli-e2e.test.ts`
 // to verify that telemetry still lands when a CLI command crashes
-// mid-execution. The preAction hook fires the detached sender as
-// `void`-d work; the action body sleeps long enough for the sender to
-// fork before the throw kills the parent. Hidden from help;
-// underscore prefix marks it as internal. Doesn't depend on any
-// project state, so it runs in any tempdir.
+// mid-execution. The preAction hook is synchronous and `fork()`s the
+// detached sender before this action body runs; the small sleep
+// gives the IPC `child.send()` a tick to flush before the throw
+// triggers commander's `exitOverride` and `process.exit(1)`. Hidden
+// from help; underscore prefix marks it as internal. Doesn't depend
+// on any project state, so it runs in any tempdir.
 //
 // Gated behind `PRISMA_NEXT_ENABLE_TEST_COMMANDS=1` so the command is
 // not even registered (and therefore not invocable) in shipped
 // binaries. `hidden: true` only filters the help output; without this
 // env gate the command would still be callable from production. The
 // e2e suite sets the env var when it spawns the CLI.
-//
-// The sleep needs to comfortably exceed the worst-case wall-clock for
-// `fireTelemetryFromPreAction` to reach `child_process.fork()`. That
-// path is async — it awaits a c12 `loadConfig()` that walks the
-// project tree looking for `prisma-next.config.ts` — and on cold CI
-// containers the I/O can take 1–1.5s. 2000ms gives ~500ms of
-// headroom on top of that; locally it costs ~2s per crash-test case,
-// which the e2e suite is sized to absorb.
-//
-// A more invariant-respecting fix is to refactor
-// `fireTelemetryFromPreAction` to call `fork()` first and feed c12's
-// result into `child.send()` once both are ready — that would shrink
-// the race window to a single syscall and protect production users
-// against CLI commands that throw synchronously before any action
-// body runs. Tracked as a follow-up; out of scope for this PR's
-// close-out.
-const TELEMETRY_CRASH_TEST_SLEEP_MS = 2000;
+const TELEMETRY_CRASH_TEST_SLEEP_MS = 200;
 if (process.env['PRISMA_NEXT_ENABLE_TEST_COMMANDS'] === '1') {
   const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
     .description('Internal: deliberately throw for the telemetry e2e suite.')

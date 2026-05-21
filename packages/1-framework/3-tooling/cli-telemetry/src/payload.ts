@@ -2,11 +2,15 @@ import { type } from 'arktype';
 
 /**
  * Wire-shape payload the parent IPC-sends to the forked child sender.
- * Mirrors the fields the parent has naturally in hand at command start
- * (installation id, sanitised command + flags, CLI version, db target,
- * extension-pack ids, project root for TS-version lookup). The child
- * fills in the rest (runtime/os/arch, package manager, ts version,
- * agent) on its side.
+ * Mirrors only the fields the parent has naturally in hand at command
+ * start: installation id, sanitised command + flags, CLI version, and
+ * the project root the child uses to discover everything else. The
+ * child probes its own process (runtime/os/arch, package manager, ts
+ * version, agent) and reads the user's `prisma-next.config.*` via
+ * c12 to derive `databaseTarget` and `extensions` — keeping those
+ * fields off the wire eliminates the original c12-await-in-preAction
+ * race against synchronous parent crashes (see PR #556's design
+ * dialogue) at the cost of the child evaluating user TS config code.
  *
  * Both sides version-couple on this shape because the IPC carrier is
  * structured-cloned by Node and there's no on-wire compat to maintain.
@@ -16,9 +20,12 @@ export interface ParentToSenderPayload {
   readonly version: string;
   readonly command: string;
   readonly flags: readonly string[];
-  readonly databaseTarget: string | null;
-  readonly extensions: readonly string[];
-  /** Absolute path of the user's project. The child reads `<projectRoot>/package.json` for `tsVersion`. */
+  /**
+   * Absolute path of the user's project. The child reads
+   * `<projectRoot>/package.json` for `tsVersion` and loads
+   * `<projectRoot>/prisma-next.config.*` via c12 for `databaseTarget`
+   * + `extensions`.
+   */
   readonly projectRoot: string;
   /** Resolved endpoint URL (already includes the `/events` path). */
   readonly endpoint: string;
@@ -43,8 +50,6 @@ export const parentToSenderPayloadSchema = type({
   version: requiredString,
   command: requiredString,
   flags: stringArray,
-  databaseTarget: type.string.or('null'),
-  extensions: stringArray,
   projectRoot: requiredString,
   endpoint: requiredString,
 });

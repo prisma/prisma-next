@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
   readUserConfig,
@@ -9,19 +9,11 @@ import {
 import { Command } from 'commander';
 import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadConfig } from '../../src/config-loader';
 import { isCI } from '../../src/utils/is-ci';
 import {
   commanderSnapshotForTelemetry,
   fireTelemetryFromPreAction,
 } from '../../src/utils/telemetry';
-
-vi.mock('../../src/config-loader', () => ({
-  loadConfig: vi.fn(async () => ({
-    target: { targetId: 'postgres' },
-    extensionPacks: [{ id: 'pgvector' }],
-  })),
-}));
 
 vi.mock('../../src/utils/is-ci', () => ({
   isCI: vi.fn(() => false),
@@ -51,7 +43,6 @@ describe('CLI telemetry bridge', () => {
     delete process.env['DO_NOT_TRACK'];
     mkdirSync(dirname(userConfigPath()), { recursive: true });
     vi.mocked(isCI).mockReturnValue(false);
-    vi.mocked(loadConfig).mockClear();
   });
 
   afterEach(() => {
@@ -96,51 +87,37 @@ describe('CLI telemetry bridge', () => {
     ]);
   });
 
-  it('does not load project config when env opt-out disables telemetry', async () => {
+  it('returns gated-off without forking when env opt-out disables telemetry', () => {
     writeUserConfig({ enableTelemetry: true });
     process.env['PRISMA_NEXT_DISABLE_TELEMETRY'] = '1';
 
-    const outcome = await fireTelemetryFromPreAction(new Command('init'));
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
-    expect(loadConfig).not.toHaveBeenCalled();
     expect(readUserConfig().enableTelemetry).toBe(true);
   });
 
-  it('does not load project config when DO_NOT_TRACK disables telemetry', async () => {
+  it('returns gated-off without forking when DO_NOT_TRACK disables telemetry', () => {
     writeUserConfig({ enableTelemetry: true });
     process.env['DO_NOT_TRACK'] = '1';
 
-    const outcome = await fireTelemetryFromPreAction(new Command('init'));
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
-    expect(loadConfig).not.toHaveBeenCalled();
   });
 
-  it('does not load project config in CI', async () => {
+  it('returns ci without forking when isCI is true', () => {
     writeUserConfig({ enableTelemetry: true });
     vi.mocked(isCI).mockReturnValue(true);
 
-    const outcome = await fireTelemetryFromPreAction(new Command('init'));
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'ci' });
-    expect(loadConfig).not.toHaveBeenCalled();
   });
 
-  it('does not load project config while telemetry is default-off', async () => {
-    const outcome = await fireTelemetryFromPreAction(new Command('init'));
+  it('returns gated-off without forking while telemetry is default-off', () => {
+    const outcome = fireTelemetryFromPreAction(new Command('init'));
 
     expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
-    expect(loadConfig).not.toHaveBeenCalled();
-  });
-
-  it('loads project config after gates pass', async () => {
-    writeUserConfig({ enableTelemetry: true });
-    writeFileSync(userConfigPath(), JSON.stringify({ ...readUserConfig(), installationId: '' }));
-
-    const outcome = await fireTelemetryFromPreAction(new Command('init'));
-
-    expect(outcome).toEqual({ spawned: false, reason: 'gated-off' });
-    expect(loadConfig).toHaveBeenCalledOnce();
   });
 });

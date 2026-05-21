@@ -10,13 +10,7 @@ import {
 } from '@prisma-next/cli-telemetry';
 import type { Command } from 'commander';
 import { version as CLI_VERSION } from '../../package.json' with { type: 'json' };
-import { loadConfig } from '../config-loader';
 import { isCI } from './is-ci';
-
-interface TelemetryFields {
-  readonly databaseTarget: string | null;
-  readonly extensions: readonly string[];
-}
 
 type TelemetryGate =
   | { readonly enabled: true; readonly userConfig: UserConfig }
@@ -74,32 +68,6 @@ function resolveTelemetryGate(): TelemetryGate {
 }
 
 /**
- * Best-effort extraction of `databaseTarget` and `extensions` from the
- * project config. Loads via the same `c12`-backed loader the action
- * handlers use so we honour the same lookup rules. Every failure mode
- * (no config file, malformed config, async load reject) collapses to
- * `(null, [])` because telemetry is non-blocking and may fire for
- * commands that legitimately don't have a config (e.g. `init`).
- */
-async function loadConfigForTelemetry(): Promise<TelemetryFields> {
-  try {
-    const config = await loadConfig();
-    const target = config.target as { readonly targetId?: unknown } | undefined;
-    const databaseTarget =
-      target !== undefined && typeof target.targetId === 'string' ? target.targetId : null;
-    const extensionPacks = (config.extensionPacks ?? []) as ReadonlyArray<{
-      readonly id?: unknown;
-    }>;
-    const extensions = extensionPacks
-      .map((pack) => pack.id)
-      .filter((id): id is string => typeof id === 'string');
-    return { databaseTarget, extensions };
-  } catch {
-    return { databaseTarget: null, extensions: [] };
-  }
-}
-
-/**
  * Path to the compiled sender script inside `@prisma-next/cli-telemetry`'s
  * `dist/`. Resolved off this module's `import.meta.url` via the package
  * specifier `@prisma-next/cli-telemetry/sender`, so the consumer pays
@@ -109,16 +77,10 @@ function senderPath(): string {
   return fileURLToPath(new URL(import.meta.resolve('@prisma-next/cli-telemetry/sender')));
 }
 
-function fireTelemetryWithFields(
-  actionCommand: Command,
-  fields: TelemetryFields,
-  userConfig: UserConfig,
-): TelemetryRunOutcome {
+function fireTelemetry(actionCommand: Command, userConfig: UserConfig): TelemetryRunOutcome {
   return runTelemetry({
     command: commanderSnapshotForTelemetry(actionCommand),
     version: CLI_VERSION,
-    databaseTarget: fields.databaseTarget,
-    extensions: fields.extensions,
     projectRoot: process.cwd(),
     senderPath: senderPath(),
     isCI: isCI(),
@@ -128,21 +90,23 @@ function fireTelemetryWithFields(
 }
 
 /**
- * preAction-stage entry point: resolve env/CI/user-consent gates first,
- * then (only when enabled) load project config for database target and
- * extension metadata, then fork the detached sender. The early gate is
- * privacy- and UX-critical: config loading can execute user code and
- * must never happen before opt-out/default-off checks have resolved.
+ * preAction-stage entry point. Synchronous by construction: resolve
+ * env/CI/user-consent gates (cheap, all in-memory and a single tiny
+ * user-config read), then — only when enabled — `fork()` the detached
+ * sender script. The forked child loads `prisma-next.config.*` via
+ * c12 on its own (see `loadProjectConfig` in cli-telemetry); the
+ * parent does no project-config I/O on the command's hot path.
+ *
+ * Privacy invariant: gate resolution always happens before any project
+ * config touches disk. The child loading user TS code is acceptable
+ * only because it's gated behind the same resolved-enabled signal.
  */
-export async function fireTelemetryFromPreAction(
-  actionCommand: Command,
-): Promise<TelemetryRunOutcome> {
+export function fireTelemetryFromPreAction(actionCommand: Command): TelemetryRunOutcome {
   const gate = resolveTelemetryGate();
   if (!gate.enabled) {
     return gate.outcome;
   }
-  const fields = await loadConfigForTelemetry();
-  return fireTelemetryWithFields(actionCommand, fields, gate.userConfig);
+  return fireTelemetry(actionCommand, gate.userConfig);
 }
 
 /**
@@ -152,15 +116,14 @@ export async function fireTelemetryFromPreAction(
  * default-off. After consent is persisted, `runInit` calls this helper
  * exactly for that first affirmative answer; subsequent init runs skip
  * it because the prompt is not shown again.
+ *
+ * `databaseTarget` is no longer injected here: the detached child
+ * loads `prisma-next.config.*` itself, and the config file does not
+ * exist yet at the moment this fires (init creates it later in the
+ * same run). The first-init telemetry event therefore reports
+ * `databaseTarget: null`; subsequent invocations pick up the target
+ * via c12. Accepted as part of the PR #556 design refactor.
  */
-export function fireTelemetryAfterInitConsent(
-  actionCommand: Command,
-  inputs: { readonly databaseTarget: string },
-): TelemetryRunOutcome {
-  const userConfig = readUserConfig();
-  return fireTelemetryWithFields(
-    actionCommand,
-    { databaseTarget: inputs.databaseTarget, extensions: [] },
-    userConfig,
-  );
+export function fireTelemetryAfterInitConsent(actionCommand: Command): TelemetryRunOutcome {
+  return fireTelemetry(actionCommand, readUserConfig());
 }

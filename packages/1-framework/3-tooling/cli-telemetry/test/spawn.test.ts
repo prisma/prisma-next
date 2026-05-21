@@ -16,8 +16,6 @@ function makeInputs(overrides: Partial<RunTelemetryInputs> = {}): RunTelemetryIn
   return {
     command: commandInput,
     version: '0.9.0',
-    databaseTarget: 'postgres',
-    extensions: [],
     projectRoot: process.cwd(),
     senderPath: '/non/existent/path/never-forked.mjs',
     isCI: false,

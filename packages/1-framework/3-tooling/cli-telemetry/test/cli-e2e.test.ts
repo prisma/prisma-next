@@ -169,14 +169,7 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     expect(await harness.readRows()).toHaveLength(0);
   });
 
-  // `{ timeout: 8_000 }` accommodates the 2s sleep in
-  // `__telemetry-crash-test`'s action body (which exists to outlast the
-  // c12 `loadConfig()` walk so the detached sender's `fork()` reliably
-  // completes before the parent throws). A single spawn lands
-  // comfortably; the multi-spawn cases below get a 15s pin.
-  it('a CLI command with seeded consent emits one backend row carrying the stored installationId', {
-    timeout: 8_000,
-  }, async () => {
+  it('a CLI command with seeded consent emits one backend row carrying the stored installationId', async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
@@ -188,9 +181,7 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     expect(rows[0]?.command).toBe('__telemetry-crash-test');
   });
 
-  it('a second CLI invocation reusing the same XDG_CONFIG_HOME produces a second row sharing the installationId', {
-    timeout: 15_000,
-  }, async () => {
+  it('a second CLI invocation reusing the same XDG_CONFIG_HOME produces a second row sharing the installationId', async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
@@ -203,9 +194,7 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
     expect(rows[1]?.installationId).toBe(installationId);
   });
 
-  it('a CLI command that crashes after the preAction hook still results in a backend row', {
-    timeout: 15_000,
-  }, async () => {
+  it('a CLI command that crashes after the preAction hook still results in a backend row', async () => {
     const installationId = randomUUID();
     seedConsent(xdgDir, installationId);
 
@@ -214,11 +203,11 @@ describe('cli-telemetry e2e — real CLI binary against the real backend', () =>
       cwd: projectDir,
     });
 
-    // The hidden command sleeps long enough for the preAction-spawned
-    // detached sender to fork, then throws — so the parent always
-    // exits non-zero while the child outlives it. The detached
-    // sender's survival across the parent crash is the invariant
-    // under test.
+    // The hidden command throws synchronously after a tiny sleep that
+    // exists only to flush the parent's IPC send to the detached
+    // sender. The preAction hook has already `fork()`ed the child
+    // before this action body runs, so the child outlives the
+    // parent's crash — that's the invariant under test.
     expect(result.exitCode).not.toBe(0);
     const rows = await harness.awaitRowsForInstallation(installationId, 1);
     expect(rows[0]?.installationId).toBe(installationId);

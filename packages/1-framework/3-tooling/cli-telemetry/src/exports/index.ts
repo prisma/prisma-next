@@ -3,6 +3,8 @@ export {
   TELEMETRY_BACKEND_URL,
   TELEMETRY_ENDPOINT_PATH,
 } from '../endpoint';
+export type { ProjectConfigFields } from '../enrich';
+export { loadProjectConfig } from '../enrich';
 export type { GatingDisabledReason, GatingInputs, GatingResolution } from '../gating';
 export { resolveGating } from '../gating';
 export type { ParentToSenderPayload, TelemetryEvent } from '../payload';
