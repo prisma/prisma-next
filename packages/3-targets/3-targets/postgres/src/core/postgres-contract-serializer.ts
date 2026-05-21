@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import {
   SqlContractSerializerBase,
-  type SqlNamespaceSlotHydrationFactory,
+  type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
 import {
   type AuthoringEntityTypeNamespace,
@@ -12,11 +12,10 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  type SqlNamespaceTablesInput,
-  type SqlStorage,
+import type {
+  SqlNamespaceTablesInput,
+  SqlStorage,
   StorageTable,
-  type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { Type } from 'arktype';
@@ -25,26 +24,24 @@ import type { PostgresEnumType } from './postgres-enum-type';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 /**
- * Walks a pack's entity-type namespace tree and emits the
- * `storageSlotKey`-keyed maps the family base consumes — one map of
- * hydrators, one map of validator-schema fragments. Only descriptors
- * that declared a `storageSlotKey` participate in either map; the
- * corresponding `hydrate` / `validatorSchema` field is the seam.
+ * Walks a pack's entity-type namespace tree and emits the maps the
+ * family base consumes — hydrators and validator-schema fragments, both
+ * keyed by the descriptor's `discriminator`.
  */
 function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamespace): {
-  readonly slotRegistry: ReadonlyMap<string, SqlNamespaceSlotHydrationFactory>;
+  readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>;
   readonly validatorFragments: ReadonlyMap<string, Type<unknown>>;
 } {
-  const slotRegistry = new Map<string, SqlNamespaceSlotHydrationFactory>();
+  const entityTypeRegistry = new Map<string, SqlEntityHydrationFactory>();
   const validatorFragments = new Map<string, Type<unknown>>();
   const walk = (node: AuthoringEntityTypeNamespace): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
-        if (value.storageSlotKey !== undefined && value.hydrate !== undefined) {
-          slotRegistry.set(value.storageSlotKey, value.hydrate);
+        if (value.hydrate !== undefined) {
+          entityTypeRegistry.set(value.discriminator, value.hydrate as SqlEntityHydrationFactory);
         }
-        if (value.storageSlotKey !== undefined && value.validatorSchema !== undefined) {
-          validatorFragments.set(value.storageSlotKey, value.validatorSchema);
+        if (value.validatorSchema !== undefined) {
+          validatorFragments.set(value.discriminator, value.validatorSchema);
         }
         continue;
       }
@@ -54,25 +51,15 @@ function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamesp
     }
   };
   walk(namespace);
-  return { slotRegistry, validatorFragments };
+  return { entityTypeRegistry, validatorFragments };
 }
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
-    // Postgres has no storage-level codec-alias entities — the
-    // `storage.types` codec-triple slot is empty for Postgres
-    // contracts — so the kind-keyed entity registry stays empty.
-    // Per-namespace entity hydration and validation are derived from
-    // the pack's authoring contributions: every descriptor that
-    // declared a `storageSlotKey` + `hydrate` / `validatorSchema`
-    // wires its slot through the family-base registry. Slot key
-    // currently `'types'` (matches the slot enum entries flow through
-    // today); renames to `'postgresEnums'` when the storage shape
-    // migration lands — the registry surface stays identical.
-    const { slotRegistry, validatorFragments } = collectEntityRegistryContributions(
+    const { entityTypeRegistry, validatorFragments } = collectEntityRegistryContributions(
       postgresAuthoringEntityTypes,
     );
-    super(new Map(), slotRegistry, validatorFragments);
+    super(entityTypeRegistry, validatorFragments);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -82,21 +69,12 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const obj = raw as {
-      id?: string;
-      tables?: Record<string, unknown>;
-      types?: Record<string, unknown>;
+    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as {
+      id: string;
+      tables: Readonly<Record<string, StorageTable>>;
+      types?: Readonly<Record<string, PostgresEnumType>>;
     };
-    const id = obj.id ?? nsId;
-    const tables = Object.fromEntries(
-      Object.entries(obj.tables ?? {}).map(([tableName, table]) => [
-        tableName,
-        table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
-      ]),
-    );
-    const hydratedNsTypes = this.hydrateNamespaceSlot('types', obj) as
-      | Record<string, PostgresEnumType>
-      | undefined;
+    const { id, tables, types: hydratedNsTypes } = hydrated;
 
     const emptyTables = Object.keys(tables).length === 0;
     const emptyTypes = !hydratedNsTypes || Object.keys(hydratedNsTypes).length === 0;
