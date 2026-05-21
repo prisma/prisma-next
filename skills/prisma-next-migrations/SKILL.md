@@ -42,8 +42,8 @@ Once the contract changes, you choose how the change reaches the database. This 
   - `end-contract.json` and `end-contract.d.ts` — the contract this migration ends at, imported by `migration.ts` for type-safe data transforms.
   - `migration.ts` — TypeScript authoring source, **framework-rendered** by `migration plan` (or `migration new`). You edit specific holes in it (see *Fill a placeholder* below) and re-emit `ops.json` / `migration.json` by running it.
 - **Self-emit.** Running `node migrations/app/<dir>/migration.ts` regenerates `ops.json` and `migration.json` from the (possibly edited) TS source. This is the only supported way to update an existing migration package after edits.
-- **`migration.ts` shape.** Framework-rendered. A class extending `Migration` (from `@prisma-next/family-mongo/migration` on Mongo, or re-exported via `@prisma-next/target-postgres/migration` on Postgres — see the framing block below), with an `operations` getter that returns an array of factory-call values. The file ends with `MigrationCLI.run(import.meta.url, M)` so executing it self-emits.
-- **`placeholder(slot)`.** A sentinel the planner emits into the rendered `migration.ts` (from `@prisma-next/errors/migration` on Mongo, or the target-postgres migration import on Postgres) wherever a data transform is needed. Calling `placeholder(...)` at emit time throws `PN-MIG-2001` *Unfilled migration placeholder*. The user replaces the `() => placeholder(...)` arrow with a real query-plan closure (Postgres) or fills `dataTransform({ check, run })` sources (Mongo — see *Fill a placeholder*), then self-emits.
+- **`migration.ts` shape.** Framework-rendered. A class extending `Migration` (from `@prisma-next/family-mongo/migration` on Mongo, or re-exported via `@prisma-next/postgres/migration` on Postgres — see the framing block below), with an `operations` getter that returns an array of factory-call values. The file ends with `MigrationCLI.run(import.meta.url, M)` so executing it self-emits.
+- **`placeholder(slot)`.** A sentinel the planner emits into the rendered `migration.ts` (from `@prisma-next/errors/migration` on Mongo, or the `@prisma-next/postgres/migration` import on Postgres) wherever a data transform is needed. Calling `placeholder(...)` at emit time throws `PN-MIG-2001` *Unfilled migration placeholder*. The user replaces the `() => placeholder(...)` arrow with a real query-plan closure (Postgres) or fills `dataTransform({ check, run })` sources (Mongo — see *Fill a placeholder*), then self-emits.
 - **`this.dataTransform(endContract, name, { check, run })`.** The data-transform factory. `check` is a rowset query whose presence-of-any-row signals "work remains"; `run` is one or more mutation queries that perform the backfill. Both are lazy closures returning query-plans built against `endContract`. The runner wraps `check` as `EXISTS(...)` for precheck and `NOT EXISTS(...)` for postcheck, so the same closure asserts both "there is work" and "the work is done".
 - **`pendingPlaceholders`.** A boolean field on the JSON result of `migration plan`. `true` means the package was written but contains unfilled placeholders — `migrate` will throw `PN-MIG-2001` until you edit `migration.ts` and self-emit.
 - **`migrationHash`.** Content-addressed identity of a migration package. `MIGRATION.HASH_MISMATCH` fires when the stored hash in `migration.json` disagrees with the hash recomputed from the on-disk files (almost always: someone edited `migration.ts` without self-emitting).
@@ -55,14 +55,14 @@ Once the contract changes, you choose how the change reaches the database. This 
 
 Files under `migrations/<space-id>/<timestamp>/migration.ts` (for your own app, `<space-id>` is always `app/`) are **rendered for you** by the framework — `prisma-next migration plan` writes a populated package whenever the contract changes, and `prisma-next migration new` writes an empty scaffold when you want to author operations directly. You do not write these files from scratch. You edit specific holes the framework leaves behind — chiefly replacing `placeholder("<slot>")` sentinels (Postgres) or filling `dataTransform({ check, run })` pipeline slots (Mongo) — then self-emit.
 
-**Postgres** rendered imports point at `@prisma-next/target-postgres/migration`. The user-facing `@prisma-next/postgres` façade does **not** currently re-export this surface, so the rendered import deliberately reaches into the target package directly. Linear ticket [TML-2526](https://linear.app/prisma-company/issue/TML-2526) tracks closing that gap; once it lands, the renderer (and this skill) will switch to `@prisma-next/postgres/migration` in one step.
+**Postgres** rendered imports point at `@prisma-next/postgres/migration` (or `@prisma-next/sqlite/migration` for SQLite projects).
 
 **Mongo** rendered imports use `@prisma-next/family-mongo/migration` for the `Migration` base class and `@prisma-next/target-mongo/migration` for operation factories (`createIndex`, `dataTransform`, …). `MigrationCLI` comes from `@prisma-next/cli/migration-cli`.
 
-Until the Postgres façade gap closes, treat the rendered import lines as framework-managed on both targets:
+Treat the rendered import lines as framework-managed on both targets:
 
 - Leave them where they are. Don't rewrite them to a different `@prisma-next/<…>` path; the framework's renderer is the authoritative shape and any change you make by hand will be reverted (and may trip `MIGRATION.HASH_MISMATCH`) the next time the package is re-rendered or self-emitted.
-- If you need an additional factory symbol, **add it to the existing rendered import line** (Postgres: `@prisma-next/target-postgres/migration`; Mongo: `@prisma-next/target-mongo/migration`) rather than introducing a second import from a different `@prisma-next/...` subpath.
+- If you need an additional factory symbol, **add it to the existing rendered import line** (Postgres: `@prisma-next/postgres/migration`; Mongo: `@prisma-next/target-mongo/migration`) rather than introducing a second import from a different `@prisma-next/...` subpath.
 - The "user code imports only from `@prisma-next/<target>`" convention applies to *your* own modules (queries, runtime setup, contract authoring). The framework-rendered `migration.ts` scaffold is the framework's surface, not yours; the rule is suspended for that one file.
 
 ## Diagnostic codes you route on
@@ -157,7 +157,7 @@ The scaffold the planner emits looks like:
 ```typescript
 // migrations/app/20260515T1200_add_user_name/migration.ts
 import endContract from './end-contract.json' with { type: 'json' };
-import { Migration, MigrationCLI, addColumn, placeholder } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI, addColumn, placeholder } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
   override get operations() {
@@ -181,11 +181,11 @@ MigrationCLI.run(import.meta.url, M);
 
 Replace both `placeholder(...)` calls with query-plan closures built from `endContract`. The `check` closure must return a **rowset query whose presence of any row signals "work remains"** — conventionally `<table>.select('id').where(<violation predicate>).limit(1)`. Scalar/aggregate shapes (`count(*)`, `bool_and(...)`) silently break the contract: the runner wraps `check` twice (`EXISTS(...)` for precheck, `NOT EXISTS(...)` for postcheck), and a query that always returns one row makes `EXISTS` always true and `NOT EXISTS` always false.
 
-Build the query builder against `endContract` so the storage hashes line up — using a different contract reference raises `PN-MIG-2005`. The filled-in shape (the rendered scaffold above with `placeholder(...)` calls replaced; if you need an extra factory like `setNotNull`, add it to the *existing* `@prisma-next/target-postgres/migration` import line rather than authoring a second import). See `prisma-next-queries` for the surrounding `db` setup:
+Build the query builder against `endContract` so the storage hashes line up — using a different contract reference raises `PN-MIG-2005`. The filled-in shape (the rendered scaffold above with `placeholder(...)` calls replaced; if you need an extra factory like `setNotNull`, add it to the *existing* `@prisma-next/postgres/migration` import line rather than authoring a second import). See `prisma-next-queries` for the surrounding `db` setup:
 
 ```typescript
 import endContract from './end-contract.json' with { type: 'json' };
-import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/postgres/migration';
 import { db } from './db'; // sql({ context: createExecutionContext({ contract: endContract, ... }) })
 
 export default class M extends Migration {
@@ -274,7 +274,7 @@ The concept: the same `Migration` class shape lets you author operations directl
 pnpm prisma-next migration new --name <snake_slug>
 ```
 
-Add factory names to the framework-rendered import line for your target (Postgres: `@prisma-next/target-postgres/migration`; Mongo: `@prisma-next/target-mongo/migration`). Browse with `--help` and the import list the renderer emitted.
+Add factory names to the framework-rendered import line for your target (Postgres: `@prisma-next/postgres/migration`; Mongo: `@prisma-next/target-mongo/migration`). Browse with `--help` and the import list the renderer emitted.
 
 **Postgres** factories (representative set):
 
@@ -413,7 +413,7 @@ In non-interactive contexts (CI, `--no-interactive`, `--json`), the destructive-
 6. **Aggregate `check` closure in Postgres `this.dataTransform`.** Returning `count(*)` or `bool_and(...)` breaks the precheck/postcheck contract — both sides resolve to constants. Use a rowset shape: `select('id').where(<violation>).limit(1)`.
 7. **Two contract references in one migration.** Building a query plan against a different contract than the one passed to `this.dataTransform(endContract, ...)` raises `PN-MIG-2005`. Always import `endContract` once at module scope and use the same reference.
 8. **Renaming and expecting the planner to detect it (Postgres).** Prisma Next has no in-contract rename hint today; the planner emits a destructive drop+add. Hand-edit `migration.ts` to rewrite the destructive op as a `rawSql({ ... })` that issues `ALTER TABLE ... RENAME COLUMN ...` (or use the two-migration keep / backfill / drop pattern), then self-emit. See `prisma-next-contract` § *Edit a field — rename*.
-9. **Hand-authoring `migration.ts` from a blank file, or rewriting the rendered import line.** Migration files are framework-rendered — let `prisma-next migration plan` (or `migration new`) render the package, then edit only the holes the framework leaves for you. On Postgres the rendered `@prisma-next/target-postgres/migration` import is framework-managed (TML-2526 tracks moving it to `@prisma-next/postgres/migration`); on Mongo use `@prisma-next/family-mongo/migration` + `@prisma-next/target-mongo/migration` as rendered. Leave paths alone and add symbols to the existing factory import line.
+9. **Hand-authoring `migration.ts` from a blank file, or rewriting the rendered import line.** Migration files are framework-rendered — let `prisma-next migration plan` (or `migration new`) render the package, then edit only the holes the framework leaves for you. On Postgres leave the rendered `@prisma-next/postgres/migration` (or `@prisma-next/sqlite/migration`) import path alone; on Mongo use `@prisma-next/family-mongo/migration` + `@prisma-next/target-mongo/migration` as rendered. Add symbols to the existing factory import line rather than introducing new import paths.
 
 ## What Prisma Next doesn't do yet
 
@@ -421,8 +421,6 @@ In non-interactive contexts (CI, `--no-interactive`, `--json`), the destructive-
 - **Seeds-as-first-class.** Prisma Next doesn't ship a `prisma db seed` equivalent. Workaround: write a TypeScript script that imports your `db` instance and runs your setup queries; invoke it from `package.json`'s scripts. If you need first-class seeding, file a feature request via the `prisma-next-feedback` skill.
 - **Migration squashing.** Prisma Next doesn't squash older migrations into a baseline. They accumulate; for very large histories, manual baseline-and-truncate is the path. If you need built-in squashing, file a feature request via the `prisma-next-feedback` skill.
 - **In-contract rename hints.** The planner cannot detect that a field rename is a rename rather than a drop+add. Workaround: hand-edit `migration.ts` to issue a `RENAME COLUMN` via `rawSql(...)`, or use a keep / backfill / drop pattern across two migrations. If you need a contract-level rename hint, file a feature request via the `prisma-next-feedback` skill.
-- **`@prisma-next/postgres` façade re-export of the migration surface.** The `@prisma-next/postgres` package does not yet re-export the migration authoring API (`Migration`, `MigrationCLI`, `placeholder`, `addColumn`, `setNotNull`, `dataTransform`, …). The framework-rendered `migration.ts` therefore imports from `@prisma-next/target-postgres/migration` directly. Workaround: leave the rendered import where it is — it works, it is what the framework emits, and rewriting it breaks `migrationHash` round-tripping. Linear ticket [TML-2526](https://linear.app/prisma-company/issue/TML-2526) tracks closing the gap; once it lands, the renderer will switch and existing files can be migrated by re-running the renderer. If this gap is biting you, file a follow-up via the `prisma-next-feedback` skill referencing TML-2526.
-
 ## Checklist
 
 - [ ] Contract emitted (`contract.json` + `contract.d.ts` current).
