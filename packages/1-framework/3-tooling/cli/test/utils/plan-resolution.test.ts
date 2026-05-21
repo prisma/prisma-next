@@ -7,6 +7,7 @@ import type { ContractIR } from '@prisma-next/migration-tools/refs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertFromIsGraphNode,
+  looksLikeFullHash,
   type ResolveFromForPlanInput,
   resolveFromForPlan,
 } from '../../src/utils/plan-resolution';
@@ -197,6 +198,36 @@ describe('resolveFromForPlan', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expectRefuse(result.failure, 'MIGRATION.HASH_NOT_IN_GRAPH', '--from');
+    }
+  });
+
+  it('refuses forgot-the-flag for explicit full hash not in graph on non-empty graph', async () => {
+    const bundles = [makePkg(E, HASH_A, 'm1')];
+    const graph = reconstructGraph(bundles);
+    mocks.readRefs.mockResolvedValue({ tip: { hash: HASH_A, invariants: [] } });
+
+    const result = await resolveFromForPlan(
+      baseInput({ bundles, graph, optionsFrom: HASH_ORPHAN }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expectRefuse(result.failure, 'MIGRATION.HASH_NOT_IN_GRAPH', '--from tip');
+    }
+    expect(looksLikeFullHash(HASH_ORPHAN)).toBe(true);
+  });
+
+  it('refuses snapshot-missing for explicit full hash not in graph on empty graph', async () => {
+    mocks.readRefs.mockResolvedValue({});
+
+    const graph = reconstructGraph([]);
+    const result = await resolveFromForPlan(
+      baseInput({ bundles: [], graph, optionsFrom: HASH_ORPHAN }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expectRefuse(result.failure, 'MIGRATION.SNAPSHOT_MISSING', HASH_ORPHAN);
     }
   });
 

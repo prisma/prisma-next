@@ -22,6 +22,12 @@ import {
   mapRefResolutionError,
 } from './cli-errors';
 
+const FULL_HASH_PATTERN = /^sha256:([0-9a-f]{64}|empty)$/;
+
+export function looksLikeFullHash(input: string): boolean {
+  return FULL_HASH_PATTERN.test(input);
+}
+
 export type FromResolution =
   | { kind: 'greenfield'; fromHash: null; fromContract: null }
   | { kind: 'graph-node'; fromHash: string; fromContract: Contract; sourceDir: string }
@@ -234,6 +240,14 @@ export async function resolveFromForPlan(
 
   const refResult = parseContractRef(optionsFrom, { graph, refs });
   if (!refResult.ok) {
+    if (looksLikeFullHash(optionsFrom)) {
+      const empty = graphIsEmpty(input.bundles);
+      const graphTip = findLatestMigration(graph)?.to ?? null;
+      if (empty) {
+        return notOk(errorSnapshotMissing(optionsFrom, { viaRef: false }));
+      }
+      return notOk(errorPlanForgotTheFlag(optionsFrom, getReachableRefs(refs, graph), graphTip));
+    }
     return notOk(mapRefResolutionError(refResult.failure));
   }
 
