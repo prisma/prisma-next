@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Phase 1 of the CLI Telemetry project has landed (Linear ticket `TML-2557`); [`docs/Telemetry.md`](../../Telemetry.md) is the user-facing reference for the installation ID's lifecycle and the consent surface this ADR scopes. This ADR scopes only the CLI usage telemetry installation identifier; it does not concern the existing runtime telemetry surface in [ADR 024 — Telemetry Schema](./ADR%20024%20-%20Telemetry%20Schema.md), which is an internal query-execution observability SPI with no client-stored identifier.
+Accepted. CLI telemetry is implemented as described in [`docs/Telemetry.md`](../../Telemetry.md), which is the user-facing reference for the installation ID's lifecycle and the consent surface this ADR scopes. This ADR scopes only the CLI usage telemetry installation identifier; it does not concern the existing runtime telemetry surface in [ADR 024 — Telemetry Schema](./ADR%20024%20-%20Telemetry%20Schema.md), which is an internal query-execution observability SPI with no client-stored identifier.
 
 ## At a glance
 
