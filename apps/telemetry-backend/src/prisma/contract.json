@@ -211,8 +211,7 @@
               "id": {
                 "codecId": "pg/int8@1",
                 "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
+                  "kind": "autoincrement"
                 },
                 "nativeType": "int8",
                 "nullable": false
@@ -221,7 +220,7 @@
                 "codecId": "pg/timestamptz@1",
                 "default": {
                   "expression": "now()",
-                  "kind": "function"
+                  "kind": "expression"
                 },
                 "nativeType": "timestamptz",
                 "nullable": false
@@ -280,7 +279,7 @@
         }
       }
     },
-    "storageHash": "sha256:41700ef5fda97339b39ea345a56aae72a1ff4be11ddc3ffcab7130bfc71c109d"
+    "storageHash": "sha256:8f73b933408b7f9c5a640c9e66325d74cdafe006ca933103dcf5fbc528cb08a8"
   },
   "capabilities": {
     "postgres": {
