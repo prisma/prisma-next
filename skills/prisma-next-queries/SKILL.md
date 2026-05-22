@@ -1,6 +1,18 @@
 ---
 name: prisma-next-queries
-description: Write Prisma Next queries for Postgres or Mongo — pick a lane (Postgres `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>` + `db.query.from(...)` pipeline builder), filter / project / sort / paginate, eager-load with `.include(...)`, Postgres `db.transaction(...)`, Postgres ORM `.aggregate(...)`, Mongo aggregations via query builder. Triggers: query, where, match, select, project, orderBy, take, skip, include, lookup, first, all, count, aggregate, group, create, update, delete, upsert, returning, transaction, db.close, script teardown, variant, polymorphism, drizzle-style, kysely-style. Notes: `.all()` is a Thenable (just `await` it), iterators are single-use (`RUNTIME.ITERATOR_CONSUMED`), Postgres `count` is `number` while sum/avg/min/max are `number | null`, ranges use chained `.where()` or `and(...)` (no `.between(...)`).
+description: >-
+  Write Prisma Next queries for Postgres or Mongo — pick a lane (Postgres
+  `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>` +
+  `db.query.from(...)` pipeline builder), filter / project / sort / paginate,
+  eager-load with `.include(...)`, Postgres `db.transaction(...)`, Postgres ORM
+  `.aggregate(...)`, Mongo aggregations via query builder. Triggers: query,
+  where, match, select, project, orderBy, take, skip, include, lookup, first,
+  all, count, aggregate, group, create, update, delete, upsert, returning,
+  transaction, db.close, script teardown, variant, polymorphism, drizzle-style,
+  kysely-style. Notes: `.all()` is a Thenable (just `await` it), iterators are
+  single-use (`RUNTIME.ITERATOR_CONSUMED`), Postgres `count` is `number` while
+  sum/avg/min/max are `number | null`, ranges use chained `.where()` or
+  `and(...)` (no `.between(...)`).
 ---
 
 # Prisma Next — Queries
