@@ -64,10 +64,21 @@ The on-disk migrations form a directed graph: **nodes are contract hashes; edges
 | `MIGRATION.DATABASE_BEHIND` | info | Marker is an ancestor of the destination; N pending edges in between. | `migrate --to <name> --db $URL`. |
 | `MIGRATION.INVARIANTS_PENDING` | info | Marker reached destination structurally but missing required invariants the ref declares. | `migrate --to <name> --db $URL` to take a path that covers them. |
 | `MIGRATION.NO_MARKER` | warn | Online, but the database has no marker row — never initialised. | `migrate --db $URL` (first apply writes the marker). |
-| `MIGRATION.MARKER_NOT_IN_HISTORY` | warn | Online; marker hash is not a node in the graph. The database was changed outside the migration system. | Decide which side is truth: `db sign` (accept DB as truth), `db update` (push contract to DB), `contract infer` (re-derive contract from DB), or `db verify` (inspect first). |
+| `MIGRATION.MARKER_NOT_IN_HISTORY` | warn | Online; marker hash is not a node in the graph. The database was changed outside the migration system. | Decide which side is truth: `db sign` (accept DB as truth), `db update` (push contract to DB), `contract infer` (re-derive contract from DB), or `db verify` (inspect first). **Not** the same as `MIGRATION.MARKER_MISMATCH`: `MARKER_NOT_IN_HISTORY` is emitted during the runner's graph walk when the live marker is off the path being traversed; `MARKER_MISMATCH` fires earlier, at the CLI pre-DDL gate, when the marker hash is not a graph node at all. |
 | `MIGRATION.DIVERGED` | warn | Multiple valid leaves; the destination is ambiguous. | Pass `--to <name>`, or `ref set <name> <hash>` to create one. |
 | `CONTRACT.AHEAD` | warn | Contract head is not in the graph — the contract was edited without re-planning. | `migration plan` to extend the graph. |
 | `CONTRACT.UNREADABLE` | warn | `contract.json` couldn't be read. | `contract emit` to regenerate it. |
+
+### Plan- and apply-time diagnostics
+
+These codes surface on `migration plan`, `ref set`, and `migrate` — not on `migration status`. See [Migration System § Recovery affordances](docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances) and [ADR 218](docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md).
+
+| Code | When | Meaning | Next move |
+|---|---|---|---|
+| `MIGRATION.HASH_NOT_IN_GRAPH` | `migration plan` (non-empty graph) or `ref set` | Resolved hash is not a node in the on-disk migration graph — typical when the default `db` ref points past the graph tip after dev-only `db update` cycles. | `migration plan --from <reachable-ref>` (e.g. `--from production`); or realign the ref with `ref set db <graph-node-hash>`. |
+| `MIGRATION.SNAPSHOT_MISSING` | `migration plan` | Ref pointer exists but paired snapshot files (`<name>.contract.json`) are absent. | `db update --advance-ref <name>` to repopulate, or `ref delete <name>` to clear the orphan pointer. |
+| `MIGRATION.MARKER_MISMATCH` | `migrate` (pre-DDL, before the runner) | Live DB marker hash is not a graph node — drift the offline planner cannot see. | `migration plan --from <graph-tip>` if the marker is canonical; `ref set db <marker-hash>` if the on-disk graph is canonical; investigate out-of-band applies. |
+| `MIGRATION.PATH_UNREACHABLE` | `migrate` (path resolution) | No migration path from the current marker to the resolved target in the on-disk graph. | Read the improved `fix` payload — it names `fromHash` / `targetHash` and suggests `migration plan --from <from> --to <target>`; run `migration list` to inspect the graph. |
 
 A CI gate should read `diagnostics` from `--json` output and decide based on `severity` plus `code`; see *Workflow — CI* below for the structure.
 
