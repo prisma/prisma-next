@@ -93,30 +93,35 @@ describe('capability contribution at authoring time', () => {
     });
   });
 
-  it('layers author-declared capabilities last so they can override pack defaults', () => {
-    const contract = buildOneModelContract({
+  it('rejects an author-supplied `capabilities` block at the type level', () => {
+    // Negative-type assertion: the `defineContract` input shape no longer
+    // accepts a `capabilities` field. Capabilities flow exclusively through
+    // component descriptors (target / extension packs at build time;
+    // adapter / driver at CLI emit time). Passing the field is a TS error.
+    buildOneModelContract({
       family: sqlFamilyPack,
-      target: targetWithCapabilities,
-      capabilities: {
-        sql: { returning: false },
-        postgres: { jsonAgg: true },
-      },
-    });
-
-    expect(contract.capabilities).toEqual({
-      sql: { returning: false, defaultInInsert: true },
-      postgres: { lateral: true, jsonAgg: true },
+      target: bareTargetPack,
+      // @ts-expect-error — `capabilities` was removed from the `defineContract` input.
+      capabilities: { postgres: { lateral: true } },
     });
   });
 
-  it('does not leak SQL-named defaults into bare targets', () => {
-    const contract = buildOneModelContract({
+  it('produces a stable `hash({})` profile hash for every contract', () => {
+    // With the author input gone, `profileHash` (which still fingerprints
+    // `definition.capabilities`) collapses to the empty-input hash on every
+    // contract regardless of which packs are wired in.
+    const bare = buildOneModelContract({
       family: sqlFamilyPack,
       target: bareTargetPack,
-      capabilities: { postgres: { lateral: true } },
     });
-
-    expect(contract.capabilities).toEqual({ postgres: { lateral: true } });
-    expect(contract.capabilities['sql']).toBeUndefined();
+    const decorated = buildOneModelContract({
+      family: sqlFamilyPack,
+      target: targetWithCapabilities,
+      extensionPacks: { pgvector: extensionWithCapabilities },
+    });
+    expect(bare.profileHash).toEqual(decorated.profileHash);
+    expect(bare.profileHash).toEqual(
+      'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e',
+    );
   });
 });

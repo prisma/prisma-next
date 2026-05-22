@@ -53,7 +53,6 @@ type ContractDefinition<
   Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
   Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
@@ -65,7 +64,6 @@ type ContractDefinition<
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
-  readonly capabilities?: Capabilities;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly types?: Types;
@@ -77,7 +75,6 @@ type ContractScaffold<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
@@ -89,7 +86,6 @@ type ContractScaffold<
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
-  readonly capabilities?: Capabilities;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
   readonly codecLookup?: CodecLookup;
@@ -305,7 +301,6 @@ export function defineContract<
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
-  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
@@ -317,7 +312,6 @@ export function defineContract<
     Types,
     Models,
     ExtensionPacks,
-    Capabilities,
     Naming,
     StorageHash,
     ForeignKeyDefaults,
@@ -330,7 +324,6 @@ export function defineContract<
     Types,
     Models,
     ExtensionPacks,
-    Capabilities,
     Naming,
     StorageHash,
     ForeignKeyDefaults,
@@ -348,7 +341,6 @@ export function defineContract<
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
-  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
@@ -358,7 +350,6 @@ export function defineContract<
     Family,
     Target,
     ExtensionPacks,
-    Capabilities,
     Naming,
     StorageHash,
     ForeignKeyDefaults,
@@ -372,7 +363,6 @@ export function defineContract<
     Types,
     Models,
     ExtensionPacks,
-    Capabilities,
     Naming,
     StorageHash,
     ForeignKeyDefaults,

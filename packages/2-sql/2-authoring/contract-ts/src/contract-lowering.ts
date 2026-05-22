@@ -708,7 +708,6 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
   return {
     target: definition.target,
     ...(definition.extensionPacks ? { extensionPacks: definition.extensionPacks } : {}),
-    ...(definition.capabilities ? { capabilities: definition.capabilities } : {}),
     ...(definition.storageHash ? { storageHash: definition.storageHash } : {}),
     ...(definition.foreignKeyDefaults ? { foreignKeyDefaults: definition.foreignKeyDefaults } : {}),
     ...(Object.keys(collection.storageTypes).length > 0

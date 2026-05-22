@@ -1209,7 +1209,6 @@ export type ContractInput<
     >
   > = Record<never, never>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
@@ -1217,7 +1216,6 @@ export type ContractInput<
   readonly naming?: NamingConfig;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
-  readonly capabilities?: Capabilities;
   /**
    * Declared namespace coordinates the contract recognises. Per-model
    * `namespace` references must reference an entry in this list (or the

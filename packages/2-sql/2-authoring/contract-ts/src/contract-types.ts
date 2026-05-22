@@ -69,12 +69,6 @@ type DefinitionExtensionPacks<Definition> = Definition extends {
   ? Packs
   : Record<never, never>;
 
-type DefinitionCapabilities<Definition> = Definition extends {
-  readonly capabilities?: infer Capabilities extends Record<string, Record<string, boolean>>;
-}
-  ? Capabilities
-  : undefined;
-
 type ExtractPackCapabilities<P> = P extends {
   readonly capabilities?: infer Caps extends Record<string, Record<string, boolean>>;
 }
@@ -94,14 +88,16 @@ type MergeExtensionPackCapabilities<Packs> =
 
 type Defaulted<T, Fallback> = [T] extends [never] ? Fallback : T;
 
+// Build-time capability derivation no longer reads an author-declared
+// `capabilities` block — that field was removed from the `defineContract`
+// input. The build-time matrix is the merge of the target pack's caps and
+// every extension pack's caps; adapter and driver caps are layered in by
+// `enrichContract` at CLI emit time.
 type DerivedCapabilities<Definition> = Defaulted<
   ExtractPackCapabilities<DefinitionTarget<Definition>>,
   Record<string, never>
 > &
-  MergeExtensionPackCapabilities<DefinitionExtensionPacks<Definition>> &
-  (DefinitionCapabilities<Definition> extends Record<string, Record<string, boolean>>
-    ? DefinitionCapabilities<Definition>
-    : Record<string, never>);
+  MergeExtensionPackCapabilities<DefinitionExtensionPacks<Definition>>;
 
 type DefinitionTargetId<Definition> = Definition extends {
   readonly target: TargetPackRef<'sql', infer Target>;
