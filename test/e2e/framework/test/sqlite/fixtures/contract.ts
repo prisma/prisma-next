@@ -59,16 +59,6 @@ const Item = model('Item', {
 }).sql({ table: 'items' });
 
 export const contract = defineContract({
-  capabilities: {
-    sql: {
-      lateral: false,
-      returning: true,
-      jsonAgg: true,
-      enums: false,
-      foreignKeys: true,
-      autoIndexesForeignKeys: false,
-    },
-  },
   models: {
     User: User.relations({
       posts: rel.hasMany(Post, { by: 'userId' }),

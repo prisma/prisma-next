@@ -14,17 +14,6 @@ export const contract = defineContract(
     target: postgresPack,
     namespaces: ['public'],
     extensionPacks: [supabasePack],
-    capabilities: {
-      postgres: {
-        returning: true,
-        'defaults.uuidv4': true,
-        'defaults.now': true,
-        // No capability flag for RLS — target presence is the gate.
-        // The Postgres pack carries RLS support; pack-aware typing makes
-        // `.rls(...)` visible on ContractModelBuilder only for Postgres.
-        // (See design-holes #1.)
-      },
-    },
   },
   ({ field, model }) => {
     const Profile = model('Profile', {

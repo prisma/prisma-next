@@ -5,12 +5,6 @@ import { defineContract } from '@prisma-next/postgres/contract-builder';
 export const contract = defineContract(
   {
     extensionPacks: { paradedb },
-    capabilities: {
-      postgres: {
-        lateral: true,
-        'paradedb/bm25': true,
-      },
-    },
   },
   ({ field, model }) => {
     const Item = model('Item', {
