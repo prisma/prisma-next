@@ -219,7 +219,7 @@ Self-emit regenerates `ops.json` and recomputes `migrationHash` in `migration.js
 
 ### Mongo
 
-Mongo `dataTransform` operations take `{ check, run }` objects whose `source` / `run` return Mongo query-plan shapes (often `RawAggregateCommand` / `RawUpdateManyCommand` from `@prisma-next/mongo-query-ast/execution`). The planner may leave `placeholder(...)` inside those sources until you fill them. Hand-authored packages use `describe()` for bookends and import factories from `@prisma-next/target-mongo/migration`:
+Mongo `dataTransform` operations take `{ check, run }` objects whose `source` / `run` return Mongo query-plan shapes (often `RawAggregateCommand` / `RawUpdateManyCommand` from `@prisma-next/mongo-query-ast/execution`). The planner may leave `placeholder(...)` inside those sources until you fill them. Every rendered `migration.ts` includes `describe()` bookends (`from` / `to` contract hashes) — the Postgres examples above omit them for brevity. Import factories from `@prisma-next/target-mongo/migration`:
 
 ```typescript
 import { MigrationCLI } from '@prisma-next/cli/migration-cli';
@@ -311,9 +311,9 @@ There is no built-in filter flag — pipe the JSON through `jq` (or your favouri
 
 The concept: `db verify` is a **standalone diagnostic** — not a routine step after `db update` or `migrate` on the happy path (those commands already verify and advance the marker when they succeed). Reach for `db verify` when you suspect drift or need to prove the DB matches the contract:
 
-- After manual SQL or ad-hoc edits outside Prisma Next.
-- After restoring a database from backup.
-- After a failed or partially-applied `migrate` (especially on Mongo, where DDL is resumable rather than transaction-wrapped).
+- Following manual SQL or ad-hoc edits outside Prisma Next.
+- When restoring a database from backup.
+- If a `migrate` fails or partially applies (especially on Mongo, where DDL is resumable rather than transaction-wrapped).
 - When `PN-RUN-3002` / `PN-RUN-3001` surfaces at runtime or from another command.
 
 Modes:
