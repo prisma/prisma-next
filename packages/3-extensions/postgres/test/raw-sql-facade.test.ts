@@ -106,29 +106,33 @@ describe('postgres client rawSql surface', () => {
   });
 });
 
+function rawSqlOf(
+  fns: ReturnType<typeof createFunctions> | ReturnType<typeof createAggregateFunctions>,
+): unknown {
+  return (fns as unknown as { readonly rawSql: unknown }).rawSql;
+}
+
 describe('AC27: fns.rawSql reference equality with bound RawSqlTag', () => {
   it('createFunctions returns the same rawSqlTag reference for the rawSql key', () => {
     const tag: RawSqlTag = createRawSql(createPostgresAdapter());
     const fns = createFunctions({}, tag);
-    expect((fns as unknown as Record<string, unknown>).rawSql).toBe(tag);
+    expect(rawSqlOf(fns)).toBe(tag);
   });
 
   it('createAggregateFunctions returns the same rawSqlTag reference for the rawSql key', () => {
     const tag: RawSqlTag = createRawSql(createPostgresAdapter());
     const fns = createAggregateFunctions({}, tag);
-    expect((fns as unknown as Record<string, unknown>).rawSql).toBe(tag);
+    expect(rawSqlOf(fns)).toBe(tag);
   });
 
   it('separate fns Proxy instances from same tag all return the same tag reference', () => {
     const tag: RawSqlTag = createRawSql(createPostgresAdapter());
-    const whereTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
-    const selectTag = (createAggregateFunctions({}, tag) as unknown as Record<string, unknown>)
-      .rawSql;
-    const groupByTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
-    const orderByTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
-    const havingTag = (createAggregateFunctions({}, tag) as unknown as Record<string, unknown>)
-      .rawSql;
-    const joinOnTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
+    const whereTag = rawSqlOf(createFunctions({}, tag));
+    const selectTag = rawSqlOf(createAggregateFunctions({}, tag));
+    const groupByTag = rawSqlOf(createFunctions({}, tag));
+    const orderByTag = rawSqlOf(createFunctions({}, tag));
+    const havingTag = rawSqlOf(createAggregateFunctions({}, tag));
+    const joinOnTag = rawSqlOf(createFunctions({}, tag));
 
     expect(whereTag).toBe(tag);
     expect(selectTag).toBe(tag);
@@ -140,21 +144,13 @@ describe('AC27: fns.rawSql reference equality with bound RawSqlTag', () => {
 
   it('fns.rawSql from different dispatch sites all reference-equal the same tag', () => {
     const tag: RawSqlTag = createRawSql(createPostgresAdapter());
-    const whereTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
-    const selectAliasedTag = (
-      createAggregateFunctions({}, tag) as unknown as Record<string, unknown>
-    ).rawSql;
-    const selectBulkTag = (createAggregateFunctions({}, tag) as unknown as Record<string, unknown>)
-      .rawSql;
-    const groupByCallbackTag = (createFunctions({}, tag) as unknown as Record<string, unknown>)
-      .rawSql;
-    const orderByCallbackTag = (createFunctions({}, tag) as unknown as Record<string, unknown>)
-      .rawSql;
-    const havingCallbackTag = (
-      createAggregateFunctions({}, tag) as unknown as Record<string, unknown>
-    ).rawSql;
-    const joinOnCallbackTag = (createFunctions({}, tag) as unknown as Record<string, unknown>)
-      .rawSql;
+    const whereTag = rawSqlOf(createFunctions({}, tag));
+    const selectAliasedTag = rawSqlOf(createAggregateFunctions({}, tag));
+    const selectBulkTag = rawSqlOf(createAggregateFunctions({}, tag));
+    const groupByCallbackTag = rawSqlOf(createFunctions({}, tag));
+    const orderByCallbackTag = rawSqlOf(createFunctions({}, tag));
+    const havingCallbackTag = rawSqlOf(createAggregateFunctions({}, tag));
+    const joinOnCallbackTag = rawSqlOf(createFunctions({}, tag));
 
     expect(whereTag).toBe(selectAliasedTag);
     expect(whereTag).toBe(selectBulkTag);
@@ -166,7 +162,7 @@ describe('AC27: fns.rawSql reference equality with bound RawSqlTag', () => {
 
   it('fns.rawSql is undefined when no tag is provided (graceful degradation)', () => {
     const fns = createFunctions({});
-    expect((fns as unknown as Record<string, unknown>).rawSql).toBeUndefined();
+    expect(rawSqlOf(fns)).toBeUndefined();
   });
 });
 
