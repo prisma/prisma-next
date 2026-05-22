@@ -138,7 +138,9 @@ This is a deliberate divergence from clig.dev §Arguments §Confirmation. AI age
 - Discovery precedence: `--config <path>` > `PRISMA_NEXT_CONFIG` > nearest `prisma-next.config.*` in CWD (no upward search).
 - Precedence: flags > config > defaults.
 - Env policy: the CLI does not auto‑load `.env`. Apps may do so in `prisma-next.config.*` and pass values (e.g., `db.connection`).
-- Contract source/output and migration directory: defined in config; flags should not override (for now).
+- Contract source: defined in config; no flag override.
+- Contract output path: `--output <path>` on `contract emit` overrides the `output` field from config. Precedence: `--output` flag > `output` in config > derived default (contract source path with `.json` extension). The path is resolved relative to CWD. Extension wrappers (`defineConfig` from `@prisma-next/mongo` and `@prisma-next/postgres`) expose an `output?: string` option that maps directly to this config field.
+- Migration directory: defined in config; no flag override.
 - DB Connection: `--db=<URL>` or `config.db.connection`.
 
 ## Exit Codes
