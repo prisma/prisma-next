@@ -83,7 +83,7 @@ export async function writeRefPaired(
 
 Any hash that participates as a **`from` end** — whether supplied explicitly (`--from`), resolved implicitly (default `db` ref), or set via `ref set` — must be a **node in the on-disk migration graph**, or the operation refuses with a structured diagnostic.
 
-A **graph node** is a contract hash that appears as the `from` or `to` of any on-disk migration bundle, or the `null` empty-graph sentinel (`sha256:empty`). A hash that is valid on its own but appears in no bundle is *not* a graph node. That distinction is load-bearing: it is exactly the condition that made the single-bundle plan in the reproduction above unapplyable.
+A **graph node** is a contract hash that appears as the `from` or `to` of any on-disk migration bundle, or the `null` empty-graph sentinel (`sha256:empty`). A hash that is valid on its own but appears in no bundle is *not* a graph node. That distinction is load-bearing: it is exactly the condition that made the single-bundle plan in the reproduction above impossible to apply.
 
 Enforcement is centralized in `isGraphNode` / `assertHashIsGraphNode`:
 
@@ -155,7 +155,7 @@ export function computeRefAdvancementName(options: {
 ### Positive
 
 - **Dev → ship transition trap closed.** Empty graph + non-null `db` ref + paired snapshot → auto-baseline two-bundle output; `migrate` finds a path `null → H_B → H_C` and applies the delta while the baseline is idempotently satisfied.
-- **Plans are applyable by construction** for the dev → ship loop: every emitted `from` either was already a graph node or is introduced by the baseline bundle in the same plan invocation.
+- **Plans can be applied by construction** for the dev → ship loop: every emitted `from` either was already a graph node or is introduced by the baseline bundle in the same plan invocation.
 - **Offline planner preserved.** No `migration plan` code path opens a database connection to read the marker; drift signal comes from on-disk refs + snapshots + graph membership.
 - **Discoverable recovery.** Plan-time `MIGRATION.HASH_NOT_IN_GRAPH` and `MIGRATION.SNAPSHOT_MISSING`, apply-time `MIGRATION.MARKER_MISMATCH`, and improved `MIGRATION.PATH_UNREACHABLE` payloads name both hashes and suggest concrete next commands (`migration plan --from <reachable>`, `ref set db <marker-hash>`, `db update --advance-ref <name>`).
 - **Uniform ref namespace.** Framework and user refs share one shape; `db` is not special-cased in storage, only in default advancement rules for dev commands.
