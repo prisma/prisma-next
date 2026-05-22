@@ -15,7 +15,7 @@ The three-step user model:
 
 Once the contract changes, you choose how the change reaches the database. This skill covers the two paths (`db update` and `migration plan` + `migrate`), the migration-package contract, the `migration.ts` authoring API, and the failure modes you recover from without leaving the loop.
 
-**Targets.** Migration authoring is first-class for **Postgres** and **Mongo**. The CLI picks the target from your contract/config; when you need to be explicit, pass `--target postgres` or `--target mongo` on `migration plan` / `migration new`. Examples below call out target-specific imports, markers, factories, and transaction behavior where they diverge.
+**Targets.** Migration authoring is first-class for **Postgres** and **Mongo**. The CLI reads the target from `prisma-next.config.ts` (set during `prisma-next init --target …`). Migration commands do not accept a `--target` flag — use a config scoped to the target you need. Examples below call out target-specific imports, markers, factories, and transaction behavior where they diverge.
 
 ## When to Use
 
@@ -120,8 +120,6 @@ Plan a change:
 ```bash
 pnpm prisma-next contract emit
 pnpm prisma-next migration plan --name <snake_slug>
-# Mongo contract: add --target mongo when the CLI does not infer mongo
-# pnpm prisma-next migration plan --target mongo --name <snake_slug>
 ```
 
 Read the result. The JSON shape exposes the queryable signals:
@@ -274,7 +272,6 @@ The concept: the same `Migration` class shape lets you author operations directl
 
 ```bash
 pnpm prisma-next migration new --name <snake_slug>
-# Mongo: pnpm prisma-next migration new --target mongo --name <snake_slug>
 ```
 
 Add factory names to the framework-rendered import line for your target (Postgres: `@prisma-next/target-postgres/migration`; Mongo: `@prisma-next/target-mongo/migration`). Browse with `--help` and the import list the renderer emitted.
