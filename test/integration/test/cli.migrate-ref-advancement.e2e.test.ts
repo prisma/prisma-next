@@ -499,7 +499,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'omits advancedRef from JSON when --advance-ref is not provided',
+      'reports advancedRef as null when --advance-ref is not provided',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testDir, configPath } = await seedPlannedMigration(
@@ -513,7 +513,7 @@ withTempDir(({ createTempDir }) => {
           const parsed = parseJsonObjectFromCliCapture(
             consoleOutput.slice(outputStart),
           ) as MigrateResult;
-          expect(parsed.advancedRef).toBeUndefined();
+          expect(parsed.advancedRef).toBeNull();
         });
       },
       timeouts.spinUpPpgDev,

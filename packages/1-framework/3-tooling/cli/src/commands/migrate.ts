@@ -329,7 +329,7 @@ async function executeMigrateCommand(
       perSpace: value.perSpace,
       ...ifDefined('pathDecision', value.pathDecision),
       timings: { total: Date.now() - startTime },
-      ...(options.advanceRef !== undefined ? { advancedRef } : {}),
+      advancedRef,
     });
   } catch (error) {
     if (CliStructuredError.is(error)) {
