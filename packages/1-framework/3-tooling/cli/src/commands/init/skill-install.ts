@@ -166,13 +166,16 @@ export function isWindsurfDetected(ctx: {
  */
 export function resolveProjectSkillInstallCommands(
   pm: PackageManager,
-  _ctx: {
+  ctx: {
     readonly baseDir: string;
     readonly env?: NodeJS.ProcessEnv;
     readonly homeDir?: string;
   },
 ): readonly string[] {
-  return DEFAULT_SKILL_SOURCES.map((source) => formatSkillInstallCommand({ pm, source }));
+  const agents: readonly SkillAgent[] = isWindsurfDetected(ctx)
+    ? DEFAULT_SKILL_AGENTS
+    : DEFAULT_SKILL_AGENTS.filter((agent) => agent !== 'windsurf');
+  return DEFAULT_SKILL_SOURCES.map((source) => formatSkillInstallCommand({ pm, source, agents }));
 }
 
 function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {

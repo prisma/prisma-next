@@ -179,7 +179,7 @@ describe('resolveProjectSkillInstallCommands', () => {
     }
   });
 
-  it('emits one consolidated install per skill source', () => {
+  it('emits one consolidated install per skill source when Windsurf is detected', () => {
     withCleanEnv(() => {
       tmpDir = mkdtempSync(join(tmpdir(), 'skill-resolve-'));
       const commands = resolveProjectSkillInstallCommands('pnpm', {
@@ -191,6 +191,25 @@ describe('resolveProjectSkillInstallCommands', () => {
         expect(command).toContain(AGENT_FLAGS);
         expect(command).not.toContain('--all');
       }
+    });
+  });
+
+  it('omits the windsurf agent when Windsurf is not detected', () => {
+    withCleanEnv(() => {
+      tmpDir = mkdtempSync(join(tmpdir(), 'skill-resolve-'));
+      const fakeHome = mkdtempSync(join(tmpdir(), 'skill-resolve-home-'));
+      const commands = resolveProjectSkillInstallCommands('pnpm', {
+        baseDir: tmpDir,
+        env: {},
+        homeDir: fakeHome,
+      });
+      const agentsWithoutWindsurf = `--agent ${DEFAULT_SKILL_AGENTS.filter((agent) => agent !== 'windsurf').join(' ')} --skill '*' -y`;
+      expect(commands).toHaveLength(DEFAULT_SKILL_SOURCES.length);
+      for (const command of commands) {
+        expect(command).toContain(agentsWithoutWindsurf);
+        expect(command).not.toContain('--agent windsurf');
+      }
+      rmSync(fakeHome, { recursive: true, force: true });
     });
   });
 });
