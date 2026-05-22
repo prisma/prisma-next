@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -46,7 +46,12 @@ function refFilesAbsent(refsDir: string, name: string): boolean {
 }
 
 function noRefFilesUnder(refsDir: string): boolean {
-  return !existsSync(refsDir) || !existsSync(join(refsDir, 'db.json'));
+  if (!existsSync(refsDir)) {
+    return true;
+  }
+  return !readdirSync(refsDir).some(
+    (fileName) => fileName.endsWith('.json') && !fileName.includes('.contract.'),
+  );
 }
 
 withTempDir(({ createTempDir }) => {

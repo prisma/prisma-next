@@ -349,7 +349,7 @@ export function appendImplicitMigrationPlanFrom(
   testDir: string,
   extraArgs: readonly string[],
 ): readonly string[] {
-  if (extraArgs.includes('--from')) {
+  if (extraArgs.some((arg) => arg === '--from' || arg.startsWith('--from='))) {
     return extraArgs;
   }
   const dbRefPath = join(testDir, 'migrations', 'app', 'refs', 'db.json');
