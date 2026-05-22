@@ -11,7 +11,7 @@
 // prisma/dev PGlite infrastructure).
 
 import { describe, expect, it } from 'vitest';
-import { timeouts, withCollectionRuntime } from './helpers';
+import { timeouts, withCollectionRuntime } from './integration-helpers';
 import { collectionWithCapabilities, LATERAL_CAPABILITIES } from './nested-includes-helpers';
 import { seedComments, seedPosts, seedUsers } from './runtime-helpers';
 
