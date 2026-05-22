@@ -18,6 +18,7 @@ import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
   errorFileNotFound,
+  errorRefSetBundleNotFound,
   errorRefSetEmptySentinel,
   errorRefSetHashNotInGraph,
   errorRuntime,
@@ -105,9 +106,7 @@ export async function executeRefSetCommand(
 
     const matchingBundle = bundles.find((bundle) => bundle.metadata.to === resolvedHash);
     if (!matchingBundle) {
-      throw new Error(
-        `ref set: graph-node hash ${resolvedHash} has no matching bundle by metadata.to`,
-      );
+      return notOk(errorRefSetBundleNotFound(resolvedHash));
     }
 
     const contractJsonPath = join(matchingBundle.dirPath, 'end-contract.json');

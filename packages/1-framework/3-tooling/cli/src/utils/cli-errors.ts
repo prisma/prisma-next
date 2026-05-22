@@ -108,6 +108,17 @@ export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
   });
 }
 
+export function errorRefSetBundleNotFound(hash: string): CliStructuredError {
+  return errorRuntime(`No migration bundle matches graph-node hash ${hash}`, {
+    why: `The hash is a graph node but no on-disk bundle has metadata.to = ${hash}.`,
+    fix: 'Run `pnpm fixtures:check`, or re-emit the migration that produces this hash so its bundle is restored.',
+    meta: {
+      code: 'MIGRATION.REF_SET_BUNDLE_NOT_FOUND',
+      hash,
+    },
+  });
+}
+
 export function errorPlanForgotTheFlag(
   resolvedHash: string,
   reachableRefs: ReadonlyArray<{ readonly name: string; readonly hash: string }>,
@@ -224,8 +235,8 @@ export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructu
       'Run `prisma-next migration show <bundle>` for any bundle in the path you expected.',
     ].join('\n'),
     meta: {
-      code: 'MIGRATION.PATH_UNREACHABLE',
       ...meta,
+      code: 'MIGRATION.PATH_UNREACHABLE',
     },
   });
 }
