@@ -6,7 +6,7 @@ import { basename, dirname, isAbsolute, join } from 'pathe';
 import { CliStructuredError } from '../../utils/cli-errors';
 import { formatErrorJson, formatErrorOutput } from '../../utils/formatters/errors';
 import type { GlobalFlags } from '../../utils/global-flags';
-import { TerminalUI } from '../../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../../utils/terminal-ui';
 import {
   detectPackageManager,
   formatAddArgs,
@@ -131,7 +131,7 @@ export async function runInit(
   },
 ): Promise<number> {
   const { options, flags, canPrompt, probeOverrides, afterFirstTelemetryConsent } = runOptions;
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+  const ui = createTerminalUI(flags);
   const warnings: string[] = [];
   const filesWritten: string[] = [];
   const filesDeleted: string[] = [];

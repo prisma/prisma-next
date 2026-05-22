@@ -23,10 +23,10 @@ import { migrationGraphToRenderInput } from '../utils/formatters/graph-migration
 import { graphRenderer } from '../utils/formatters/graph-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import type { StatusRef } from '../utils/migration-types';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationGraphOptions extends CommonCommandOptions {
   readonly config?: string;
@@ -130,8 +130,8 @@ export function createMigrationGraphCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--dot', 'Output in Graphviz DOT format')
     .action(async (options: MigrationGraphOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
       const result = await executeMigrationGraphCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (graphResult) => {
         // Explicit format flags win over the auto-JSON default. `flags.json`

@@ -102,6 +102,8 @@ async function runInitTest(
  * is not deterministic across CI / local runs.
  */
 const interactiveFlags = (overrides: Partial<GlobalFlags> = {}): GlobalFlags => ({
+  format: 'pretty',
+  explicitFormat: false,
   json: false,
   quiet: false,
   verbose: 0,
@@ -112,6 +114,8 @@ const interactiveFlags = (overrides: Partial<GlobalFlags> = {}): GlobalFlags => 
 });
 
 const noninteractiveFlags = (overrides: Partial<GlobalFlags> = {}): GlobalFlags => ({
+  format: 'pretty',
+  explicitFormat: false,
   json: false,
   quiet: true,
   verbose: 0,

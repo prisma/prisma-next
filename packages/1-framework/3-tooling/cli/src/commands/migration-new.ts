@@ -49,9 +49,9 @@ import {
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI } from '../utils/terminal-ui';
 
 interface MigrationNewOptions extends CommonCommandOptions {
   readonly name?: string;
@@ -287,8 +287,8 @@ export function createMigrationNewCommand(): Command {
     .option('--from <hash>', 'Starting contract hash (default: latest migration target)')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: MigrationNewOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
 
       if (!flags.json && !flags.quiet) {
         const header = formatStyledHeader({

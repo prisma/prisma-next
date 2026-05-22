@@ -17,8 +17,8 @@ import {
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
-import { TerminalUI } from '../utils/terminal-ui';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 import { INTEGRITY_FAILED, OK, PRECONDITION } from './migration-check/exit-codes';
 
 interface MigrationCheckOptions extends CommonCommandOptions {
@@ -335,8 +335,8 @@ export function createMigrationCheckCommand(): Command {
     .argument('[migration]', 'Migration reference (directory name or hash) to check')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationCheckOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
 
       let result: MigrationCheckResult;
       let exitCode: number;

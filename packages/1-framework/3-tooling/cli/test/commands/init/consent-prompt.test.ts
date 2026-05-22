@@ -50,6 +50,8 @@ const initOptions = { target: 'postgres', authoring: 'psl', writeEnv: false };
 
 function interactiveFlags(): GlobalFlags {
   return {
+    format: 'pretty',
+    explicitFormat: false,
     json: false,
     quiet: false,
     verbose: 0,

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
+import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 const mocks = vi.hoisted(() => ({
   loadConfigMock: vi.fn(),
@@ -73,6 +73,29 @@ describe('contract emit command', () => {
       ...overrides,
     };
   }
+
+  it('emits human-readable success output on piped stdout with --format pretty', async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--format', 'pretty'])).resolves.toBe(0);
+
+    const combined = consoleOutput.join('\n');
+    expect(combined).toMatch(/Emitted contract\.json/i);
+  });
+
+  it('rejects --format pretty together with --json via structured error', async () => {
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--format', 'pretty', '--json'])).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(getExitCode()).toBe(2);
+    const combined = consoleOutput.join('\n');
+    expect(combined).toContain('PN-CLI-4015');
+    expect(combined).not.toContain('at resolveOutputFormat');
+  });
 
   it('delegates to executeContractEmit and exits successfully', async () => {
     const outputPath = join(tmpDir, 'contract.json');

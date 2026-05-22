@@ -10,9 +10,9 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 import { resolveContractInferOutputPath } from './contract-infer-paths';
 import {
   type InspectLiveSchemaOptions,
@@ -42,7 +42,7 @@ async function executeContractInferCommand(
   ui: TerminalUI,
   startTime: number,
 ): Promise<Result<ContractInferSuccessResult, CliStructuredError>> {
-  const flags = parseGlobalFlags(options);
+  const flags = parseGlobalFlagsOrExit(options);
   const inspectResult = await inspectLiveSchema(options, flags, ui, startTime, {
     commandName: 'contract infer',
     description: 'Infer a PSL contract from the live database schema',
@@ -112,8 +112,8 @@ export function createContractInferCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--output <path>', 'Write the inferred PSL contract to the specified path')
     .action(async (options: ContractInferOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
       const startTime = Date.now();
 
       const result = await executeContractInferCommand(options, ui, startTime);

@@ -26,9 +26,9 @@ import {
 } from '../utils/command-helpers';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationLogOptions extends CommonCommandOptions {
   readonly db?: string;
@@ -193,8 +193,8 @@ export function createMigrationLogCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: MigrationLogOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
       const result = await executeMigrationLogCommand(options, flags, ui);
       const exitCode = handleResult(result, flags, ui, (logResult) => {
         if (flags.json) {

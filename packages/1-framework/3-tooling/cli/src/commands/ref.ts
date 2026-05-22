@@ -25,9 +25,9 @@ import {
   setCommandDescriptions,
 } from '../utils/command-helpers';
 import { formatCommandHelp } from '../utils/formatters/help';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { parseGlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI } from '../utils/terminal-ui';
 
 interface RefSetResult {
   readonly ok: true;
@@ -145,8 +145,8 @@ function createRefSetCommand(): Command {
         hash: string,
         options: { config?: string; json?: string | boolean; quiet?: boolean },
       ) => {
-        const flags = parseGlobalFlags(options);
-        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const flags = parseGlobalFlagsOrExit(options);
+        const ui = createTerminalUI(flags);
         const result = await executeRefSetCommand(name, hash, options);
         const exitCode = handleResult(result, flags, ui, (value) => {
           if (flags.json) {
@@ -172,8 +172,8 @@ function createRefDeleteCommand(): Command {
         name: string,
         options: { config?: string; json?: string | boolean; quiet?: boolean },
       ) => {
-        const flags = parseGlobalFlags(options);
-        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+        const flags = parseGlobalFlagsOrExit(options);
+        const ui = createTerminalUI(flags);
         const result = await executeRefDeleteCommand(name, options);
         const exitCode = handleResult(result, flags, ui, (value) => {
           if (flags.json) {
@@ -194,8 +194,8 @@ function createRefListCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: { config?: string; json?: string | boolean; quiet?: boolean }) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
       const result = await executeRefListCommand(options);
       const exitCode = handleResult(result, flags, ui, (value) => {
         if (flags.json) {

@@ -51,9 +51,9 @@ import { toExtensionInputs } from '../utils/extension-pack-inputs';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationPlanOptions extends CommonCommandOptions {
   readonly config?: string;
@@ -551,10 +551,10 @@ export function createMigrationPlanCommand(): Command {
       'Starting contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .action(async (options: MigrationPlanOptions) => {
-      const flags = parseGlobalFlags(options);
+      const flags = parseGlobalFlagsOrExit(options);
       const startTime = Date.now();
 
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const ui = createTerminalUI(flags);
       const result = await executeMigrationPlanCommand(options, flags, ui, startTime);
 
       const exitCode = handleResult(result, flags, ui, (planResult) => {

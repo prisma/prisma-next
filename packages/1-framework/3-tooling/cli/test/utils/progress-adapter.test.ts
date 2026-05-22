@@ -3,11 +3,24 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 import type { GlobalFlags } from '../../src/utils/global-flags';
 import { createProgressAdapter } from '../../src/utils/progress-adapter';
-import { TerminalUI } from '../../src/utils/terminal-ui';
+import { createTerminalUI } from '../../src/utils/terminal-ui';
 
-function createAdapter(flags: GlobalFlags = {}) {
-  const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
-  return createProgressAdapter({ ui, flags });
+function defaultTestFlags(overrides: Partial<GlobalFlags> = {}): GlobalFlags {
+  return {
+    format: 'pretty',
+    explicitFormat: false,
+    quiet: false,
+    verbose: 0,
+    color: false,
+    interactive: true,
+    ...overrides,
+  };
+}
+
+function createAdapter(flags: Partial<GlobalFlags> = {}) {
+  const resolved = defaultTestFlags(flags);
+  const ui = createTerminalUI(resolved);
+  return createProgressAdapter({ ui, flags: resolved });
 }
 
 describe('progress adapter', () => {

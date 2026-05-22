@@ -1,11 +1,14 @@
+import { notOk } from '@prisma-next/utils/result';
+import { CliStructuredError, errorInvalidOutputFormat, errorOutputFormatMutex } from './cli-errors';
 import { isCI } from './is-ci';
+import { handleResult } from './result-handler';
+import { createTerminalUI } from './terminal-ui';
 
 export type OutputFormat = 'pretty' | 'json';
 
-const OUTPUT_FORMATS: readonly OutputFormat[] = ['pretty', 'json'];
-
 export interface GlobalFlags {
   readonly format: OutputFormat;
+  readonly explicitFormat: boolean;
   readonly json?: boolean;
   readonly quiet?: boolean;
   readonly verbose?: number;
@@ -38,33 +41,62 @@ function isJsonFlagSet(json: string | boolean | undefined): boolean {
   return json === true;
 }
 
-function resolveOutputFormat(options: CommonCommandOptions): OutputFormat {
+interface ResolvedOutputFormat {
+  readonly format: OutputFormat;
+  readonly explicitFormat: boolean;
+}
+
+function resolveOutputFormat(options: CommonCommandOptions): ResolvedOutputFormat {
   const formatOption = options.format;
   const jsonFlag = isJsonFlagSet(options.json);
 
   if (formatOption !== undefined) {
     if (formatOption !== 'pretty' && formatOption !== 'json') {
-      throw new Error(
-        `Invalid --format value "${formatOption}". Allowed values: ${OUTPUT_FORMATS.join(', ')}.`,
-      );
+      throw errorInvalidOutputFormat(formatOption);
     }
     if (jsonFlag && formatOption === 'pretty') {
-      throw new Error(
-        'Cannot use --format pretty together with --json. Use --format json or --json alone for JSON output.',
-      );
+      throw errorOutputFormatMutex();
     }
-    return formatOption;
+    return { format: formatOption, explicitFormat: true };
   }
 
   if (jsonFlag) {
-    return 'json';
+    return { format: 'json', explicitFormat: false };
   }
 
   if (!process.stdout.isTTY) {
-    return 'json';
+    return { format: 'json', explicitFormat: false };
   }
 
-  return 'pretty';
+  return { format: 'pretty', explicitFormat: false };
+}
+
+function inferJsonModeForParseError(options: CommonCommandOptions): boolean {
+  if (options.format === 'json') {
+    return true;
+  }
+  if (isJsonFlagSet(options.json) && options.format !== 'pretty') {
+    return true;
+  }
+  if (options.format !== undefined) {
+    return false;
+  }
+  return !process.stdout.isTTY;
+}
+
+function emitGlobalFlagParseError(error: CliStructuredError, options: CommonCommandOptions): never {
+  const jsonMode = inferJsonModeForParseError(options);
+  const flags: GlobalFlags = {
+    format: jsonMode ? 'json' : 'pretty',
+    explicitFormat: false,
+    ...(jsonMode ? { json: true } : {}),
+    color: false,
+    verbose: 0,
+    interactive: false,
+  };
+  const ui = createTerminalUI(flags);
+  const exitCode = handleResult(notOk(error), flags, ui);
+  process.exit(exitCode);
 }
 
 /**
@@ -72,18 +104,41 @@ function resolveOutputFormat(options: CommonCommandOptions): OutputFormat {
  * Handles verbosity flags (-v, --trace), output format (--format, --json),
  * quiet mode, color, interactivity (--interactive/--no-interactive), and
  * auto-accept (-y/--yes).
+ *
+ * On invalid or conflicting format flags, prints a structured CLI error
+ * envelope and exits with code 2.
+ */
+export function parseGlobalFlagsOrExit(options: CommonCommandOptions): GlobalFlags {
+  try {
+    return parseGlobalFlags(options);
+  } catch (error) {
+    if (CliStructuredError.is(error)) {
+      emitGlobalFlagParseError(error, options);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Parses global flags from CLI options.
+ * Handles verbosity flags (-v, --trace), output format (--format, --json),
+ * quiet mode, color, interactivity (--interactive/--no-interactive), and
+ * auto-accept (-y/--yes).
+ *
+ * Throws {@link CliStructuredError} for invalid or conflicting format flags.
  */
 export function parseGlobalFlags(options: CommonCommandOptions): GlobalFlags {
-  const format = resolveOutputFormat(options);
+  const { format, explicitFormat } = resolveOutputFormat(options);
   const flags: {
     format: OutputFormat;
+    explicitFormat: boolean;
     json?: boolean;
     quiet?: boolean;
     verbose?: number;
     color?: boolean;
     interactive?: boolean;
     yes?: boolean;
-  } = { format };
+  } = { format, explicitFormat };
 
   if (format === 'json') {
     flags.json = true;
