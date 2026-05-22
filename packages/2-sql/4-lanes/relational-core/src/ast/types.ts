@@ -32,6 +32,7 @@ export interface ExpressionRewriter {
   literal?(expr: LiteralExpr): LiteralExpr;
   list?(expr: ListExpression): ListExpression | LiteralExpr;
   select?(ast: SelectAst): SelectAst;
+  rawSql?(expr: RawExpr): AnyExpression;
 }
 
 export interface AstRewriter extends ExpressionRewriter {
@@ -58,6 +59,7 @@ export interface ExprVisitor<R> {
   param(expr: ParamRef): R;
   preparedParam(expr: PreparedParamRef): R;
   list(expr: ListExpression): R;
+  rawSql(expr: RawExpr): R;
 }
 
 export interface ExpressionFolder<T> {
@@ -71,6 +73,7 @@ export interface ExpressionFolder<T> {
   literal?(expr: LiteralExpr): T;
   list?(expr: ListExpression): T;
   select?(ast: SelectAst): T;
+  rawSql?(expr: RawExpr): T;
 }
 
 export type ProjectionExpr = AnyExpression;
@@ -614,6 +617,42 @@ export class OperationExpr extends Expression {
 
   override baseColumnRef(): ColumnRef {
     return this.self.baseColumnRef();
+  }
+}
+
+export class RawExpr extends Expression {
+  readonly kind = 'raw-sql' as const;
+  readonly parts: ReadonlyArray<string | AnyExpression>;
+  readonly returns: ParamSpec;
+
+  constructor(options: {
+    readonly parts: ReadonlyArray<string | AnyExpression>;
+    readonly returns: ParamSpec;
+  }) {
+    super();
+    this.parts = frozenArrayCopy(options.parts);
+    this.returns = options.returns;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.rawSql(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return rewriter.rawSql ? rewriter.rawSql(this) : this;
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    if (folder.rawSql) {
+      return folder.rawSql(this);
+    }
+    return combineAll(
+      folder,
+      this.parts
+        .filter((p): p is AnyExpression => typeof p !== 'string')
+        .map((p) => () => p.fold(folder)),
+    );
   }
 }
 
@@ -1851,7 +1890,8 @@ export type AnyExpression =
   | OrExpr
   | ExistsExpr
   | NullCheckExpr
-  | NotExpr;
+  | NotExpr
+  | RawExpr;
 export type AnyParamRef = ParamRef | PreparedParamRef;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
 export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;
