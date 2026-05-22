@@ -49,9 +49,11 @@ function noRefFilesUnder(refsDir: string): boolean {
   if (!existsSync(refsDir)) {
     return true;
   }
-  return !readdirSync(refsDir).some(
-    (fileName) => fileName.endsWith('.json') && !fileName.includes('.contract.'),
-  );
+  const entries = readdirSync(refsDir, { recursive: true });
+  return !entries.some((entry) => {
+    const fileName = String(entry);
+    return fileName.endsWith('.json') && !fileName.includes('.contract.');
+  });
 }
 
 withTempDir(({ createTempDir }) => {
