@@ -441,8 +441,10 @@ async function executeMigrationPlanCommand(
     r.newMigrationDirs.map((dirName) => ({ spaceId: r.spaceId, dirName })),
   );
 
-  // Check for no-op (same hash means no changes)
-  if (fromHash === toStorageHash) {
+  // Check for no-op (same hash means no changes). Auto-baseline is exempt:
+  // an empty graph with db ref at the current contract still needs a
+  // null → fromHash baseline bundle so migrate can anchor the marker.
+  if (fromHash === toStorageHash && !isAutoBaseline) {
     const result: MigrationPlanResult = {
       ok: true,
       noOp: true,
@@ -532,6 +534,47 @@ async function executeMigrationPlanCommand(
         snapshotStartContract.contractDts,
         'end-contract',
       );
+
+      if (fromHash === toStorageHash) {
+        const baselineOps = baselineLeg.value.hasPlaceholders ? [] : baselineLeg.value.plannedOps;
+        if (baselineLeg.value.hasPlaceholders) {
+          const result: MigrationPlanResult = {
+            ok: true,
+            noOp: false,
+            from: fromHash,
+            to: toStorageHash,
+            baselineDir: relative(process.cwd(), baselinePackageDir),
+            operations: [],
+            emittedExtensionDirs,
+            pendingPlaceholders: true,
+            summary:
+              'Planned baseline with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
+            timings: { total: Date.now() - startTime },
+          };
+          return ok(result);
+        }
+
+        const preview = hasOperationPreview(familyInstance)
+          ? familyInstance.toOperationPreview(baselineOps)
+          : undefined;
+        const result: MigrationPlanResult = {
+          ok: true,
+          noOp: false,
+          from: fromHash,
+          to: toStorageHash,
+          baselineDir: relative(process.cwd(), baselinePackageDir),
+          operations: baselineOps.map((op) => ({
+            id: op.id,
+            label: op.label,
+            operationClass: op.operationClass,
+          })),
+          emittedExtensionDirs,
+          ...(preview !== undefined ? { preview } : {}),
+          summary: buildAutoBaselinePlanSummary(0, emittedExtensionDirs.length),
+          timings: { total: Date.now() - startTime },
+        };
+        return ok(result);
+      }
 
       const deltaLeg = await runPlannerLeg(
         planner,
@@ -880,7 +923,7 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
   const reviewTarget =
     result.baselineDir !== undefined && result.dir !== undefined
       ? `${result.baselineDir} and ${result.dir}`
-      : (result.dir ?? '<dir>');
+      : (result.baselineDir ?? result.dir ?? '<dir>');
   lines.push(
     `Next: review ${green_(reviewTarget)} if needed, then run ${green_('prisma-next migrate')}.`,
   );
