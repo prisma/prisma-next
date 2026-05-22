@@ -9,15 +9,20 @@ import {
 import { Command } from 'commander';
 import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isCI } from '../../src/utils/is-ci';
-import {
-  commanderSnapshotForTelemetry,
-  fireTelemetryFromPreAction,
-} from '../../src/utils/telemetry';
 
-vi.mock('../../src/utils/is-ci', () => ({
-  isCI: vi.fn(() => false),
-}));
+// Re-evaluated per test via vi.resetModules() + dynamic import. With the
+// CLI vitest config's `isolate: false` + shared-worker setup, any other
+// test file that imports `is-ci` first causes `telemetry.ts`'s top-level
+// `import { isCI }` binding to permanently reference the real function;
+// a plain `vi.mock` here would re-register the mock for future loads but
+// not rewrite the already-evaluated binding, so the production call to
+// `isCI()` still reaches `ci-info` (returns true under CI=true). Forcing
+// the SUT to re-evaluate per test pins the binding to the mocked module.
+const isCIMock = vi.fn(() => false);
+vi.mock('../../src/utils/is-ci', () => ({ isCI: isCIMock }));
+
+let commanderSnapshotForTelemetry: typeof import('../../src/utils/telemetry').commanderSnapshotForTelemetry;
+let fireTelemetryFromPreAction: typeof import('../../src/utils/telemetry').fireTelemetryFromPreAction;
 
 function restoreEnv(name: string, value: string | undefined): void {
   if (value === undefined) {
@@ -33,7 +38,7 @@ describe('CLI telemetry bridge', () => {
   let originalDisableTelemetry: string | undefined;
   let originalDoNotTrack: string | undefined;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     xdgRoot = mkdtempSync(join(tmpdir(), 'cli-telemetry-bridge-'));
     originalXdg = process.env['XDG_CONFIG_HOME'];
     originalDisableTelemetry = process.env['PRISMA_NEXT_DISABLE_TELEMETRY'];
@@ -42,7 +47,11 @@ describe('CLI telemetry bridge', () => {
     delete process.env['PRISMA_NEXT_DISABLE_TELEMETRY'];
     delete process.env['DO_NOT_TRACK'];
     mkdirSync(dirname(userConfigPath()), { recursive: true });
-    vi.mocked(isCI).mockReturnValue(false);
+    isCIMock.mockReturnValue(false);
+    vi.resetModules();
+    const telem = await import('../../src/utils/telemetry');
+    commanderSnapshotForTelemetry = telem.commanderSnapshotForTelemetry;
+    fireTelemetryFromPreAction = telem.fireTelemetryFromPreAction;
   });
 
   afterEach(() => {
@@ -108,7 +117,7 @@ describe('CLI telemetry bridge', () => {
 
   it('returns ci without forking when isCI is true', () => {
     writeUserConfig({ enableTelemetry: true });
-    vi.mocked(isCI).mockReturnValue(true);
+    isCIMock.mockReturnValue(true);
 
     const outcome = fireTelemetryFromPreAction(new Command('init'));
 
