@@ -587,11 +587,17 @@ When the user is running a one-off `tsx my-script.ts` (not a long-lived server),
 // src/scripts/seed.ts
 import { db } from '../prisma/db';
 
+// Postgres — PascalCase model root from contract
 for (const u of users) {
   await db.orm.User.create(u);
 }
-console.log('Seeded.');
 
+// Mongo — lowercased plural root from contract (e.g. users, not User)
+// for (const u of users) {
+//   await db.orm.users.create(u);
+// }
+
+console.log('Seeded.');
 await db.close();
 ```
 
