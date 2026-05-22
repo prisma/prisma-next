@@ -134,7 +134,7 @@ describe.each(
         ctx.project,
         'check-objectid.ts',
         [
-          "import { ObjectId } from '@prisma-next/mongo';",
+          "import { ObjectId } from '@prisma-next/mongo/bson';",
           'const id = new ObjectId();',
           'console.log(id.toHexString().length);',
           '',
@@ -312,7 +312,7 @@ const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult
 
 const TML_2487_seam = seamExpectation<StepResult>({
   ticket: 'TML-2487',
-  description: '@prisma-next/mongo re-exports ObjectId',
+  description: '@prisma-next/mongo/bson re-exports ObjectId',
   status: 'fixed',
   whenBroken: (r) => {
     expect(r.exitCode, 'TML-2487 still broken: ObjectId import must currently fail').not.toBe(0);
