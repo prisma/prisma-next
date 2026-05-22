@@ -1,18 +1,7 @@
 import { datetimeColumn, textColumn } from '@prisma-next/adapter-sqlite/column-types';
 import { defineContract, rel } from '@prisma-next/sqlite/contract-builder';
 
-export const contract = defineContract(
-  {
-    capabilities: {
-      sql: {
-        jsonAgg: true,
-        lateral: false,
-        enums: false,
-        autoIndexesForeignKeys: false,
-      },
-    },
-  },
-  ({ field, model }) => {
+export const contract = defineContract(({ field, model }) => {
     const User = model('User', {
       fields: {
         id: field.id.uuidv4(),
@@ -50,5 +39,4 @@ export const contract = defineContract(
         })),
       },
     };
-  },
-);
+});

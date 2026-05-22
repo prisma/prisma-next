@@ -1,17 +1,6 @@
 import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
 
-export const contract = defineContract(
-  {
-    capabilities: {
-      postgres: {
-        lateral: true,
-        jsonAgg: true,
-        'defaults.now': true,
-        'defaults.uuidv4': true,
-      },
-    },
-  },
-  ({ field, model }) => {
+export const contract = defineContract(({ field, model }) => {
     const User = model('User', {
       fields: {
         id: field.id.uuidv4(),
@@ -50,5 +39,4 @@ export const contract = defineContract(
         })),
       },
     };
-  },
-);
+});

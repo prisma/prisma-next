@@ -79,15 +79,6 @@ const User = UserBase.relations({
 
 export const contract = defineContract({
   codecLookup: postgresCodecLookup,
-  capabilities: {
-    postgres: {
-      lateral: true,
-      jsonAgg: true,
-      returning: true,
-      'defaults.autoincrement': true,
-      'defaults.now': true,
-    },
-  },
   models: {
     User,
     Post,
