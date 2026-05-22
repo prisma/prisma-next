@@ -8,6 +8,7 @@ import {
   DEFAULT_SKILL_AGENTS,
   DEFAULT_SKILL_BASE,
   DEFAULT_SKILL_SOURCES,
+  ensureAgentSkillInstallDirs,
   formatSkillInstallCommand,
   formatSkillSourceUrl,
   isWindsurfDetected,
@@ -167,6 +168,32 @@ describe('isWindsurfDetected', () => {
     const fakeHome = mkdtempSync(join(tmpdir(), 'windsurf-home-'));
     expect(isWindsurfDetected({ baseDir: tmpDir, env: {}, homeDir: fakeHome })).toBe(false);
     rmSync(fakeHome, { recursive: true, force: true });
+  });
+});
+
+describe('ensureAgentSkillInstallDirs', () => {
+  let tmpDir: string;
+
+  afterEach(() => {
+    if (tmpDir && existsSync(tmpDir)) {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('creates .claude/skills for every init install', () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'skill-dirs-'));
+    const fakeHome = mkdtempSync(join(tmpdir(), 'skill-dirs-home-'));
+    ensureAgentSkillInstallDirs({ baseDir: tmpDir, env: {}, homeDir: fakeHome });
+    expect(existsSync(join(tmpDir, '.claude', 'skills'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.windsurf', 'skills'))).toBe(false);
+    rmSync(fakeHome, { recursive: true, force: true });
+  });
+
+  it('creates .windsurf/skills when Windsurf is detected', () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'skill-dirs-'));
+    ensureAgentSkillInstallDirs({ baseDir: tmpDir, env: { WINDSURF: '1' } });
+    expect(existsSync(join(tmpDir, '.claude', 'skills'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.windsurf', 'skills'))).toBe(true);
   });
 });
 

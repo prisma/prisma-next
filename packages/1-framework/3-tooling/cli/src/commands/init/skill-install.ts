@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 import { join } from 'pathe';
@@ -178,6 +178,23 @@ export function resolveProjectSkillInstallCommands(
   return DEFAULT_SKILL_SOURCES.map((source) => formatSkillInstallCommand({ pm, source, agents }));
 }
 
+/**
+ * Upstream `skills add` with multiple `--agent` slugs symlinks Claude Code and
+ * Windsurf skills only when the project already has `.claude/skills` or
+ * `.windsurf/skills`. Fresh init runs create those directories before the
+ * consolidated install so every targeted agent gets project-local skills.
+ */
+export function ensureAgentSkillInstallDirs(ctx: {
+  readonly baseDir: string;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly homeDir?: string;
+}): void {
+  mkdirSync(join(ctx.baseDir, '.claude', 'skills'), { recursive: true });
+  if (isWindsurfDetected(ctx)) {
+    mkdirSync(join(ctx.baseDir, '.windsurf', 'skills'), { recursive: true });
+  }
+}
+
 function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {
   switch (pm) {
     case 'pnpm':
@@ -227,9 +244,9 @@ export async function runProjectLevelSkillInstall(ctx: {
   readonly filesWritten: readonly string[];
 }): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
   const commands: string[] = [];
-  const installCommands = resolveProjectSkillInstallCommands(ctx.pm, {
-    baseDir: ctx.baseDir,
-  });
+  const installCtx = { baseDir: ctx.baseDir };
+  ensureAgentSkillInstallDirs(installCtx);
+  const installCommands = resolveProjectSkillInstallCommands(ctx.pm, installCtx);
 
   for (const command of installCommands) {
     const { file, args } = commandToExec(command);
