@@ -2,7 +2,7 @@
 
 ## Context
 
-Migrations are modeled as directed edges from `fromHash` to `toHash`. At apply time, the runner must compute a path from the database's current contract hash to the desired hash using the set of on-disk edges. The graph tolerates cycles (e.g., rollback migrations C1→C2→C1) — BFS pathfinding uses visited-node tracking to handle them safely. Ordering is determined entirely by graph topology; named refs (`migrations/refs.json`) provide multi-environment targeting. See also [ADR 169 — On-disk migration persistence](ADR%20169%20-%20On-disk%20migration%20persistence.md).
+Migrations are modeled as directed edges from `fromHash` to `toHash`. At apply time, the runner must compute a path from the database's current contract hash to the desired hash using the set of on-disk edges. The graph tolerates cycles (e.g., rollback migrations C1→C2→C1) — BFS pathfinding uses visited-node tracking to handle them safely. Ordering is determined entirely by graph topology; named refs (`migrations/<space>/refs/<name>.json`) provide multi-environment targeting. See also [ADR 169 — On-disk migration persistence](ADR%20169%20-%20On-disk%20migration%20persistence.md).
 
 ## Problem
 

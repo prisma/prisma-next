@@ -8,7 +8,7 @@
 
 Prisma Next's migration workflow is deliberately Git-shaped: named **refs** point at contract hashes, the on-disk **migration graph** records committed edges between hashes, and the live database **marker** records which hash the database was last brought up to. In healthy operation those three views agree. In the dev-shaped loop — iterate locally with `db init` / `db update`, then publish with `migration plan` and `migrate` — they can drift apart with no precise diagnostic.
 
-The failure mode that motivated this ADR is the **dev → ship transition trap** (TML-2629). A typical reproduction (audit sequence J4) looks like this:
+The failure mode that motivated this ADR is the **dev → ship transition trap** (TML-2629). A typical dev → ship transition reproduction looks like this:
 
 1. `db init` stamps the database and advances local dev state to contract hash **H_A**; the migration graph is still **empty**.
 2. The developer edits the schema and runs `contract emit` → **H_B**, then `db update` → marker **H_B**, still with an **empty graph**.
@@ -83,7 +83,7 @@ export async function writeRefPaired(
 
 Any hash that participates as a **`from` end** — whether supplied explicitly (`--from`), resolved implicitly (default `db` ref), or set via `ref set` — must be a **node in the on-disk migration graph**, or the operation refuses with a structured diagnostic.
 
-A **graph node** is a contract hash that appears as the `from` or `to` of any on-disk migration bundle, or the `null` empty-graph sentinel (`sha256:empty`). A hash that is valid on its own but appears in no bundle is *not* a graph node. That distinction is load-bearing: it is exactly the condition that made J4's single-bundle plan unapplyable.
+A **graph node** is a contract hash that appears as the `from` or `to` of any on-disk migration bundle, or the `null` empty-graph sentinel (`sha256:empty`). A hash that is valid on its own but appears in no bundle is *not* a graph node. That distinction is load-bearing: it is exactly the condition that made the single-bundle plan in the reproduction above unapplyable.
 
 Enforcement is centralized in `isGraphNode` / `assertHashIsGraphNode`:
 
@@ -112,9 +112,11 @@ export function assertHashIsGraphNode(hash: string, graph: MigrationGraph): asse
 1. Baseline: `null → from-hash` (introduces `from-hash` as a graph node)
 2. Delta: `from-hash → current_contract`
 
-By the time downstream checks run, the baseline bundle has materialised the `from` hash on disk. This is the mechanism that closes the J4 trap without requiring a separate `--baseline` command or a live-DB connection at plan time.
+By the time downstream checks run, the baseline bundle has materialised the `from` hash on disk. This is the mechanism that closes the dev → ship transition trap without requiring a separate `--baseline` command or a live-DB connection at plan time.
 
 `ref set` enforces the same invariant: the hash being set must be a graph node; the command synthesises the paired snapshot from the matching bundle's `end-contract` files.
+
+**Sibling invariant for `migrate --to`:** Target reachability is separate from the universal `from`-membership rule above. `migrate --to <ref-or-hash>` requires a path from the live marker to the target in the on-disk graph; path resolution refuses with `MIGRATION.PATH_UNREACHABLE` when none exists. At apply time, the live DB marker is the implicit `from` of the apply — it must be a graph node, checked before the runner executes DDL (`MIGRATION.MARKER_MISMATCH`). During the runner's graph walk, `MIGRATION.MARKER_NOT_IN_HISTORY` fires when the marker is not on the path being traversed — a complementary check at a different layer, not a restatement of the plan-time `from` invariant.
 
 ### (3) Asymmetric ref-advancement
 
@@ -152,7 +154,7 @@ export function computeRefAdvancementName(options: {
 
 ### Positive
 
-- **J4 trap closed.** Empty graph + non-null `db` ref + paired snapshot → auto-baseline two-bundle output; `migrate` finds a path `null → H_B → H_C` and applies the delta while the baseline is idempotently satisfied.
+- **Dev → ship transition trap closed.** Empty graph + non-null `db` ref + paired snapshot → auto-baseline two-bundle output; `migrate` finds a path `null → H_B → H_C` and applies the delta while the baseline is idempotently satisfied.
 - **Plans are applyable by construction** for the dev → ship loop: every emitted `from` either was already a graph node or is introduced by the baseline bundle in the same plan invocation.
 - **Offline planner preserved.** No `migration plan` code path opens a database connection to read the marker; drift signal comes from on-disk refs + snapshots + graph membership.
 - **Discoverable recovery.** Plan-time `MIGRATION.HASH_NOT_IN_GRAPH` and `MIGRATION.SNAPSHOT_MISSING`, apply-time `MIGRATION.MARKER_MISMATCH`, and improved `MIGRATION.PATH_UNREACHABLE` payloads name both hashes and suggest concrete next commands (`migration plan --from <reachable>`, `ref set db <marker-hash>`, `db update --advance-ref <name>`).
