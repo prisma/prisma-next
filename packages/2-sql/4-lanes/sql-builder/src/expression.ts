@@ -116,7 +116,7 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
 
 export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &
   DeriveExtFunctions<QC['queryOperationTypes']> & {
-    readonly rawSql: RawSqlTag;
+    readonly rawSql: RawSqlTag | undefined;
   };
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
