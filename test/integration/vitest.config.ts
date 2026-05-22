@@ -5,7 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.test.ts', 'test/**/*.test-d.ts'],
+    include: ['test/**/*.test.ts'],
+    typecheck: {
+      enabled: true,
+      include: ['test/**/*.test-d.ts'],
+    },
     testTimeout: timeouts.default,
     // Hook timeout needs to be higher than default (100ms) because beforeEach/afterEach
     // hooks often perform filesystem operations (creating/cleaning test directories)
