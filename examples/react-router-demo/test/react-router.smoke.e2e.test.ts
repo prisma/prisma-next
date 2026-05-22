@@ -6,7 +6,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const exampleDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const schemaPath = join(exampleDir, 'prisma', 'contract.prisma');
+const schemaPath = join(exampleDir, 'src', 'prisma', 'contract.prisma');
 const contractJsonPath = join(exampleDir, 'src', 'prisma', 'contract.json');
 
 // Bootstraps Prisma Next's marker table plus our own model tables via raw DDL

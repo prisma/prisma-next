@@ -13,7 +13,7 @@ if (contractSource !== 'psl' && contractSource !== 'ts') {
 // Left undefined when DATABASE_URL is not set so emit-only flows
 // (`prisma-next contract emit`, CI typegen) work in fresh checkouts.
 export default defineConfig({
-  contract: contractSource === 'ts' ? './prisma/contract.ts' : './prisma/contract.prisma',
+  contract: contractSource === 'ts' ? './src/prisma/contract.ts' : './src/prisma/contract.prisma',
   ...(process.env['DATABASE_URL'] !== undefined && {
     db: { connection: process.env['DATABASE_URL'] },
   }),
