@@ -30,7 +30,7 @@
 //   Comment(id, body, postId)
 
 import { describe, expect, it } from 'vitest';
-import { createUsersCollection, timeouts, withCollectionRuntime } from './helpers';
+import { createUsersCollection, timeouts, withCollectionRuntime } from './integration-helpers';
 import { seedComments, seedPosts, seedProfiles, seedUsers } from './runtime-helpers';
 
 describe('integration/nested-includes', () => {
