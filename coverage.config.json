@@ -21,6 +21,15 @@
       "notes": "See packages/3-targets/6-adapters/sqlite/test/migrations/* (runner.basic, runner.errors, runner.idempotency, planner-introspection.integration, render-typescript.roundtrip) and test/e2e/framework/test/sqlite/migrations/* for the integration coverage. Recovery requires either reorganizing coverage scopes or adding unit-level tests inside target-sqlite."
     },
     {
+      "package": "3-extensions/sql-orm-client",
+      "reason": "Several test files were moved from packages/3-extensions/sql-orm-client/test/ into test/integration/test/sql-orm-client/ to break a workspace build cycle (the package depended on pgvector / postgres test fixtures through its devDependencies). The covered behaviour is still exercised end-to-end in test/integration; only the per-package coverage report regressed because those tests no longer run under the package's vitest config.",
+      "addedDate": "2026-05-22",
+      "expiryDays": 90,
+      "assignee": null,
+      "linear": "TML-2526",
+      "notes": "Recovery requires either reorganising coverage scopes (so integration tests count toward this package's report) or adding equivalent unit-level tests inside the package that don't need pgvector fixtures."
+    },
+    {
       "package": "1-framework/2-authoring/contract",
       "reason": "M9 target-extensible-IR refactor introduced composed-helpers-scaffolding.ts (currently 0%) — module-level scaffolding exercised through composed authoring flows in target packages rather than direct unit tests at the framework layer. Per-module unit coverage tracked as a follow-up before 0.9 release.",
       "addedDate": "2026-05-16",
