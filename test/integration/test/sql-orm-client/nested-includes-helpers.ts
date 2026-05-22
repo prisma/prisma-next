@@ -10,9 +10,9 @@
 // across multiple files keeps each invocation under that threshold
 // while preserving the breadth of the coverage.
 
+import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import { Collection } from '../../src/collection';
-import { getTestContext, getTestContract, type TestContract } from '../helpers';
+import { getTestContext, getTestContract, type TestContract } from './helpers';
 import type { PgIntegrationRuntime } from './runtime-helpers';
 
 /**
