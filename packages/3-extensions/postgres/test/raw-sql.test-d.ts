@@ -16,6 +16,8 @@ const stubContext = {} as unknown as ExecutionContext<Contract<SqlStorage>>;
 
 test('field reference typechecks as rawSql interpolation', () => {
   const tag = createRawSql(createPostgresAdapter());
+  // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
+  // the narrow structural subset that this type-level test exercises.
   const db = sql({
     context: stubContext,
     rawSqlTag: tag,
@@ -56,6 +58,8 @@ test('operation result typechecks as rawSql interpolation', () => {
 
 test('aggregate result composition typechecks', () => {
   const tag = createRawSql(createPostgresAdapter());
+  // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
+  // the narrow structural subset that this type-level test exercises.
   const db = sql({
     context: stubContext,
     rawSqlTag: tag,

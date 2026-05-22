@@ -58,10 +58,22 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
   } as unknown as ExecutionContext<Contract<SqlStorage>>;
 }
 
+// `createAggregateFunctions` returns a generic `Functions<QC>` whose `rawSql` field
+// may be `RawSqlTag | undefined` depending on the QC type parameter. In these tests
+// we always construct the fns with a concrete tag, so the field is always present;
+// casting via `as unknown as { rawSql: RawSqlTag }` is safe here and avoids
+// propagating the generic QC type into test scaffolding.
+function rawSqlOf(fns: unknown, tag: ReturnType<typeof createRawSql>): typeof tag {
+  return (fns as unknown as { rawSql: typeof tag }).rawSql;
+}
+
 describe('rawSql composition with the typed builder', () => {
   it('aliased single-column select emits a RawExpr in the projection list', () => {
     const tag = createRawSql(createPostgresAdapter());
     const ctx = makeStubContext();
+    // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
+    // the narrow structural subset that this test exercises so TypeScript can typecheck
+    // the call site without requiring the full contract-typed DB surface.
     const db = sql({ context: ctx, rawSqlTag: tag }) as unknown as {
       users: {
         select: (
@@ -96,7 +108,7 @@ describe('rawSql composition with the typed builder', () => {
 
     // Use createAggregateFunctions directly — same dispatch path as the aliased-select branch.
     const fns = createAggregateFunctions({}, tag);
-    const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+    const rawSql = rawSqlOf(fns, tag);
 
     // Field proxy top-level access produces IdentifierRef (not ColumnRef); simulate that here.
     const nameExpr = {
@@ -122,7 +134,7 @@ describe('rawSql composition with the typed builder', () => {
 
     // Use createAggregateFunctions directly — same dispatch path as the bulk-object-select branch.
     const fns = createAggregateFunctions({}, tag);
-    const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+    const rawSql = rawSqlOf(fns, tag);
 
     const idExpr = {
       buildAst: () => IdentifierRef.of('id'),
@@ -138,6 +150,8 @@ describe('rawSql composition with the typed builder', () => {
   it('bulk-object select via the typed builder wires the RawExpr through the AST', () => {
     const tag = createRawSql(createPostgresAdapter());
     const ctx = makeStubContext();
+    // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
+    // the narrow structural subset that this test exercises.
     const db = sql({ context: ctx, rawSqlTag: tag }) as unknown as {
       users: {
         select: (
@@ -158,7 +172,7 @@ describe('rawSql composition with the typed builder', () => {
     const capturedAsts: AnyExpression[] = [];
     db.users
       .select((_f, fns) => {
-        const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+        const rawSql = rawSqlOf(fns, tag);
         const rawExpr = rawSql`coalesce(score, 0)`.returns('pg/int4@1');
         capturedAsts.push(rawExpr.buildAst());
         return { b: rawExpr };
@@ -173,7 +187,7 @@ describe('rawSql composition with the typed builder', () => {
 
     // Use createAggregateFunctions directly — same dispatch path as the .where branch.
     const fns = createAggregateFunctions({}, tag);
-    const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+    const rawSql = rawSqlOf(fns, tag);
 
     // Top-level field proxy produces IdentifierRef for createdAt.
     const createdAtExpr = {
@@ -183,6 +197,8 @@ describe('rawSql composition with the typed builder', () => {
 
     const epochExpr = rawSql`extract(epoch from ${createdAtExpr})`.returns('pg/int4@1');
 
+    // Functions<QC>.gt is typed via the generic QC; casting to a narrow concrete shape avoids
+    // threading the full QC type parameter through test scaffolding.
     const gtResult = (
       fns as unknown as { gt: (a: unknown, b: unknown) => { buildAst(): AnyExpression } }
     ).gt(epochExpr, 1_700_000_000);
@@ -203,7 +219,7 @@ describe('rawSql composition with the typed builder', () => {
     const tag = createRawSql(createPostgresAdapter());
 
     const fns = createAggregateFunctions({}, tag);
-    const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+    const rawSql = rawSqlOf(fns, tag);
 
     // Top-level field proxy produces IdentifierRef for score.
     const scoreExpr = {
@@ -212,6 +228,8 @@ describe('rawSql composition with the typed builder', () => {
     };
 
     const coalesced = rawSql`coalesce(${scoreExpr}, 0)`.returns('pg/int4@1');
+    // Functions<QC>.count is typed via the generic QC; casting to a narrow concrete shape avoids
+    // threading the full QC type parameter through test scaffolding.
     const countResult = (
       fns as unknown as { count: (expr: unknown) => { buildAst(): AnyExpression } }
     ).count(coalesced);
@@ -232,7 +250,7 @@ describe('rawSql composition with the typed builder', () => {
     const tag = createRawSql(createPostgresAdapter());
 
     const fns = createAggregateFunctions({}, tag);
-    const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+    const rawSql = rawSqlOf(fns, tag);
 
     const scoreExpr = {
       buildAst: () => IdentifierRef.of('score'),
@@ -265,7 +283,7 @@ describe('rawSql composition with the typed builder', () => {
     const tag = createRawSql(createPostgresAdapter());
 
     const fns = createAggregateFunctions({}, tag);
-    const rawSql = (fns as unknown as { rawSql: typeof tag }).rawSql;
+    const rawSql = rawSqlOf(fns, tag);
 
     const scoreExpr = {
       buildAst: () => IdentifierRef.of('score'),
