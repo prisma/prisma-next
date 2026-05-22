@@ -137,33 +137,45 @@ describe('SQLite adapter', () => {
       );
     });
 
-    // Mirrors the wrapped-subquery AST shape that
-    // `buildDistinctNonLeafChildRowsSelect` produces in the SQL ORM client
-    // planner for `include('rel', r => r.distinct(...).include('grandchild'))`.
-    // Postgres rejects equality on `json` aggregates, so the planner wraps
-    // a scalar `SELECT DISTINCT` in a derived table and attaches grandchild
-    // aggregates outside. The Postgres integration suite covers execution;
-    // this test covers the SQLite renderer side of TML-2656 AC2: the same
-    // AST must lower to valid SQLite SQL with no Postgres-only constructs.
-    it('renders wrapped SELECT DISTINCT subquery for non-leaf distinct includes', () => {
-      const innerDistinct = SelectAst.from(TableSource.named('post'))
+    // Mirrors the ROW_NUMBER-wrapped AST that the SQL ORM client planner
+    // produces for `include('rel', r => r.distinct(cols).include('grandchild'))`:
+    // an inner SELECT augments the projection with a
+    // `ROW_NUMBER() OVER (PARTITION BY <distinct cols> ORDER BY <ranking cols>)`
+    // column, wrapped in a derived table whose outer WHERE keeps only
+    // `__prisma_distinct_rn = 1` — one representative row per partition.
+    // The Postgres integration suite covers execution; this test pins the
+    // SQLite renderer side: the same AST must lower to valid SQLite SQL
+    // with no Postgres-only constructs.
+    it('renders ROW_NUMBER dedup subquery for non-leaf distinct includes', () => {
+      const innerRanked = SelectAst.from(TableSource.named('post'))
         .withProjection([
           ProjectionItem.of('title', ColumnRef.of('post', 'title')),
           ProjectionItem.of('id', ColumnRef.of('post', 'id')),
+          ProjectionItem.of(
+            '__prisma_distinct_rn',
+            WindowFuncExpr.rowNumber({
+              partitionBy: [ColumnRef.of('post', 'title')],
+              orderBy: [new OrderByItem(ColumnRef.of('post', 'title'), 'asc')],
+            }),
+          ),
         ])
-        .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ParamRef.of(1)))
-        .withDistinct();
+        .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ParamRef.of(1)));
 
-      const ast = SelectAst.from(
-        DerivedTableSource.as('posts__distinct', innerDistinct),
-      ).withProjection([ProjectionItem.of('title', ColumnRef.of('posts__distinct', 'title'))]);
+      const ast = SelectAst.from(DerivedTableSource.as('posts__distinct', innerRanked))
+        .withProjection([
+          ProjectionItem.of('title', ColumnRef.of('posts__distinct', 'title')),
+          ProjectionItem.of('id', ColumnRef.of('posts__distinct', 'id')),
+        ])
+        .withWhere(
+          BinaryExpr.eq(ColumnRef.of('posts__distinct', '__prisma_distinct_rn'), LiteralExpr.of(1)),
+        );
 
       const { sql } = adapter.lower(ast, { contract });
       // Full-string assertion: an exact-match check catches Postgres-only
       // leakage (`DISTINCT ON`, `LATERAL`, `::` casts) and brittle-substring
       // false positives in one pass.
       expect(sql).toEqual(
-        'SELECT "posts__distinct"."title" AS "title" FROM (SELECT DISTINCT "post"."title" AS "title", "post"."id" AS "id" FROM "post" WHERE "post"."userId" = ?) AS "posts__distinct"',
+        'SELECT "posts__distinct"."title" AS "title", "posts__distinct"."id" AS "id" FROM (SELECT "post"."title" AS "title", "post"."id" AS "id", ROW_NUMBER() OVER (PARTITION BY "post"."title" ORDER BY "post"."title" ASC) AS "__prisma_distinct_rn" FROM "post" WHERE "post"."userId" = ?) AS "posts__distinct" WHERE "posts__distinct"."__prisma_distinct_rn" = 1',
       );
     });
 
