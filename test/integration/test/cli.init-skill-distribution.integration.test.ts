@@ -11,6 +11,8 @@ const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 const SKILLS_BIN = resolve(WORKSPACE_ROOT, 'node_modules/.bin/skills');
 
 const NONINTERACTIVE_FLAGS = {
+  format: 'pretty',
+  explicitFormat: false,
   json: false,
   quiet: true,
   verbose: 0,
