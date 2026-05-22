@@ -538,12 +538,14 @@ async function executeMigrationPlanCommand(
       if (fromHash === toStorageHash) {
         const baselineOps = baselineLeg.value.hasPlaceholders ? [] : baselineLeg.value.plannedOps;
         if (baselineLeg.value.hasPlaceholders) {
+          const baselineDir = relative(process.cwd(), baselinePackageDir);
           const result: MigrationPlanResult = {
             ok: true,
             noOp: false,
             from: fromHash,
             to: toStorageHash,
-            baselineDir: relative(process.cwd(), baselinePackageDir),
+            dir: baselineDir,
+            baselineDir,
             operations: [],
             emittedExtensionDirs,
             pendingPlaceholders: true,
