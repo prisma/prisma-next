@@ -95,6 +95,13 @@ export function toExpr(value: unknown, codec?: CodecRef): AstExpression {
 }
 
 /**
+ * Construct a `ParamRef` for a value whose codec identity is known at call time. Use this when interpolating a value into a raw SQL expression and the codec cannot be inferred from context — e.g. `param(myDate, { codecId: 'pg/timestamptz@1' })`.
+ */
+export function param<T>(value: T, opts: { codecId: string }): ParamRef {
+  return ParamRef.of(value, { codec: { codecId: opts.codecId } });
+}
+
+/**
  * Derive the {@link CodecRef} carried by an expression-like value.
  *
  * Resolution order:

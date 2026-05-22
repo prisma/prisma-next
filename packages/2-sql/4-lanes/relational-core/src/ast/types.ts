@@ -20,6 +20,9 @@ export type AggregateFn = AggregateCountFn | AggregateOpFn;
  */
 export type WindowFn = 'row_number' | 'rank' | 'dense_rank';
 
+/** Scalar JS values that map directly to a SQL wire type. `Date` is excluded — it must be routed through `param(date, { codecId })` to select the target codec (timestamp vs. timestamptz, precision, timezone semantics). */
+export type RawSqlLiteral = number | bigint | string | boolean | Uint8Array;
+
 export interface ExpressionSource {
   toExpr(): AnyExpression;
 }
