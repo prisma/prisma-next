@@ -1730,7 +1730,11 @@ describe('PostgresControlAdapter', () => {
         },
       ]);
 
-      await expect(adapter.readAllMarkers(driver)).rejects.toMatchObject({ code: '3005' });
+      await expect(adapter.readAllMarkers(driver)).rejects.toSatisfy((err: unknown) => {
+        expect(CliStructuredError.is(err)).toBe(true);
+        expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+        return true;
+      });
     });
   });
 });
