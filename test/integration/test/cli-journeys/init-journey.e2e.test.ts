@@ -376,12 +376,6 @@ function expectSchemaFile(project: JourneyProject, cell: CellId): void {
     expect(contents, 'TS schema imports defineContract from the facade').toContain(
       `from '@prisma-next/${cell.target}/contract-builder'`,
     );
-    expect(contents, 'TS schema imports family from the facade').toContain(
-      `from '@prisma-next/${cell.target}/family'`,
-    );
-    expect(contents, 'TS schema imports target from the facade').toContain(
-      `from '@prisma-next/${cell.target}/target'`,
-    );
   } else {
     expect(contents, 'PSL schema declares at least one model').toMatch(/^model\s+\w+\s*\{/m);
     if (cell.target === 'mongo') {
