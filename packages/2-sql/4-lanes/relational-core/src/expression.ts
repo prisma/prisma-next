@@ -166,10 +166,11 @@ interface RawSqlAdapter {
 
 /** The one-method builder returned by a `RawSqlTag` template call before `.returns()` is called. */
 export interface RawSqlBuilder {
-  returns(spec: string | { codecId: string; nullable?: boolean }): Expression<{
-    codecId: string;
-    nullable: boolean;
-  }>;
+  returns<S extends string>(spec: S): Expression<{ codecId: S; nullable: false }>;
+  returns<S extends string, N extends boolean = false>(spec: {
+    readonly codecId: S;
+    readonly nullable?: N;
+  }): Expression<{ codecId: S; nullable: N }>;
 }
 
 /** Tagged-template function returned by {@link createRawSql}. */
@@ -224,7 +225,7 @@ export function createRawSql(adapter: RawSqlAdapter): RawSqlTag {
       }
     }
     return {
-      returns(spec) {
+      returns(spec: string | { readonly codecId: string; readonly nullable?: boolean }) {
         const codecId = typeof spec === 'string' ? spec : spec.codecId;
         const nullable = typeof spec === 'string' ? false : (spec.nullable ?? false);
         const returns: ParamSpec = { codecId, nullable };
@@ -232,8 +233,8 @@ export function createRawSql(adapter: RawSqlAdapter): RawSqlTag {
         return {
           returnType: { codecId, nullable },
           buildAst: () => node,
-        };
+        } as Expression<{ codecId: string; nullable: boolean }>;
       },
-    };
+    } as RawSqlBuilder;
   };
 }

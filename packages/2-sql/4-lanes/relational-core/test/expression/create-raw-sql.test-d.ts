@@ -1,4 +1,4 @@
-import { assertType, expectTypeOf, test } from 'vitest';
+import { assertType, test } from 'vitest';
 import { ColumnRef, type ParamRef, type RawSqlLiteral } from '../../src/exports/ast';
 import {
   buildOperation,
@@ -113,22 +113,19 @@ test('custom class instance is rejected as an interpolation', () => {
 
 // ── .returns() variants produce expected Expression types ────────────────────
 
-test('.returns(string) produces Expression<{ codecId: string; nullable: boolean }>', () => {
+test('.returns(string) preserves literal codecId and infers nullable: false', () => {
   const expr = rawSql`now()`.returns('pg/timestamptz');
-  expectTypeOf(expr.returnType.codecId).toBeString();
-  expectTypeOf(expr.returnType.nullable).toBeBoolean();
+  assertType<Expression<{ codecId: 'pg/timestamptz'; nullable: false }>>(expr);
 });
 
-test('.returns({ codecId }) produces Expression<{ codecId: string; nullable: boolean }>', () => {
-  const expr = rawSql`now()`.returns({ codecId: 'pg/timestamptz' });
-  expectTypeOf(expr.returnType.codecId).toBeString();
-  expectTypeOf(expr.returnType.nullable).toBeBoolean();
+test('.returns({ codecId }) preserves literal codecId and defaults nullable to false', () => {
+  const expr = rawSql`now()`.returns({ codecId: 'pg/int4' });
+  assertType<Expression<{ codecId: 'pg/int4'; nullable: false }>>(expr);
 });
 
-test('.returns({ codecId, nullable: true }) produces Expression with boolean nullable', () => {
+test('.returns({ codecId, nullable: true }) preserves literal codecId and literal nullable: true', () => {
   const expr = rawSql`now()`.returns({ codecId: 'pg/timestamptz', nullable: true });
-  expectTypeOf(expr.returnType.codecId).toBeString();
-  expectTypeOf(expr.returnType.nullable).toBeBoolean();
+  assertType<Expression<{ codecId: 'pg/timestamptz'; nullable: true }>>(expr);
 });
 
 // ── Multiple .returns() calls are structurally impossible ─────────────────────
