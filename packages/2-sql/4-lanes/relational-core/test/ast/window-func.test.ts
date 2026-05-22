@@ -17,7 +17,7 @@ describe('ast/WindowFuncExpr', () => {
   });
 
   it('drops empty partitionBy and orderBy to undefined', () => {
-    const expr = new WindowFuncExpr({ fn: 'row_number', partitionBy: [], orderBy: [] });
+    const expr = WindowFuncExpr.rowNumber({ partitionBy: [], orderBy: [] });
 
     expect(expr.partitionBy).toBeUndefined();
     expect(expr.orderBy).toBeUndefined();
