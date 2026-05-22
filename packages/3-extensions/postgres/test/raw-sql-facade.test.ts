@@ -112,7 +112,7 @@ function rawSqlOf(
   return (fns as unknown as { readonly rawSql: unknown }).rawSql;
 }
 
-describe('AC27: fns.rawSql reference equality with bound RawSqlTag', () => {
+describe('fns.rawSql reference equality with bound RawSqlTag', () => {
   it('createFunctions returns the same rawSqlTag reference for the rawSql key', () => {
     const tag: RawSqlTag = createRawSql(createPostgresAdapter());
     const fns = createFunctions({}, tag);
@@ -166,7 +166,7 @@ describe('AC27: fns.rawSql reference equality with bound RawSqlTag', () => {
   });
 });
 
-describe('AC12: param() override beats adapter inferCodec through rawSql tag', () => {
+describe('param() override beats adapter inferCodec through rawSql tag', () => {
   it('bare number interpolation uses adapter inferCodec (pg/int4 for safe integer)', () => {
     const adapter = createPostgresAdapter();
     const tag = createRawSql(adapter);
