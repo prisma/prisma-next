@@ -435,8 +435,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
           commandArgs.includes('--agent') &&
           commandArgs.includes('cursor') &&
           commandArgs.includes('claude-code') &&
-          commandArgs.includes('codex') &&
-          commandArgs.includes('windsurf')
+          commandArgs.includes('codex')
         );
       }),
     ).toBe(true);

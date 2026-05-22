@@ -5,6 +5,10 @@ import { join, resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { INIT_EXIT_OK } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/exit-codes';
 import { runInit } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/init';
+import {
+  DEFAULT_SKILL_AGENTS,
+  isWindsurfDetected,
+} from '../../../packages/1-framework/3-tooling/cli/src/commands/init/skill-install';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
@@ -84,7 +88,10 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       expect(exitCode).toBe(INIT_EXIT_OK);
 
       const loggedCommands = readLoggedCommands(logPath);
-      const consolidatedAgentFlags = '--agent cursor claude-code codex windsurf --skill * -y';
+      const agents = isWindsurfDetected({ baseDir: testDir })
+        ? DEFAULT_SKILL_AGENTS
+        : DEFAULT_SKILL_AGENTS.filter((agent) => agent !== 'windsurf');
+      const consolidatedAgentFlags = `--agent ${agents.join(' ')} --skill * -y`;
       expect(loggedCommands).toContain(
         `dlx skills@latest add ${workspaceClone}/skills ${consolidatedAgentFlags}`,
       );
