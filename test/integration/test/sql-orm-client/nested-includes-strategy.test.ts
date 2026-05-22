@@ -452,35 +452,25 @@ describe('integration/nested-includes/strategy', () => {
   });
 
   // ===========================================================================
-  // `distinct()` on a non-leaf include used to stay on multi-query because
-  // the single-query lowering emitted `SELECT DISTINCT <scalars>, json_agg(...)`
-  // which Postgres rejects on `json` equality. TML-2656 replaced the
-  // dispatch gate with a wrapped-subquery lowering in the planner: the
-  // shape now resolves in a single SQL execution under both lateral and
-  // correlated capabilities.
+  // Sentinel coverage for the dispatch boundary: include trees with
+  // `distinct()` on a non-leaf level must resolve via the single-query
+  // strategies (lateral / correlated). A regression that flips dispatch
+  // back to multi-query is caught here at the dispatch boundary, not
+  // only downstream in the dedicated distinct suites.
   //
   // Result-shape coverage — hasMany/belongsTo grandchild variants, force-
   // included join keys, depth-3 trees, self-relations, refinements,
   // empty grandchildren — lives in:
   //   - test/integration/nested-includes-distinct.test.ts
   //   - test/integration/nested-includes-distinct-refinements.test.ts
-  //
-  // The cases below remain in this file as the strategy-suite sentinels:
-  // they are the inverse of the pre-fix "stays on multi-query" cases,
-  // pinned to the strategy-selection contract so a regression flipping
-  // the dispatch back to multi-query is caught here at the dispatch
-  // boundary, not only downstream in the dedicated distinct suites.
   // ===========================================================================
 
   describe('non-leaf includes with distinct() resolve in a single SQL execution', () => {
     it(
       'distinct() on a non-leaf include resolves in 1 execution under lateral and correlated capabilities',
       async () => {
-        // Both strategy variants are exercised against the same seeded
-        // dataset under one `withCollectionRuntime` to stay under the
-        // per-file PGlite-spinup threshold documented in
-        // `nested-includes-helpers.ts`. Result-shape coverage lives in
-        // the dedicated `nested-includes-distinct*.test.ts` suites.
+        // Both strategy variants share one `withCollectionRuntime` spinup
+        // for the reason documented in `nested-includes-helpers.ts`.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [
