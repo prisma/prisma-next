@@ -232,6 +232,7 @@ function makeBuilderContext(rawSqlTag: RawSqlTag): DbWithUsers {
     },
     queryOperations: { entries: () => ({}) },
     applyMutationDefaults: () => [],
+    // stub context for builder-chain reference-equality test; no real ExecutionContext fixture exists in this package
   } as unknown as ExecutionContext<Contract<SqlStorage>>;
   return sql({ context: stubContext, rawSqlTag }) as unknown as DbWithUsers;
 }
