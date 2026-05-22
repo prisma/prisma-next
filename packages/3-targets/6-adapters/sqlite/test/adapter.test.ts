@@ -25,6 +25,7 @@ import {
   SubqueryExpr,
   TableSource,
   UpdateAst,
+  WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { describe, expect, it } from 'vitest';
@@ -116,6 +117,24 @@ describe('SQLite adapter', () => {
 
       const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('SELECT DISTINCT');
+    });
+
+    it('renders ROW_NUMBER() OVER (PARTITION BY … ORDER BY …)', () => {
+      const ast = SelectAst.from(TableSource.named('post')).withProjection([
+        ProjectionItem.of('title', ColumnRef.of('post', 'title')),
+        ProjectionItem.of(
+          'rn',
+          WindowFuncExpr.rowNumber({
+            partitionBy: [ColumnRef.of('post', 'title')],
+            orderBy: [new OrderByItem(ColumnRef.of('post', 'views'), 'desc')],
+          }),
+        ),
+      ]);
+
+      const { sql } = adapter.lower(ast, { contract });
+      expect(sql).toEqual(
+        'SELECT "post"."title" AS "title", ROW_NUMBER() OVER (PARTITION BY "post"."title" ORDER BY "post"."views" DESC) AS "rn" FROM "post"',
+      );
     });
 
     // Mirrors the wrapped-subquery AST shape that

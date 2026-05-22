@@ -15,6 +15,7 @@ import {
   LiteralExpr,
   NullCheckExpr,
   OperationExpr,
+  OrderByItem,
   OrExpr,
   ParamRef,
   ProjectionItem,
@@ -24,6 +25,7 @@ import {
   SubqueryExpr,
   TableSource,
   UpdateAst,
+  WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -254,6 +256,24 @@ describe('Postgres adapter', () => {
 
     expect(sql).toBe(
       `SELECT 12 AS "bigintValue", '2024-01-01T00:00:00.000Z' AS "createdAtLiteral", ARRAY[1, 'two'] AS "arrayValue", '{"ok":true}' AS "jsonValue", NULL AS "missingValue" FROM "user"`,
+    );
+  });
+
+  it('renders ROW_NUMBER() OVER (PARTITION BY … ORDER BY …)', () => {
+    const ast = SelectAst.from(TableSource.named('post')).withProjection([
+      ProjectionItem.of('title', ColumnRef.of('post', 'title')),
+      ProjectionItem.of(
+        'rn',
+        WindowFuncExpr.rowNumber({
+          partitionBy: [ColumnRef.of('post', 'title')],
+          orderBy: [OrderByItem.desc(ColumnRef.of('post', 'views'))],
+        }),
+      ),
+    ]);
+
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
+    expect(sql).toEqual(
+      'SELECT "post"."title" AS "title", ROW_NUMBER() OVER (PARTITION BY "post"."title" ORDER BY "post"."views" DESC) AS "rn" FROM "post"',
     );
   });
 

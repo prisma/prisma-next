@@ -28,6 +28,7 @@ import type {
   SqlQueryable,
   SubqueryExpr,
   UpdateAst,
+  WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
@@ -199,6 +200,8 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return renderSubqueryExpr(node, contract);
     case 'aggregate':
       return renderAggregateExpr(node, contract);
+    case 'window-func':
+      return renderWindowFuncExpr(node, contract);
     case 'json-object':
       return renderJsonObjectExpr(node, contract);
     case 'json-array-agg':
@@ -365,6 +368,21 @@ function renderAggregateExpr(expr: AggregateExpr, contract?: SqliteContract): st
     return `${fn}(*)`;
   }
   return `${fn}(${renderExpr(expr.expr, contract)})`;
+}
+
+function renderWindowFuncExpr(expr: WindowFuncExpr, contract?: SqliteContract): string {
+  const fn = expr.fn.toUpperCase();
+  const args = expr.args.map((arg) => renderExpr(arg, contract)).join(', ');
+  const partitionClause =
+    expr.partitionBy && expr.partitionBy.length > 0
+      ? `PARTITION BY ${expr.partitionBy.map((e) => renderExpr(e, contract)).join(', ')}`
+      : '';
+  const orderClause =
+    expr.orderBy && expr.orderBy.length > 0
+      ? `ORDER BY ${renderOrderByItems(expr.orderBy, contract)}`
+      : '';
+  const over = [partitionClause, orderClause].filter((part) => part.length > 0).join(' ');
+  return `${fn}(${args}) OVER (${over})`;
 }
 
 function renderJsonObjectExpr(expr: JsonObjectExpr, contract?: SqliteContract): string {

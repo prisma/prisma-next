@@ -10,6 +10,15 @@ export type AggregateCountFn = 'count';
 export type AggregateOpFn = 'sum' | 'avg' | 'min' | 'max';
 export type AggregateFn = AggregateCountFn | AggregateOpFn;
 
+/**
+ * Window function names. Currently only `row_number` is wired up — added
+ * to support `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) = 1`
+ * lowering for `.distinct(cols)` semantics in the SQL ORM client. `rank`
+ * and `dense_rank` are reserved here so future additions don't churn the
+ * type; renderers only need to dispatch on the function name string.
+ */
+export type WindowFn = 'row_number' | 'rank' | 'dense_rank';
+
 export interface ExpressionSource {
   toExpr(): AnyExpression;
 }
@@ -35,6 +44,7 @@ export interface ExprVisitor<R> {
   subquery(expr: SubqueryExpr): R;
   operation(expr: OperationExpr): R;
   aggregate(expr: AggregateExpr): R;
+  windowFunc(expr: WindowFuncExpr): R;
   jsonObject(expr: JsonObjectExpr): R;
   jsonArrayAgg(expr: JsonArrayAggExpr): R;
   binary(expr: BinaryExpr): R;
@@ -651,6 +661,77 @@ export class AggregateExpr extends Expression {
 
   override fold<T>(folder: ExpressionFolder<T>): T {
     return this.expr ? this.expr.fold(folder) : folder.empty;
+  }
+}
+
+/**
+ * Window function call: `fn(args) OVER (PARTITION BY ... ORDER BY ...)`.
+ *
+ * Both `partitionBy` and `orderBy` are optional; an empty `OVER ()`
+ * clause is legal SQL but rarely useful. For `ROW_NUMBER`, `RANK`, and
+ * `DENSE_RANK` the standard mandates an `ORDER BY` for deterministic
+ * results — callers are expected to provide one, but the AST does not
+ * enforce it.
+ *
+ * The `args` slot exists for future window function additions that take
+ * arguments (e.g. `COUNT(*) OVER`, `SUM(x) OVER`); `ROW_NUMBER` and the
+ * other ranking functions take no arguments.
+ */
+export class WindowFuncExpr extends Expression {
+  readonly kind = 'window-func' as const;
+  readonly fn: WindowFn;
+  readonly args: ReadonlyArray<AnyExpression>;
+  readonly partitionBy: ReadonlyArray<AnyExpression> | undefined;
+  readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
+
+  constructor(options: {
+    readonly fn: WindowFn;
+    readonly args?: ReadonlyArray<AnyExpression>;
+    readonly partitionBy?: ReadonlyArray<AnyExpression>;
+    readonly orderBy?: ReadonlyArray<OrderByItem>;
+  }) {
+    super();
+    this.fn = options.fn;
+    this.args = options.args && options.args.length > 0 ? frozenArrayCopy(options.args) : [];
+    this.partitionBy =
+      options.partitionBy && options.partitionBy.length > 0
+        ? frozenArrayCopy(options.partitionBy)
+        : undefined;
+    this.orderBy =
+      options.orderBy && options.orderBy.length > 0 ? frozenArrayCopy(options.orderBy) : undefined;
+    this.freeze();
+  }
+
+  static rowNumber(options: {
+    readonly partitionBy?: ReadonlyArray<AnyExpression>;
+    readonly orderBy?: ReadonlyArray<OrderByItem>;
+  }): WindowFuncExpr {
+    return new WindowFuncExpr({ fn: 'row_number', ...options });
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.windowFunc(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new WindowFuncExpr({
+      fn: this.fn,
+      args: this.args.map((arg) => arg.rewrite(rewriter)),
+      ...(this.partitionBy === undefined
+        ? {}
+        : { partitionBy: this.partitionBy.map((expr) => expr.rewrite(rewriter)) }),
+      ...(this.orderBy === undefined
+        ? {}
+        : { orderBy: this.orderBy.map((orderItem) => orderItem.rewrite(rewriter)) }),
+    });
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return combineAll(folder, [
+      ...this.args.map((arg) => () => arg.fold(folder)),
+      ...(this.partitionBy ?? []).map((expr) => () => expr.fold(folder)),
+      ...(this.orderBy ?? []).map((orderItem) => () => orderItem.expr.fold(folder)),
+    ]);
   }
 }
 
@@ -1758,6 +1839,7 @@ export type AnyExpression =
   | SubqueryExpr
   | OperationExpr
   | AggregateExpr
+  | WindowFuncExpr
   | JsonObjectExpr
   | JsonArrayAggExpr
   | ListExpression

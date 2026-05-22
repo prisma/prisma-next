@@ -27,6 +27,7 @@ import {
   type SelectAst,
   type SubqueryExpr,
   type UpdateAst,
+  type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -333,6 +334,7 @@ function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
     case 'prepared-param-ref':
     case 'literal':
     case 'aggregate':
+    case 'window-func':
     case 'json-object':
     case 'json-array-agg':
     case 'list':
@@ -439,6 +441,25 @@ function renderAggregateExpr(
   return `${fn}(${renderExpr(expr.expr, contract, pim)})`;
 }
 
+function renderWindowFuncExpr(
+  expr: WindowFuncExpr,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
+  const fn = expr.fn.toUpperCase();
+  const args = expr.args.map((arg) => renderExpr(arg, contract, pim)).join(', ');
+  const partitionClause =
+    expr.partitionBy && expr.partitionBy.length > 0
+      ? `PARTITION BY ${expr.partitionBy.map((e) => renderExpr(e, contract, pim)).join(', ')}`
+      : '';
+  const orderClause =
+    expr.orderBy && expr.orderBy.length > 0
+      ? `ORDER BY ${renderOrderByItems(expr.orderBy, contract, pim)}`
+      : '';
+  const over = [partitionClause, orderClause].filter((part) => part.length > 0).join(' ');
+  return `${fn}(${args}) OVER (${over})`;
+}
+
 function renderJsonObjectExpr(
   expr: JsonObjectExpr,
   contract: PostgresContract,
@@ -495,6 +516,8 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
       return renderSubqueryExpr(node, contract, pim);
     case 'aggregate':
       return renderAggregateExpr(node, contract, pim);
+    case 'window-func':
+      return renderWindowFuncExpr(node, contract, pim);
     case 'json-object':
       return renderJsonObjectExpr(node, contract, pim);
     case 'json-array-agg':
