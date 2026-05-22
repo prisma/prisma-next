@@ -271,6 +271,7 @@ export interface MigrationApplyCommandOutputResult {
   readonly timings?: {
     readonly total: number;
   };
+  readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
 }
 
 export function formatMigrationApplyCommandOutput(
@@ -293,6 +294,13 @@ export function formatMigrationApplyCommandOutput(
     for (const line of formatPerSpaceBlock(result.perSpace, 'apply', useColor)) {
       lines.push(line);
     }
+  }
+
+  if (result.advancedRef) {
+    lines.push('');
+    lines.push(
+      formatDimText(`Advanced ref "${result.advancedRef.name}" → ${result.advancedRef.hash}`),
+    );
   }
 
   lines.push('');

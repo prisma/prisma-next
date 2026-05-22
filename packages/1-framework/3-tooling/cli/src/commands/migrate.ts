@@ -8,6 +8,7 @@ import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { join } from 'pathe';
 
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
@@ -44,6 +45,7 @@ import { formatMigrationApplyCommandOutput } from '../utils/formatters/migration
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { executeRefAdvancement, readContractIR } from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -51,6 +53,7 @@ interface MigrateCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly to?: string;
+  readonly advanceRef?: string;
 }
 
 export interface MigrateResult {
@@ -72,6 +75,7 @@ export interface MigrateResult {
   readonly timings: {
     readonly total: number;
   };
+  readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
 }
 
 function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
@@ -268,6 +272,53 @@ async function executeMigrateCommand(
 
     const { value } = applyResult;
 
+    let advancedRef: { name: string; hash: string } | null = null;
+    if (options.advanceRef !== undefined) {
+      let contractJsonPathForSnapshot = contractPathAbsolute;
+      let contractJsonForSnapshot: Record<string, unknown> = JSON.parse(contractContent) as Record<
+        string,
+        unknown
+      >;
+      if (toArg && refEntry) {
+        const matchingBundle = appPackages.bundles.find((p) => p.metadata.to === refEntry.hash);
+        if (matchingBundle) {
+          const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
+          contractJsonPathForSnapshot = endContractPath;
+          try {
+            const raw = await readFile(endContractPath, 'utf-8');
+            contractJsonForSnapshot = JSON.parse(raw) as Record<string, unknown>;
+          } catch (error) {
+            if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+              return notOk(
+                errorFileNotFound(endContractPath, {
+                  why: `Bundle end-contract not found at ${endContractPath}`,
+                  fix: 'Re-emit the migration bundle or pick a different --to target.',
+                }),
+              );
+            }
+            throw error;
+          }
+        }
+      }
+      try {
+        const contractIR = await readContractIR(
+          contractJsonForSnapshot,
+          contractJsonPathForSnapshot,
+        );
+        advancedRef = await executeRefAdvancement(
+          refsDir,
+          options.advanceRef,
+          value.markerHash,
+          contractIR,
+        );
+      } catch (error) {
+        if (MigrationToolsError.is(error)) {
+          return notOk(mapMigrationToolsError(error));
+        }
+        throw error;
+      }
+    }
+
     return ok({
       ok: true,
       migrationsApplied: value.migrationsApplied,
@@ -278,6 +329,7 @@ async function executeMigrateCommand(
       perSpace: value.perSpace,
       ...ifDefined('pathDecision', value.pathDecision),
       timings: { total: Date.now() - startTime },
+      ...(options.advanceRef !== undefined ? { advancedRef } : {}),
     });
   } catch (error) {
     if (CliStructuredError.is(error)) {
@@ -318,6 +370,7 @@ export function createMigrateCommand(): Command {
       '--to <contract>',
       'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
+    .option('--advance-ref <name>', 'Advance the named ref to the post-apply marker after success')
     .action(async (options: MigrateCommandOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const startTime = Date.now();
