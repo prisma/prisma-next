@@ -3,8 +3,8 @@ import type { ParamSpec } from '@prisma-next/operations';
 import type { QueryOperationReturn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { CodecRef } from './ast/codec-types';
-import type { AnyExpression as AstExpression } from './ast/types';
-import { OperationExpr, ParamRef } from './ast/types';
+import type { AnyExpression as AstExpression, RawSqlLiteral } from './ast/types';
+import { OperationExpr, ParamRef, RawExpr } from './ast/types';
 
 export type ScopeField = {
   codecId: string;
@@ -157,5 +157,83 @@ export function buildOperation<R extends ScopeField>(spec: BuildOperationSpec<R>
   return {
     returnType: spec.returns,
     buildAst: () => op,
+  };
+}
+
+interface RawSqlAdapter {
+  inferCodec(value: RawSqlLiteral): string;
+}
+
+/** The one-method builder returned by a `RawSqlTag` template call before `.returns()` is called. */
+export interface RawSqlBuilder {
+  returns(spec: string | { codecId: string; nullable?: boolean }): Expression<{
+    codecId: string;
+    nullable: boolean;
+  }>;
+}
+
+/** Tagged-template function returned by {@link createRawSql}. */
+export type RawSqlTag = (
+  strings: TemplateStringsArray,
+  ...values: RawSqlInterpolation[]
+) => RawSqlBuilder;
+
+type RawSqlInterpolation = Expression<ScopeField> | ParamRef | RawSqlLiteral;
+
+function resolveInterpolation(
+  adapter: RawSqlAdapter,
+  value: RawSqlInterpolation,
+): AstExpression | ParamRef {
+  if (isExpressionLike(value)) {
+    return value.buildAst();
+  }
+  if (value instanceof ParamRef) {
+    return value;
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    value instanceof Uint8Array
+  ) {
+    return ParamRef.of(value, { codec: { codecId: adapter.inferCodec(value) } });
+  }
+  throw runtimeError(
+    'RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION',
+    'unsupported JS value type for raw-SQL interpolation; wrap in `param(...)`',
+  );
+}
+
+/**
+ * Create a tagged-template builder for raw SQL expressions. The returned tag accepts SQL string fragments interleaved with typed {@link Expression}, {@link ParamRef}, or bare {@link RawSqlLiteral} interpolations. Call `.returns(spec)` on the result to obtain a typed {@link Expression} whose AST is a {@link RawExpr}.
+ *
+ * Bare {@link RawSqlLiteral} interpolations are wrapped as `ParamRef` nodes with the codec resolved via `adapter.inferCodec(value)`. Use {@link param} when the codec cannot be inferred from the value alone (e.g. `Date`).
+ */
+export function createRawSql(adapter: RawSqlAdapter): RawSqlTag {
+  return (strings, ...values) => {
+    const parts: (string | AstExpression | ParamRef)[] = [];
+    for (let i = 0; i < strings.length; i++) {
+      const fragment = strings[i] ?? '';
+      parts.push(fragment);
+      if (i < values.length) {
+        const interpolation = values[i];
+        if (interpolation !== undefined) {
+          parts.push(resolveInterpolation(adapter, interpolation));
+        }
+      }
+    }
+    return {
+      returns(spec) {
+        const codecId = typeof spec === 'string' ? spec : spec.codecId;
+        const nullable = typeof spec === 'string' ? false : (spec.nullable ?? false);
+        const returns: ParamSpec = { codecId, nullable };
+        const node = new RawExpr({ parts, returns });
+        return {
+          returnType: { codecId, nullable },
+          buildAst: () => node,
+        };
+      },
+    };
   };
 }
