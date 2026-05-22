@@ -24,6 +24,7 @@ import {
   SelectAst,
   SubqueryExpr,
   UpdateAst,
+  WindowFuncExpr,
 } from '../../src/exports/ast';
 import { col, lowerExpr, param, table } from './test-helpers';
 
@@ -43,6 +44,13 @@ const allKindEntries: Array<[string, { kind: string }]> = [
   ['SubqueryExpr', SubqueryExpr.of(minimalSelect)],
   ['OperationExpr', lowerExpr(col('t', 'name'))],
   ['AggregateExpr', AggregateExpr.count()],
+  [
+    'WindowFuncExpr',
+    WindowFuncExpr.rowNumber({
+      partitionBy: [col('t', 'id')],
+      orderBy: [OrderByItem.asc(col('t', 'id'))],
+    }),
+  ],
   ['JsonObjectExpr', JsonObjectExpr.fromEntries([{ key: 'k', value: col('t', 'v') }])],
   ['JsonArrayAggExpr', JsonArrayAggExpr.of(col('t', 'v'))],
   ['ListExpression', ListExpression.of([param(1)])],
@@ -75,6 +83,7 @@ describe('AST kind discriminants', () => {
     ['SubqueryExpr', 'subquery'],
     ['OperationExpr', 'operation'],
     ['AggregateExpr', 'aggregate'],
+    ['WindowFuncExpr', 'window-func'],
     ['JsonObjectExpr', 'json-object'],
     ['JsonArrayAggExpr', 'json-array-agg'],
     ['ListExpression', 'list'],

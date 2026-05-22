@@ -88,6 +88,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
     subquery: rejectHavingExpr,
     operation: rejectHavingExpr,
     aggregate: rejectHavingExpr,
+    windowFunc: rejectHavingExpr,
     jsonObject: rejectHavingExpr,
     jsonArrayAgg: rejectHavingExpr,
     literal: rejectHavingExpr,
