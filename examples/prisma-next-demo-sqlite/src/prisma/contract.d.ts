@@ -19,7 +19,7 @@ export type StorageHash =
 export type ExecutionHash =
   ExecutionHashBase<'sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7'>;
+  ProfileHashBase<'sha256:947828dba5c24ac64fdfce0f6c118a8d7cf3574b0555b7fd419d8f809d61377d'>;
 
 export type CodecTypes = SqliteTypes;
 export type LaneCodecTypes = CodecTypes;
