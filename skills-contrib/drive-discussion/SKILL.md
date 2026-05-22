@@ -3,17 +3,18 @@ name: drive-discussion
 description: >
   Drops the agent into a structured Q&A mode that iterates with the user toward a
   complete understanding of a topic, then documents the outcome (project spec, plan,
-  decision record, or whatever shape fits). Adopts personas from
-  `drive-agent-personas` — named by the user, or inferred and announced. Invoke when
-  a design question or load-bearing assumption needs collaborative resolution: pre-spec
-  (before/inside `drive-specify-project` or `drive-specify-slice`), when a spec session
-  hits a fork-in-the-road (mid-spec), when an implementation observation falsifies a
-  load-bearing assumption (mid-flight, per I12), when an obstacle emerges that the plan
-  doesn't account for, or when the user asks ("discussion mode", "pressure-test this",
-  "let's design this", "design mode", "tech design mode", "product mode", "pm mode",
-  "challenge my idea").
-  Do NOT invoke for simple clarifying questions, implementation work (read-only by
-  design), or pressure-testing a finished artefact (use a review skill instead).
+  decision record, or whatever shape fits). Adopts one or more personas from the
+  `drive-agent-personas` library — named by the user or inferred from context and
+  announced. Invoke when a design question or load-bearing assumption needs
+  collaborative resolution — in `drive-specify-project` or `drive-specify-slice`
+  (pre-spec), when spec authoring hits a fork needing a collaborative pick
+  (mid-spec), when implementation falsifies a load-bearing assumption
+  (mid-flight, I12), when an unplanned obstacle emerges, or when the user
+  explicitly asks ("discussion mode", "pressure-test this", "let's design
+  this", "design mode", "tech design mode", "product mode", "pm mode",
+  "challenge my idea"). Do NOT invoke for simple clarifying questions,
+  implementation (read-only), or pressure-testing a finished artefact (use a
+  review skill instead).
 ---
 
 > **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
