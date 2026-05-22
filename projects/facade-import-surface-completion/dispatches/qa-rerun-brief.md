@@ -2,17 +2,17 @@
 
 **Branch:** `tml-2526-facades-must-re-export-everything-users-import-in-their-app`
 **Worktree:** `/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2526-facades-must-re-export-everything-users-import-in-their-app`
-**Target HEAD:** the post-tiny-fixes push (set by orchestrator before dispatch — orchestrator will replace `<HEAD-SHA>` in this brief at dispatch time with the actual sha; if you find the placeholder unsubstituted, abort and report).
+**Target HEAD:** the post-rebase-cleanup push (the rebase-cleanup dispatch resolved two reds the orchestrator initially classified as pre-existing — they were actually our own rebase-resolution misses; pre-flight is now fully green).
 
-**Target HEAD sha:** `<HEAD-SHA>`
+**Target HEAD sha:** `c5cdb597e`
 
 ## Why this re-run exists
 
-The first QA run (`manual-qa-reports/2026-05-21-claude-opus-runner-1.md`) returned `❌ Fail` because of two PR-introduced regressions (F-1 e2e-tests missing `@prisma-next/sqlite` dep; F-2 sql-orm-client emit script wrong `cd` depth). Those have since been fixed and the branch has been rebased onto `origin/main`, which pulled in TML-2614 (`db.close()` / `[Symbol.asyncDispose]`) — meaning script-scaffolding scenarios can now teardown cleanly with `await using db = ...` instead of hanging.
+The first QA run (`manual-qa-reports/2026-05-21-claude-opus-runner-1.md`) returned `❌ Fail` because of two PR-introduced regressions (F-1 e2e-tests missing `@prisma-next/sqlite` dep; F-2 sql-orm-client emit script wrong `cd` depth). Those were fixed in the tiny-fixes dispatch, and the branch has since been rebased onto `origin/main`, which pulled in TML-2614 (`db.close()` / `[Symbol.asyncDispose]`) — meaning script-scaffolding scenarios can now teardown cleanly with `await using db = ...` instead of hanging. The rebase-cleanup dispatch then resolved two more reds (TML-2520 IR shape in `helpers.ts` + missing `unbound-tables.ts` at integration) that had blocked typecheck.
 
 This re-run validates:
 
-1. **Pre-flight gate is green now** (confirms F-1 and F-2 fixes are real, not papered over).
+1. **Pre-flight gate is green now** (confirms F-1 and F-2 fixes are real, plus the rebase-cleanup landed without regressions).
 2. **Scenarios 1, 2, 4 still pass against the post-rebase tree** (the rebase swept across `package.json`, lockfile, and infrastructure code — re-validate that the slice's user-visible behaviour survived).
 3. **Scenarios 1 and 2 (script-scaffolding) exercise `db.close()` / `await using` where applicable** — produce evidence the scripts terminate cleanly (no `<5s wait then SIGINT>` workaround needed for the demo-config db handles).
 
