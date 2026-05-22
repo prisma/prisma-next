@@ -24,6 +24,7 @@ import type {
   OperationExpr,
   OrderByItem,
   ProjectionItem,
+  RawExpr,
   SelectAst,
   SqlQueryable,
   SubqueryExpr,
@@ -234,9 +235,17 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return renderLiteral(node);
     case 'list':
       return renderListLiteral(node);
+    case 'raw-sql':
+      return renderRawExpr(node, contract);
     default:
       throw new Error(`Unsupported expression node kind: ${(node as { kind: string }).kind}`);
   }
+}
+
+function renderRawExpr(node: RawExpr, contract?: SqliteContract): string {
+  return node.parts
+    .map((part) => (typeof part === 'string' ? part : renderExpr(part, contract)))
+    .join('');
 }
 
 // `excluded` is a pseudo-table in ON CONFLICT DO UPDATE that references the row proposed for insertion. It is not quoted because it's a keyword.
