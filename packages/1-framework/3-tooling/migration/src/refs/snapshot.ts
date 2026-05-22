@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { type } from 'arktype';
@@ -35,7 +36,7 @@ function snapshotDtsPath(refsDir: string, name: string): string {
 function tmpPathFor(finalPath: string): string {
   const dir = dirname(finalPath);
   const fileName = basename(finalPath);
-  return join(dir, `.${fileName}.${Date.now()}.tmp`);
+  return join(dir, `.${fileName}.${Date.now()}-${randomBytes(4).toString('hex')}.tmp`);
 }
 
 async function atomicWriteFile(finalPath: string, content: string): Promise<void> {

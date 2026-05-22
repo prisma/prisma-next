@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContractIR } from '../../src/refs/snapshot';
 
 const fsMocks = vi.hoisted(() => ({
@@ -30,6 +30,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       return actual.unlink(path);
     },
   };
+});
+
+afterAll(() => {
+  vi.doUnmock('node:fs/promises');
 });
 
 import { rm, unlink } from 'node:fs/promises';
