@@ -79,6 +79,8 @@ Evidence to capture (used by every pass):
 - `git diff --name-only origin/<base>...HEAD`
 - `git diff origin/<base>...HEAD`
 
+**Use three-dot (`...`) for diffs; two-dot (`..`) is wrong for scope checks.** `git diff A...B` shows what `B` has that the *merge-base* of A and B does not — i.e. *just the branch's changes*. `git diff A..B` is the symmetric diff between the two tips and includes everything `A` has gained since the branch diverged, which on a long-lived `origin/main` is unrelated churn. The trap is silent: the diff "works", just with the wrong contents — so a scope check using two-dot will surface files the branch never touched and you'll waste time investigating phantom out-of-scope changes. For `git log`, `..` is correct (range, not diff), which is why the commands above mix syntaxes.
+
 PR discovery hints:
 
 - `gh pr view --json number,url,title,body,baseRefName,headRefName`
