@@ -9,8 +9,21 @@ import {
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
+import {
+  createSqlContractSchema,
+  validateSqlContractFully,
+} from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
+import { type Type, type } from 'arktype';
+
+const NamespaceRawSchema = type({
+  id: 'string',
+  'kind?': 'string',
+});
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
 
@@ -41,9 +54,20 @@ export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
 export abstract class SqlContractSerializerBase<TContract extends Contract<SqlStorage>>
   implements ContractSerializer<TContract>
 {
+  private readonly contractSchema: Type<unknown> | undefined;
+
   constructor(
-    private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>,
-  ) {}
+    private readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory> = new Map(),
+    validatorFragments?: ReadonlyMap<string, Type<unknown>>,
+  ) {
+    // Only build a fragments-aware contract schema when pack contributions
+    // exist. The cached module-level default in `validators.ts` covers the
+    // no-contributions case and avoids per-instance schema compilation.
+    this.contractSchema =
+      validatorFragments !== undefined && validatorFragments.size > 0
+        ? createSqlContractSchema(validatorFragments)
+        : undefined;
+  }
 
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
     const validated = this.parseSqlContractStructure(json);
@@ -56,7 +80,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   }
 
   protected parseSqlContractStructure(json: unknown): Contract<SqlStorage> {
-    return validateSqlContractFully<Contract<SqlStorage>>(json);
+    return validateSqlContractFully<Contract<SqlStorage>>(
+      json,
+      this.contractSchema !== undefined ? { contractSchema: this.contractSchema } : undefined,
+    );
   }
 
   protected hydrateSqlStorage(validated: Contract<SqlStorage>): Contract<SqlStorage> {
@@ -103,26 +130,76 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const obj = raw as {
-      id?: string;
-      tables?: Record<string, unknown>;
-      types?: Record<string, unknown>;
-    };
-    if (obj.types !== undefined && Object.keys(obj.types).length > 0) {
+    const rawRecord = isPlainRecord(raw) ? raw : {};
+    const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
+    const parsed = NamespaceRawSchema({ ...rawRecord, id });
+    if (parsed instanceof type.errors) {
+      const messages = parsed.map((p: { message: string }) => p.message).join('; ');
+      throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
+    }
+    const result: Record<string, unknown> = { id };
+
+    for (const [propertyKey, slotValue] of Object.entries(parsed)) {
+      if (propertyKey === 'id') continue;
+      if (slotValue === null || typeof slotValue !== 'object') continue;
+
+      if (propertyKey === 'tables') {
+        result['tables'] = Object.fromEntries(
+          Object.entries(slotValue as Record<string, unknown>).map(([tableName, table]) => [
+            tableName,
+            table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
+          ]),
+        );
+        continue;
+      }
+
+      const hydratedSlot = Object.fromEntries(
+        Object.entries(slotValue as Record<string, unknown>).map(([entryName, entry]) => {
+          if (typeof entry !== 'object' || entry === null) {
+            return [entryName, entry];
+          }
+          const kind = (entry as { kind?: unknown }).kind;
+          if (typeof kind === 'string') {
+            const factory = this.entityTypeRegistry.get(kind);
+            if (factory !== undefined) {
+              return [entryName, factory(entry)];
+            }
+          }
+          return [entryName, entry];
+        }),
+      );
+      if (Object.keys(hydratedSlot).length > 0) {
+        result[propertyKey] = hydratedSlot;
+      }
+    }
+
+    const typesRaw = rawRecord['types'];
+    const hasUnhydratedPostgresEnumEntry =
+      typesRaw !== undefined &&
+      typeof typesRaw === 'object' &&
+      typesRaw !== null &&
+      Object.values(typesRaw as Record<string, unknown>).some(
+        (entry) =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          (entry as { kind?: unknown }).kind === 'postgres-enum',
+      );
+    if (
+      hasUnhydratedPostgresEnumEntry &&
+      this.entityTypeRegistry.get('postgres-enum') === undefined
+    ) {
       throw new ContractValidationError(
         'Per-schema database types (e.g. postgres-enum) under storage.namespaces[..].types require PostgresContractSerializer.',
         'structural',
       );
     }
-    const tables = Object.fromEntries(
-      Object.entries(obj.tables ?? {}).map(([tableName, table]) => [
-        tableName,
-        table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
-      ]),
-    );
+
+    const tables = (result['tables'] ?? {}) as Record<string, StorageTable>;
+    const types = result['types'] as NonNullable<SqlNamespaceTablesInput['types']> | undefined;
     return {
-      id: obj.id ?? nsId,
+      id,
       tables,
+      ...(types !== undefined ? { types } : {}),
     };
   }
 

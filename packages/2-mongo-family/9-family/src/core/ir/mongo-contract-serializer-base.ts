@@ -1,6 +1,7 @@
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
+  createMongoContractSchema,
   MongoCollection,
   type MongoCollectionInput,
   type MongoContract,
@@ -8,7 +9,7 @@ import {
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { type as arktypeType } from 'arktype';
+import { type as arktypeType, type Type } from 'arktype';
 
 /**
  * Mongo family `ContractSerializer` abstract base. Owns the family-shared
@@ -34,6 +35,18 @@ import { type as arktypeType } from 'arktype';
 export abstract class MongoContractSerializerBase<TContract>
   implements ContractSerializer<TContract>
 {
+  private readonly contractSchema: Type<unknown> | undefined;
+
+  constructor(validatorFragments?: ReadonlyMap<string, Type<unknown>>) {
+    // Mirrors the SQL base: only build a fragments-aware schema when
+    // pack contributions exist; otherwise the cached module-level
+    // default in `contract-schema.ts` covers the validation path.
+    this.contractSchema =
+      validatorFragments !== undefined && validatorFragments.size > 0
+        ? createMongoContractSchema(validatorFragments)
+        : undefined;
+  }
+
   deserializeContract<T extends TContract = TContract>(json: unknown): T {
     const validated = this.parseMongoContractStructure(json);
     return this.constructTargetContract(validated) as T;
@@ -63,7 +76,8 @@ export abstract class MongoContractSerializerBase<TContract>
    * subsystems and don't sit behind this SPI.
    */
   protected parseMongoContractStructure(json: unknown): MongoContract {
-    const parsed = MongoContractSchema(json);
+    const schema = this.contractSchema ?? MongoContractSchema;
+    const parsed = schema(json);
     if (parsed instanceof arktypeType.errors) {
       throw new Error(`Contract structural validation failed: ${parsed.summary}`);
     }

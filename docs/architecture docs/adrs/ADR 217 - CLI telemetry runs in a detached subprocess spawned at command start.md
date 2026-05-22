@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Recorded during the design of the CLI Telemetry project (see `projects/cli-telemetry/spec.md`). Promote to Accepted once that project's Phase 1 lands. This ADR is the engineering-architecture companion to [ADR 216 — CLI telemetry installation ID is a stored random UUID](./ADR%20216%20-%20CLI%20telemetry%20installation%20ID%20is%20a%20stored%20random%20UUID%20not%20a%20system%20fingerprint.md). It does not cover crash/error reporting, which is Phase 2 of the same project and is expected to require a different isolation contract (synchronous-flush-before-exit rather than fire-and-forget).
+Accepted. CLI telemetry subprocess pattern is implemented as described in [`docs/Telemetry.md`](../../Telemetry.md), which is the user-facing reference for the telemetry surface this ADR scopes. This ADR is the engineering-architecture companion to [ADR 216 — CLI telemetry installation ID is a stored random UUID](./ADR%20216%20-%20CLI%20telemetry%20installation%20ID%20is%20a%20stored%20random%20UUID%20not%20a%20system%20fingerprint.md). It does not cover crash/error reporting, which is Phase 2 of the project and is expected to require a different isolation contract (synchronous-flush-before-exit rather than fire-and-forget).
 
 ## At a glance
 
@@ -26,7 +26,7 @@ Spawn happens at **command start**, not at command exit. Telemetry events fire c
 
 ## Context
 
-The CLI Telemetry project's strict isolation contract (`projects/cli-telemetry/spec.md`, NFR1–NFR6) requires that no telemetry-path failure can affect CLI exit time, output, or exit code, and that telemetry never blocks CLI exit by even a few milliseconds. The contract is load-bearing for the project's trust posture: a single user-visible telemetry failure (a 30-second DNS hang on a flight, a stack trace from a corporate-proxy fetch, a 2-second perceived slowdown during a backend outage) costs more reputational capital than a year of clean data collection earns. The implementation therefore needs to make those failure modes impossible by construction, not merely "handled with try/catch".
+The CLI Telemetry project's strict isolation contract requires that no telemetry-path failure can affect CLI exit time, output, or exit code, and that telemetry never blocks CLI exit by even a few milliseconds. The contract is load-bearing for the project's trust posture: a single user-visible telemetry failure (a 30-second DNS hang on a flight, a stack trace from a corporate-proxy fetch, a 2-second perceived slowdown during a backend outage) costs more reputational capital than a year of clean data collection earns. The implementation therefore needs to make those failure modes impossible by construction, not merely "handled with try/catch".
 
 Three implementation shapes were considered.
 
@@ -71,7 +71,7 @@ The child must run on the same runtime as the parent. The CLI ships to Node, Bun
 
 ### Why spawn at command start, not at command exit
 
-The conventional pattern is to spawn telemetry at the *end* of a command (so the event payload can include outcome — exit code, duration, success/failure). The Phase 1 EA field list has zero outcome-dependent fields (see `projects/cli-telemetry/spec.md` § At a glance), so the conventional pattern's main advantage is unused. Spawning at command *start* has two real advantages:
+The conventional pattern is to spawn telemetry at the *end* of a command (so the event payload can include outcome — exit code, duration, success/failure). The Phase 1 field list has zero outcome-dependent fields (the user-facing field list is at [`docs/Telemetry.md`](../../Telemetry.md)), so the conventional pattern's main advantage is unused. Spawning at command *start* has two real advantages:
 
 - **Zero perceived spawn cost.** Process spawn takes ~30–80ms on Node and less on Bun. When the spawn happens after the parent has completed its main work, that cost is wholly attributable to telemetry and adds to the user-perceived CLI runtime. When the spawn happens *at command start*, in parallel with the parent's main work, the spawn completes concurrently with work the user is waiting for anyway. The user perceives nothing extra.
 - **Crash-resilient counting.** A command that crashes 200ms into a long-running operation still contributes to MAU, because the telemetry fork happened before the crash. The conventional pattern would lose this event entirely — the command crashed before the telemetry hook ran.
@@ -105,7 +105,7 @@ The `detached: true` flag puts the child in its own process group so the parent'
 
 ### Payload contents (parent contribution)
 
-- The parsed command name and the parsed flag names (no values, no positionals — see `projects/cli-telemetry/spec.md` FR7).
+- The parsed command name and the parsed flag names (no values, no positionals — see [`docs/Telemetry.md`](../../Telemetry.md) for the user-facing rule).
 - Already-loaded config-derived fields: database target from `config.target.targetId`, official-allowlist extension names plus non-allowlist count.
 - The installation UUID read from disk (per [ADR 216](./ADR%20216%20-%20CLI%20telemetry%20installation%20ID%20is%20a%20stored%20random%20UUID%20not%20a%20system%20fingerprint.md)).
 - The Prisma Next version (from the client package's own `package.json`).

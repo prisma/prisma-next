@@ -425,7 +425,9 @@ function isPostgresSchemaNamespace(ns: Namespace): ns is Namespace & {
   );
 }
 
-function namespaceSerializedKind(ns: Namespace): string | undefined {
+const SQL_NAMESPACE_KIND_FALLBACK = 'sql-namespace' as const;
+
+function namespaceSerializedKind(ns: Namespace): string {
   const kind = (ns as { kind?: unknown }).kind;
   if (kind === 'schema') {
     const id = ns.id;
@@ -435,7 +437,12 @@ function namespaceSerializedKind(ns: Namespace): string | undefined {
   if (typeof kind === 'string') {
     return `readonly kind: ${serializeValue(kind)}`;
   }
-  return undefined;
+  // Plain-literal namespaces built via the contract-ts DSL bypass the
+  // class-level `Object.defineProperty(this, 'kind', { value, enumerable: false })`
+  // path, so `ns.kind` is missing on the runtime object. Surfacing the
+  // framework-default kind here keeps the emitted `.d.ts` literal
+  // structurally assignable to `Namespace`, which now requires `kind`.
+  return `readonly kind: '${SQL_NAMESPACE_KIND_FALLBACK}'`;
 }
 
 function generateTableLiteralType(table: StorageTable): string {
@@ -532,8 +539,7 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
   }
   const parts: string[] = [];
   for (const [name, ns] of entries) {
-    const kindPart = namespaceSerializedKind(ns);
-    const kindSuffix = kindPart ? `; ${kindPart}` : '';
+    const kindSuffix = `; ${namespaceSerializedKind(ns)}`;
     const tablesType = generateTablesMapType(ns.tables as Readonly<Record<string, StorageTable>>);
     const isPg = isPostgresSchemaNamespace(ns);
     const typesClause = isPg

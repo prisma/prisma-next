@@ -47,6 +47,7 @@ type GeneratedLikeContractBase = Contract<
     namespaces: {
       __unbound__: {
         id: '__unbound__';
+        kind: 'sql-namespace';
         tables: {
           user: {
             columns: {
@@ -401,6 +402,7 @@ type VOContractBase = Contract<
     namespaces: {
       __unbound__: {
         id: '__unbound__';
+        kind: 'sql-namespace';
         tables: {
           users: {
             columns: {

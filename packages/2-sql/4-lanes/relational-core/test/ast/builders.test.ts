@@ -39,10 +39,12 @@ describe('ast/builders', () => {
 
   it('builds insert ASTs with on-conflict update sets', () => {
     const ast = InsertAst.into(table('user'))
-      .withValues({
-        id: param(1, 'id'),
-        email: param(2, 'email'),
-      })
+      .withRows([
+        {
+          id: param(1, 'id'),
+          email: param(2, 'email'),
+        },
+      ])
       .withOnConflict(
         InsertOnConflict.on([col('user', 'id')]).doUpdateSet({ email: param(3, 'email') }),
       )
@@ -54,7 +56,7 @@ describe('ast/builders', () => {
 
   it('builds insert ASTs with do-nothing conflicts and explicit row lists', () => {
     const conflictAst = InsertAst.into(table('user'))
-      .withValues({ id: param(1, 'id') })
+      .withRows([{ id: param(1, 'id') }])
       .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
     const rowAst = InsertAst.into(table('user')).withRows([
       {

@@ -8,6 +8,7 @@ import {
   isExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { Type } from 'arktype';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -138,6 +139,18 @@ export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> 
   readonly output:
     | AuthoringEntityTypeTemplateOutput
     | AuthoringEntityTypeFactoryOutput<Input, Output>;
+  /**
+   * arktype schema fragment for one entry whose envelope `kind` matches
+   * this descriptor's {@link discriminator}. The family validator composes
+   * contributed fragments into the per-namespace entry schema at
+   * validator construction time so the structural check covers
+   * pack-introduced kinds without the family core hard-coding the schema.
+   *
+   * Hydration uses {@link AuthoringEntityTypeFactoryOutput.factory}
+   * directly — the wire shape conforms structurally to the factory's
+   * `Input` after `validatorSchema` validates it.
+   */
+  readonly validatorSchema?: Type<unknown>;
 }
 
 export type AuthoringEntityTypeNamespace = {

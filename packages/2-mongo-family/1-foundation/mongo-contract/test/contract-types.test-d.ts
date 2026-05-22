@@ -83,6 +83,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
+          readonly kind: 'mongo-namespace';
           readonly collections: { readonly users: MongoCollection };
         };
       };

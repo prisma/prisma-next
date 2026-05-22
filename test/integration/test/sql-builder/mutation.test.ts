@@ -8,7 +8,7 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     const row = await runtime()
       .execute(
         db()
-          .users.insert({ id: 100, name: 'NewUser', email: 'new@test.com' })
+          .users.insert([{ id: 100, name: 'NewUser', email: 'new@test.com' }])
           .returning('id', 'name')
           .build(),
       )
@@ -68,7 +68,9 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
 
   it('UPDATE accumulates multiple where() clauses with AND', async () => {
     await runtime().execute(
-      db().users.insert({ id: 300, name: 'Multi', email: 'multi@test.com' }).build(),
+      db()
+        .users.insert([{ id: 300, name: 'Multi', email: 'multi@test.com' }])
+        .build(),
     );
 
     const row = await runtime()
@@ -84,9 +86,27 @@ describe('integration: mutations', { timeout: timeouts.databaseOperation }, () =
     expect(row.name).toBe('MultiUpdated');
   });
 
+  it('multi-row INSERT with returning yields one result per row', async () => {
+    const rows = await runtime().execute(
+      db()
+        .users.insert([
+          { id: 401, name: 'First', email: 'first@test.com' },
+          { id: 402, name: 'Second', email: 'second@test.com' },
+        ])
+        .returning('id')
+        .build(),
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.id).sort()).toEqual([401, 402]);
+  });
+
   it('INSERT without returning executes silently', async () => {
     const row = await runtime()
-      .execute(db().users.insert({ id: 200, name: 'Silent', email: 'silent@test.com' }).build())
+      .execute(
+        db()
+          .users.insert([{ id: 200, name: 'Silent', email: 'silent@test.com' }])
+          .build(),
+      )
       .first();
     expect(row).toBeNull();
 

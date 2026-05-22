@@ -1,7 +1,74 @@
 import { readFileSync } from 'node:fs';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { join } from 'pathe';
 import { detectAgent } from './detect-agent';
 import type { ParentToSenderPayload, TelemetryEvent } from './payload';
+
+/**
+ * Subset of the user's `prisma-next.config.*` the telemetry event
+ * surfaces. Loaded inside the detached child via {@link loadProjectConfig}
+ * — see the design rationale on {@link ParentToSenderPayload} for why
+ * this side runs c12 instead of the parent CLI.
+ */
+export interface ProjectConfigFields {
+  readonly databaseTarget: string | null;
+  readonly extensions: readonly string[];
+}
+
+const EMPTY_PROJECT_CONFIG: ProjectConfigFields = {
+  databaseTarget: null,
+  extensions: [],
+};
+
+/**
+ * Best-effort load of `prisma-next.config.*` from `projectRoot`,
+ * validated against the canonical `@prisma-next/config` schema.
+ * Returns `{ databaseTarget: null, extensions: [] }` on any failure
+ * mode — missing config file (e.g. before `prisma-next init`), c12
+ * throws while evaluating user TS, validator rejects a malformed
+ * shape, etc. Telemetry is non-blocking and best-effort; an empty
+ * result is the only downside of an unloadable or invalid config.
+ *
+ * Both `c12` and `@prisma-next/config/config-validation` are imported
+ * lazily so the detached sender's cold-start cost is paid only when
+ * telemetry actually fires, not on every fork even when gates
+ * short-circuit before reaching this code path.
+ */
+export async function loadProjectConfig(projectRoot: string): Promise<ProjectConfigFields> {
+  try {
+    const { loadConfig } = await import('c12');
+    const result = await loadConfig<Record<string, unknown>>({
+      name: 'prisma-next',
+      cwd: projectRoot,
+      dotenv: false,
+      rcFile: false,
+      globalRc: false,
+    });
+    const config = result.config ?? null;
+    // c12 returns an empty object when no config file exists in the
+    // search path — distinct from "file existed but parsed to an empty
+    // object". Either way, the canonical validator below would reject
+    // it on the first required field (`family`), so short-circuit
+    // without paying the import cost.
+    if (config === null || Object.keys(config).length === 0) {
+      return EMPTY_PROJECT_CONFIG;
+    }
+    const validation = await import('@prisma-next/config/config-validation');
+    // TS 4.7+ only flows `asserts cfg is X` narrowing when the
+    // assertion function is called via a directly-declared name with
+    // an explicit signature. The dynamic-import binding doesn't
+    // satisfy that, so wrap the call in a local declaration that
+    // re-asserts the signature.
+    const validate: (cfg: unknown) => asserts cfg is PrismaNextConfig = validation.validateConfig;
+    validate(config);
+    return {
+      databaseTarget: config.target.targetId,
+      extensions: (config.extensionPacks ?? []).map((pack) => pack.id),
+    };
+  } catch {
+    return EMPTY_PROJECT_CONFIG;
+  }
+}
 
 /**
  * Versions surface the enrichment cares about. Modelled as a structural
@@ -100,11 +167,13 @@ function pickStringDep(deps: unknown): string | null {
 }
 
 /**
- * Build the full backend event from the parent's payload and the
- * child's per-process snapshot. Pure given an `EnrichEnvironment`.
+ * Build the full backend event from the parent's payload, the
+ * c12-loaded project-config slice, and the child's per-process
+ * snapshot. Pure given a `projectConfig` + `EnrichEnvironment`.
  */
 export function buildTelemetryEvent(
   payload: ParentToSenderPayload,
+  projectConfig: ProjectConfigFields,
   env: EnrichEnvironment,
 ): TelemetryEvent {
   const runtime = resolveRuntime(env.versions);
@@ -118,20 +187,34 @@ export function buildTelemetryEvent(
     os: env.platform,
     arch: env.arch,
     packageManager: parsePackageManager(env.env['npm_config_user_agent']),
-    databaseTarget: payload.databaseTarget,
+    databaseTarget: projectConfig.databaseTarget,
     tsVersion: readTsVersionFromPackageJson(env.readProjectPackageJson()),
     agent: detectAgent(env.env),
-    extensions: payload.extensions,
+    extensions: projectConfig.extensions,
   };
 }
 
 /**
  * Convenience for the sender entry: build the event from the live
- * `process` plus a real project-package.json reader, swallowing any
- * I/O errors in the file read.
+ * `process` plus a c12 load of `prisma-next.config.*` from
+ * `payload.projectRoot` plus a real project-package.json reader,
+ * swallowing any I/O errors in the file read.
+ *
+ * The parent's `payload.databaseTarget` (when present) wins over the
+ * c12-derived value. The parent sets this for the first-`init` run,
+ * where the config file does not exist on disk yet but the user has
+ * just declared a target via the consent prompt; every other
+ * invocation leaves it unset and the c12 load supplies the value.
  */
-export function buildTelemetryEventFromProcess(payload: ParentToSenderPayload): TelemetryEvent {
-  return buildTelemetryEvent(payload, {
+export async function buildTelemetryEventFromProcess(
+  payload: ParentToSenderPayload,
+): Promise<TelemetryEvent> {
+  const loadedConfig = await loadProjectConfig(payload.projectRoot);
+  const projectConfig: ProjectConfigFields = {
+    databaseTarget: payload.databaseTarget ?? loadedConfig.databaseTarget,
+    extensions: loadedConfig.extensions,
+  };
+  return buildTelemetryEvent(payload, projectConfig, {
     platform: process.platform,
     arch: process.arch,
     versions: process.versions,

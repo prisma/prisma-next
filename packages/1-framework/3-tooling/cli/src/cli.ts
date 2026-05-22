@@ -70,17 +70,18 @@ const program = new Command();
 program.name('prisma-next').description('Prisma Next CLI').version(packageJson.version);
 
 // Telemetry hook — fires at command start, before the action body
-// runs. Every failure mode is swallowed inside `runTelemetry`; the
-// hook never throws and never blocks long enough to be perceptible.
-//
-// Fire-and-forget: `fireTelemetryFromPreAction` `await`s a c12 config
-// load before forking the sender, so awaiting it here would block the
-// command's action body behind telemetry. Use `void` to dispatch in
-// parallel; the existing `.catch(() => {})` keeps errors swallowed.
+// runs. Synchronous by construction: `fireTelemetryFromPreAction`
+// resolves gates (cheap), then `fork()`s the detached sender. The
+// fork is enqueued before the action body runs at all, so the child
+// survives even when the action throws synchronously. The try/catch
+// is defence-in-depth — `runTelemetry` already swallows every failure
+// mode internally and returns an outcome instead of throwing.
 program.hook('preAction', (_thisCommand, actionCommand) => {
-  void fireTelemetryFromPreAction(actionCommand).catch(() => {
+  try {
+    fireTelemetryFromPreAction(actionCommand);
+  } catch {
     // defence-in-depth — runTelemetry already swallows internally.
-  });
+  }
 });
 
 // Override version option description to match capitalization style
@@ -316,6 +317,32 @@ program.addCommand(contractCommand);
 program.addCommand(dbCommand);
 program.addCommand(migrationCommand);
 program.addCommand(refCommand);
+
+// Test-only hidden command used by `cli-telemetry`'s `cli-e2e.test.ts`
+// to verify that telemetry still lands when a CLI command crashes
+// mid-execution. The preAction hook is synchronous and `fork()`s the
+// detached sender before this action body runs; the small sleep
+// gives the IPC `child.send()` a tick to flush before the throw
+// triggers commander's `exitOverride` and `process.exit(1)`. Hidden
+// from help; underscore prefix marks it as internal. Doesn't depend
+// on any project state, so it runs in any tempdir.
+//
+// Gated behind `PRISMA_NEXT_ENABLE_TEST_COMMANDS=1` so the command is
+// not even registered (and therefore not invocable) in shipped
+// binaries. `hidden: true` only filters the help output; without this
+// env gate the command would still be callable from production. The
+// e2e suite sets the env var when it spawns the CLI.
+const TELEMETRY_CRASH_TEST_SLEEP_MS = 200;
+if (process.env['PRISMA_NEXT_ENABLE_TEST_COMMANDS'] === '1') {
+  const telemetryCrashTestCommand = new Command('__telemetry-crash-test')
+    .description('Internal: deliberately throw for the telemetry e2e suite.')
+    .action(async () => {
+      await new Promise((settle) => setTimeout(settle, TELEMETRY_CRASH_TEST_SLEEP_MS));
+      throw new Error('__telemetry-crash-test: intentional crash for e2e coverage');
+    });
+  telemetryCrashTestCommand.configureHelp({ visibleCommands: () => [] });
+  program.addCommand(telemetryCrashTestCommand, { hidden: true });
+}
 
 // Create help command
 const helpCommand = new Command('help')

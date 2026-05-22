@@ -115,6 +115,8 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 
 See [`docs/architecture docs/subsystems/`](docs/architecture%20docs/subsystems/) — Data Contract, Contract Emitter & Types, Query Lanes, Runtime & Middleware Framework, Adapters & Targets, Error Handling, Migration System.
 
+- [Telemetry](docs/Telemetry.md) — user-facing reference for what the CLI collects, the consent prompt, opt-out signals, and the per-user config file.
+
 ## Ask First
 
 - Significant refactors to rule scope (`alwaysApply`) or architecture docs.

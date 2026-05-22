@@ -5,6 +5,7 @@ import type {
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
+import { PostgresEnumTypeSchema } from '@prisma-next/sql-contract/validators';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
@@ -43,6 +44,7 @@ export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
     discriminator: 'postgres-enum',
+    validatorSchema: PostgresEnumTypeSchema,
     output: {
       factory: (input: PostgresEnumTypeInput): PostgresEnumStorageEntry =>
         new PostgresEnumType(input),

@@ -1,26 +1,87 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
+import {
+  SqlContractSerializerBase,
+  type SqlEntityHydrationFactory,
+} from '@prisma-next/family-sql/ir';
+import {
+  type AuthoringEntityContext,
+  type AuthoringEntityTypeFactoryOutput,
+  type AuthoringEntityTypeNamespace,
+  isAuthoringEntityTypeDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import {
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import {
-  type SqlNamespaceTablesInput,
-  type SqlStorage,
+import type {
+  SqlNamespaceTablesInput,
+  SqlStorage,
+  SqlStorageTypeEntry,
   StorageTable,
-  type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
+import type { Type } from 'arktype';
+import { postgresAuthoringEntityTypes } from './authoring';
+import type { PostgresEnumType } from './postgres-enum-type';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+
+const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
+  family: 'sql',
+  target: 'postgres',
+};
+
+function isAuthoringEntityTypeFactoryOutput(
+  output: unknown,
+): output is AuthoringEntityTypeFactoryOutput<unknown, unknown> {
+  return (
+    typeof output === 'object' &&
+    output !== null &&
+    typeof (output as AuthoringEntityTypeFactoryOutput).factory === 'function'
+  );
+}
+
+/**
+ * Walks a pack's entity-type namespace tree and emits the maps the
+ * family base consumes — hydrators and validator-schema fragments, both
+ * keyed by the descriptor's `discriminator`.
+ */
+function collectEntityRegistryContributions(namespace: AuthoringEntityTypeNamespace): {
+  readonly entityTypeRegistry: ReadonlyMap<string, SqlEntityHydrationFactory>;
+  readonly validatorFragments: ReadonlyMap<string, Type<unknown>>;
+} {
+  const entityTypeRegistry = new Map<string, SqlEntityHydrationFactory>();
+  const validatorFragments = new Map<string, Type<unknown>>();
+  const walk = (node: AuthoringEntityTypeNamespace): void => {
+    for (const value of Object.values(node)) {
+      if (isAuthoringEntityTypeDescriptor(value)) {
+        if (isAuthoringEntityTypeFactoryOutput(value.output)) {
+          const { factory } = value.output;
+          entityTypeRegistry.set(
+            value.discriminator,
+            (raw) => factory(raw, POSTGRES_AUTHORING_CTX) as SqlStorageTypeEntry,
+          );
+        }
+        if (value.validatorSchema !== undefined) {
+          validatorFragments.set(value.discriminator, value.validatorSchema);
+        }
+        continue;
+      }
+      if (typeof value === 'object' && value !== null) {
+        walk(value);
+      }
+    }
+  };
+  walk(namespace);
+  return { entityTypeRegistry, validatorFragments };
+}
 
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor() {
-    // Postgres entity types (enums) are namespace-level and hydrated in
-    // hydrateSqlNamespaceEntry; there are no storage-level codec alias entities
-    // specific to Postgres, so the registry is empty.
-    super(new Map());
+    const { entityTypeRegistry, validatorFragments } = collectEntityRegistryContributions(
+      postgresAuthoringEntityTypes,
+    );
+    super(entityTypeRegistry, validatorFragments);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -30,38 +91,12 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     if (raw instanceof NamespaceBase) {
       return raw;
     }
-    const obj = raw as {
-      id?: string;
-      tables?: Record<string, unknown>;
-      types?: Record<string, unknown>;
+    const hydrated = super.hydrateSqlNamespaceEntry(nsId, raw) as {
+      id: string;
+      tables: Readonly<Record<string, StorageTable>>;
+      types?: Readonly<Record<string, PostgresEnumType>>;
     };
-    const id = obj.id ?? nsId;
-    const tables = Object.fromEntries(
-      Object.entries(obj.tables ?? {}).map(([tableName, table]) => [
-        tableName,
-        table instanceof StorageTable ? table : new StorageTable(table as StorageTableInput),
-      ]),
-    );
-    const typeEntries = obj.types;
-    const hydratedNsTypes =
-      typeEntries !== undefined && Object.keys(typeEntries).length > 0
-        ? Object.fromEntries(
-            Object.entries(typeEntries).map(([typeName, entry]) => {
-              if (entry instanceof PostgresEnumType) {
-                return [typeName, entry];
-              }
-              const plain = entry as Record<string, unknown>;
-              const name = typeof plain['name'] === 'string' ? plain['name'] : typeName;
-              const nativeType =
-                typeof plain['nativeType'] === 'string' ? plain['nativeType'] : name;
-              const values = Array.isArray(plain['values']) ? (plain['values'] as string[]) : [];
-              return [
-                typeName,
-                new PostgresEnumType({ name, nativeType, values } as PostgresEnumTypeInput),
-              ];
-            }),
-          )
-        : undefined;
+    const { id, tables, types: hydratedNsTypes } = hydrated;
 
     const emptyTables = Object.keys(tables).length === 0;
     const emptyTypes = !hydratedNsTypes || Object.keys(hydratedNsTypes).length === 0;

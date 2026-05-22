@@ -32,6 +32,10 @@ import {
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
 import {
+  hasNonLeafIncludeWithDistinct,
+  hasScalarOrCombineIncludeDescriptors,
+} from './include-tree-predicates';
+import {
   compileRelationSelect,
   compileSelect,
   compileSelectWithIncludeStrategy,
@@ -77,9 +81,23 @@ function dispatchWithIncludeStrategy<Row>(options: {
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
+  // Nested row includes (depth >= 2) are emitted recursively by the
+  // lateral / correlated builders — they no longer force a fallback to
+  // multi-query (TML-2594). Scalar (`count`/`sum`/...) and `combine()`
+  // descriptors still do, until TML-2595 lands the matching lowering;
+  // the recursive scan below catches them at any depth so a nested
+  // `count()` inside a row include doesn't accidentally hit the
+  // throw in `compileSelectWithIncludeStrategy`.
+  //
+  // `distinct()` on a non-leaf include is also forced through multi-query:
+  // under the single-query strategies the child SELECT carries nested
+  // JSON aggregate columns, and `SELECT DISTINCT` over those fails on
+  // Postgres (`json` has no equality operator). The multi-query stitcher
+  // applies distinct to scalar-only child rows before grandchildren are
+  // joined, which is the semantically correct behavior we preserve.
   if (
-    hasNestedIncludes(options.state.includes) ||
-    hasComplexIncludeDescriptors(options.state.includes)
+    hasScalarOrCombineIncludeDescriptors(options.state.includes) ||
+    hasNonLeafIncludeWithDistinct(options.state.includes)
   ) {
     return dispatchWithMultiQueryIncludes<Row>(options);
   }
@@ -144,18 +162,10 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
 
       for (const parent of parentRows) {
         for (const include of state.includes) {
-          if (include.scalar || include.combine) {
-            throw new Error(
-              'single-query include strategy does not support scalar include selectors or combine()',
-            );
-          }
-          const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
-          const mappedChildren = rawChildren.map((childRow) =>
-            mapStorageRowToModelFields(contract, include.relatedModelName, childRow),
-          );
-          parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
-            mappedChildren,
-            include.cardinality,
+          parent.mapped[include.relationName] = decodeIncludePayload(
+            contract,
+            include,
+            parent.raw[include.relationName],
           );
         }
 
@@ -372,8 +382,22 @@ async function resolveRowsByParent(
   state: CollectionState,
   parentJoinValues: readonly unknown[],
 ): Promise<Map<unknown, Record<string, unknown>[]>> {
+  // Multi-query stitching reads `child.raw[grandchildInclude.localColumn]`
+  // for every immediate include in `state.includes` to bucket children by
+  // join value. A user-supplied `.select(...)` on the child that omits any
+  // of those join columns would silently yield `undefined` for the join
+  // value, producing empty nested arrays at depth >= 2. Force every
+  // direct nested include's `localColumn` into the child's selected set
+  // alongside `include.targetColumn` so the stitcher always sees a
+  // defined join value. The next level of recursion (when grandchild
+  // stitching itself dispatches through `resolveRowsByParent`) repeats
+  // this same augmentation for its own children.
+  const nestedJoinColumns = state.includes.map((nested) => nested.localColumn);
+  const requiredChildColumns = Array.from(
+    new Set<string>([include.targetColumn, ...nestedJoinColumns]),
+  );
   const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
-    augmentSelectionForJoinColumns(state.selectedFields, [include.targetColumn]);
+    augmentSelectionForJoinColumns(state.selectedFields, requiredChildColumns);
 
   const childCompiled = compileRelationSelect(
     contract,
@@ -471,12 +495,44 @@ function uniqueValues(values: unknown[]): unknown[] {
   return [...new Set(values)];
 }
 
-function hasNestedIncludes(includes: readonly IncludeExpr[]): boolean {
-  return includes.some((include) => include.nested.includes.length > 0);
-}
-
-function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
-  return includes.some((include) => include.scalar !== undefined || include.combine !== undefined);
+/**
+ * Decode a single-query include payload from a parent row's raw cell
+ * into the model-shaped value that downstream consumers see. Recurses
+ * through `include.nested.includes` so depth-2+ trees — emitted by the
+ * recursive lateral / correlated builders — are decoded symmetrically.
+ *
+ * The shape produced by the SQL side is one JSON column per top-level
+ * include; values nested inside that JSON are already-parsed JS values
+ * after the outer `JSON.parse`, so `parseIncludedRows` recognises both
+ * the string (top-level) and array (nested) forms.
+ */
+function decodeIncludePayload(
+  contract: Contract<SqlStorage>,
+  include: IncludeExpr,
+  raw: unknown,
+): Record<string, unknown>[] | Record<string, unknown> | null {
+  const rawChildren = parseIncludedRows(raw);
+  const mappedChildren = rawChildren.map((childRow) => {
+    const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
+    for (const nestedInclude of include.nested.includes) {
+      // Defence in depth: the dispatch gate filters scalar/combine at
+      // any depth via `hasScalarOrCombineIncludeDescriptors`. This branch
+      // is unreachable in production but documents the contract the
+      // recursion relies on.
+      if (nestedInclude.scalar || nestedInclude.combine) {
+        throw new Error(
+          'single-query include strategy does not support nested scalar include selectors or combine()',
+        );
+      }
+      mapped[nestedInclude.relationName] = decodeIncludePayload(
+        contract,
+        nestedInclude,
+        mapped[nestedInclude.relationName],
+      );
+    }
+    return mapped;
+  });
+  return coerceSingleQueryIncludeResult(mappedChildren, include.cardinality);
 }
 
 function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {

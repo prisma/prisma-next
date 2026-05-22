@@ -57,7 +57,7 @@ describe('end-to-end prepared statements (Postgres)', () => {
         );
 
         const insertedId = await withTransaction(runtime, async (tx) => {
-          await tx.execute(db.user.insert({ email: 'tx-prepared@example.com' }).build());
+          await tx.execute(db.user.insert([{ email: 'tx-prepared@example.com' }]).build());
           const rows = await ps.execute(tx, { email: 'tx-prepared@example.com' });
           expect(rows).toHaveLength(1);
           return rows[0]!.id;

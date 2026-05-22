@@ -352,6 +352,70 @@ describe('compileSelectWithIncludeStrategy', () => {
       'single-query include strategy does not support scalar include selectors or combine()',
     );
   });
+
+  // Planner invariant: scalar / combine descriptors must be rejected at
+  // every depth, not just the top level. The dispatch path already gates
+  // these via its own `hasScalarOrCombineIncludeDescriptors` recursively,
+  // but the planner is exported and called directly by tests and rich-plan
+  // callers. Without recursive rejection here, a nested `count()` inside a
+  // row include would silently produce a malformed lateral / correlated
+  // plan instead of failing fast at the boundary.
+  it('rejects scalar include selectors nested inside row includes', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.include('comments', (comments) => comments.count()),
+    ).state;
+
+    expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
+      'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  });
+
+  it('rejects combine() include descriptors nested inside row includes', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.include('comments', (comments) =>
+        comments.combine({
+          rows: comments.orderBy((c) => c.id.asc()),
+          total: comments.count(),
+        }),
+      ),
+    ).state;
+
+    expect(() =>
+      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
+    ).toThrow(
+      'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  });
+
+  // Planner invariant: a non-leaf `distinct()` cannot be lowered into
+  // the lateral / correlated strategies — the child SELECT would emit
+  // `SELECT DISTINCT <scalars>, json_agg(<nested>)` and Postgres rejects
+  // equality on `json`. The dispatch path routes these to multi-query;
+  // the exported planner must fail fast at every depth so direct callers
+  // (tests, rich-plan consumers) don't build an invalid plan.
+  it('rejects distinct() on a non-leaf include at the top level', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.select('title').distinct('title').include('comments'),
+    ).state;
+
+    expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
+      'single-query include strategy does not support distinct() on a non-leaf include',
+    );
+  });
+
+  it('rejects distinct() on a non-leaf include nested at depth 2', () => {
+    const { collection } = createCollection();
+    const state = collection.include('invitedUsers', (inv) =>
+      inv.include('posts', (posts) => posts.select('title').distinct('title').include('comments')),
+    ).state;
+
+    expect(() =>
+      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
+    ).toThrow('single-query include strategy does not support distinct() on a non-leaf include');
+  });
 });
 
 describe('compileSelect MTI JOINs', () => {

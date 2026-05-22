@@ -11,10 +11,12 @@ import { col, param, returning, table } from './test-helpers';
 
 describe('ast/insert', () => {
   it('creates insert ASTs with a single values row', () => {
-    const insertAst = InsertAst.into(table('user')).withValues({
-      id: param(0, 'id'),
-      email: param(1, 'email'),
-    });
+    const insertAst = InsertAst.into(table('user')).withRows([
+      {
+        id: param(0, 'id'),
+        email: param(1, 'email'),
+      },
+    ]);
 
     expect(insertAst.table).toEqual(table('user'));
     expect(insertAst.rows).toEqual([
@@ -28,10 +30,12 @@ describe('ast/insert', () => {
 
   it('creates insert ASTs with returning columns', () => {
     const insertAst = InsertAst.into(table('user'))
-      .withValues({
-        id: param(0, 'id'),
-        email: param(1, 'email'),
-      })
+      .withRows([
+        {
+          id: param(0, 'id'),
+          email: param(1, 'email'),
+        },
+      ])
       .withReturning(returning('user', ['id', 'email']));
 
     expect(insertAst.returning).toEqual(returning('user', ['id', 'email']));
@@ -53,7 +57,7 @@ describe('ast/insert', () => {
   });
 
   it('preserves empty value objects and explicit empty row lists', () => {
-    expect(InsertAst.into(table('user')).withValues({}).rows).toEqual([{}]);
+    expect(InsertAst.into(table('user')).withRows([{}]).rows).toEqual([{}]);
     expect(InsertAst.into(table('user')).withRows([]).rows).toEqual([]);
   });
 
@@ -62,10 +66,12 @@ describe('ast/insert', () => {
       email: param(2, 'updatedEmail'),
     });
     const insertAst = InsertAst.into(table('user'))
-      .withValues({
-        id: param(0, 'id'),
-        email: param(1, 'email'),
-      })
+      .withRows([
+        {
+          id: param(0, 'id'),
+          email: param(1, 'email'),
+        },
+      ])
       .withOnConflict(onConflict);
 
     expect(insertAst.onConflict?.columns).toEqual([col('user', 'id')]);
@@ -76,7 +82,7 @@ describe('ast/insert', () => {
 
   it('stores on-conflict do-nothing actions', () => {
     const insertAst = InsertAst.into(table('user'))
-      .withValues({ id: param(0, 'id') })
+      .withRows([{ id: param(0, 'id') }])
       .withOnConflict(InsertOnConflict.on([col('user', 'id')]).doNothing());
 
     expect(insertAst.onConflict?.action?.kind).toBe('do-nothing');
@@ -97,10 +103,12 @@ describe('ast/insert', () => {
 
   it('collectParamRefs skips DefaultValueExpr entries', () => {
     const rowId = param('u1', 'id');
-    const insertAst = InsertAst.into(table('user')).withValues({
-      id: rowId,
-      email: new DefaultValueExpr(),
-    });
+    const insertAst = InsertAst.into(table('user')).withRows([
+      {
+        id: rowId,
+        email: new DefaultValueExpr(),
+      },
+    ]);
 
     expect(insertAst.collectParamRefs()).toEqual([rowId]);
   });
@@ -120,7 +128,7 @@ describe('ast/insert', () => {
 
   it('rewrite descends into returning ProjectionItem.expr', () => {
     const insertAst = InsertAst.into(table('user'))
-      .withValues({ id: param(1, 'id') })
+      .withRows([{ id: param(1, 'id') }])
       .withReturning([ProjectionItem.of('id', col('user', 'id'), { codecId: 'pg/int4@1' })]);
 
     const rewritten = insertAst.rewrite({
@@ -135,7 +143,7 @@ describe('ast/insert', () => {
   it('collectParamRefs surfaces ParamRefs from returning items', () => {
     const idCodec = param(1, 'rid');
     const insertAst = InsertAst.into(table('user'))
-      .withValues({ id: param(0, 'id') })
+      .withRows([{ id: param(0, 'id') }])
       .withReturning([
         ProjectionItem.of('id', col('user', 'id')),
         ProjectionItem.of('computed', idCodec),

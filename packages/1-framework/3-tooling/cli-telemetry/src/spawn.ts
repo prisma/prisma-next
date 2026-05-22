@@ -1,5 +1,6 @@
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveTelemetryEndpoint } from './endpoint';
 import { resolveGating } from './gating';
 import type { ParentToSenderPayload } from './payload';
@@ -8,22 +9,33 @@ import { readUserConfig, type UserConfig } from './user-config';
 
 /**
  * Inputs the CLI entry point hands the telemetry layer at command
- * start. The CLI is responsible for stitching commander's result, the
- * loaded config, and the project root together; the telemetry module
- * does no I/O of its own except for the user-config read (skipped when
- * `userConfig` is provided).
+ * start. The CLI is responsible for stitching commander's result and
+ * the project root together; the telemetry module does no I/O of its
+ * own except for the user-config read (skipped when `userConfig` is
+ * provided). `extensions` is deliberately absent: the detached child
+ * loads `prisma-next.config.*` via c12 itself and derives the
+ * extension-pack ids from the validated config — see the rationale
+ * on `ParentToSenderPayload` for why c12 lives in the child rather
+ * than on the parent's hot path.
+ *
+ * `databaseTarget` is an optional parent-side override forwarded to
+ * the child. Set by `fireTelemetryAfterInitConsent` (where the
+ * config file does not yet exist on disk); left unset by the
+ * preAction-hook path so the child's c12 load supplies the value.
  */
 export interface RunTelemetryInputs {
   /** Sanitised commander snapshot — see `CommanderResultShape`. */
   readonly command: CommanderResultShape;
   /** This CLI's own version (from its `package.json`). */
   readonly version: string;
-  /** Resolved `config.target.targetId`, or `null` when the config could not be loaded. */
-  readonly databaseTarget: string | null;
-  /** Declared extension-pack IDs, in any deterministic order. */
-  readonly extensions: readonly string[];
   /** Absolute path of the project root (typically `process.cwd()`). */
   readonly projectRoot: string;
+  /**
+   * Optional parent-side override for the c12-derived database target,
+   * forwarded verbatim to the child sender. Wins over the child's
+   * c12-derived value when present; `undefined` means "no override".
+   */
+  readonly databaseTarget?: string;
   /**
    * Path to the sender entry compiled into this package's `dist/`.
    * Resolved by the caller because the compiled sender lives at
@@ -85,10 +97,9 @@ export function runTelemetry(inputs: RunTelemetryInputs): TelemetryRunOutcome {
     version: inputs.version,
     command: sanitised.command,
     flags: sanitised.flags,
-    databaseTarget: inputs.databaseTarget,
-    extensions: inputs.extensions,
     projectRoot: inputs.projectRoot,
     endpoint: resolveTelemetryEndpoint(env),
+    ...ifDefined('databaseTarget', inputs.databaseTarget),
   };
 
   try {

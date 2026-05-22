@@ -1,4 +1,8 @@
-export { MongoContractSchema } from '../contract-schema';
+export {
+  createMongoContractSchema,
+  createMongoNamespaceEnvelopeSchema,
+  MongoContractSchema,
+} from '../contract-schema';
 export type {
   ExtractMongoCodecTypes,
   ExtractMongoFieldInputTypes,

@@ -2,7 +2,7 @@ import { ContractValidationError } from '@prisma-next/contract/contract-validati
 import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { type } from 'arktype';
+import { type Type, type } from 'arktype';
 import {
   type ForeignKeyInput,
   type ForeignKeyReferenceInput,
@@ -159,26 +159,112 @@ const StorageTableSchema = type({
 });
 
 /**
- * Namespace entry under `storage.namespaces[id]`. Tables live on each
- * namespace; the unbound sentinel may appear as a plain `{ id }`
- * envelope (normalised to `SqlUnboundNamespace.instance` by
- * {@link SqlStorage}'s constructor) or carry a `tables` map when the
- * late-bound slot holds authored tables.
+ * Re-exported so target packs can register their `validatorSchema`
+ * fragment without re-declaring the schema for the kinds the family
+ * core already validates. Full extraction of enum-specific schemas
+ * into the Postgres pack is a follow-up; today the symbol lives here.
  */
-const NamespaceEntrySchema = type({
-  '+': 'reject',
-  id: 'string',
-  'kind?': 'string',
-  'tables?': type({ '[string]': StorageTableSchema }),
-  'types?': type({ '[string]': PostgresEnumTypeSchema }),
-});
+export { PostgresEnumTypeSchema };
 
-const StorageSchema = type({
-  '+': 'reject',
-  storageHash: 'string',
-  'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
-  'namespaces?': type({ '[string]': NamespaceEntrySchema }),
-});
+/**
+ * Composes a hardcoded family `fallback` schema with optional
+ * pack-contributed `fragments` keyed by the entry's `kind`
+ * discriminator. The composition is **additive**, not substitutive:
+ *
+ * - No fragments registered → entries are validated by `fallback`
+ *   alone (the unchanged baseline).
+ * - An entry's `kind` matches `fallbackKind` AND a fragment for that
+ *   kind is registered → the entry must pass **both** `fallback` and
+ *   the fragment. This preserves family-owned invariants (e.g. the
+ *   built-in `PostgresEnumType` shape) even when a pack contributes
+ *   its own schema for the same kind.
+ * - An entry's `kind` matches a registered fragment for some
+ *   non-fallback kind → the fragment alone validates the entry.
+ *   `fallback` is family-specific (validates a single hardcoded kind)
+ *   and would reject any other kind, so it does not apply here.
+ * - An entry's `kind` matches no fragment → fall through to
+ *   `fallback`.
+ */
+function namespaceSlotEntrySchema(
+  fallback: Type<unknown>,
+  fallbackKind: string,
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  if (fragments === undefined || fragments.size === 0) {
+    return fallback;
+  }
+  return type('unknown').narrow((entry, ctx) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      return ctx.mustBe('an object');
+    }
+    const kind = (entry as { kind?: unknown }).kind;
+    if (typeof kind === 'string') {
+      const fragment = fragments.get(kind);
+      if (fragment !== undefined) {
+        if (kind === fallbackKind) {
+          const baseParsed = fallback(entry);
+          if (baseParsed instanceof type.errors) {
+            return ctx.reject({ expected: baseParsed.summary });
+          }
+        }
+        const parsed = fragment(entry);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: parsed.summary });
+        }
+        return true;
+      }
+    }
+    const parsed = fallback(entry);
+    if (parsed instanceof type.errors) {
+      return ctx.reject({ expected: parsed.summary });
+    }
+    return true;
+  });
+}
+
+/**
+ * Builds the per-namespace entry schema for `storage.namespaces[id]`.
+ * Pack-contributed `validatorSchema` fragments — keyed by the
+ * descriptor's `discriminator` — validate each entry by matching the
+ * entry's `kind` field. The hardcoded `'types?'` slot is preserved
+ * unconditionally: it coexists additively with any contributed fragment
+ * that validates the same shape today. The full rename of `types` →
+ * `postgresEnums` lands later; until then, the redundancy is the F1 cure
+ * (no relocated dual-shape probe).
+ */
+export function createNamespaceEntrySchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  return type({
+    '+': 'reject',
+    id: 'string',
+    'kind?': 'string',
+    'tables?': type({ '[string]': StorageTableSchema }),
+    'types?': type({
+      '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
+    }),
+  }) as Type<unknown>;
+}
+
+/**
+ * Builds the storage schema. Pack contributions reach the per-namespace
+ * entry shape through {@link createNamespaceEntrySchema}; the
+ * document-scoped `storage.types` slot (codec triples only) and the
+ * storage hash stay family-shared.
+ */
+export function createSqlStorageSchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  const namespaceEntry = createNamespaceEntrySchema(fragments);
+  return type({
+    '+': 'reject',
+    storageHash: 'string',
+    'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
+    'namespaces?': type({ '[string]': namespaceEntry }),
+  }) as Type<unknown>;
+}
+
+const StorageSchema = createSqlStorageSchema();
 
 // SQL-specific namespace walk shape (`tables` is the SQL family's idiom —
 // the framework `Namespace` interface no longer carries it). The wider
@@ -283,21 +369,34 @@ const ContractMetaSchema = type({
   '[string]': 'unknown',
 });
 
-const SqlContractSchema = type({
-  '+': 'reject',
-  target: 'string',
-  targetFamily: "'sql'",
-  'coreHash?': 'string',
-  profileHash: 'string',
-  'capabilities?': 'Record<string, Record<string, boolean>>',
-  'extensionPacks?': 'Record<string, unknown>',
-  'meta?': ContractMetaSchema,
-  'roots?': 'Record<string, string>',
-  models: type({ '[string]': ModelSchema }),
-  'valueObjects?': 'Record<string, unknown>',
-  storage: StorageSchema,
-  'execution?': ExecutionSchema,
-});
+/**
+ * Builds the full SQL contract schema. The storage subtree threads
+ * pack contributions through {@link createSqlStorageSchema}; the rest
+ * of the contract envelope is family-shared.
+ */
+export function createSqlContractSchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  const storage = createSqlStorageSchema(fragments);
+  return type({
+    '+': 'reject',
+    target: 'string',
+    targetFamily: "'sql'",
+    'coreHash?': 'string',
+    profileHash: 'string',
+    'capabilities?': 'Record<string, Record<string, boolean>>',
+    'extensionPacks?': 'Record<string, unknown>',
+    'meta?': ContractMetaSchema,
+    'roots?': 'Record<string, string>',
+    models: type({ '[string]': ModelSchema }),
+    'valueObjects?': 'Record<string, unknown>',
+    'domain?': 'unknown',
+    storage,
+    'execution?': ExecutionSchema,
+  }) as Type<unknown>;
+}
+
+const SqlContractSchema = createSqlContractSchema();
 
 // NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
 // instead of type.declare<T>().type() because the ColumnDefault union's value field
@@ -340,7 +439,10 @@ export function validateModel(value: unknown): unknown {
  * this module, since the family seam-of-record is the
  * `SqlContractSerializerBase.deserializeContract` SPI.
  */
-function validateSqlContractStructure<T extends Contract<SqlStorage>>(value: unknown): T {
+function validateSqlContractStructure<T extends Contract<SqlStorage>>(
+  value: unknown,
+  contractSchema: Type<unknown>,
+): T {
   if (typeof value !== 'object' || value === null) {
     throw new ContractValidationError(
       'Contract structural validation failed: value must be an object',
@@ -356,7 +458,7 @@ function validateSqlContractStructure<T extends Contract<SqlStorage>>(value: unk
     );
   }
 
-  const contractResult = SqlContractSchema(value);
+  const contractResult = contractSchema(value);
 
   if (contractResult instanceof type.errors) {
     const messages = contractResult.map((p: { message: string }) => p.message).join('; ');
@@ -676,6 +778,18 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
   }
 }
 
+export interface ValidateSqlContractFullyOptions {
+  /**
+   * Precomputed structural schema to validate against. Built once at
+   * serializer construction time when the family `ContractSerializer`
+   * has folded pack-contributed `validatorSchema` fragments into the
+   * per-namespace entry shape; absent for the family-default validator
+   * path (no pack contributions). Falls back to the cached default
+   * `SqlContractSchema` when omitted.
+   */
+  readonly contractSchema?: Type<unknown>;
+}
+
 /**
  * Full SQL contract validation: structural (arktype) +
  * framework-shared domain + SQL storage logical-consistency + SQL
@@ -684,7 +798,10 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
  * validated flat-data shape; IR class hydration happens in the SPI
  * base on top of this helper.
  */
-export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: unknown): T {
+export function validateSqlContractFully<T extends Contract<SqlStorage>>(
+  value: unknown,
+  options?: ValidateSqlContractFullyOptions,
+): T {
   const stripped =
     typeof value === 'object' && value !== null
       ? (() => {
@@ -692,7 +809,8 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: 
           return rest;
         })()
       : value;
-  const validated = validateSqlContractStructure<T>(stripped);
+  const schema = options?.contractSchema ?? SqlContractSchema;
+  const validated = validateSqlContractStructure<T>(stripped, schema);
   validateContractDomain({
     roots: validated.roots,
     models: validated.models,

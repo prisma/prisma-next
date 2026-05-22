@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'pathe';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildTelemetryEvent,
+  buildTelemetryEventFromProcess,
   type EnrichEnvironment,
+  loadProjectConfig,
+  type ProjectConfigFields,
   parsePackageManager,
   readTsVersionFromPackageJson,
 } from '../src/enrich';
@@ -12,10 +18,18 @@ const basePayload: ParentToSenderPayload = {
   version: '0.9.0',
   command: 'migration new',
   flags: ['name', 'dry-run'],
-  databaseTarget: 'postgres',
-  extensions: ['pgvector'],
   projectRoot: '/project',
   endpoint: 'http://localhost/events',
+};
+
+const baseProjectConfig: ProjectConfigFields = {
+  databaseTarget: 'postgres',
+  extensions: ['pgvector'],
+};
+
+const EMPTY_PROJECT_CONFIG: ProjectConfigFields = {
+  databaseTarget: null,
+  extensions: [],
 };
 
 const baseEnv: EnrichEnvironment = {
@@ -99,7 +113,7 @@ describe('readTsVersionFromPackageJson', () => {
 
 describe('buildTelemetryEvent', () => {
   it('round-trips the parent payload and overlays child-side probes', () => {
-    const event = buildTelemetryEvent(basePayload, {
+    const event = buildTelemetryEvent(basePayload, baseProjectConfig, {
       ...baseEnv,
       env: { npm_config_user_agent: 'pnpm/10.27.0 node/v24.13.0' },
       readProjectPackageJson: () => JSON.stringify({ devDependencies: { typescript: '^5.9.3' } }),
@@ -123,7 +137,7 @@ describe('buildTelemetryEvent', () => {
   });
 
   it('detects bun as the runtime when versions.bun is present', () => {
-    const event = buildTelemetryEvent(basePayload, {
+    const event = buildTelemetryEvent(basePayload, baseProjectConfig, {
       ...baseEnv,
       versions: { node: '24.13.0', bun: '1.3.0' },
     });
@@ -132,7 +146,7 @@ describe('buildTelemetryEvent', () => {
   });
 
   it('detects deno as the runtime when versions.deno is present', () => {
-    const event = buildTelemetryEvent(basePayload, {
+    const event = buildTelemetryEvent(basePayload, baseProjectConfig, {
       ...baseEnv,
       versions: { node: '24.13.0', deno: '2.5.0' },
     });
@@ -141,12 +155,15 @@ describe('buildTelemetryEvent', () => {
   });
 
   it('populates the agent field when a marker env var is set', () => {
-    const event = buildTelemetryEvent(basePayload, { ...baseEnv, env: { CLAUDECODE: '1' } });
+    const event = buildTelemetryEvent(basePayload, baseProjectConfig, {
+      ...baseEnv,
+      env: { CLAUDECODE: '1' },
+    });
     expect(event.agent).toBe('Claude Code');
   });
 
   it('passes null tsVersion when the project package.json read fails', () => {
-    const event = buildTelemetryEvent(basePayload, {
+    const event = buildTelemetryEvent(basePayload, baseProjectConfig, {
       ...baseEnv,
       readProjectPackageJson: () => null,
     });
@@ -154,6 +171,184 @@ describe('buildTelemetryEvent', () => {
   });
 
   it('passes null packageManager when npm_config_user_agent is absent', () => {
-    expect(buildTelemetryEvent(basePayload, baseEnv).packageManager).toBeNull();
+    expect(buildTelemetryEvent(basePayload, baseProjectConfig, baseEnv).packageManager).toBeNull();
+  });
+
+  it('passes the project-config slice straight through (databaseTarget + extensions)', () => {
+    const event = buildTelemetryEvent(
+      basePayload,
+      { databaseTarget: 'mongodb', extensions: ['pgvector', 'paradedb'] },
+      baseEnv,
+    );
+    expect(event.databaseTarget).toBe('mongodb');
+    expect(event.extensions).toEqual(['pgvector', 'paradedb']);
+  });
+});
+
+/**
+ * Build a `prisma-next.config.mjs` source string that satisfies
+ * `validateConfig` from `@prisma-next/config/config-validation`.
+ * `target.targetId` is the only structurally-significant variable
+ * the telemetry projection cares about; `extensionPacks` defaults to
+ * empty. Caller can override either via the parameters; pass a
+ * pre-formed `extensionPacks` literal to inject specific ids, or
+ * `omitExtensionPacks: true` to drop the field entirely (validator
+ * accepts the absent-field branch separately from the empty-array
+ * branch — useful for cases that mean to exercise the former).
+ */
+function validConfigSource(
+  options: {
+    readonly targetId?: string;
+    readonly extensionPacksLiteral?: string;
+    readonly omitExtensionPacks?: boolean;
+  } = {},
+): string {
+  const targetId = options.targetId ?? 'postgres';
+  const descriptor = (kind: string) =>
+    `{ kind: '${kind}', id: '${targetId}', familyId: 'sql', targetId: '${targetId}', version: '0.0.1', create: () => ({}) }`;
+  const lines = [
+    'export default {',
+    `  family: { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1', emission: {}, create: () => ({}) },`,
+    `  target: ${descriptor('target')},`,
+    `  adapter: ${descriptor('adapter')},`,
+  ];
+  if (options.omitExtensionPacks !== true) {
+    const extensionPacksLiteral = options.extensionPacksLiteral ?? '[]';
+    lines.push(`  extensionPacks: ${extensionPacksLiteral},`);
+  }
+  lines.push('};\n');
+  return lines.join('\n');
+}
+
+describe('loadProjectConfig', () => {
+  let projectDir: string;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'cli-telemetry-loadcfg-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it('returns empty config when no prisma-next.config.* exists in projectRoot', async () => {
+    expect(await loadProjectConfig(projectDir)).toEqual(EMPTY_PROJECT_CONFIG);
+  });
+
+  it('extracts target.targetId and extensionPacks[].id from a validated .mjs config', async () => {
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      validConfigSource({
+        extensionPacksLiteral:
+          "[{ kind: 'extension', id: 'pgvector', familyId: 'sql', targetId: 'postgres', version: '0.0.1', create: () => ({}) }, { kind: 'extension', id: 'paradedb', familyId: 'sql', targetId: 'postgres', version: '0.0.1', create: () => ({}) }]",
+      }),
+    );
+    expect(await loadProjectConfig(projectDir)).toEqual({
+      databaseTarget: 'postgres',
+      extensions: ['pgvector', 'paradedb'],
+    });
+  });
+
+  it('returns empty extensions when extensionPacks is truly omitted from an otherwise valid config', async () => {
+    // Exercises the validator's absent-field branch, which is
+    // distinct from the empty-array branch. The projection collapses
+    // both to `extensions: []` via `(config.extensionPacks ?? []).map(…)`,
+    // but the validator paths differ — worth covering directly.
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      validConfigSource({ omitExtensionPacks: true }),
+    );
+    expect(await loadProjectConfig(projectDir)).toEqual({
+      databaseTarget: 'postgres',
+      extensions: [],
+    });
+  });
+
+  it('returns empty config when the canonical validator rejects a missing target descriptor', async () => {
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      `export default { family: { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1', emission: {}, create: () => ({}) } };\n`,
+    );
+    // Validator throws on missing `target` -> caught -> EMPTY_PROJECT_CONFIG.
+    expect(await loadProjectConfig(projectDir)).toEqual(EMPTY_PROJECT_CONFIG);
+  });
+
+  it('returns empty config when an extensionPacks entry fails validation', async () => {
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      validConfigSource({
+        // Missing `create: function` field on the pack — validator rejects.
+        extensionPacksLiteral:
+          "[{ kind: 'extension', id: 'pgvector', familyId: 'sql', targetId: 'postgres', version: '0.0.1' }]",
+      }),
+    );
+    expect(await loadProjectConfig(projectDir)).toEqual(EMPTY_PROJECT_CONFIG);
+  });
+
+  it('swallows errors from a config file that throws during load', async () => {
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      `throw new Error('boom — user config crashed');\n`,
+    );
+    expect(await loadProjectConfig(projectDir)).toEqual(EMPTY_PROJECT_CONFIG);
+  });
+});
+
+describe('buildTelemetryEventFromProcess — parent databaseTarget override', () => {
+  let projectDir: string;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'cli-telemetry-override-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it('overrides the c12-derived databaseTarget when payload.databaseTarget is a string', async () => {
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      validConfigSource({ targetId: 'postgres' }),
+    );
+    const event = await buildTelemetryEventFromProcess({
+      installationId: 'install-1',
+      version: '0.9.0',
+      command: 'init',
+      flags: [],
+      projectRoot: projectDir,
+      endpoint: 'http://localhost/events',
+      databaseTarget: 'mongodb',
+    });
+    expect(event.databaseTarget).toBe('mongodb');
+  });
+
+  it('falls back to the c12-derived databaseTarget when payload.databaseTarget is omitted', async () => {
+    writeFileSync(
+      join(projectDir, 'prisma-next.config.mjs'),
+      validConfigSource({ targetId: 'postgres' }),
+    );
+    const event = await buildTelemetryEventFromProcess({
+      installationId: 'install-1',
+      version: '0.9.0',
+      command: 'migration new',
+      flags: [],
+      projectRoot: projectDir,
+      endpoint: 'http://localhost/events',
+    });
+    expect(event.databaseTarget).toBe('postgres');
+  });
+
+  it('uses the override even when no prisma-next.config.* exists on disk (first-init shape)', async () => {
+    const event = await buildTelemetryEventFromProcess({
+      installationId: 'install-1',
+      version: '0.9.0',
+      command: 'init',
+      flags: [],
+      projectRoot: projectDir,
+      endpoint: 'http://localhost/events',
+      databaseTarget: 'postgres',
+    });
+    expect(event.databaseTarget).toBe('postgres');
+    expect(event.extensions).toEqual([]);
   });
 });

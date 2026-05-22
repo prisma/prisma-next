@@ -1,4 +1,4 @@
-import { type } from 'arktype';
+import { type Type, type } from 'arktype';
 import type { MongoJsonObject, MongoJsonPrimitive, MongoJsonValue } from './contract-types';
 
 const ScalarFieldTypeSchema = type({
@@ -317,36 +317,91 @@ const StorageCollectionSchema = type({
   'options?': MongoCollectionOptionsSchema,
 });
 
-const MongoNamespaceEnvelopeSchema = type({
-  '+': 'reject',
-  id: 'string',
-  'kind?': 'string',
-  'collections?': type({ '[string]': StorageCollectionSchema }),
-});
+function collectionEntrySchema(fragments?: ReadonlyMap<string, Type<unknown>>): Type<unknown> {
+  if (fragments === undefined || fragments.size === 0) {
+    return StorageCollectionSchema;
+  }
+  return type('unknown').narrow((entry, ctx) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      return ctx.mustBe('an object');
+    }
+    const kind = (entry as { kind?: unknown }).kind;
+    if (typeof kind === 'string') {
+      const fragment = fragments.get(kind);
+      if (fragment !== undefined) {
+        const parsed = fragment(entry);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: parsed.summary });
+        }
+        return true;
+      }
+    }
+    const parsed = StorageCollectionSchema(entry);
+    if (parsed instanceof type.errors) {
+      return ctx.reject({ expected: parsed.summary });
+    }
+    return true;
+  });
+}
 
-export const MongoContractSchema = type({
-  '+': 'reject',
-  targetFamily: "'mongo'",
-  'schemaVersion?': 'string',
-  'target?': 'string',
-  'storageHash?': 'string',
-  'profileHash?': 'string',
-  roots: 'Record<string, string>',
-  'capabilities?': 'Record<string, unknown>',
-  'extensionPacks?': 'Record<string, unknown>',
-  'meta?': 'Record<string, unknown>',
-  'sources?': 'Record<string, unknown>',
-  '_generated?': 'Record<string, unknown>',
-  storage: type({
+/**
+ * Builds the per-namespace envelope schema for Mongo storage. Pack
+ * contributions are keyed by the descriptor's `discriminator` and
+ * validate each entry by matching the entry's `kind` field. Mongo today
+ * has no pack contributions; the composition surface exists for symmetry
+ * with SQL and as the substrate for future entity kinds.
+ *
+ * `'kind?': 'string'` because `kind` is non-enumerable on
+ * `MongoNamespacePayload` and therefore absent from the wire shape; the
+ * type-side narrowing is enforced by the IR class, not by this validator.
+ */
+export function createMongoNamespaceEnvelopeSchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  return type({
     '+': 'reject',
-    namespaces: type({ '[string]': MongoNamespaceEnvelopeSchema }),
+    id: 'string',
+    'kind?': 'string',
+    'collections?': type({ '[string]': collectionEntrySchema(fragments) }),
+  }) as Type<unknown>;
+}
+
+/**
+ * Builds the full Mongo contract schema. The per-namespace entry
+ * threading happens through {@link createMongoNamespaceEnvelopeSchema};
+ * the rest of the envelope is family-shared.
+ */
+export function createMongoContractSchema(
+  fragments?: ReadonlyMap<string, Type<unknown>>,
+): Type<unknown> {
+  const namespaceEnvelope = createMongoNamespaceEnvelopeSchema(fragments);
+  return type({
+    '+': 'reject',
+    targetFamily: "'mongo'",
+    'schemaVersion?': 'string',
+    'target?': 'string',
     'storageHash?': 'string',
-  }),
-  models: type({ '[string]': ModelDefinitionSchema }),
-  'valueObjects?': type({
-    '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
-  }),
-});
+    'profileHash?': 'string',
+    roots: 'Record<string, string>',
+    'capabilities?': 'Record<string, unknown>',
+    'extensionPacks?': 'Record<string, unknown>',
+    'meta?': 'Record<string, unknown>',
+    'sources?': 'Record<string, unknown>',
+    '_generated?': 'Record<string, unknown>',
+    'domain?': 'unknown',
+    storage: type({
+      '+': 'reject',
+      namespaces: type({ '[string]': namespaceEnvelope }),
+      'storageHash?': 'string',
+    }),
+    models: type({ '[string]': ModelDefinitionSchema }),
+    'valueObjects?': type({
+      '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
+    }),
+  }) as Type<unknown>;
+}
+
+export const MongoContractSchema = createMongoContractSchema();
 
 export {
   CollationSchema,

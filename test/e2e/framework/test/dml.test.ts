@@ -12,7 +12,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   it('inserts, updates, and deletes a user', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
       // Insert
-      await runtime.execute(db.user.insert({ email: 'e2e@example.com' }).build());
+      await runtime.execute(db.user.insert([{ email: 'e2e@example.com' }]).build());
 
       const insertedRows = await runtime.execute(
         db.user
@@ -74,7 +74,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
   it('auto-generates a valid UUIDv7 id on insert', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
-      await runtime.execute(db.event.insert({ name: 'uuidv7-test-event' }).build());
+      await runtime.execute(db.event.insert([{ name: 'uuidv7-test-event' }]).build());
 
       const rows = await runtime.execute(
         db.event
@@ -98,7 +98,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
       const overrideId = '019470ab-9a66-7000-8000-000000000001';
 
-      await runtime.execute(db.event.insert({ id: overrideId, name: 'override-event' }).build());
+      await runtime.execute(db.event.insert([{ id: overrideId, name: 'override-event' }]).build());
 
       const rows = await runtime.execute(
         db.event
@@ -119,7 +119,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
   it('updates and deletes by UUIDv7 id', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, client, runtime }) => {
       // Insert (auto-generated id)
-      await runtime.execute(db.event.insert({ name: 'to-be-updated' }).build());
+      await runtime.execute(db.event.insert([{ name: 'to-be-updated' }]).build());
 
       const insertedRows = await runtime.execute(
         db.event
@@ -171,7 +171,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
   it('applies literal defaults for every supported type', async () => {
     await withTestRuntime<Contract>(contractJsonPath, async ({ db, runtime }) => {
-      await runtime.execute(db.literal_defaults.insert({}).build());
+      await runtime.execute(db.literal_defaults.insert([{}]).build());
 
       const rows = await runtime.execute(
         db.literal_defaults
@@ -206,7 +206,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         verified: true,
       } as const;
 
-      await runtime.execute(db.user.insert({ email: 'json@example.com', profile }).build());
+      await runtime.execute(db.user.insert([{ email: 'json@example.com', profile }]).build());
 
       const userRows = await runtime.execute(
         db.user
@@ -221,12 +221,14 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
 
       await runtime.execute(
         db.post
-          .insert({
-            userId: userRow!.id,
-            title: 'Typed JSON post',
-            published: true,
-            meta,
-          })
+          .insert([
+            {
+              userId: userRow!.id,
+              title: 'Typed JSON post',
+              published: true,
+              meta,
+            },
+          ])
           .build(),
       );
 

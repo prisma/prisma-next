@@ -1295,6 +1295,9 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
+      arktype:
+        specifier: 'catalog:'
+        version: 2.2.0
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.10.0
@@ -1571,9 +1574,18 @@ importers:
 
   packages/1-framework/3-tooling/cli-telemetry:
     dependencies:
+      '@prisma-next/config':
+        specifier: workspace:0.10.0
+        version: link:../../1-core/config
+      '@prisma-next/utils':
+        specifier: workspace:0.10.0
+        version: link:../../0-foundation/utils
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      c12:
+        specifier: ^3.3.4
+        version: 3.3.4(magicast@0.5.2)
       pathe:
         specifier: ^2.0.3
         version: 2.0.3

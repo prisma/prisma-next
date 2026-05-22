@@ -154,10 +154,16 @@ describe('envExampleContent (FR3.1)', () => {
     expect(md).toContain('postgresql://');
   });
 
-  it('writes a mongodb:// placeholder with a database segment for the mongo target', () => {
+  it('writes a mongodb:// placeholder with credentials and a database segment for the mongo target', () => {
     const md = envExampleContent('mongo');
     expect(md).toContain('mongodb://');
-    expect(md).toMatch(/mongodb:\/\/[^"]+\/mydb/);
+    expect(md).toContain('DATABASE_URL="mongodb://user:password@localhost:27017/mydb"');
+  });
+
+  it('documents replica-set requirements without baking query params into the default URL', () => {
+    const md = envExampleContent('mongo');
+    expect(md).toMatch(/replica set/i);
+    expect(md).toMatch(/standalone local mongod/i);
   });
 
   it('documents the minimum supported server version (FR8.2)', () => {
@@ -193,7 +199,7 @@ describe('envFileContent (FR3.2)', () => {
 
   it('writes a target-specific connection-string placeholder', () => {
     expect(envFileContent('postgres')).toContain('postgresql://');
-    expect(envFileContent('mongo')).toContain('mongodb://');
+    expect(envFileContent('mongo')).toContain('mongodb://user:password@localhost:27017/mydb');
   });
 });
 

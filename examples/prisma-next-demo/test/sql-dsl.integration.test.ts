@@ -104,7 +104,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
   ];
 
   for (const user of users) {
-    await runtime.execute(builder.user.insert(user).build());
+    await runtime.execute(builder.user.insert([user]).build());
   }
 
   // Alice's aliceFar [0.7,0.3,0] and Bob's bobClose [0.5,0.5,0] are the closest
@@ -156,7 +156,7 @@ async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    await runtime.execute(builder.post.insert(post).build());
+    await runtime.execute(builder.post.insert([post]).build());
   }
 }
 

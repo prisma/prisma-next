@@ -224,6 +224,35 @@ describe('assembleAuthoringContributions', () => {
       ]),
     ).toThrow(/Ambiguous authoring registry path "custom.Json"/);
   });
+
+  it('merges entityTypes namespaces from multiple descriptors', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          entityTypes: {
+            enum: {
+              kind: 'entity',
+              discriminator: 'postgres-enum',
+              output: { factory: () => ({}) },
+            },
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'other',
+        authoring: {
+          entityTypes: {
+            demo: {
+              kind: 'entity',
+              discriminator: 'demo-entity',
+              output: { factory: () => ({}) },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.entityTypes)).toEqual(['enum', 'demo']);
+  });
 });
 
 describe('extractCodecLookup', () => {

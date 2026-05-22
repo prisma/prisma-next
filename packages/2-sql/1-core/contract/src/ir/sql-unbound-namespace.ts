@@ -40,7 +40,7 @@ export class SqlUnboundNamespace extends NamespaceBase {
 
   readonly id = UNBOUND_NAMESPACE_ID;
   readonly tables: Readonly<Record<string, StorageTable>> = Object.freeze({});
-  declare readonly kind?: string;
+  declare readonly kind: string;
 
   private constructor() {
     super();

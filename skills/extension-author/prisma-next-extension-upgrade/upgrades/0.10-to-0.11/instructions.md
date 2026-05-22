@@ -2,6 +2,14 @@
 from: "0.10"
 to: "0.11"
 changes:
+  - id: namespace-kind-required-on-handcrafted-contract-literals
+    summary: Add the `kind` discriminator (`'sql-namespace'` for SQL namespaces; `'mongo-namespace'` for Mongo namespaces) to every handcrafted `Contract<{ namespaces: { ... } }>` type literal in extension test-d files and inline-typed fixtures. The framework `Namespace` interface tightened `kind` from optional to required; emitted `contract.d.ts` literals carry it automatically, but anything you write by hand will fail typecheck without it.
+    detection:
+      glob: "**/*.test-d.ts"
+      contains:
+        - "Contract<"
+        - "namespaces"
+      anyMatch: true
   - id: facade-add-close-and-async-dispose
     summary: |
       The official Prisma Next facades (`@prisma-next/postgres`, `@prisma-next/sqlite`, `@prisma-next/mongo`) now expose `close()` and `[Symbol.asyncDispose]` so short-lived scripts can release facade-owned resources cleanly and exit instead of hanging on a live connection. Extensions that expose a facade in the same shape should add the same surface for parity, honouring the ownership rule (only close resources the facade itself constructed) and managing a terminal closed state (subsequent operations reject with a clear error). No script — manual code authoring per extension.
@@ -19,9 +27,110 @@ changes:
         - "mongoClient"
         - "@prisma-next/mongo"
       anyMatch: true
+  - id: insert-single-row-wrap-in-array
+    summary: Wrap single-row `.insert({...})` call sites in an array — `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - ".insert("
+      anyMatch: true
+  - id: insert-ast-with-values-to-with-rows
+    summary: Replace `InsertAst.withValues(assignments)` with `InsertAst.withRows([assignments])`. The `withValues` method is removed; `withRows` accepts an array of assignment maps.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - ".withValues("
 ---
 
 # 0.10 → 0.11 — Extension-author upgrade instructions
+
+## `namespace-kind-required-on-handcrafted-contract-literals`
+
+Starting at the 0.11 release, the framework `Namespace` interface tightens `kind` from optional (inherited from `IRNode`) to required. Any **handcrafted** `Contract<{ namespaces: { ... } }>` type literal — typically used in extension test-d files and inline-typed fixtures — must add `kind: 'sql-namespace'` (or `'mongo-namespace'`) to each namespace literal or TypeScript will reject the literal as not structurally assignable to `Namespace`.
+
+This **does not** affect:
+
+- Real `contract.d.ts` files emitted by `prisma-next contract emit`. The emitter prints `kind` automatically.
+- Real `contract.json` envelopes. The runtime `kind` field is non-enumerable on namespace class instances, so it doesn't surface in the JSON on-disk envelope and the byte hash is unchanged.
+- Plain-literal `Contract` values constructed at runtime (the framework only tightens the **type** declaration of `kind`; the runtime walks tolerate missing values).
+
+It **does** affect:
+
+- `.test-d.ts` files in extension packages that handcraft `Contract<{ namespaces: { __unbound__: { id, tables, ... } } }>` literals to assert generic-inference shapes. Each namespace literal needs `kind: 'sql-namespace'` (SQL namespaces) or `kind: 'mongo-namespace'` (Mongo namespaces) added alongside `id`.
+- Any inline-typed fixture file (`test/fixtures/*.d.ts`, etc.) that mirrors what the emitter would produce for testing.
+
+### Before 0.11
+
+```ts
+type ContractUnderTest = Contract<
+  SqlStorage<string> & {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly tables: {
+          readonly user: {
+            // ... columns, primaryKey, etc.
+          };
+        };
+      };
+    };
+    readonly storageHash: StorageHash;
+  },
+  // ...
+>;
+```
+
+### Starting at 0.11
+
+```ts
+type ContractUnderTest = Contract<
+  SqlStorage<string> & {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace'; // ← new: required
+        readonly tables: {
+          readonly user: {
+            // ... columns, primaryKey, etc.
+          };
+        };
+      };
+    };
+    readonly storageHash: StorageHash;
+  },
+  // ...
+>;
+```
+
+### Mapping table
+
+| Namespace family | Discriminator literal | Where it surfaces in handcrafted types |
+|---|---|---|
+| SQL (`SqlNamespace`, `SqlUnboundNamespace`) | `'sql-namespace'` | Anywhere you write `Contract<{ namespaces: { … } }>` with a SQL-style namespace |
+| Mongo (`MongoNamespace`, `MongoUnboundNamespace`) | `'mongo-namespace'` | Anywhere you write `Contract<{ namespaces: { … } }>` with a Mongo-style namespace |
+| Postgres (`PostgresSchema`, when handcrafted) | `'postgres-schema'` or `'postgres-unbound-schema'` | Rare in extension code; only needed if you handcraft a literal with a Postgres-specific namespace class |
+
+### Detection
+
+Run the matcher's grep over your extension's source:
+
+```bash
+rg --files-with-matches -t ts -e 'Contract<' -e 'namespaces' -g '**/*.test-d.ts'
+```
+
+For each match, open the file and add the `kind` literal to every namespace entry under `namespaces:`. If you have many such literals, a regex-driven mechanical pass works (e.g. find every `readonly id: '<ns-id>';` inside a `namespaces:` block and inject `readonly kind: 'sql-namespace';` immediately after).
+
+### Why the change
+
+The framework needs every namespace IR node to carry its family discriminator at the type level so that cross-family namespace walks (the new `elementCoordinates(storage)` surface in `@prisma-next/framework-components/ir`) can dispatch on a known-present `kind`, not an optional one.
+
+The runtime invariant has always held — every concrete namespace class sets `kind` non-enumerably via `Object.defineProperty(this, 'kind', { value, enumerable: false })` in its constructor. The type tightening makes the invariant honest at the consumer surface.
+
+### What you do **not** need to change
+
+- No `.d.ts` regeneration is needed. Run `prisma-next contract emit` only as part of your normal authoring flow; the emitter handles the `kind` field for you.
+- No `contract.json` snapshot changes. The hash inputs are unchanged because `kind` is non-enumerable on namespace class instances.
+- No runtime API changes. Extension factories that construct namespaces via `new SqlStorage(...)`, `new PostgresSchema(...)`, etc. are unchanged — the constructors continue to materialise `kind` non-enumerably.
 
 ## `facade-add-close-and-async-dispose`
 
@@ -91,8 +200,77 @@ async close() {
 
 No script — the right migration depends on why your extension was sharing the client in the first place. Walk the call sites by hand.
 
+## `insert-single-row-wrap-in-array`
+
+Starting at the 0.11 release, the `.insert()` method on the SQL builder accepts **only** an array of row objects. The single-object overload that previously allowed `.insert({ field: value })` is removed.
+
+Before 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .insert({ field: value });
+// or via the query builder:
+db.sql.table.insert({ field: value }).build();
+```
+
+Starting at 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .insert([{ field: value }]);
+// or via the query builder:
+db.sql.table.insert([{ field: value }]).build();
+```
+
+Walk every `.ts` / `.tsx` file matched by the `detection.glob` above. For each call site that passes a plain object directly to `.insert(...)`, wrap the argument in an array:
+
+- `.insert(row)` → `.insert([row])`
+- `.insert({ field: value })` → `.insert([{ field: value }])`
+
+Variable references to a row object are safe to wrap directly:
+
+```ts
+// Before
+await runtime.execute(db.sql.table.insert(row).build());
+// After
+await runtime.execute(db.sql.table.insert([row]).build());
+```
+
+If a call site already passes an array (`.insert([row1, row2])`), it is already correct — leave it unchanged.
+
+TypeScript will report bare-object call sites as type errors after the bump, which is a reliable compile-time signal for every affected site.
+
+## `insert-ast-with-values-to-with-rows`
+
+Starting at the 0.11 release, the `InsertAst.withValues(assignments)` method is removed. Extensions that build `InsertAst` directly via the AST layer must switch to `InsertAst.withRows([assignments])`.
+
+Before 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .withValues(createAssignments.assignments)
+  .withOnConflict(onConflict);
+```
+
+Starting at 0.11:
+
+```ts
+const ast = InsertAst.into(TableSource.named(tableName))
+  .withRows([createAssignments.assignments])
+  .withOnConflict(onConflict);
+```
+
+The change is:
+- Replace `.withValues(expr)` with `.withRows([expr])` — the single-row overload is removed; `withRows` accepts an array of assignment maps.
+
+Walk every `.ts` / `.tsx` file matched by the `detection.glob` above. For each call site matching `.withValues(`, apply the replacement. The argument remains a single expression; it just needs to be wrapped in an array.
+
+### Validation
+
+After applying the rules above, run `pnpm typecheck && pnpm test` (or your extension's equivalent). `prisma-next-check-pins` should also pass — the pin set is unchanged for this transition; the breaking change is in the `InsertAst` builder method surface, not the dependency contract.
+
 ## Validation by execution
 
-This transition's entries are prose-only (no scripts). The substrate diff on `packages/3-extensions/` is additive (new methods on the three official facades) plus the Mongo behaviour change documented above. There is no codemod to apply against a reverted substrate — the framework change *is* the new surface, and these instructions describe the consumer-side translation, not a substrate transform.
+These entries are prose-only (no scripts). The substrate diff on `packages/3-extensions/` is additive (new methods on the three official facades) plus the Mongo behaviour change documented above; the `namespace-kind-required-on-handcrafted-contract-literals` entry covers a type-only tightening with no runtime substrate transform. There is no codemod to apply against a reverted substrate — the framework changes *are* the new surfaces, and these instructions describe the consumer-side translation, not a substrate transform.
 
 The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry. The substantive verification of the consumer-facing translation lives in the published skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.

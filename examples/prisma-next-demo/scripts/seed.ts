@@ -26,25 +26,29 @@ async function main() {
     // Insert users with embedded address value objects
     await runtime.execute(
       db.sql.user
-        .insert({
-          email: 'alice@example.com',
-          displayName: 'Alice',
-          createdAt: new Date(),
-          kind: 'admin',
-          address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
-        })
+        .insert([
+          {
+            email: 'alice@example.com',
+            displayName: 'Alice',
+            createdAt: new Date(),
+            kind: 'admin',
+            address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
+          },
+        ])
         .build(),
     );
 
     await runtime.execute(
       db.sql.user
-        .insert({
-          email: 'bob@example.com',
-          displayName: 'Bob',
-          createdAt: new Date(),
-          kind: 'user',
-          address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
-        })
+        .insert([
+          {
+            email: 'bob@example.com',
+            displayName: 'Bob',
+            createdAt: new Date(),
+            kind: 'user',
+            address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
+          },
+        ])
         .build(),
     );
 
@@ -85,34 +89,40 @@ async function main() {
     // Insert posts with embeddings
     await runtime.execute(
       db.sql.post
-        .insert({
-          title: 'First Post',
-          userId: alice.id,
-          embedding: generateEmbedding(1),
-          createdAt: new Date(),
-        })
+        .insert([
+          {
+            title: 'First Post',
+            userId: alice.id,
+            embedding: generateEmbedding(1),
+            createdAt: new Date(),
+          },
+        ])
         .build(),
     );
 
     await runtime.execute(
       db.sql.post
-        .insert({
-          title: 'Second Post',
-          userId: alice.id,
-          embedding: generateEmbedding(2),
-          createdAt: new Date(),
-        })
+        .insert([
+          {
+            title: 'Second Post',
+            userId: alice.id,
+            embedding: generateEmbedding(2),
+            createdAt: new Date(),
+          },
+        ])
         .build(),
     );
 
     await runtime.execute(
       db.sql.post
-        .insert({
-          title: 'Third Post',
-          userId: bob.id,
-          embedding: generateEmbedding(3),
-          createdAt: new Date(),
-        })
+        .insert([
+          {
+            title: 'Third Post',
+            userId: bob.id,
+            embedding: generateEmbedding(3),
+            createdAt: new Date(),
+          },
+        ])
         .build(),
     );
 

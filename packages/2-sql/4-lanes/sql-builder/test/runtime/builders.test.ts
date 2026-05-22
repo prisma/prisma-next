@@ -6,6 +6,7 @@ import {
   DerivedTableSource,
   ExistsExpr,
   IdentifierRef,
+  ParamRef,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
@@ -449,7 +450,7 @@ describe('mutation defaults', () => {
 
   it('INSERT calls applyMutationDefaults with op create', () => {
     const { d, spy } = dbWithSpy();
-    d.users.insert({ id: 1, name: 'A', email: 'a@b.com' }).build();
+    d.users.insert([{ id: 1, name: 'A', email: 'a@b.com' }]).build();
     expect(spy).toHaveBeenCalledWith({
       op: 'create',
       table: 'users',
@@ -468,5 +469,151 @@ describe('mutation defaults', () => {
       table: 'users',
       values: { name: 'B' },
     });
+  });
+});
+
+describe('INSERT multi-row', () => {
+  it('empty array throws at build time', () => {
+    expect(() => db().users.insert([]).build()).toThrow(
+      'insert() called with an empty row array — at least one row is required',
+    );
+  });
+
+  it('single row via array calls applyMutationDefaults once', () => {
+    const spy = vi.fn(() => []);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    d.users.insert([{ id: 1, name: 'A' }]).build();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({
+      op: 'create',
+      table: 'users',
+      values: { id: 1, name: 'A' },
+    });
+  });
+
+  it('multi-row calls applyMutationDefaults once per row', () => {
+    const spy = vi.fn(() => [{ column: 'email', value: 'default@x.com' }]);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    const plan = d.users
+      .insert([
+        { id: 1, name: 'A' },
+        { id: 2, name: 'B' },
+      ])
+      .build();
+    expect(spy).toHaveBeenCalledTimes(2);
+    const params = plan.ast.collectParamRefs();
+    expect(params).toHaveLength(6); // id + name + email (default) for each of 2 rows
+  });
+
+  it('multi-row with differing column sets passes each row through with its own columns only', () => {
+    const d = db();
+    const plan = d.users
+      .insert([
+        { id: 1, name: 'A' },
+        { id: 2, email: 'b@x.com' },
+      ])
+      .build();
+    const ast = plan.ast;
+    expect(ast.kind).toBe('insert');
+    if (ast.kind !== 'insert') throw new Error('expected insert');
+    expect(ast.rows).toHaveLength(2);
+    // each row carries exactly the columns the caller supplied — no cross-row fill
+    expect(Object.keys(ast.rows[0]!).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(ast.rows[1]!).sort()).toEqual(['email', 'id']);
+  });
+
+  it('multi-row with defaults hook: each row gets its own defaults independently', () => {
+    const spy = vi.fn((args: { values: Record<string, unknown> }) => {
+      if ('id' in args.values && (args.values['id'] as number) === 1) {
+        return [{ column: 'email', value: 'default@x.com' }];
+      }
+      return [];
+    });
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    const plan = d.users
+      .insert([
+        { id: 1, name: 'A' },
+        { id: 2, name: 'B' },
+      ])
+      .build();
+    expect(spy).toHaveBeenCalledTimes(2);
+    const ast = plan.ast;
+    if (ast.kind !== 'insert') throw new Error('expected insert');
+    expect(ast.rows).toHaveLength(2);
+    // row 0 got email from defaults; row 1 did not — no cross-row fill
+    expect(Object.keys(ast.rows[0]!).sort()).toEqual(['email', 'id', 'name']);
+    expect(Object.keys(ast.rows[1]!).sort()).toEqual(['id', 'name']);
+  });
+});
+
+describe('UPDATE callback overload', () => {
+  it('set clause carries a non-ParamRef expression node for callback-assigned column', () => {
+    const d = db();
+    const plan = d.users
+      .update((f) => ({ name: f.name }))
+      .where((f, fns) => fns.eq(f.id, 1))
+      .build();
+    const ast = plan.ast;
+    if (ast.kind !== 'update') throw new Error('expected update');
+    const nameValue = ast.set['name'];
+    expect(nameValue).toBeDefined();
+    expect(nameValue).not.toBeInstanceOf(ParamRef);
+    expect(nameValue!.kind).toBe('identifier-ref');
+  });
+
+  it('mutation defaults hook fires once with op update for callback overload', () => {
+    const spy = vi.fn(() => []);
+    const d = sql({
+      context: {
+        ...stubBase,
+        contract: sqlContract,
+        applyMutationDefaults: spy,
+      } as unknown as ExecutionContext<typeof sqlContract>,
+    });
+    d.users
+      .update((f) => ({ name: f.name }))
+      .where((f, fns) => fns.eq(f.id, 1))
+      .build();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ op: 'update', table: 'users' }));
+  });
+
+  it('where and returning clauses are identical between object and callback overloads', () => {
+    const d = db();
+    const objectPlan = d.users
+      .update({ name: 'x' })
+      .where((f, fns) => fns.eq(f.id, 42))
+      .returning('id')
+      .build();
+    const callbackPlan = d.users
+      .update((f) => ({ name: f.name }))
+      .where((f, fns) => fns.eq(f.id, 42))
+      .returning('id')
+      .build();
+    const objectAst = objectPlan.ast;
+    const callbackAst = callbackPlan.ast;
+    if (objectAst.kind !== 'update' || callbackAst.kind !== 'update') {
+      throw new Error('expected update');
+    }
+    expect(callbackAst.where).toEqual(objectAst.where);
+    expect(callbackAst.returning).toEqual(objectAst.returning);
   });
 });

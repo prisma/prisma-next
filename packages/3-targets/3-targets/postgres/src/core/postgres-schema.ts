@@ -41,7 +41,7 @@ export class PostgresSchema extends NamespaceBase {
    */
   static unbound: PostgresUnboundSchema;
 
-  readonly kind = 'schema' as const;
+  declare readonly kind: 'schema';
   readonly id: string;
   readonly tables: Readonly<Record<string, StorageTable>>;
   readonly types: Readonly<Record<string, PostgresEnumType>>;
@@ -65,6 +65,12 @@ export class PostgresSchema extends NamespaceBase {
         ]),
       ),
     );
+    Object.defineProperty(this, 'kind', {
+      value: 'schema',
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
     freezeNode(this);
   }
 

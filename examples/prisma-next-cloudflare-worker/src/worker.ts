@@ -55,11 +55,13 @@ export default {
       const result = await withTransaction(runtime, async (tx) => {
         await tx.execute(
           db.sql.post
-            .insert({
-              title: `Post written in tx for ${userId}`,
-              userId,
-              createdAt: new Date(),
-            })
+            .insert([
+              {
+                title: `Post written in tx for ${userId}`,
+                userId,
+                createdAt: new Date(),
+              },
+            ])
             .build(),
         );
         await tx.execute(

@@ -46,6 +46,12 @@ export interface Contract<
   readonly roots: Record<string, string>;
   readonly models: TModels;
   readonly valueObjects?: Record<string, ContractValueObject>;
+  /**
+   * Domain plane keyed as `domain[plane][namespaceId][entityKind][entityName]`.
+   * Optional until downstream slices populate it; when absent the field is
+   * omitted from the on-disk envelope so emitted contracts stay byte-stable.
+   */
+  readonly domain?: Record<string, Record<string, Record<string, unknown>>>;
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;

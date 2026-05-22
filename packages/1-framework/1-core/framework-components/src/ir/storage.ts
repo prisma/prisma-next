@@ -2,6 +2,53 @@ import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
 /**
+ * Canonical address for a named entity in Contract IR / Schema IR.
+ *
+ * `plane` is `'domain' | 'storage'`: which top-level contract plane the
+ * entity lives on. Domain-side walks (once domain content is populated)
+ * yield `plane: 'domain'`; {@link elementCoordinates} over storage yields
+ * `plane: 'storage'`. A sibling `elementCoordinates(domain)` is not wired
+ * yet — domain-plane content lands in S1.C; the sibling walk lands there.
+ *
+ * Cross-plane references obey a directional invariant: domain → storage is
+ * allowed; storage → domain is forbidden. That rule is enforced by a
+ * separate validator, not by constraining this coordinate shape — the
+ * coordinate carries the axis the validator checks.
+ *
+ * Iteration order over namespace properties follows `Object.entries` order;
+ * consumers that depend on ordering must sort.
+ */
+export interface EntityCoordinate {
+  readonly plane: 'domain' | 'storage';
+  readonly namespaceId: string;
+  readonly entityKind: string;
+  readonly entityName: string;
+}
+
+/**
+ * Lazy walk over every named storage entity in a `Storage`-shaped
+ * value, yielded as {@link EntityCoordinate} tuples with
+ * `plane: 'storage'` (the parameter type binds the plane).
+ *
+ * Iterates each namespace's own-enumerable properties structurally.
+ * Skips `id` (known scalar); `kind` is non-enumerable on namespace
+ * concretions and does not appear in `Object.entries`. For every other
+ * property whose value is a non-null object, yields one coordinate per
+ * entry key in that map. No family-specific slot vocabulary is required.
+ */
+export function* elementCoordinates(storage: Storage): Generator<EntityCoordinate> {
+  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+    for (const [entityKind, slot] of Object.entries(ns)) {
+      if (entityKind === 'id') continue;
+      if (slot === null || typeof slot !== 'object') continue;
+      for (const entityName of Object.keys(slot)) {
+        yield { plane: 'storage', namespaceId, entityKind, entityName };
+      }
+    }
+  }
+}
+
+/**
  * Framework-level promise that every Contract IR / Schema IR carries a
  * collection of namespaces keyed by namespace id. Family storage
  * concretions (`SqlStorage`, `MongoStorage`) refine the shape with

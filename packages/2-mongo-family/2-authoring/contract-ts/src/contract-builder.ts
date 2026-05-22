@@ -40,6 +40,7 @@ import {
   type MongoIndexFields,
   type MongoIndexInput,
   type MongoIndexOptionsInput,
+  MongoStorage,
   type MongoStorageShape,
   type MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
@@ -1521,20 +1522,24 @@ function buildContractFromDefinition<
     },
   };
 
+  const storageHash = computeStorageHash({
+    target: definition.target.targetId,
+    targetFamily: definition.family.familyId,
+    storage: storageBody,
+  });
+
+  const storage = new MongoStorage({
+    storageHash,
+    ...storageBody,
+  }) as unknown as MongoStorageShape<string>;
+
   const builtContract = {
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,
     roots,
     models: builtModels,
     ...(Object.keys(builtValueObjects).length > 0 ? { valueObjects: builtValueObjects } : {}),
-    storage: {
-      ...storageBody,
-      storageHash: computeStorageHash({
-        target: definition.target.targetId,
-        targetFamily: definition.family.familyId,
-        storage: storageBody,
-      }),
-    },
+    storage,
     capabilities,
     extensionPacks: definition.extensionPacks ?? {},
     profileHash: computeProfileHash({
