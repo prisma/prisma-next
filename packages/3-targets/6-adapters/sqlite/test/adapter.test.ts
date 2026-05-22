@@ -7,6 +7,7 @@ import {
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
+  DerivedTableSource,
   ExistsExpr,
   InsertAst,
   InsertOnConflict,
@@ -115,6 +116,38 @@ describe('SQLite adapter', () => {
 
       const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('SELECT DISTINCT');
+    });
+
+    // Mirrors the wrapped-subquery AST shape that
+    // `buildDistinctNonLeafChildRowsSelect` produces in the SQL ORM client
+    // planner for `include('rel', r => r.distinct(...).include('grandchild'))`.
+    // Postgres rejects equality on `json` aggregates, so the planner wraps
+    // a scalar `SELECT DISTINCT` in a derived table and attaches grandchild
+    // aggregates outside. The Postgres integration suite covers execution;
+    // this test covers the SQLite renderer side of TML-2656 AC2: the same
+    // AST must lower to valid SQLite SQL with no Postgres-only constructs.
+    it('renders wrapped SELECT DISTINCT subquery for non-leaf distinct includes', () => {
+      const innerDistinct = SelectAst.from(TableSource.named('post'))
+        .withProjection([
+          ProjectionItem.of('title', ColumnRef.of('post', 'title')),
+          ProjectionItem.of('id', ColumnRef.of('post', 'id')),
+        ])
+        .withWhere(BinaryExpr.eq(ColumnRef.of('post', 'userId'), ParamRef.of(1)))
+        .withDistinct();
+
+      const ast = SelectAst.from(
+        DerivedTableSource.as('posts__distinct', innerDistinct),
+      ).withProjection([ProjectionItem.of('title', ColumnRef.of('posts__distinct', 'title'))]);
+
+      const { sql } = adapter.lower(ast, { contract });
+      // Inner `SELECT DISTINCT` over scalars is present, wrapped in a
+      // derived table the outer select reads from.
+      expect(sql).toContain('SELECT DISTINCT');
+      expect(sql).toContain('AS "posts__distinct"');
+      // No Postgres-only constructs leak through the SQLite renderer.
+      expect(sql).not.toContain('DISTINCT ON');
+      expect(sql).not.toContain('LATERAL');
+      expect(sql).not.toContain('::');
     });
 
     it('renders GROUP BY and HAVING', () => {

@@ -55,11 +55,7 @@ import {
   dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from './collection-mutation-dispatch';
-import {
-  augmentSelectionForJoinColumns,
-  mapModelDataToStorageRow,
-  mapPolymorphicRow,
-} from './collection-runtime';
+import { mapModelDataToStorageRow, mapPolymorphicRow } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { shorthandToWhereExpr } from './filters';
 import { GroupedCollection } from './grouped-collection';
@@ -92,6 +88,7 @@ import {
   compileUpsertReturning,
   mergeAnnotations,
 } from './query-plan';
+import { augmentSelectionForJoinColumns } from './selection-shaping';
 import {
   type AggregateBuilder,
   type AggregateResult,

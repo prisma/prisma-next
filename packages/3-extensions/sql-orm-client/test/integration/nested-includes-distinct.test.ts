@@ -11,8 +11,8 @@
 // LATERAL / correlated child SELECT, and Postgres rejects equality on the
 // `json` aggregate column.
 //
-// The post-fix lowering uses a CTE / wrapped-subquery shape: pre-aggregate
-// distinct scalar children first (force-including the grandchild join keys),
+// The post-fix lowering uses a CTE / wrapped-subquery shape: pre-dedupe
+// scalar child rows first (force-including the grandchild join keys),
 // then attach grandchild aggregates onto the deduped rows. `DISTINCT` runs
 // over scalar columns only — no `json` column is in scope — and grandchild
 // aggregates compute after the dedupe. This mirrors the multi-query
@@ -483,6 +483,124 @@ describe('integration/nested-includes/distinct', () => {
               invitedUsers: [
                 { id: 2, name: 'A', posts: [{ title: 'aP' }] },
                 { id: 3, name: 'B', posts: [{ title: 'bP' }] },
+              ],
+            },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct at depth 1 inside a depth-3 tree — single execution + shape',
+      async () => {
+        // The load-bearing recursion case for the distinct wrapper: the
+        // depth-1 include is distinct AND has nested grandchildren that
+        // themselves carry a further include. The wrapper must force-
+        // project the grandchild join key into the distinct inner select
+        // while the recursive child of that grandchild correlates back
+        // through the distinct alias. Companion to the depth-2 distinct
+        // case above; together they pin the recursion at both endpoints.
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [
+            { id: 1, name: 'Root', email: 'root@example.com' },
+            { id: 2, name: 'A', email: 'a@example.com', invitedById: 1 },
+            { id: 3, name: 'B', email: 'b@example.com', invitedById: 1 },
+          ]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'aP', userId: 2, views: 1 },
+            { id: 11, title: 'bP', userId: 3, views: 2 },
+          ]);
+          await seedComments(runtime, [
+            { id: 100, body: 'aC', postId: 10 },
+            { id: 101, body: 'bC', postId: 11 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          const rows = await users
+            .select('id', 'name')
+            .where((u) => u.id.eq(1))
+            .include('invitedUsers', (invitedUsers) =>
+              invitedUsers
+                .select('name')
+                .distinct('name')
+                .orderBy((u) => u.name.asc())
+                .include('posts', (posts) =>
+                  posts
+                    .select('title')
+                    .orderBy((p) => p.id.asc())
+                    .include('comments', (c) => c.select('body').orderBy((cc) => cc.id.asc())),
+                ),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Root',
+              invitedUsers: [
+                { name: 'A', posts: [{ title: 'aP', comments: [{ body: 'aC' }] }] },
+                { name: 'B', posts: [{ title: 'bP', comments: [{ body: 'bC' }] }] },
+              ],
+            },
+          ]);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'distinct non-leaf with two sibling grandchildren sharing the same join column',
+      async () => {
+        // Regression for the duplicate-forced-join-key failure mode: when
+        // two sibling nested includes both join from the same `localColumn`
+        // on the distinct child (here, `invitedUsers` and `posts` both
+        // join from `users.id`), the wrapper's force-include must collapse
+        // the duplicate before projection. Without the `new Set` collapse,
+        // the inner derived table would project `id` twice and the
+        // outer `distinctAlias.id` reference would be ambiguous — the
+        // query either fails at lower-time or silently returns wrong data.
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [
+            { id: 1, name: 'Root', email: 'root@example.com' },
+            { id: 2, name: 'A', email: 'a@example.com', invitedById: 1 },
+            { id: 3, name: 'B', email: 'b@example.com', invitedById: 1 },
+            { id: 4, name: 'GC', email: 'gc@example.com', invitedById: 2 },
+          ]);
+          await seedPosts(runtime, [{ id: 10, title: 'aP', userId: 2, views: 1 }]);
+
+          const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+
+          // `.select('name')` drops `id` from the user-visible projection.
+          // Both grandchild includes (`invitedUsers`, `posts`) need
+          // `users.id` to correlate — same `localColumn`. Without the
+          // dedupe, the wrapper widens the projection with a duplicate
+          // `id` alias.
+          const rows = await users
+            .select('id', 'name')
+            .where((u) => u.id.eq(1))
+            .include('invitedUsers', (invitedUsers) =>
+              invitedUsers
+                .select('name')
+                .distinct('name')
+                .orderBy((u) => u.name.asc())
+                .include('invitedUsers', (gc) => gc.select('name'))
+                .include('posts', (p) => p.select('title').orderBy((pp) => pp.id.asc())),
+            )
+            .all();
+
+          expect(runtime.executions).toHaveLength(1);
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Root',
+              invitedUsers: [
+                { name: 'A', invitedUsers: [{ name: 'GC' }], posts: [{ title: 'aP' }] },
+                { name: 'B', invitedUsers: [], posts: [] },
               ],
             },
           ]);

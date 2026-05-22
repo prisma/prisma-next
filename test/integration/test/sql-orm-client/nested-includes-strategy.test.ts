@@ -451,15 +451,73 @@ describe('integration/nested-includes/strategy', () => {
     );
   });
 
+  // ===========================================================================
   // `distinct()` on a non-leaf include used to stay on multi-query because
   // the single-query lowering emitted `SELECT DISTINCT <scalars>, json_agg(...)`
-  // which Postgres rejects on `json` equality. The fix landed in TML-2656
-  // via a wrapped-subquery lowering that dedupes scalar columns first
-  // (force-including grandchild join keys) then attaches grandchild
-  // aggregates per surviving row. Coverage now lives in:
+  // which Postgres rejects on `json` equality. TML-2656 replaced the
+  // dispatch gate with a wrapped-subquery lowering in the planner: the
+  // shape now resolves in a single SQL execution under both lateral and
+  // correlated capabilities.
+  //
+  // Result-shape coverage — hasMany/belongsTo grandchild variants, force-
+  // included join keys, depth-3 trees, self-relations, refinements,
+  // empty grandchildren — lives in:
   //   - test/integration/nested-includes-distinct.test.ts
   //   - test/integration/nested-includes-distinct-refinements.test.ts
-  // The old "stays on multi-query" assertions were deliberately removed:
-  // their entire premise (the dispatch gate) is gone, and the new suites
-  // pin both execution count and result shape on the post-fix behavior.
+  //
+  // The cases below remain in this file as the strategy-suite sentinels:
+  // they are the inverse of the pre-fix "stays on multi-query" cases,
+  // pinned to the strategy-selection contract so a regression flipping
+  // the dispatch back to multi-query is caught here at the dispatch
+  // boundary, not only downstream in the dedicated distinct suites.
+  // ===========================================================================
+
+  describe('non-leaf includes with distinct() resolve in a single SQL execution', () => {
+    it(
+      'distinct() on a non-leaf include resolves in 1 execution under lateral and correlated capabilities',
+      async () => {
+        // Both strategy variants are exercised against the same seeded
+        // dataset under one `withCollectionRuntime` to stay under the
+        // per-file PGlite-spinup threshold documented in
+        // `nested-includes-helpers.ts`. Result-shape coverage lives in
+        // the dedicated `nested-includes-distinct*.test.ts` suites.
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'B', userId: 1, views: 2 },
+          ]);
+          await seedComments(runtime, [{ id: 100, body: 'c', postId: 10 }]);
+
+          const lateralUsers = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
+          runtime.resetExecutions();
+          await lateralUsers
+            .include('posts', (posts) =>
+              posts
+                .select('title')
+                .distinct('title')
+                .orderBy((p) => p.title.asc())
+                .include('comments'),
+            )
+            .orderBy((u) => u.id.asc())
+            .all();
+          expect(runtime.executions).toHaveLength(1);
+
+          const correlatedUsers = collectionWithCapabilities(
+            runtime,
+            'User',
+            CORRELATED_CAPABILITIES,
+          );
+          runtime.resetExecutions();
+          await correlatedUsers
+            .include('posts', (posts) =>
+              posts.select('title').distinct('title').include('comments'),
+            )
+            .all();
+          expect(runtime.executions).toHaveLength(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

@@ -29,9 +29,9 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import { augmentSelectionForJoinColumns } from './collection-runtime';
 import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
+import { augmentSelectionForJoinColumns } from './selection-shaping';
 import type { CollectionState, IncludeExpr } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
@@ -300,13 +300,13 @@ function buildIncludeChildRowsSelect(
   // `distinct()` on a non-leaf include cannot be lowered as
   // `SELECT DISTINCT <scalars>, json_agg(<grandchild>) FROM ...`:
   // Postgres rejects equality on the `json` aggregate column. Instead,
-  // pre-aggregate distinct scalar children in a wrapped subquery — force-
-  // including the grandchild join keys so the outer aggregates can
-  // correlate back to the deduped rows — and attach grandchild aggregates
-  // onto that wrapped result. `DISTINCT` runs over scalar columns only,
-  // no `json` column is in scope, and the user-visible row shape stays
-  // bit-for-bit equivalent to the multi-query stitcher's output (which
-  // applies the same force-include + strip-hidden pattern in JS).
+  // pre-dedupe scalar child rows in a wrapped subquery — force-including
+  // the grandchild join keys so the outer aggregates can correlate back
+  // to the deduped rows — and attach grandchild aggregates onto that
+  // wrapped result. `DISTINCT` runs over scalar columns only, no `json`
+  // column is in scope, and the user-visible row shape stays bit-for-bit
+  // equivalent to the multi-query stitcher's output (which applies the
+  // same force-include + strip-hidden pattern in JS).
   const isDistinctNonLeaf =
     childState.distinct !== undefined &&
     childState.distinct.length > 0 &&
@@ -423,7 +423,14 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // when it doesn't (e.g. `.select('title').distinct('title').include('comments')`)
   // the join keys appear inside the wrapper subquery only and are stripped
   // from the user-visible projection in the outer SELECT.
-  const grandchildJoinColumns = childState.includes.map((nested) => nested.localColumn);
+  //
+  // De-duplicate before projection: two sibling nested includes can share
+  // the same `localColumn` on the distinct child (e.g. a `User` whose
+  // `posts` and `invitedUsers` grandchildren both join from `users.id`).
+  // Mirrors the `new Set` collapse in `resolveRowsByParent`.
+  const grandchildJoinColumns = Array.from(
+    new Set(childState.includes.map((nested) => nested.localColumn)),
+  );
   const { selectedForQuery } = augmentSelectionForJoinColumns(
     childState.selectedFields,
     grandchildJoinColumns,
@@ -431,7 +438,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
 
   // INNER: distinct scalar select with force-included join keys + hidden
   // order-by projections. No nested aggregates — `DISTINCT` only sees
-  // scalar columns.
+  // scalar columns; pre-deduped rows are the input to the outer wrap.
   const innerScalarProjection = buildProjection(
     contract,
     include.relatedTableName,
