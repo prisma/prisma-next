@@ -5,7 +5,6 @@ import {
   runContractEmit,
   runDbInit,
   setupJourney,
-  timeouts,
   useDevDatabase,
 } from '../utils/journey-test-helpers';
 
