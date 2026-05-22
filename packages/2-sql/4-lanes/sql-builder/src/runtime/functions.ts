@@ -180,11 +180,23 @@ function createAggregateOnlyFunctions() {
 
 export function createFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag: RawSqlTag,
+): Functions<QC, RawSqlTag>;
+export function createFunctions<QC extends QueryContext>(
+  operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag?: undefined,
+): Functions<QC, undefined>;
+export function createFunctions<QC extends QueryContext>(
+  operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag: RawSqlTag | undefined,
+): Functions<QC, RawSqlTag | undefined>;
+export function createFunctions<QC extends QueryContext>(
+  operations: Readonly<Record<string, SqlOperationEntry>>,
   rawSqlTag?: RawSqlTag,
-): Functions<QC> {
+): Functions<QC, RawSqlTag | undefined> {
   const builtins = createBuiltinFunctions();
 
-  return new Proxy({} as Functions<QC>, {
+  return new Proxy({} as Functions<QC, RawSqlTag | undefined>, {
     get(_target, prop: string) {
       if (prop === 'rawSql') return rawSqlTag;
 
@@ -200,12 +212,24 @@ export function createFunctions<QC extends QueryContext>(
 
 export function createAggregateFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag: RawSqlTag,
+): AggregateFunctions<QC, RawSqlTag>;
+export function createAggregateFunctions<QC extends QueryContext>(
+  operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag?: undefined,
+): AggregateFunctions<QC, undefined>;
+export function createAggregateFunctions<QC extends QueryContext>(
+  operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag: RawSqlTag | undefined,
+): AggregateFunctions<QC, RawSqlTag | undefined>;
+export function createAggregateFunctions<QC extends QueryContext>(
+  operations: Readonly<Record<string, SqlOperationEntry>>,
   rawSqlTag?: RawSqlTag,
-): AggregateFunctions<QC> {
-  const baseFns = createFunctions<QC>(operations, rawSqlTag);
+): AggregateFunctions<QC, RawSqlTag | undefined> {
+  const baseFns = createFunctions<QC>(operations, rawSqlTag as RawSqlTag);
   const aggregates = createAggregateOnlyFunctions();
 
-  return new Proxy({} as AggregateFunctions<QC>, {
+  return new Proxy({} as AggregateFunctions<QC, RawSqlTag | undefined>, {
     get(_target, prop: string) {
       if (prop === 'rawSql') return rawSqlTag;
 
