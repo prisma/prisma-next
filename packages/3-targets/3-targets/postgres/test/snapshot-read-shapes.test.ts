@@ -85,39 +85,7 @@ describe('snapshot-read shape fixtures — per-kind round-trip (TML-2536)', () =
   });
 
   it('hydrates the postgres-enum fixture into a PostgresEnumType IR-class instance', () => {
-    const raw = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      profileHash: 'sha256:fixture-postgres-enum',
-      roots: {},
-      models: {},
-      storage: {
-        storageHash: 'sha256:fixture-postgres-enum',
-        namespaces: {
-          __unbound__: {
-            id: '__unbound__',
-            tables: {},
-          },
-          public: {
-            id: 'public',
-            tables: {},
-            enum: {
-              user_role: {
-                kind: 'postgres-enum',
-                name: 'user_role',
-                nativeType: 'user_role',
-                values: ['admin', 'user'],
-                codecId: 'pg/enum@1',
-              },
-            },
-          },
-        },
-      },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-    };
+    const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, 'postgres-enum.json'), 'utf-8'));
     const contract = serializer.deserializeContract(raw);
     expect(contract.storage).toBeInstanceOf(SqlStorage);
     const entry = contract.storage.namespaces['public']?.enum?.['user_role'];
@@ -160,14 +128,6 @@ describe('snapshot-read shape scan — checked-in on-disk contracts deserialize 
     // cipherstash example).
     if (rel.startsWith('examples/prisma-next-demo/migrations/')) return false;
     if (rel.startsWith('examples/cipherstash-integration/migrations/')) return false;
-    // Checked-in example contracts still carry the legacy namespace
-    // `types` slot until the committed fixtures are regenerated.
-    if (rel.endsWith('examples/prisma-next-demo/src/prisma/contract.json')) return false;
-    if (rel.endsWith('examples/prisma-next-cloudflare-worker/src/prisma/contract.json'))
-      return false;
-    // Stale on-disk postgres-enum.json still carries the legacy
-    // namespace `types` slot until the committed fixture is regenerated.
-    if (rel.endsWith('postgres-enum.json')) return false;
     return true;
   });
 

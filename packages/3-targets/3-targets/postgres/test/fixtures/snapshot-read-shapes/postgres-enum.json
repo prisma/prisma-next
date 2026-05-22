@@ -1,36 +1,26 @@
 {
-  "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
   "profileHash": "sha256:fixture-postgres-enum",
   "roots": {},
   "models": {},
+  "capabilities": {},
+  "extensionPacks": {},
+  "meta": {},
   "storage": {
     "storageHash": "sha256:fixture-postgres-enum",
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
-        "tables": {
-          "user": {
-            "columns": {
-              "role": {
-                "codecId": "pg/enum@1",
-                "nativeType": "user_role",
-                "nullable": false,
-                "typeRef": "user_role"
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": { "columns": ["role"] },
-            "uniques": []
-          }
-        }
+        "kind": "postgres-unbound-schema",
+        "tables": {},
+        "enum": {}
       },
       "public": {
         "id": "public",
+        "kind": "postgres-schema",
         "tables": {},
-        "types": {
+        "enum": {
           "user_role": {
             "kind": "postgres-enum",
             "name": "user_role",
@@ -41,8 +31,5 @@
         }
       }
     }
-  },
-  "capabilities": {},
-  "extensionPacks": {},
-  "meta": {}
+  }
 }
