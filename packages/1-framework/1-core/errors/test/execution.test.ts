@@ -156,11 +156,14 @@ describe('Runtime Errors', () => {
   it('errorMarkerReadFailed creates PN-RUN-3006 envelope', () => {
     const error = errorMarkerReadFailed({
       why: 'permission denied for table marker',
+      space: 'app',
       markerLocation: 'prisma_contract.marker',
     });
     expect(error.toEnvelope().code).toBe('PN-RUN-3006');
     expect(error.message).toBe('Database error while reading contract marker');
-    expect(error.fix).toContain('SELECT permission');
+    expect(error.fix).toContain('space "app"');
+    expect(error.fix).toContain('prisma_contract.marker');
+    expect(error.meta).toEqual({ space: 'app' });
   });
 
   it('rethrowMarkerReadError maps parse failures to PN-RUN-3005', () => {
@@ -183,13 +186,22 @@ describe('Runtime Errors', () => {
   });
 
   it('rethrowMarkerReadError maps driver failures to PN-RUN-3006', () => {
-    try {
+    const invoke = () =>
       rethrowMarkerReadError(new Error('permission denied for table marker'), {
         space: 'app',
         markerLocation: 'prisma_contract.marker',
       });
+
+    expect(invoke).toThrow(CliStructuredError);
+
+    try {
+      invoke();
     } catch (err) {
-      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3006');
+      expect(CliStructuredError.is(err)).toBe(true);
+      if (CliStructuredError.is(err)) {
+        expect(err.toEnvelope().code).toBe('PN-RUN-3006');
+        expect(err.meta).toEqual({ space: 'app' });
+      }
     }
   });
 

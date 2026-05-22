@@ -84,12 +84,14 @@ export function errorMarkerRowCorrupt(options: {
  */
 export function errorMarkerReadFailed(options: {
   readonly why: string;
+  readonly space: string;
   readonly markerLocation: string;
 }): CliStructuredError {
   return new CliStructuredError('3006', 'Database error while reading contract marker', {
     domain: 'RUN',
     why: options.why,
-    fix: `Check that the database user has SELECT permission on ${options.markerLocation}, then retry. If the error persists, inspect database connectivity and locks.`,
+    fix: `Could not read marker at ${options.markerLocation} for space "${options.space}". Verify read permissions, connectivity, and locks, then retry.`,
+    meta: { space: options.space },
   });
 }
 
@@ -148,6 +150,7 @@ export function rethrowMarkerReadError(
   }
   throw errorMarkerReadFailed({
     why: message,
+    space: context.space,
     markerLocation: context.markerLocation,
   });
 }
