@@ -587,12 +587,15 @@ export function buildSqlContractFromDefinition(
   const capabilities = mergeCapabilityMatrices(
     definition.target.capabilities as CapabilityMatrix | undefined,
     ...extensionPackCapabilitySources,
-    definition.capabilities,
   );
+  // Internal `profileHash` computation is unchanged from `origin/main`: it
+  // continues to fingerprint the author-declared capability subset. With
+  // `capabilities` removed from the `defineContract` input that subset is
+  // now always empty, so the hash naturally stabilises at `hash({})`.
   const profileHash = computeProfileHash({
     target,
     targetFamily,
-    capabilities: (definition.capabilities ?? {}) as Record<string, Record<string, boolean>>,
+    capabilities: {},
   });
 
   const executionWithHash = executionSection

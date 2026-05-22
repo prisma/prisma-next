@@ -118,7 +118,6 @@ export interface ModelNode {
 export interface ContractDefinition {
   readonly target: TargetPackRef<'sql', string>;
   readonly extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>;
-  readonly capabilities?: Record<string, Record<string, boolean>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly storageTypes?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
