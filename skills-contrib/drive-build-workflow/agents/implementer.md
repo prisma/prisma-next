@@ -81,6 +81,14 @@ expected_duration: <coarse estimate, e.g. "~30s" or "~5min" or "long-running tes
 
 Use `mkdir -p wip/heartbeats` once at round start; subsequent pings just overwrite the file. Pings are cheap — one file write — so erring on the side of more pings is correct.
 
+### Foreground vs background for long-running shell calls
+
+The cadence above assumes you regain control between pings. Backgrounding a long-running shell call (the harness's "fire and forget" mode) takes that control away — you cannot write the next heartbeat until the backgrounded shell *returns*, because you have no turn to spend. If the shell then hangs (e.g. `pnpm test:packages` workspace-wide hits a fork-pool stall, a Postgres adapter test loses its connection, a `pnpm install` wedges on a registry timeout), the heartbeat goes stale silently and the orchestrator's only recovery path is asking the user to kill the shell manually. That happens too often to ignore.
+
+**Default to foreground** for the long-running gates listed in cadence trigger 2 (`pnpm test:*` workspace-wide, `pnpm typecheck` cold-cache, `pnpm install`, large rebases). The harness will block your turn for the full call, but you regain control immediately on return and can ping. Only background a long-running shell when (a) you have explicit parallel work to do during the wait *and* (b) the shell's failure modes are well-understood enough that a stall is unambiguously diagnosable from the heartbeat alone.
+
+If you do background a long call and notice the heartbeat is about to go stale, your next ping is to update `phase` with the staleness risk and `last_progress` with the underlying call's expected end-time — so the orchestrator at least has fresh metadata when it intervenes.
+
 ## Pushback policy
 
 When a finding from a prior round (passed in the round-context section of your prompt) conflicts with evidence you have:

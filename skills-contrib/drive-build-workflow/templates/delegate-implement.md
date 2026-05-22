@@ -71,6 +71,8 @@ If any gate fails after the confirmation run, stop and surface to the orchestrat
 
 Write to `wip/heartbeats/implementer.txt` on the cadence in `<skill-dir>/agents/implementer.md § Heartbeats`: at round start, before/after every long-running shell call (>~1 min), at each task/commit boundary, and at least every ~5 minutes otherwise. The orchestrator reads this file between turns to detect a stalled round; without it, a hung round wastes minutes before the user has to intervene manually. `mkdir -p wip/heartbeats` once at round start; overwrite the file each ping.
 
+**Run long-running gates (`pnpm test:*` workspace-wide, `pnpm typecheck` cold-cache, `pnpm install`) in the foreground** unless you have explicit parallel work to do during the wait. Backgrounding takes away your ability to ping mid-call; if the shell then hangs, the heartbeat goes stale silently and the orchestrator has to ask the user to kill the shell. See `<skill-dir>/agents/implementer.md § Foreground vs background for long-running shell calls`.
+
 ## Deferral protocol
 
 You may **not** unilaterally defer or descope any task. If you hit a blocker:
