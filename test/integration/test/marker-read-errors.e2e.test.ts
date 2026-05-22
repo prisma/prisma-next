@@ -20,7 +20,7 @@ function extractJson(text: string): Record<string, unknown> {
 }
 
 withTempDir(({ createTempDir }) => {
-  describe('marker read typed errors (PGlite)', () => {
+  describe('marker read typed errors (PostgreSQL)', () => {
     const db = useDevDatabase();
 
     it(
