@@ -1,0 +1,196 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { createContract } from '@prisma-next/contract/testing';
+import { createAggregateFunctions, createFunctions } from '@prisma-next/sql-builder/runtime';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { RawExpr } from '@prisma-next/sql-relational-core/ast';
+import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
+import { createRawSql, param } from '@prisma-next/sql-relational-core/expression';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  instantiateExecutionStack: vi.fn(),
+  createRuntime: vi.fn(),
+  createExecutionContext: vi.fn(),
+  createSqlExecutionStack: vi.fn(),
+  withTransaction: vi.fn(),
+  driverCreate: vi.fn(),
+  driverConnect: vi.fn(),
+  deserializeContract: vi.fn(),
+  poolCtor: vi.fn(),
+}));
+
+vi.mock('@prisma-next/framework-components/execution', () => ({
+  instantiateExecutionStack: mocks.instantiateExecutionStack,
+}));
+
+vi.mock('@prisma-next/sql-runtime', () => ({
+  createExecutionContext: mocks.createExecutionContext,
+  createSqlExecutionStack: mocks.createSqlExecutionStack,
+  createRuntime: mocks.createRuntime,
+  withTransaction: mocks.withTransaction,
+}));
+
+vi.mock('@prisma-next/sql-orm-client', () => ({
+  orm: vi.fn(() => ({ lane: 'orm' })),
+}));
+
+vi.mock('@prisma-next/target-postgres/runtime', () => ({
+  default: { id: 'target-postgres' },
+  PostgresContractSerializer: class {
+    deserializeContract(value: unknown) {
+      return mocks.deserializeContract(value);
+    }
+  },
+}));
+
+vi.mock('@prisma-next/adapter-postgres/runtime', () => ({
+  default: { id: 'adapter-postgres' },
+}));
+
+vi.mock('@prisma-next/driver-postgres/runtime', () => ({
+  default: { id: 'driver-postgres' },
+}));
+
+vi.mock('pg', () => {
+  class Pool {
+    constructor(options: unknown) {
+      mocks.poolCtor(options);
+    }
+  }
+  class Client {}
+  return { Pool, Client };
+});
+
+import postgres from '../src/runtime/postgres';
+
+const contract = createContract<SqlStorage>();
+
+function setupMocks() {
+  mocks.createExecutionContext.mockReturnValue({
+    contract,
+    codecs: {},
+    queryOperations: { entries: () => ({}) },
+    types: {},
+    applyMutationDefaults: () => [],
+  });
+  mocks.createSqlExecutionStack.mockReturnValue({
+    target: { id: 'target-postgres' },
+    adapter: { id: 'adapter-postgres' },
+    driver: { create: mocks.driverCreate },
+    extensionPacks: [],
+  });
+  mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
+  mocks.driverConnect.mockResolvedValue(undefined);
+  mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
+  mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
+  mocks.deserializeContract.mockReturnValue(contract);
+}
+
+describe('postgres client rawSql surface', () => {
+  beforeEach(setupMocks);
+
+  it('exposes rawSql as a function on the client', () => {
+    const db = postgres({ contract });
+    expect(typeof db.rawSql).toBe('function');
+  });
+
+  it('rawSql is bound once — distinct clients get distinct tags', () => {
+    const db1 = postgres({ contract });
+    const db2 = postgres({ contract });
+    expect(db1.rawSql).not.toBe(db2.rawSql);
+  });
+
+  it('rawSql is stable across repeated accesses on the same client', () => {
+    const db = postgres({ contract });
+    expect(db.rawSql).toBe(db.rawSql);
+  });
+});
+
+describe('AC27: fns.rawSql reference equality with bound RawSqlTag', () => {
+  it('createFunctions returns the same rawSqlTag reference for the rawSql key', () => {
+    const tag: RawSqlTag = createRawSql(createPostgresAdapter());
+    const fns = createFunctions({}, tag);
+    expect((fns as unknown as Record<string, unknown>).rawSql).toBe(tag);
+  });
+
+  it('createAggregateFunctions returns the same rawSqlTag reference for the rawSql key', () => {
+    const tag: RawSqlTag = createRawSql(createPostgresAdapter());
+    const fns = createAggregateFunctions({}, tag);
+    expect((fns as unknown as Record<string, unknown>).rawSql).toBe(tag);
+  });
+
+  it('separate fns Proxy instances from same tag all return the same tag reference', () => {
+    const tag: RawSqlTag = createRawSql(createPostgresAdapter());
+    const whereTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
+    const selectTag = (createAggregateFunctions({}, tag) as unknown as Record<string, unknown>)
+      .rawSql;
+    const groupByTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
+    const orderByTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
+    const havingTag = (createAggregateFunctions({}, tag) as unknown as Record<string, unknown>)
+      .rawSql;
+    const joinOnTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
+
+    expect(whereTag).toBe(tag);
+    expect(selectTag).toBe(tag);
+    expect(groupByTag).toBe(tag);
+    expect(orderByTag).toBe(tag);
+    expect(havingTag).toBe(tag);
+    expect(joinOnTag).toBe(tag);
+  });
+
+  it('fns.rawSql from different dispatch sites all reference-equal the same tag', () => {
+    const tag: RawSqlTag = createRawSql(createPostgresAdapter());
+    const whereTag = (createFunctions({}, tag) as unknown as Record<string, unknown>).rawSql;
+    const selectAliasedTag = (
+      createAggregateFunctions({}, tag) as unknown as Record<string, unknown>
+    ).rawSql;
+    const selectBulkTag = (createAggregateFunctions({}, tag) as unknown as Record<string, unknown>)
+      .rawSql;
+    const groupByCallbackTag = (createFunctions({}, tag) as unknown as Record<string, unknown>)
+      .rawSql;
+    const orderByCallbackTag = (createFunctions({}, tag) as unknown as Record<string, unknown>)
+      .rawSql;
+    const havingCallbackTag = (
+      createAggregateFunctions({}, tag) as unknown as Record<string, unknown>
+    ).rawSql;
+    const joinOnCallbackTag = (createFunctions({}, tag) as unknown as Record<string, unknown>)
+      .rawSql;
+
+    expect(whereTag).toBe(selectAliasedTag);
+    expect(whereTag).toBe(selectBulkTag);
+    expect(whereTag).toBe(groupByCallbackTag);
+    expect(whereTag).toBe(orderByCallbackTag);
+    expect(whereTag).toBe(havingCallbackTag);
+    expect(whereTag).toBe(joinOnCallbackTag);
+  });
+
+  it('fns.rawSql is undefined when no tag is provided (graceful degradation)', () => {
+    const fns = createFunctions({});
+    expect((fns as unknown as Record<string, unknown>).rawSql).toBeUndefined();
+  });
+});
+
+describe('AC12: param() override beats adapter inferCodec through rawSql tag', () => {
+  it('bare number interpolation uses adapter inferCodec (pg/int4 for safe integer)', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`SELECT ${42}`.returns('pg/int4');
+    const ast = expr.buildAst();
+    expect(ast).toBeInstanceOf(RawExpr);
+    const rawExpr = ast as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string');
+    expect(paramPart).toBeDefined();
+  });
+
+  it('param() with explicit codecId overrides adapter inferCodec default', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const overridden = param(42, { codecId: 'pg/int8' });
+    const expr = tag`SELECT ${overridden}`.returns('pg/int8');
+    const ast = expr.buildAst();
+    expect(ast).toBeInstanceOf(RawExpr);
+    const rawExpr = ast as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string');
+    expect(paramPart).toBeDefined();
+  });
+});
