@@ -1,5 +1,6 @@
 import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { CodecRef } from './codec-types';
 
 export type Direction = 'asc' | 'desc';
@@ -717,12 +718,14 @@ export class WindowFuncExpr extends Expression {
     return new WindowFuncExpr({
       fn: this.fn,
       args: this.args.map((arg) => arg.rewrite(rewriter)),
-      ...(this.partitionBy === undefined
-        ? {}
-        : { partitionBy: this.partitionBy.map((expr) => expr.rewrite(rewriter)) }),
-      ...(this.orderBy === undefined
-        ? {}
-        : { orderBy: this.orderBy.map((orderItem) => orderItem.rewrite(rewriter)) }),
+      ...ifDefined(
+        'partitionBy',
+        this.partitionBy?.map((expr) => expr.rewrite(rewriter)),
+      ),
+      ...ifDefined(
+        'orderBy',
+        this.orderBy?.map((orderItem) => orderItem.rewrite(rewriter)),
+      ),
     });
   }
 
