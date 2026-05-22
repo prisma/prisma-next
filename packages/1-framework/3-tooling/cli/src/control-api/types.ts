@@ -719,6 +719,13 @@ export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyF
 export interface ContractEmitOptions {
   /** Path to the prisma-next.config.ts file */
   readonly configPath: string;
+  /**
+   * Optional override for the contract artifact output path. When provided, takes
+   * precedence over `contractConfig.output` from the loaded config. The value is
+   * used verbatim — resolution against cwd is the caller's responsibility (the
+   * CLI command resolves it before passing it in).
+   */
+  readonly outputOverride?: string;
   /** Optional AbortSignal for cancelling the in-flight emit */
   readonly signal?: AbortSignal;
   /** Optional progress callback for observing source-resolution and emit spans */

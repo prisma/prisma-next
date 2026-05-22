@@ -153,7 +153,7 @@ function validateProviderResult(providerResult: unknown): ValidatedProviderResul
 export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
-  const { configPath, signal = new AbortController().signal, onProgress } = options;
+  const { configPath, outputOverride, signal = new AbortController().signal, onProgress } = options;
   const unlessAborted = abortable(signal);
 
   const config = await unlessAborted(loadConfig(configPath));
@@ -166,7 +166,9 @@ export async function executeContractEmit(
 
   const contractConfig = config.contract;
 
-  if (!contractConfig.output) {
+  const effectiveOutput = outputOverride ?? contractConfig.output;
+
+  if (!effectiveOutput) {
     throw errorContractConfigMissing({
       why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
     });
@@ -180,7 +182,7 @@ export async function executeContractEmit(
 
   let outputPaths: ReturnType<typeof getEmittedArtifactPaths>;
   try {
-    outputPaths = getEmittedArtifactPaths(contractConfig.output);
+    outputPaths = getEmittedArtifactPaths(effectiveOutput);
   } catch (error) {
     throw errorContractConfigMissing({
       why: error instanceof Error ? error.message : String(error),

@@ -113,6 +113,135 @@ describe('contract emit command', () => {
     );
   });
 
+  it('forwards --output to executeContractEmit as outputOverride resolved against cwd', async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(
+      executeCommand(command, ['--output', './custom/out.json', '--json']),
+    ).resolves.toBe(0);
+
+    expect(mocks.executeContractEmitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputOverride: expect.stringContaining('custom/out.json'),
+      }),
+    );
+  });
+
+  it('CLI --output wins over config output (CLI > config precedence)', async () => {
+    const configOutputPath = join(tmpDir, 'config-contract.json');
+    const cliOutputPath = join(tmpDir, 'cli-contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(configOutputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(
+      emitResult({ files: { json: cliOutputPath, dts: cliOutputPath.replace('.json', '.d.ts') } }),
+    );
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--output', cliOutputPath, '--json'])).resolves.toBe(0);
+
+    expect(mocks.executeContractEmitMock).toHaveBeenCalledWith(
+      expect.objectContaining({ outputOverride: cliOutputPath }),
+    );
+  });
+
+  it('resolves relative --output against cwd', async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(
+      executeCommand(command, ['--output', 'relative/out.json', '--json']),
+    ).resolves.toBe(0);
+
+    const call = mocks.executeContractEmitMock.mock.calls[0]?.[0] as { outputOverride?: string };
+    expect(call?.outputOverride).toMatch(/^\/.*relative\/out\.json$/);
+  });
+
+  it('passes absolute --output verbatim', async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    const absoluteOut = join(tmpDir, 'abs/out.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--output', absoluteOut, '--json'])).resolves.toBe(0);
+
+    expect(mocks.executeContractEmitMock).toHaveBeenCalledWith(
+      expect.objectContaining({ outputOverride: absoluteOut }),
+    );
+  });
+
+  it('emits soft warning when --output has non-.json extension', async () => {
+    cleanupMocks();
+    const interactiveMocks = setupCommandMocks({ isTTY: true });
+    consoleOutput = interactiveMocks.consoleOutput;
+    cleanupMocks = interactiveMocks.cleanup;
+
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--output', join(tmpDir, 'contract.txt')])).resolves.toBe(
+      0,
+    );
+
+    expect(consoleOutput.some((line) => line.toLowerCase().includes('.json'))).toBe(true);
+  });
+
+  it('emits soft warning when --output looks like a directory (trailing slash)', async () => {
+    cleanupMocks();
+    const interactiveMocks = setupCommandMocks({ isTTY: true });
+    consoleOutput = interactiveMocks.consoleOutput;
+    cleanupMocks = interactiveMocks.cleanup;
+
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--output', join(tmpDir, 'out/')])).resolves.toBe(0);
+
+    expect(consoleOutput.some((line) => line.toLowerCase().includes('directory'))).toBe(true);
+  });
+
+  it('emits soft warning when --output collides with a contract source input', async () => {
+    cleanupMocks();
+    const interactiveMocks = setupCommandMocks({ isTTY: true });
+    consoleOutput = interactiveMocks.consoleOutput;
+    cleanupMocks = interactiveMocks.cleanup;
+
+    const sourceFile = join(tmpDir, 'contract.prisma');
+    mocks.loadConfigMock.mockResolvedValue({
+      ...configWithOutput(join(tmpDir, 'contract.json')),
+      contract: {
+        source: { load: vi.fn(), inputs: [sourceFile] },
+        output: join(tmpDir, 'contract.json'),
+      },
+    });
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--output', sourceFile])).resolves.toBe(0);
+
+    expect(consoleOutput.some((line) => line.toLowerCase().includes('collide'))).toBe(true);
+  });
+
+  it('does not forward outputOverride when --output is not passed', async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--json'])).resolves.toBe(0);
+
+    const call = mocks.executeContractEmitMock.mock.calls[0]?.[0] as { outputOverride?: string };
+    expect(call?.outputOverride).toBeUndefined();
+  });
+
   it('surfaces validationWarning via the terminal UI', async () => {
     cleanupMocks();
     // ui.warn is a no-op when not interactive; promote to TTY so the warning surfaces.
