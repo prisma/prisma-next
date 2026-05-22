@@ -19,6 +19,9 @@ import { type Type, type } from 'arktype';
 const NamespaceRawSchema = type({
   id: 'string',
   'kind?': 'string',
+  // Undeclared keys (`tables`, `enum`, and any pack-contributed slot maps)
+  // intentionally pass through; the slot loop below iterates them by name.
+  '+': 'ignore',
 });
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -173,33 +176,26 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       }
     }
 
-    const typesRaw = rawRecord['types'];
-    const hasUnhydratedPostgresEnumEntry =
-      typesRaw !== undefined &&
-      typeof typesRaw === 'object' &&
-      typesRaw !== null &&
-      Object.values(typesRaw as Record<string, unknown>).some(
-        (entry) =>
-          typeof entry === 'object' &&
-          entry !== null &&
-          (entry as { kind?: unknown }).kind === 'postgres-enum',
-      );
-    if (
-      hasUnhydratedPostgresEnumEntry &&
-      this.entityTypeRegistry.get('postgres-enum') === undefined
-    ) {
-      throw new ContractValidationError(
-        'Per-schema database types (e.g. postgres-enum) under storage.namespaces[..].types require PostgresContractSerializer.',
-        'structural',
-      );
+    const enumRaw = rawRecord['enum'];
+    if (enumRaw !== undefined && typeof enumRaw === 'object' && enumRaw !== null) {
+      for (const entry of Object.values(enumRaw as Record<string, unknown>)) {
+        if (typeof entry !== 'object' || entry === null) continue;
+        const kind = (entry as { kind?: unknown }).kind;
+        if (typeof kind === 'string' && this.entityTypeRegistry.get(kind) === undefined) {
+          throw new ContractValidationError(
+            `Entry kind '${kind}' has no registered hydration factory.`,
+            'structural',
+          );
+        }
+      }
     }
 
     const tables = (result['tables'] ?? {}) as Record<string, StorageTable>;
-    const types = result['types'] as NonNullable<SqlNamespaceTablesInput['types']> | undefined;
+    const enumSlot = result['enum'] as NonNullable<SqlNamespaceTablesInput['enum']> | undefined;
     return {
       id,
       tables,
-      ...(types !== undefined ? { types } : {}),
+      ...(enumSlot !== undefined ? { enum: enumSlot } : {}),
     };
   }
 

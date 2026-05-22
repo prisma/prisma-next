@@ -23,7 +23,7 @@ import {
  * Polymorphic value type for document-scoped `SqlStorage.types` entries
  * (codec aliases / parameterised native type registrations). Postgres
  * native enum registrations live under
- * `storage.namespaces[namespaceId].types` instead.
+ * `storage.namespaces[namespaceId].enum` instead.
  */
 export type SqlStorageTypeEntry =
   | StorageTypeInstance
@@ -37,7 +37,7 @@ const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
 export interface SqlNamespaceTablesInput {
   readonly id: string;
   readonly tables?: Record<string, StorageTable | StorageTableInput>;
-  readonly types?: Record<string, PostgresEnumStorageEntry>;
+  readonly enum?: Record<string, PostgresEnumStorageEntry>;
 }
 
 export interface SqlStorageInput<THash extends string = string> {
@@ -48,7 +48,7 @@ export interface SqlStorageInput<THash extends string = string> {
 
 class SqlNamespacePayload extends NamespaceBase {
   declare readonly kind: string;
-  declare readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  declare readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 
   readonly id: string;
   readonly tables: Readonly<Record<string, StorageTable>>;
@@ -64,9 +64,9 @@ class SqlNamespacePayload extends NamespaceBase {
         ]),
       ),
     );
-    if (input.types !== undefined && Object.keys(input.types).length > 0) {
-      Object.defineProperty(this, 'types', {
-        value: Object.freeze({ ...input.types }),
+    if (input.enum !== undefined && Object.keys(input.enum).length > 0) {
+      Object.defineProperty(this, 'enum', {
+        value: Object.freeze({ ...input.enum }),
         writable: false,
         enumerable: true,
         configurable: false,
@@ -91,7 +91,7 @@ function normaliseNamespaceEntry(
   }
   const input = ns as SqlNamespaceTablesInput; // JSON namespace payloads match SqlNamespaceTablesInput before SqlNamespacePayload materialises StorageTable instances.
   const tableCount = Object.keys(input.tables ?? {}).length;
-  const typeCount = Object.keys(input.types ?? {}).length;
+  const typeCount = Object.keys(input.enum ?? {}).length;
   if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0 && typeCount === 0) {
     return SqlUnboundNamespace.instance;
   }
@@ -136,7 +136,7 @@ function normaliseNamespaceEntry(
 // the slot without a class-instance check.
 export type SqlNamespace = Namespace & {
   readonly tables: Readonly<Record<string, StorageTable>>;
-  readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
 };
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {

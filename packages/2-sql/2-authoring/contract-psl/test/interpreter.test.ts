@@ -905,9 +905,9 @@ namespace tenant_a {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const types = storage.namespaces['tenant_a']?.types ?? {};
-      expect(types).toHaveProperty('Status');
-      expect(types).toHaveProperty('Tier');
+      const enums = storage.namespaces['tenant_a']?.enum ?? {};
+      expect(enums).toHaveProperty('Status');
+      expect(enums).toHaveProperty('Tier');
     });
 
     it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {

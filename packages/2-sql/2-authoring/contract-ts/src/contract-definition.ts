@@ -125,7 +125,7 @@ export interface ContractDefinition {
   /**
    * Enum types declared inside a named `namespace { enum … }` block,
    * keyed first by namespace id then by type name. These are routed to
-   * `storage.namespaces[nsId].types` rather than the implicit fallback
+   * `storage.namespaces[nsId].enum` rather than the implicit fallback
    * namespace used for top-level `storageTypes` enums.
    */
   readonly namespaceTypes?: Readonly<

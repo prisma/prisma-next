@@ -136,9 +136,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     >),
   };
   for (const ns of Object.values(contract.storage.namespaces)) {
-    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
-    if (nsTypes) {
-      for (const [k, v] of Object.entries(nsTypes)) {
+    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    if (nsEnums) {
+      for (const [k, v] of Object.entries(nsEnums)) {
         allStorageTypesMap[k] = v;
       }
     }
