@@ -140,14 +140,12 @@ describe('SQLite adapter', () => {
       ).withProjection([ProjectionItem.of('title', ColumnRef.of('posts__distinct', 'title'))]);
 
       const { sql } = adapter.lower(ast, { contract });
-      // Inner `SELECT DISTINCT` over scalars is present, wrapped in a
-      // derived table the outer select reads from.
-      expect(sql).toContain('SELECT DISTINCT');
-      expect(sql).toContain('AS "posts__distinct"');
-      // No Postgres-only constructs leak through the SQLite renderer.
-      expect(sql).not.toContain('DISTINCT ON');
-      expect(sql).not.toContain('LATERAL');
-      expect(sql).not.toContain('::');
+      // Full-string assertion: an exact-match check catches Postgres-only
+      // leakage (`DISTINCT ON`, `LATERAL`, `::` casts) and brittle-substring
+      // false positives in one pass.
+      expect(sql).toEqual(
+        'SELECT "posts__distinct"."title" AS "title" FROM (SELECT DISTINCT "post"."title" AS "title", "post"."id" AS "id" FROM "post" WHERE "post"."userId" = ?) AS "posts__distinct"',
+      );
     });
 
     it('renders GROUP BY and HAVING', () => {
