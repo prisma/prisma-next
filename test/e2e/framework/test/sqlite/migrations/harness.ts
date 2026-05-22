@@ -10,6 +10,7 @@ import sqlFamilyDescriptor, {
   INIT_ADDITIVE_POLICY,
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
+import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import {
   APP_SPACE_ID,
@@ -22,6 +23,7 @@ import { field } from '@prisma-next/sqlite/contract-builder';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
+import sqlitePack from '@prisma-next/target-sqlite/pack';
 
 const familyInstance = sqlFamilyDescriptor.create(
   createControlStack({
