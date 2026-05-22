@@ -21,6 +21,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         run: pnpm --filter prisma-orm-demo prisma:generate
+      - name: Build packages
+        run: pnpm build
       - name: Type check packages
         run: pnpm typecheck:packages
       - name: Type check examples
