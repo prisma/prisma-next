@@ -1,4 +1,11 @@
-import { copyFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -84,6 +91,15 @@ function readManifest(ctx: JourneyContext, dirName: string): MigrationManifest {
 function readDbRefHash(ctx: JourneyContext): string {
   const raw = readFileSync(join(refsDir(ctx), 'db.json'), 'utf-8');
   return (JSON.parse(raw) as { hash: string }).hash;
+}
+
+function dbRefSnapshotExists(ctx: JourneyContext): boolean {
+  const dir = refsDir(ctx);
+  return (
+    existsSync(join(dir, 'db.contract.json')) &&
+    existsSync(join(dir, 'db.contract.d.ts')) &&
+    statSync(join(dir, 'db.contract.json')).size > 0
+  );
 }
 
 function listAppMigrationBundleDirs(ctx: JourneyContext): string[] {
@@ -212,16 +228,23 @@ withTempDir(({ createTempDir }) => {
             expect(deltaMeta.to).toBe(planJson.to);
 
             await emitAllAppMigrations(ctx);
-            const apply = await runMigrate(ctx, ['--json']);
+            const apply = await runMigrate(ctx, ['--advance-ref', 'db', '--json']);
             expect(apply.exitCode).toBe(0);
             const applyJson = parseJsonOutput<{
               ok: boolean;
               migrationsApplied: number;
               markerHash: string;
+              advancedRef: { name: string; hash: string } | null;
             }>(apply);
             expect(applyJson.ok).toBe(true);
             expect(applyJson.migrationsApplied).toBeGreaterThanOrEqual(1);
             expect(applyJson.markerHash).toBe(planJson.to);
+            expect(applyJson.advancedRef).toEqual({
+              name: 'db',
+              hash: planJson.to,
+            });
+            expect(readDbRefHash(ctx)).toBe(planJson.to);
+            expect(dbRefSnapshotExists(ctx)).toBe(true);
           });
         });
       },

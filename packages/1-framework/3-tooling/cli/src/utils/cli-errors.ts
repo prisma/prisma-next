@@ -28,6 +28,7 @@ import {
 import { errorRuntime } from '@prisma-next/errors/execution';
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefResolutionError } from '@prisma-next/migration-tools/ref-resolution';
+import type { MigrationApplyFailure } from '../control-api/types';
 
 export {
   ERROR_CODE_DESTRUCTIVE_CHANGES,
@@ -136,6 +137,63 @@ export function errorSnapshotMissing(
  * values are caller-classified (rethrow, wrap with command-specific
  * `errorUnexpected`, etc.).
  */
+export function errorMarkerMismatch(
+  markerHash: string,
+  reachableHashes: readonly string[],
+  graphTip: string | null,
+): CliStructuredError {
+  const reachableList =
+    reachableHashes.length > 0 ? reachableHashes.join(', ') : '(none — migration graph is empty)';
+  const planFromFix =
+    graphTip !== null
+      ? `Run \`prisma-next migration plan --from ${graphTip}\` if the live marker is canonical and the on-disk graph needs catching up.`
+      : 'Run `prisma-next migration plan` if the live marker is canonical and the on-disk graph needs catching up.';
+  return errorRuntime('Database marker is not reachable in the on-disk migration graph', {
+    why: `DB marker is ${markerHash}, but the on-disk migration graph reaches: ${reachableList}.`,
+    fix: [
+      planFromFix,
+      `Run \`prisma-next ref set db ${markerHash}\` if the on-disk graph is canonical and the local \`db\` ref drifted.`,
+      'Investigate whether the database was migrated by an out-of-band process.',
+    ].join('\n'),
+    meta: {
+      code: 'MIGRATION.MARKER_MISMATCH',
+      markerHash,
+      reachableHashes: [...reachableHashes],
+      ...(graphTip !== null ? { graphTip } : {}),
+    },
+  });
+}
+
+export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructuredError {
+  const meta = failure.meta ?? {};
+  const fromHash = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : '<unknown>';
+  const targetHash =
+    typeof meta['targetHash'] === 'string'
+      ? meta['targetHash']
+      : typeof meta['target'] === 'string'
+        ? meta['target']
+        : '<unknown>';
+  const deadEnds = meta['deadEnds'];
+  const deadEndsSuffix =
+    Array.isArray(deadEnds) && deadEnds.length > 0
+      ? ` Dead-ends: ${deadEnds.map(String).join(', ')}.`
+      : '';
+  return errorRuntime(failure.summary, {
+    why:
+      failure.why ??
+      `Cannot reach target "${targetHash}" from current marker "${fromHash}".${deadEndsSuffix}`,
+    fix: [
+      'Run `prisma-next migration list` to see the on-disk graph.',
+      `Run \`prisma-next migration plan --from ${fromHash} --to ${targetHash}\` to introduce the missing path.`,
+      'Run `prisma-next migration show <bundle>` for any bundle in the path you expected.',
+    ].join('\n'),
+    meta: {
+      code: 'MIGRATION.PATH_UNREACHABLE',
+      ...meta,
+    },
+  });
+}
+
 export function mapMigrationToolsError(error: MigrationToolsError): CliStructuredError {
   return errorRuntime(error.message, {
     why: error.why,

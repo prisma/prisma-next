@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
@@ -9,7 +10,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join } from 'pathe';
-
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type {
@@ -24,6 +24,8 @@ import {
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
+  errorMarkerMismatch,
+  errorPathUnreachable,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -79,6 +81,9 @@ export interface MigrateResult {
 }
 
 function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
+  if (failure.code === 'MIGRATION_PATH_NOT_FOUND') {
+    return errorPathUnreachable(failure);
+  }
   return errorRuntime(failure.summary, {
     why: failure.why ?? 'Migration runner failed',
     fix: 'Fix the issue and re-run `prisma-next migrate --to <contract>` — previously applied migrations are preserved.',
@@ -233,9 +238,21 @@ async function executeMigrateCommand(
   try {
     await client.connect(dbConnection);
 
+    const allMarkers = await client.readAllMarkers();
+    const appMarker = allMarkers.get('app') ?? null;
+    const { graph } = appPackages;
+
+    if (appMarker !== null && !isGraphNode(appMarker.storageHash, graph)) {
+      return notOk(
+        errorMarkerMismatch(
+          appMarker.storageHash,
+          [...graph.nodes].sort(),
+          findLatestMigration(graph)?.to ?? null,
+        ),
+      );
+    }
+
     if (refEntry && refEntry.invariants.length > 0) {
-      const allMarkers = await client.readAllMarkers();
-      const appMarker = allMarkers.get('app') ?? null;
       const declared = collectDeclaredInvariants(appPackages.graph);
       const known = new Set<string>(declared);
       for (const id of appMarker?.invariants ?? []) known.add(id);
