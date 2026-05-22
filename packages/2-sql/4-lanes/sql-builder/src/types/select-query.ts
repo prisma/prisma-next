@@ -10,6 +10,7 @@ import type {
   Functions,
   OrderByOptions,
   OrderByScope,
+  RawSqlTag,
 } from '../expression';
 import type { GatedMethod, QueryContext, Scope, ScopeField, Subquery } from '../scope';
 import type { GroupedQuery } from './grouped-query';
@@ -19,8 +20,9 @@ export interface SelectQuery<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
+  RS extends RawSqlTag | undefined = undefined,
 > extends Subquery<RowType>,
-    WithSelect<QC, AvailableScope, RowType>,
+    WithSelect<QC, AvailableScope, RowType, RS>,
     WithPagination<QC>,
     WithDistinct,
     WithAlias<RowType>,
@@ -35,33 +37,35 @@ export interface SelectQuery<
    */
   annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
     ...annotations: As & ValidAnnotations<'read', As>
-  ): SelectQuery<QC, AvailableScope, RowType>;
+  ): SelectQuery<QC, AvailableScope, RowType, RS>;
 
-  where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType>;
+  where(
+    expr: ExpressionBuilder<AvailableScope, QC, RS>,
+  ): SelectQuery<QC, AvailableScope, RowType, RS>;
 
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
     options?: OrderByOptions,
-  ): SelectQuery<QC, AvailableScope, RowType>;
+  ): SelectQuery<QC, AvailableScope, RowType, RS>;
 
   orderBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: Functions<QC>,
+      fns: Functions<QC, RS>,
     ) => Expression<ScopeField>,
     options?: OrderByOptions,
-  ): SelectQuery<QC, AvailableScope, RowType>;
+  ): SelectQuery<QC, AvailableScope, RowType, RS>;
 
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, RS>;
 
   groupBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-      fns: Functions<QC>,
+      fns: Functions<QC, RS>,
     ) => Expression<ScopeField>,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, RS>;
 
   distinctOn: GatedMethod<
     QC['capabilities'],
@@ -69,13 +73,13 @@ export interface SelectQuery<
     {
       (
         ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-      ): SelectQuery<QC, AvailableScope, RowType>;
+      ): SelectQuery<QC, AvailableScope, RowType, RS>;
       (
         expr: (
           fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
-          fns: Functions<QC>,
+          fns: Functions<QC, RS>,
         ) => Expression<ScopeField>,
-      ): SelectQuery<QC, AvailableScope, RowType>;
+      ): SelectQuery<QC, AvailableScope, RowType, RS>;
     }
   >;
 }

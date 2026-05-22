@@ -44,12 +44,12 @@ type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBu
 
 export interface PostgresTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
-  readonly sql: Db<TContract>;
+  readonly sql: Db<TContract, RawSqlTag>;
   readonly orm: OrmClient<TContract>;
 }
 
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
-  readonly sql: Db<TContract>;
+  readonly sql: Db<TContract, RawSqlTag>;
   readonly orm: OrmClient<TContract>;
   readonly rawSql: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
@@ -63,7 +63,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
     CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
   >(
     declaration: D,
-    callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+    callback: (sql: Db<TContract, RawSqlTag>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
   close(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
@@ -253,7 +253,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     context,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawSqlTag });
+  const sql: Db<TContract, RawSqlTag> = sqlBuilder<TContract, RawSqlTag>({ context, rawSqlTag });
 
   return {
     sql,
@@ -300,14 +300,17 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
     >(
       declaration: D,
-      callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+      callback: (sql: Db<TContract, RawSqlTag>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract>({ context, rawSqlTag });
+        const txSql: Db<TContract, RawSqlTag> = sqlBuilder<TContract, RawSqlTag>({
+          context,
+          rawSqlTag,
+        });
 
         const txOrm: OrmClient<TContract> = ormBuilder({
           runtime: {

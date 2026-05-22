@@ -6,9 +6,12 @@ import type { Db, TableProxyContract } from '../types/db';
 import type { BuilderContext } from './builder-base';
 import { TableProxyImpl } from './table-proxy-impl';
 
-export interface SqlOptions<C extends Contract<SqlStorage> & TableProxyContract> {
+export interface SqlOptions<
+  C extends Contract<SqlStorage> & TableProxyContract,
+  RS extends RawSqlTag | undefined = undefined,
+> {
   readonly context: ExecutionContext<C>;
-  readonly rawSqlTag?: RawSqlTag;
+  readonly rawSqlTag?: RS;
 }
 
 // Find a table by name across every declared namespace. Mirrors the
@@ -26,9 +29,10 @@ function findTableAcrossNamespaces(storage: SqlStorage, name: string): StorageTa
   return undefined;
 }
 
-export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
-  options: SqlOptions<C>,
-): Db<C> {
+export function sql<
+  C extends Contract<SqlStorage> & TableProxyContract,
+  RS extends RawSqlTag | undefined = undefined,
+>(options: SqlOptions<C, RS>): Db<C, RS> {
   const { context } = options;
   const ctx: BuilderContext = {
     capabilities: context.contract.capabilities,
@@ -40,7 +44,7 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
     rawSqlTag: options.rawSqlTag,
   };
 
-  return new Proxy({} as Db<C>, {
+  return new Proxy({} as Db<C, RS>, {
     get(_target, prop: string) {
       const table = findTableAcrossNamespaces(context.contract.storage, prop);
       if (table) {
