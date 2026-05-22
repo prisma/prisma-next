@@ -69,6 +69,45 @@ export {
   errorUnexpected,
 };
 
+export function errorRefSetHashNotInGraph(
+  resolvedHash: string,
+  reachableHashes: readonly string[],
+  graphTipHash: string | null,
+): CliStructuredError {
+  const reachableList =
+    reachableHashes.length > 0 ? reachableHashes.join(', ') : '(none — migration graph is empty)';
+  const fix =
+    reachableHashes.length > 0
+      ? graphTipHash !== null
+        ? `Set the ref to a graph-node hash such as ${graphTipHash}, or run \`prisma-next migration plan\` to extend the graph.`
+        : 'Set the ref to a hash that appears in the migration graph.'
+      : 'Run `prisma-next migration plan` first.';
+  return errorRuntime(`Resolved contract hash is not in the migration graph: ${resolvedHash}`, {
+    why:
+      reachableHashes.length > 0
+        ? `The migration graph reaches ${reachableList}; resolved ${resolvedHash} isn't a graph node.`
+        : 'The migration graph is empty — no hashes reachable.',
+    fix,
+    meta: {
+      code: 'MIGRATION.HASH_NOT_IN_GRAPH',
+      resolvedHash,
+      reachableHashes: [...reachableHashes],
+      ...(graphTipHash !== null ? { graphTipHash } : {}),
+    },
+  });
+}
+
+export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
+  return errorRuntime(`Cannot set ref to the empty-database sentinel: ${hash}`, {
+    why: 'The empty-database sentinel is a planner internal; it is not a valid ref target.',
+    fix: 'Set the ref to a contract hash from the migration graph, or use another ref name.',
+    meta: {
+      code: 'MIGRATION.REF_SET_EMPTY_SENTINEL',
+      hash,
+    },
+  });
+}
+
 export function errorPlanForgotTheFlag(
   resolvedHash: string,
   reachableRefs: ReadonlyArray<{ readonly name: string; readonly hash: string }>,

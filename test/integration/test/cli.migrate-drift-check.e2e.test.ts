@@ -9,7 +9,6 @@ import {
   runContractEmit,
   runDbInit,
   runMigrate,
-  runMigrationPlan,
   runMigrationPlanAndEmit,
   setupJourney,
   swapContract,

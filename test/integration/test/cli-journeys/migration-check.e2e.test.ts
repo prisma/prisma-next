@@ -22,7 +22,6 @@ import {
   runContractEmit,
   runMigrationCheck,
   runMigrationPlanAndEmit,
-  runRef,
   setupJourney,
   timeouts,
 } from '../utils/journey-test-helpers';
@@ -157,8 +156,12 @@ withTempDir(({ createTempDir }) => {
         expect(plan.exitCode, 'plan').toBe(0);
 
         const danglingHash = `sha256:${'f'.repeat(64)}`;
-        const refSet = await runRef(ctx, ['set', 'dangling', danglingHash]);
-        expect(refSet.exitCode, 'ref set').toBe(0);
+        const refsDir = join(ctx.testDir, 'migrations', 'app', 'refs');
+        mkdirSync(refsDir, { recursive: true });
+        writeFileSync(
+          join(refsDir, 'dangling.json'),
+          `${JSON.stringify({ hash: danglingHash, invariants: [] }, null, 2)}\n`,
+        );
 
         const check = await runMigrationCheck(ctx, ['--json']);
         const json = parseJsonOutput(check);

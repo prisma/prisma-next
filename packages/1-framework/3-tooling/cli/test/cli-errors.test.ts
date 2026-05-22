@@ -4,6 +4,8 @@ import {
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorPathUnreachable,
+  errorRefSetEmptySentinel,
+  errorRefSetHashNotInGraph,
 } from '../src/utils/cli-errors';
 
 describe('CliStructuredError.toEnvelope()', () => {
@@ -81,5 +83,38 @@ describe('errorPathUnreachable', () => {
     expect(envelope.fix).not.toContain('--from');
     expect(envelope.fix).not.toContain('--to');
     expect(envelope.fix).not.toContain('<unknown>');
+  });
+});
+
+describe('errorRefSetHashNotInGraph', () => {
+  const resolvedHash = `sha256:${'x'.repeat(64)}`;
+  const reachableHashes = [`sha256:${'a'.repeat(64)}`, `sha256:${'b'.repeat(64)}`];
+  const graphTip = reachableHashes[1]!;
+
+  it('emits MIGRATION.HASH_NOT_IN_GRAPH with reachable hashes and graph tip', () => {
+    const envelope = errorRefSetHashNotInGraph(
+      resolvedHash,
+      reachableHashes,
+      graphTip,
+    ).toEnvelope();
+    expect(envelope.meta?.['code']).toBe('MIGRATION.HASH_NOT_IN_GRAPH');
+    expect(envelope.meta?.['resolvedHash']).toBe(resolvedHash);
+    expect(envelope.meta?.['reachableHashes']).toEqual(reachableHashes);
+    expect(envelope.meta?.['graphTipHash']).toBe(graphTip);
+    expect(envelope.fix).toContain(graphTip);
+  });
+
+  it('describes an empty migration graph in the why line', () => {
+    const envelope = errorRefSetHashNotInGraph(resolvedHash, [], null).toEnvelope();
+    expect(envelope.why).toContain('empty');
+    expect(envelope.fix).toContain('migration plan');
+  });
+});
+
+describe('errorRefSetEmptySentinel', () => {
+  it('emits MIGRATION.REF_SET_EMPTY_SENTINEL', () => {
+    const envelope = errorRefSetEmptySentinel('sha256:empty').toEnvelope();
+    expect(envelope.meta?.['code']).toBe('MIGRATION.REF_SET_EMPTY_SENTINEL');
+    expect(envelope.summary).toContain('empty-database sentinel');
   });
 });
