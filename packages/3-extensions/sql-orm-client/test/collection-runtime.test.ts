@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { resolvePolymorphismInfo } from '../src/collection-contract';
 import {
   acquireRuntimeScope,
-  augmentSelectionForJoinColumns,
   createRowEnvelope,
   mapModelDataToStorageRow,
   mapPolymorphicRow,
@@ -15,25 +14,6 @@ import { buildMixedPolyContract, getTestContract } from './helpers';
 
 describe('collection-runtime', () => {
   const contract = getTestContract();
-
-  it('augmentSelectionForJoinColumns() handles undefined and complete selections', () => {
-    expect(augmentSelectionForJoinColumns(undefined, ['id'])).toEqual({
-      selectedForQuery: undefined,
-      hiddenColumns: [],
-    });
-
-    expect(augmentSelectionForJoinColumns(['id', 'name'], ['id'])).toEqual({
-      selectedForQuery: ['id', 'name'],
-      hiddenColumns: [],
-    });
-  });
-
-  it('augmentSelectionForJoinColumns() appends missing required columns', () => {
-    expect(augmentSelectionForJoinColumns(['name'], ['id', 'name'])).toEqual({
-      selectedForQuery: ['name', 'id'],
-      hiddenColumns: ['id'],
-    });
-  });
 
   it('mapStorageRowToModelFields() maps known columns and falls back otherwise', () => {
     expect(

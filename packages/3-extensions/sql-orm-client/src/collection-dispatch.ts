@@ -21,7 +21,6 @@ import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { isToOneCardinality, resolvePolymorphismInfo } from './collection-contract';
 import {
   acquireRuntimeScope,
-  augmentSelectionForJoinColumns,
   createRowEnvelope,
   mapPolymorphicRow,
   mapResultRows,
@@ -37,6 +36,7 @@ import {
   compileSelect,
   compileSelectWithIncludeStrategy,
 } from './query-plan';
+import { augmentSelectionForJoinColumns } from './selection-shaping';
 import type {
   CollectionContext,
   CollectionState,
