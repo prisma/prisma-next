@@ -1,10 +1,12 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createContract } from '@prisma-next/contract/testing';
-import { createAggregateFunctions, createFunctions } from '@prisma-next/sql-builder/runtime';
+import type { Contract } from '@prisma-next/contract/types';
+import { createAggregateFunctions, createFunctions, sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { RawExpr } from '@prisma-next/sql-relational-core/ast';
+import { type ParamRef, RawExpr } from '@prisma-next/sql-relational-core/ast';
 import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { createRawSql, param } from '@prisma-next/sql-relational-core/expression';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -176,6 +178,7 @@ describe('param() override beats adapter inferCodec through rawSql tag', () => {
     const rawExpr = ast as RawExpr;
     const paramPart = rawExpr.parts.find((p) => typeof p !== 'string');
     expect(paramPart).toBeDefined();
+    expect((paramPart as ParamRef).codec?.codecId).toBe('pg/int4');
   });
 
   it('param() with explicit codecId overrides adapter inferCodec default', () => {
@@ -188,5 +191,76 @@ describe('param() override beats adapter inferCodec through rawSql tag', () => {
     const rawExpr = ast as RawExpr;
     const paramPart = rawExpr.parts.find((p) => typeof p !== 'string');
     expect(paramPart).toBeDefined();
+    expect((paramPart as ParamRef).codec?.codecId).toBe('pg/int8');
+  });
+});
+
+type FnsSpy = { rawSql: unknown; eq: (a: unknown, b: unknown) => unknown };
+type ColProxy = Record<string, unknown>;
+type WherableBuilder = {
+  where: (cb: (f: ColProxy, fns: FnsSpy) => unknown) => { buildAst(): unknown };
+};
+type SelectableBuilder = {
+  select(col: string): WherableBuilder;
+  select(alias: string, cb: (f: ColProxy, fns: FnsSpy) => unknown): { buildAst(): unknown };
+};
+type DbWithUsers = { users: SelectableBuilder };
+
+function makeBuilderContext(rawSqlTag: RawSqlTag): DbWithUsers {
+  const stubContext = {
+    contract: {
+      capabilities: {},
+      target: 'postgres',
+      storage: {
+        namespaces: {
+          __unbound__: {
+            id: '__unbound__',
+            tables: {
+              users: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nullable: false },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          },
+        },
+        storageHash: 'sha256:test',
+      },
+    },
+    queryOperations: { entries: () => ({}) },
+    applyMutationDefaults: () => [],
+  } as unknown as ExecutionContext<Contract<SqlStorage>>;
+  return sql({ context: stubContext, rawSqlTag }) as unknown as DbWithUsers;
+}
+
+describe('fns.rawSql reference equality through the typed builder chain', () => {
+  it('fns.rawSql in .where callback is referentially equal to the bound tag', () => {
+    const tag = createRawSql(createPostgresAdapter());
+    const d = makeBuilderContext(tag);
+    const captured: unknown[] = [];
+    d.users
+      .select('id')
+      .where((_f, fns) => {
+        captured.push(fns.rawSql);
+        return fns.eq(_f['id'], _f['id']);
+      })
+      .buildAst();
+    expect(captured[0]).toBe(tag);
+  });
+
+  it('fns.rawSql in .select aliased callback (AggregateFunctions) is referentially equal to the bound tag', () => {
+    const tag = createRawSql(createPostgresAdapter());
+    const d = makeBuilderContext(tag);
+    const captured: unknown[] = [];
+    d.users
+      .select('uid', (_f, fns) => {
+        captured.push(fns.rawSql);
+        return _f['id'];
+      })
+      .buildAst();
+    expect(captured[0]).toBe(tag);
   });
 });
