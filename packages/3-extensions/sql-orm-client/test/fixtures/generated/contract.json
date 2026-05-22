@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:743175fa48e5ce10f19df38ceac528272c924c37d3881a9e772dac7acc2e4d90",
   "roots": {
     "articles": "Article",
     "comments": "Comment",
