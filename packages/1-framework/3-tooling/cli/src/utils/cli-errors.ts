@@ -122,21 +122,6 @@ export function errorSnapshotMissing(
   );
 }
 
-/**
- * Maps a `MigrationToolsError` raised by the migration-tools loader/graph
- * surface (`readMigrationPackage`, `readMigrationsDir`, `readRefs`,
- * `resolveRef`, `reconstructGraph`, ...) into a CLI `errorRuntime` envelope.
- *
- * The full `error.details` payload is forwarded into `meta` so machine
- * consumers (`--json`) see structural fields like `dir`, `storedHash`,
- * `computedHash` (for `MIGRATION.HASH_MISMATCH`) alongside the stable
- * `code`. The user-visible `summary`/`why`/`fix` text is unchanged.
- *
- * Callers are expected to gate on `MigrationToolsError.is(error)` first
- * (mirroring the original inline pattern); non-`MigrationToolsError`
- * values are caller-classified (rethrow, wrap with command-specific
- * `errorUnexpected`, etc.).
- */
 export function errorMarkerMismatch(
   markerHash: string,
   reachableHashes: readonly string[],
@@ -166,25 +151,37 @@ export function errorMarkerMismatch(
 
 export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructuredError {
   const meta = failure.meta ?? {};
-  const fromHash = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : '<unknown>';
+  const fromHash = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : null;
   const targetHash =
     typeof meta['targetHash'] === 'string'
       ? meta['targetHash']
       : typeof meta['target'] === 'string'
         ? meta['target']
-        : '<unknown>';
+        : null;
   const deadEnds = meta['deadEnds'];
   const deadEndsSuffix =
     Array.isArray(deadEnds) && deadEnds.length > 0
       ? ` Dead-ends: ${deadEnds.map(String).join(', ')}.`
       : '';
+  const planFix = (() => {
+    if (fromHash !== null && targetHash !== null) {
+      return `Run \`prisma-next migration plan --from ${fromHash} --to ${targetHash}\` to introduce the missing path.`;
+    }
+    if (targetHash !== null) {
+      return `Run \`prisma-next migration plan --to ${targetHash}\` to introduce the missing path.`;
+    }
+    if (fromHash !== null) {
+      return `Run \`prisma-next migration plan --from ${fromHash}\` to introduce the missing path.`;
+    }
+    return 'Run `prisma-next migration plan` to introduce the missing path.';
+  })();
   return errorRuntime(failure.summary, {
     why:
       failure.why ??
-      `Cannot reach target "${targetHash}" from current marker "${fromHash}".${deadEndsSuffix}`,
+      `Cannot reach target "${targetHash ?? '<unknown>'}" from current marker "${fromHash ?? '<unknown>'}".${deadEndsSuffix}`,
     fix: [
       'Run `prisma-next migration list` to see the on-disk graph.',
-      `Run \`prisma-next migration plan --from ${fromHash} --to ${targetHash}\` to introduce the missing path.`,
+      planFix,
       'Run `prisma-next migration show <bundle>` for any bundle in the path you expected.',
     ].join('\n'),
     meta: {
@@ -194,6 +191,21 @@ export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructu
   });
 }
 
+/**
+ * Maps a `MigrationToolsError` raised by the migration-tools loader/graph
+ * surface (`readMigrationPackage`, `readMigrationsDir`, `readRefs`,
+ * `resolveRef`, `reconstructGraph`, ...) into a CLI `errorRuntime` envelope.
+ *
+ * The full `error.details` payload is forwarded into `meta` so machine
+ * consumers (`--json`) see structural fields like `dir`, `storedHash`,
+ * `computedHash` (for `MIGRATION.HASH_MISMATCH`) alongside the stable
+ * `code`. The user-visible `summary`/`why`/`fix` text is unchanged.
+ *
+ * Callers are expected to gate on `MigrationToolsError.is(error)` first
+ * (mirroring the original inline pattern); non-`MigrationToolsError`
+ * values are caller-classified (rethrow, wrap with command-specific
+ * `errorUnexpected`, etc.).
+ */
 export function mapMigrationToolsError(error: MigrationToolsError): CliStructuredError {
   return errorRuntime(error.message, {
     why: error.why,
