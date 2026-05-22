@@ -15,6 +15,7 @@ import {
   INIT_EXIT_SKILL_INSTALL_FAILED,
   INIT_EXIT_USER_ABORTED,
 } from './exit-codes';
+import { defaultSchemaPath } from './templates/code-templates';
 
 /**
  * Commander.js parsed options for `init`. The init-specific options live
@@ -72,7 +73,7 @@ export function createInitCommand(): Command {
     .option('--authoring <style>', 'Schema authoring style: psl or typescript')
     .option(
       '--schema-path <path>',
-      'Where to write the starter schema (default: src/prisma/contract.prisma)',
+      `Where to write the starter schema (default: ${defaultSchemaPath('psl')})`,
     )
     .option('--force', 'Overwrite an existing scaffold without prompting')
     .option(
