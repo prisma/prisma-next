@@ -1,29 +1,9 @@
 // Integration coverage for `distinct()` on a non-leaf include under the
 // single-query strategies (lateral, correlated).
 //
-// Linear: TML-2656.
-//
-// History: prior to this slice, `include('rel', r => r.distinct().include('grandchild'))`
-// unconditionally fell through `hasNonLeafIncludeWithDistinct` in
-// `dispatchWithIncludeStrategy()` and was routed to multi-query. The underlying
-// constraint was semantic, not a code defect — the single-query lowering would
-// emit `SELECT DISTINCT <scalars>, json_agg(<grandchild>) FROM ...` inside the
-// LATERAL / correlated child SELECT, and Postgres rejects equality on the
-// `json` aggregate column.
-//
-// The post-fix lowering uses a CTE / wrapped-subquery shape: pre-dedupe
-// scalar child rows first (force-including the grandchild join keys),
-// then attach grandchild aggregates onto the deduped rows. `DISTINCT` runs
-// over scalar columns only — no `json` column is in scope — and grandchild
-// aggregates compute after the dedupe. This mirrors the multi-query
-// stitcher's "dedupe scalar rows before joining nested aggregates" in pure
-// SQL.
-//
-// These tests focus on the lateral/subquery side, per the project plan: the
-// multi-query include strategy is being removed in a follow-up PR. Each test
-// asserts both `runtime.executions.length === 1` (single execution) and the
-// full row tree (`expect(rows).toEqual([...])`) under explicit `.select(...)`
-// projections so the shapes are stable.
+// Each test asserts both `runtime.executions.length === 1` (single execution)
+// and the full row tree (`expect(rows).toEqual([...])`) under explicit
+// `.select(...)` projections so the shapes are stable.
 //
 // Refinements (`orderBy` / `take` / `where` / multi-column distinct) and
 // edge cases (empty grandchildren, zero surviving distinct rows) live in
