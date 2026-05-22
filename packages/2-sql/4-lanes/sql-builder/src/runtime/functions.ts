@@ -13,6 +13,7 @@ import {
   OrExpr,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
 import { codecOf, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type {
   AggregateFunctions,
@@ -179,11 +180,14 @@ function createAggregateOnlyFunctions() {
 
 export function createFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag?: RawSqlTag,
 ): Functions<QC> {
   const builtins = createBuiltinFunctions();
 
   return new Proxy({} as Functions<QC>, {
     get(_target, prop: string) {
+      if (prop === 'rawSql') return rawSqlTag;
+
       const builtin = (builtins as Record<string, unknown>)[prop];
       if (builtin) return builtin;
 
@@ -196,12 +200,15 @@ export function createFunctions<QC extends QueryContext>(
 
 export function createAggregateFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawSqlTag?: RawSqlTag,
 ): AggregateFunctions<QC> {
-  const baseFns = createFunctions<QC>(operations);
+  const baseFns = createFunctions<QC>(operations, rawSqlTag);
   const aggregates = createAggregateOnlyFunctions();
 
   return new Proxy({} as AggregateFunctions<QC>, {
     get(_target, prop: string) {
+      if (prop === 'rawSql') return rawSqlTag;
+
       const agg = (aggregates as Record<string, unknown>)[prop];
       if (agg) return agg;
 

@@ -211,7 +211,7 @@ export class SelectQueryImpl<
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType> {
     const fieldProxy = createFieldProxy(this.state.scope);
-    const fns = createFunctions<QC>(this.ctx.queryOperationTypes);
+    const fns = createFunctions<QC>(this.ctx.queryOperationTypes, this.ctx.rawSqlTag);
     const result = (expr as ExpressionBuilder<Scope, QueryContext>)(fieldProxy, fns as never);
     return new SelectQueryImpl(
       cloneState(this.state, {
@@ -269,7 +269,7 @@ export class GroupedQueryImpl<
       this.state.scope as AvailableScope,
       this.state.rowFields as RowType,
     );
-    const fns = createAggregateFunctions(this.ctx.queryOperationTypes);
+    const fns = createAggregateFunctions(this.ctx.queryOperationTypes, this.ctx.rawSqlTag);
     const result = expr(createFieldProxy(combined), fns);
     return new GroupedQueryImpl(cloneState(this.state, { having: result.buildAst() }), this.ctx);
   }
