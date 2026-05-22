@@ -1,5 +1,6 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs/promises', async () => {
@@ -73,8 +74,9 @@ describe('publishContractArtifactPair', () => {
   afterEach(async () => {
     if (tmpDir.length > 0) {
       await actualFs.rm(tmpDir, { recursive: true, force: true });
+      tmpDir = '';
     }
-  });
+  }, timeouts.databaseOperation);
 
   it('publishes contract.d.ts before contract.json', async () => {
     const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
