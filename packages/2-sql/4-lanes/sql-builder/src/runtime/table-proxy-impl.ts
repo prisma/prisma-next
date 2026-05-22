@@ -113,7 +113,7 @@ export class TableProxyImpl<
 
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>> {
+  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC> {
     return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx);
   }
 

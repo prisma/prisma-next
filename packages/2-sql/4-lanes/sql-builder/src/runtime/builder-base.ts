@@ -299,7 +299,7 @@ export function resolveSelectArgs(
     const alias = args[0] as string;
     const exprFn = args[1] as (
       f: FieldProxy<Scope>,
-      fns: AggregateFunctions<QueryContext>,
+      fns: AggregateFunctions<QueryContext, RawSqlTag | undefined>,
     ) => Expression<ScopeField>;
     const fns = createAggregateFunctions(ctx.queryOperationTypes, ctx.rawSqlTag);
     const result = exprFn(createFieldProxy(scope), fns);
@@ -312,7 +312,7 @@ export function resolveSelectArgs(
   if (typeof args[0] === 'function') {
     const callbackFn = args[0] as (
       f: FieldProxy<Scope>,
-      fns: AggregateFunctions<QueryContext>,
+      fns: AggregateFunctions<QueryContext, RawSqlTag | undefined>,
     ) => Record<string, Expression<ScopeField>>;
     const fns = createAggregateFunctions(ctx.queryOperationTypes, ctx.rawSqlTag);
     const record = callbackFn(createFieldProxy(scope), fns);

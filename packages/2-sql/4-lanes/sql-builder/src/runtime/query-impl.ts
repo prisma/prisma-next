@@ -270,7 +270,7 @@ export class GroupedQueryImpl<
       this.state.rowFields as RowType,
     );
     const fns = createAggregateFunctions(this.ctx.queryOperationTypes, this.ctx.rawSqlTag);
-    const result = expr(createFieldProxy(combined), fns);
+    const result = expr(createFieldProxy(combined), fns as AggregateFunctions<QC>);
     return new GroupedQueryImpl(cloneState(this.state, { having: result.buildAst() }), this.ctx);
   }
 
