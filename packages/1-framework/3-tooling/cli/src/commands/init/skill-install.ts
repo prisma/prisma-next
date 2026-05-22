@@ -15,8 +15,8 @@ export const DEFAULT_SKILL_BASE = 'prisma/prisma-next';
 
 /**
  * One discovery scope inside the Prisma Next monorepo. The CLI emits
- * one `skills add <base>/<subpath>[#ref] --all` invocation per source
- * during `init`.
+ * one `skills add <base>/<subpath>[#ref] --agent ... --skill '*' -y`
+ * invocation per source during `init`.
  *
  * `ref` semantics:
  * - `cli`: pin to the CLI's own package version (lockstep with the
