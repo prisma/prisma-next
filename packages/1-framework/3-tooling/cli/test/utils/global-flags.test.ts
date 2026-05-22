@@ -135,9 +135,9 @@ describe('parseGlobalFlagsOrExit', () => {
     }) as unknown as typeof process.exit;
     process.exit = exit;
 
-    await expect(async () =>
-      parseGlobalFlagsOrExit({ format: 'pretty', json: true }),
-    ).rejects.toThrow('process.exit called');
+    expect(() => parseGlobalFlagsOrExit({ format: 'pretty', json: true })).toThrow(
+      'process.exit called',
+    );
 
     expect(exit).toHaveBeenCalledWith(2);
     const stderr = stderrLines.join('');
