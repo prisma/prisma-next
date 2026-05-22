@@ -50,7 +50,7 @@ export function minimalProjectReadmeMd(
       runDbDown: run('db:down'),
       runDbReset: run('db:reset'),
     };
-    return renderTemplate('readme-minimal-mongo.md', mongoVariables, vars);
+    return renderTemplate('readme-mongo.md', mongoVariables, vars);
   }
 
   const vars: PostgresVars = {
@@ -58,5 +58,5 @@ export function minimalProjectReadmeMd(
     runDbInit: run('db:init'),
     runDbUpdate: run('db:update'),
   };
-  return renderTemplate('readme-minimal-postgres.md', postgresVariables, vars);
+  return renderTemplate('readme-postgres.md', postgresVariables, vars);
 }

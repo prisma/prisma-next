@@ -530,13 +530,13 @@ describe('templates', () => {
       expect(mdVars).toEqual(new Set(quickRefVars));
     });
 
-    it('readme-minimal-postgres.md placeholders match declared variables', () => {
-      const mdVars = extractPlaceholders('readme-minimal-postgres.md');
+    it('readme-postgres.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('readme-postgres.md');
       expect(mdVars).toEqual(new Set(readmePostgresVars));
     });
 
-    it('readme-minimal-mongo.md placeholders match declared variables', () => {
-      const mdVars = extractPlaceholders('readme-minimal-mongo.md');
+    it('readme-mongo.md placeholders match declared variables', () => {
+      const mdVars = extractPlaceholders('readme-mongo.md');
       expect(mdVars).toEqual(new Set(readmeMongoVars));
     });
   });
