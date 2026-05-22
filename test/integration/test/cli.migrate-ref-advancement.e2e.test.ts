@@ -9,6 +9,7 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  appendImplicitMigrationPlanFrom,
   executeCommand,
   getExitCode,
   parseJsonObjectFromCliCapture,
@@ -68,7 +69,8 @@ async function selfEmitLatestMigration(testDir: string): Promise<void> {
 
 async function runMigrationPlan(testDir: string, args: readonly string[]): Promise<number> {
   const command = createMigrationPlanCommand();
-  const exit = await inDir(testDir, () => executeCommand(command, [...args]));
+  const planArgs = appendImplicitMigrationPlanFrom(testDir, args);
+  const exit = await inDir(testDir, () => executeCommand(command, [...planArgs]));
   if (exit === 0) {
     await selfEmitLatestMigration(testDir);
   }

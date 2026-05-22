@@ -42,7 +42,12 @@ import { afterAll, beforeAll } from 'vitest';
 const execFileAsync = promisify(execFile);
 const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
 
-import { executeCommand, getExitCode, setupCommandMocks } from './cli-test-helpers';
+import {
+  appendImplicitMigrationPlanFrom,
+  executeCommand,
+  getExitCode,
+  setupCommandMocks,
+} from './cli-test-helpers';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -367,7 +372,11 @@ export async function runMigrationPlan(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  return runCommand(createMigrationPlanCommand(), ctx, extraArgs);
+  return runCommand(
+    createMigrationPlanCommand(),
+    ctx,
+    appendImplicitMigrationPlanFrom(ctx.testDir, extraArgs),
+  );
 }
 
 export async function runMigrationNew(

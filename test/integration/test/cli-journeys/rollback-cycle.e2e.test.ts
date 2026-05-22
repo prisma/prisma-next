@@ -2,12 +2,11 @@
  * Rollback Cycle (Journey J — spec scenario P-2/S-2)
  *
  * Tests cycle-safe shortest-path resolution after a rollback migration
- * creates a cycle in the migration graph (C1 → C2 → C1). Without --from,
- * findLeaf fails with NO_TARGET. Using --from bypasses the cycle
- * and produces a valid migration path.
+ * creates a cycle in the migration graph (C1 → C2 → C1). The default db
+ * ref supplies --from implicitly; an explicit --from can still target an
+ * older graph node when the implicit path is not desired.
  */
 
-import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
@@ -71,16 +70,14 @@ withTempDir(({ createTempDir }) => {
         const apply2 = await runMigrate(ctx);
         expect(apply2.exitCode, 'J.03: apply rollback').toBe(0);
 
-        // J.04: graph now has cycle (C1→C2→C1). plan without --from errors
+        // J.04: graph has cycle (C1→C2→C1); implicit db ref still plans forward
         swapContract(ctx, 'contract-bio');
         const emit3 = await runContractEmit(ctx);
         expect(emit3.exitCode, 'J.04: emit C3 (bio)').toBe(0);
-        const planFail = await runMigrationPlan(ctx, ['--name', 'add-bio']);
-        expect(planFail.exitCode, 'J.04: plan without --from fails').toBe(1);
-        const failOutput = stripAnsi(planFail.stdout);
-        expect(failOutput, 'J.04: error mentions no target').toMatch(
-          /no.*target.*resolved|cycle|NO_TARGET/i,
-        );
+        const planImplicit = await runMigrationPlan(ctx, ['--name', 'add-bio-implicit', '--json']);
+        expect(planImplicit.exitCode, 'J.04: plan without explicit --from').toBe(0);
+        const implicitResult = parseJsonOutput<{ from: string; to: string }>(planImplicit);
+        expect(implicitResult.from, 'J.04: from resolved via db ref').toBeTruthy();
 
         // J.05: plan with --from C1 recovers
         const planFrom = await runMigrationPlanAndEmit(ctx, [

@@ -5,12 +5,14 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterEach, beforeEach } from 'vitest';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
@@ -300,6 +302,77 @@ export async function setupDbTestFixture(
   }
 
   return { testSetup, configPath };
+}
+
+function readMigrationGraphTipHash(testDir: string): string | null {
+  const appDir = join(testDir, 'migrations', 'app');
+  if (!existsSync(appDir)) {
+    return null;
+  }
+  let newestDir: string | null = null;
+  let newestMtime = 0;
+  for (const dir of readdirSync(appDir)) {
+    if (dir.startsWith('.') || dir === 'refs') {
+      continue;
+    }
+    const dirPath = join(appDir, dir);
+    if (!statSync(dirPath).isDirectory()) {
+      continue;
+    }
+    const manifestPath = join(dirPath, 'migration.json');
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+    const mtime = statSync(dirPath).mtimeMs;
+    if (mtime > newestMtime) {
+      newestMtime = mtime;
+      newestDir = dir;
+    }
+  }
+  if (newestDir === null) {
+    return null;
+  }
+  const manifest = JSON.parse(
+    readFileSync(join(appDir, newestDir, 'migration.json'), 'utf-8'),
+  ) as MigrationMetadata;
+  return manifest.to;
+}
+
+/**
+ * Supplies an implicit `--from` for integration tests that predate the db-ref
+ * default: when the db ref is absent but the on-disk graph is not, plan from
+ * the graph tip (matching pre-change CLI behaviour). Callers that exercise the
+ * implicit db default leave the db ref in place; greenfield scenarios clear it
+ * with {@link clearDbRefForGreenfieldPlan}.
+ */
+export function appendImplicitMigrationPlanFrom(
+  testDir: string,
+  extraArgs: readonly string[],
+): readonly string[] {
+  if (extraArgs.includes('--from')) {
+    return extraArgs;
+  }
+  const dbRefPath = join(testDir, 'migrations', 'app', 'refs', 'db.json');
+  if (existsSync(dbRefPath)) {
+    return extraArgs;
+  }
+  const tipHash = readMigrationGraphTipHash(testDir);
+  if (tipHash !== null) {
+    return [...extraArgs, '--from', tipHash];
+  }
+  return extraArgs;
+}
+
+export function clearDbRefForGreenfieldPlan(testDir: string): void {
+  const refsDir = join(testDir, 'migrations', 'app', 'refs');
+  if (!existsSync(refsDir)) {
+    return;
+  }
+  for (const name of readdirSync(refsDir)) {
+    if (name === 'db.json' || name.startsWith('db.contract.')) {
+      rmSync(join(refsDir, name), { force: true });
+    }
+  }
 }
 
 // Re-export framework-agnostic helpers from CLI package

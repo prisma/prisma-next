@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
+  parseJsonOutput,
   runContractEmit,
   runMigrate,
   runMigrationPlan,
@@ -74,17 +75,17 @@ withTempDir(({ createTempDir }) => {
           /Cannot reconstruct migration history/,
         );
 
-        // P4.02: migration plan detects the broken graph (does NOT silently
-        //        treat it as empty and plan a duplicate init migration)
-        const planAgain = await runMigrationPlan(ctx, ['--name', 'should-fail']);
-        const planOutput = stripAnsi(planAgain.stdout);
-
-        // The critical assertion: the planner must NOT succeed and silently
-        // create a new init migration as if no migrations existed
-        expect(planAgain.exitCode, 'P4.02: plan fails on broken graph').not.toBe(0);
-        expect(planOutput, 'P4.02: reports missing initial migration').toMatch(
-          /No initial migration found/,
+        // P4.02: migration plan uses the db ref even when the graph chain is
+        // broken — it must not silently greenfield-plan a duplicate init
+        const planAgain = await runMigrationPlan(ctx, ['--name', 'catch-up', '--json']);
+        expect(planAgain.exitCode, 'P4.02: plan from db ref').toBe(0);
+        const planResult = parseJsonOutput<{ from: string }>(planAgain);
+        expect(planResult.from, 'P4.02: from is db ref not empty sentinel').not.toBe(
+          'sha256:empty',
         );
+        const dirsAfterPlan = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+        expect(dirsAfterPlan, 'P4.02: orphaned add-name only — no greenfield init').toHaveLength(1);
+        expect(dirsAfterPlan[0], 'P4.02: surviving migration is add-name').toMatch(/_add_name$/);
       },
       timeouts.spinUpPpgDev,
     );
