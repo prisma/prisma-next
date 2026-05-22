@@ -84,21 +84,15 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       expect(exitCode).toBe(INIT_EXIT_OK);
 
       const loggedCommands = readLoggedCommands(logPath);
-      expect(loggedCommands).toContain(`dlx skills@latest add ${workspaceClone}/skills --all`);
+      const consolidatedAgentFlags = '--agent cursor claude-code codex windsurf --skill * -y';
       expect(loggedCommands).toContain(
-        `dlx skills@latest add ${workspaceClone}/skills --agent claude-code --skill * -y`,
+        `dlx skills@latest add ${workspaceClone}/skills ${consolidatedAgentFlags}`,
       );
       expect(loggedCommands).toContain(
-        `dlx skills@latest add ${workspaceClone}/skills/upgrade --all`,
+        `dlx skills@latest add ${workspaceClone}/skills/upgrade ${consolidatedAgentFlags}`,
       );
       expect(loggedCommands).toContain(
-        `dlx skills@latest add ${workspaceClone}/skills/upgrade --agent claude-code --skill * -y`,
-      );
-      expect(loggedCommands).toContain(
-        `dlx skills@latest add ${workspaceClone}/skills/extension-author --all`,
-      );
-      expect(loggedCommands).toContain(
-        `dlx skills@latest add ${workspaceClone}/skills/extension-author --agent claude-code --skill * -y`,
+        `dlx skills@latest add ${workspaceClone}/skills/extension-author ${consolidatedAgentFlags}`,
       );
 
       const installed = readInstalledSkillDirs(testDir);
@@ -152,8 +146,8 @@ describe('init skill distribution (offline integration, real CLI)', () => {
 
       const loggedCommands = readLoggedCommands(logPath);
       const skillsAddCommands = loggedCommands.filter((c) => c.startsWith('dlx skills@latest add'));
-      // Three subpath sources, each installed for universal agents and Claude Code.
-      expect(skillsAddCommands).toHaveLength(6);
+      // Three subpath sources, one consolidated multi-agent install each.
+      expect(skillsAddCommands).toHaveLength(3);
       for (const command of skillsAddCommands) {
         // Each call's source ends at one of the three known subpaths
         // before any flags. A bare repo URL (no `/skills`) would leak

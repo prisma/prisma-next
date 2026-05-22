@@ -51,7 +51,6 @@ import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './pr
 import { findStaleArtefacts, removeDependency } from './reinit-cleanup';
 import {
   DEFAULT_SKILL_SOURCES,
-  formatClaudeSkillInstallCommand,
   formatSkillInstallCommand,
   LEGACY_SKILL_FILE,
   runProjectLevelSkillInstall,
@@ -464,10 +463,9 @@ export async function runInit(
   // `--no-install` therefore skips only dependency installation and
   // contract emission; `--no-skill` is the explicit escape hatch for
   // skipping skills.
-  const manualProjectSkillCommands = DEFAULT_SKILL_SOURCES.flatMap((source) => [
-    formatSkillInstallCommand(install.effectivePm, source),
-    formatClaudeSkillInstallCommand(install.effectivePm, source),
-  ]);
+  const manualProjectSkillCommands = DEFAULT_SKILL_SOURCES.map((source) =>
+    formatSkillInstallCommand({ pm: install.effectivePm, source }),
+  );
   const manualProjectSkillSummary = manualProjectSkillCommands.map((c) => `\`${c}\``).join(' && ');
   let skillRegistered = false;
   if (!inputs.installProjectSkill) {

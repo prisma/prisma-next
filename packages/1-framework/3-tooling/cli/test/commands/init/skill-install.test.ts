@@ -5,17 +5,18 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
 import {
+  DEFAULT_SKILL_AGENTS,
   DEFAULT_SKILL_BASE,
   DEFAULT_SKILL_SOURCES,
-  formatClaudeSkillInstallCommand,
   formatSkillInstallCommand,
   formatSkillSourceUrl,
-  formatWindsurfSkillInstallCommand,
   isWindsurfDetected,
   resolveProjectSkillInstallCommands,
 } from '../../../src/commands/init/skill-install';
 
 const PRESERVED_ENV = ['PRISMA_NEXT_SKILLS_BASE'] as const;
+
+const AGENT_FLAGS = `--agent ${DEFAULT_SKILL_AGENTS.join(' ')} --skill '*' -y`;
 
 function withCleanEnv<T>(fn: () => T): T {
   const previous: Record<string, string | undefined> = {};
@@ -84,94 +85,51 @@ describe('formatSkillSourceUrl', () => {
 
 describe('formatSkillInstallCommand', () => {
   it.each([
-    ['npm', `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['pnpm', `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['yarn', `yarn dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['bun', `bunx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
-    ['deno', `deno run -A npm:skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['npm', `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} ${AGENT_FLAGS}`],
+    [
+      'pnpm',
+      `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} ${AGENT_FLAGS}`,
+    ],
+    [
+      'yarn',
+      `yarn dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} ${AGENT_FLAGS}`,
+    ],
+    ['bun', `bunx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} ${AGENT_FLAGS}`],
+    [
+      'deno',
+      `deno run -A npm:skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} ${AGENT_FLAGS}`,
+    ],
   ] satisfies ReadonlyArray<
     readonly [PackageManager, string]
   >)('formats %s command with the version-pinned usage source', (pm, expected) => {
     withCleanEnv(() => {
-      expect(formatSkillInstallCommand(pm, usageSource)).toBe(expected);
+      expect(formatSkillInstallCommand({ pm, source: usageSource })).toBe(expected);
     });
   });
 
   it('pnpm command for the upgrade source omits the #ref fragment', () => {
     withCleanEnv(() => {
-      expect(formatSkillInstallCommand('pnpm', upgradeSource)).toBe(
-        `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills/upgrade --all`,
+      expect(formatSkillInstallCommand({ pm: 'pnpm', source: upgradeSource })).toBe(
+        `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills/upgrade ${AGENT_FLAGS}`,
       );
     });
   });
 
   it('pnpm command for the extension-author source omits the #ref fragment', () => {
     withCleanEnv(() => {
-      expect(formatSkillInstallCommand('pnpm', extAuthorSource)).toBe(
-        `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills/extension-author --all`,
+      expect(formatSkillInstallCommand({ pm: 'pnpm', source: extAuthorSource })).toBe(
+        `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills/extension-author ${AGENT_FLAGS}`,
       );
     });
   });
-});
 
-describe('formatClaudeSkillInstallCommand', () => {
-  it.each([
-    [
-      'npm',
-      `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
-    ],
-    [
-      'pnpm',
-      `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
-    ],
-    [
-      'yarn',
-      `yarn dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
-    ],
-    [
-      'bun',
-      `bunx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
-    ],
-    [
-      'deno',
-      `deno run -A npm:skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent claude-code --skill '*' -y`,
-    ],
-  ] satisfies ReadonlyArray<
-    readonly [PackageManager, string]
-  >)('formats %s command with the usage source', (pm, expected) => {
+  it('honours a custom agents list', () => {
     withCleanEnv(() => {
-      expect(formatClaudeSkillInstallCommand(pm, usageSource)).toBe(expected);
-    });
-  });
-});
-
-describe('formatWindsurfSkillInstallCommand', () => {
-  it.each([
-    [
-      'npm',
-      `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent windsurf --skill '*' -y`,
-    ],
-    [
-      'pnpm',
-      `pnpm dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent windsurf --skill '*' -y`,
-    ],
-    [
-      'yarn',
-      `yarn dlx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent windsurf --skill '*' -y`,
-    ],
-    [
-      'bun',
-      `bunx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent windsurf --skill '*' -y`,
-    ],
-    [
-      'deno',
-      `deno run -A npm:skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent windsurf --skill '*' -y`,
-    ],
-  ] satisfies ReadonlyArray<
-    readonly [PackageManager, string]
-  >)('formats %s command with the usage source', (pm, expected) => {
-    withCleanEnv(() => {
-      expect(formatWindsurfSkillInstallCommand(pm, usageSource)).toBe(expected);
+      expect(
+        formatSkillInstallCommand({ pm: 'npm', source: usageSource, agents: ['windsurf'] }),
+      ).toBe(
+        `npx skills@latest add ${DEFAULT_SKILL_BASE}/skills#v${cliVersion} --agent windsurf --skill '*' -y`,
+      );
     });
   });
 });
@@ -221,38 +179,18 @@ describe('resolveProjectSkillInstallCommands', () => {
     }
   });
 
-  it('includes Windsurf installs when Windsurf is detected', () => {
+  it('emits one consolidated install per skill source', () => {
     withCleanEnv(() => {
-      tmpDir = mkdtempSync(join(tmpdir(), 'windsurf-resolve-'));
+      tmpDir = mkdtempSync(join(tmpdir(), 'skill-resolve-'));
       const commands = resolveProjectSkillInstallCommands('pnpm', {
         baseDir: tmpDir,
         env: { WINDSURF: '1' },
       });
-      expect(commands).toHaveLength(DEFAULT_SKILL_SOURCES.length * 3);
-      expect(commands.filter((c) => c.includes('--agent windsurf'))).toHaveLength(
-        DEFAULT_SKILL_SOURCES.length,
-      );
-    });
-  });
-
-  it('omits Windsurf installs when Windsurf is absent', () => {
-    withCleanEnv(() => {
-      tmpDir = mkdtempSync(join(tmpdir(), 'windsurf-resolve-'));
-      const fakeHome = mkdtempSync(join(tmpdir(), 'windsurf-home-'));
-      const commands = resolveProjectSkillInstallCommands('pnpm', {
-        baseDir: tmpDir,
-        env: {},
-        homeDir: fakeHome,
-      });
-      expect(commands).toHaveLength(DEFAULT_SKILL_SOURCES.length * 2);
-      expect(commands.some((c) => c.includes('--agent windsurf'))).toBe(false);
-      expect(commands.filter((c) => c.includes('--all'))).toHaveLength(
-        DEFAULT_SKILL_SOURCES.length,
-      );
-      expect(commands.filter((c) => c.includes('--agent claude-code'))).toHaveLength(
-        DEFAULT_SKILL_SOURCES.length,
-      );
-      rmSync(fakeHome, { recursive: true, force: true });
+      expect(commands).toHaveLength(DEFAULT_SKILL_SOURCES.length);
+      for (const command of commands) {
+        expect(command).toContain(AGENT_FLAGS);
+        expect(command).not.toContain('--all');
+      }
     });
   });
 });

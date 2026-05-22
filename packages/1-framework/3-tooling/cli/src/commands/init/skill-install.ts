@@ -90,6 +90,21 @@ export function formatSkillSourceUrl(source: SkillSource): string {
   return url;
 }
 
+/** Agent slugs accepted by the upstream `skills add --agent` flag. */
+export type SkillAgent = 'cursor' | 'claude-code' | 'codex' | 'windsurf';
+
+/**
+ * Default agents for project-level init installs. One `skills add` per source
+ * targets every supported consumer runtime explicitly so fresh projects get
+ * project-local symlinks under each agent's skills directory without prompts.
+ */
+export const DEFAULT_SKILL_AGENTS: readonly SkillAgent[] = [
+  'cursor',
+  'claude-code',
+  'codex',
+  'windsurf',
+];
+
 /**
  * The skill-install command for one source, formatted for the
  * project's detected package manager. `npx`/`pnpm dlx`/`bunx` are
@@ -97,57 +112,29 @@ export function formatSkillSourceUrl(source: SkillSource): string {
  * rest of the install step so a single project consistently uses one
  * runner.
  *
- * `--all` auto-selects every skill in the cluster and every detected
- * agent runtime, skipping the multi-select prompts the `skills` CLI
- * shows by default. A non-interactive scaffold step cannot present
- * prompts.
+ * `--agent` takes space-separated slugs on one flag; `--skill '*'` and `-y`
+ * skip the multi-select prompts a non-interactive scaffold step cannot show.
  *
  * Exported for unit tests so the per-PM dispatch can be asserted
  * without a live subprocess.
  */
-export function formatSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
-  const args = ['skills@latest', 'add', formatSkillSourceUrl(source), '--all'];
-  return formatPackageManagerCommand(pm, args);
-}
-
-/**
- * `skills add --all` should cover Claude Code, but upstream currently skips
- * project-local Claude symlinks when `.claude/` does not already exist. Run
- * the explicit Claude Code install as well so fresh projects get
- * `.claude/skills` without asking users to create that folder first.
- */
-export function formatClaudeSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
-  const args = [
+export function formatSkillInstallCommand(args: {
+  readonly pm: PackageManager;
+  readonly source: SkillSource;
+  readonly agents?: readonly SkillAgent[];
+}): string {
+  const agents = args.agents ?? DEFAULT_SKILL_AGENTS;
+  const cliArgs = [
     'skills@latest',
     'add',
-    formatSkillSourceUrl(source),
+    formatSkillSourceUrl(args.source),
     '--agent',
-    'claude-code',
+    ...agents,
     '--skill',
     "'*'",
     '-y',
   ];
-  return formatPackageManagerCommand(pm, args);
-}
-
-/**
- * `skills add --all` should cover Windsurf, but upstream skips project-local
- * Windsurf symlinks when `.windsurf/` does not already exist. Run the explicit
- * Windsurf install when a Windsurf session or install is detected so skills land
- * under `.windsurf/skills/` without asking users to create that folder first.
- */
-export function formatWindsurfSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
-  const args = [
-    'skills@latest',
-    'add',
-    formatSkillSourceUrl(source),
-    '--agent',
-    'windsurf',
-    '--skill',
-    "'*'",
-    '-y',
-  ];
-  return formatPackageManagerCommand(pm, args);
+  return formatPackageManagerCommand(args.pm, cliArgs);
 }
 
 function isTruthyEnvMarker(raw: string | undefined): boolean {
@@ -179,18 +166,13 @@ export function isWindsurfDetected(ctx: {
  */
 export function resolveProjectSkillInstallCommands(
   pm: PackageManager,
-  ctx: {
+  _ctx: {
     readonly baseDir: string;
     readonly env?: NodeJS.ProcessEnv;
     readonly homeDir?: string;
   },
 ): readonly string[] {
-  const windsurfDetected = isWindsurfDetected(ctx);
-  return DEFAULT_SKILL_SOURCES.flatMap((source) => [
-    formatSkillInstallCommand(pm, source),
-    formatClaudeSkillInstallCommand(pm, source),
-    ...(windsurfDetected ? [formatWindsurfSkillInstallCommand(pm, source)] : []),
-  ]);
+  return DEFAULT_SKILL_SOURCES.map((source) => formatSkillInstallCommand({ pm, source }));
 }
 
 function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {

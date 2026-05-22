@@ -432,7 +432,11 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
           commandArgs.includes('skills@latest') &&
           commandArgs.includes('add') &&
           commandArgs.some((arg) => arg.includes('/skills#v')) &&
-          commandArgs.includes('--all')
+          commandArgs.includes('--agent') &&
+          commandArgs.includes('cursor') &&
+          commandArgs.includes('claude-code') &&
+          commandArgs.includes('codex') &&
+          commandArgs.includes('windsurf')
         );
       }),
     ).toBe(true);
