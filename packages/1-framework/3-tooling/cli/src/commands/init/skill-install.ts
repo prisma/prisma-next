@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { join } from 'pathe';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from './detect-package-manager';
 import { errorInitSkillInstallFailed } from './errors';
