@@ -75,6 +75,34 @@ type DefinitionCapabilities<Definition> = Definition extends {
   ? Capabilities
   : undefined;
 
+type ExtractPackCapabilities<P> = P extends {
+  readonly capabilities?: infer Caps extends Record<string, Record<string, boolean>>;
+}
+  ? Caps
+  : never;
+
+type MergeExtensionPackCapabilities<Packs> =
+  Packs extends Record<string, unknown>
+    ? keyof Packs extends never
+      ? Record<string, never>
+      : UnionToIntersection<
+          {
+            [K in keyof Packs]: ExtractPackCapabilities<Packs[K]>;
+          }[keyof Packs]
+        >
+    : Record<string, never>;
+
+type Defaulted<T, Fallback> = [T] extends [never] ? Fallback : T;
+
+type DerivedCapabilities<Definition> = Defaulted<
+  ExtractPackCapabilities<DefinitionTarget<Definition>>,
+  Record<string, never>
+> &
+  MergeExtensionPackCapabilities<DefinitionExtensionPacks<Definition>> &
+  (DefinitionCapabilities<Definition> extends Record<string, Record<string, boolean>>
+    ? DefinitionCapabilities<Definition>
+    : Record<string, never>);
+
 type DefinitionTargetId<Definition> = Definition extends {
   readonly target: TargetPackRef<'sql', infer Target>;
 }
@@ -608,12 +636,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
     readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
       : DefinitionExtensionPacks<Definition>;
-    readonly capabilities: DefinitionCapabilities<Definition> extends Record<
-      string,
-      Record<string, boolean>
-    >
-      ? DefinitionCapabilities<Definition>
-      : Record<string, Record<string, boolean>>;
+    readonly capabilities: DerivedCapabilities<Definition>;
   },
   TypeMaps<
     CodecTypesFromDefinition<Definition>,
