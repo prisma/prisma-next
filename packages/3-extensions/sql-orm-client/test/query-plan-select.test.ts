@@ -388,12 +388,6 @@ describe('compileSelectWithIncludeStrategy', () => {
       'single-query include strategy does not support scalar include selectors or combine()',
     );
   });
-
-  // `distinct()` on a non-leaf include used to throw at the planner
-  // boundary (the lowering emitted `SELECT DISTINCT <scalars>, json_agg(...)`
-  // which Postgres rejects on `json` equality). TML-2656 replaced that
-  // with a wrapped-subquery lowering. Integration coverage lives in
-  // `test/integration/nested-includes-distinct{,-refinements}.test.ts`.
 });
 
 describe('compileSelect MTI JOINs', () => {
