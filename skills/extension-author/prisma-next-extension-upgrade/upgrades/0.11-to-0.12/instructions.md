@@ -22,7 +22,7 @@ changes:
       anyMatch: false
   - id: distinct-cols-now-collapses-by-specified-columns
     summary: |
-      `.distinct(cols)` on `@prisma-next/sql-orm-client` `Collection` (and on nested `.include(…, c => c.distinct(cols)…)`) now keeps **one representative row per `(cols)` group**, matching Prisma semantics. Prior to 0.12 the lowering was effectively a no-op — `.distinct('title')` returned every row whenever the projection contained any unique column (typically `id`), because the underlying SQL `DISTINCT` deduped on the full projected row. No code change is required for consumer call sites, but any extension tests or fixtures that asserted the pre-0.12 no-collapse output will fail and need updating to reflect the new collapsed shape. The representative within each partition is picked by the user's `.orderBy(…)` (if any); when the orderBy doesn't fully order rows in a partition the pick is implementation-defined, matching Prisma's documented behaviour.
+      `.distinct(cols)` on `@prisma-next/sql-orm-client` `Collection` (and on nested `.include(…, c => c.distinct(cols)…)`) now keeps **one representative row per `(cols)` group**, matching Prisma semantics. Prior to 0.12, `.distinct(cols)` did not actually collapse rows on the specified columns — when the projection contained any other distinguishing column (typically `id`), rows that differed only in those other columns were all returned. No code change is required for consumer call sites, but any extension tests or fixtures that asserted the pre-0.12 no-collapse output will fail and need updating to reflect the new collapsed shape. The representative within each partition is picked by the user's `.orderBy(…)` (if any); when the orderBy doesn't fully order rows in a partition the pick is implementation-defined, matching Prisma's documented behaviour.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
@@ -155,7 +155,7 @@ No automated codemod — the body of the new arm depends on what the switch does
 
 Starting at the 0.12 release, `.distinct(cols)` on the `@prisma-next/sql-orm-client` `Collection` API — at the top level (`db.Post.distinct('title')`), on leaf includes (`include('posts', p => p.distinct('title'))`), and on non-leaf includes (`include('posts', p => p.distinct('title').include('comments'))`) — keeps one representative row per `(cols)` group, matching Prisma's documented semantics.
 
-Prior to 0.12, the lowering compiled to `SELECT DISTINCT <projected-cols>` — which dedupes on the full projected row. Once the projection included any unique column (typically `id` — and grandchild-include force-includes added it implicitly), the dedup never collapsed anything; `.distinct('title')` returned every row. The bug existed at all three call sites and was preserved as "status-quo behaviour" by an earlier spec decision, then fixed in the same PR that landed the non-leaf single-query lowering. See `projects/tml-2656-distinct-on-non-leaf-include/spec.md` § D3 in the source tree.
+Prior to 0.12, `.distinct(cols)` did not actually collapse rows on the specified columns: when the projection contained any other distinguishing column (typically `id`), rows that differed only in those other columns were all returned. From 0.12 onwards, `.distinct(cols)` keeps one representative row per `(cols)` group, matching the way Prisma documents `distinct`.
 
 ### No code change for consumer call sites
 
