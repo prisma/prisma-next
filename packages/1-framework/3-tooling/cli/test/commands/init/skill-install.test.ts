@@ -1,17 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'pathe';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
 import {
   DEFAULT_SKILL_AGENTS,
   DEFAULT_SKILL_BASE,
   DEFAULT_SKILL_SOURCES,
-  ensureAgentSkillInstallDirs,
   formatSkillInstallCommand,
   formatSkillSourceUrl,
-  isWindsurfDetected,
   resolveProjectSkillInstallCommands,
 } from '../../../src/commands/init/skill-install';
 
@@ -135,108 +130,15 @@ describe('formatSkillInstallCommand', () => {
   });
 });
 
-describe('isWindsurfDetected', () => {
-  let tmpDir: string;
-
-  afterEach(() => {
-    if (tmpDir && existsSync(tmpDir)) {
-      rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('returns true when the WINDSURF session marker is set', () => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'windsurf-detect-'));
-    expect(isWindsurfDetected({ baseDir: tmpDir, env: { WINDSURF: '1' } })).toBe(true);
-  });
-
-  it('returns true when the project already has a .windsurf directory', () => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'windsurf-detect-'));
-    mkdirSync(join(tmpDir, '.windsurf'));
-    expect(isWindsurfDetected({ baseDir: tmpDir, env: {} })).toBe(true);
-  });
-
-  it('returns true when Windsurf is installed globally', () => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'windsurf-detect-'));
-    const fakeHome = mkdtempSync(join(tmpdir(), 'windsurf-home-'));
-    mkdirSync(join(fakeHome, '.codeium', 'windsurf'), { recursive: true });
-    expect(isWindsurfDetected({ baseDir: tmpDir, env: {}, homeDir: fakeHome })).toBe(true);
-    rmSync(fakeHome, { recursive: true, force: true });
-  });
-
-  it('returns false when no Windsurf markers are present', () => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'windsurf-detect-'));
-    const fakeHome = mkdtempSync(join(tmpdir(), 'windsurf-home-'));
-    expect(isWindsurfDetected({ baseDir: tmpDir, env: {}, homeDir: fakeHome })).toBe(false);
-    rmSync(fakeHome, { recursive: true, force: true });
-  });
-});
-
-describe('ensureAgentSkillInstallDirs', () => {
-  let tmpDir: string;
-
-  afterEach(() => {
-    if (tmpDir && existsSync(tmpDir)) {
-      rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('creates .claude/skills for every init install', () => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'skill-dirs-'));
-    const fakeHome = mkdtempSync(join(tmpdir(), 'skill-dirs-home-'));
-    ensureAgentSkillInstallDirs({ baseDir: tmpDir, env: {}, homeDir: fakeHome });
-    expect(existsSync(join(tmpDir, '.claude', 'skills'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.windsurf', 'skills'))).toBe(false);
-    rmSync(fakeHome, { recursive: true, force: true });
-  });
-
-  it('creates .windsurf/skills when Windsurf is detected', () => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'skill-dirs-'));
-    ensureAgentSkillInstallDirs({ baseDir: tmpDir, env: { WINDSURF: '1' } });
-    expect(existsSync(join(tmpDir, '.claude', 'skills'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.windsurf', 'skills'))).toBe(true);
-  });
-});
-
 describe('resolveProjectSkillInstallCommands', () => {
-  let tmpDir: string;
-
-  afterEach(() => {
-    if (tmpDir && existsSync(tmpDir)) {
-      rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('emits one consolidated install per skill source when Windsurf is detected', () => {
+  it('emits one consolidated install per skill source covering every agent', () => {
     withCleanEnv(() => {
-      tmpDir = mkdtempSync(join(tmpdir(), 'skill-resolve-'));
-      const commands = resolveProjectSkillInstallCommands('pnpm', {
-        baseDir: tmpDir,
-        env: { WINDSURF: '1' },
-      });
+      const commands = resolveProjectSkillInstallCommands('pnpm');
       expect(commands).toHaveLength(DEFAULT_SKILL_SOURCES.length);
       for (const command of commands) {
         expect(command).toContain(AGENT_FLAGS);
         expect(command).not.toContain('--all');
       }
-    });
-  });
-
-  it('omits the windsurf agent when Windsurf is not detected', () => {
-    withCleanEnv(() => {
-      tmpDir = mkdtempSync(join(tmpdir(), 'skill-resolve-'));
-      const fakeHome = mkdtempSync(join(tmpdir(), 'skill-resolve-home-'));
-      const commands = resolveProjectSkillInstallCommands('pnpm', {
-        baseDir: tmpDir,
-        env: {},
-        homeDir: fakeHome,
-      });
-      const agentsWithoutWindsurf = `--agent ${DEFAULT_SKILL_AGENTS.filter((agent) => agent !== 'windsurf').join(' ')} --skill '*' -y`;
-      expect(commands).toHaveLength(DEFAULT_SKILL_SOURCES.length);
-      for (const command of commands) {
-        expect(command).toContain(agentsWithoutWindsurf);
-        expect(command).not.toContain('--agent windsurf');
-      }
-      rmSync(fakeHome, { recursive: true, force: true });
     });
   });
 });

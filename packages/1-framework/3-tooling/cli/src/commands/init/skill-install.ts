@@ -1,8 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { promisify } from 'node:util';
-import { join } from 'pathe';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from './detect-package-manager';
 import { errorInitSkillInstallFailed } from './errors';
@@ -76,6 +73,21 @@ function isLocalPath(base: string): boolean {
   return base.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(base);
 }
 
+/** Agent slugs accepted by the upstream `skills add --agent` flag. */
+export type SkillAgent = 'cursor' | 'claude-code' | 'codex' | 'windsurf';
+
+/**
+ * Agents passed to every project-level init install. Upstream `skills add`
+ * is the source of truth for per-agent install behaviour; the CLI lists
+ * every supported runtime on one invocation and delegates the rest.
+ */
+export const DEFAULT_SKILL_AGENTS: readonly SkillAgent[] = [
+  'cursor',
+  'claude-code',
+  'codex',
+  'windsurf',
+];
+
 /**
  * Build the `<base>/<subpath>[#ref]` URL the `skills` CLI will
  * resolve. Exported for unit tests so the per-source format can be
@@ -89,21 +101,6 @@ export function formatSkillSourceUrl(source: SkillSource): string {
   if (source.ref === 'cli') return `${url}#v${cliVersion}`;
   return url;
 }
-
-/** Agent slugs accepted by the upstream `skills add --agent` flag. */
-export type SkillAgent = 'cursor' | 'claude-code' | 'codex' | 'windsurf';
-
-/**
- * Default agents for project-level init installs. One `skills add` per source
- * targets every supported consumer runtime explicitly so fresh projects get
- * project-local symlinks under each agent's skills directory without prompts.
- */
-export const DEFAULT_SKILL_AGENTS: readonly SkillAgent[] = [
-  'cursor',
-  'claude-code',
-  'codex',
-  'windsurf',
-];
 
 /**
  * The skill-install command for one source, formatted for the
@@ -137,62 +134,11 @@ export function formatSkillInstallCommand(args: {
   return formatPackageManagerCommand(args.pm, cliArgs);
 }
 
-function isTruthyEnvMarker(raw: string | undefined): boolean {
-  if (raw === undefined) return false;
-  const normalised = raw.trim().toLowerCase();
-  if (normalised === '' || normalised === '0' || normalised === 'false') return false;
-  return true;
-}
-
-/**
- * Best-effort Windsurf detection for project-level skill install. Matches the
- * upstream `skills` CLI's Windsurf install probe and the `WINDSURF` session
- * marker used elsewhere in the CLI toolchain.
- */
-export function isWindsurfDetected(ctx: {
-  readonly baseDir: string;
-  readonly env?: NodeJS.ProcessEnv;
-  readonly homeDir?: string;
-}): boolean {
-  const env = ctx.env ?? process.env;
-  if (isTruthyEnvMarker(env['WINDSURF'])) return true;
-  if (existsSync(join(ctx.baseDir, '.windsurf'))) return true;
-  const home = ctx.homeDir ?? homedir();
-  return existsSync(join(home, '.codeium', 'windsurf'));
-}
-
 /**
  * Ordered skill-install commands for one init run. Exported for unit tests.
  */
-export function resolveProjectSkillInstallCommands(
-  pm: PackageManager,
-  ctx: {
-    readonly baseDir: string;
-    readonly env?: NodeJS.ProcessEnv;
-    readonly homeDir?: string;
-  },
-): readonly string[] {
-  const agents: readonly SkillAgent[] = isWindsurfDetected(ctx)
-    ? DEFAULT_SKILL_AGENTS
-    : DEFAULT_SKILL_AGENTS.filter((agent) => agent !== 'windsurf');
-  return DEFAULT_SKILL_SOURCES.map((source) => formatSkillInstallCommand({ pm, source, agents }));
-}
-
-/**
- * Upstream `skills add` with multiple `--agent` slugs symlinks Claude Code and
- * Windsurf skills only when the project already has `.claude/skills` or
- * `.windsurf/skills`. Fresh init runs create those directories before the
- * consolidated install so every targeted agent gets project-local skills.
- */
-export function ensureAgentSkillInstallDirs(ctx: {
-  readonly baseDir: string;
-  readonly env?: NodeJS.ProcessEnv;
-  readonly homeDir?: string;
-}): void {
-  mkdirSync(join(ctx.baseDir, '.claude', 'skills'), { recursive: true });
-  if (isWindsurfDetected(ctx)) {
-    mkdirSync(join(ctx.baseDir, '.windsurf', 'skills'), { recursive: true });
-  }
+export function resolveProjectSkillInstallCommands(pm: PackageManager): readonly string[] {
+  return DEFAULT_SKILL_SOURCES.map((source) => formatSkillInstallCommand({ pm, source }));
 }
 
 function formatPackageManagerCommand(pm: PackageManager, args: readonly string[]): string {
@@ -244,9 +190,7 @@ export async function runProjectLevelSkillInstall(ctx: {
   readonly filesWritten: readonly string[];
 }): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
   const commands: string[] = [];
-  const installCtx = { baseDir: ctx.baseDir };
-  ensureAgentSkillInstallDirs(installCtx);
-  const installCommands = resolveProjectSkillInstallCommands(ctx.pm, installCtx);
+  const installCommands = resolveProjectSkillInstallCommands(ctx.pm);
 
   for (const command of installCommands) {
     const { file, args } = commandToExec(command);
