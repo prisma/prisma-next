@@ -10,7 +10,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 import { resolveContractInferOutputPath } from './contract-infer-paths';
@@ -39,10 +39,10 @@ interface ContractInferSuccessResult {
 
 async function executeContractInferCommand(
   options: ContractInferOptions,
+  flags: GlobalFlags,
   ui: TerminalUI,
   startTime: number,
 ): Promise<Result<ContractInferSuccessResult, CliStructuredError>> {
-  const flags = parseGlobalFlagsOrExit(options);
   const inspectResult = await inspectLiveSchema(options, flags, ui, startTime, {
     commandName: 'contract infer',
     description: 'Infer a PSL contract from the live database schema',
@@ -116,7 +116,7 @@ export function createContractInferCommand(): Command {
       const ui = createTerminalUI(flags);
       const startTime = Date.now();
 
-      const result = await executeContractInferCommand(options, ui, startTime);
+      const result = await executeContractInferCommand(options, flags, ui, startTime);
       const exitCode = handleResult(result, flags, ui, (value) => {
         if (flags.json) {
           ui.output(JSON.stringify(value, null, 2));
