@@ -17,7 +17,7 @@
 // per-file test-count threshold documented in `./nested-includes-helpers.ts`.
 
 import { describe, expect, it } from 'vitest';
-import { timeouts, withCollectionRuntime } from './helpers';
+import { timeouts, withCollectionRuntime } from './integration-helpers';
 import {
   CORRELATED_CAPABILITIES,
   collectionWithCapabilities,
