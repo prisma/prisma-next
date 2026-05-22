@@ -299,16 +299,44 @@ describe('migration plan command', () => {
       expect(result.baselineDir! < result.dir!).toBe(true);
     });
 
-    it('returns noOp without writing bundles when fromHash equals toStorageHash', async () => {
-      setupAutoBaselineEmptyGraph(SAME_HASH, SAME_HASH);
+    it('writes baseline-only bundle when fromHash equals toStorageHash on empty graph', async () => {
+      const planMock = vi
+        .fn()
+        .mockReturnValueOnce(
+          defaultPlannerSuccess([
+            { id: 'baseline.table', label: 'Create baseline table', operationClass: 'additive' },
+          ]),
+        );
+      setupBaseConfig(planMock);
+      mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      setupDbRefFromHash(SAME_HASH);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+
       const command = createMigrationPlanCommand();
       const exitCode = await executeCommand(command, ['--json']);
 
       expect(exitCode).toBe(0);
-      expect(mocks.writeMigrationPackage).not.toHaveBeenCalled();
+      expect(planMock).toHaveBeenCalledTimes(1);
+      expect(mocks.writeMigrationPackage).toHaveBeenCalledTimes(1);
+
+      const baselineMeta = mocks.writeMigrationPackage.mock.calls[0]![1] as {
+        from: string | null;
+        to: string;
+      };
+      expect(baselineMeta.from).toBeNull();
+      expect(baselineMeta.to).toBe(SAME_HASH);
+
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       const result = JSON.parse(jsonLine!) as MigrationPlanResult;
-      expect(result.noOp).toBe(true);
+      expect(result.noOp).toBe(false);
+      expect(result.baselineDir).toBeDefined();
+      expect(result.dir).toBeUndefined();
+      expect(result.from).toBe(SAME_HASH);
+      expect(result.to).toBe(SAME_HASH);
+      expect(result.summary).toContain('Planned baseline');
     });
 
     it('refuses without writing when baseline planner fails', async () => {

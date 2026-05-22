@@ -476,6 +476,55 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
+      'dev iteration after db update emits baseline-only and migrate closes the loop',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withJourney(createTempDir, connectionString, async (ctx) => {
+            expect((await runContractEmit(ctx)).exitCode).toBe(0);
+            expect((await runDbInit(ctx)).exitCode).toBe(0);
+
+            swapContract(ctx, 'contract-additive');
+            expect((await runContractEmit(ctx)).exitCode).toBe(0);
+            expect((await runDbUpdate(ctx)).exitCode).toBe(0);
+
+            const dbRefHash = readDbRefHash(ctx);
+            const plan = await runMigrationPlan(ctx, ['--name', 'ship-baseline', '--json']);
+            expect(plan.exitCode).toBe(0);
+            const planJson = parseJsonOutput<PlanJsonResult>(plan);
+            expect(planJson.noOp).toBe(false);
+            expect(planJson.baselineDir).toBeDefined();
+            expect(planJson.dir).toBeUndefined();
+            expect(planJson.from).toBe(dbRefHash);
+            expect(planJson.to).toBe(dbRefHash);
+
+            const dirs = listAppMigrationBundleDirs(ctx);
+            expect(dirs).toHaveLength(1);
+            const baselineMeta = readManifest(ctx, dirs[0]!);
+            expect(baselineMeta.from).toBeNull();
+            expect(baselineMeta.to).toBe(dbRefHash);
+
+            await emitAllAppMigrations(ctx);
+            const apply = await runMigrate(ctx, ['--advance-ref', 'db', '--json']);
+            expect(apply.exitCode).toBe(0);
+            const applyJson = parseJsonOutput<{
+              ok: boolean;
+              migrationsApplied: number;
+              markerHash: string;
+              advancedRef: { name: string; hash: string } | null;
+            }>(apply);
+            expect(applyJson.ok).toBe(true);
+            expect(applyJson.migrationsApplied).toBe(0);
+            expect(applyJson.markerHash).toBe(dbRefHash);
+            expect(applyJson.advancedRef).toEqual({ name: 'db', hash: dbRefHash });
+            expect(readDbRefHash(ctx)).toBe(dbRefHash);
+            expect(dbRefSnapshotExists(ctx)).toBe(true);
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
       'explicit --from db matches implicit default resolution',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
