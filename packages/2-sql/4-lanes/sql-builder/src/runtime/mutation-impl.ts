@@ -101,9 +101,10 @@ function evaluateWhere(
   whereCallback: WhereCallback,
   scope: Scope,
   queryOperationTypes: BuilderContext['queryOperationTypes'],
+  rawSqlTag?: BuilderContext['rawSqlTag'],
 ): AstExpression {
   const fieldProxy = createFieldProxy(scope);
-  const fns = createFunctions(queryOperationTypes);
+  const fns = createFunctions(queryOperationTypes, rawSqlTag);
   const result = whereCallback(fieldProxy, fns as never);
   return result.buildAst();
 }
@@ -112,9 +113,10 @@ export function evaluateUpdateCallback(
   callback: UpdateSetCallback,
   scope: Scope,
   queryOperationTypes: BuilderContext['queryOperationTypes'],
+  rawSqlTag?: BuilderContext['rawSqlTag'],
 ): Record<string, AstExpression> {
   const fieldProxy = createFieldProxy(scope);
-  const fns = createFunctions(queryOperationTypes);
+  const fns = createFunctions(queryOperationTypes, rawSqlTag);
   const result = callback(fieldProxy, fns as never);
   const set: Record<string, AstExpression> = {};
   for (const [col, expr] of Object.entries(result)) {
@@ -290,7 +292,7 @@ export class UpdateQueryImpl<
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType> {
     const fieldProxy = createFieldProxy(this.#scope);
-    const fns = createFunctions(this.ctx.queryOperationTypes);
+    const fns = createFunctions(this.ctx.queryOperationTypes, this.ctx.rawSqlTag);
     const result = (expr as ExpressionBuilder<Scope, QueryContext>)(fieldProxy, fns as never);
     return new UpdateQueryImpl(
       this.#tableName,
@@ -460,7 +462,7 @@ export class DeleteQueryImpl<
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const whereExpr = combineWhereExprs(
       this.#whereCallbacks.map((cb) =>
-        evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes),
+        evaluateWhere(cb, this.#scope, this.ctx.queryOperationTypes, this.ctx.rawSqlTag),
       ),
     );
 
