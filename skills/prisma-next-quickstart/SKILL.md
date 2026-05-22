@@ -111,6 +111,8 @@ If that prints `[{ id: 1, email: 'alice@example.com' }]`, the project is wired e
 
 `db.orm.<Model>` is the default ORM lane — model-shaped, fully typed against the contract, lazily connects to the database on first use (it picks up `DATABASE_URL` from `.env` via the runtime's `dotenv/config`-loaded environment). The deeper `prisma-next-queries` skill covers the rest of the surface (filters, joins, transactions, the SQL builder, raw SQL, TypedSQL) when the user is ready.
 
+> **Mongo target:** the snippet above is SQL-target shape. On `@prisma-next/mongo`, `db.orm` is keyed by the collection's storage name (`@@map(...)`, or the lowercased model name if no `@@map`), so the same arc reads `await db.orm.users.create(...)` / `await db.orm.users.select('id', 'email').all()` — not `db.orm.User`. Full rule and rewrite recipe in `prisma-next-queries` § *MongoDB ORM addressing*.
+
 **Prerequisites for the arc to work.** All three paths leave these in place by the time you reach the arc:
 
 - `prisma-next.config.ts` exists at the repo root and declares the target + contract source (typically `src/prisma/contract.prisma` or `src/prisma/contract.ts`).
