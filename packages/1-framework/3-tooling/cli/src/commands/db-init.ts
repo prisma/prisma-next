@@ -81,7 +81,9 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
 
   if (failure.code === 'RUNNER_FAILED') {
     const runnerCode =
-      typeof failure.meta?.runnerErrorCode === 'string' ? failure.meta.runnerErrorCode : undefined;
+      typeof failure.meta?.['runnerErrorCode'] === 'string'
+        ? failure.meta['runnerErrorCode']
+        : undefined;
     const fix =
       runnerCode === 'LEGACY_MARKER_SHAPE'
         ? 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.'
