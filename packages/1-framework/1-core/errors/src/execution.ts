@@ -74,7 +74,7 @@ export function errorMarkerRowCorrupt(options: {
   return new CliStructuredError('3005', 'Marker row is corrupt or incompatible', {
     domain: 'RUN',
     why: options.why,
-    fix: `The ${options.markerLocation} row for space "${options.space}" contains invalid data. Delete the row and run \`prisma-next db init --db <url>\` to reinitialize.`,
+    fix: `The ${options.markerLocation} row for space "${options.space}" contains invalid data. Delete the row, then run \`prisma-next db sign --db <url>\` to write a fresh marker.`,
     meta: { space: options.space },
   });
 }

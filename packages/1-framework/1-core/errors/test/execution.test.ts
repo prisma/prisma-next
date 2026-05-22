@@ -150,7 +150,7 @@ describe('Runtime Errors', () => {
     expect(error.toEnvelope().code).toBe('PN-RUN-3005');
     expect(error.message).toBe('Marker row is corrupt or incompatible');
     expect(error.fix).toContain('space "app"');
-    expect(error.fix).toContain('prisma-next db init');
+    expect(error.fix).toContain('prisma-next db sign');
   });
 
   it('errorMarkerReadFailed creates PN-RUN-3006 envelope', () => {

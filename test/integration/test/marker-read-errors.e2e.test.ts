@@ -53,7 +53,7 @@ withTempDir(({ createTempDir }) => {
           code: 'PN-RUN-3005',
           summary: 'Marker row is corrupt or incompatible',
           why: expect.stringContaining('Invalid contract marker row'),
-          fix: expect.stringContaining('prisma-next db init'),
+          fix: expect.stringContaining('prisma-next db sign'),
         });
       },
       timeouts.spinUpPpgDev,
