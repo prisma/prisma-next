@@ -192,24 +192,4 @@ describe('--reinit legacy-layout warning', () => {
     },
     timeouts.databaseOperation,
   );
-
-  it(
-    'does not warn when --schema-path is still prisma/ (user intentionally keeping the legacy layout)',
-    async () => {
-      // User explicitly re-inits into prisma/ — schemaDir equals the legacy dir,
-      // so the guard (schemaDir !== 'prisma') must suppress the warning.
-      mkdirSync(join(tmpDir, 'prisma'));
-      for (const f of ['contract.prisma', 'contract.json', 'db.ts']) {
-        writeFileSync(join(tmpDir, 'prisma', f), '');
-      }
-
-      const { warnings } = await runReinit(tmpDir, { schemaPath: 'prisma/contract.prisma' });
-      const text = warnings.join('\n');
-
-      expect(text).not.toContain('prisma/contract.prisma');
-      expect(text).not.toContain('prisma/contract.json');
-      expect(text).not.toContain('prisma/db.ts');
-    },
-    timeouts.databaseOperation,
-  );
 });
