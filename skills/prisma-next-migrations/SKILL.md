@@ -144,7 +144,7 @@ If the paired snapshot is missing (`MIGRATION.SNAPSHOT_MISSING`), repopulate wit
 
 `db` is a **default ref name**, not a reserved one. The framework overwrites it on the next dev cycle; you may `ref set db <hash>` explicitly and accept that a subsequent `db update` replaces it when run against the default URL.
 
-Canonical detail: [Migration System § Refs (paired contract snapshots)](docs/architecture%20docs/subsystems/7.%20Migration%20System.md#paired-contract-snapshots), [§ `migration plan`](docs/architecture%20docs/subsystems/7.%20Migration%20System.md#migration-plan), [§ Recovery affordances](docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances), and [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (TML-2629).
+Canonical detail: [Migration System § Refs (paired contract snapshots)](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#paired-contract-snapshots), [§ `migration plan`](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#migration-plan), [§ Recovery affordances](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances), and [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](../../docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (TML-2629).
 
 ## Workflow — `db update` (quick path)
 
