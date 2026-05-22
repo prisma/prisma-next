@@ -18,7 +18,6 @@
     "app/**/*.tsx",
     "src/**/*.ts",
     "test/**/*.ts",
-    "prisma/**/*.ts",
     "prisma-next.config.ts",
     "react-router.config.ts",
     "vite.config.ts",
