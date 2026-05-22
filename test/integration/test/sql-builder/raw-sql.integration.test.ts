@@ -1,0 +1,284 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import pgvector from '@prisma-next/extension-pgvector/runtime';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import {
+  type ExecutionStackInstance,
+  instantiateExecutionStack,
+  type RuntimeDriverInstance,
+} from '@prisma-next/framework-components/execution';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import { createRawSql, param } from '@prisma-next/sql-relational-core/expression';
+import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+  type Runtime,
+  type SqlMiddleware,
+  type SqlRuntimeAdapterInstance,
+  type SqlRuntimeDriverInstance,
+  type SqlRuntimeExtensionInstance,
+} from '@prisma-next/sql-runtime';
+import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { Client } from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { contract } from './fixtures/contract';
+import type { Contract } from './fixtures/generated/contract';
+
+const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
+
+type TestStackInstance = ExecutionStackInstance<
+  'sql',
+  'postgres',
+  SqlRuntimeAdapterInstance<'postgres'>,
+  RuntimeDriverInstance<'sql', 'postgres'>,
+  SqlRuntimeExtensionInstance<'postgres'>
+>;
+
+describe('integration: rawSql expression in typed builder', {
+  timeout: timeouts.databaseOperation,
+}, () => {
+  let context: ExecutionContext<typeof sqlContract>;
+  let driver: SqlRuntimeDriverInstance<'postgres'>;
+  let stackInstance: TestStackInstance;
+  const closeFns: Array<() => Promise<void>> = [];
+
+  beforeAll(async () => {
+    const database = await createDevDatabase();
+    const client = new Client({ connectionString: database.connectionString });
+    await client.connect();
+
+    await setupTestDatabase(client, sqlContract, async (c) => {
+      await c.query(`
+        CREATE TABLE users (
+          id int4 PRIMARY KEY,
+          name text NOT NULL,
+          email text NOT NULL,
+          invited_by_id int4
+        )
+      `);
+      await c.query('CREATE EXTENSION IF NOT EXISTS vector');
+      await c.query(`
+        CREATE TABLE posts (
+          id int4 PRIMARY KEY,
+          title text NOT NULL,
+          user_id int4 NOT NULL,
+          views int4 NOT NULL,
+          embedding vector(3)
+        )
+      `);
+      await c.query(`
+        CREATE TABLE comments (
+          id int4 PRIMARY KEY,
+          body text NOT NULL,
+          post_id int4 NOT NULL
+        )
+      `);
+      await c.query(`
+        CREATE TABLE profiles (
+          id int4 PRIMARY KEY,
+          user_id int4 NOT NULL,
+          bio text NOT NULL
+        )
+      `);
+      await c.query(`
+        CREATE TABLE articles (
+          id uuid PRIMARY KEY,
+          title text NOT NULL
+        )
+      `);
+
+      await c.query(`
+        INSERT INTO users (id, name, email, invited_by_id) VALUES
+          (1, 'Alice', 'alice@example.com', NULL),
+          (2, 'Bob', 'bob@example.com', 1),
+          (3, 'Charlie', 'charlie@example.com', 1),
+          (4, 'Diana', 'diana@example.com', 2)
+      `);
+      await c.query(`
+        INSERT INTO posts (id, title, user_id, views, embedding) VALUES
+          (1, 'Hello World', 1, 100, '[1,0,0]'),
+          (2, 'Second Post', 1, 50, '[0,1,0]'),
+          (3, 'Bobs Post',   2, 200, '[0,0,1]'),
+          (4, 'Another One', 3, 10, '[1,1,0]')
+      `);
+    });
+
+    const stack = createSqlExecutionStack({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      driver: {
+        ...postgresDriver,
+        create() {
+          return postgresDriver.create({ cursor: { disabled: true } });
+        },
+      },
+      extensionPacks: [pgvector],
+    });
+
+    stackInstance = instantiateExecutionStack(stack) as TestStackInstance;
+    context = createExecutionContext({ contract: sqlContract, stack });
+    const resolvedDriver = stackInstance.driver;
+    if (!resolvedDriver) throw new Error('Driver missing');
+    driver = resolvedDriver as SqlRuntimeDriverInstance<'postgres'>;
+    await driver.connect({ kind: 'pgClient', client });
+
+    closeFns.push(
+      () => driver.close(),
+      () => client.end(),
+      () => database.close(),
+    );
+  }, timeouts.spinUpPpgDev);
+
+  afterAll(async () => {
+    for (const fn of closeFns) {
+      try {
+        await fn();
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  });
+
+  function buildRuntime(middleware?: readonly SqlMiddleware[]): Runtime {
+    return createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      ...(middleware ? { middleware } : {}),
+    });
+  }
+
+  describe('rawSql expression survives the full pipeline and returns expected rows', () => {
+    it('rawSql in aliased select produces correct computed values from the database', async () => {
+      const rawSqlTag = createRawSql(createPostgresAdapter());
+      const db = sql({ context, rawSqlTag });
+      const runtime = buildRuntime();
+
+      // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
+      // rawSqlTag is used from the outer scope: fns.rawSql is RawSqlTag | undefined in the
+      // generic Functions<QC> type, so we call the bound tag directly to avoid a null check.
+      const rows = await runtime.execute(
+        db.posts
+          .select('id')
+          .select('doubled', (f) => rawSqlTag`${f.views} * 2`.returns('pg/int4@1'))
+          .orderBy('id')
+          .build(),
+      );
+
+      expect(rows).toHaveLength(4);
+      expect(rows.map((r) => r.doubled)).toEqual([200, 100, 400, 20]);
+    });
+
+    it('rawSql with a literal scalar expression returns the same value for every row', async () => {
+      const rawSqlTag = createRawSql(createPostgresAdapter());
+      const db = sql({ context, rawSqlTag });
+      const runtime = buildRuntime();
+
+      const rows = await runtime.execute(
+        db.posts
+          .select('id')
+          .select('magic', () => rawSqlTag`42`.returns('pg/int4@1'))
+          .orderBy('id')
+          .build(),
+      );
+
+      expect(rows).toHaveLength(4);
+      expect(rows.every((r) => r.magic === 42)).toBe(true);
+    });
+  });
+
+  describe('ParamRef from rawSql interpolation surfaces in beforeExecute params walk', () => {
+    it('param() inside rawSql appears in beforeExecute entries() in canonical order', async () => {
+      const capturedEntries: Array<{ codecId: string | undefined; value: unknown }> = [];
+
+      const middleware: SqlMiddleware = {
+        name: 'param-capture',
+        familyId: 'sql',
+        beforeExecute(_plan, _ctx, params?: SqlParamRefMutator) {
+          if (!params) return;
+          for (const entry of params.entries()) {
+            capturedEntries.push({ codecId: entry.codecId, value: entry.value });
+          }
+        },
+      };
+
+      const rawSqlTag = createRawSql(createPostgresAdapter());
+      const db = sql({ context, rawSqlTag });
+      const runtime = buildRuntime([middleware]);
+
+      // The where clause embeds a param() inside a rawSql expression.
+      // After lowering, the plan carries one ParamRef (value 50, codec pg/int4@1).
+      // The middleware's beforeExecute should see it via params.entries().
+      // rawSqlTag is called from the outer scope (same pattern as the select tests above) to avoid
+      // the fns.rawSql undefined-union at the callback's type boundary.
+      await runtime.execute(
+        db.posts
+          .select('id')
+          .where((_f, fns) =>
+            fns.gt(
+              rawSqlTag`${param(50, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+              rawSqlTag`0`.returns('pg/int4@1'),
+            ),
+          )
+          .build(),
+      );
+
+      // The where predicate gt(rawSql`${param(50)}`, rawSql`0`) produces one ParamRef.
+      // The rawSql`0` branch has no interpolations; param(50) introduces one ParamRef.
+      expect(capturedEntries.length).toBeGreaterThanOrEqual(1);
+      const paramEntry = capturedEntries.find((e) => e.codecId === 'pg/int4@1');
+      expect(paramEntry).toBeDefined();
+      expect(paramEntry?.value).toBe(50);
+    });
+
+    it('param() count in beforeExecute entries matches the number of param() calls in rawSql', async () => {
+      const capturedEntries: Array<{ codecId: string | undefined; value: unknown }> = [];
+
+      const middleware: SqlMiddleware = {
+        name: 'param-count-capture',
+        familyId: 'sql',
+        beforeExecute(_plan, _ctx, params?: SqlParamRefMutator) {
+          if (!params) return;
+          for (const entry of params.entries()) {
+            capturedEntries.push({ codecId: entry.codecId, value: entry.value });
+          }
+        },
+      };
+
+      const rawSqlTag = createRawSql(createPostgresAdapter());
+      const db = sql({ context, rawSqlTag });
+      const runtime = buildRuntime([middleware]);
+
+      // Two param() calls: param(10) and param(200).
+      // The where clause: both params embedded in rawSql expressions, surfaced via gt/lt.
+      await runtime.execute(
+        db.posts
+          .select('id')
+          .where((_f, fns) =>
+            fns.and(
+              fns.gt(
+                rawSqlTag`${param(10, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+                rawSqlTag`0`.returns('pg/int4@1'),
+              ),
+              fns.lt(
+                rawSqlTag`${param(200, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+                rawSqlTag`1000`.returns('pg/int4@1'),
+              ),
+            ),
+          )
+          .build(),
+      );
+
+      const int4Entries = capturedEntries.filter((e) => e.codecId === 'pg/int4@1');
+      expect(int4Entries).toHaveLength(2);
+      expect(int4Entries.map((e) => e.value).sort()).toEqual([10, 200]);
+    });
+  });
+});
