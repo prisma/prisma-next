@@ -597,6 +597,7 @@ export function exitCodeForError(error: { readonly code: string }): number {
     case '5010': // invalid manifest (malformed package.json) — precondition
     case '5011': // invalid tsconfig (unparseable JSONC) — precondition
     case '5012': // probe failed under --strict-probe — precondition
+    case '5014': // --authoring / --schema-path extension mismatch — precondition
       return INIT_EXIT_PRECONDITION;
     case '5006': // user aborted interactive prompt
       return INIT_EXIT_USER_ABORTED;

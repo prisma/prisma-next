@@ -1240,6 +1240,94 @@ describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation
     expect(existsSync(join(tmpDir, 'db/db.ts'))).toBe(true);
   });
 
+  it('scaffolds when --authoring and --schema-path extensions match (psl + .prisma)', async () => {
+    const exit = await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'psl',
+        schemaPath: 'prisma/schema.prisma',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(existsSync(join(tmpDir, 'prisma/schema.prisma'))).toBe(true);
+  });
+
+  it('scaffolds when --authoring and --schema-path extensions match (typescript + .ts)', async () => {
+    const exit = await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'typescript',
+        schemaPath: 'prisma/contract.ts',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(true);
+  });
+
+  it('exits PRECONDITION when --authoring typescript is paired with a .prisma --schema-path', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: {
+          target: 'postgres',
+          authoring: 'typescript',
+          schemaPath: 'prisma/schema.prisma',
+          install: false,
+        },
+        flags: noninteractiveFlags({ json: true }),
+      });
+
+      expect(exit).toBe(INIT_EXIT_PRECONDITION);
+      const envelope = JSON.parse(writes.join('').trim()) as { ok: false; code: string };
+      expect(envelope.ok).toBe(false);
+      expect(envelope.code).toBe('PN-CLI-5014');
+      expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+      expect(existsSync(join(tmpDir, 'prisma/schema.prisma'))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('exits PRECONDITION when --authoring psl is paired with a .ts --schema-path', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: {
+          target: 'postgres',
+          authoring: 'psl',
+          schemaPath: 'prisma/contract.ts',
+          install: false,
+        },
+        flags: noninteractiveFlags({ json: true }),
+      });
+
+      expect(exit).toBe(INIT_EXIT_PRECONDITION);
+      const envelope = JSON.parse(writes.join('').trim()) as { ok: false; code: string };
+      expect(envelope.ok).toBe(false);
+      expect(envelope.code).toBe('PN-CLI-5014');
+      expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+      expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('exits PRECONDITION when --target is missing in non-interactive mode (FR1.4)', async () => {
     const exit = await runInitTest(tmpDir, {
       options: { authoring: 'psl', install: false },
@@ -2279,7 +2367,7 @@ describe('exitCodeForError', () => {
   });
 
   it('maps user-facing precondition codes to PRECONDITION', () => {
-    for (const code of ['5002', '5003', '5004', '5005', '5010', '5011', '5012']) {
+    for (const code of ['5002', '5003', '5004', '5005', '5010', '5011', '5012', '5014']) {
       expect(exitCodeForError({ code })).toBe(INIT_EXIT_PRECONDITION);
     }
   });

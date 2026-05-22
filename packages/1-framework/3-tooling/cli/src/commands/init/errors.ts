@@ -70,6 +70,37 @@ export function errorInitInvalidFlagValue(options: {
 }
 
 /**
+ * `--authoring` and `--schema-path` disagree on file extension (e.g. PSL
+ * authoring with a `.ts` path). Surfaces before any scaffold files are
+ * written so the project tree stays untouched.
+ */
+export function errorInitAuthoringSchemaPathMismatch(options: {
+  readonly authoring: 'psl' | 'typescript';
+  readonly schemaPath: string;
+  readonly actualExtension: string;
+  readonly expectedExtension: string;
+}): CliStructuredError {
+  const expectedAuthoring = options.expectedExtension === '.ts' ? 'typescript' : 'psl';
+  return new CliStructuredError('5014', 'Authoring and schema path do not match', {
+    domain: 'CLI',
+    why:
+      `\`--authoring ${options.authoring}\` requires a schema file ending in ${options.expectedExtension}, ` +
+      `but \`--schema-path ${options.schemaPath}\` ends in ${options.actualExtension}.`,
+    fix:
+      `Use a matching pair, for example \`--authoring ${expectedAuthoring} --schema-path <path>${options.expectedExtension}\`, ` +
+      'or change `--authoring` to match the path you supplied. ' +
+      'You can also omit `--schema-path` to use the default for the chosen authoring.',
+    docsUrl: 'https://prisma-next.dev/docs/cli/init',
+    meta: {
+      authoring: options.authoring,
+      schemaPath: options.schemaPath,
+      actualExtension: options.actualExtension,
+      expectedExtension: options.expectedExtension,
+    },
+  });
+}
+
+/**
  * The user cancelled an interactive prompt (Ctrl-C, escape, declined a
  * selection). Distinct from `errorInitReinitNeedsForce` because that path
  * applies to non-interactive mode where the user was never given the

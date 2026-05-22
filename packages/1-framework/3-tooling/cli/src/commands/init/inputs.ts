@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'pathe';
 import type { GlobalFlags } from '../../utils/global-flags';
 import { isCI } from '../../utils/is-ci';
 import {
+  errorInitAuthoringSchemaPathMismatch,
   errorInitInvalidFlagValue,
   errorInitMissingFlags,
   errorInitReinitNeedsForce,
@@ -451,10 +452,11 @@ function validateSchemaPath(value: string, authoring: AuthoringId): string {
   const ext = extname(trimmed).toLowerCase();
   const expected = authoring === 'typescript' ? '.ts' : '.prisma';
   if (ext !== expected) {
-    throw errorInitInvalidFlagValue({
-      flag: 'schema-path',
-      value,
-      allowed: [`<file path ending in ${expected} for --authoring ${authoring}>`],
+    throw errorInitAuthoringSchemaPathMismatch({
+      authoring,
+      schemaPath: trimmed,
+      actualExtension: ext.length > 0 ? ext : '(none)',
+      expectedExtension: expected,
     });
   }
   return normalize(trimmed);
