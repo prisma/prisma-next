@@ -5,6 +5,12 @@
 // and the full row tree (`expect(rows).toEqual([...])`) under explicit
 // `.select(...)` projections so the shapes are stable.
 //
+// `.distinct(cols)` keeps one representative row per `(cols)` group; the
+// representative is picked by the caller's `.orderBy(...)` (lowest first
+// when ties are broken by `id.asc()`). Grandchildren attach only to the
+// surviving representative — dropped rows take their grandchildren with
+// them.
+//
 // Refinements (`orderBy` / `take` / `where` / multi-column distinct) and
 // edge cases (empty grandchildren, zero surviving distinct rows) live in
 // `./nested-includes-distinct-refinements.test.ts` to stay under the
@@ -30,13 +36,10 @@ describe('integration/nested-includes/distinct', () => {
     it(
       'lateral: depth-2 hasMany + hasMany leaf — single execution + canonical shape',
       async () => {
-        // Seed two posts sharing the title 'A' so the distinct path actually
-        // sees colliding distinct-column values. Per spec D3, dedupe is a
-        // structural no-op once grandchild join keys (here `post.id`) are
-        // force-included into the inner projection — the wrapped subquery's
-        // user-visible output stays bit-for-bit equivalent to the multi-query
-        // stitcher, which means both 'A' rows survive and each stitches its
-        // own grandchildren.
+        // Two posts share the title 'A' so `.distinct('title')` collapses
+        // them to one representative. With orderBy [title.asc, id.asc] the
+        // lower-id row (id=10) wins; id=11 is dropped along with its
+        // comments. Title 'B' has only one row (id=12) so it survives.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [
@@ -80,11 +83,6 @@ describe('integration/nested-includes/distinct', () => {
                   ],
                 },
                 {
-                  id: 11,
-                  title: 'A',
-                  comments: [{ id: 102, body: 'a3' }],
-                },
-                {
                   id: 12,
                   title: 'B',
                   comments: [{ id: 103, body: 'b1' }],
@@ -102,7 +100,7 @@ describe('integration/nested-includes/distinct', () => {
       async () => {
         // Same setup as the lateral variant; only capabilities differ. The
         // correlated builder reaches into the same `buildIncludeChildRowsSelect`
-        // helper, so the wrapped-subquery shape must be uniform between
+        // helper, so the ROW_NUMBER dedup shape must be uniform between
         // the two strategies.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
@@ -147,11 +145,6 @@ describe('integration/nested-includes/distinct', () => {
                   ],
                 },
                 {
-                  id: 11,
-                  title: 'A',
-                  comments: [{ id: 102, body: 'a3' }],
-                },
-                {
                   id: 12,
                   title: 'B',
                   comments: [{ id: 103, body: 'b1' }],
@@ -169,16 +162,17 @@ describe('integration/nested-includes/distinct', () => {
       async () => {
         // Mixed cardinality at the leaf: the depth-2 grandchild is a
         // to-one belongsTo (post.author), which collapses to a single
-        // object rather than an array. The wrapper subquery projects the
-        // distinct post scalars + the join key for `author` (post.user_id),
-        // and the author subquery joins against that key.
+        // object rather than an array. The dedup is per-parent: Alice's
+        // posts are partitioned independently of Bob's, so 'A' resolves
+        // to id=10 inside Alice's include and 'B' resolves to id=12
+        // inside Bob's.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [
             { id: 1, name: 'Alice', email: 'alice@example.com' },
             { id: 2, name: 'Bob', email: 'bob@example.com' },
           ]);
-          // Two of Alice's posts share the title 'A' so the distinct path
-          // sees colliding distinct-column values (see spec D3).
+          // Two of Alice's posts share the title 'A' so the distinct
+          // dedup collapses them to one representative (id=10 by orderBy).
           await seedPosts(runtime, [
             { id: 10, title: 'A', userId: 1, views: 1 },
             { id: 11, title: 'A', userId: 1, views: 2 },
@@ -205,10 +199,7 @@ describe('integration/nested-includes/distinct', () => {
             {
               id: 1,
               name: 'Alice',
-              posts: [
-                { id: 10, title: 'A', author: { id: 1, name: 'Alice' } },
-                { id: 11, title: 'A', author: { id: 1, name: 'Alice' } },
-              ],
+              posts: [{ id: 10, title: 'A', author: { id: 1, name: 'Alice' } }],
             },
             {
               id: 2,
@@ -255,10 +246,7 @@ describe('integration/nested-includes/distinct', () => {
             {
               id: 1,
               name: 'Alice',
-              posts: [
-                { id: 10, title: 'A', author: { id: 1, name: 'Alice' } },
-                { id: 11, title: 'A', author: { id: 1, name: 'Alice' } },
-              ],
+              posts: [{ id: 10, title: 'A', author: { id: 1, name: 'Alice' } }],
             },
             {
               id: 2,
@@ -277,7 +265,7 @@ describe('integration/nested-includes/distinct', () => {
   //
   // When the user `.select(...)`'s on the distinct level excludes the
   // grandchild's `localColumn` (post.id for the comments include), the
-  // wrapper subquery must still pull that column into its projection so
+  // dedup subquery must still pull that column into its projection so
   // the grandchild correlated subquery can find its parent. The column
   // is then stripped from the user-visible row shape.
   //
@@ -293,9 +281,9 @@ describe('integration/nested-includes/distinct', () => {
       async () => {
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          // Two posts share the title 'A' — each surviving row still stitches
-          // its own grandchildren (id is hidden from the user-visible shape
-          // but force-included for the comments correlated subquery).
+          // Two posts share the title 'A' — `.distinct('title')` collapses
+          // them to one representative (id=10 by orderBy). Its comments
+          // come along; id=11's comment 'a2' is dropped with id=11.
           await seedPosts(runtime, [
             { id: 10, title: 'A', userId: 1, views: 1 },
             { id: 11, title: 'A', userId: 1, views: 2 },
@@ -311,8 +299,8 @@ describe('integration/nested-includes/distinct', () => {
           runtime.resetExecutions();
 
           // `.select('title')` on posts omits post.id, but the grandchild
-          // `comments` include needs post.id for stitching. The wrapper
-          // must force-include it and strip it from the visible row.
+          // `comments` include needs post.id for stitching. The dedup
+          // subquery must force-include it and strip it from the visible row.
           const rows = await users
             .select('name')
             .include('posts', (posts) =>
@@ -330,7 +318,6 @@ describe('integration/nested-includes/distinct', () => {
               name: 'Alice',
               posts: [
                 { title: 'A', comments: [{ body: 'a1' }] },
-                { title: 'A', comments: [{ body: 'a2' }] },
                 { title: 'B', comments: [{ body: 'b1' }] },
               ],
             },
@@ -376,7 +363,6 @@ describe('integration/nested-includes/distinct', () => {
               name: 'Alice',
               posts: [
                 { title: 'A', comments: [{ body: 'a1' }] },
-                { title: 'A', comments: [{ body: 'a2' }] },
                 { title: 'B', comments: [{ body: 'b1' }] },
               ],
             },
@@ -389,7 +375,7 @@ describe('integration/nested-includes/distinct', () => {
 
   // ===========================================================================
   // Nested distinct shapes. `distinct()` can sit at any non-leaf level in
-  // the include tree; the wrapped-subquery lowering recurses uniformly.
+  // the include tree; the dedup lowering recurses uniformly.
   // ===========================================================================
 
   describe('nested distinct shapes', () => {
@@ -397,10 +383,9 @@ describe('integration/nested-includes/distinct', () => {
       'distinct at depth 2 (nested under a depth-1 row include) — single execution + shape',
       async () => {
         // Depth-3 tree, with `distinct()` on the depth-2 level rather than
-        // depth 1. The wrapped-subquery shape must compose recursively: the
-        // outer lateral / correlated builder reaches into the inner one,
-        // which builds its own distinct wrapper with its own grandchild
-        // join keys.
+        // depth 1. The dedup wrapper must compose recursively: the outer
+        // lateral / correlated builder reaches into the inner one, which
+        // builds its own dedup wrapper with its own grandchild join keys.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [
             { id: 1, name: 'Root', email: 'root@example.com' },
@@ -448,7 +433,6 @@ describe('integration/nested-includes/distinct', () => {
                   name: 'Child',
                   posts: [
                     { id: 10, title: 'A', comments: [{ body: 'a1' }] },
-                    { id: 11, title: 'A', comments: [{ body: 'a2' }] },
                     { id: 12, title: 'B', comments: [{ body: 'b1' }] },
                   ],
                 },
@@ -469,12 +453,13 @@ describe('integration/nested-includes/distinct', () => {
       'distinct on a self-relation non-leaf — single execution + shape',
       async () => {
         // Self-relation aliasing must propagate through the recursion or
-        // the distinct wrapper will reference the wrong physical table at
+        // the dedup wrapper will reference the wrong physical table at
         // depth 2. Asserting one execution pins both the alias
-        // propagation and the new wrapped-subquery shape.
+        // propagation and the new dedup subquery shape.
         await withCollectionRuntime(async (runtime) => {
-          // Two invitees share the name 'A' so the distinct path sees
-          // colliding distinct-column values.
+          // Two invitees share the name 'A' so `.distinct('name')` collapses
+          // them to one representative (id=2 by orderBy); id=3 is dropped
+          // along with its post 'a2P'.
           await seedUsers(runtime, [
             { id: 1, name: 'Root', email: 'root@example.com' },
             { id: 2, name: 'A', email: 'a@example.com', invitedById: 1 },
@@ -509,7 +494,6 @@ describe('integration/nested-includes/distinct', () => {
               name: 'Root',
               invitedUsers: [
                 { id: 2, name: 'A', posts: [{ title: 'aP' }] },
-                { id: 3, name: 'A', posts: [{ title: 'a2P' }] },
                 { id: 4, name: 'B', posts: [{ title: 'bP' }] },
               ],
             },
@@ -522,17 +506,17 @@ describe('integration/nested-includes/distinct', () => {
     it(
       'distinct at depth 1 inside a depth-3 tree — single execution + shape',
       async () => {
-        // The load-bearing recursion case for the distinct wrapper: the
+        // The load-bearing recursion case for the dedup wrapper: the
         // depth-1 include is distinct AND has nested grandchildren that
         // themselves carry a further include. The wrapper must force-
-        // project the grandchild join key into the distinct inner select
+        // project the grandchild join key into the dedup inner select
         // while the recursive child of that grandchild correlates back
-        // through the distinct alias. Companion to the depth-2 distinct
+        // through the dedup alias. Companion to the depth-2 distinct
         // case above; together they pin the recursion at both endpoints.
         await withCollectionRuntime(async (runtime) => {
-          // Two invitees share the name 'A' so the distinct path sees
-          // colliding distinct-column values; each surviving row still
-          // recurses into its own posts → comments grandchildren.
+          // Two invitees share the name 'A' so `.distinct('name')` collapses
+          // them to one representative (id=2); id=3 (and its post 'a2P'
+          // with comment 'a2C') is dropped.
           await seedUsers(runtime, [
             { id: 1, name: 'Root', email: 'root@example.com' },
             { id: 2, name: 'A', email: 'a@example.com', invitedById: 1 },
@@ -577,7 +561,6 @@ describe('integration/nested-includes/distinct', () => {
               name: 'Root',
               invitedUsers: [
                 { name: 'A', posts: [{ title: 'aP', comments: [{ body: 'aC' }] }] },
-                { name: 'A', posts: [{ title: 'a2P', comments: [{ body: 'a2C' }] }] },
                 { name: 'B', posts: [{ title: 'bP', comments: [{ body: 'bC' }] }] },
               ],
             },
@@ -593,16 +576,16 @@ describe('integration/nested-includes/distinct', () => {
         // Regression for the duplicate-forced-join-key failure mode: when
         // two sibling nested includes both join from the same `localColumn`
         // on the distinct child (here, `invitedUsers` and `posts` both
-        // join from `users.id`), the wrapper's force-include must collapse
-        // the duplicate before projection. Without the `new Set` collapse,
-        // the inner derived table would project `id` twice and the
-        // outer `distinctAlias.id` reference would be ambiguous — the
-        // query either fails at lower-time or silently returns wrong data.
+        // join from `users.id`), the dedup wrapper's force-include must
+        // collapse the duplicate before projection. Without the `new Set`
+        // collapse, the inner derived table would project `id` twice and
+        // the outer reference would be ambiguous — the query either fails
+        // at lower-time or silently returns wrong data.
         await withCollectionRuntime(async (runtime) => {
-          // Two depth-1 invitees share the name 'A' so the distinct path
-          // sees colliding distinct-column values; each surviving row must
-          // still stitch its own `invitedUsers` + `posts` grandchildren via
-          // the shared `users.id` join key.
+          // Two depth-1 invitees share the name 'A' so `.distinct('name')`
+          // collapses them to one representative (id=2 by orderBy). The
+          // surviving row still stitches its own `invitedUsers` + `posts`
+          // grandchildren via the shared `users.id` join key.
           await seedUsers(runtime, [
             { id: 1, name: 'Root', email: 'root@example.com' },
             { id: 2, name: 'A', email: 'a@example.com', invitedById: 1 },
@@ -618,7 +601,6 @@ describe('integration/nested-includes/distinct', () => {
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
           runtime.resetExecutions();
 
-          // `.select('name')` drops `id` from the user-visible projection.
           // Both grandchild includes (`invitedUsers`, `posts`) need
           // `users.id` to correlate — same `localColumn`. Without the
           // dedupe, the wrapper widens the projection with a duplicate
@@ -643,7 +625,6 @@ describe('integration/nested-includes/distinct', () => {
               name: 'Root',
               invitedUsers: [
                 { name: 'A', invitedUsers: [{ name: 'GC' }], posts: [{ title: 'aP' }] },
-                { name: 'A', invitedUsers: [], posts: [{ title: 'a2P' }] },
                 { name: 'B', invitedUsers: [], posts: [] },
               ],
             },
