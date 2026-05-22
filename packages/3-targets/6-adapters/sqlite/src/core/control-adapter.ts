@@ -36,16 +36,20 @@ const SQLITE_MARKER_TABLE = '_prisma_marker';
  * corrupt row and surfaces as `Invalid contract marker row: …` via the
  * typed-envelope wrapper.
  */
-function decodeSqliteMarkerRow<T extends { invariants: unknown }>(row: T): T {
-  if (typeof row.invariants !== 'string') return row;
+function decodeSqliteMarkerRow(row: unknown): unknown {
+  if (typeof row !== 'object' || row === null || !('invariants' in row)) {
+    return row;
+  }
+  const record = row as { invariants: unknown };
+  if (typeof record.invariants !== 'string') return row;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(row.invariants);
+    parsed = JSON.parse(record.invariants);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(`Invalid contract marker row: invariants is not valid JSON: ${detail}`);
   }
-  return { ...row, invariants: parsed };
+  return { ...record, invariants: parsed };
 }
 
 // PRAGMA result row types

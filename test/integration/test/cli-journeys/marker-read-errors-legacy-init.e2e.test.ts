@@ -54,11 +54,11 @@ withTempDir(({ createTempDir }) => {
       expect(initFail.exitCode).not.toBe(0);
 
       const envelope = extractJson(`${initFail.stdout}\n${initFail.stderr}`);
-      expect(envelope.code).toBe('PN-RUN-3020');
-      expect(String(envelope.fix)).toContain('Legacy marker-table shape detected');
-      expect(String(envelope.fix)).toContain('prisma_contract.marker');
-      expect(String(envelope.fix)).toContain('prisma-next db init');
-      expect(envelope.code).not.toBe('PN-RUN-3006');
+      expect(envelope['code']).toBe('PN-RUN-3020');
+      expect(String(envelope['fix'])).toContain('Legacy marker-table shape detected');
+      expect(String(envelope['fix'])).toContain('prisma_contract.marker');
+      expect(String(envelope['fix'])).toContain('prisma-next db init');
+      expect(envelope['code']).not.toBe('PN-RUN-3006');
     });
   });
 });

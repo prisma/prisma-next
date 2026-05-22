@@ -1691,9 +1691,9 @@ describe('PostgresControlAdapter', () => {
       const driver: ControlDriverInstance<'sql', 'postgres'> = {
         familyId: 'sql',
         targetId: 'postgres',
-        query: async (sql: string) => {
+        query: async <Row = Record<string, unknown>>(sql: string) => {
           if (sql.includes('information_schema.tables')) {
-            return { rows: [{ '?column?': 1 }] };
+            return { rows: [{ '?column?': 1 }] as Row[] };
           }
           throw new Error('permission denied for table marker');
         },
