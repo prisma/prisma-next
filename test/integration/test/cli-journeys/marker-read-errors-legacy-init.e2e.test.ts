@@ -56,7 +56,7 @@ withTempDir(({ createTempDir }) => {
         const initFail = await runDbInit(ctx, ['--json', '--no-color']);
         expect(initFail.exitCode).not.toBe(0);
 
-        const envelope = extractJson(`${initFail.stdout}\n${initFail.stderr}`);
+        const envelope = extractJson(initFail.stdout);
         expect(envelope['code']).toBe('PN-RUN-3020');
         expect(String(envelope['fix'])).toContain('Legacy marker-table shape detected');
         expect(String(envelope['fix'])).toContain('prisma_contract.marker');

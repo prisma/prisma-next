@@ -42,7 +42,7 @@ withTempDir(({ createTempDir }) => {
         const statusFail = await runMigrationStatus(ctx, ['--json', '--no-color']);
         expect(statusFail.exitCode).not.toBe(0);
 
-        const envelope = extractJson(`${statusFail.stdout}\n${statusFail.stderr}`);
+        const envelope = extractJson(statusFail.stdout);
         expect(envelope).toMatchObject({
           code: 'PN-RUN-3005',
           summary: 'Marker row is corrupt or incompatible',
