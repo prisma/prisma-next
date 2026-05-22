@@ -85,18 +85,18 @@ describe.each(
     if (emit === null) return;
     expect(emit.exitCode, formatStepDiagnostic('emit', ctx.project, emit)).toBe(0);
 
-    // The init scaffold passes a single string `contract: "./prisma/contract.ts"`
+    // The init scaffold passes a single string `contract: "./src/prisma/contract.ts"`
     // to the facade `defineConfig`, which derives an output path next to the
     // input. The journey verifies that derivation actually reaches the emitter
     // — this is the seam that breaks when init scaffold and emit output get
     // out of sync (the symptom shape of TML-2461, even if the facade currently
     // masks the underlying default-output bug).
     expect(
-      existsSync(join(ctx.project.dir, 'prisma/contract.json')),
+      existsSync(join(ctx.project.dir, 'src/prisma/contract.json')),
       'contract.json must land next to the scaffolded contract source',
     ).toBe(true);
     expect(
-      existsSync(join(ctx.project.dir, 'prisma/contract.d.ts')),
+      existsSync(join(ctx.project.dir, 'src/prisma/contract.d.ts')),
       'contract.d.ts must land next to the scaffolded contract source',
     ).toBe(true);
   });
@@ -168,8 +168,8 @@ describe.each(
         [
           "import { createPostgresControlClient } from '@prisma-next/postgres/control';",
           "import postgres from '@prisma-next/postgres/runtime';",
-          "import type { Contract } from './prisma/contract.d';",
-          "import contractJson from './prisma/contract.json' with { type: 'json' };",
+          "import type { Contract } from './src/prisma/contract.d';",
+          "import contractJson from './src/prisma/contract.json' with { type: 'json' };",
           '',
           'const url = process.env.DATABASE_URL;',
           'if (url === undefined) {',
@@ -345,7 +345,7 @@ function expectScaffoldedFiles(project: JourneyProject): void {
     'package.json',
     'prisma-next.config.ts',
     schemaPath(project.cell),
-    'prisma/db.ts',
+    'src/prisma/db.ts',
     'tsconfig.json',
   ];
   for (const rel of required) {
@@ -354,7 +354,7 @@ function expectScaffoldedFiles(project: JourneyProject): void {
 }
 
 /**
- * TML-2494 — the scaffolded `prisma/db.ts` uses the ESM-only
+ * TML-2494 — the scaffolded `src/prisma/db.ts` uses the ESM-only
  * `with { type: 'json' }` import attribute, so the emitted `package.json`
  * must opt into ESM. Without this, Node either prints the
  * `MODULE_TYPELESS_PACKAGE_JSON` warning (Node 22+ with strip-types) or
@@ -399,7 +399,7 @@ function expectConfigFile(project: JourneyProject, cell: CellId): void {
 }
 
 function schemaPath(cell: CellId): string {
-  return cell.authoring === 'typescript' ? 'prisma/contract.ts' : 'prisma/contract.prisma';
+  return cell.authoring === 'typescript' ? 'src/prisma/contract.ts' : 'src/prisma/contract.prisma';
 }
 
 function expectFacadeIsResolvable(project: JourneyProject): void {
