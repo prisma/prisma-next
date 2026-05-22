@@ -54,6 +54,40 @@ describe('defineConfig facade', () => {
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 
+  it('uses explicit output path when provided', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+      output: './custom/output.json',
+    });
+
+    expect(config.contract?.output).toBe('./custom/output.json');
+  });
+
+  it('threads relative output path verbatim', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+      output: '../sibling/contract.json',
+    });
+
+    expect(config.contract?.output).toBe('../sibling/contract.json');
+  });
+
+  it('threads output override through TypeScript contract provider', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.ts',
+      output: './custom/output.json',
+    });
+
+    expect(config.contract?.output).toBe('./custom/output.json');
+    expect(config.contract?.source.inputs).toEqual(['./prisma/contract.ts']);
+  });
+
+  it('falls back to derived output when output is not provided', () => {
+    const config = defineConfig({ contract: './prisma/contract.prisma' });
+
+    expect(config.contract?.output).toBe('./prisma/contract.json');
+  });
+
   it('passes db config through', () => {
     const config = defineConfig({
       contract: './prisma/contract.prisma',

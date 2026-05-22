@@ -12,6 +12,7 @@ import { extname } from 'pathe';
 
 export interface PostgresConfigOptions {
   readonly contract: string;
+  readonly output?: string;
   readonly db?: {
     readonly connection?: string;
   };
@@ -31,7 +32,7 @@ function deriveOutputPath(contractPath: string): string {
 
 export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'sql', 'postgres'> {
   const extensions = options.extensions ?? [];
-  const output = deriveOutputPath(options.contract);
+  const output = options.output ?? deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
   const contractConfig =
