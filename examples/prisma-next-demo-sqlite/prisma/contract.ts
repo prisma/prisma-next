@@ -5,11 +5,9 @@ export const contract = defineContract(
   {
     capabilities: {
       sql: {
-        returning: true,
         jsonAgg: true,
         lateral: false,
         enums: false,
-        foreignKeys: true,
         autoIndexesForeignKeys: false,
       },
     },

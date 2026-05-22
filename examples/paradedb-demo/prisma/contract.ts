@@ -8,7 +8,6 @@ export const contract = defineContract(
     capabilities: {
       postgres: {
         lateral: true,
-        returning: true,
         'paradedb/bm25': true,
       },
     },

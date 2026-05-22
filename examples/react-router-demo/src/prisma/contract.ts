@@ -6,7 +6,6 @@ export const contract = defineContract(
       postgres: {
         lateral: true,
         jsonAgg: true,
-        returning: true,
         'defaults.now': true,
         'defaults.uuidv4': true,
       },
