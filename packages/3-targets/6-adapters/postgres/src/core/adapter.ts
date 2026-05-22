@@ -6,6 +6,7 @@ import type {
   AnyQueryAst,
   LowererContext,
   MarkerReadResult,
+  RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
@@ -48,6 +49,24 @@ class PostgresAdapterImpl
       capabilities: defaultCapabilities,
       readMarker: (queryable: SqlQueryable) => readPostgresMarker(queryable),
     });
+  }
+
+  inferCodec(value: RawSqlLiteral): string {
+    switch (typeof value) {
+      case 'number':
+        return Number.isSafeInteger(value) && value % 1 === 0 ? 'pg/int4' : 'pg/float8';
+      case 'bigint':
+        return 'pg/int8';
+      case 'string':
+        return 'pg/text';
+      case 'boolean':
+        return 'pg/bool';
+      case 'object':
+        if (value instanceof Uint8Array) return 'pg/bytea';
+    }
+    throw new Error(
+      'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+    );
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
