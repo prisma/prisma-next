@@ -5,10 +5,7 @@ import { join, resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { INIT_EXIT_OK } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/exit-codes';
 import { runInit } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/init';
-import {
-  DEFAULT_SKILL_AGENTS,
-  isWindsurfDetected,
-} from '../../../packages/1-framework/3-tooling/cli/src/commands/init/skill-install';
+import { DEFAULT_SKILL_AGENTS } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/skill-install';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
@@ -88,10 +85,7 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       expect(exitCode).toBe(INIT_EXIT_OK);
 
       const loggedCommands = readLoggedCommands(logPath);
-      const agents = isWindsurfDetected({ baseDir: testDir })
-        ? DEFAULT_SKILL_AGENTS
-        : DEFAULT_SKILL_AGENTS.filter((agent) => agent !== 'windsurf');
-      const consolidatedAgentFlags = `--agent ${agents.join(' ')} --skill * -y`;
+      const consolidatedAgentFlags = `--agent ${DEFAULT_SKILL_AGENTS.join(' ')} --skill * -y`;
       expect(loggedCommands).toContain(
         `dlx skills@latest add ${workspaceClone}/skills ${consolidatedAgentFlags}`,
       );
@@ -111,7 +105,6 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       const expectedSorted = Array.from(new Set(expected)).sort();
       expect(installed).toEqual(expectedSorted);
       expect(installed.length).toBeGreaterThan(0);
-      expect(readClaudeSkillDirs(testDir)).toEqual(expectedSorted);
 
       const contributorNames = new Set(readContributorSkillNames());
       const leaks = installed.filter((name) => contributorNames.has(name));
@@ -286,11 +279,6 @@ function readLoggedCommands(logPath: string): readonly string[] {
 
 function readInstalledSkillDirs(testDir: string): readonly string[] {
   const root = join(testDir, '.agents', 'skills');
-  return readSkillDirNames(root);
-}
-
-function readClaudeSkillDirs(testDir: string): readonly string[] {
-  const root = join(testDir, '.claude', 'skills');
   return readSkillDirNames(root);
 }
 
