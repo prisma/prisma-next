@@ -792,7 +792,6 @@ async function executeMigrationStatusCommand(
       }
     } catch (error) {
       if (CliStructuredError.is(error)) {
-        await client.close();
         return notOk(error);
       }
       if (!flags.json && !flags.quiet) {
