@@ -13,6 +13,7 @@ import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-t
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { acc, fn, mongoQuery } from '@prisma-next/mongo-query-builder';
 import mongoTargetPack from '@prisma-next/target-mongo/pack';
+import { timeouts } from '@prisma-next/test-utils';
 import { ObjectId } from 'mongodb';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { withMongod } from '../mongo/setup';
@@ -122,7 +123,7 @@ const contract = defineContract({
   models: { User, Task },
 });
 
-describe('pipeline builder integration', () => {
+describe('pipeline builder integration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   const p = mongoQuery<TContract>({ contractJson });
 
   it('match → group → sort → limit analytics query', async () => {
