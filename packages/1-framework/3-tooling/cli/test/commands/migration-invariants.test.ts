@@ -98,6 +98,9 @@ function setupConfigMock(
       create: vi.fn().mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) }),
     },
     db: { connection: 'postgres://localhost/invariant-test' },
+    // Per-test fixtures write contract.json under <cwd>/src/prisma/. Each
+    // test chdirs to its tempdir before invoking the command.
+    contract: { output: 'src/prisma/contract.json' },
   });
 }
 

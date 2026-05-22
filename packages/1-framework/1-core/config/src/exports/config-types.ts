@@ -1,7 +1,6 @@
 export type { ContractConfig, PrismaNextConfig } from '../config-types';
 export {
-  DEFAULT_CONTRACT_OUTPUT,
-  DEFAULT_PRISMA_DIR,
+  DEFAULT_CONTRACT_SOURCE_DIR,
   defineConfig,
   normalizeContractConfig,
 } from '../config-types';

@@ -64,14 +64,12 @@ describe('resolveContractPath', () => {
     expect(result).toBe(resolve('/custom/path/contract.json'));
   });
 
-  it('falls back to src/prisma/contract.json when no output configured', () => {
-    const result = resolveContractPath({});
-    expect(result).toBe(resolve('src/prisma/contract.json'));
+  it('throws when no output is configured', () => {
+    expect(() => resolveContractPath({})).toThrow(/contract\.output is required/);
   });
 
-  it('falls back when contract config exists but output is undefined', () => {
-    const result = resolveContractPath({ contract: {} });
-    expect(result).toBe(resolve('src/prisma/contract.json'));
+  it('throws when contract config exists but output is undefined', () => {
+    expect(() => resolveContractPath({ contract: {} })).toThrow(/contract\.output is required/);
   });
 });
 

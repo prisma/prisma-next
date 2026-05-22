@@ -1,4 +1,4 @@
-import { DEFAULT_PRISMA_DIR } from '@prisma-next/config/config-types';
+import { DEFAULT_CONTRACT_SOURCE_DIR } from '@prisma-next/config/config-types';
 
 export type TargetId = 'postgres' | 'mongo';
 export type AuthoringId = 'psl' | 'typescript';
@@ -13,9 +13,9 @@ export function targetLabel(target: TargetId): string {
 
 export function defaultSchemaPath(authoring: AuthoringId): string {
   if (authoring === 'typescript') {
-    return `${DEFAULT_PRISMA_DIR}/contract.ts`;
+    return `${DEFAULT_CONTRACT_SOURCE_DIR}/contract.ts`;
   }
-  return `${DEFAULT_PRISMA_DIR}/contract.prisma`;
+  return `${DEFAULT_CONTRACT_SOURCE_DIR}/contract.prisma`;
 }
 
 export function starterSchema(target: TargetId, authoring: AuthoringId): string {

@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import { DEFAULT_CONTRACT_OUTPUT } from '@prisma-next/config/config-types';
 import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { NoInvariantPathStructuralEdge } from '@prisma-next/migration-tools/errors';
@@ -12,6 +11,7 @@ import { APP_SPACE_ID, spaceMigrationDirectory } from '@prisma-next/migration-to
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
+import { errorRuntime } from './cli-errors';
 import { formatCommandHelp } from './formatters/help';
 import type { CommonCommandOptions } from './global-flags';
 import { parseGlobalFlags } from './global-flags';
@@ -95,12 +95,15 @@ export interface MigrationCommandOptions extends CommonCommandOptions {
 
 /**
  * Resolves the absolute path to contract.json from the config.
- * Centralises the fallback logic shared by every command that reads the contract.
  */
 export function resolveContractPath(config: { contract?: { output?: string } }): string {
-  return config.contract?.output
-    ? resolve(config.contract.output)
-    : resolve(DEFAULT_CONTRACT_OUTPUT);
+  if (config.contract?.output === undefined) {
+    throw errorRuntime('config.contract.output is required to resolve the contract path', {
+      why: 'CLI commands read the emitted contract from config.contract.output; the config has no value to read.',
+      fix: 'Ensure your prisma-next.config.ts goes through `defineConfig()`, which normalises a default output when the provider supplies an input path, or set `contract.output` explicitly.',
+    });
+  }
+  return resolve(config.contract.output);
 }
 
 /**

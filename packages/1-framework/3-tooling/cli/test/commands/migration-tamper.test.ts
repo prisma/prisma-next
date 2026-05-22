@@ -108,6 +108,10 @@ function setupConfigMock(): void {
     adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
     driver: { kind: 'driver' },
     db: { connection: 'postgres://localhost/tamper-test' },
+    // The fixture writes contract.json at this path under the per-test cwd
+    // (see setupTamperFixture). Each test chdirs to its tempdir before
+    // invoking the command, so the relative path resolves correctly.
+    contract: { output: 'src/prisma/contract.json' },
   });
 }
 

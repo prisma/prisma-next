@@ -34,21 +34,22 @@ export interface ContractConfig {
 }
 
 /**
- * Last-resort fallback used by `normalizeContractConfig` when neither the
- * caller nor the provider has supplied an `output`. Providers that carry
- * an input path (PSL, `typescriptContractFromPath`) prefer a colocated
- * default; this constant is only reached by providers like `typescriptContract`
- * that hold an in-memory contract with no source path to anchor on.
+ * Default *source* directory for the contract file the user authors at `init`
+ * time. Output artefacts colocate with source per the same rule path-bearing
+ * providers apply.
  */
-export const DEFAULT_PRISMA_DIR = 'src/prisma';
-export const DEFAULT_CONTRACT_OUTPUT = `${DEFAULT_PRISMA_DIR}/contract.json`;
+export const DEFAULT_CONTRACT_SOURCE_DIR = 'src/prisma';
 
 export function normalizeContractConfig(
   contract: ContractConfig,
 ): ContractConfig & { readonly output: string } {
+  // In-memory-only fallback: `typescriptContract(contract)` has no source path
+  // to anchor on, so normalization supplies a default output colocated with
+  // the default source directory.
+  const inMemoryFallbackOutput = `${DEFAULT_CONTRACT_SOURCE_DIR}/contract.json`;
   return {
     source: contract.source,
-    output: contract.output ?? DEFAULT_CONTRACT_OUTPUT,
+    output: contract.output ?? inMemoryFallbackOutput,
   };
 }
 
@@ -143,7 +144,8 @@ const PrismaNextConfigSchema = type({
  * Validates and normalizes the config using Arktype, then returns the normalized IR.
  *
  * Normalization:
- * - contract.output defaults to DEFAULT_CONTRACT_OUTPUT if missing
+ * - contract.output defaults to a path colocated with DEFAULT_CONTRACT_SOURCE_DIR
+ *   when missing (in-memory-only providers)
  *
  * @param config - Raw config input from user
  * @returns Normalized config IR with defaults applied
