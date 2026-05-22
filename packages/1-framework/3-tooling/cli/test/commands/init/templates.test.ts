@@ -546,7 +546,9 @@ describe('templates', () => {
       const md = minimalProjectReadmeMd('postgres', 'prisma/contract.prisma', 'my-app', 'npm');
 
       expect(md).toMatch(/## First run/);
-      expect(md.indexOf('db:init')).toBeLessThan(md.indexOf('npm run dev'));
+      expect(md).toContain('npm run db:init');
+      expect(md).toContain('npm run dev');
+      expect(md.indexOf('npm run db:init')).toBeLessThan(md.indexOf('npm run dev'));
       expect(md).not.toContain('Run the migration and seed scripts first');
     });
 
@@ -554,7 +556,9 @@ describe('templates', () => {
       const md = minimalProjectReadmeMd('mongo', 'prisma/contract.prisma', 'my-app', 'npm');
 
       expect(md).toMatch(/## First run/);
-      expect(md.indexOf('db:up')).toBeLessThan(md.indexOf('npm run dev'));
+      expect(md).toContain('npm run db:up');
+      expect(md).toContain('npm run dev');
+      expect(md.indexOf('npm run db:up')).toBeLessThan(md.indexOf('npm run dev'));
       expect(md).not.toContain('Run the migration and seed scripts first');
     });
 
