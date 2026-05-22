@@ -82,7 +82,9 @@ flowchart LR
 - **Sizing.** 3–4 dispatches; PR boundary tight. The auto-baseline emission logic is the load-bearing piece — likely its own dispatch.
 - **Risk.** **Medium.** Touches the planner's core resolution path. Three-case rule branches each need integration tests. Watch for the runner's idempotency-class assumption (A4) — if a baseline emits ops whose postconditions are already satisfied, the runner must skip via `postcheck_pre_satisfied`, not re-run; verify before merging.
 
-#### 4. Slice — `migrate` `--advance-ref` flag + apply-time drift check
+#### 4. Slice — `migrate` `--advance-ref` flag + apply-time drift check — **CLOSED**
+
+_Delivered as `migrate-advance-ref-and-drift-check`. Commits: `0741a3ad8` (D1 wiring) + `5e8eb5776` (D1 R2 envelope shape) + `98f5a450d` (D2 drift check + `pathUnreachable` improvement + e2e) + `b1e41836f` (D2 R2 F6 + F7 polish). Manual-QA at [`./slices/migrate-advance-ref-and-drift-check/manual-qa.md`](./slices/migrate-advance-ref-and-drift-check/manual-qa.md). Closes PDoD4 (planner + runner together) and PDoD5._
 
 - **Purpose.** Runner-side fix and `migrate`'s new ref-advancement opt-in. Closes the cold-clone-drift trap.
 - **Scope.**
