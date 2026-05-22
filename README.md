@@ -100,7 +100,7 @@ Security issues: follow the Private Vulnerability Reporting flow in [SECURITY.md
 
 Built something with Prisma Next? Tag [@prisma](https://pris.ly/x) on X. The best community builds get a shout-out and a link here.
 
-- **Discord**: Talk to us in the [pris.ly/discord](https://pris.ly/discord) channel
+- **Discord**: Talk to us in [Discord](https://pris.ly/discord) in the `prisma-next` channel
 - **X**: [@prisma](https://pris.ly/x)
 - **Blog**: [prisma.io/blog](https://www.prisma.io/blog)
 
