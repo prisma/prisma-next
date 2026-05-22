@@ -25,18 +25,22 @@ describe('integration/nested-includes/distinct/refinements', () => {
       'distinct + orderBy + take applies inside the distinct CTE',
       async () => {
         // orderBy + take limit the distinct CTE to the first N rows.
-        // Grandchildren attach only to the surviving rows.
+        // Grandchildren attach only to the surviving rows. Two posts share
+        // the title 'A' so the distinct path sees colliding distinct-column
+        // values; with take(2) the first two rows by (title, id) survive.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [
             { id: 10, title: 'A', userId: 1, views: 1 },
-            { id: 11, title: 'B', userId: 1, views: 2 },
-            { id: 12, title: 'C', userId: 1, views: 3 },
+            { id: 11, title: 'A', userId: 1, views: 2 },
+            { id: 12, title: 'B', userId: 1, views: 3 },
+            { id: 13, title: 'C', userId: 1, views: 4 },
           ]);
           await seedComments(runtime, [
             { id: 100, body: 'a1', postId: 10 },
-            { id: 101, body: 'b1', postId: 11 },
-            { id: 102, body: 'c1', postId: 12 },
+            { id: 101, body: 'a2', postId: 11 },
+            { id: 102, body: 'b1', postId: 12 },
+            { id: 103, body: 'c1', postId: 13 },
           ]);
 
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
@@ -48,7 +52,7 @@ describe('integration/nested-includes/distinct/refinements', () => {
               posts
                 .select('id', 'title')
                 .distinct('title')
-                .orderBy((p) => p.title.asc())
+                .orderBy([(p) => p.title.asc(), (p) => p.id.asc()])
                 .take(2)
                 .include('comments', (c) => c.select('body').orderBy((cc) => cc.id.asc())),
             )
@@ -60,7 +64,7 @@ describe('integration/nested-includes/distinct/refinements', () => {
               name: 'Alice',
               posts: [
                 { id: 10, title: 'A', comments: [{ body: 'a1' }] },
-                { id: 11, title: 'B', comments: [{ body: 'b1' }] },
+                { id: 11, title: 'A', comments: [{ body: 'a2' }] },
               ],
             },
           ]);
@@ -72,15 +76,19 @@ describe('integration/nested-includes/distinct/refinements', () => {
     it(
       'distinct + where() filters before deduping; grandchildren only attach to surviving rows',
       async () => {
+        // Two 'High' posts survive the where-filter so the distinct path
+        // sees colliding distinct-column values among the surviving rows.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [
             { id: 10, title: 'Low', userId: 1, views: 10 },
             { id: 11, title: 'High', userId: 1, views: 100 },
+            { id: 12, title: 'High', userId: 1, views: 200 },
           ]);
           await seedComments(runtime, [
             { id: 100, body: 'on low', postId: 10 },
             { id: 101, body: 'on high', postId: 11 },
+            { id: 102, body: 'on high2', postId: 12 },
           ]);
 
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
@@ -93,7 +101,7 @@ describe('integration/nested-includes/distinct/refinements', () => {
                 .select('id', 'title')
                 .where((p) => p.views.gte(50))
                 .distinct('title')
-                .orderBy((p) => p.title.asc())
+                .orderBy([(p) => p.title.asc(), (p) => p.id.asc()])
                 .include('comments', (c) => c.select('body')),
             )
             .all();
@@ -102,7 +110,10 @@ describe('integration/nested-includes/distinct/refinements', () => {
           expect(rows).toEqual([
             {
               name: 'Alice',
-              posts: [{ id: 11, title: 'High', comments: [{ body: 'on high' }] }],
+              posts: [
+                { id: 11, title: 'High', comments: [{ body: 'on high' }] },
+                { id: 12, title: 'High', comments: [{ body: 'on high2' }] },
+              ],
             },
           ]);
         });
@@ -114,22 +125,25 @@ describe('integration/nested-includes/distinct/refinements', () => {
       'distinct over multiple columns yields one row per unique tuple',
       async () => {
         // `.distinct('title', 'views')` applies DISTINCT over both columns
-        // (plus force-included join keys). Since each post differs by id
-        // anyway, all four survive; the test pins that multi-column
-        // distinct does not error and stitches grandchildren correctly.
+        // (plus force-included join keys). Two rows share the same
+        // (title='A', views=1) tuple, so the distinct path sees colliding
+        // distinct-column values; per spec D3 the force-included `id`
+        // keeps both rows in the user-visible output.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [
             { id: 10, title: 'A', userId: 1, views: 1 },
-            { id: 11, title: 'A', userId: 1, views: 2 },
-            { id: 12, title: 'B', userId: 1, views: 1 },
-            { id: 13, title: 'B', userId: 1, views: 2 },
+            { id: 11, title: 'A', userId: 1, views: 1 },
+            { id: 12, title: 'A', userId: 1, views: 2 },
+            { id: 13, title: 'B', userId: 1, views: 1 },
+            { id: 14, title: 'B', userId: 1, views: 2 },
           ]);
           await seedComments(runtime, [
             { id: 100, body: 'a1.v1', postId: 10 },
-            { id: 101, body: 'a1.v2', postId: 11 },
-            { id: 102, body: 'b1.v1', postId: 12 },
-            { id: 103, body: 'b1.v2', postId: 13 },
+            { id: 101, body: 'a1.v1.dup', postId: 11 },
+            { id: 102, body: 'a1.v2', postId: 12 },
+            { id: 103, body: 'b1.v1', postId: 13 },
+            { id: 104, body: 'b1.v2', postId: 14 },
           ]);
 
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
@@ -141,7 +155,7 @@ describe('integration/nested-includes/distinct/refinements', () => {
               posts
                 .select('id', 'title', 'views')
                 .distinct('title', 'views')
-                .orderBy([(p) => p.title.asc(), (p) => p.views.asc()])
+                .orderBy([(p) => p.title.asc(), (p) => p.views.asc(), (p) => p.id.asc()])
                 .include('comments', (c) => c.select('body')),
             )
             .all();
@@ -152,9 +166,10 @@ describe('integration/nested-includes/distinct/refinements', () => {
               name: 'Alice',
               posts: [
                 { id: 10, title: 'A', views: 1, comments: [{ body: 'a1.v1' }] },
-                { id: 11, title: 'A', views: 2, comments: [{ body: 'a1.v2' }] },
-                { id: 12, title: 'B', views: 1, comments: [{ body: 'b1.v1' }] },
-                { id: 13, title: 'B', views: 2, comments: [{ body: 'b1.v2' }] },
+                { id: 11, title: 'A', views: 1, comments: [{ body: 'a1.v1.dup' }] },
+                { id: 12, title: 'A', views: 2, comments: [{ body: 'a1.v2' }] },
+                { id: 13, title: 'B', views: 1, comments: [{ body: 'b1.v1' }] },
+                { id: 14, title: 'B', views: 2, comments: [{ body: 'b1.v2' }] },
               ],
             },
           ]);
@@ -175,9 +190,12 @@ describe('integration/nested-includes/distinct/refinements', () => {
       async () => {
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          // Two posts share the title 'A' so the distinct path sees
+          // colliding distinct-column values even when no comments stitch.
           await seedPosts(runtime, [
             { id: 10, title: 'A', userId: 1, views: 1 },
-            { id: 11, title: 'B', userId: 1, views: 2 },
+            { id: 11, title: 'A', userId: 1, views: 2 },
+            { id: 12, title: 'B', userId: 1, views: 3 },
           ]);
           // No comments seeded.
 
@@ -190,7 +208,7 @@ describe('integration/nested-includes/distinct/refinements', () => {
               posts
                 .select('title')
                 .distinct('title')
-                .orderBy((p) => p.title.asc())
+                .orderBy([(p) => p.title.asc(), (p) => p.id.asc()])
                 .include('comments', (c) => c.select('body')),
             )
             .all();
@@ -200,6 +218,7 @@ describe('integration/nested-includes/distinct/refinements', () => {
             {
               name: 'Alice',
               posts: [
+                { title: 'A', comments: [] },
                 { title: 'A', comments: [] },
                 { title: 'B', comments: [] },
               ],
@@ -215,7 +234,13 @@ describe('integration/nested-includes/distinct/refinements', () => {
       async () => {
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
-          await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
+          // Two posts share the title 'A' so the distinct path would see
+          // colliding distinct-column values if any survived the filter —
+          // here `where` removes them all.
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'A', userId: 1, views: 2 },
+          ]);
           await seedComments(runtime, [{ id: 100, body: 'a1', postId: 10 }]);
 
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
