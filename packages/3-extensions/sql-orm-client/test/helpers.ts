@@ -81,7 +81,7 @@ const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = ((
 
   return {
     kind: 'extension' as const,
-    id: 'pgvector-codec-stub',
+    id: 'pgvector',
     version: '0.0.0',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
