@@ -43,9 +43,9 @@ import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-l
 import { formatMigrationShowOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface MigrationShowOptions extends CommonCommandOptions {
   readonly config?: string;
@@ -495,9 +495,9 @@ export function createMigrationShowCommand(): Command {
     )
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
-      const flags = parseGlobalFlags(options);
+      const flags = parseGlobalFlagsOrExit(options);
 
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const ui = createTerminalUI(flags);
 
       const result = await executeMigrationShowCommand(target, options, flags, ui);
 

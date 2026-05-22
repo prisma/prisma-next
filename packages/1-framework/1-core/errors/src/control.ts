@@ -421,6 +421,32 @@ export function errorMigrationCliUnknownFlag(options: {
 }
 
 /**
+ * The main CLI received an unsupported `--format` value.
+ */
+export function errorInvalidOutputFormat(value: string): CliStructuredError {
+  return new CliStructuredError(
+    '4014',
+    `Invalid --format value "${value}". Allowed values: pretty, json.`,
+    {
+      domain: 'CLI',
+      meta: { value, allowed: ['pretty', 'json'] as const },
+    },
+  );
+}
+
+/**
+ * The main CLI received mutually exclusive output format flags
+ * (`--format pretty` together with `--json`).
+ */
+export function errorOutputFormatMutex(): CliStructuredError {
+  return new CliStructuredError(
+    '4015',
+    'Cannot use --format pretty together with --json. Use --format json or --json alone for JSON output.',
+    { domain: 'CLI' },
+  );
+}
+
+/**
  * Config validation error (missing required fields).
  */
 export function errorConfigValidation(

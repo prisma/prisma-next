@@ -6,9 +6,9 @@ import {
   setCommandExamples,
 } from '../utils/command-helpers';
 import { formatIntrospectJson, formatIntrospectOutput } from '../utils/formatters/verify';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI } from '../utils/terminal-ui';
 import {
   type InspectLiveSchemaOptions,
   type InspectLiveSchemaResult,
@@ -46,8 +46,8 @@ export function createDbSchemaCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: InspectLiveSchemaOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
       const startTime = Date.now();
 
       const result = await inspectLiveSchema(options, flags, ui, startTime, {

@@ -20,10 +20,10 @@ import {
 } from '../utils/formatters/emit';
 import { formatStyledHeader, formatSuccessMessage } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
@@ -159,8 +159,8 @@ export function createContractEmitCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (options: ContractEmitOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
       const startTime = Date.now();
 
       const result = await executeContractEmitCommand(options, flags, ui, startTime);

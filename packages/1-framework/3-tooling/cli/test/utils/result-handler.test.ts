@@ -5,11 +5,29 @@ import {
   errorConfigFileNotFound,
   errorMarkerMissing,
 } from '../../src/utils/cli-errors';
+import type { GlobalFlags } from '../../src/utils/global-flags';
 import { handleResult } from '../../src/utils/result-handler';
 import { TerminalUI } from '../../src/utils/terminal-ui';
 
-function createUI(flags?: { json?: boolean }) {
-  return new TerminalUI({ color: false, interactive: !flags?.json });
+function defaultTestFlags(overrides: Partial<GlobalFlags> = {}): GlobalFlags {
+  return {
+    format: 'pretty',
+    explicitFormat: false,
+    quiet: false,
+    verbose: 0,
+    color: false,
+    interactive: true,
+    ...overrides,
+  };
+}
+
+function createUI(flags?: Partial<GlobalFlags>) {
+  const resolved = defaultTestFlags(flags);
+  return new TerminalUI({
+    color: false,
+    interactive: !resolved.json,
+    forcePretty: resolved.format === 'pretty' && resolved.explicitFormat,
+  });
 }
 
 describe('result handler', () => {
@@ -28,14 +46,14 @@ describe('result handler', () => {
 
   it('returns 0 for successful result', () => {
     const result = ok('success');
-    const exitCode = handleResult(result, {}, createUI());
+    const exitCode = handleResult(result, defaultTestFlags(), createUI());
     expect(exitCode).toBe(0);
   });
 
   it('calls onSuccess callback for successful result', () => {
     const result = ok('success');
     const onSuccess = vi.fn();
-    const exitCode = handleResult(result, {}, createUI(), onSuccess);
+    const exitCode = handleResult(result, defaultTestFlags(), createUI(), onSuccess);
     expect(exitCode).toBe(0);
     expect(onSuccess).toHaveBeenCalledWith('success');
   });
@@ -43,21 +61,25 @@ describe('result handler', () => {
   it('returns exit code 2 for CLI errors', () => {
     const error = errorConfigFileNotFound();
     const result = notOk(error);
-    const exitCode = handleResult(result, {}, createUI());
+    const exitCode = handleResult(result, defaultTestFlags(), createUI());
     expect(exitCode).toBe(2);
   });
 
   it('returns exit code 1 for RUN errors', () => {
     const error = errorMarkerMissing();
     const result = notOk(error);
-    const exitCode = handleResult(result, {}, createUI());
+    const exitCode = handleResult(result, defaultTestFlags(), createUI());
     expect(exitCode).toBe(1);
   });
 
   it('writes JSON error to stdout when json flag is set', () => {
     const error = errorConfigFileNotFound();
     const result = notOk(error);
-    handleResult(result, { json: true }, createUI({ json: true }));
+    handleResult(
+      result,
+      defaultTestFlags({ format: 'json', json: true }),
+      createUI({ format: 'json', json: true }),
+    );
 
     // JSON data goes to stdout via ui.output()
     const stdoutCalls = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0]));
@@ -73,7 +95,11 @@ describe('result handler', () => {
     });
     const result = notOk(error);
 
-    handleResult(result, { json: true }, createUI({ json: true }));
+    handleResult(
+      result,
+      defaultTestFlags({ format: 'json', json: true }),
+      createUI({ format: 'json', json: true }),
+    );
 
     const stdoutCalls = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0]));
     const jsonOutput = stdoutCalls.find((s: string) => s.includes('{'));
@@ -86,7 +112,7 @@ describe('result handler', () => {
   it('writes error to stderr when json flag is not set', () => {
     const error = errorConfigFileNotFound();
     const result = notOk(error);
-    handleResult(result, {}, createUI());
+    handleResult(result, defaultTestFlags(), createUI());
 
     // Error goes to stderr via clack
     expect(stderrSpy).toHaveBeenCalled();

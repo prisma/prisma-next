@@ -43,9 +43,9 @@ import {
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface MigrateCommandOptions extends CommonCommandOptions {
   readonly db?: string;
@@ -319,13 +319,10 @@ export function createMigrateCommand(): Command {
       'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .action(async (options: MigrateCommandOptions) => {
-      const flags = parseGlobalFlags(options);
+      const flags = parseGlobalFlagsOrExit(options);
       const startTime = Date.now();
 
-      const ui = new TerminalUI({
-        color: flags.color,
-        interactive: flags.interactive,
-      });
+      const ui = createTerminalUI(flags);
 
       const result = await executeMigrateCommand(options, flags, ui, startTime);
 

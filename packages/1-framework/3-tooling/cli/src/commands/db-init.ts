@@ -24,13 +24,13 @@ import {
   formatMigrationPlanOutput,
   type MigrationCommandResult,
 } from '../utils/formatters/migrations';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import {
   addMigrationCommandOptions,
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 type DbInitOptions = MigrationCommandOptions;
 
@@ -222,10 +222,10 @@ export function createDbInitCommand(): Command {
   ]);
   addMigrationCommandOptions(command);
   command.action(async (options: DbInitOptions) => {
-    const flags = parseGlobalFlags(options);
+    const flags = parseGlobalFlagsOrExit(options);
     const startTime = Date.now();
 
-    const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+    const ui = createTerminalUI(flags);
 
     const result = await executeDbInitCommand(options, flags, ui, startTime);
 

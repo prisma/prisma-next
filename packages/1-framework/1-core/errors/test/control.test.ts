@@ -10,10 +10,12 @@ import {
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
+  errorInvalidOutputFormat,
   errorJsonFormatNotSupported,
   errorMigrationCliInvalidConfigArg,
   errorMigrationCliUnknownFlag,
   errorMigrationPlanningFailed,
+  errorOutputFormatMutex,
   errorQueryRunnerFactoryRequired,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -420,6 +422,23 @@ describe('Config Errors', () => {
     expect(error.fix).toContain('--dry-run');
     expect(error.fix).toContain('--config');
     expect(error.fix).toContain('--help');
+  });
+
+  it('errorInvalidOutputFormat produces PN-CLI-4014', () => {
+    const error = errorInvalidOutputFormat('yaml');
+    const envelope = error.toEnvelope();
+    expect(error.code).toBe('4014');
+    expect(envelope.code).toBe('PN-CLI-4014');
+    expect(error.message).toContain('yaml');
+    expect(error.message).toContain('pretty, json');
+  });
+
+  it('errorOutputFormatMutex produces PN-CLI-4015', () => {
+    const error = errorOutputFormatMutex();
+    const envelope = error.toEnvelope();
+    expect(error.code).toBe('4015');
+    expect(envelope.code).toBe('PN-CLI-4015');
+    expect(error.message).toMatch(/--format pretty.*--json/i);
   });
 });
 

@@ -40,10 +40,10 @@ import {
   formatSignOutput,
 } from '../utils/formatters/verify';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface DbSignOptions extends CommonCommandOptions {
   readonly db?: string;
@@ -270,7 +270,7 @@ export function createDbSignCommand(): Command {
       'Contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
     )
     .action(async (positionalContract: string | undefined, options: DbSignOptions) => {
-      const flags = parseGlobalFlags(options);
+      const flags = parseGlobalFlagsOrExit(options);
 
       if (positionalContract && options.contract) {
         process.stderr.write(
@@ -280,7 +280,7 @@ export function createDbSignCommand(): Command {
         return;
       }
 
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const ui = createTerminalUI(flags);
 
       const result = await executeDbSignCommand(positionalContract, options, flags, ui);
 

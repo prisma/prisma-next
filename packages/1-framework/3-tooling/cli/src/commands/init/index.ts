@@ -4,7 +4,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../../utils/command-helpers';
-import { type CommonCommandOptions, parseGlobalFlags } from '../../utils/global-flags';
+import { type CommonCommandOptions, parseGlobalFlagsOrExit } from '../../utils/global-flags';
 import { fireTelemetryAfterInitConsent } from '../../utils/telemetry';
 import {
   INIT_EXIT_EMIT_FAILED,
@@ -94,7 +94,7 @@ export function createInitCommand(): Command {
     )
     .action(async (options: InitCommandOptions, actionCommand: Command) => {
       const { runInit } = await import('./init');
-      const flags = parseGlobalFlags(options);
+      const flags = parseGlobalFlagsOrExit(options);
       const canPrompt = deriveCanPrompt({
         flagsInteractive: flags.interactive,
         optionInteractive: options.interactive,

@@ -1,5 +1,6 @@
 import * as clack from '@clack/prompts';
 import { bold, cyan, dim, green, red, yellow } from 'colorette';
+import type { GlobalFlags } from './global-flags';
 import { shutdownSignal } from './shutdown';
 
 /**
@@ -13,7 +14,7 @@ import { shutdownSignal } from './shutdown';
  * 1. All methods except `output()` and `error()` write to stderr only in interactive mode.
  * 2. `output(data)` always writes to stdout — if a command calls it, there is data to emit.
  * 3. `error()` always writes to stderr — errors matter even when piped.
- * 4. All other decoration is suppressed when piped — `isInteractive` gates every other decoration method.
+ * 4. Decoration is suppressed when piped unless `--format pretty` was explicit (`forcePretty`).
  * 5. Never write data to stderr — decoration methods are for human context only.
  * 6. Never write decoration to stdout — it breaks pipes, `$(...)` captures, and `> file` redirects.
  */
@@ -29,42 +30,54 @@ export class TerminalUI {
    */
   readonly useColor: boolean;
 
+  /**
+   * When true, decoration methods write even on non-TTY stdout
+   * (explicit `--format pretty`).
+   */
+  readonly forcePretty: boolean;
+
   private static readonly stderrOpts = { output: process.stderr } as const;
 
   constructor(options?: {
     readonly color?: boolean | undefined;
     readonly interactive?: boolean | undefined;
+    readonly forcePretty?: boolean | undefined;
   }) {
     // --interactive/--no-interactive override TTY detection
     this.isInteractive = options?.interactive ?? !!process.stdout.isTTY;
-    this.useColor = options?.color ?? this.isInteractive;
+    this.forcePretty = options?.forcePretty ?? false;
+    this.useColor = options?.color ?? (this.isInteractive || this.forcePretty);
+  }
+
+  private get shouldDecorate(): boolean {
+    return this.isInteractive || this.forcePretty;
   }
 
   // ---------------------------------------------------------------------------
-  // Decoration → stderr (only in interactive mode)
+  // Decoration → stderr (interactive mode, or explicit --format pretty)
   // ---------------------------------------------------------------------------
 
   /**
-   * Log a message line to stderr. No-op when piped.
+   * Log a message line to stderr. No-op when piped unless forcePretty.
    */
   log(message: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.log.message(message, TerminalUI.stderrOpts);
   }
 
   /**
-   * Log a success message to stderr. No-op when piped.
+   * Log a success message to stderr. No-op when piped unless forcePretty.
    */
   success(message: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.log.success(message, TerminalUI.stderrOpts);
   }
 
   /**
-   * Log a warning message to stderr. No-op when piped.
+   * Log a warning message to stderr. No-op when piped unless forcePretty.
    */
   warn(message: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.log.warn(message, TerminalUI.stderrOpts);
   }
 
@@ -76,49 +89,49 @@ export class TerminalUI {
   }
 
   /**
-   * Log an info message to stderr. No-op when piped.
+   * Log an info message to stderr. No-op when piped unless forcePretty.
    */
   info(message: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.log.info(message, TerminalUI.stderrOpts);
   }
 
   /**
-   * Log a step message to stderr. No-op when piped.
+   * Log a step message to stderr. No-op when piped unless forcePretty.
    */
   step(message: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.log.step(message, TerminalUI.stderrOpts);
   }
 
   /**
-   * Display a note box on stderr. No-op when piped.
+   * Display a note box on stderr. No-op when piped unless forcePretty.
    */
   note(message: string, title?: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.note(message, title, TerminalUI.stderrOpts);
   }
 
   /**
-   * Display intro banner on stderr. No-op when piped.
+   * Display intro banner on stderr. No-op when piped unless forcePretty.
    */
   intro(title?: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.intro(title, TerminalUI.stderrOpts);
   }
 
   /**
-   * Display outro banner on stderr. No-op when piped.
+   * Display outro banner on stderr. No-op when piped unless forcePretty.
    */
   outro(message?: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     clack.outro(message, TerminalUI.stderrOpts);
   }
 
   /**
    * Create a Clack spinner on stderr with a 100ms delay threshold.
    * The spinner only appears if the operation takes longer than the threshold,
-   * avoiding flicker for fast operations. Returns a no-op spinner when not interactive.
+   * avoiding flicker for fast operations. Returns a no-op spinner when not decorating.
    */
   spinner(delayMs = 100): clack.SpinnerResult {
     const noop: clack.SpinnerResult = {
@@ -133,7 +146,7 @@ export class TerminalUI {
       },
     };
 
-    if (!this.isInteractive) {
+    if (!this.shouldDecorate) {
       return noop;
     }
 
@@ -229,11 +242,11 @@ export class TerminalUI {
   }
 
   /**
-   * Write a raw line to stderr. No-op when piped.
+   * Write a raw line to stderr. No-op when piped unless forcePretty.
    * Use for decoration that doesn't fit Clack's log format (e.g. styled headers).
    */
   stderr(message: string): void {
-    if (!this.isInteractive) return;
+    if (!this.shouldDecorate) return;
     process.stderr.write(`${message}\n`);
   }
 
@@ -273,4 +286,12 @@ export class TerminalUI {
   yellow(text: string): string {
     return this.useColor ? yellow(text) : text;
   }
+}
+
+export function createTerminalUI(flags: GlobalFlags): TerminalUI {
+  return new TerminalUI({
+    color: flags.color,
+    interactive: flags.interactive,
+    forcePretty: flags.format === 'pretty' && flags.explicitFormat,
+  });
 }

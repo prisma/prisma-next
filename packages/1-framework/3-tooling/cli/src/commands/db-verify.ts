@@ -47,10 +47,10 @@ import {
   formatVerifyOutput,
 } from '../utils/formatters/verify';
 import type { CommonCommandOptions } from '../utils/global-flags';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
-import { TerminalUI } from '../utils/terminal-ui';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface DbVerifyOptions extends CommonCommandOptions {
   readonly db?: string;
@@ -529,8 +529,8 @@ export function createDbVerifyCommand(): Command {
       false,
     )
     .action(async (options: DbVerifyOptions) => {
-      const flags = parseGlobalFlags(options);
-      const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
 
       const modeResult = resolveDbVerifyMode(options);
       if (!modeResult.ok) {

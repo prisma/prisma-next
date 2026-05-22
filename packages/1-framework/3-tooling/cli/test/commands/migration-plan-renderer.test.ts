@@ -3,10 +3,15 @@ import {
   formatMigrationPlanOutput,
   type MigrationPlanResult,
 } from '../../src/commands/migration-plan';
+import type { GlobalFlags } from '../../src/utils/global-flags';
 
 const HASH_A = `sha256:${'a'.repeat(8)}`;
 const HASH_B = `sha256:${'b'.repeat(8)}`;
-const NO_COLOR_FLAGS = { color: false } as const;
+const NO_COLOR_FLAGS = {
+  format: 'pretty',
+  explicitFormat: false,
+  color: false,
+} as const satisfies GlobalFlags;
 
 function makeNoOpResult(
   emitted: readonly { readonly spaceId: string; readonly dirName: string }[],
