@@ -93,11 +93,35 @@ export function errorMarkerReadFailed(options: {
   });
 }
 
-function isMarkerRowParseError(err: unknown): boolean {
+function isMarkerRowParseError(err: unknown): err is Error {
   return (
     err instanceof Error &&
     (err.message.startsWith('Invalid contract marker row:') ||
       err.message.startsWith('Invalid marker doc on'))
+  );
+}
+
+function isLegacyMarkerShapeReadError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('column "space" does not exist') ||
+    normalized.includes('no such column: space')
+  );
+}
+
+function errorLegacyMarkerShape(options: {
+  readonly why: string;
+  readonly markerLocation: string;
+}): CliStructuredError {
+  return errorRunnerFailed(
+    `Legacy marker-table shape detected on ${options.markerLocation} (no \`space\` column). ` +
+      'Prisma Next is in pre-1.0; the previous transitional auto-migration to the per-space-row schema has been removed. ' +
+      `Drop \`${options.markerLocation}\` and re-run \`prisma-next db init\` to reinitialise from a clean baseline.`,
+    {
+      why: options.why,
+      fix: 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.',
+      meta: { code: 'RUNNER_FAILED', runnerErrorCode: 'LEGACY_MARKER_SHAPE' },
+    },
   );
 }
 
@@ -116,6 +140,12 @@ export function rethrowMarkerReadError(
     });
   }
   const message = err instanceof Error ? err.message : String(err);
+  if (isLegacyMarkerShapeReadError(message)) {
+    throw errorLegacyMarkerShape({
+      why: message,
+      markerLocation: context.markerLocation,
+    });
+  }
   throw errorMarkerReadFailed({
     why: message,
     markerLocation: context.markerLocation,

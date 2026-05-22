@@ -193,6 +193,21 @@ describe('Runtime Errors', () => {
     }
   });
 
+  it('rethrowMarkerReadError maps legacy marker shape to PN-RUN-3020', () => {
+    try {
+      rethrowMarkerReadError(new Error('column "space" does not exist'), {
+        space: 'app',
+        markerLocation: 'prisma_contract.marker',
+      });
+    } catch (err) {
+      const envelope = (err as CliStructuredError).toEnvelope();
+      expect(envelope.code).toBe('PN-RUN-3020');
+      expect(envelope.fix).toContain('Legacy marker-table shape detected');
+      expect(envelope.fix).toContain('prisma_contract.marker');
+      expect(envelope.fix).toContain('prisma-next db init');
+    }
+  });
+
   it('rethrowMarkerReadError rethrows existing CliStructuredError', () => {
     const existing = errorMarkerMissing();
     expect(() =>
