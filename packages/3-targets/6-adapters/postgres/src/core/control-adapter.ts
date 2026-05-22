@@ -4,6 +4,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control-spaces';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import type {
@@ -158,7 +159,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   async readAllMarkers(
     driver: ControlDriverInstance<'sql', 'postgres'>,
   ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const markerContext = { space: 'app', markerLocation: POSTGRES_MARKER_TABLE };
+    const markerContext = { space: APP_SPACE_ID, markerLocation: POSTGRES_MARKER_TABLE };
     const exists = await withMarkerReadErrorHandling(
       () =>
         driver.query(
