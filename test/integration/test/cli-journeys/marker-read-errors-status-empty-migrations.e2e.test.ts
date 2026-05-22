@@ -6,6 +6,7 @@ import {
   runDbInit,
   runMigrationStatus,
   setupJourney,
+  timeouts,
   useDevDatabase,
 } from '../utils/journey-test-helpers';
 
@@ -29,21 +30,25 @@ withTempDir(({ createTempDir }) => {
   describe('marker read typed errors — corrupt marker on migration status', () => {
     const db = useDevDatabase();
 
-    it('returns PN-RUN-3005 on migration status when marker is corrupt and migrations dir is empty', async () => {
-      const ctx = setupJourney({ connectionString: db.connectionString, createTempDir });
+    it(
+      'returns PN-RUN-3005 on migration status when marker is corrupt and migrations dir is empty',
+      async () => {
+        const ctx = setupJourney({ connectionString: db.connectionString, createTempDir });
 
-      expect((await runContractEmit(ctx)).exitCode).toBe(0);
-      expect((await runDbInit(ctx)).exitCode).toBe(0);
-      await plantNullInvariants(db.connectionString);
+        expect((await runContractEmit(ctx)).exitCode).toBe(0);
+        expect((await runDbInit(ctx)).exitCode).toBe(0);
+        await plantNullInvariants(db.connectionString);
 
-      const statusFail = await runMigrationStatus(ctx, ['--json', '--no-color']);
-      expect(statusFail.exitCode).not.toBe(0);
+        const statusFail = await runMigrationStatus(ctx, ['--json', '--no-color']);
+        expect(statusFail.exitCode).not.toBe(0);
 
-      const envelope = extractJson(`${statusFail.stdout}\n${statusFail.stderr}`);
-      expect(envelope).toMatchObject({
-        code: 'PN-RUN-3005',
-        summary: 'Marker row is corrupt or incompatible',
-      });
-    });
+        const envelope = extractJson(`${statusFail.stdout}\n${statusFail.stderr}`);
+        expect(envelope).toMatchObject({
+          code: 'PN-RUN-3005',
+          summary: 'Marker row is corrupt or incompatible',
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 });
