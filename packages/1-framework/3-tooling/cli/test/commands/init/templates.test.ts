@@ -110,8 +110,10 @@ describe('templates', () => {
         const mongo = starterSchema('mongo', 'typescript');
 
         for (const schema of [pg, mongo]) {
-          expect(schema).toMatch(/defineContract\(\s*\{ family:/);
-          expect(schema).toMatch(/\(\{ field, model, rel \}\) => \(\{/);
+          expect(schema).toMatch(
+            /defineContract\(\s*\{\s*\},\s*\(\{ field, model, rel \}\) => \(\{/,
+          );
+          expect(schema).not.toMatch(/\{ family:/);
           expect(schema).toContain('models: {');
         }
       });
