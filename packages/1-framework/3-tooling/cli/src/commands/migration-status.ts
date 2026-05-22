@@ -540,6 +540,40 @@ async function loadContractRawSafely(config: {
   }
 }
 
+async function validateOnlineMarkerRead(
+  config: Awaited<ReturnType<typeof loadConfig>>,
+  dbConnection: unknown,
+): Promise<Result<void, CliStructuredError>> {
+  const driver = config.driver;
+  if (!driver) {
+    return ok(undefined);
+  }
+
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    driver,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+  try {
+    await client.connect(dbConnection);
+    await client.readMarker();
+    return ok(undefined);
+  } catch (error) {
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read database marker: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  } finally {
+    await client.close();
+  }
+}
+
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
@@ -666,6 +700,12 @@ async function executeMigrationStatusCommand(
   }
 
   if (bundles.length === 0) {
+    if (dbConnection && hasDriver) {
+      const markerProbe = await validateOnlineMarkerRead(config, dbConnection);
+      if (!markerProbe.ok) {
+        return markerProbe;
+      }
+    }
     if (contractHash !== EMPTY_CONTRACT_HASH) {
       diagnostics.push({
         code: 'CONTRACT.AHEAD',
