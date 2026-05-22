@@ -162,12 +162,12 @@ describe('integration: rawSql expression in typed builder', {
       const runtime = buildRuntime();
 
       // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
-      // rawSqlTag is used from the outer scope: fns.rawSql is RawSqlTag | undefined in the
-      // generic Functions<QC> type, so we call the bound tag directly to avoid a null check.
+      // fns.rawSql is RawSqlTag (non-optional) because sql() with rawSqlTag returns
+      // Db<C, RawSqlTag>, so the callback receives AggregateFunctions<QC, RawSqlTag>.
       const rows = await runtime.execute(
         db.posts
           .select('id')
-          .select('doubled', (f) => rawSqlTag`${f.views} * 2`.returns('pg/int4@1'))
+          .select('doubled', (f, fns) => fns.rawSql`${f.views} * 2`.returns('pg/int4@1'))
           .orderBy('id')
           .build(),
       );
@@ -184,7 +184,7 @@ describe('integration: rawSql expression in typed builder', {
       const rows = await runtime.execute(
         db.posts
           .select('id')
-          .select('magic', () => rawSqlTag`42`.returns('pg/int4@1'))
+          .select('magic', (_f, fns) => fns.rawSql`42`.returns('pg/int4@1'))
           .orderBy('id')
           .build(),
       );
@@ -216,15 +216,14 @@ describe('integration: rawSql expression in typed builder', {
       // The where clause embeds a param() inside a rawSql expression.
       // After lowering, the plan carries one ParamRef (value 50, codec pg/int4@1).
       // The middleware's beforeExecute should see it via params.entries().
-      // rawSqlTag is called from the outer scope (same pattern as the select tests above) to avoid
-      // the fns.rawSql undefined-union at the callback's type boundary.
+      // fns.rawSql is RawSqlTag (non-optional) — callable directly as a template tag.
       await runtime.execute(
         db.posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
-              rawSqlTag`${param(50, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
-              rawSqlTag`0`.returns('pg/int4@1'),
+              fns.rawSql`${param(50, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+              fns.rawSql`0`.returns('pg/int4@1'),
             ),
           )
           .build(),
