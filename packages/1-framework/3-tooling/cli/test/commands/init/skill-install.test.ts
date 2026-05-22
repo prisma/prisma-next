@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
 import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
