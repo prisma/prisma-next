@@ -3,6 +3,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   type AnyExpression,
+  type AnyFromSource,
   type AstRewriter,
   BinaryExpr,
   type BinaryOp,
@@ -20,6 +21,7 @@ import {
   SelectAst,
   SubqueryExpr,
   TableSource,
+  WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -213,6 +215,63 @@ function buildIncludeOrderArtifacts(
 }
 
 /**
+ * Wrap a base SELECT in a `ROW_NUMBER() OVER (PARTITION BY … ORDER BY …) = 1`
+ * filter, implementing Prisma-style `.distinct(cols)` semantics: one
+ * representative row per `(distinctColumnRefs)` group is kept; the rest
+ * are dropped.
+ *
+ * Picking which row survives in each partition is governed by
+ * `rankingOrderBy`. When the caller's `orderBy` doesn't fully order rows
+ * within a partition (e.g. user wrote `.distinct('title')` with no
+ * `orderBy`, or ties in their ordering), the choice is
+ * implementation-defined — matching Prisma's documented nested-distinct
+ * behaviour. Callers that want determinism should pass an `orderBy` that
+ * is total within each partition.
+ *
+ * The wrapper forwards every column of `base.projection` through the
+ * derived alias, so the wrapper's projection is byte-identical in alias
+ * names — making this transparent to any outer query (`json_agg`,
+ * lateral correlation, top-level SELECT) that consumes the SELECT.
+ */
+function wrapWithRowNumberDedup(options: {
+  readonly base: SelectAst;
+  readonly distinctColumnRefs: ReadonlyArray<AnyExpression>;
+  readonly rankingOrderBy: ReadonlyArray<OrderByItem>;
+  readonly rankedAlias: string;
+}): SelectAst {
+  const { base, distinctColumnRefs, rankingOrderBy, rankedAlias } = options;
+  const rnAlias = '__prisma_distinct_rn';
+  // SQLite requires an ORDER BY inside the window spec for ranking
+  // functions; Postgres allows omitting it but the result is
+  // unspecified. Default to ordering by the partition columns so the
+  // emitted SQL is portable AND deterministic-modulo-distinct-cols
+  // (which is the natural choice when the caller didn't specify).
+  const effectiveOrderBy =
+    rankingOrderBy.length > 0
+      ? rankingOrderBy
+      : distinctColumnRefs.map((expr) => OrderByItem.asc(expr));
+
+  const inner = base.withProjection([
+    ...base.projection,
+    ProjectionItem.of(
+      rnAlias,
+      WindowFuncExpr.rowNumber({
+        partitionBy: distinctColumnRefs,
+        orderBy: effectiveOrderBy,
+      }),
+    ),
+  ]);
+
+  return SelectAst.from(DerivedTableSource.as(rankedAlias, inner))
+    .withProjection(
+      base.projection.map((item) =>
+        ProjectionItem.of(item.alias, ColumnRef.of(rankedAlias, item.alias)),
+      ),
+    )
+    .withWhere(BinaryExpr.eq(ColumnRef.of(rankedAlias, rnAlias), LiteralExpr.of(1)));
+}
+
+/**
  * Recursively build the join + projection artifacts for the nested
  * includes attached to a child SELECT. Used by
  * `buildIncludeChildRowsSelect` to wire depth-2+ aggregates into the
@@ -360,15 +419,42 @@ function buildIncludeChildRowsSelect(
     .withJoins(nestedJoins)
     .withWhere(whereExpr);
 
-  if (childOrderBy) {
-    childRows = childRows.withOrderBy(childOrderBy);
-  }
   if (childState.distinctOn && childState.distinctOn.length > 0) {
     childRows = childRows.withDistinctOn(
       childState.distinctOn.map((column) => ColumnRef.of(childTableRef, column)),
     );
+    if (childOrderBy) {
+      childRows = childRows.withOrderBy(childOrderBy);
+    }
   } else if (childState.distinct && childState.distinct.length > 0) {
-    childRows = childRows.withDistinct(true);
+    // Prisma-style `.distinct(cols)`: keep one representative row per
+    // (distinct cols) group. Plain SQL `DISTINCT` over the projected row
+    // set dedupes nothing when the projection includes columns outside
+    // `distinct cols` (typically an `id`), so we lower to a
+    // `ROW_NUMBER() OVER (PARTITION BY <cols> ORDER BY …) = 1` wrap.
+    // The user's `orderBy` (if any) feeds the OVER clause so it picks
+    // the right representative; we reapply it on the wrapped SELECT
+    // for any subsequent LIMIT/OFFSET. See `wrapWithRowNumberDedup`.
+    const rankedAlias = `${include.relationName}__distinct`;
+    childRows = wrapWithRowNumberDedup({
+      base: childRows,
+      distinctColumnRefs: childState.distinct.map((column) => ColumnRef.of(childTableRef, column)),
+      rankingOrderBy: childOrderBy ?? [],
+      rankedAlias,
+    });
+    if (childOrderBy) {
+      childRows = childRows.withOrderBy(
+        childOrderBy.map(
+          (item, index) =>
+            new OrderByItem(
+              ColumnRef.of(rankedAlias, `${include.relationName}__order_${index}`),
+              item.dir,
+            ),
+        ),
+      );
+    }
+  } else if (childOrderBy) {
+    childRows = childRows.withOrderBy(childOrderBy);
   }
   if (childState.limit !== undefined) {
     childRows = childRows.withLimit(childState.limit);
@@ -436,21 +522,59 @@ function buildDistinctNonLeafChildRowsSelect(options: {
     grandchildJoinColumns,
   );
 
-  // INNER: distinct scalar select with force-included join keys + hidden
-  // order-by projections. No nested aggregates — `DISTINCT` only sees
-  // scalar columns; pre-deduped rows are the input to the outer wrap.
+  // INNER: per-column-distinct scalar select with force-included join
+  // keys + hidden order-by projections. No nested aggregates yet — the
+  // ROW_NUMBER-based dedup only sees scalar columns; pre-deduped rows
+  // are the input to the outer wrap.
+  //
+  // We use `ROW_NUMBER() OVER (PARTITION BY <distinct cols> ORDER BY …)
+  // = 1` rather than SQL `DISTINCT` because the latter dedupes by the
+  // full projected row — and we force-include grandchild join keys
+  // (e.g. `post.id` so the `comments` lateral can correlate). With those
+  // join keys in the projection, plain `DISTINCT` would never collapse
+  // rows whose ids differ, making `.distinct('title')` a no-op. The
+  // window-function form partitions strictly on the user's chosen
+  // columns and is therefore correct regardless of what else lives in
+  // the projection.
   const innerScalarProjection = buildProjection(
     contract,
     include.relatedTableName,
     selectedForQuery,
     childTableRef,
   );
-  let innerSelect = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+  const baseInner = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
     .withProjection([...innerScalarProjection, ...hiddenOrderProjection])
-    .withWhere(whereExpr)
-    .withDistinct(true);
+    .withWhere(whereExpr);
+
+  // `childState.distinct` is non-empty by the `isDistinctNonLeaf` guard
+  // at the only caller (`buildIncludeChildRowsSelect`); assert here so
+  // the partition expression list below is well-typed without a cast.
+  const distinctColumns = childState.distinct;
+  if (distinctColumns === undefined || distinctColumns.length === 0) {
+    throw new Error(
+      'buildDistinctNonLeafChildRowsSelect requires a non-empty `distinct` selection',
+    );
+  }
+  const rankedAlias = `${include.relationName}__ranked`;
+  let innerSelect = wrapWithRowNumberDedup({
+    base: baseInner,
+    distinctColumnRefs: distinctColumns.map((column) => ColumnRef.of(childTableRef, column)),
+    rankingOrderBy: childOrderBy ?? [],
+    rankedAlias,
+  });
   if (childOrderBy) {
-    innerSelect = innerSelect.withOrderBy(childOrderBy);
+    // Reapply user's orderBy on the deduped result so LIMIT/OFFSET are
+    // deterministic. Reference the hidden-order alias columns the
+    // wrapper forwarded under their original names from `rankedAlias`.
+    innerSelect = innerSelect.withOrderBy(
+      childOrderBy.map(
+        (item, index) =>
+          new OrderByItem(
+            ColumnRef.of(rankedAlias, `${include.relationName}__order_${index}`),
+            item.dir,
+          ),
+      ),
+    );
   }
   if (childState.limit !== undefined) {
     innerSelect = innerSelect.withLimit(childState.limit);
@@ -583,8 +707,32 @@ function buildSelectAst(
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
   const where = options.where ?? buildStateWhere(contract, tableName, state);
 
-  let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
-  if (where) {
+  // When `.distinct(cols)` is set, wrap the table source in a
+  // ROW_NUMBER-based dedup subquery aliased to the original `tableName`.
+  // That aliasing keeps every outer reference — the projection's
+  // scalar columns, the MTI variant joins, the include subqueries'
+  // lateral parent correlations, the orderBy — resolving transparently,
+  // without needing to rewrite column refs across the AST.
+  //
+  // We project every column of the underlying table so anything the
+  // outer query may reference is in scope; the database can prune
+  // unused columns. The original WHERE moves INTO the wrap (so
+  // ROW_NUMBER computes over filtered rows), and the outer's WHERE
+  // becomes just `__prisma_distinct_rn = 1`.
+  const usesRowNumberDistinct = state.distinct !== undefined && state.distinct.length > 0;
+  const fromSource: AnyFromSource = usesRowNumberDistinct
+    ? DerivedTableSource.as(
+        tableName,
+        buildTopLevelDistinctRankedInner(contract, tableName, state, where),
+      )
+    : TableSource.named(tableName);
+
+  let ast = SelectAst.from(fromSource).withProjection(projection);
+  if (usesRowNumberDistinct) {
+    ast = ast.withWhere(
+      BinaryExpr.eq(ColumnRef.of(tableName, '__prisma_distinct_rn'), LiteralExpr.of(1)),
+    );
+  } else if (where) {
     ast = ast.withWhere(where);
   }
   if (state.orderBy) {
@@ -595,9 +743,9 @@ function buildSelectAst(
   }
   if (state.distinctOn && state.distinctOn.length > 0) {
     ast = ast.withDistinctOn(state.distinctOn.map((column) => ColumnRef.of(tableName, column)));
-  } else if (state.distinct && state.distinct.length > 0) {
-    ast = ast.withDistinct(true);
   }
+  // `state.distinct` is handled via the `usesRowNumberDistinct` wrap
+  // above; we do not apply SQL `DISTINCT` here.
   if (state.limit !== undefined) {
     ast = ast.withLimit(state.limit);
   }
@@ -609,6 +757,45 @@ function buildSelectAst(
   }
 
   return ast;
+}
+
+function buildTopLevelDistinctRankedInner(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+  state: CollectionState,
+  where: AnyExpression | undefined,
+): SelectAst {
+  const distinctColumns = state.distinct;
+  if (distinctColumns === undefined || distinctColumns.length === 0) {
+    throw new Error('buildTopLevelDistinctRankedInner called without `state.distinct`');
+  }
+  // Project every column of the underlying table so outer references
+  // (projection, joins, includes' lateral correlations, orderBy) resolve
+  // through the derived-subquery alias.
+  const allCols = resolveTableColumns(contract, tableName);
+  const allColsProjection = allCols.map((column) =>
+    ProjectionItem.of(column, ColumnRef.of(tableName, column)),
+  );
+  const distinctColumnRefs = distinctColumns.map((column) => ColumnRef.of(tableName, column));
+  const rankingOrderBy =
+    state.orderBy && state.orderBy.length > 0
+      ? state.orderBy
+      : distinctColumnRefs.map((expr) => OrderByItem.asc(expr));
+
+  let inner = SelectAst.from(TableSource.named(tableName)).withProjection([
+    ...allColsProjection,
+    ProjectionItem.of(
+      '__prisma_distinct_rn',
+      WindowFuncExpr.rowNumber({
+        partitionBy: distinctColumnRefs,
+        orderBy: rankingOrderBy,
+      }),
+    ),
+  ]);
+  if (where) {
+    inner = inner.withWhere(where);
+  }
+  return inner;
 }
 
 function buildMtiJoins(

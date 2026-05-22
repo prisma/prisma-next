@@ -44,6 +44,9 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
     aggregate(expr) {
       return bindExpression(contract, expr);
     },
+    windowFunc(expr) {
+      return bindExpression(contract, expr);
+    },
     jsonObject(expr) {
       return bindExpression(contract, expr);
     },
