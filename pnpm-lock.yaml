@@ -4573,15 +4573,6 @@ importers:
         specifier: 'catalog:'
         version: 8.20.0
 
-  test/integration/test/fixtures/cli/cli-integration-test-app/test-1779440829345-2mmflhsudq4:
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.10.4
-      prisma-next:
-        specifier: ^0.10.0
-        version: 0.10.0(magicast@0.5.2)(typanion@3.14.0)
-
   test/integration/test/fixtures/cli/cli-test-app:
     dependencies:
       '@prisma-next/adapter-postgres':
@@ -5858,43 +5849,6 @@ packages:
 
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
-
-  '@prisma-next/config@0.10.0':
-    resolution: {integrity: sha512-NVd+lHqGiopgZsqJZh9FAfSZHdzKtnCnokWgiuvrEC4uCK24G1erPRmRskkpg7fIeW8ZtZEs/24yjLbxYhj7Vg==}
-    engines: {node: '>=20'}
-
-  '@prisma-next/contract@0.10.0':
-    resolution: {integrity: sha512-tqLXa2nt5mfuIj2BlmyvfUYl2mUlfBQMYRMHiUiBtvTYukVQLCQmH3IrhjU4+FX1Y5ZmCw14WztJomFOzM1H1w==}
-    engines: {node: '>=20'}
-
-  '@prisma-next/emitter@0.10.0':
-    resolution: {integrity: sha512-Bek5fWE7QWHzzwKsTvq/gmLYJPk+p7NisYNd0229IZSMfWzo6OMJT2/pHvDRyU6ykFK/c2rYdxvqrBdwGR5vfw==}
-
-  '@prisma-next/errors@0.10.0':
-    resolution: {integrity: sha512-EYFw4isfWMvme3euuji1KAslSZ5REp+37Gw8QPwZ6+gpJjqpTh7LWtTTE4zmexv/Nc4KNYfuH/hVOQcPSfHVMQ==}
-    engines: {node: '>=20'}
-
-  '@prisma-next/framework-components@0.10.0':
-    resolution: {integrity: sha512-tdcGLgrN2wsuSsfjA5rTqO3pOFaQiypn28f0i/uQ9KwoDFEDoq7XwFwhimqqrrpeePAVAt/la8Tw60ThE/AsDQ==}
-
-  '@prisma-next/migration-tools@0.10.0':
-    resolution: {integrity: sha512-WJJ8LMHCXlewSrtC4aJkxi0yI7/m9JbvnLVlTRzA4D94RkiEDbQg77LQhp3osF26eQqXu3Jc+LQMQ6nAItEYfQ==}
-    engines: {node: '>=20'}
-
-  '@prisma-next/operations@0.10.0':
-    resolution: {integrity: sha512-R6qhJB9CJuT2xyQbTIkJ4wXqclLaiJz5h6aVkRBUXr+Vt/EYA8SfGzzA6vO62gBbLHvDr+nZXEolxsSi5LOOIw==}
-    engines: {node: '>=20'}
-
-  '@prisma-next/psl-printer@0.10.0':
-    resolution: {integrity: sha512-aeE9udDT9tNJ3SMDNYQhND7Sv8q3XpLaDbX83ZG2tynQKNvZP+RsbA03FYTs5UdEDm2pY2EjpGQ68nnPpTXY6g==}
-
-  '@prisma-next/ts-render@0.10.0':
-    resolution: {integrity: sha512-8hKW3krALe5aPtUZnZWyTp25qqdshQ1JPqtDGWKEwRhFXIxeOWzJoajxJw0hBAGhFVimTcF0y1PaXU0gSVD0eQ==}
-    engines: {node: '>=20'}
-
-  '@prisma-next/utils@0.10.0':
-    resolution: {integrity: sha512-MLBGskruFbGiyjHs78gyBRS/6D0cpJeAVN4UxxVxq/qm2m4dS9saXeI3OZz5sn4cHgc10vU47Ssibo6cSWpc1g==}
-    engines: {node: '>=20'}
 
   '@prisma/compute-sdk@0.17.0':
     resolution: {integrity: sha512-YfCmszlEMYndDyVT17jiAZEHOMXlVq/lJKv9cc6KT9Zn2rPdR/MKvsPhQZg4E44vgJuPXMKieULOKUwFz0aj2g==}
@@ -8591,10 +8545,6 @@ packages:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
 
-  prisma-next@0.10.0:
-    resolution: {integrity: sha512-TTxjICd78R3A8ecZdXiAbZly9FVVEV9St8Cx1Rl09CT0A4VDdM2fNgbfFRP8O8Q9DvOCElSE87EOZMogTWZuLw==}
-    hasBin: true
-
   prompts@2.4.2:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
     engines: {node: '>= 6'}
@@ -10497,60 +10447,6 @@ snapshots:
       supports-color: 10.2.2
 
   '@poppinss/exception@1.2.3': {}
-
-  '@prisma-next/config@0.10.0':
-    dependencies:
-      '@prisma-next/contract': 0.10.0
-      '@prisma-next/framework-components': 0.10.0
-      '@prisma-next/utils': 0.10.0
-      arktype: 2.2.0
-
-  '@prisma-next/contract@0.10.0':
-    dependencies:
-      '@prisma-next/utils': 0.10.0
-      '@standard-schema/spec': 1.1.0
-      arktype: 2.2.0
-
-  '@prisma-next/emitter@0.10.0':
-    dependencies:
-      '@prisma-next/contract': 0.10.0
-      '@prisma-next/framework-components': 0.10.0
-      '@prisma-next/operations': 0.10.0
-      '@prisma-next/utils': 0.10.0
-      arktype: 2.2.0
-      prettier: 3.8.3
-
-  '@prisma-next/errors@0.10.0':
-    dependencies:
-      '@prisma-next/framework-components': 0.10.0
-      '@prisma-next/utils': 0.10.0
-
-  '@prisma-next/framework-components@0.10.0':
-    dependencies:
-      '@prisma-next/contract': 0.10.0
-      '@prisma-next/operations': 0.10.0
-      '@prisma-next/ts-render': 0.10.0
-      '@prisma-next/utils': 0.10.0
-      '@standard-schema/spec': 1.1.0
-
-  '@prisma-next/migration-tools@0.10.0':
-    dependencies:
-      '@prisma-next/contract': 0.10.0
-      '@prisma-next/framework-components': 0.10.0
-      '@prisma-next/utils': 0.10.0
-      arktype: 2.2.0
-      pathe: 2.0.3
-      prettier: 3.8.3
-
-  '@prisma-next/operations@0.10.0': {}
-
-  '@prisma-next/psl-printer@0.10.0':
-    dependencies:
-      '@prisma-next/framework-components': 0.10.0
-
-  '@prisma-next/ts-render@0.10.0': {}
-
-  '@prisma-next/utils@0.10.0': {}
 
   '@prisma/compute-sdk@0.17.0(@prisma/management-api-sdk@1.29.0)':
     dependencies:
@@ -12955,35 +12851,6 @@ snapshots:
       ansi-regex: 5.0.1
       ansi-styles: 5.2.0
       react-is: 17.0.2
-
-  prisma-next@0.10.0(magicast@0.5.2)(typanion@3.14.0):
-    dependencies:
-      '@clack/prompts': 1.3.0
-      '@dagrejs/dagre': 3.0.0
-      '@prisma-next/config': 0.10.0
-      '@prisma-next/contract': 0.10.0
-      '@prisma-next/emitter': 0.10.0
-      '@prisma-next/errors': 0.10.0
-      '@prisma-next/framework-components': 0.10.0
-      '@prisma-next/migration-tools': 0.10.0
-      '@prisma-next/psl-printer': 0.10.0
-      '@prisma-next/utils': 0.10.0
-      arktype: 2.2.0
-      c12: 3.3.4(magicast@0.5.2)
-      clipanion: 4.0.0-rc.4(typanion@3.14.0)
-      closest-match: 1.3.3
-      colorette: 2.0.20
-      commander: 14.0.3
-      esbuild: 0.28.0
-      jsonc-parser: 3.3.1
-      package-manager-detector: 1.6.0
-      pathe: 2.0.3
-      string-width: 8.2.1
-      strip-ansi: 7.2.0
-      wrap-ansi: 10.0.0
-    transitivePeerDependencies:
-      - magicast
-      - typanion
 
   prompts@2.4.2:
     dependencies:
