@@ -169,19 +169,20 @@ For every file classified `long-lived` at step 4, read the file and apply the fo
 
 The audit surfaces a per-file disposition; the operator confirms at step 5 (the disposition is part of what they sign off on).
 
-### Step 5 — Confirm the classification with the operator
+### Step 5 — Surface ambiguous classifications; otherwise proceed
 
-Present the classification list **with the step-4.5 dispositions attached**. **The operator must confirm before step 6 begins.** This is a hard gate because the cost of mis-classifying long-lived as transient is irrecoverable file loss; the cost of mis-classifying transient as long-lived is project-shaping cruft accumulating in `docs/` (a softer but compounding failure that the prose audit exists to catch).
+Default-classified files (clean hits on the step-4 table with no step-4.5 audit findings) do not require operator confirmation — the operator already opted into close-out by invoking this skill, and re-confirming every transient `spec.md` / `plan.md` is friction without signal. Present the classification list as part of the close-out output and proceed.
 
-Allow the operator to:
+**Surface to the operator and wait** only when the run contains:
 
-- Re-classify any individual file.
-- Override the destination path for any long-lived file.
-- Add files to the migration that the rules tagged transient (and vice versa).
-- Override the step-4.5 disposition (e.g. accept project-framing voice for a particular file, or escalate "rewrite-at-migration" to "reclassify-as-transient").
-- Update `drive/project/README.md` with new rules if the override would apply to future projects.
+- One or more **ambiguous** files (step 4 couldn't decide via default rules).
+- One or more **long-lived** files with a step-4.5 disposition of `rewrite-at-migration`, `lift-example-to-context`, `soften-at-migration`, or `reclassify-as-transient`. The disposition is a judgement call the operator should sign off on.
+- A `design-decisions.md` whose contents look ADR-worthy and weren't already migrated during the project (step 4 catches this; surface here).
+- A destination-path collision detected at step 6 pre-flight.
 
-When the operator confirms, lock the classification list and proceed.
+When surfacing, present the affected items with rationale and the proposed disposition. Allow the operator to: re-classify, override the destination, accept/reject the step-4.5 disposition, or update `drive/project/README.md` with a new rule for future projects.
+
+If no items in the list above are present, proceed to step 6 without prompting. The classification block still lands in the close-out PR description for the reviewer's audit trail.
 
 ### Step 6 — Migrate long-lived files (applying step-4.5 dispositions)
 
@@ -253,7 +254,7 @@ Push and open the PR.
 
 ## Common Pitfalls
 
-1. **Skipping the operator confirmation at step 5.** Symptom: a long-lived file gets classified transient by a default rule, file is deleted, and lessons it captured are lost. Fix: step 5 is a hard gate. Default rules are heuristics, not authority — the operator owns the final call.
+1. **Surfacing every classification for confirmation.** Symptom: operator is asked to re-confirm `spec.md → transient`, `plan.md → transient`, etc. on every close-out. The default rules exist precisely so the obvious cases don't need re-litigating. Fix: per step 5, surface only ambiguous classifications, step-4.5 judgement calls, ADR-worthy `design-decisions.md`, and destination collisions. Otherwise proceed and let the close-out PR carry the audit trail.
 2. **Treating retros as long-lived.** Symptom: `retros.md` migrates into `docs/<project>/retros.md` and accumulates project-archeology cruft. Fix: per the retro principle, lessons land in surfaces the next dispatch reads (skills / READMEs / ADRs). The retro log itself is transient; if a lesson hasn't landed somewhere durable, that's a step-2 DoD failure, not a step-6 migration concern.
 3. **Treating `design-decisions.md` as long-lived.** Symptom: project's `design-decisions.md` migrates to `docs/<project>/design-decisions.md` because it "documents decisions". Fix: decisions worth preserving should already have migrated to ADRs during the project (the principles document this). If they haven't, surface at step 4 and require ADR migration before close — not a docs/<project>/ migration of the raw log.
 4. **Re-pointing references at `projects/<project>/**` content that's about to vanish.** Symptom: post-close, a `docs/onboarding/X.md` link points at `projects/<old-project>/spec.md` which 404s. Fix: step 7 is the gate. Re-run the step-3 scan after step 7 to verify the residual is empty.
@@ -280,7 +281,7 @@ Push and open the PR.
 - [ ] External-reference scan run; worklist recorded.
 - [ ] Every file under `projects/<project>/` classified; ambiguous files surfaced to operator.
 - [ ] Prose audit (step 4.5) run on every long-lived candidate; per-file dispositions recorded (none / rewrite-at-migration / lift-example-to-context / soften-at-migration / reclassify-as-transient).
-- [ ] Operator confirmed the classification list **with dispositions attached** before any deletion.
+- [ ] Operator surfaced on (only) ambiguous classifications, step-4.5 judgement calls, ADR-worthy `design-decisions.md`, or destination collisions; clean default classifications proceed without prompting.
 - [ ] Long-lived files migrated to destination per their disposition (`git mv` for the trivial case; rewrite / lift / soften for the audited cases); index doc (`docs/<project>/README.md` or equivalent) written.
 - [ ] External references re-pointed or removed; re-scan returns empty.
 - [ ] `projects/<project>/` deleted via `git rm -rf`.
