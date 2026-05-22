@@ -641,13 +641,13 @@ This skill is intentionally body-only. The authoritative surfaces are:
 
 **Postgres**
 
-- Example queries under [`examples/prisma-next-demo/src/orm-client/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/orm-client) and [`examples/prisma-next-demo/src/queries/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/queries) — canonical ORM and SQL-builder shapes.
+- Example queries under [`examples/prisma-next-demo/src/orm-client/`](examples/prisma-next-demo/src/orm-client/) and [`examples/prisma-next-demo/src/queries/`](examples/prisma-next-demo/src/queries/) — canonical ORM and SQL-builder shapes.
 - ORM client source under `packages/3-extensions/sql-orm-client/src/`.
 - SQL builder source under `packages/2-sql/4-lanes/sql-builder/src/`.
 
 **Mongo**
 
-- Example queries under [`examples/mongo-demo/src/server.ts`](https://github.com/prisma/prisma-next/tree/main/examples/mongo-demo/src/server.ts) — ORM reads, `.include`, `.variant`, and pipeline DSL via `db.query`.
+- Example queries under [`examples/mongo-demo/src/server.ts`](examples/mongo-demo/src/server.ts) — ORM reads, `.include`, `.variant`, and pipeline DSL via `db.query`.
 - Integration tests under `examples/mongo-demo/test/` (`blog.test.ts`, `crud-lifecycle.test.ts`, `query-builder-writes.test.ts`).
 - Query builder README under `packages/2-mongo-family/5-query-builders/query-builder/README.md`.
 - ORM collection surface under `packages/2-mongo-family/5-query-builders/orm/src/collection.ts`.
