@@ -80,7 +80,7 @@ What stays the same: document-scoped `storage.types` (codec triples / aliases on
 
 ### Dispatch 2: Fixture regeneration + migration replay (A4)
 
-**Intent.** Regenerate every committed contract that carries `"kind": "postgres-enum"` so on-disk JSON and emitted `contract.d.ts` use `storage.namespaces.<ns>.enum.<name>`. Run migration-replay verification against pre-#534 bookend contracts with **document-scoped** `storage.types` enums (A4). Regenerate bookends only if replay fails; document outcome in PR notes (spec open question #2).
+**Intent.** Regenerate every committed contract that carries `"kind": "postgres-enum"` so on-disk JSON and emitted `contract.d.ts` use `storage.namespaces.<ns>.enum.<name>`. Run migration-replay verification against pre-#534 bookend contracts with **document-scoped** `storage.types` enums (A4). Regenerate bookends only if replay fails; document outcome in PR notes (spec open question #2). **Fold-in:** generalize two pre-existing JSDoc references in `packages/1-framework/1-core/framework-components/src/ir/ir-node.ts` and `packages/1-framework/1-core/framework-components/src/ir/storage-type.ts` that name `'postgres-enum'` as the example discriminator — replace with a target-agnostic placeholder so the JSDoc reads as framework-substrate documentation rather than Postgres-specific (D1 post-flight surfaced; cost = 2 lines).
 
 What stays the same: no further source edits unless replay falsification requires a small planner/serializer fix (if fix cascades beyond bookend regen → halt per spec edge #12 deferral). Mongo contracts unchanged. User-facing DSL unchanged.
 

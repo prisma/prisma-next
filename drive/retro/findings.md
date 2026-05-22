@@ -2,6 +2,21 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-22 · drive-specify-slice · gap (over-strict grep gate conflated slot relocation with type retirement)
+
+S1.B slice spec's `SDoD6` translated project PDoD3 — *"no hardcoded `'postgres-enum'` paths or codec-hook hacks in framework or SQL-family"* — into the grep `rg "PostgresEnumStorageEntry|'postgres-enum'" packages/1-framework/ packages/2-sql/9-family/ → zero matches`. PDoD3's actual wording only audits the literal `'postgres-enum'` string; the slice author added `PostgresEnumStorageEntry` to the pattern thinking it tightened the gate. It didn't tighten — it changed the scope. PDoD3 is about retiring hardcoded discriminator paths; `PostgresEnumStorageEntry` type imports in family-sql are a legitimate bridging-adapter signature (a deliberate post-S1.A design that lets the family verifier walk enums natively while leaving target-specific schema introspection to the Postgres target).
+
+D1 hit the actual PDoD3 cleanly (zero literal `'postgres-enum'` in family-sql source) but tripped the over-strict SDoD6 gate (37 `PostgresEnumStorageEntry` type-import hits in family-sql). The post-flight DoD walk surfaced the gate defect, the slice spec was patched to match PDoD3's actual wording verbatim, and the descriptor-driven verifier generalization (the work the over-strict gate would have demanded) was filed as a separate ticket ([TML-2667](https://linear.app/prisma-company/issue/TML-2667), Low priority, related to the parent project).
+
+Two failure modes compounded:
+
+1. **Translating a project-DoD audit into a slice-DoD gate via paraphrase rather than copy-paste.** When the project spec gives the exact grep, the slice spec should reproduce it verbatim and add scope-narrowing exceptions rather than re-typing the pattern. Paraphrase = drift.
+2. **Pattern-tightening that's actually scope-broadening.** Adding a token to a regex makes the gate match more; whether that matches the right *more* depends on whether the added token names the same surface as the rest of the pattern. Here, `'postgres-enum'` names a discriminator literal (a behaviour-laden code path) and `PostgresEnumStorageEntry` names a type symbol (a structural import); they live on different axes. Tightening one axis under cover of "tightening the gate" hid the scope change.
+
+**Suggested action:** `drive-specify-slice` should call out, when a slice spec's SDoD lifts a project-DoD audit gate (especially grep gates), that the gate text must be **verbatim** with any scope exceptions added as explicit carve-outs rather than by adjusting the pattern itself. The retrofit pattern is *"copy the project-DoD gate, then `MINUS …` for slice-specific exceptions"* — never *"re-type the pattern from intent."*
+
+**Upstream candidate?** Yes — the pitfall is structural to any project-→-slice DoD translation, not Drive-specific.
+
 ## 2026-05-21 · drive-run-retro · boundary
 
 First in-anger use of `drive-run-retro` in this trial, triggered by an

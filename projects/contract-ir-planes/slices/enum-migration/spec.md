@@ -46,7 +46,7 @@ Postgres enum relocates from `storage.namespaces.<ns>.types.<name>` → `storage
 
 **Verification gates.**
 
-- PDoD3 grep gate: `rg "PostgresEnumStorageEntry|'postgres-enum'" packages/1-framework/ packages/2-sql/9-family/` returns zero matches (SQLite adapter imports of `PostgresEnumStorageEntry` for rejection spelling remain in `packages/3-targets/` per project non-goals).
+- PDoD3 grep gate (verbatim from project spec): `rg "'postgres-enum'" packages/1-framework/ packages/2-sql/9-family/` returns hits only in test fixtures exercising the kind. **`PostgresEnumStorageEntry` type imports in family-sql (bridging adapter signature on `verifyEnumType` / `control-adapter.ts` / `contract-to-schema-ir.ts`) are out of scope for S1.B** — that's a separate descriptor-driven verifier generalization, filed as [TML-2667](https://linear.app/prisma-company/issue/TML-2667). PDoD3 targets hardcoded `'postgres-enum'` discriminator paths and codec-hook hacks (project spec § PDoD3), not type-import bridging.
 - Migration-replay check against pre-#534 bookend contracts carrying **document-scoped** enum shape (`storage.types.<enum>`, not namespace-scoped) — A4 falsification probe (see edge cases).
 
 **In-flight cleanup fold decisions.**
@@ -125,7 +125,7 @@ flowchart LR
 - [ ] **SDoD3.** Reviewer verdict: accept (PR review surface).
 - [ ] **SDoD4.** Manual-QA: **N/A** — no user-observable authoring or runtime API change; users still author `enum { … }` / `helpers.enum({…})`. Structural IR / emitted contract shape change only. Hash shifts are invisible at the DSL surface.
 - [ ] **SDoD5.** Slice doesn't touch surfaces listed as out-of-scope (domain plane population, cross-ref encoding, subsumed helper deletion, TML-2654 pipeline, plural rename).
-- [ ] **SDoD6 — PDoD3 satisfied.** Postgres enum emitted at `contract.storage.namespaces.<ns>.enum.<name>`. Framework-shared namespace `types` slot no longer accepts enum entries. `rg "PostgresEnumStorageEntry|'postgres-enum'" packages/1-framework/ packages/2-sql/9-family/` returns zero matches. `'postgres-enum'` hits confined to `packages/3-targets/3-targets/postgres/**`, `packages/3-targets/6-adapters/postgres/**`, and test fixtures exercising the kind.
+- [ ] **SDoD6 — PDoD3 satisfied.** Postgres enum emitted at `contract.storage.namespaces.<ns>.enum.<name>`. Framework-shared namespace `types` slot no longer accepts enum entries. `rg "'postgres-enum'" packages/1-framework/ packages/2-sql/9-family/` returns hits only in test fixtures exercising the kind (no hardcoded discriminator paths or codec-hook hacks in source code). `'postgres-enum'` source hits confined to `packages/3-targets/3-targets/postgres/**` and `packages/3-targets/6-adapters/postgres/**`. **Note:** `PostgresEnumStorageEntry` type-import bridging in family-sql (`verifyEnumType` adapter, `contract-to-schema-ir.ts` polymorphic record) is *not* a PDoD3 violation — that's a separate descriptor-driven verifier scope, filed as a follow-up. PDoD3's wording (project spec) audits `'postgres-enum'` literal, not the type symbol.
 - [ ] **SDoD7 — TML-2658 closed.** `NamespaceRawSchema` carries explicit `'+': 'ignore'` + comment (folded, not separate PR).
 - [ ] **SDoD8 — Migration replay.** Pre-#534 bookend contracts with document-scoped enums replay successfully OR bookends regenerated with documented rationale if A4 falsified.
 
