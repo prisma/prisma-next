@@ -201,7 +201,9 @@ exports[`help text snapshots > formats db verify help 1`] = `
 exports[`help text snapshots > formats init help 1`] = `
 "prisma-next init → Initialize a new Prisma Next project
 │
-│ --json                Output as JSON
+│ --format <pretty|json>  Output format (default: pretty, or json when stdout is
+│                       not a TTY)
+│ --json                Output as JSON (alias for --format json)
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
 │ --trace               Trace output: deep internals, stack traces
