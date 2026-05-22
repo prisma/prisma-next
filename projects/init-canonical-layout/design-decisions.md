@@ -48,3 +48,37 @@
 **Decision:** No coordination needed. Verified via `ls packages/3-extensions/agent-skill` (no such directory) and Grep for residual references in init.
 
 **Affected:** None.
+
+## D5 — Drop legacy `prisma/` detect-and-warn (post-review)
+
+**Trigger:** Operator rejected D2 on principle that init does not maintain compatibility code for past defaults; PR #581 review comment `r3286723789` ([discussion](https://github.com/prisma/prisma-next/pull/581#discussion_r3286723789)).
+
+**Decision:** Revert the D2 detect-and-warn branch and its test file. Init declares the current canonical layout and accepts user-supplied overrides via `--schema-path`; it does not maintain detection of past defaults. The install-base cohort affected is small enough that `ls` is sufficient self-service; the framework should not absorb a moving boundary ("which past defaults qualify? for how long?").
+
+**Affected:**
+- `packages/1-framework/3-tooling/cli/src/commands/init/init.ts` (legacy-warn branch removed).
+- `packages/1-framework/3-tooling/cli/test/commands/init/reinit-legacy-warn.test.ts` (deleted).
+- Project spec: FR4 and PDoD3 dropped.
+
+## D6 — Constant naming reflects source-location, not directory (post-review)
+
+**Trigger:** Operator anchor finding F-USER-2; architect review § 3 / § 8.
+
+**Decision:** Rename `DEFAULT_PRISMA_DIR` → `DEFAULT_CONTRACT_SOURCE_DIR`. The domain concept is the default *source* directory for the contract file the user authors at init time; output artefacts colocate with source per the same rule path-bearing providers apply. The name "Prisma dir" overloads the framework name onto a directory the framework happens to scaffold into for historical reasons.
+
+**Affected:**
+- `packages/1-framework/1-core/config/src/config-types.ts` (definition + doc-comment).
+- `packages/1-framework/1-core/config/src/exports/config-types.ts`.
+- `packages/1-framework/3-tooling/cli/src/commands/init/templates/code-templates.ts`.
+- Doc-comments in `hygiene-gitattributes.ts`.
+
+## D7 — Runtime fallback removed (post-review)
+
+**Trigger:** Operator anchor finding F-USER-1; code-review F01 Option A; architect review § 8.
+
+**Decision:** Remove the `resolveContractPath` static fallback entirely. When `config.contract?.output` is undefined, throw a typed `errorRuntime(...)` (matching the existing `contract-emit.ts` precondition pattern). Remove exported `DEFAULT_CONTRACT_OUTPUT`; the in-memory-only fallback in `normalizeContractConfig` derives inline from `DEFAULT_CONTRACT_SOURCE_DIR`. A config that bypassed normalization is a bug at the call site and must surface as an error, not paper over with a static path.
+
+**Affected:**
+- `packages/1-framework/3-tooling/cli/src/utils/command-helpers.ts`.
+- `packages/1-framework/3-tooling/cli/test/utils/command-helpers.test.ts`.
+- `packages/1-framework/1-core/config/src/config-types.ts` (`DEFAULT_CONTRACT_OUTPUT` removed).
