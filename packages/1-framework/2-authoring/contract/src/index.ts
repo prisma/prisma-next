@@ -1,3 +1,5 @@
+export type { CapabilityMatrix } from './capability-registry';
+export { mergeCapabilityMatrices } from './capability-registry';
 export type {
   AuthoringNamespaceKey,
   EntityHelperFactoryOptions,

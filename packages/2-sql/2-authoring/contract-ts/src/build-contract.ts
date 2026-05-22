@@ -16,6 +16,7 @@ import {
   type JsonValue,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
+import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
@@ -578,8 +579,21 @@ export function buildSqlContractFromDefinition(
     }
   }
 
-  const capabilities: Record<string, Record<string, boolean>> = definition.capabilities || {};
-  const profileHash = computeProfileHash({ target, targetFamily, capabilities });
+  const extensionPackCapabilitySources = definition.extensionPacks
+    ? Object.values(definition.extensionPacks).map(
+        (pack) => pack.capabilities as CapabilityMatrix | undefined,
+      )
+    : [];
+  const capabilities = mergeCapabilityMatrices(
+    definition.target.capabilities as CapabilityMatrix | undefined,
+    ...extensionPackCapabilitySources,
+    definition.capabilities,
+  );
+  const profileHash = computeProfileHash({
+    target,
+    targetFamily,
+    capabilities: (definition.capabilities ?? {}) as Record<string, Record<string, boolean>>,
+  });
 
   const executionWithHash = executionSection
     ? {
