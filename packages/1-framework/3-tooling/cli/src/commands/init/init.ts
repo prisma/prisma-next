@@ -351,19 +351,23 @@ export async function runInit(
   }
 
   if (existsSync(join(baseDir, 'src/index.ts'))) {
-    const rawName =
-      parsedPackageJson !== null && typeof parsedPackageJson['name'] === 'string'
-        ? parsedPackageJson['name']
-        : basename(baseDir);
-    filesToWrite.push({
-      path: 'README.md',
-      content: minimalProjectReadmeMd(
-        inputs.target,
-        inputs.schemaPath,
-        sanitisePackageName(rawName),
-        pm,
-      ),
-    });
+    if (!existsSync(join(baseDir, 'README.md'))) {
+      const rawName =
+        parsedPackageJson !== null && typeof parsedPackageJson['name'] === 'string'
+          ? parsedPackageJson['name']
+          : basename(baseDir);
+      filesToWrite.push({
+        path: 'README.md',
+        content: minimalProjectReadmeMd(
+          inputs.target,
+          inputs.schemaPath,
+          sanitisePackageName(rawName),
+          pm,
+        ),
+      });
+    } else {
+      warnings.push('README.md already exists; leaving it untouched.');
+    }
   }
 
   // -----------------------------------------------------------------

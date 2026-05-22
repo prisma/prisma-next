@@ -633,6 +633,30 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
     expect(readFileSync(join(tmpDir, '.env'), 'utf-8')).toBe('DATABASE_URL=secret://existing');
   });
 
+  it('never overwrites an existing README.md when src/index.ts is present', async () => {
+    mkdirSync(join(tmpDir, 'src'), { recursive: true });
+    writeFileSync(join(tmpDir, 'src/index.ts'), 'export {}');
+    writeFileSync(join(tmpDir, 'README.md'), '# user-authored readme');
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(readFileSync(join(tmpDir, 'README.md'), 'utf-8')).toBe('# user-authored readme');
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      expect(parsed.warnings.join('\n')).toMatch(/README\.md already exists/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('writes .gitignore with .env, dist/, node_modules/ when missing (FR3.3)', async () => {
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
