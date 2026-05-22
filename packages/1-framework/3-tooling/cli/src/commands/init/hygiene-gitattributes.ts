@@ -20,7 +20,7 @@ import type { TargetId } from './templates/code-templates';
  * `db/contract.json linguist-generated` — not the workspace-glob form
  * `<glob>/contract.json` (which would over-match any unrelated
  * `contract.json` the user has elsewhere) and not the absolute
- * `src/prisma/contract.json` (which would silently break for a non-default
+ * `DEFAULT_CONTRACT_SOURCE_DIR/contract.json` (which would silently break for a non-default
  * schema path).
  */
 const ARTEFACT_FILENAMES: readonly string[] = [
@@ -59,7 +59,7 @@ export function requiredGitattributesLines(
  *
  * Equivalence is exact-line: a user-customised line like
  * `prisma/*.json linguist-generated` is *not* recognised as covering
- * `src/prisma/contract.json linguist-generated`. We accept that
+ * `DEFAULT_CONTRACT_SOURCE_DIR/contract.json linguist-generated`. We accept that
  * over-specification — preserving the user's broad pattern *and*
  * appending the narrow one — because the narrow lines are what the
  * acceptance criteria pin (FR3.4 AC).

@@ -198,6 +198,61 @@ exports[`help text snapshots > formats db verify help 1`] = `
 "
 `;
 
+exports[`help text snapshots > formats init help 1`] = `
+"prisma-next init → Initialize a new Prisma Next project
+│
+│ --json                Output as JSON
+│ -q, --quiet           Quiet mode: errors only
+│ -v, --verbose         Verbose output: debug info, timings
+│ --trace               Trace output: deep internals, stack traces
+│ --color               Force color output
+│ --no-color            Disable color output
+│ --interactive         Force interactive mode
+│ --no-interactive      Disable interactive prompts
+│ -y, --yes             Auto-accept prompts
+│ --target <db>         Database target: postgres or mongodb
+│ --authoring <style>   Schema authoring style: psl or typescript
+│ --schema-path <path>  Where to write the starter schema (default:
+│                       src/prisma/contract.prisma)
+│ --force               Overwrite an existing scaffold without prompting
+│ --write-env           Write a .env file from .env.example (gitignored;
+│                       default: only .env.example)
+│ --probe-db            Connect to DATABASE_URL once and check the server
+│                       version against the target minimum (opt-in; off by
+│                       default)
+│ --strict-probe        Treat a failed --probe-db as fatal (no-op without
+│                       --probe-db; init is offline-by-default)
+│ --no-install          Skip dependency installation and contract emission
+│ --no-skill            Skip Prisma Next skills install (air-gapped CI,
+│                       restricted registries, etc.)
+│
+│ Examples:
+│   $ prisma-next init
+│   $ prisma-next init --yes --target postgres --authoring psl
+│   $ prisma-next init --yes --target mongodb --authoring typescript --json
+│   $ prisma-next init --yes --force --target postgres --authoring psl  # overwrite an existing scaffold
+│   $ prisma-next init --no-install                                       # skip pnpm/npm install + emit
+│   $ prisma-next init --no-skill                                         # skip the skills install (air-gapped / restricted env)
+│
+│ Scaffolds config, schema, and runtime files, installs dependencies,
+│ and emits the contract. Gets you from zero to typed queries in one step.
+│ Run interactively for a guided experience, or supply --target / --authoring
+│ and --yes for a fully scriptable run (CI, AI coding agents, automation).
+│ Exit codes (see CLI Style Guide § Exit Codes):
+│ 0   OK                    Init succeeded.
+│ 1   INTERNAL_ERROR        Unexpected bug in prisma-next (please report).
+│ 2   PRECONDITION          Bad flags / missing prerequisite (e.g. no
+│ package.json).
+│ 3   USER_ABORTED          User cancelled an interactive prompt.
+│ 4   INSTALL_FAILED        Dependency installation failed (init-specific).
+│ 5   EMIT_FAILED           \`contract emit\` failed after install
+│ (init-specific).
+│ 6   SKILL_INSTALL_FAILED  Agent-skill install failed (re-run with --no-skill
+│ to skip).
+└
+"
+`;
+
 exports[`help text snapshots > formats root help 1`] = `
 "prisma-next Manage your data layer
 │

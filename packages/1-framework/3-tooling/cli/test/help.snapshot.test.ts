@@ -6,6 +6,7 @@ import { createContractInferCommand } from '../src/commands/contract-infer';
 import { createDbSchemaCommand } from '../src/commands/db-schema';
 import { createDbUpdateCommand } from '../src/commands/db-update';
 import { createDbVerifyCommand } from '../src/commands/db-verify';
+import { createInitCommand } from '../src/commands/init/index';
 import { formatCommandHelp, formatRootHelp } from '../src/utils/formatters/help';
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
@@ -44,6 +45,14 @@ describe('help text snapshots', { timeout: timeouts.default }, () => {
 
   it('formats contract infer help', () => {
     const command = createContractInferCommand();
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const helpText = formatCommandHelp({ command, flags });
+
+    expect(helpText).toMatchSnapshot();
+  });
+
+  it('formats init help', () => {
+    const command = createInitCommand();
     const flags = parseGlobalFlags({ 'no-color': true });
     const helpText = formatCommandHelp({ command, flags });
 
