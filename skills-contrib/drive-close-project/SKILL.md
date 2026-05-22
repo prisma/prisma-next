@@ -82,6 +82,7 @@ Also walk the canonical Project DoD (per `principles/definition-of-done.md`):
 - Mandatory final retro complete (invariant I10) — verify a retro entry exists in the project's retro log dated within the close-out window. If absent: halt and point at `drive-run-retro` with the "mandatory at project close" trigger.
 - Long-lived docs ready to land (this is what step 4 onward enacts; verify the candidate list exists before proceeding).
 - No open ADRs blocking close.
+- Before classification, check the PR for unresolved review comments / anchor findings (e.g. `gh api repos/<owner>/<repo>/pulls/<n>/comments`). If any exist, surface to the operator and pause.
 
 Write the DoD verification into a draft block — it will become a section of the close-out PR description in step 9.
 
@@ -179,6 +180,7 @@ Default-classified files (clean hits on the step-4 table with no step-4.5 audit 
 - One or more **long-lived** files with a step-4.5 disposition of `rewrite-at-migration`, `lift-example-to-context`, `soften-at-migration`, or `reclassify-as-transient`. The disposition is a judgement call the operator should sign off on.
 - A `design-decisions.md` whose contents look ADR-worthy and weren't already migrated during the project (step 4 catches this; surface here).
 - A destination-path collision detected at step 6 pre-flight.
+- The PR has open anchor / review findings the operator has not marked resolved.
 
 When surfacing, present the affected items with rationale and the proposed disposition. Allow the operator to: re-classify, override the destination, accept/reject the step-4.5 disposition, or update `drive/project/README.md` with a new rule for future projects.
 
@@ -278,6 +280,7 @@ Push and open the PR.
 - [ ] Project context loaded (`drive/project/README.md`, `drive/pr/README.md`).
 - [ ] Every acceptance criterion in `spec.md` verified met / deferred-with-ticket / cancelled-with-rationale. Result block drafted for the PR description.
 - [ ] Mandatory final retro completion verified (per invariant I10).
+- [ ] PR checked for unresolved review comments / anchor findings before classification; any open findings surfaced to operator.
 - [ ] External-reference scan run; worklist recorded.
 - [ ] Every file under `projects/<project>/` classified; ambiguous files surfaced to operator.
 - [ ] Prose audit (step 4.5) run on every long-lived candidate; per-file dispositions recorded (none / rewrite-at-migration / lift-example-to-context / soften-at-migration / reclassify-as-transient).
