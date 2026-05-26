@@ -567,9 +567,10 @@ describe('compileSelectWithIncludeStrategy', () => {
   // Lateral lowers `combine({ a, b, ... })` as a single LATERAL JOIN
   // whose inner SELECT cross-joins each branch as a derived table and
   // projects `json_build_object('a', a_alias.<rel>, 'b', b_alias.<rel>, ...)`.
-  // Row branches reuse the standalone row builder; scalar branches reuse
-  // the D1 scalar builder (preserving the `{value: <primitive>}`
-  // envelope inside the combined JSON — the decoder unwraps per-branch).
+  // Row branches reuse the standalone row builder; scalar branches
+  // reuse the standalone scalar builder (preserving the `{value:
+  // <primitive>}` envelope inside the combined JSON — the decoder
+  // unwraps per-branch).
   describe('lateral combine() packing', () => {
     function extractCombineLateralSelect(plan: { ast: unknown }, alias: string): SelectAst {
       expectSelectAst(plan.ast);
