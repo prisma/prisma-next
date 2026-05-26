@@ -30,6 +30,23 @@ Rationale for the two-commit shape: the convenience wrappers in `packages/3-exte
 - `packages/2-sql/5-runtime/test/sql-runtime.test.ts`, `sql-runtime-abort.test.ts`, `intercept-decoding.test.ts`, `scope-plumbing.test.ts`, `async-iterable-result.test.ts`, `prepared.test.ts`, `runtime-ctx-passthrough.test.ts` — replace `verify: { mode: 'onFirstUse', requireMarker: false }` literals. Most callers can omit the field entirely (the default does the right thing); keep `verifyMarker: false` only where the test explicitly relies on skipping the marker read.
 - `packages/3-extensions/postgres/test/postgres-serverless.test.ts` — replace literal.
 
+### Tests (downstream workspace packages — migrate in lockstep)
+
+The rename breaks workspace-wide typecheck unless every consumer is updated in the same commit. Concretely:
+
+- `test/integration/test/utils.ts` — drop the `verify` option on `CreateTestRuntimeOptions`; replace its threading into `createRuntime` with `verifyMarker` (or omit on first move since the test default doesn't care about the option).
+- `test/integration/test/runtime.verify-marker.missing-table.integration.test.ts` — **semantic re-targeting**: assertions that expect `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISSING' })` flip to "the log handler receives a `warn`-level call with the expected payload, and the query returns rows normally." Pass a stub `log` into `createRuntime` and assert on `log.warn`.
+- `test/integration/test/value-objects/value-objects.e2e.test.ts`, `test/integration/test/sql-orm-client/runtime-helpers.ts`, `test/integration/test/sql-builder/setup.ts`, `test/integration/test/rewriting-middleware.integration.test.ts`, `test/integration/test/cross-package/middleware-cache.test.ts` — literal-replacement only.
+- `test/e2e/framework/test/sqlite/runtime.verify-marker.missing-table.test.ts` — drop the `RuntimeVerifyOptions` import; same semantic re-targeting as the integration counterpart.
+- `test/e2e/framework/test/sqlite/utils.ts` — literal replacement.
+- `examples/prisma-next-demo/src/prisma-no-emit/runtime.ts` — production-shaped example code; replace the literal so adopters reading the demo see the new API.
+- `examples/prisma-next-demo/test/sql-dsl.integration.test.ts`, `examples/prisma-next-demo/test/repositories.integration.test.ts` — literal replacement.
+
+### JSDoc cleanup adjacent to the rename
+
+- `packages/2-sql/5-runtime/src/runtime-spi.ts` — `MarkerReader.readMarker` JSDoc says "(when `verify` is enabled)"; update to "(when `verifyMarker` is not `false`)" since the semantics are no longer "enabled / disabled" but "lazy on first execute unless opted out."
+- `packages/2-sql/5-runtime/src/runtime-spi.ts` — extend `VerifyMarkerOption`'s JSDoc with a brief default-on rationale (per design-notes D5: "default-on so drift surfaces by default for teams who never thought to enable it"). Keep tight; one sentence.
+
 ### Not in this commit
 
 - _Framework errors module_: no edits. The `'CONTRACT.MARKER_*'` strings are inline `runtimeError` arguments only, not central enum entries. The CLI's separate `VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001'` is unrelated and stays as-is.
@@ -41,6 +58,7 @@ Rationale for the two-commit shape: the convenience wrappers in `packages/3-exte
 - `pnpm --filter @prisma-next/sqlite-extension typecheck` green.
 - `pnpm --filter @prisma-next/postgres-extension test typecheck` green.
 - `pnpm test:packages` green (broader workspace not broken).
+- **`pnpm -r typecheck` green** — explicitly catches downstream consumers (`@prisma-next/integration-tests`, `@prisma-next/e2e-tests`, `prisma-next-demo`) that `pnpm test:packages` does not run.
 - New test cases (skip-when-false, one-shot semantics) passing.
 - `pnpm lint:deps` clean (no new layering violations).
 

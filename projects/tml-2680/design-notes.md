@@ -68,6 +68,7 @@ These assumptions underpin the design. If any of them turn out to be wrong, the 
 - **A4** — "Marker" is sufficiently established as user-facing vocabulary (error codes, table name, README references, ADRs) that we are not introducing a new term.
 - **A5** — A one-shot log line per runtime is acceptable steady-state noise. When there's no drift, no log fires; this is a per-runtime-lifetime cost, not a per-query cost.
 - **A6** — The narrow class of failures the marker check catches (codec incompatibilities, silent type coercions) is real and hard enough to root-cause from per-query errors weeks later that the check earns its modest implementation cost.
+- **A7** — `MarkerReader.readMarker(...)` exceptions are *not* part of the one-shot guarantee. If the reader itself throws (driver-level failure, adapter-level error), the exception propagates to the caller of `execute()` and the `verified` flag is **not** set; the next query will re-attempt the read. The one-shot guarantee covers only the *successful-but-non-matching* outcomes (mismatch, absent, no-table). This is consistent with how the runtime treats any other transient driver failure on first execute. If a future change wants reader exceptions to also count as "verified" (e.g. to avoid log-spam under sustained DB outages), that's an explicit follow-up — not a silent amendment to A7.
 
 ## Alternatives considered and rejected
 

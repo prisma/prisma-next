@@ -26,15 +26,38 @@ Two user populations are affected by the response change:
 
 ## Surface and scope
 
-The change lives in the SQL runtime layer and its three convenience-wrapper extensions:
+The change lives in the SQL runtime layer, its three convenience-wrapper extensions, and any downstream workspace consumer that constructs runtimes through the renamed API.
+
+### Owning packages
 
 - `packages/2-sql/5-runtime/src/runtime-spi.ts` — owner of `RuntimeVerifyOptions`.
 - `packages/2-sql/5-runtime/src/sql-runtime.ts` — the runtime implementation, including `verifyMarker()`, the constructor's mode-handling, and `streamRows`' verification call sites.
 - `packages/2-sql/5-runtime/src/exports/index.ts` — public re-exports.
 - `packages/3-extensions/sqlite/src/runtime/sqlite.ts`, `packages/3-extensions/postgres/src/runtime/postgres.ts`, `packages/3-extensions/postgres/src/runtime/postgres-serverless.ts` — convenience wrappers.
+
+### In-package tests
+
 - Tests under `packages/2-sql/5-runtime/test/` (~10 files reference the old shape; one — `marker-verification.test.ts` — pins behaviour and needs re-targeting at log emission).
-- `packages/2-sql/5-runtime/README.md` — example snippet uses the old API.
-- Changelog (breaking change).
+- `packages/3-extensions/postgres/test/postgres-serverless.test.ts` — also references the old shape.
+
+### Downstream consumers (must be migrated in lockstep)
+
+The rename is breaking; every workspace package that constructs a runtime or imports `RuntimeVerifyOptions` must be migrated in the same commit, or workspace-wide typecheck breaks. Concretely:
+
+- `test/integration/test/utils.ts` — shared helper exposing a `verify` option on `CreateTestRuntimeOptions`; threads into `createRuntime`. Touched transitively by most integration tests.
+- `test/integration/test/runtime.verify-marker.missing-table.integration.test.ts` — pins old `requireMarker: true` throws-`CONTRACT.MARKER_MISSING` semantics. **Needs semantic re-targeting**, not just literal replacement: assertions flip from "rejects with `CONTRACT.MARKER_MISSING`" to "the log handler receives a structured `warn` payload with `code: 'CONTRACT.MARKER_MISSING'` and the query proceeds." The test stays — it's the integration-level coverage of the missing-table branch against a real DB and is complementary to the unit-level coverage in `marker-verification.test.ts`.
+- `test/integration/test/value-objects/value-objects.e2e.test.ts`, `test/integration/test/sql-orm-client/runtime-helpers.ts`, `test/integration/test/sql-builder/setup.ts`, `test/integration/test/rewriting-middleware.integration.test.ts`, `test/integration/test/cross-package/middleware-cache.test.ts` — literal-replacement sites.
+- `test/e2e/framework/test/sqlite/runtime.verify-marker.missing-table.test.ts` — imports `RuntimeVerifyOptions` (must drop), pins the old throw behaviour (same semantic re-targeting as the integration counterpart). Stays; complementary at the e2e layer.
+- `test/e2e/framework/test/sqlite/utils.ts` — literal replacement.
+- `examples/prisma-next-demo/src/prisma-no-emit/runtime.ts` — **production-shaped example code**. Replacing the literal is high-leverage: this is what readers learning the framework see.
+- `examples/prisma-next-demo/test/sql-dsl.integration.test.ts`, `examples/prisma-next-demo/test/repositories.integration.test.ts` — literal replacement.
+
+### Docs
+
+- `packages/2-sql/5-runtime/README.md` — example snippet uses the old API; symbol table entry references `RuntimeVerifyOptions`.
+- `docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md` — runtime API snippet uses the old shape.
+- ADR 021 / 042 (Contract Marker Storage / Evolution) — possibly amended with a Decisions section noting the read-side response shift.
+- Per-package CHANGELOGs (`@prisma-next/sql-runtime`, `@prisma-next/sqlite-extension`, `@prisma-next/postgres-extension`) — breaking-change note with migration snippet.
 
 # Requirements
 
