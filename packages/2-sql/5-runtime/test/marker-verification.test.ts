@@ -6,6 +6,7 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
+import type { RuntimeLog } from '@prisma-next/framework-components/runtime';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
@@ -27,7 +28,14 @@ import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecs } from './utils';
 
 /**
- * Pins the per-result-kind branches of `verifyMarker` in `sql-runtime.ts`: missing marker (with `requireMarker: true`), missing marker tolerated (with `requireMarker: false`), and profile-hash mismatch. Storage-hash mismatch is covered by `marker-vs-intercept-ordering.test.ts`.
+ * Pins the per-result-kind branches of `verifyMarker` in `sql-runtime.ts`: absent marker
+ * (warns CONTRACT.MARKER_MISSING), missing table (warns CONTRACT.MARKER_MISSING), storage-hash
+ * mismatch (warns CONTRACT.MARKER_MISMATCH), profile-hash mismatch (warns CONTRACT.MARKER_MISMATCH),
+ * matching marker (silent), verifyMarker: false (reader never called), and one-shot semantics
+ * (at most one log per runtime lifetime).
+ *
+ * Storage-hash mismatch ordering against middleware intercepts is covered by
+ * `marker-vs-intercept-ordering.test.ts`.
  */
 
 const testContract: Contract<SqlStorage> = {
@@ -67,7 +75,12 @@ function markerRecord(overrides: Partial<ContractMarkerRecord> = {}): ContractMa
   };
 }
 
-function createStubAdapter(codecs: ReadonlyArray<Codec<string>>, markerResult: MarkerReadResult) {
+function createStubAdapter(
+  codecs: ReadonlyArray<Codec<string>>,
+  markerResult: MarkerReadResult,
+  readMarkerSpy?: ReturnType<typeof vi.fn>,
+) {
+  const readMarkerImpl = async () => markerResult;
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
@@ -78,7 +91,7 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>, markerResult: M
       codecs() {
         return codecs;
       },
-      readMarker: async () => markerResult,
+      readMarker: readMarkerSpy ?? readMarkerImpl,
     },
     lower(ast: SelectAst) {
       return Object.freeze({ sql: JSON.stringify(ast), params: [] });
@@ -146,16 +159,23 @@ type SqlTestStackInstance = ExecutionStackInstance<
   RuntimeExtensionInstance<'sql', 'postgres'>
 >;
 
-interface RuntimeOptions {
+interface BuildRuntimeOptions {
   readonly markerResult: MarkerReadResult;
-  readonly verifyMode: 'always' | 'startup' | 'onFirstUse';
-  readonly requireMarker: boolean;
+  readonly verifyMarker?: 'onFirstUse' | false;
+  readonly log?: RuntimeLog;
   readonly driver?: SqlDriver;
+  readonly readMarkerSpy?: ReturnType<typeof vi.fn>;
 }
 
-function buildRuntime({ markerResult, verifyMode, requireMarker, driver }: RuntimeOptions) {
+function buildRuntime({
+  markerResult,
+  verifyMarker,
+  log,
+  driver,
+  readMarkerSpy,
+}: BuildRuntimeOptions) {
   const codecs = createCodecs();
-  const adapter = createStubAdapter(codecs, markerResult);
+  const adapter = createStubAdapter(codecs, markerResult, readMarkerSpy);
   const target = createTargetDescriptor();
   const adapterDesc = createAdapterDescriptor(adapter);
   const stack = createSqlExecutionStack({
@@ -172,7 +192,8 @@ function buildRuntime({ markerResult, verifyMode, requireMarker, driver }: Runti
     stackInstance,
     context,
     driver: driver ?? createDriver(),
-    verify: { mode: verifyMode, requireMarker },
+    ...(verifyMarker !== undefined ? { verifyMarker } : {}),
+    ...(log ? { log } : {}),
   });
 }
 
@@ -192,122 +213,134 @@ function createPlan(): SqlExecutionPlan {
 }
 
 describe('verifyMarker', () => {
-  it('throws CONTRACT.MARKER_MISSING when the marker is absent and requireMarker is true', async () => {
-    const runtime = buildRuntime({
-      markerResult: { kind: 'absent' },
-      verifyMode: 'always',
-      requireMarker: true,
-    });
-
-    await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
-      code: 'CONTRACT.MARKER_MISSING',
-      category: 'CONTRACT',
-    });
-  });
-
-  it('throws CONTRACT.MARKER_MISSING when the marker table is missing and requireMarker is true', async () => {
-    const runtime = buildRuntime({
-      markerResult: { kind: 'no-table' },
-      verifyMode: 'always',
-      requireMarker: true,
-    });
-
-    await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
-      code: 'CONTRACT.MARKER_MISSING',
-    });
-  });
-
-  it('caches verification past the first execute when mode is "startup"', async () => {
-    const readMarker = vi.fn(async () => ({ kind: 'present', record: markerRecord() }) as const);
-    const codecs = createCodecs();
-    const target = createTargetDescriptor();
-    const adapter = {
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      profile: {
-        id: 'test-profile',
-        target: 'postgres',
-        capabilities: {},
-        codecs: () => codecs,
-        readMarker,
-      },
-      lower(ast: SelectAst) {
-        return Object.freeze({ sql: JSON.stringify(ast), params: [] });
-      },
-    };
-    const adapterDesc = createAdapterDescriptor(adapter);
-    const stack = createSqlExecutionStack({
-      target,
-      adapter: adapterDesc,
-      extensionPacks: [],
-    });
-    const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
-    const context = createExecutionContext({
-      contract: testContract,
-      stack: { target, adapter: adapterDesc, extensionPacks: [] },
-    });
-    const runtime = createRuntime({
-      stackInstance,
-      context,
-      driver: createDriver(),
-      verify: { mode: 'startup', requireMarker: false },
-    });
+  it('warns with CONTRACT.MARKER_MISSING when the marker is absent', async () => {
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = buildRuntime({ markerResult: { kind: 'absent' }, log });
 
     await runtime.execute(createPlan()).toArray();
+
+    expect(log.warn).toHaveBeenCalledOnce();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'CONTRACT.MARKER_MISSING',
+        scope: 'marker-verification',
+        expected: {
+          storageHash: 'sha256:test',
+          profileHash: 'sha256:test-profile',
+        },
+        actual: null,
+      }),
+    );
+  });
+
+  it('warns with CONTRACT.MARKER_MISSING when the marker table is missing', async () => {
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = buildRuntime({ markerResult: { kind: 'no-table' }, log });
+
     await runtime.execute(createPlan()).toArray();
 
-    expect(readMarker).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledOnce();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'CONTRACT.MARKER_MISSING',
+        scope: 'marker-verification',
+        actual: null,
+      }),
+    );
   });
 
-  it('skips verification when the marker is absent and requireMarker is false', async () => {
-    const runtime = buildRuntime({
-      markerResult: { kind: 'absent' },
-      verifyMode: 'always',
-      requireMarker: false,
-    });
-
-    const rows = await runtime.execute(createPlan()).toArray();
-    expect(rows).toBeDefined();
-  });
-
-  it('skips verification when the marker table is missing and requireMarker is false', async () => {
-    const runtime = buildRuntime({
-      markerResult: { kind: 'no-table' },
-      verifyMode: 'always',
-      requireMarker: false,
-    });
-
-    const rows = await runtime.execute(createPlan()).toArray();
-    expect(rows).toBeDefined();
-  });
-
-  it('passes verification when the marker record matches contract storage and profile hash', async () => {
+  it('emits no log when the marker record matches the contract', async () => {
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const runtime = buildRuntime({
       markerResult: { kind: 'present', record: markerRecord() },
-      verifyMode: 'always',
-      requireMarker: true,
+      log,
     });
 
-    const rows = await runtime.execute(createPlan()).toArray();
-    expect(rows).toBeDefined();
+    await runtime.execute(createPlan()).toArray();
+
+    expect(log.warn).not.toHaveBeenCalled();
   });
 
-  it('throws CONTRACT.MARKER_MISMATCH when the database profile hash differs from the contract', async () => {
+  it('warns with CONTRACT.MARKER_MISMATCH when the storage hash differs', async () => {
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = buildRuntime({
+      markerResult: {
+        kind: 'present',
+        record: markerRecord({ storageHash: 'sha256:stale' }),
+      },
+      log,
+    });
+
+    await runtime.execute(createPlan()).toArray();
+
+    expect(log.warn).toHaveBeenCalledOnce();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'CONTRACT.MARKER_MISMATCH',
+        scope: 'marker-verification',
+        expected: {
+          storageHash: 'sha256:test',
+          profileHash: 'sha256:test-profile',
+        },
+        actual: expect.objectContaining({ storageHash: 'sha256:stale' }),
+      }),
+    );
+  });
+
+  it('warns with CONTRACT.MARKER_MISMATCH when the profile hash differs', async () => {
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const runtime = buildRuntime({
       markerResult: {
         kind: 'present',
         record: markerRecord({ profileHash: 'sha256:other-profile' }),
       },
-      verifyMode: 'always',
-      requireMarker: true,
+      log,
     });
 
-    await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
-      code: 'CONTRACT.MARKER_MISMATCH',
-      details: expect.objectContaining({
-        expectedProfile: 'sha256:test-profile',
-        actualProfile: 'sha256:other-profile',
+    await runtime.execute(createPlan()).toArray();
+
+    expect(log.warn).toHaveBeenCalledOnce();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'CONTRACT.MARKER_MISMATCH',
+        scope: 'marker-verification',
+        expected: expect.objectContaining({ profileHash: 'sha256:test-profile' }),
+        actual: expect.objectContaining({ profileHash: 'sha256:other-profile' }),
       }),
+    );
+  });
+
+  it('skips the marker reader entirely when verifyMarker is false', async () => {
+    const readMarkerSpy = vi.fn().mockResolvedValue({ kind: 'present', record: markerRecord() });
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = buildRuntime({
+      markerResult: { kind: 'present', record: markerRecord() },
+      verifyMarker: false,
+      log,
+      readMarkerSpy,
     });
+
+    await runtime.execute(createPlan()).toArray();
+    await runtime.execute(createPlan()).toArray();
+
+    expect(readMarkerSpy).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it('emits at most one warning per runtime lifetime regardless of query count', async () => {
+    const readMarkerSpy = vi.fn().mockResolvedValue({ kind: 'absent' });
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = buildRuntime({
+      markerResult: { kind: 'absent' },
+      log,
+      readMarkerSpy,
+    });
+
+    await runtime.execute(createPlan()).toArray();
+    await runtime.execute(createPlan()).toArray();
+    await runtime.execute(createPlan()).toArray();
+
+    expect(readMarkerSpy).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledTimes(1);
   });
 });

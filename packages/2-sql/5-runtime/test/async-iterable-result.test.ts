@@ -93,7 +93,7 @@ function createTestRuntime(mockDriver: MockDriver): Runtime {
     stackInstance,
     context,
     driver: mockDriver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
+    verifyMarker: false,
   });
 }
 

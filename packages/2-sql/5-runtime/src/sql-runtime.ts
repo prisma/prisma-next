@@ -61,8 +61,8 @@ import type {
 import type {
   RuntimeFamilyAdapter,
   RuntimeTelemetryEvent,
-  RuntimeVerifyOptions,
   TelemetryOutcome,
+  VerifyMarkerOption,
 } from './runtime-spi';
 import type {
   ExecutionContext,
@@ -77,7 +77,7 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly context: ExecutionContext<TContract>;
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
-  readonly verify: RuntimeVerifyOptions;
+  readonly verifyMarker?: VerifyMarkerOption;
   readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -96,7 +96,7 @@ export interface CreateRuntimeOptions<
   >;
   readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
-  readonly verify: RuntimeVerifyOptions;
+  readonly verifyMarker?: VerifyMarkerOption;
   readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -157,7 +157,7 @@ export interface TransactionContext extends RuntimeQueryable {
   readonly invalidated: boolean;
 }
 
-export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
+export type { RuntimeTelemetryEvent, TelemetryOutcome, VerifyMarkerOption };
 
 function isExecutionPlan(plan: SqlExecutionPlan | SqlQueryPlan): plan is SqlExecutionPlan {
   return 'sql' in plan;
@@ -178,15 +178,14 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly contractCodecs: ContractCodecRegistry;
   private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly sqlCtx: SqlMiddlewareContext;
-  private readonly verify: RuntimeVerifyOptions;
+  private readonly verifyMarkerOption: VerifyMarkerOption;
   readonly #preparedStatementHandles = new WeakMap<object, unknown>();
   private codecRegistryValidated: boolean;
   private verified: boolean;
-  private startupVerified: boolean;
   private _telemetry: RuntimeTelemetryEvent | null;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { context, adapter, driver, verify, middleware, mode, log } = options;
+    const { context, adapter, driver, verifyMarker, middleware, mode, log } = options;
 
     if (middleware) {
       for (const mw of middleware) {
@@ -213,16 +212,10 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.contractCodecs = context.contractCodecs;
     this.codecDescriptors = context.codecDescriptors;
     this.sqlCtx = sqlCtx;
-    this.verify = verify;
+    this.verifyMarkerOption = verifyMarker ?? 'onFirstUse';
     this.codecRegistryValidated = false;
-    this.verified = verify.mode === 'startup' ? false : verify.mode === 'always';
-    this.startupVerified = false;
+    this.verified = this.verifyMarkerOption === false;
     this._telemetry = null;
-
-    if (verify.mode === 'startup') {
-      validateCodecRegistryCompleteness(this.codecDescriptors, context.contract);
-      this.codecRegistryValidated = true;
-    }
   }
 
   /**
@@ -336,22 +329,15 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.familyAdapter.validatePlan(exec, this.contract);
     this._telemetry = null;
 
-    if (!this.startupVerified && this.verify.mode === 'startup') {
+    if (!this.verified) {
       await this.verifyMarker();
-    }
-
-    if (!this.verified && this.verify.mode === 'onFirstUse') {
-      await this.verifyMarker();
+      this.verified = true;
     }
 
     const startedAt = Date.now();
     let outcome: TelemetryOutcome | null = null;
 
     try {
-      if (this.verify.mode === 'always') {
-        await this.verifyMarker();
-      }
-
       const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
         exec,
         this.middleware,
@@ -697,48 +683,40 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private async verifyMarker(): Promise<void> {
     const readResult = await this.familyAdapter.markerReader.readMarker(this.driver);
 
-    if (readResult.kind !== 'present') {
-      if (this.verify.requireMarker) {
-        throw runtimeError('CONTRACT.MARKER_MISSING', 'Contract marker not found in database');
-      }
+    const contract = this.contract as {
+      storage: { storageHash: string };
+      profileHash?: string | null;
+    };
 
-      this.verified = true;
+    const expectedStorageHash = contract.storage.storageHash;
+    const expectedProfileHash = contract.profileHash ?? null;
+    const expected = { storageHash: expectedStorageHash, profileHash: expectedProfileHash };
+
+    if (readResult.kind !== 'present') {
+      this.sqlCtx.log.warn({
+        code: 'CONTRACT.MARKER_MISSING',
+        scope: 'marker-verification',
+        expected,
+        actual: null,
+        message: 'Contract marker not found in database',
+      });
       return;
     }
 
     const marker = readResult.record;
+    const storageHashMatch = marker.storageHash === expectedStorageHash;
+    const profileHashMatch =
+      expectedProfileHash === null || marker.profileHash === expectedProfileHash;
 
-    const contract = this.contract as {
-      storage: { storageHash: string };
-      execution?: { executionHash?: string | null };
-      profileHash?: string | null;
-    };
-
-    if (marker.storageHash !== contract.storage.storageHash) {
-      throw runtimeError(
-        'CONTRACT.MARKER_MISMATCH',
-        'Database storage hash does not match contract',
-        {
-          expected: contract.storage.storageHash,
-          actual: marker.storageHash,
-        },
-      );
+    if (!storageHashMatch || !profileHashMatch) {
+      this.sqlCtx.log.warn({
+        code: 'CONTRACT.MARKER_MISMATCH',
+        scope: 'marker-verification',
+        expected,
+        actual: { storageHash: marker.storageHash, profileHash: marker.profileHash ?? null },
+        message: 'Contract marker hash does not match runtime contract',
+      });
     }
-
-    const expectedProfile = contract.profileHash ?? null;
-    if (expectedProfile !== null && marker.profileHash !== expectedProfile) {
-      throw runtimeError(
-        'CONTRACT.MARKER_MISMATCH',
-        'Database profile hash does not match contract',
-        {
-          expectedProfile,
-          actualProfile: marker.profileHash,
-        },
-      );
-    }
-
-    this.verified = true;
-    this.startupVerified = true;
   }
 
   private recordTelemetry(
@@ -876,13 +854,13 @@ export async function withTransaction<R>(
 export function createRuntime<TContract extends Contract<SqlStorage>, TTargetId extends string>(
   options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
-  const { stackInstance, context, driver, verify, middleware, mode, log } = options;
+  const { stackInstance, context, driver, verifyMarker, middleware, mode, log } = options;
 
   return new SqlRuntimeImpl({
     context,
     adapter: stackInstance.adapter,
     driver,
-    verify,
+    ...ifDefined('verifyMarker', verifyMarker),
     ...ifDefined('middleware', middleware),
     ...ifDefined('mode', mode),
     ...ifDefined('log', log),

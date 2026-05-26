@@ -29,8 +29,8 @@ export type {
   MarkerReader,
   RuntimeFamilyAdapter,
   RuntimeTelemetryEvent,
-  RuntimeVerifyOptions,
   TelemetryOutcome,
+  VerifyMarkerOption,
 } from '../runtime-spi';
 export type {
   ExecutionContext,

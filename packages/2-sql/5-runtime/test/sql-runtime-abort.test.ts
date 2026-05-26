@@ -215,7 +215,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
     const rows = await runtime.execute(rawExecutionPlan()).toArray();
     expect(rows).toEqual([{ id: 1 }]);
@@ -227,7 +227,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const controller = new AbortController();
@@ -265,7 +265,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const controller = new AbortController();
@@ -327,7 +327,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const plan = projectingExecutionPlan('name', 'users', 'name', 'test/observe-signal@1');
@@ -369,7 +369,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const plan = projectingExecutionPlan('name', 'users', 'name', 'test/ignore-signal@1');

@@ -141,7 +141,7 @@ describe('SQL middleware context surface', () => {
       stackInstance,
       context,
       driver: createDriver(),
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
       middleware: [probe],
     });
 

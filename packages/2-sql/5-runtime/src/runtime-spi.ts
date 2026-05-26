@@ -22,10 +22,21 @@ export interface RuntimeFamilyAdapter<TContract = unknown> {
   validatePlan(plan: ExecutionPlan, contract: TContract): void;
 }
 
-export interface RuntimeVerifyOptions {
-  readonly mode: 'onFirstUse' | 'startup' | 'always';
-  readonly requireMarker: boolean;
-}
+/**
+ * Controls whether the runtime reads and checks the contract marker row on first execute.
+ *
+ * - `'onFirstUse'` (default when omitted): the marker is read once per runtime lifetime, on the
+ *   first `execute()` call. Any hash mismatch or absent marker emits a structured `warn`-level log
+ *   through the runtime's {@link RuntimeLog} and the query proceeds. Subsequent queries skip the
+ *   marker reader entirely.
+ * - `false`: the marker reader is never invoked. No log line is emitted. Use this to opt out of
+ *   the diagnostic entirely (e.g. during a known deploy-skew window).
+ *
+ * The string-or-false shape is forward-compatible: future modes such as `'startup'` (eager check
+ * inside the wrapper `connect()` step) can be added as additive union members without an API break.
+ * `true` is intentionally not permitted — modes are always named.
+ */
+export type VerifyMarkerOption = 'onFirstUse' | false;
 
 export type TelemetryOutcome = 'success' | 'runtime-error';
 

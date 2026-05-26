@@ -15,11 +15,11 @@ import type {
   ParamsFromDeclaration,
   PreparedStatement,
   Runtime,
-  RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
   SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
   TransactionContext,
+  VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
@@ -69,7 +69,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
 export interface PostgresOptionsBase {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
   readonly middleware?: readonly SqlMiddleware[];
-  readonly verify?: RuntimeVerifyOptions;
+  readonly verifyMarker?: VerifyMarkerOption;
   readonly poolOptions?: {
     readonly connectionTimeoutMillis?: number;
     readonly idleTimeoutMillis?: number;
@@ -230,7 +230,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       stackInstance,
       context,
       driver,
-      verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+      ...ifDefined('verifyMarker', options.verifyMarker),
       ...ifDefined('middleware', options.middleware),
     });
 

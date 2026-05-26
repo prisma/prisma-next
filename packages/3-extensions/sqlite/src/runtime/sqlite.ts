@@ -17,10 +17,10 @@ import type {
   ParamsFromDeclaration,
   PreparedStatement,
   Runtime,
-  RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
   SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
+  VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
@@ -28,6 +28,7 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { resolveOptionalSqliteBinding, resolveSqliteBinding } from './binding';
 
 export type SqliteTargetId = 'sqlite';
@@ -55,7 +56,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
 export interface SqliteOptionsBase {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<SqliteTargetId>[];
   readonly middleware?: readonly SqlMiddleware[];
-  readonly verify?: RuntimeVerifyOptions;
+  readonly verifyMarker?: VerifyMarkerOption;
 }
 
 export type SqliteOptionsWithContract<TContract extends Contract<SqlStorage>> = {
@@ -167,7 +168,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       stackInstance,
       context,
       driver,
-      verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+      ...ifDefined('verifyMarker', options.verifyMarker),
       ...(options.middleware ? { middleware: options.middleware } : {}),
     });
 
