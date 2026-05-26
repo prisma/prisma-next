@@ -161,7 +161,7 @@ model User {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          types: {
+          enum: {
             UserRole: {
               kind: 'postgres-enum',
               name: 'UserRole',

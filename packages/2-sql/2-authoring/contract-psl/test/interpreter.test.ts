@@ -385,7 +385,7 @@ model Post {
       },
       namespaces: {
         public: {
-          types: {
+          enum: {
             Role: {
               kind: 'postgres-enum',
               name: 'Role',
