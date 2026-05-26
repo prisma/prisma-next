@@ -352,18 +352,19 @@ describe('integration/nested-includes/strategy', () => {
   });
 
   // ===========================================================================
-  // Dispatch carve-out for scalar / combine descriptors:
-  // - `combine()` at any depth routes to multi-query under any
-  //   strategy — neither single-query builder lowers it yet.
-  // - Scalar reducers (`count`/`sum`/...) route through the lateral
-  //   single-query builder at any depth. The recursive
-  //   `hasScalarIncludeDescriptors` predicate ensures a nested scalar
-  //   doesn't accidentally land on the planner throw.
+  // Dispatch carve-out for scalar / combine descriptors under the
+  // lateral strategy: both shapes route through the single-query
+  // builders at any depth. The recursive predicates
+  // (`hasScalarIncludeDescriptors`, `hasCombineIncludeDescriptors`)
+  // ensure a nested scalar / combine inside a row include doesn't
+  // accidentally land on the planner throw. Under correlated, both
+  // still fall back to multi-query — covered in the broader strategy
+  // tests above.
   // ===========================================================================
 
   describe('dispatch carve-out for scalar / combine include descriptors', () => {
     it(
-      'top-level combine() stays on multi-query under lateral capabilities',
+      'top-level combine() resolves in a single execution under lateral capabilities',
       async () => {
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
@@ -372,11 +373,10 @@ describe('integration/nested-includes/strategy', () => {
             { id: 11, title: 'B', userId: 1, views: 2 },
           ]);
 
-          // `combine()` at the top of an include continues to route
-          // through multi-query — neither single-query builder lowers
-          // it yet. Asserting > 1 execution is a forward-compatible
-          // upper bound: when single-query combine emission lands
-          // we'll flip to `.toBe(1)`.
+          // The lateral builder packs combine() into one LATERAL JOIN
+          // whose inner SELECT cross-joins per-branch derived tables
+          // and projects json_build_object over them. The whole tree
+          // rolls up into a single SQL execution.
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
           runtime.resetExecutions();
           const rows = await users
@@ -404,7 +404,7 @@ describe('integration/nested-includes/strategy', () => {
               },
             },
           ]);
-          expect(runtime.executions.length).toBeGreaterThan(1);
+          expect(runtime.executions).toHaveLength(1);
         });
       },
       timeouts.spinUpPpgDev,
