@@ -83,14 +83,16 @@ The verification log is emitted at `warn` level (through `RuntimeOptions.log.war
 - `code: 'CONTRACT.MARKER_MISSING'` fires for `kind: 'absent'` and `kind: 'no-table'`.
 - `code: 'CONTRACT.MARKER_MISMATCH'` fires for hash divergence on a present marker.
 
-The string codes are stable identifiers, not exported `error` codes — the underlying error-code enums for marker-mismatch / marker-missing **are removed** from the framework errors module because nothing throws them anymore. Callers that previously caught `CONTRACT.MARKER_*` errors must migrate to log scraping (or wait for a follow-up that adds an opt-in strict mode).
+The string codes are inline identifiers — there is no central enum in the framework errors module to delete; `runtimeError(code, ...)` accepts a free-form `code: string`, so the only producers of these particular codes are the two `runtimeError('CONTRACT.MARKER_*', ...)` call sites inside `SqlRuntimeImpl.verifyMarker()`. After this change, no producer remains; the strings live on only as stable tags in the new log payload. Callers that previously caught `CONTRACT.MARKER_*` runtime errors must migrate to log scraping or to the explicit-verification surface (see below).
+
+**Related surface, intentionally untouched: the `db-verify` CLI command** (`packages/1-framework/3-tooling/cli/src/commands/db-verify.ts`) and the underlying control-instance verification flow (`packages/2-sql/9-family/src/core/control-instance.ts`, `packages/2-mongo-family/9-family/src/core/control-instance.ts`) use a **distinct** identifier set: `VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001'`, `VERIFY_CODE_HASH_MISMATCH`, `VERIFY_CODE_TARGET_MISMATCH` (defined in `packages/1-framework/1-core/framework-components/src/control/control-result-types.ts`). That flow is the operator-invoked "verify the DB now" path; it returns a structured failure result and is the existing strict-mode surface this slice does **not** need to duplicate. The `PN-RUN-*` codes and the CLI command are out of scope for this change.
 
 ### Removed surfaces
 
 - `RuntimeVerifyOptions` (interface).
-- `RuntimeOptions.verify` / `CreateRuntimeOptions.verify` (renamed).
+- `RuntimeOptions.verify` / `CreateRuntimeOptions.verify` (renamed to `verifyMarker`).
 - `requireMarker` (field on the removed interface; no replacement).
-- `runtimeError('CONTRACT.MARKER_MISSING', …)` and `runtimeError('CONTRACT.MARKER_MISMATCH', …)` thrower sites in `SqlRuntimeImpl.verifyMarker()`. The error-code identifiers in the framework errors module are deleted in the same change.
+- `runtimeError('CONTRACT.MARKER_MISSING', …)` and `runtimeError('CONTRACT.MARKER_MISMATCH', …)` thrower call sites in `SqlRuntimeImpl.verifyMarker()`. The string codes themselves stay in the codebase (in log payloads); only the throwers go.
 
 ## Non-goals
 

@@ -9,7 +9,7 @@ Files:
 - `packages/2-sql/5-runtime/src/runtime-spi.ts` — remove `RuntimeVerifyOptions`; add `export type VerifyMarkerOption = 'onFirstUse' | false`.
 - `packages/2-sql/5-runtime/src/sql-runtime.ts` — rename `verify` field on `RuntimeOptions` / `CreateRuntimeOptions` to `verifyMarker?: VerifyMarkerOption`; default to `'onFirstUse'` when absent; rewrite `verifyMarker()` body to log via `this.log.warn(...)` instead of throwing; collapse mode branching in the constructor and `streamRows` (only one fire path remains).
 - `packages/2-sql/5-runtime/src/exports/index.ts` — re-export `VerifyMarkerOption`; drop the `RuntimeVerifyOptions` re-export.
-- `packages/1-framework/1-core/errors/src/contract.ts` (or wherever `CONTRACT.MARKER_MISSING` / `CONTRACT.MARKER_MISMATCH` codes live) — delete the codes from the framework errors module. No remaining thrower depends on them.
+- _(No edits to `framework-components` / errors modules. The `'CONTRACT.MARKER_*'` strings are inline `runtimeError` arguments only, not central enum entries. The CLI's separate `VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001'` is unrelated and stays as-is.)_
 - `packages/2-sql/5-runtime/test/marker-verification.test.ts` — rewrite assertions: every "throws" expectation becomes a "log.warn called with structured payload" expectation. Add two new test cases:
   - `verifyMarker: false` ⇒ marker reader is never called (spy assertion).
   - Mismatch ⇒ runtime emits exactly one log line for N queries (one-shot semantics).

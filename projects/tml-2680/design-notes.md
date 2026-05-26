@@ -96,9 +96,23 @@ The PE → architect ordering was load-bearing. The architect-lens typology pres
 
 The architect's cold-read probe on `verify` then settled the name (D4) — but only once the underlying shape (D3) was locked in. A union called `verify: 'onFirstUse' | false` reads worse than `verifyMarker: 'onFirstUse' | false` because the noun is missing, but neither read makes sense until you know the type's a string-or-false rather than an object.
 
+## Related existing surface — explicit `db-verify` CLI
+
+Pre-spec investigation (after the discussion closed but before dispatch) surfaced that the codebase already has an **explicit operator-invoked verification path** distinct from the runtime's silent read-path:
+
+- `packages/1-framework/3-tooling/cli/src/commands/db-verify.ts` — CLI command `db-verify` calling `verifyDatabase(...)`.
+- `packages/1-framework/1-core/framework-components/src/control/control-result-types.ts` — defines codes `VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001'`, `VERIFY_CODE_HASH_MISMATCH`, `VERIFY_CODE_TARGET_MISMATCH`.
+- `packages/2-sql/9-family/src/core/control-instance.ts` and `packages/2-mongo-family/9-family/src/core/control-instance.ts` — emit those codes from the family-level verification flow.
+
+This is the "operator asked for verification now, give a structured failure" path. It's strict by design — it returns a failure result the caller can react to.
+
+Implication for this slice: **we don't need to add a strict / throw mode to the runtime API**. The CLI already serves the "I want fail-fast verification" use case. The runtime's job is the silent diagnostic; the CLI's job is the explicit verification. The two surfaces are complementary, not competing.
+
+This means the "Optional strict / throw mode for CI" follow-up below is **demoted** — it's only worth doing if real demand surfaces for "fail-fast verification *inside* the runtime process," which the existing CLI surface already covers for ~all operational use cases.
+
 ## Follow-ups (separate tickets)
 
 - **Dual-signature marker writes.** Migrations write both the previous and new contract hashes during a deploy window; runtime accepts either. The proper zero-downtime primitive; lives in the migration-emission layer.
-- **Optional strict / throw mode for CI.** If demand surfaces, add a `'strict'` (or similarly named) member to the `VerifyMarkerOption` union that restores throw-on-mismatch semantics. The union is open for it.
 - **Eager-at-`connect()` mode (`'startup'`).** Wire marker-read into the wrappers' `connect()` step so the warning appears in startup logs, before any traffic. Additive union member; no API break.
 - **Telemetry surface for marker drift.** A dedicated telemetry event for the mismatch case, in addition to the log line.
+- **(Demoted; only if demand surfaces.)** Optional strict / throw mode for the runtime API. Existing CLI `db-verify` covers the explicit-verification case; this would add an in-process equivalent. Additive union member if added.
