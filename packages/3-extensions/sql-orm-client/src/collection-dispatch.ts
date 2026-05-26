@@ -88,11 +88,11 @@ function dispatchWithIncludeStrategy<Row>(options: {
   // lowering (TML-2656).
   //
   // Strategy-aware carve-out for scalar / combine descriptors:
-  // - `combine()` at any depth still routes to multi-query (D2 lifts
-  //   this for lateral; D3 for correlated).
+  // - `combine()` at any depth routes to multi-query under any
+  //   strategy — neither single-query builder lowers it yet.
   // - Scalar reducers (`count`/`sum`/...) at any depth route through
-  //   single-query under the lateral strategy (D1), but still fall back
-  //   to multi-query under correlated (D3 mirrors lateral's emission).
+  //   single-query under the lateral strategy; the correlated strategy
+  //   currently has no scalar emission and falls back to multi-query.
   // The recursive predicates catch the descriptor at any depth so a
   //   nested scalar / combine inside a row include doesn't accidentally
   //   hit the planner throw in `compileSelectWithIncludeStrategy`.
@@ -511,7 +511,7 @@ function uniqueValues(values: unknown[]): unknown[] {
  * envelope (see `buildIncludeChildScalarSelect`); the branch below
  * unwraps that envelope and applies the empty-relation default
  * (`0` for count; `null` for sum/avg/min/max). Combine leaves still
- * throw — D2 will lift that.
+ * throw — neither single-query builder lowers them yet.
  */
 function decodeIncludePayload(
   contract: Contract<SqlStorage>,
@@ -525,10 +525,10 @@ function decodeIncludePayload(
   const mappedChildren = rawChildren.map((childRow) => {
     const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
     for (const nestedInclude of include.nested.includes) {
-      // Combine remains unhandled by the single-query builders; D2 lifts
-      // this. The dispatch gate routes combine-containing trees to
-      // multi-query, so this branch is unreachable in production but
-      // documents the contract the recursion relies on.
+      // Combine remains unhandled by the single-query builders. The
+      // dispatch gate routes combine-containing trees to multi-query,
+      // so this branch is unreachable in production but documents the
+      // contract the recursion relies on.
       if (nestedInclude.combine) {
         throw new Error(
           'single-query include strategy does not support nested combine() include descriptors',

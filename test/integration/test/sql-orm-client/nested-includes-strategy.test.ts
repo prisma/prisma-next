@@ -353,10 +353,10 @@ describe('integration/nested-includes/strategy', () => {
 
   // ===========================================================================
   // Dispatch carve-out for scalar / combine descriptors:
-  // - `combine()` at any depth still routes to multi-query under any
-  //   strategy (D2 lifts this for lateral; D3 for correlated).
-  // - Scalar reducers (`count`/`sum`/...) now route through the
-  //   lateral single-query builder at any depth. The recursive
+  // - `combine()` at any depth routes to multi-query under any
+  //   strategy — neither single-query builder lowers it yet.
+  // - Scalar reducers (`count`/`sum`/...) route through the lateral
+  //   single-query builder at any depth. The recursive
   //   `hasScalarIncludeDescriptors` predicate ensures a nested scalar
   //   doesn't accidentally land on the planner throw.
   // ===========================================================================
@@ -372,11 +372,11 @@ describe('integration/nested-includes/strategy', () => {
             { id: 11, title: 'B', userId: 1, views: 2 },
           ]);
 
-          // `combine()` at the top of an include must continue to route
-          // through multi-query in this dispatch (D2 lifts lateral; D3
-          // lifts correlated). Asserting > 1 execution is a
-          // forward-compatible upper bound: when D2 collapses this to
-          // one round-trip we'll flip to `.toBe(1)`.
+          // `combine()` at the top of an include continues to route
+          // through multi-query — neither single-query builder lowers
+          // it yet. Asserting > 1 execution is a forward-compatible
+          // upper bound: when single-query combine emission lands
+          // we'll flip to `.toBe(1)`.
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
           runtime.resetExecutions();
           const rows = await users

@@ -989,9 +989,9 @@ export function compileSelectWithIncludeStrategy(
   strategy: 'lateral' | 'correlated',
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  // Combine is still unhandled by both single-query builders (D2 lifts
-  // lateral; D3 lifts correlated). Scalar reducers are handled by the
-  // lateral builder (D1) but not yet by the correlated builder (D3).
+  // Combine is still unhandled by both single-query builders, so it
+  // always throws. Scalar reducers are handled by the lateral builder;
+  // the correlated builder has no scalar emission yet and throws.
   if (hasCombineIncludeDescriptors(state.includes)) {
     throw new Error('single-query include strategy does not support combine() include descriptors');
   }
