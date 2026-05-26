@@ -261,3 +261,59 @@ describe('fns.rawSql reference equality through the typed builder chain', () => 
     expect(captured[0]).toBe(tag);
   });
 });
+
+describe('bare literal interpolation resolves codec via adapter inferCodec', () => {
+  it('bare number interpolation resolves to sqlite/integer@1 via inferCodec (safe integer)', () => {
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${42})`.returns('sqlite/integer@1');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('sqlite/integer@1');
+  });
+
+  it('bare fractional number interpolation resolves to sqlite/real@1 via inferCodec', () => {
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${1.5})`.returns('sqlite/real@1');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('sqlite/real@1');
+  });
+
+  it('bare bigint interpolation resolves to sqlite/bigint@1 via inferCodec', () => {
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${9n ** 18n})`.returns('sqlite/bigint@1');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('sqlite/bigint@1');
+  });
+
+  it('bare string interpolation resolves to sqlite/text@1 via inferCodec', () => {
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${'hello'})`.returns('sqlite/text@1');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('sqlite/text@1');
+  });
+
+  it('bare boolean interpolation resolves to sqlite/integer@1 via inferCodec', () => {
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${true})`.returns('sqlite/integer@1');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('sqlite/integer@1');
+  });
+
+  it('bare Uint8Array interpolation resolves to sqlite/blob@1 via inferCodec', () => {
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${new Uint8Array([1, 2, 3])})`.returns('sqlite/blob@1');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('sqlite/blob@1');
+  });
+});
