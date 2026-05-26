@@ -31,10 +31,6 @@ import {
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
 import {
-  hasCombineIncludeDescriptors,
-  hasScalarIncludeDescriptors,
-} from './include-tree-predicates';
-import {
   compileRelationSelect,
   compileSelect,
   compileSelectWithIncludeStrategy,
@@ -82,30 +78,13 @@ function dispatchWithIncludeStrategy<Row>(options: {
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
-  // Nested row includes (depth >= 2) are emitted recursively by the
-  // lateral / correlated builders — they no longer force a fallback to
-  // multi-query (TML-2594). `distinct()` on a non-leaf include is also
-  // handled by the lateral / correlated builders via a wrapped-subquery
-  // lowering (TML-2656).
-  //
-  // Strategy-aware carve-out for scalar / combine descriptors:
-  // - The lateral strategy lowers scalar reducers and combine()
-  //   descriptors at any depth into a single LATERAL JOIN; trees
-  //   under lateral never fall back to multi-query for these shapes.
-  // - The correlated strategy currently has no scalar / combine
-  //   emission; trees carrying either descriptor at any depth route
-  //   to multi-query.
-  // The recursive predicates catch the descriptor at any depth so a
-  // nested scalar / combine inside a row include doesn't accidentally
-  // hit the planner throw in `compileSelectWithIncludeStrategy`.
-  if (
-    strategy !== 'lateral' &&
-    (hasCombineIncludeDescriptors(options.state.includes) ||
-      hasScalarIncludeDescriptors(options.state.includes))
-  ) {
-    return dispatchWithMultiQueryIncludes<Row>(options);
-  }
-
+  // Both single-query builders (lateral, correlated) lower every
+  // include descriptor shape — row, scalar reducers, and combine() —
+  // at any depth (TML-2594 + TML-2595 + TML-2588). Dispatch routes
+  // purely on the contract's capability flags via `selectIncludeStrategy`.
+  // The `'multiQuery'` arm remains reachable only from synthetic test
+  // contracts that declare neither `lateral` nor `jsonAgg` capabilities;
+  // its removal is tracked separately.
   switch (strategy) {
     case 'lateral':
       return dispatchWithSingleQueryIncludes<Row>({
