@@ -778,43 +778,236 @@ describe('compileSelectWithIncludeStrategy', () => {
     });
   });
 
-  it('still rejects scalar include selectors under the correlated strategy', () => {
-    const { collection } = createCollection();
-    const state = collection.include('posts', (posts) => posts.count()).state;
+  // Correlated mirror of the lateral scalar tests: each scalar reducer
+  // lowers to a correlated subquery whose projection is the same
+  // `json_build_object('value', AGG(...))` envelope used by the lateral
+  // builder. The structural difference is the SQL primitive — a
+  // SubqueryExpr in the outer projection vs. a LEFT JOIN LATERAL
+  // contributing a joined derived table.
+  describe('correlated scalar reducers', () => {
+    function extractScalarCorrelatedSubquery(
+      plan: { ast: unknown },
+      relationName: string,
+    ): SelectAst {
+      expectSelectAst(plan.ast);
+      const projection = plan.ast.projection.find((item) => item.alias === relationName);
+      expectSubqueryExpr(projection?.expr);
+      return projection.expr.query;
+    }
 
-    expect(() =>
-      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
-    ).toThrow('correlated include strategy does not support scalar include selectors');
+    function expectAggregateProjection(
+      subquerySelect: SelectAst,
+      relationName: string,
+      expectedAggregate: AnyExpression,
+    ): void {
+      expect(subquerySelect.projection).toEqual([
+        ProjectionItem.of(
+          relationName,
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', expectedAggregate)]),
+        ),
+      ]);
+    }
+
+    it('emits correlated COUNT(*) for a bare count() include', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) => posts.count()).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const subquery = extractScalarCorrelatedSubquery(plan, 'posts');
+
+      expectAggregateProjection(subquery, 'posts', AggregateExpr.count());
+      expect(subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+      );
+      // Aggregate scope omits pagination / orderBy.
+      expect(subquery.limit).toBeUndefined();
+      expect(subquery.offset).toBeUndefined();
+      expect(subquery.orderBy).toBeUndefined();
+    });
+
+    // TML-2498 mirror under correlated: pagination on a scalar refine
+    // must not enter the aggregate scope.
+    it('TML-2498: LIMIT and OFFSET do not enter the correlated COUNT scope', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts
+          .where((post) => post.views.gte(100))
+          .skip(5)
+          .take(10)
+          .count(),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const subquery = extractScalarCorrelatedSubquery(plan, 'posts');
+
+      expect(subquery.limit).toBeUndefined();
+      expect(subquery.offset).toBeUndefined();
+      expect(subquery.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+          bindWhereExpr(
+            baseContract,
+            BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+          ),
+        ]),
+      );
+    });
+
+    it('emits correlated SUM / AVG / MIN / MAX over the column reference', () => {
+      const reducers: ReadonlyArray<['sum' | 'avg' | 'min' | 'max', AggregateExpr]> = [
+        ['sum', AggregateExpr.sum(ColumnRef.of('posts', 'views'))],
+        ['avg', AggregateExpr.avg(ColumnRef.of('posts', 'views'))],
+        ['min', AggregateExpr.min(ColumnRef.of('posts', 'views'))],
+        ['max', AggregateExpr.max(ColumnRef.of('posts', 'views'))],
+      ];
+      for (const [fn, expected] of reducers) {
+        const { collection } = createCollection();
+        const state = collection.include('posts', (posts) => posts[fn]('views')).state;
+        const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+        const subquery = extractScalarCorrelatedSubquery(plan, 'posts');
+        expectAggregateProjection(subquery, 'posts', expected);
+      }
+    });
+
+    // Recursive: scalar nested inside a row include emits a nested
+    // correlated subquery inside the parent row's child SELECT.
+    it('emits a nested correlated subquery for count() inside a row include', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.include('comments', (comments) => comments.count()),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const postsSubquery = extractScalarCorrelatedSubquery(plan, 'posts');
+      // The posts subquery's FROM is the child-rows derived table; its
+      // inner SELECT carries the nested comments correlated subquery as
+      // a projection item.
+      expectDerivedTableSource(postsSubquery.from);
+      const postsRows = postsSubquery.from.query;
+      const commentsProjection = postsRows.projection.find((item) => item.alias === 'comments');
+      expectSubqueryExpr(commentsProjection?.expr);
+      expect(commentsProjection.expr.query.projection).toEqual([
+        ProjectionItem.of(
+          'comments',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+        ),
+      ]);
+    });
   });
 
-  it('still rejects combine() include descriptors under the correlated strategy', () => {
-    const { collection } = createCollection();
-    const state = collection.include('posts', (posts) =>
-      posts.combine({
-        rows: posts.orderBy((p) => p.id.asc()),
-        total: posts.count(),
-      }),
-    ).state;
+  // Correlated mirror of the lateral combine tests: combine packs into
+  // a single correlated subquery whose FROM cross-joins per-branch
+  // derived tables and whose projection is the `json_build_object`
+  // over those branches.
+  describe('correlated combine() packing', () => {
+    function extractCombineCorrelatedSubquery(
+      plan: { ast: unknown },
+      relationName: string,
+    ): SelectAst {
+      expectSelectAst(plan.ast);
+      const projection = plan.ast.projection.find((item) => item.alias === relationName);
+      expectSubqueryExpr(projection?.expr);
+      return projection.expr.query;
+    }
 
-    expect(() =>
-      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
-    ).toThrow('correlated include strategy does not support combine() include descriptors');
-  });
-
-  it('still rejects combine() nested inside row includes under the correlated strategy', () => {
-    const { collection } = createCollection();
-    const state = collection.include('posts', (posts) =>
-      posts.include('comments', (comments) =>
-        comments.combine({
-          rows: comments.orderBy((c) => c.id.asc()),
-          total: comments.count(),
+    it('packs row + scalar combine into one correlated subquery', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          recent: posts.orderBy((p) => p.id.desc()).take(3),
+          total: posts.count(),
         }),
-      ),
-    ).state;
+      ).state;
 
-    expect(() =>
-      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
-    ).toThrow('correlated include strategy does not support combine() include descriptors');
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const subquery = extractCombineCorrelatedSubquery(plan, 'posts');
+
+      // Outer projection is json_build_object referencing per-branch
+      // derived-table aliases.
+      expect(subquery.projection).toEqual([
+        ProjectionItem.of(
+          'posts',
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('recent', ColumnRef.of('posts__combine__recent', 'posts')),
+            JsonObjectExpr.entry('total', ColumnRef.of('posts__combine__total', 'posts')),
+          ]),
+        ),
+      ]);
+
+      // FROM <recent_branch>, INNER JOIN <total_branch> ON TRUE.
+      expectDerivedTableSource(subquery.from);
+      expect(subquery.from.alias).toBe('posts__combine__recent');
+      const totalJoin = subquery.joins?.[0];
+      expect(totalJoin?.joinType).toBe('inner');
+      expect(totalJoin?.lateral).toBe(false);
+      expect(totalJoin?.on).toEqual(AndExpr.true());
+      expectDerivedTableSource(totalJoin?.source);
+      expect(totalJoin.source.alias).toBe('posts__combine__total');
+    });
+
+    it('packs two scalar branches (count + sum) under correlated', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          a: posts.count(),
+          b: posts.sum('views'),
+        }),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const subquery = extractCombineCorrelatedSubquery(plan, 'posts');
+
+      expectDerivedTableSource(subquery.from);
+      const aSelect = subquery.from.query;
+      expect(aSelect.projection).toEqual([
+        ProjectionItem.of(
+          'posts',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+        ),
+      ]);
+      const bJoin = subquery.joins?.[0];
+      expectDerivedTableSource(bJoin?.source);
+      const bSelect = bJoin.source.query;
+      expect(bSelect.projection).toEqual([
+        ProjectionItem.of(
+          'posts',
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
+          ]),
+        ),
+      ]);
+    });
+
+    it('keeps each branch independently scoped under divergent where filters (correlated)', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          popular: posts.where((p) => p.views.gte(200)).count(),
+          mediocre: posts.where((p) => p.views.lt(200)).count(),
+        }),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const subquery = extractCombineCorrelatedSubquery(plan, 'posts');
+
+      const fkExpr = BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id'));
+      const popularWhere = bindWhereExpr(
+        baseContract,
+        BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(200)),
+      );
+      const mediocreWhere = bindWhereExpr(
+        baseContract,
+        BinaryExpr.lt(ColumnRef.of('posts', 'views'), LiteralExpr.of(200)),
+      );
+
+      expectDerivedTableSource(subquery.from);
+      const popularSelect = subquery.from.query;
+      expect(popularSelect.where).toEqual(AndExpr.of([fkExpr, popularWhere]));
+      const mediocreJoin = subquery.joins?.[0];
+      expectDerivedTableSource(mediocreJoin?.source);
+      const mediocreSelect = mediocreJoin.source.query;
+      expect(mediocreSelect.where).toEqual(AndExpr.of([fkExpr, mediocreWhere]));
+    });
   });
 });
 
