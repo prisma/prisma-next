@@ -684,13 +684,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private async verifyMarker(): Promise<void> {
     const readResult = await this.familyAdapter.markerReader.readMarker(this.driver);
 
-    const contract = this.contract as {
-      storage: { storageHash: string };
-      profileHash?: string | null;
-    };
-
-    const expectedStorageHash = contract.storage.storageHash;
-    const expectedProfileHash = contract.profileHash ?? null;
+    const expectedStorageHash = this.contract.storage.storageHash;
+    const expectedProfileHash = this.contract.profileHash ?? null;
     const expected = { storageHash: expectedStorageHash, profileHash: expectedProfileHash };
 
     if (readResult.kind !== 'present') {
