@@ -181,7 +181,62 @@ describe('integration/include', () => {
           { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null, comments: 0 },
           { id: 12, title: 'Post C', userId: 2, views: 300, embedding: null, comments: 1 },
         ]);
-        expect(runtime.executions).toHaveLength(2);
+        // Scalar `count()` lowers to a `LEFT JOIN LATERAL (SELECT
+        // json_build_object('value', count(*)) ...)` — the whole
+        // parent + counts roll up into one SQL execution.
+        expect(runtime.executions).toHaveLength(1);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  // TML-2498 regression guard: `take(N)` / `skip(N)` on a scalar
+  // refine must not affect the aggregate scope. The pre-fix
+  // multi-query path would silently mis-count by letting LIMIT/OFFSET
+  // leak into the row-fetch that fed the JS-side reducer. The lateral
+  // builder emits the aggregate over the where-filtered, unpaginated
+  // relation by construction, so a paginated count() still returns
+  // the total matching `where` — matching root-level `aggregate()`
+  // semantics.
+  it(
+    'TML-2498: include().where().take().count() returns the unpaginated total',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'A', userId: 1, views: 100 },
+          { id: 11, title: 'B', userId: 1, views: 200 },
+          { id: 12, title: 'C', userId: 1, views: 300 },
+          { id: 13, title: 'D', userId: 1, views: 400 },
+          { id: 14, title: 'E', userId: 1, views: 500 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .include('posts', (posts) =>
+            posts
+              .where((post) => post.views.gte(200))
+              .take(2)
+              .count(),
+          )
+          .all();
+
+        // Four posts match `views >= 200`; `take(2)` is irrelevant for
+        // a scalar aggregate — the count is over the matching set, not
+        // a page of it.
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: 4,
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
       });
     },
     timeouts.spinUpPpgDev,
@@ -237,7 +292,9 @@ describe('integration/include', () => {
             posts: null,
           },
         ]);
-        expect(runtime.executions).toHaveLength(2);
+        // Same single-execution roll-up as count(): scalar sum/avg/
+        // min/max emit through the same lateral path.
+        expect(runtime.executions).toHaveLength(1);
       });
     },
     timeouts.spinUpPpgDev,

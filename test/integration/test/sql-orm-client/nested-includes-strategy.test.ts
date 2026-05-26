@@ -352,17 +352,16 @@ describe('integration/nested-includes/strategy', () => {
   });
 
   // ===========================================================================
-  // Coexistence with the sibling TML-2595 gate. After TML-2594 drops the
-  // `hasNestedIncludes` early-return, the dispatch must still route any
-  // tree carrying a scalar or `combine()` descriptor through multi-query
-  // (the lateral / correlated builders explicitly throw on those
-  // descriptors). `hasScalarOrCombineIncludeDescriptors` is recursive, so
-  // a nested scalar at depth 2 also gates the dispatch — catching the
-  // case where a future refactor might assume only top-level scalars
-  // need the gate.
+  // Dispatch carve-out for scalar / combine descriptors:
+  // - `combine()` at any depth still routes to multi-query under any
+  //   strategy (D2 lifts this for lateral; D3 for correlated).
+  // - Scalar reducers (`count`/`sum`/...) now route through the
+  //   lateral single-query builder at any depth. The recursive
+  //   `hasScalarIncludeDescriptors` predicate ensures a nested scalar
+  //   doesn't accidentally land on the planner throw.
   // ===========================================================================
 
-  describe('coexistence with scalar/combine gate (still on multi-query)', () => {
+  describe('dispatch carve-out for scalar / combine include descriptors', () => {
     it(
       'top-level combine() stays on multi-query under lateral capabilities',
       async () => {
@@ -374,10 +373,10 @@ describe('integration/nested-includes/strategy', () => {
           ]);
 
           // `combine()` at the top of an include must continue to route
-          // through multi-query until TML-2595 lands. Asserting > 1
-          // execution gives a forward-compatible upper bound: when
-          // TML-2595 collapses this to one round-trip we'll flip this
-          // from `.toBeGreaterThan(1)` to `.toBe(1)`.
+          // through multi-query in this dispatch (D2 lifts lateral; D3
+          // lifts correlated). Asserting > 1 execution is a
+          // forward-compatible upper bound: when D2 collapses this to
+          // one round-trip we'll flip to `.toBe(1)`.
           const users = collectionWithCapabilities(runtime, 'User', LATERAL_CAPABILITIES);
           runtime.resetExecutions();
           const rows = await users
@@ -412,14 +411,14 @@ describe('integration/nested-includes/strategy', () => {
     );
 
     it(
-      'nested scalar at depth 2 stays on multi-query under lateral capabilities (recursive gate)',
+      'nested scalar at depth 2 resolves in a single execution under lateral capabilities',
       async () => {
-        // The fix in TML-2594 dropped the shallow `hasNestedIncludes`
-        // gate but tightened `hasScalarOrCombineIncludeDescriptors` to
-        // recurse. This test pins that recursion: a `count()` at depth 2
-        // must still gate the whole tree to multi-query, even though the
-        // outer include is row-shaped (which the lateral builder
-        // otherwise handles).
+        // The recursive `hasScalarIncludeDescriptors` predicate matches
+        // a scalar at any depth; the lateral builder then emits a
+        // nested LATERAL inside the parent row's SELECT so the whole
+        // tree resolves in one round-trip. This test pins that
+        // recursion: a `count()` at depth 2 must roll up into the same
+        // single-query plan as the outer row include.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
@@ -444,7 +443,7 @@ describe('integration/nested-includes/strategy', () => {
               posts: [{ id: 10, title: 'A', userId: 1, views: 1, embedding: null, comments: 2 }],
             },
           ]);
-          expect(runtime.executions.length).toBeGreaterThan(1);
+          expect(runtime.executions).toHaveLength(1);
         });
       },
       timeouts.spinUpPpgDev,
