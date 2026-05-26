@@ -163,7 +163,6 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
       middleware,
       ...(log ? { log } : {}),
     });

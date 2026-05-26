@@ -88,7 +88,7 @@ function createSetup(options?: {
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
+    verifyMarker: false,
     ...(options?.middleware ? { middleware: options.middleware } : {}),
   });
   return { runtime, driver, adapter: Object.assign(adapter, { lower: lowerSpy }) };

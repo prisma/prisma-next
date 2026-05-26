@@ -27,7 +27,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
 - **Codec Validation**: Validate that codec registries contain all required codecs
 - **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts (defined in `runtime-spi.ts`)
-- **Marker Verification**: Parse contract-marker rows from the database (`marker.ts`) and gate execution on hash equality
+- **Marker Verification**: Read contract-marker rows from the database (`marker.ts`) on first execute and compare storage/profile hashes against the contract. On the first `execute()` call, any drift — hash mismatch, absent row, or missing marker table — is reported via a single `warn`-level structured log line through the runtime's `Log` interface (payload includes `code`, `scope`, `expected`, `actual`, `message`) and the query proceeds normally. The check runs once per runtime lifetime; subsequent queries skip the marker read. Pass `verifyMarker: false` to skip the marker read entirely.
 - **Telemetry Fingerprinting**: Compute SQL fingerprints for telemetry events (`fingerprint.ts`)
 - **Raw-SQL Guardrails**: Heuristic safety checks for raw SQL plans (`guardrails/raw.ts`)
 - **`beforeCompile` Chain**: AST-rewrite middleware chain run pre-lowering (`middleware/before-compile-chain.ts`)
@@ -72,13 +72,24 @@ const runtime = createRuntime({
   stackInstance,
   context,
   driver,
-  verify: { mode: 'onFirstUse', requireMarker: false },
   middleware: [budgets()],
 });
 
 for await (const row of runtime.execute(plan)) {
   console.log(row);
 }
+```
+
+Use `verifyMarker: false` to skip the marker read entirely — e.g. during a known-skewed deploy window where contract drift is expected and tolerated.
+
+```typescript
+const runtime = createRuntime({
+  stackInstance,
+  context,
+  driver,
+  verifyMarker: false,
+  middleware: [budgets()],
+});
 ```
 
 ## Exports
@@ -88,7 +99,7 @@ for await (const row of runtime.execute(plan)) {
 - `createRuntime` - Create a SQL runtime instance
 - `Runtime` - Runtime instance type
 - `CreateRuntimeOptions` - Options for `createRuntime`
-- `RuntimeVerifyOptions` - Verification mode configuration
+- `VerifyMarkerOption` - Marker-verification option (`'onFirstUse'` default; `false` to skip)
 - `RuntimeTelemetryEvent`, `TelemetryOutcome` - Telemetry event types
 
 ### Context

@@ -147,7 +147,6 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
             stackInstance,
             context,
             driver,
-            verify: { mode: 'onFirstUse', requireMarker: true },
           });
 
           try {

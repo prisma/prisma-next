@@ -245,7 +245,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     expect(runtime).toBeDefined();
@@ -261,7 +261,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     expect(runtime.telemetry()).toBeNull();
@@ -274,21 +274,20 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     await runtime.close();
     expect(driver.close).toHaveBeenCalled();
   });
 
-  it('validates codec registry at startup when verify mode is startup', () => {
+  it('creates runtime with default verifyMarker behaviour when the option is omitted', () => {
     const { stackInstance, context, driver } = createTestSetup();
 
     const runtime = createRuntime({
       stackInstance,
       context,
       driver,
-      verify: { mode: 'startup', requireMarker: false },
     });
 
     expect(runtime).toBeDefined();
@@ -300,7 +299,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const connection = await runtime.connection();
@@ -319,7 +318,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const connection = await runtime.connection();
@@ -337,7 +336,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const connection = await runtime.connection();
@@ -358,7 +357,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     await runtime.execute(createRawExecutionPlan()).toArray();
@@ -375,7 +374,7 @@ describe('createRuntime', () => {
         stackInstance,
         context,
         driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
+        verifyMarker: false,
         middleware: [{ name: 'generic' }],
       }),
     ).not.toThrow();
@@ -388,7 +387,7 @@ describe('createRuntime', () => {
         stackInstance,
         context,
         driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
+        verifyMarker: false,
         middleware: [{ name: 'sql-lints', familyId: 'sql' }],
       }),
     ).not.toThrow();
@@ -403,7 +402,7 @@ describe('createRuntime', () => {
         stackInstance,
         context,
         driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
+        verifyMarker: false,
         middleware: [mongoMiddleware],
       }),
     ).toThrow(
@@ -431,7 +430,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
       middleware: [softDelete],
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug },
     });
@@ -509,7 +508,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
       middleware: [rewriteA, rewriteB],
     });
 
@@ -544,7 +543,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
       middleware: [observer],
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug },
     });
@@ -569,7 +568,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const ast = SelectAst.from(TableSource.named('users'))
@@ -619,7 +618,7 @@ describe('createRuntime', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
 
     const ast = SelectAst.from(TableSource.named('users'))
@@ -659,7 +658,7 @@ describe('withTransaction', () => {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
     });
     return { runtime, driver };
   }

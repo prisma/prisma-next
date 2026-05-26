@@ -64,7 +64,6 @@ async function getRuntime(connectionString: string): Promise<Runtime> {
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
   });
 }
 
@@ -82,7 +81,6 @@ async function getRuntimeWithMiddleware(
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
     middleware,
   });
   return { runtime, driver };

@@ -10,7 +10,10 @@ export interface MarkerStatement {
 }
 
 /**
- * Outcome of an adapter's marker read. `no-table` means the marker storage itself is absent (e.g. attaching to a database that was never `db init`'d); `absent` means the storage exists but holds no row for the requested space; `present` carries the parsed record. Callers distinguish these so runtime telemetry and `requireMarker` policy can react to each case appropriately.
+ * Outcome of an adapter's marker read. `no-table` means the marker storage itself is absent
+ * (e.g. attaching to a database that was never `db init`'d); `absent` means the storage exists
+ * but holds no row for the requested space; `present` carries the parsed record. Callers
+ * distinguish these to produce appropriate log diagnostics for each case.
  */
 export type MarkerReadResult =
   | { readonly kind: 'present'; readonly record: ContractMarkerRecord }
