@@ -352,17 +352,14 @@ describe('integration/nested-includes/strategy', () => {
   });
 
   // ===========================================================================
-  // Dispatch carve-out for scalar / combine descriptors under the
-  // lateral strategy: both shapes route through the single-query
-  // builders at any depth. The recursive predicates
-  // (`hasScalarIncludeDescriptors`, `hasCombineIncludeDescriptors`)
-  // ensure a nested scalar / combine inside a row include doesn't
-  // accidentally land on the planner throw. Under correlated, both
-  // still fall back to multi-query — covered in the broader strategy
-  // tests above.
+  // Scalar / combine include descriptors resolve in a single SQL
+  // execution under both lateral and correlated capabilities. The
+  // single-query builders lower scalar and combine at any depth; the
+  // dispatch path no longer has a descriptor-aware fallback to
+  // multi-query.
   // ===========================================================================
 
-  describe('dispatch carve-out for scalar / combine include descriptors', () => {
+  describe('scalar / combine include descriptors resolve in a single execution', () => {
     it(
       'top-level combine() resolves in a single execution under lateral capabilities',
       async () => {
@@ -413,12 +410,11 @@ describe('integration/nested-includes/strategy', () => {
     it(
       'nested scalar at depth 2 resolves in a single execution under lateral capabilities',
       async () => {
-        // The recursive `hasScalarIncludeDescriptors` predicate matches
-        // a scalar at any depth; the lateral builder then emits a
-        // nested LATERAL inside the parent row's SELECT so the whole
-        // tree resolves in one round-trip. This test pins that
-        // recursion: a `count()` at depth 2 must roll up into the same
-        // single-query plan as the outer row include.
+        // The lateral builder emits a nested LATERAL inside the parent
+        // row's SELECT so the whole tree resolves in one round-trip.
+        // This test pins that recursion: a `count()` at depth 2 must
+        // roll up into the same single-query plan as the outer row
+        // include.
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
           await seedPosts(runtime, [{ id: 10, title: 'A', userId: 1, views: 1 }]);
@@ -441,6 +437,145 @@ describe('integration/nested-includes/strategy', () => {
               invitedById: null,
               address: null,
               posts: [{ id: 10, title: 'A', userId: 1, views: 1, embedding: null, comments: 2 }],
+            },
+          ]);
+          expect(runtime.executions).toHaveLength(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    // Correlated mirror of the lateral scalar count test. Same shape,
+    // same result; the SQL primitive is a correlated subquery instead
+    // of a LATERAL JOIN. Both paths produce one execution.
+    it(
+      'scalar count() resolves in a single execution under correlated capabilities',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [
+            { id: 1, name: 'Alice', email: 'alice@example.com' },
+            { id: 2, name: 'Bob', email: 'bob@example.com' },
+          ]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'B', userId: 1, views: 2 },
+            { id: 12, title: 'C', userId: 2, views: 3 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', CORRELATED_CAPABILITIES);
+          runtime.resetExecutions();
+          const rows = await users
+            .orderBy((u) => u.id.asc())
+            .include('posts', (posts) => posts.count())
+            .all();
+
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: 2,
+            },
+            {
+              id: 2,
+              name: 'Bob',
+              email: 'bob@example.com',
+              invitedById: null,
+              address: null,
+              posts: 1,
+            },
+          ]);
+          expect(runtime.executions).toHaveLength(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    // TML-2498 mirror under correlated: `take(N)` on a count() refine
+    // must NOT enter the aggregate scope.
+    it(
+      'TML-2498: count().take() returns the unpaginated total under correlated capabilities',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 100 },
+            { id: 11, title: 'B', userId: 1, views: 200 },
+            { id: 12, title: 'C', userId: 1, views: 300 },
+            { id: 13, title: 'D', userId: 1, views: 400 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', CORRELATED_CAPABILITIES);
+          runtime.resetExecutions();
+          const rows = await users
+            .include('posts', (posts) =>
+              posts
+                .where((p) => p.views.gte(200))
+                .take(2)
+                .count(),
+            )
+            .all();
+
+          // Three posts match views >= 200; take(2) is irrelevant.
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: 3,
+            },
+          ]);
+          expect(runtime.executions).toHaveLength(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    // Combine under correlated: same Pothos `totalCount` worked
+    // example as the lateral version, validated against the correlated
+    // emission shape (one correlated subquery whose FROM cross-joins
+    // per-branch derived tables).
+    it(
+      'combine({ rows, count }) resolves in a single execution under correlated capabilities',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 1 },
+            { id: 11, title: 'B', userId: 1, views: 2 },
+            { id: 12, title: 'C', userId: 1, views: 3 },
+            { id: 13, title: 'D', userId: 1, views: 4 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', CORRELATED_CAPABILITIES);
+          runtime.resetExecutions();
+          const rows = await users
+            .include('posts', (posts) =>
+              posts.combine({
+                recent: posts.orderBy((p) => p.id.desc()).take(2),
+                total: posts.count(),
+              }),
+            )
+            .all();
+
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: {
+                recent: [
+                  { id: 13, title: 'D', userId: 1, views: 4, embedding: null },
+                  { id: 12, title: 'C', userId: 1, views: 3, embedding: null },
+                ],
+                total: 4,
+              },
             },
           ]);
           expect(runtime.executions).toHaveLength(1);
