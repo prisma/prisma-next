@@ -1,0 +1,247 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath } from 'node:url';
+import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
+import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
+import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import type { Db } from '@prisma-next/sql-builder/types';
+import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
+import { createRawSql, param } from '@prisma-next/sql-relational-core/expression';
+import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+  type Runtime,
+  type SqlMiddleware,
+} from '@prisma-next/sql-runtime';
+import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from './fixtures/generated/contract.d';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
+
+interface Harness {
+  readonly db: Db<Contract, RawSqlTag>;
+  readonly runtime: Runtime;
+  readonly close: () => Promise<void>;
+}
+
+async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harness> {
+  const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as unknown;
+  const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+
+  const testDir = mkdtempSync(join(tmpdir(), 'prisma-sqlite-rawsql-'));
+  const dbPath = join(testDir, 'test.db');
+
+  const rawDb = new DatabaseSync(dbPath);
+  rawDb.exec('PRAGMA foreign_keys = ON');
+  rawDb.exec(`
+    CREATE TABLE _prisma_marker (
+      space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
+      core_hash TEXT NOT NULL,
+      profile_hash TEXT NOT NULL,
+      contract_json TEXT,
+      canonical_version INTEGER,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      app_tag TEXT,
+      meta TEXT NOT NULL DEFAULT '{}',
+      invariants TEXT NOT NULL DEFAULT '[]'
+    )
+  `);
+  rawDb
+    .prepare('INSERT INTO _prisma_marker (space, core_hash, profile_hash) VALUES (?, ?, ?)')
+    .run('app', contract.storage.storageHash, contract.profileHash ?? contract.storage.storageHash);
+  rawDb.exec(`
+    CREATE TABLE posts (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      views INTEGER NOT NULL
+    )
+  `);
+  rawDb.exec(`
+    INSERT INTO posts (id, title, user_id, views) VALUES
+      (1, 'Hello World', 1, 100),
+      (2, 'Second Post', 1, 50),
+      (3, 'Bobs Post', 2, 200),
+      (4, 'Another One', 3, 10)
+  `);
+  rawDb.close();
+
+  const stack = createSqlExecutionStack({
+    target: sqliteTarget,
+    adapter: sqliteAdapter,
+    driver: sqliteDriver,
+    extensionPacks: [],
+  });
+
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createExecutionContext({ contract, stack });
+  const driver = stackInstance.driver;
+  if (!driver) throw new Error('SQLite driver missing from execution stack');
+  await driver.connect({ kind: 'path', path: dbPath });
+
+  const runtime = createRuntime({
+    stackInstance,
+    context,
+    driver,
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    ...(middleware ? { middleware } : {}),
+  });
+
+  const rawSqlTag: RawSqlTag = createRawSql(createSqliteAdapter());
+  const db: Db<Contract, RawSqlTag> = sql<Contract, RawSqlTag>({ context, rawSqlTag });
+
+  return {
+    db,
+    runtime,
+    async close() {
+      await runtime.close();
+      try {
+        rmSync(testDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    },
+  };
+}
+
+describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperation }, () => {
+  let cleanup: (() => Promise<void>) | undefined;
+
+  beforeEach(() => {
+    cleanup = undefined;
+  });
+
+  afterEach(async () => {
+    await cleanup?.();
+  });
+
+  describe('rawSql expression survives the full pipeline and returns expected rows', () => {
+    it('rawSql in aliased select produces correct computed values from the database', async () => {
+      const harness = await buildHarness();
+      cleanup = harness.close;
+
+      // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
+      const rows = await harness.runtime.execute(
+        harness.db.posts
+          .select('id')
+          .select('doubled', (f, fns) => fns.rawSql`${f.views} * 2`.returns('sqlite/integer@1'))
+          .orderBy('id')
+          .build(),
+      );
+
+      expect(rows).toHaveLength(4);
+      expect(rows.map((r) => r.doubled)).toEqual([200, 100, 400, 20]);
+    });
+
+    it('rawSql with a literal scalar expression returns the same value for every row', async () => {
+      const harness = await buildHarness();
+      cleanup = harness.close;
+
+      const rows = await harness.runtime.execute(
+        harness.db.posts
+          .select('id')
+          .select('magic', (_f, fns) => fns.rawSql`42`.returns('sqlite/integer@1'))
+          .orderBy('id')
+          .build(),
+      );
+
+      expect(rows).toHaveLength(4);
+      expect(rows.every((r) => r.magic === 42)).toBe(true);
+    });
+  });
+
+  describe('ParamRef from rawSql interpolation surfaces in beforeExecute params walk', () => {
+    it('param() inside rawSql appears in beforeExecute entries() in canonical order', async () => {
+      const capturedEntries: Array<{ codecId: string | undefined; value: unknown }> = [];
+
+      const middleware: SqlMiddleware = {
+        name: 'param-capture',
+        familyId: 'sql',
+        beforeExecute(_plan, _ctx, params?: SqlParamRefMutator) {
+          if (!params) return;
+          for (const entry of params.entries()) {
+            capturedEntries.push({ codecId: entry.codecId, value: entry.value });
+          }
+        },
+      };
+
+      const harness = await buildHarness([middleware]);
+      cleanup = harness.close;
+
+      // The where clause embeds a param() inside a rawSql expression.
+      // After lowering, the plan carries one ParamRef (value 50, codec sqlite/integer@1).
+      // The middleware's beforeExecute should see it via params.entries().
+      await harness.runtime.execute(
+        harness.db.posts
+          .select('id')
+          .where((_f, fns) =>
+            fns.gt(
+              fns.rawSql`${param(50, { codecId: 'sqlite/integer@1' })}`.returns('sqlite/integer@1'),
+              fns.rawSql`0`.returns('sqlite/integer@1'),
+            ),
+          )
+          .build(),
+      );
+
+      expect(capturedEntries.length).toBeGreaterThanOrEqual(1);
+      const paramEntry = capturedEntries.find((e) => e.codecId === 'sqlite/integer@1');
+      expect(paramEntry).toBeDefined();
+      expect(paramEntry?.value).toBe(50);
+    });
+
+    it('param() count in beforeExecute entries matches the number of param() calls in rawSql', async () => {
+      const capturedEntries: Array<{ codecId: string | undefined; value: unknown }> = [];
+
+      const middleware: SqlMiddleware = {
+        name: 'param-count-capture',
+        familyId: 'sql',
+        beforeExecute(_plan, _ctx, params?: SqlParamRefMutator) {
+          if (!params) return;
+          for (const entry of params.entries()) {
+            capturedEntries.push({ codecId: entry.codecId, value: entry.value });
+          }
+        },
+      };
+
+      const harness = await buildHarness([middleware]);
+      cleanup = harness.close;
+
+      // Two param() calls: param(10) and param(200).
+      await harness.runtime.execute(
+        harness.db.posts
+          .select('id')
+          .where((_f, fns) =>
+            fns.and(
+              fns.gt(
+                fns.rawSql`${param(10, { codecId: 'sqlite/integer@1' })}`.returns(
+                  'sqlite/integer@1',
+                ),
+                fns.rawSql`0`.returns('sqlite/integer@1'),
+              ),
+              fns.lt(
+                fns.rawSql`${param(200, { codecId: 'sqlite/integer@1' })}`.returns(
+                  'sqlite/integer@1',
+                ),
+                fns.rawSql`1000`.returns('sqlite/integer@1'),
+              ),
+            ),
+          )
+          .build(),
+      );
+
+      const intEntries = capturedEntries.filter((e) => e.codecId === 'sqlite/integer@1');
+      expect(intEntries).toHaveLength(2);
+      expect(intEntries.map((e) => e.value).sort()).toEqual([10, 200]);
+    });
+  });
+});
