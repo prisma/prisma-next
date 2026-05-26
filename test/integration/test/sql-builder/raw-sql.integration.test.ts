@@ -263,12 +263,12 @@ describe('integration: rawSql expression in typed builder', {
           .where((_f, fns) =>
             fns.and(
               fns.gt(
-                rawSqlTag`${param(10, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
-                rawSqlTag`0`.returns('pg/int4@1'),
+                fns.rawSql`${param(10, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+                fns.rawSql`0`.returns('pg/int4@1'),
               ),
               fns.lt(
-                rawSqlTag`${param(200, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
-                rawSqlTag`1000`.returns('pg/int4@1'),
+                fns.rawSql`${param(200, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+                fns.rawSql`1000`.returns('pg/int4@1'),
               ),
             ),
           )
