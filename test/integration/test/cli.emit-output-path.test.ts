@@ -13,7 +13,7 @@ import {
 const fixtureSubdir = 'emit';
 
 withTempDir(({ createTempDir }) => {
-  describe('contract emit: output path override (integration)', () => {
+  describe('contract emit: output path (integration)', () => {
     let cleanupMocks: () => void;
 
     beforeEach(() => {
@@ -26,7 +26,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      '--output redirects artifacts to the override path with byte-identical JSON content',
+      '--output-path redirects artifacts into the given directory with byte-identical JSON content',
       async () => {
         const originalCwd = process.cwd();
 
@@ -50,31 +50,33 @@ withTempDir(({ createTempDir }) => {
         const defaultJsonContent = readFileSync(defaultJsonPath, 'utf-8');
         const defaultDtsContent = readFileSync(defaultDtsPath, 'utf-8');
 
-        // Run 2: --output overrides the config's output path
+        // Run 2: --output-path overrides the config's output, writing into a new directory
         const overrideSetup = setupTestDirectoryFromFixtures(
           createTempDir,
           fixtureSubdir,
           'prisma-next.config.emit.ts',
         );
-        const customJsonPath = join(overrideSetup.testDir, 'custom-out', 'contract.json');
-        const customDtsPath = join(overrideSetup.testDir, 'custom-out', 'contract.d.ts');
-        mkdirSync(join(overrideSetup.testDir, 'custom-out'), { recursive: true });
+        const customDir = join(overrideSetup.testDir, 'custom-out');
+        mkdirSync(customDir, { recursive: true });
+        const customJsonPath = join(customDir, 'contract.json');
+        const customDtsPath = join(customDir, 'contract.d.ts');
 
         try {
           process.chdir(overrideSetup.testDir);
           await executeCommand(createContractEmitCommand(), [
             '--config',
             'prisma-next.config.ts',
-            '--output',
-            'custom-out/contract.json',
+            '--output-path',
+            'custom-out',
           ]);
         } finally {
           process.chdir(originalCwd);
         }
 
-        // Artifacts land at the override path, not the config's output path
+        // Artifacts land inside the override directory with canonical filenames
         expect(existsSync(customJsonPath)).toBe(true);
         expect(existsSync(customDtsPath)).toBe(true);
+        // Config's default output directory should not have been written
         expect(existsSync(join(overrideSetup.outputDir, 'contract.json'))).toBe(false);
 
         // JSON content is byte-identical (same contract, same hash, deterministic emission)
@@ -89,7 +91,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'config output field routes artifacts to the configured path',
+      'config outputPath field routes artifacts to the configured directory',
       async () => {
         const originalCwd = process.cwd();
         const setup = setupTestDirectoryFromFixtures(

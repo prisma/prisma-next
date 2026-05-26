@@ -3,7 +3,7 @@ import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { dirname, extname, relative, resolve } from 'pathe';
+import { dirname, join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { executeContractEmit } from '../control-api/operations/contract-emit';
 import type { ContractEmitResult } from '../control-api/types';
@@ -27,14 +27,13 @@ import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
-  readonly output?: string;
+  readonly outputPath?: string;
 }
 
 interface HeaderPaths {
   readonly displayConfigPath: string;
   readonly outputJsonPath: string;
   readonly outputDtsPath: string;
-  readonly sourceInputs: readonly string[];
 }
 
 /**
@@ -45,7 +44,7 @@ interface HeaderPaths {
  */
 async function resolveHeaderPaths(
   configOption: string | undefined,
-  outputOverride: string | undefined,
+  outputPath: string | undefined,
 ): Promise<Result<HeaderPaths, CliStructuredError>> {
   const displayConfigPath = configOption
     ? relative(process.cwd(), resolve(configOption))
@@ -65,9 +64,10 @@ async function resolveHeaderPaths(
     );
   }
 
-  const effectiveOutput = outputOverride ?? config.contract?.output;
+  const effectiveJsonPath =
+    outputPath !== undefined ? join(outputPath, 'contract.json') : config.contract?.output;
 
-  if (!effectiveOutput) {
+  if (!effectiveJsonPath) {
     return notOk(
       errorContractConfigMissing({
         why: 'Config.contract.output is required for emit. Define it in your config: contract: { source: ..., output: ... }',
@@ -75,64 +75,17 @@ async function resolveHeaderPaths(
     );
   }
 
-  const sourceInputs = config.contract?.source.inputs ?? [];
-
-  if (effectiveOutput.endsWith('.json')) {
-    try {
-      const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } =
-        getEmittedArtifactPaths(effectiveOutput);
-      return ok({ displayConfigPath, outputJsonPath, outputDtsPath, sourceInputs });
-    } catch (error) {
-      return notOk(
-        errorContractConfigMissing({
-          why: error instanceof Error ? error.message : String(error),
-        }),
-      );
-    }
-  }
-
-  // Non-.json extension: derive display paths without throwing so the warning
-  // logic can fire. The actual emit attempt will also fail, but via a structured
-  // error rather than an early validation exit.
-  const ext = extname(effectiveOutput);
-  const base = ext.length > 0 ? effectiveOutput.slice(0, -ext.length) : effectiveOutput;
-  return ok({
-    displayConfigPath,
-    outputJsonPath: effectiveOutput,
-    outputDtsPath: `${base}.d.ts`,
-    sourceInputs,
-  });
-}
-
-function computeOutputWarnings(
-  rawOutput: string,
-  resolvedOutput: string,
-  sourceInputs: readonly string[],
-): string[] {
-  const warnings: string[] = [];
-
-  if (extname(resolvedOutput) !== '.json') {
-    warnings.push(
-      `The --output path "${rawOutput}" does not end with .json. The path will be used verbatim; the companion .d.ts is derived by replacing the extension.`,
+  try {
+    const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } =
+      getEmittedArtifactPaths(effectiveJsonPath);
+    return ok({ displayConfigPath, outputJsonPath, outputDtsPath });
+  } catch (error) {
+    return notOk(
+      errorContractConfigMissing({
+        why: error instanceof Error ? error.message : String(error),
+      }),
     );
   }
-
-  if (rawOutput.endsWith('/') || rawOutput.endsWith('\\')) {
-    warnings.push(
-      `The --output path "${rawOutput}" looks like a directory. Writing will fail at the file-creation step.`,
-    );
-  }
-
-  for (const input of sourceInputs) {
-    if (input === resolvedOutput) {
-      warnings.push(
-        `The --output path "${rawOutput}" collides with a contract source file. Emitting will overwrite the source.`,
-      );
-      break;
-    }
-  }
-
-  return warnings;
 }
 
 async function executeContractEmitCommand(
@@ -141,20 +94,13 @@ async function executeContractEmitCommand(
   ui: TerminalUI,
   startTime: number,
 ): Promise<Result<EmitContractResult, CliStructuredError>> {
-  const outputOverride = options.output !== undefined ? resolve(options.output) : undefined;
+  const outputPath = options.outputPath !== undefined ? resolve(options.outputPath) : undefined;
 
-  const headerPathsResult = await resolveHeaderPaths(options.config, outputOverride);
+  const headerPathsResult = await resolveHeaderPaths(options.config, outputPath);
   if (!headerPathsResult.ok) {
     return headerPathsResult;
   }
-  const { displayConfigPath, outputJsonPath, outputDtsPath, sourceInputs } =
-    headerPathsResult.value;
-
-  if (outputOverride !== undefined && options.output !== undefined) {
-    for (const warning of computeOutputWarnings(options.output, outputOverride, sourceInputs)) {
-      ui.warn(warning);
-    }
-  }
+  const { displayConfigPath, outputJsonPath, outputDtsPath } = headerPathsResult.value;
 
   if (!flags.json && !flags.quiet) {
     ui.stderr(
@@ -180,7 +126,7 @@ async function executeContractEmitCommand(
     result = await executeContractEmit({
       configPath,
       onProgress,
-      ...ifDefined('outputOverride', outputOverride),
+      ...ifDefined('outputPath', outputPath),
     });
   } catch (error) {
     if (CliStructuredError.is(error)) {
@@ -219,11 +165,11 @@ export function createContractEmitCommand(): Command {
   setCommandExamples(command, [
     'prisma-next contract emit',
     'prisma-next contract emit --config ./custom-config.ts',
-    'prisma-next contract emit --output ./generated/contract.json',
+    'prisma-next contract emit --output-path ./generated',
   ]);
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--output <path>', 'Override the output path for emitted contract artifacts')
+    .option('--output-path <dir>', 'Directory to write contract.json and contract.d.ts into')
     .action(async (options: ContractEmitOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);

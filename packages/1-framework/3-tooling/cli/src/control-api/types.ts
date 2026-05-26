@@ -720,12 +720,12 @@ export interface ContractEmitOptions {
   /** Path to the prisma-next.config.ts file */
   readonly configPath: string;
   /**
-   * Optional override for the contract artifact output path. When provided, takes
-   * precedence over `contractConfig.output` from the loaded config. The value is
-   * used verbatim — resolution against cwd is the caller's responsibility (the
-   * CLI command resolves it before passing it in).
+   * Directory to write contract artifacts into. When set, `contract.json` and
+   * `contract.d.ts` are written inside this directory, taking precedence over
+   * any output path from the loaded config. The value must be an absolute path;
+   * resolution against cwd is the caller's responsibility.
    */
-  readonly outputOverride?: string;
+  readonly outputPath?: string;
   /** Optional AbortSignal for cancelling the in-flight emit */
   readonly signal?: AbortSignal;
   /** Optional progress callback for observing source-resolution and emit spans */
