@@ -356,7 +356,81 @@ describe('integration/include', () => {
             posts: { avgViews: null, minViews: null, maxViews: null },
           },
         ]);
-        expect(runtime.executions).toHaveLength(4);
+        // All three scalar branches now pack into a single LATERAL
+        // (json_build_object packing three sub-envelopes); the parent
+        // SELECT rolls up everything into one round-trip.
+        expect(runtime.executions).toHaveLength(1);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  // TML-2595 worked example: the Pothos `totalCount` shape — a paginated
+  // row branch alongside a count() scalar branch. This is the headline
+  // case that motivated single-query combine emission: one LATERAL
+  // packs both branches; the parent + count + page roll up to one SQL
+  // execution per query.
+  it(
+    'TML-2595: include().combine({ recent: take(N), count: count() }) resolves in a single execution',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 1, views: 300 },
+          { id: 13, title: 'Post D', userId: 1, views: 400 },
+          { id: 14, title: 'Post E', userId: 2, views: 500 },
+        ]);
+
+        runtime.resetExecutions();
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts.combine({
+              recent: posts.orderBy((post) => post.id.desc()).take(3),
+              total: posts.count(),
+            }),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: {
+              recent: [
+                { id: 13, title: 'Post D', userId: 1, views: 400, embedding: null },
+                { id: 12, title: 'Post C', userId: 1, views: 300, embedding: null },
+                { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null },
+              ],
+              // The `take(3)` paginates the `recent` row branch but
+              // does NOT enter the scalar count's scope — Alice has 4
+              // posts total, not 3.
+              total: 4,
+            },
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            address: null,
+            posts: {
+              recent: [{ id: 14, title: 'Post E', userId: 2, views: 500, embedding: null }],
+              total: 1,
+            },
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(1);
       });
     },
     timeouts.spinUpPpgDev,
@@ -416,7 +490,8 @@ describe('integration/include', () => {
             },
           },
         ]);
-        expect(runtime.executions).toHaveLength(4);
+        // Three branches (two row + one scalar) pack into one LATERAL.
+        expect(runtime.executions).toHaveLength(1);
       });
     },
     timeouts.spinUpPpgDev,
