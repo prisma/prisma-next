@@ -184,3 +184,7 @@ createRunner({
 - Provide automatic migration path from v1 to v2
 - Maintain backward compatibility with existing deployments
 - Enable contract snapshots and enhanced drift analysis
+
+### Runtime read-side behaviour (TML-2680)
+
+The SQL runtime's response to marker drift on read has shifted from throwing blocking errors to emitting a structured `warn`-level log line once per runtime and proceeding with the query. This does not change marker schema, write paths, or the explicit `db-verify` CLI verification surface — only the runtime's lazy read-side diagnostic during normal query execution.
