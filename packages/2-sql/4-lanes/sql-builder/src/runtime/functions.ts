@@ -226,7 +226,7 @@ export function createAggregateFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
   rawSqlTag?: RawSqlTag,
 ): AggregateFunctions<QC, RawSqlTag | undefined> {
-  const baseFns = createFunctions<QC>(operations, rawSqlTag as RawSqlTag);
+  const baseFns = createFunctions<QC>(operations, rawSqlTag);
   const aggregates = createAggregateOnlyFunctions();
 
   return new Proxy({} as AggregateFunctions<QC, RawSqlTag | undefined>, {
