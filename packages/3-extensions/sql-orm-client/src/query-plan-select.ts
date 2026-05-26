@@ -32,10 +32,6 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import {
-  hasCombineIncludeDescriptors,
-  hasScalarIncludeDescriptors,
-} from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
 import type { CollectionState, IncludeCombineBranch, IncludeExpr, IncludeScalar } from './types';
@@ -706,8 +702,10 @@ function buildIncludeAggregateExpr(
  * stitched together as cross-joined derived tables (FROM <first>
  * INNER JOIN <second> ON TRUE ...), and the outer projection packs
  * them into a single `json_build_object` keyed by branch name. The
- * resulting LATERAL emits exactly one row per parent row containing
- * the combined JSON.
+ * resulting subquery emits exactly one row per parent row containing
+ * the combined JSON — wrapped as a LATERAL join under the lateral
+ * strategy or embedded as a correlated subquery under the correlated
+ * strategy.
  *
  * Row branches reuse the standalone row-include builder; scalar
  * branches reuse `buildIncludeChildScalarSelect` — the `{value: ...}`
@@ -721,6 +719,7 @@ function buildIncludeChildCombineSelect(
   parentTableName: string,
   include: IncludeExpr,
   branches: Readonly<Record<string, IncludeCombineBranch>>,
+  strategy: 'lateral' | 'correlated',
 ): SelectAst {
   const branchEntries = Object.entries(branches);
   if (branchEntries.length === 0) {
@@ -730,7 +729,13 @@ function buildIncludeChildCombineSelect(
   const compiledBranches = branchEntries.map(([name, branch]) => ({
     name,
     alias: `${include.relationName}__combine__${name}`,
-    select: buildIncludeChildCombineBranchSelect(contract, parentTableName, include, branch),
+    select: buildIncludeChildCombineBranchSelect(
+      contract,
+      parentTableName,
+      include,
+      branch,
+      strategy,
+    ),
   }));
 
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
@@ -759,13 +764,16 @@ function buildIncludeChildCombineSelect(
  * Compile one branch of a `combine({ ... })` into a SelectAst that
  * projects exactly one row with one column aliased to the parent
  * relation name. Dispatches to the standalone scalar / row builders
- * with the branch's state spliced into a synthetic IncludeExpr.
+ * with the branch's state spliced into a synthetic IncludeExpr. The
+ * `strategy` is forwarded so that nested includes inside a row branch
+ * stay on the same emission strategy as the outer query.
  */
 function buildIncludeChildCombineBranchSelect(
   contract: Contract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
   branch: IncludeCombineBranch,
+  strategy: 'lateral' | 'correlated',
 ): SelectAst {
   if (branch.kind === 'scalar') {
     return buildIncludeChildScalarSelect(contract, parentTableName, include, branch.selector);
@@ -778,26 +786,33 @@ function buildIncludeChildCombineBranchSelect(
     scalar: undefined,
     combine: undefined,
   };
-  return buildIncludeChildRowsAggregateSelect(contract, parentTableName, syntheticInclude);
+  return buildIncludeChildRowsAggregateSelect(
+    contract,
+    parentTableName,
+    syntheticInclude,
+    strategy,
+  );
 }
 
 /**
- * Internal helper extracted from `buildLateralIncludeArtifacts`'s
- * row path: build the inner aggregate SELECT that `json_agg`s child
- * rows into a single JSON-array column aliased to the relation name.
- * Used both by the standalone row LATERAL and by combine's row
- * branches.
+ * Internal helper: build the inner aggregate SELECT that `json_agg`s
+ * child rows into a single JSON-array column aliased to the relation
+ * name. Used by both the standalone row LATERAL / correlated path and
+ * by combine's row branches. The `strategy` parameter propagates into
+ * `buildIncludeChildRowsSelect` so that nested includes inside the
+ * aggregated child rows use the same emission shape as the outer query.
  */
 function buildIncludeChildRowsAggregateSelect(
   contract: Contract<SqlStorage>,
   parentTableName: string,
   include: IncludeExpr,
+  strategy: 'lateral' | 'correlated',
 ): SelectAst {
   const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
     contract,
     parentTableName,
     include,
-    'lateral',
+    strategy,
   );
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
@@ -844,6 +859,7 @@ function buildLateralIncludeArtifacts(
       parentTableName,
       include,
       include.combine,
+      'lateral',
     );
     return {
       join: JoinAst.left(DerivedTableSource.as(lateralAlias, combineSelect), AndExpr.true(), true),
@@ -854,7 +870,12 @@ function buildLateralIncludeArtifacts(
     };
   }
 
-  const aggregateQuery = buildIncludeChildRowsAggregateSelect(contract, parentTableName, include);
+  const aggregateQuery = buildIncludeChildRowsAggregateSelect(
+    contract,
+    parentTableName,
+    include,
+    'lateral',
+  );
 
   return {
     join: JoinAst.left(DerivedTableSource.as(lateralAlias, aggregateQuery), AndExpr.true(), true),
@@ -872,26 +893,37 @@ function buildCorrelatedIncludeProjection(
 ): {
   readonly projection: ProjectionItem;
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+  if (include.scalar) {
+    const scalarSelect = buildIncludeChildScalarSelect(
+      contract,
+      parentTableName,
+      include,
+      include.scalar,
+    );
+    return {
+      projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(scalarSelect)),
+    };
+  }
+
+  if (include.combine) {
+    const combineSelect = buildIncludeChildCombineSelect(
+      contract,
+      parentTableName,
+      include,
+      include.combine,
+      'correlated',
+    );
+    return {
+      projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(combineSelect)),
+    };
+  }
+
+  const aggregateQuery = buildIncludeChildRowsAggregateSelect(
     contract,
     parentTableName,
     include,
     'correlated',
   );
-  const jsonObjectExpr = JsonObjectExpr.fromEntries(
-    childProjection.map((item) =>
-      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
-    ),
-  );
-  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection(
-    [
-      ProjectionItem.of(
-        include.relationName,
-        JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
-      ),
-    ],
-  );
-
   return {
     projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(aggregateQuery)),
   };
@@ -1100,18 +1132,6 @@ export function compileSelectWithIncludeStrategy(
   strategy: 'lateral' | 'correlated',
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  // The lateral builder handles both scalar reducers and combine()
-  // descriptors at any depth. The correlated builder has no scalar
-  // or combine emission yet and throws on either.
-  if (strategy === 'correlated') {
-    if (hasCombineIncludeDescriptors(state.includes)) {
-      throw new Error('correlated include strategy does not support combine() include descriptors');
-    }
-    if (hasScalarIncludeDescriptors(state.includes)) {
-      throw new Error('correlated include strategy does not support scalar include selectors');
-    }
-  }
-
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
   const topLevelWhere = buildStateWhere(contract, tableName, state);
