@@ -102,7 +102,13 @@ async function readBodyTextWithLimit(request: Request): Promise<string> {
 
   const decoded = request.body
     .pipeThrough(createByteLimitStream(MAX_EVENT_BODY_BYTES))
-    .pipeThrough(new TextDecoderStream());
+    // `TextDecoderStream`'s writable side is typed as `WritableStream<BufferSource>`
+    // (broader than the `Uint8Array` chunks our limiter emits), but TypeScript does
+    // not model the contravariance of `WritableStream<T>` correctly under the
+    // newer DOM/Node lib typings — the chunk types fail to match even though every
+    // chunk we feed in is a valid `BufferSource`. Cast through the matching pair
+    // shape to keep the existing pipeline.
+    .pipeThrough(new TextDecoderStream() as ReadableWritablePair<string, Uint8Array>);
   let text = '';
   for await (const chunk of decoded) {
     text += chunk;
