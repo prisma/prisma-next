@@ -25,6 +25,7 @@ import type {
   OrderByItem,
   ProjectionItem,
   RawExpr,
+  RawSqlLiteral,
   SelectAst,
   SqlQueryable,
   SubqueryExpr,
@@ -59,6 +60,26 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       capabilities: defaultCapabilities,
       readMarker: (queryable: SqlQueryable) => readSqliteMarker(queryable),
     });
+  }
+
+  inferCodec(value: RawSqlLiteral): string {
+    switch (typeof value) {
+      case 'number':
+        return Number.isSafeInteger(value) && value % 1 === 0
+          ? 'sqlite/integer@1'
+          : 'sqlite/real@1';
+      case 'bigint':
+        return 'sqlite/bigint@1';
+      case 'string':
+        return 'sqlite/text@1';
+      case 'boolean':
+        return 'sqlite/integer@1';
+      case 'object':
+        if (value instanceof Uint8Array) return 'sqlite/blob@1';
+    }
+    throw new Error(
+      'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+    );
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
