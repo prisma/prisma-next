@@ -5,7 +5,7 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { dirname } from 'pathe';
+import { dirname, join } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { queueEmitByOutput } from '../../utils/emit-queue';
@@ -153,7 +153,7 @@ function validateProviderResult(providerResult: unknown): ValidatedProviderResul
 export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
-  const { configPath, outputOverride, signal = new AbortController().signal, onProgress } = options;
+  const { configPath, outputPath, signal = new AbortController().signal, onProgress } = options;
   const unlessAborted = abortable(signal);
 
   const config = await unlessAborted(loadConfig(configPath));
@@ -166,7 +166,8 @@ export async function executeContractEmit(
 
   const contractConfig = config.contract;
 
-  const effectiveOutput = outputOverride ?? contractConfig.output;
+  const effectiveOutput =
+    outputPath !== undefined ? join(outputPath, 'contract.json') : contractConfig.output;
 
   if (!effectiveOutput) {
     throw errorContractConfigMissing({

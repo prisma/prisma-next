@@ -15,12 +15,12 @@ exports[`help text snapshots > formats contract emit help 1`] = `
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
 │ --config <path>       Path to prisma-next.config.ts
-│ --output <path>       Override the output path for emitted contract artifacts
+│ --output-path <dir>   Directory to write contract.json and contract.d.ts into
 │
 │ Examples:
 │   $ prisma-next contract emit
 │   $ prisma-next contract emit --config ./custom-config.ts
-│   $ prisma-next contract emit --output ./generated/contract.json
+│   $ prisma-next contract emit --output-path ./generated
 │
 │ Reads your contract source (TypeScript or Prisma schema) and emits
 │ contract.json and
@@ -46,12 +46,12 @@ exports[`help text snapshots > formats contract emit help with no color 1`] = `
 │ --no-interactive      Disable interactive prompts
 │ -y, --yes             Auto-accept prompts
 │ --config <path>       Path to prisma-next.config.ts
-│ --output <path>       Override the output path for emitted contract artifacts
+│ --output-path <dir>   Directory to write contract.json and contract.d.ts into
 │
 │ Examples:
 │   $ prisma-next contract emit
 │   $ prisma-next contract emit --config ./custom-config.ts
-│   $ prisma-next contract emit --output ./generated/contract.json
+│   $ prisma-next contract emit --output-path ./generated
 │
 │ Reads your contract source (TypeScript or Prisma schema) and emits
 │ contract.json and

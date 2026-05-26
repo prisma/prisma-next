@@ -8,11 +8,11 @@ import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { extname } from 'pathe';
+import { extname, join } from 'pathe';
 
 export interface PostgresConfigOptions {
   readonly contract: string;
-  readonly output?: string;
+  readonly outputPath?: string;
   readonly db?: {
     readonly connection?: string;
   };
@@ -32,7 +32,10 @@ function deriveOutputPath(contractPath: string): string {
 
 export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'sql', 'postgres'> {
   const extensions = options.extensions ?? [];
-  const output = options.output ?? deriveOutputPath(options.contract);
+  const output =
+    options.outputPath !== undefined
+      ? join(options.outputPath, 'contract.json')
+      : deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
   const contractConfig =

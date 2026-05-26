@@ -8,11 +8,11 @@ import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/mongo-contract-ts/config-types';
 import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { extname } from 'pathe';
+import { extname, join } from 'pathe';
 
 export interface MongoConfigOptions {
   readonly contract: string;
-  readonly output?: string;
+  readonly outputPath?: string;
   readonly db?: {
     readonly connection?: string;
   };
@@ -32,7 +32,10 @@ function deriveOutputPath(contractPath: string): string {
 
 export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mongo', 'mongo'> {
   const extensions = options.extensions ?? [];
-  const output = options.output ?? deriveOutputPath(options.contract);
+  const output =
+    options.outputPath !== undefined
+      ? join(options.outputPath, 'contract.json')
+      : deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
   const contractConfig =
