@@ -193,10 +193,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     const tables = (result['tables'] ?? {}) as Record<string, StorageTable>;
     const enumSlot = result['enum'] as NonNullable<SqlNamespaceTablesInput['enum']> | undefined;
     return {
-      id,
+      ...result,
       tables,
       ...(enumSlot !== undefined ? { enum: enumSlot } : {}),
-    };
+    } as SqlNamespaceTablesInput;
   }
 
   protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {
