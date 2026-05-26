@@ -113,6 +113,7 @@ This means the "Optional strict / throw mode for CI" follow-up below is **demote
 
 ## Follow-ups (separate tickets)
 
+- **Thread `log` through the convenience wrappers.** Surfaced during the post-commit review: none of `sqlite`, `postgres`, `postgresServerless` accept or thread a `log` option through to `createRuntime`. The result is that operators using the convenience wrappers cannot observe the new marker-verification warnings — the warnings land on the runtime's default `Log` (effectively a noop). The slice's behaviour change ("log, don't throw") works as designed at the `createRuntime` layer, but is invisible to wrapper users. The slice does not introduce the gap (the wrappers never exposed `log`), but it does make the user-visible cost of the gap concrete. Recommended action: a separate ticket adding `log?: Log` to each wrapper's `*OptionsBase` interface and threading it via `ifDefined`. Three near-identical changes plus wrapper-level tests.
 - **Dual-signature marker writes.** Migrations write both the previous and new contract hashes during a deploy window; runtime accepts either. The proper zero-downtime primitive; lives in the migration-emission layer.
 - **Eager-at-`connect()` mode (`'startup'`).** Wire marker-read into the wrappers' `connect()` step so the warning appears in startup logs, before any traffic. Additive union member; no API break.
 - **Telemetry surface for marker drift.** A dedicated telemetry event for the mismatch case, in addition to the log line.
