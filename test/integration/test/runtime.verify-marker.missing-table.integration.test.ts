@@ -1,9 +1,19 @@
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
-import postgresServerless from '@prisma-next/postgres/serverless';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
+import type { Log } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Client } from 'pg';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { contract } from './sql-builder/fixtures/contract';
 import type { Contract } from './sql-builder/fixtures/generated/contract';
 
@@ -48,48 +58,50 @@ describe('runtime verify-marker: missing marker table', {
     }
   });
 
-  it('postgresServerless with default verify (requireMarker: false) tolerates a missing marker table', async () => {
-    const db = postgresServerless<Contract>({
-      contract: sqlContract,
-      extensions: [pgvector],
+  it('logs warn and proceeds when the marker table is absent', async () => {
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } satisfies Log;
+
+    const stack = createSqlExecutionStack({
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensionPacks: [pgvector],
     });
-    await using runtime = await db.connect({ url: connectionString });
-    const builder = sql({ context: db.context });
+    const stackInstance = instantiateExecutionStack(stack);
+    const context = createExecutionContext({ contract: sqlContract, stack });
+    const driver = stackInstance.driver;
+    if (!driver) {
+      throw new Error('Driver missing from execution stack instance');
+    }
 
-    const rows = await runtime.execute(builder.users.select('id').build()).toArray();
+    const client = new Client({ connectionString });
+    await driver.connect({ kind: 'pgClient', client });
 
-    expect(rows.map((r) => r.id)).toEqual([1]);
-  });
-
-  it('postgresServerless with verify.mode: "always" + requireMarker: false tolerates a missing marker table on every call', async () => {
-    const db = postgresServerless<Contract>({
-      contract: sqlContract,
-      extensions: [pgvector],
-      verify: { mode: 'always', requireMarker: false },
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      log,
     });
-    await using runtime = await db.connect({ url: connectionString });
-    const builder = sql({ context: db.context });
+    const builder = sql({ context });
 
-    const first = await runtime.execute(builder.users.select('id').build()).toArray();
-    const second = await runtime.execute(builder.users.select('id').build()).toArray();
+    try {
+      const rows = await runtime.execute(builder.users.select('id').build()).toArray();
 
-    expect(first.map((r) => r.id)).toEqual([1]);
-    expect(second.map((r) => r.id)).toEqual([1]);
-  });
-
-  it('postgresServerless with requireMarker: true surfaces CONTRACT.MARKER_MISSING (not raw driver error) when the marker table is absent', async () => {
-    const db = postgresServerless<Contract>({
-      contract: sqlContract,
-      extensions: [pgvector],
-      verify: { mode: 'onFirstUse', requireMarker: true },
-    });
-    await using runtime = await db.connect({ url: connectionString });
-    const builder = sql({ context: db.context });
-
-    await expect(
-      runtime.execute(builder.users.select('id').build()).toArray(),
-    ).rejects.toMatchObject({
-      code: 'CONTRACT.MARKER_MISSING',
-    });
+      expect(rows.map((r) => r.id)).toEqual([1]);
+      expect(log.warn).toHaveBeenCalledOnce();
+      expect(log.warn).toHaveBeenCalledWith({
+        code: 'CONTRACT.MARKER_MISSING',
+        scope: 'marker-verification',
+        expected: {
+          storageHash: sqlContract.storage.storageHash,
+          profileHash: sqlContract.profileHash ?? null,
+        },
+        actual: null,
+        message: 'Contract marker not found in database',
+      });
+    } finally {
+      await runtime.close();
+    }
   });
 });

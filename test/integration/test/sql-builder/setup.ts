@@ -121,7 +121,6 @@ export function setupIntegrationTest() {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
     closeFns.push(

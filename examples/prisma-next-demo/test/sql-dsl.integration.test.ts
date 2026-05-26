@@ -45,7 +45,6 @@ async function getRuntime(connectionString: string): Promise<Runtime> {
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
   });
 }
 

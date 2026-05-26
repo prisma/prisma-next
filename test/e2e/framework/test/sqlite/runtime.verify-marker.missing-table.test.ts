@@ -13,12 +13,12 @@ import {
   createExecutionContext,
   createRuntime,
   createSqlExecutionStack,
+  type Log,
   type Runtime,
-  type RuntimeVerifyOptions,
 } from '@prisma-next/sql-runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +30,7 @@ interface Harness {
   readonly cleanup: () => Promise<void>;
 }
 
-async function buildHarness(verify: RuntimeVerifyOptions): Promise<Harness> {
+async function buildHarness(log: Log): Promise<Harness> {
   const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as unknown;
   const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
@@ -67,7 +67,7 @@ async function buildHarness(verify: RuntimeVerifyOptions): Promise<Harness> {
   if (!driver) throw new Error('SQLite driver missing from execution stack');
   await driver.connect({ kind: 'path', path: dbPath });
 
-  const runtime = createRuntime({ stackInstance, context, driver, verify });
+  const runtime = createRuntime({ stackInstance, context, driver, log });
   const db: Db<Contract> = sqlBuilder<Contract>({ context });
 
   return {
@@ -99,31 +99,26 @@ describe('sqlite runtime verify-marker: missing marker table', {
     }
   });
 
-  it('verify.mode: "onFirstUse" + requireMarker: false tolerates a missing _prisma_marker table', async () => {
-    harness = await buildHarness({ mode: 'onFirstUse', requireMarker: false });
+  it('logs warn and proceeds when the marker table is absent', async () => {
+    const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as unknown;
+    const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } satisfies Log;
+
+    harness = await buildHarness(log);
 
     const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
 
     expect(rows.map((r) => r.id)).toEqual([1]);
-  });
-
-  it('verify.mode: "always" + requireMarker: false tolerates a missing _prisma_marker table across calls', async () => {
-    harness = await buildHarness({ mode: 'always', requireMarker: false });
-
-    const first = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
-    const second = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
-
-    expect(first.map((r) => r.id)).toEqual([1]);
-    expect(second.map((r) => r.id)).toEqual([1]);
-  });
-
-  it('requireMarker: true surfaces CONTRACT.MARKER_MISSING (not raw driver error) when the marker table is absent', async () => {
-    harness = await buildHarness({ mode: 'onFirstUse', requireMarker: true });
-
-    await expect(
-      harness.runtime.execute(harness.db.users.select('id').build()).toArray(),
-    ).rejects.toMatchObject({
+    expect(log.warn).toHaveBeenCalledOnce();
+    expect(log.warn).toHaveBeenCalledWith({
       code: 'CONTRACT.MARKER_MISSING',
+      scope: 'marker-verification',
+      expected: {
+        storageHash: contract.storage.storageHash,
+        profileHash: contract.profileHash ?? null,
+      },
+      actual: null,
+      message: 'Contract marker not found in database',
     });
   });
 });

@@ -198,7 +198,6 @@ describe('integration: middleware-cache against real Postgres', {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
       middleware,
     });
   }

@@ -2,7 +2,7 @@ import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 import type { MarkerReadResult, SqlQueryable } from '@prisma-next/sql-relational-core/ast';
 
 /**
- * Reader of the SQL contract marker. SQL runtimes call `readMarker` before executing user queries (when `verify` is enabled). The adapter owns the full marker-read flow — probing for storage, issuing the read, decoding the row — and returns a tagged result so callers can distinguish "marker storage missing", "no row for this space", and "present".
+ * Reader of the SQL contract marker. SQL runtimes call `readMarker` before executing user queries (unless `verifyMarker` is false). The adapter owns the full marker-read flow — probing for storage, issuing the read, decoding the row — and returns a tagged result so callers can distinguish "marker storage missing", "no row for this space", and "present".
  */
 export interface MarkerReader {
   readMarker(queryable: SqlQueryable): Promise<MarkerReadResult>;
@@ -35,6 +35,9 @@ export interface RuntimeFamilyAdapter<TContract = unknown> {
  * The string-or-false shape is forward-compatible: future modes such as `'startup'` (eager check
  * inside the wrapper `connect()` step) can be added as additive union members without an API break.
  * `true` is intentionally not permitted — modes are always named.
+ *
+ * Default-on so contract drift surfaces by default — teams who never thought to enable the diagnostic
+ * still see the warning when something goes wrong.
  */
 export type VerifyMarkerOption = 'onFirstUse' | false;
 
