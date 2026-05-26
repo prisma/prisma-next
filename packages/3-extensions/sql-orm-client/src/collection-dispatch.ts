@@ -30,7 +30,10 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
-import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
+import {
+  hasCombineIncludeDescriptors,
+  hasScalarIncludeDescriptors,
+} from './include-tree-predicates';
 import {
   compileRelationSelect,
   compileSelect,
@@ -82,12 +85,21 @@ function dispatchWithIncludeStrategy<Row>(options: {
   // lateral / correlated builders — they no longer force a fallback to
   // multi-query (TML-2594). `distinct()` on a non-leaf include is also
   // handled by the lateral / correlated builders via a wrapped-subquery
-  // lowering (TML-2656). Scalar (`count`/`sum`/...) and `combine()`
-  // descriptors still force multi-query until TML-2595 lands; the
-  // recursive scan below catches them at any depth so a nested
-  // `count()` inside a row include doesn't accidentally hit the throw
-  // in `compileSelectWithIncludeStrategy`.
-  if (hasScalarOrCombineIncludeDescriptors(options.state.includes)) {
+  // lowering (TML-2656).
+  //
+  // Strategy-aware carve-out for scalar / combine descriptors:
+  // - `combine()` at any depth still routes to multi-query (D2 lifts
+  //   this for lateral; D3 for correlated).
+  // - Scalar reducers (`count`/`sum`/...) at any depth route through
+  //   single-query under the lateral strategy (D1), but still fall back
+  //   to multi-query under correlated (D3 mirrors lateral's emission).
+  // The recursive predicates catch the descriptor at any depth so a
+  //   nested scalar / combine inside a row include doesn't accidentally
+  //   hit the planner throw in `compileSelectWithIncludeStrategy`.
+  if (
+    hasCombineIncludeDescriptors(options.state.includes) ||
+    (strategy !== 'lateral' && hasScalarIncludeDescriptors(options.state.includes))
+  ) {
     return dispatchWithMultiQueryIncludes<Row>(options);
   }
 
@@ -494,23 +506,32 @@ function uniqueValues(values: unknown[]): unknown[] {
  * include; values nested inside that JSON are already-parsed JS values
  * after the outer `JSON.parse`, so `parseIncludedRows` recognises both
  * the string (top-level) and array (nested) forms.
+ *
+ * Scalar leaves arrive wrapped in a `{ value: <primitive> }` JSON
+ * envelope (see `buildIncludeChildScalarSelect`); the branch below
+ * unwraps that envelope and applies the empty-relation default
+ * (`0` for count; `null` for sum/avg/min/max). Combine leaves still
+ * throw — D2 will lift that.
  */
 function decodeIncludePayload(
   contract: Contract<SqlStorage>,
   include: IncludeExpr,
   raw: unknown,
-): Record<string, unknown>[] | Record<string, unknown> | null {
+): unknown {
+  if (include.scalar) {
+    return decodeScalarIncludePayload(include.scalar, raw);
+  }
   const rawChildren = parseIncludedRows(raw);
   const mappedChildren = rawChildren.map((childRow) => {
     const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
     for (const nestedInclude of include.nested.includes) {
-      // Defence in depth: the dispatch gate filters scalar/combine at
-      // any depth via `hasScalarOrCombineIncludeDescriptors`. This branch
-      // is unreachable in production but documents the contract the
-      // recursion relies on.
-      if (nestedInclude.scalar || nestedInclude.combine) {
+      // Combine remains unhandled by the single-query builders; D2 lifts
+      // this. The dispatch gate routes combine-containing trees to
+      // multi-query, so this branch is unreachable in production but
+      // documents the contract the recursion relies on.
+      if (nestedInclude.combine) {
         throw new Error(
-          'single-query include strategy does not support nested scalar include selectors or combine()',
+          'single-query include strategy does not support nested combine() include descriptors',
         );
       }
       mapped[nestedInclude.relationName] = decodeIncludePayload(
@@ -522,6 +543,34 @@ function decodeIncludePayload(
     return mapped;
   });
   return coerceSingleQueryIncludeResult(mappedChildren, include.cardinality);
+}
+
+/**
+ * Pull the primitive scalar value out of the JSON envelope emitted by
+ * the lateral scalar builder. The envelope is `{ value: <primitive> }`
+ * (or `{ value: null }` when the aggregate falls on an empty relation
+ * for sum/avg/min/max).
+ *
+ * Values are passed through unchanged — no JS-side `Number()` coercion
+ * happens here. Whatever the JSON parse produced (a JS number for
+ * `count` and most aggregates over int columns; `null` when the
+ * underlying SQL aggregate returned NULL) flows straight to the
+ * caller. The empty-relation default mirrors the JS-side reducer's
+ * historical shape (`0` for `count`, `null` for the rest).
+ */
+function decodeScalarIncludePayload(scalar: IncludeScalar<unknown>, raw: unknown): unknown {
+  if (raw === null || raw === undefined) {
+    return emptyScalarResult(scalar.fn);
+  }
+  const parsed = parseIncludePayload(raw);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return emptyScalarResult(scalar.fn);
+  }
+  const value = (parsed as { value?: unknown }).value;
+  if (value === undefined || value === null) {
+    return emptyScalarResult(scalar.fn);
+  }
+  return value;
 }
 
 function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {

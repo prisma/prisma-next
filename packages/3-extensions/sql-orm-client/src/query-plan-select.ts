@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  AggregateExpr,
   AndExpr,
   type AnyExpression,
   type AnyFromSource,
@@ -31,10 +32,13 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
+import {
+  hasCombineIncludeDescriptors,
+  hasScalarIncludeDescriptors,
+} from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
-import type { CollectionState, IncludeExpr } from './types';
+import type { CollectionState, IncludeExpr, IncludeScalar } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
 
@@ -622,6 +626,78 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   };
 }
 
+/**
+ * Build the inner SELECT for a scalar include reducer (`count` /
+ * `sum` / `avg` / `min` / `max`).
+ *
+ * Emits one row containing `json_build_object('value', AGG(...))`
+ * over the **where-filtered, unpaginated** child relation correlated
+ * to the parent via the FK. The JSON wrap lets the value flow through
+ * the existing include-payload decoder unchanged (it JSON.parses the
+ * column and the scalar branch pulls `.value` out).
+ *
+ * `take` / `skip` are intentionally NOT applied here — they're
+ * meaningless for an aggregate over a relation and would silently
+ * miscount (TML-2498). `orderBy` is similarly meaningless for a
+ * scalar aggregate and is dropped at the SQL level. Distinct / cursor
+ * pagination likewise have no place inside an aggregate scope.
+ */
+function buildIncludeChildScalarSelect(
+  contract: Contract<SqlStorage>,
+  parentTableName: string,
+  include: IncludeExpr,
+  scalar: IncludeScalar<unknown>,
+): SelectAst {
+  const childTableAlias =
+    include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
+  const childTableRef = childTableAlias ?? include.relatedTableName;
+
+  const joinExpr = BinaryExpr.eq(
+    ColumnRef.of(childTableRef, include.targetColumn),
+    ColumnRef.of(parentTableName, include.localColumn),
+  );
+  // Reuse the row-include where machinery: handles user filters,
+  // self-relation column remapping, cursor binding. Pagination clauses
+  // (`limit` / `offset`) on the scalar's CollectionState are read by
+  // `buildStateWhere` only for cursor bounds; the SELECT we assemble
+  // below never reads `scalar.state.limit` / `scalar.state.offset`
+  // directly, so the TML-2498 invariant holds by construction.
+  const childWhere = buildStateWhere(contract, childTableRef, scalar.state, {
+    filterTableName: include.relatedTableName,
+  });
+  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+
+  const aggregateExpr = buildIncludeAggregateExpr(scalar, childTableRef);
+  const jsonObjectExpr = JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', aggregateExpr)]);
+
+  return SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+    .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
+    .withWhere(whereExpr);
+}
+
+function buildIncludeAggregateExpr(
+  scalar: IncludeScalar<unknown>,
+  childTableRef: string,
+): AggregateExpr {
+  if (scalar.fn === 'count') {
+    return AggregateExpr.count();
+  }
+  if (scalar.column === undefined) {
+    throw new Error(`Aggregate selector "${scalar.fn}" requires a column`);
+  }
+  const columnRef = ColumnRef.of(childTableRef, scalar.column);
+  switch (scalar.fn) {
+    case 'sum':
+      return AggregateExpr.sum(columnRef);
+    case 'avg':
+      return AggregateExpr.avg(columnRef);
+    case 'min':
+      return AggregateExpr.min(columnRef);
+    case 'max':
+      return AggregateExpr.max(columnRef);
+  }
+}
+
 function buildLateralIncludeArtifacts(
   contract: Contract<SqlStorage>,
   parentTableName: string,
@@ -630,13 +706,30 @@ function buildLateralIncludeArtifacts(
   readonly join: JoinAst;
   readonly projection: ProjectionItem;
 } {
+  const lateralAlias = `${include.relationName}_lateral`;
+
+  if (include.scalar) {
+    const scalarSelect = buildIncludeChildScalarSelect(
+      contract,
+      parentTableName,
+      include,
+      include.scalar,
+    );
+    return {
+      join: JoinAst.left(DerivedTableSource.as(lateralAlias, scalarSelect), AndExpr.true(), true),
+      projection: ProjectionItem.of(
+        include.relationName,
+        ColumnRef.of(lateralAlias, include.relationName),
+      ),
+    };
+  }
+
   const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
     contract,
     parentTableName,
     include,
     'lateral',
   );
-  const lateralAlias = `${include.relationName}_lateral`;
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
       JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
@@ -896,10 +989,14 @@ export function compileSelectWithIncludeStrategy(
   strategy: 'lateral' | 'correlated',
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  if (hasScalarOrCombineIncludeDescriptors(state.includes)) {
-    throw new Error(
-      'single-query include strategy does not support scalar include selectors or combine()',
-    );
+  // Combine is still unhandled by both single-query builders (D2 lifts
+  // lateral; D3 lifts correlated). Scalar reducers are handled by the
+  // lateral builder (D1) but not yet by the correlated builder (D3).
+  if (hasCombineIncludeDescriptors(state.includes)) {
+    throw new Error('single-query include strategy does not support combine() include descriptors');
+  }
+  if (strategy === 'correlated' && hasScalarIncludeDescriptors(state.includes)) {
+    throw new Error('correlated include strategy does not support scalar include selectors');
   }
 
   const includeJoins: JoinAst[] = [];
