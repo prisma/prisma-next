@@ -15,8 +15,6 @@ changes:
 
 # 0.11 → 0.12 — User upgrade instructions
 
-The `examples/` diff currently in flight also bumps a small group of dev-only Cloudflare-worker tooling (`pkg-pr-new`, `@cloudflare/vitest-pool-workers`, `@cloudflare/workers-types`, `wrangler`) inside `examples/prisma-next-cloudflare-worker`. Those dependencies are confined to the demo app's own dev workflow; downstream Prisma Next consumers are unaffected and do not need to take any action.
-
 ## `replace-verify-with-verify-marker`
 
 Starting at the 0.12 release, the SQL runtime's marker-verification API is simplified. The previous `verify: { mode; requireMarker }` option carried two concerns — *when* to verify and *whether to throw on absent markers* — both of which leaked internal implementation detail into the public API. The new option is a single discriminated union: `verifyMarker?: 'onFirstUse' | false`, with `'onFirstUse'` as the default.
