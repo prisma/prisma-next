@@ -106,7 +106,7 @@ Dispatch-specific grep gates appear in each dispatch's "Done when" section.
 
 **Size.** M. Estimated 4 files, ~150-200 LoC including tests. Smaller than D1 because the scalar building blocks and the gate-carving pattern are already in place; D2 reuses them.
 
-**Model tier.** Sonnet (mid tier). Pattern established by D1 — design judgment for combine's SQL shape (the one-LATERAL-with-`json_build_object` approach from spec § Open Question 3) is pre-named, so the implementer applies it rather than designs it. Per [`model-tier.md`](../../drive/calibration/model-tier.md) — "Architect-class finding remediation (single discipline, narrow surface)."
+**Model tier.** Opus (orchestrator tier). Despite the pattern being established by D1, combine carries unresolved design surface that may settle mid-implementation: (1) NULL/empty-relation handling location — `LEFT JOIN LATERAL` + parent-side `COALESCE` vs. LATERAL-internal NULL-handling vs. sentinel wrap; (2) branch-level WHERE reuse — N independent subqueries packed into `json_build_object` vs. one shared correlation scope with branch-specific filters; (3) the spec § Open Q 3 escape-hatch ("if the one-LATERAL shape proves awkward for the row+scalar mix, escalate"). Per [`model-tier.md`](../../drive/calibration/model-tier.md)'s explicit non-fit row — "Dispatches where the design must settle mid-implementation" route to orchestrator tier rather than mid-tier. Demote to Sonnet only after a pre-D2 design-discussion pins the three questions (option not taken; orchestrator-tier accepts the cost instead).
 
 **DoR confirmed:** ✓ (depends on D1's gate-carve and scalar-decoder shape; D1's "Done when" guarantees that state).
 
