@@ -202,16 +202,54 @@ describe('createRawSql factory', () => {
   });
 
   describe('defence-in-depth throw for off-union values', () => {
-    it('throws with a clear message when an unexpected value type is passed via any cast', () => {
-      type AnyTemplate = (
-        strings: TemplateStringsArray,
-        ...values: unknown[]
-      ) => { returns(spec: string): { buildAst(): unknown } };
-      const offUnion = rawSql as unknown as AnyTemplate;
+    type AnyTemplate = (
+      strings: TemplateStringsArray,
+      ...values: unknown[]
+    ) => { returns(spec: string): { buildAst(): unknown } };
+    const offUnion = rawSql as unknown as AnyTemplate;
+    const verbatimMsg = 'wrap this value in `param(...)` with an explicit codec';
+
+    it('throws with the spec verbatim phrase when a Date is passed via any cast', () => {
       expect(() => {
         const tagged = offUnion`${new Date()}`;
         tagged.returns('pg/text');
-      }).toThrow('unsupported JS value type for raw-SQL interpolation');
+      }).toThrow(verbatimMsg);
+    });
+
+    it('throws with the spec verbatim phrase when null is passed via any cast', () => {
+      expect(() => {
+        const tagged = offUnion`${null}`;
+        tagged.returns('pg/text');
+      }).toThrow(verbatimMsg);
+    });
+
+    it('throws with the spec verbatim phrase when a plain object is passed via any cast', () => {
+      expect(() => {
+        const tagged = offUnion`${{ x: 1 }}`;
+        tagged.returns('pg/text');
+      }).toThrow(verbatimMsg);
+    });
+
+    it('throws with the spec verbatim phrase when an array is passed via any cast', () => {
+      expect(() => {
+        const tagged = offUnion`${[1, 2]}`;
+        tagged.returns('pg/text');
+      }).toThrow(verbatimMsg);
+    });
+
+    it('throws with the spec verbatim phrase when a class instance is passed via any cast', () => {
+      class Custom {}
+      expect(() => {
+        const tagged = offUnion`${new Custom()}`;
+        tagged.returns('pg/text');
+      }).toThrow(verbatimMsg);
+    });
+
+    it('throws with the spec verbatim phrase when undefined is passed via any cast', () => {
+      expect(() => {
+        const tagged = offUnion`${undefined}`;
+        tagged.returns('pg/text');
+      }).toThrow(verbatimMsg);
     });
   });
 });

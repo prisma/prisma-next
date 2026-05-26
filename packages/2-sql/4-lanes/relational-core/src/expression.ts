@@ -202,7 +202,7 @@ function resolveInterpolation(
   }
   throw runtimeError(
     'RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION',
-    'unsupported JS value type for raw-SQL interpolation; wrap in `param(...)`',
+    'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
   );
 }
 
@@ -218,10 +218,7 @@ export function createRawSql(adapter: RawSqlAdapter): RawSqlTag {
       const fragment = strings[i] ?? '';
       parts.push(fragment);
       if (i < values.length) {
-        const interpolation = values[i];
-        if (interpolation !== undefined) {
-          parts.push(resolveInterpolation(adapter, interpolation));
-        }
+        parts.push(resolveInterpolation(adapter, values[i] as RawSqlInterpolation));
       }
     }
     return {
