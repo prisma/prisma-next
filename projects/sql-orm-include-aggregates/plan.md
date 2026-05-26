@@ -187,9 +187,18 @@ If any of these is observed mid-dispatch, halt and re-enter `drive-discussion` p
 3. **LATERAL-vs-correlated scope creep guard** (spec § Open Q 4). Watch in D3 when both builders are open simultaneously. If a benchmark-worthy observation surfaces, record it to `projects/sql-orm-include-aggregates/design-decisions.md` (create the file if it doesn't exist) and continue — do not collapse builders inside this slice.
 4. **TML-2498 urgency re-check** (spec § Open Q 1). If real consumers surface during D1+D2 that TML-2498 is biting them today (Pothos plugin author, EA dogfooders), discuss carving a minimal TML-2498 fix out of this slice as a precursor; otherwise proceed.
 
+## Open items
+
+Decisions taken mid-slice that produce downstream work, recorded here for traceability:
+
+1. **Bigint precision via codec routing — deferred to [TML-2684](https://linear.app/prisma-company/issue/TML-2684) (filed Medium).** Surfaced in D1 R1 review. D1 ships scalar reducers via a `json_build_object('value', AGG(...))` LATERAL envelope, unwrapped by `decodeScalarIncludePayload` via the existing `parseIncludedRows → JSON.parse` pipeline. The spec's literal "no JS-side `Number` coercion truncation" promise holds via structural defence (no explicit `Number()` cast on the scalar return path); the spec's broader "codec layer decodes via the column's declared codec" framing is **not** met. Trade-off accepted with these grounds: (a) the JSON-envelope path is correct for counts within JS-safe-integer range and for sum/avg over `int4`, which covers the vast majority of practical cases; (b) the prior multi-query stitcher also used JS-side reducers without codec routing, so D1 does not regress anything; (c) decimal-precision questions cross-cut root-level `aggregate()` decoding too, which is a bigger codec-routing question better tackled as its own work item. TML-2684 captures the codec routing + bigint/decimal fixture extension as a coupled followup, blocked by this slice merging.
+
+2. **Integration-test suite stability — out-of-scope team ticket recommended.** Surfaced in D1 R1 review. `pnpm test:integration` workspace-wide exhibits pre-existing PG portal-cleanup races (signature: `portal "C_X" does not exist`, non-overlapping fail-sets across re-runs) unrelated to this slice's touch surface. D1's touched scalar tests in `include.test.ts` are stably green in isolation (47/47). Not a slice-DoD blocker; the team should file a separate suite-stability investigation ticket. **Not filed by this slice's orchestrator** — the work isn't in this slice's family; whoever picks up suite-stability separately is the right author.
+
 ## Post-slice handoff
 
 After D3 merges:
 - TML-2595 / TML-2588 / TML-2498 auto-close on merge (via `Closes:` lines in the PR body).
 - TML-2657 unblocks: its "blocked by TML-2595" relationship is satisfied; ready to pick up.
 - TML-2683 stays blocked by TML-2657 per its own sequencing.
+- TML-2684 unblocks: ready to pick up (codec routing + bigint/decimal fixture extension).
