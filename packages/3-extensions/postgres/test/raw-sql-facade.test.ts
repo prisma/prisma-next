@@ -237,6 +237,62 @@ function makeBuilderContext(rawSqlTag: RawSqlTag): DbWithUsers {
   return sql({ context: stubContext, rawSqlTag }) as unknown as DbWithUsers;
 }
 
+describe('bare literal interpolation resolves codec via adapter inferCodec', () => {
+  it('bare number interpolation resolves to pg/int4 via inferCodec (safe integer)', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${42})`.returns('pg/int4');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('pg/int4');
+  });
+
+  it('bare fractional number interpolation resolves to pg/float8 via inferCodec', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${3.14})`.returns('pg/float8');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('pg/float8');
+  });
+
+  it('bare string interpolation resolves to pg/text via inferCodec', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${'hello'})`.returns('pg/text');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('pg/text');
+  });
+
+  it('bare bigint interpolation resolves to pg/int8 via inferCodec', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${9n ** 18n})`.returns('pg/int8');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('pg/int8');
+  });
+
+  it('bare boolean interpolation resolves to pg/bool via inferCodec', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${true})`.returns('pg/bool');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('pg/bool');
+  });
+
+  it('bare Uint8Array interpolation resolves to pg/bytea via inferCodec', () => {
+    const adapter = createPostgresAdapter();
+    const tag = createRawSql(adapter);
+    const expr = tag`f(${new Uint8Array([1, 2, 3])})`.returns('pg/bytea');
+    const rawExpr = expr.buildAst() as RawExpr;
+    const paramPart = rawExpr.parts.find((p) => typeof p !== 'string') as ParamRef | undefined;
+    expect(paramPart?.codec?.codecId).toBe('pg/bytea');
+  });
+});
+
 describe('fns.rawSql reference equality through the typed builder chain', () => {
   it('fns.rawSql in .where callback is referentially equal to the bound tag', () => {
     const tag = createRawSql(createPostgresAdapter());
