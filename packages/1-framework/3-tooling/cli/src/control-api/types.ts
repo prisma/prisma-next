@@ -719,6 +719,13 @@ export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyF
 export interface ContractEmitOptions {
   /** Path to the prisma-next.config.ts file */
   readonly configPath: string;
+  /**
+   * Directory to write contract artifacts into. When set, `contract.json` and
+   * `contract.d.ts` are written inside this directory, taking precedence over
+   * any output path from the loaded config. The value must be an absolute path;
+   * resolution against cwd is the caller's responsibility.
+   */
+  readonly outputPath?: string;
   /** Optional AbortSignal for cancelling the in-flight emit */
   readonly signal?: AbortSignal;
   /** Optional progress callback for observing source-resolution and emit spans */

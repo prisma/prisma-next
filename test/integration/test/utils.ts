@@ -12,6 +12,7 @@ import type {
   Runtime,
   SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
+  VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
@@ -23,10 +24,7 @@ import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
 
 export interface CreateTestRuntimeOptions {
-  readonly verify?: {
-    mode: 'onFirstUse' | 'startup' | 'always';
-    requireMarker?: boolean;
-  };
+  readonly verifyMarker?: VerifyMarkerOption;
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
   readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
@@ -47,16 +45,6 @@ export async function createTestRuntime(
   driverOptions: IntegrationDriverOptions,
   options?: CreateTestRuntimeOptions,
 ): Promise<Runtime> {
-  const verify: {
-    mode: 'onFirstUse' | 'startup' | 'always';
-    requireMarker: boolean;
-  } = options?.verify
-    ? {
-        ...options.verify,
-        requireMarker: options.verify.requireMarker ?? false,
-      }
-    : { mode: 'onFirstUse', requireMarker: false };
-
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
@@ -97,7 +85,7 @@ export async function createTestRuntime(
     stackInstance,
     context,
     driver,
-    verify,
+    ...(options?.verifyMarker !== undefined ? { verifyMarker: options.verifyMarker } : {}),
     ...(options?.middleware ? { middleware: options.middleware } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
     ...(options?.log ? { log: options.log } : {}),
@@ -119,10 +107,7 @@ export async function createTestRuntimeFromClient(
       binding: { kind: 'pgClient', client },
       cursor: { disabled: true },
     },
-    {
-      ...options,
-      verify: options?.verify ?? ({ mode: 'onFirstUse', requireMarker: true } as const),
-    },
+    options,
   );
 }
 

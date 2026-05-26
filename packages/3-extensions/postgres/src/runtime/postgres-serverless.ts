@@ -10,10 +10,10 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   ExecutionContext,
   Runtime,
-  RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
   SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
+  VerifyMarkerOption,
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
@@ -39,7 +39,7 @@ export interface PostgresServerlessClient<TContract extends Contract<SqlStorage>
 export interface PostgresServerlessOptionsBase {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
   readonly middleware?: readonly SqlMiddleware[];
-  readonly verify?: RuntimeVerifyOptions;
+  readonly verifyMarker?: VerifyMarkerOption;
   readonly cursor?: PostgresServerlessCursorOptions;
 }
 
@@ -158,7 +158,7 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
           stackInstance,
           context,
           driver,
-          verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+          ...ifDefined('verifyMarker', options.verifyMarker),
           ...ifDefined('middleware', options.middleware),
         });
       } catch (err) {

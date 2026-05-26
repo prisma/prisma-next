@@ -168,7 +168,7 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
+    verifyMarker: false,
     middleware,
   });
 

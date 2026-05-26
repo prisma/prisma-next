@@ -63,19 +63,19 @@ test('factory accepts the same option keys as the Node postgres() factory', asyn
   const { default: postgres } = await import('../src/runtime/postgres');
   type NodeOptionKeys = keyof Pick<
     PostgresOptionsWithContract<TestContract>,
-    'contract' | 'extensions' | 'middleware' | 'verify'
+    'contract' | 'extensions' | 'middleware' | 'verifyMarker'
   >;
   type ServerlessOptionKeys = Parameters<typeof postgresServerless<TestContract>>[0] extends infer O
-    ? Extract<keyof O, 'contract' | 'extensions' | 'middleware' | 'verify'>
+    ? Extract<keyof O, 'contract' | 'extensions' | 'middleware' | 'verifyMarker'>
     : never;
   expectTypeOf<ServerlessOptionKeys>().toEqualTypeOf<NodeOptionKeys>();
 
   type NodeJsonKeys = keyof Pick<
     PostgresOptionsWithContractJson<TestContract>,
-    'contractJson' | 'extensions' | 'middleware' | 'verify'
+    'contractJson' | 'extensions' | 'middleware' | 'verifyMarker'
   >;
   type ServerlessJsonKeys = Parameters<typeof postgresServerless<TestContract>>[0] extends infer O
-    ? Extract<keyof O, 'contractJson' | 'extensions' | 'middleware' | 'verify'>
+    ? Extract<keyof O, 'contractJson' | 'extensions' | 'middleware' | 'verifyMarker'>
     : never;
   expectTypeOf<ServerlessJsonKeys>().toEqualTypeOf<NodeJsonKeys>();
 

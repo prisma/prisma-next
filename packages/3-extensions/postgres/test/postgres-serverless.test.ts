@@ -290,25 +290,24 @@ describe('postgresServerless', () => {
     expect(mocks.createRuntime).toHaveBeenCalledWith(expect.objectContaining({ middleware }));
   });
 
-  it('forwards verify option to createRuntime', async () => {
-    const verify = { mode: 'always', requireMarker: true } as const;
-    const db = postgresServerless({ contract, verify });
-
-    await db.connect({ url: 'postgres://localhost:5432/db' });
-
-    expect(mocks.createRuntime).toHaveBeenCalledWith(expect.objectContaining({ verify }));
-  });
-
-  it('defaults verify to onFirstUse without requireMarker', async () => {
-    const db = postgresServerless({ contract });
+  it('forwards verifyMarker option to createRuntime', async () => {
+    const db = postgresServerless({ contract, verifyMarker: false });
 
     await db.connect({ url: 'postgres://localhost:5432/db' });
 
     expect(mocks.createRuntime).toHaveBeenCalledWith(
-      expect.objectContaining({
-        verify: { mode: 'onFirstUse', requireMarker: false },
-      }),
+      expect.objectContaining({ verifyMarker: false }),
     );
+  });
+
+  it('omits verifyMarker from createRuntime when not provided (runtime default applies)', async () => {
+    const db = postgresServerless({ contract });
+
+    await db.connect({ url: 'postgres://localhost:5432/db' });
+
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    const callArg = mocks.createRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty('verifyMarker');
   });
 
   it('validates contractJson input', () => {

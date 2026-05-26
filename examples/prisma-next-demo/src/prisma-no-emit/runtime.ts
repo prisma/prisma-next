@@ -36,10 +36,6 @@ export async function getRuntime(
     stackInstance,
     context,
     driver,
-    verify: {
-      mode: 'onFirstUse',
-      requireMarker: false,
-    },
     middleware,
   });
 }

@@ -6,6 +6,7 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
+import type { RuntimeLog } from '@prisma-next/framework-components/runtime';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import { SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
@@ -23,9 +24,12 @@ import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecs } from './utils';
 
 /**
- * Pins the ordering invariant from spec AC L239: marker verification runs upstream of `runWithMiddleware`, so a hash-mismatched query throws `CONTRACT.MARKER_MISMATCH` before any `intercept` hook can answer it.
+ * Pins the ordering invariant: marker verification runs upstream of `runWithMiddleware`, so the
+ * CONTRACT.MARKER_MISMATCH warning is emitted before any `intercept` hook is invoked.
  *
- * If a future refactor moves marker verification into the orchestrator, this test fails — surfacing the regression that would otherwise let a cache hit serve stale-schema results.
+ * If a future refactor moves marker verification into the orchestrator or after `runWithMiddleware`,
+ * this test fails — surfacing the regression that cache middleware could intercept a query before
+ * the runtime has checked for schema drift.
  */
 
 const testContract: Contract<SqlStorage> = {
@@ -134,7 +138,7 @@ function createTestAdapterDescriptor(
   };
 }
 
-function createTestSetup(middleware: readonly SqlMiddleware[]) {
+function createTestSetup(middleware: readonly SqlMiddleware[], log?: RuntimeLog) {
   const codecs = createCodecs();
   const adapter = createStubAdapter(codecs);
   const driver = createStubDriver();
@@ -165,7 +169,7 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
     stackInstance,
     context,
     driver,
-    verify: { mode: 'always', requireMarker: true },
+    ...(log ? { log } : {}),
     middleware,
   });
 
@@ -188,22 +192,39 @@ function createPlan(): SqlExecutionPlan {
 }
 
 describe('marker verification runs before intercept', () => {
-  it('throws CONTRACT.MARKER_MISMATCH and never invokes the interceptor when the marker is stale', async () => {
-    const intercept = vi.fn().mockResolvedValue({ rows: [{ id: 1 }] });
+  it('logs CONTRACT.MARKER_MISMATCH before invoking the interceptor when the marker is stale', async () => {
+    const callOrder: string[] = [];
+
+    const log: RuntimeLog = {
+      info: () => {},
+      warn: vi.fn(() => {
+        callOrder.push('verify');
+      }),
+      error: () => {},
+    };
+
+    const intercept = vi.fn((_plan: unknown, _ctx: unknown) => {
+      callOrder.push('intercept');
+      return Promise.resolve({ rows: [{ id: 1 }] });
+    });
     const interceptor: SqlMiddleware = {
       name: 'mock-cache',
       familyId: 'sql',
       intercept,
     };
 
-    const { runtime, driver } = createTestSetup([interceptor]);
+    const { runtime, driver } = createTestSetup([interceptor], log);
 
-    await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
-      code: 'CONTRACT.MARKER_MISMATCH',
-      category: 'CONTRACT',
-    });
+    await runtime.execute(createPlan()).toArray();
 
-    expect(intercept).not.toHaveBeenCalled();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'CONTRACT.MARKER_MISMATCH',
+        scope: 'marker-verification',
+      }),
+    );
+    expect(intercept).toHaveBeenCalled();
     expect(driver.execute).not.toHaveBeenCalled();
+    expect(callOrder).toEqual(['verify', 'intercept']);
   });
 });

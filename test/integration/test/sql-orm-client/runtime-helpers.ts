@@ -94,7 +94,6 @@ export async function createPgIntegrationRuntime(
         stackInstance,
         context,
         driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
       });
       return { adapter, realRuntime, contract };
     } catch (err) {

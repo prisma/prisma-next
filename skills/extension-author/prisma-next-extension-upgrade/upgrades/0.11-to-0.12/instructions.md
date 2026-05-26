@@ -28,6 +28,15 @@ changes:
       contains:
         - ".distinct("
       anyMatch: true
+  - id: replace-runtime-verify-options-with-verify-marker
+    summary: |
+      The `@prisma-next/sql-runtime` export `RuntimeVerifyOptions` is removed; replaced by `VerifyMarkerOption = 'onFirstUse' | false`. Extension convenience wrappers that expose a `*OptionsBase` interface must rename `verify?: RuntimeVerifyOptions` to `verifyMarker?: VerifyMarkerOption`, drop the hard-coded `verify: { mode: 'onFirstUse', requireMarker: false }` default in the wrapper's `createRuntime(...)` call, and thread the caller's value through via `...ifDefined('verifyMarker', options.verifyMarker)` so the runtime's own default (`'onFirstUse'`) applies when the option is omitted. The runtime no longer throws `CONTRACT.MARKER_MISMATCH` / `CONTRACT.MARKER_MISSING` on drift — it emits a structured `warn`-level log line once per runtime instance (single-flighted under concurrent first queries) and proceeds.
+    detection:
+      glob: "**/*.ts"
+      contains:
+        - "RuntimeVerifyOptions"
+        - "verify: {"
+      anyMatch: true
 ---
 
 # 0.11 → 0.12 — Extension-author upgrade instructions
@@ -190,13 +199,178 @@ The user's `.orderBy(…)` drives the OVER ORDER BY of the underlying `ROW_NUMBE
 
 After updating fixture / test data, run your extension's standard `pnpm test` (or `pnpm test:integration` for tests that exercise live SQL). No type-level changes — TypeScript will not pinpoint sites; runtime assertions are the signal.
 
+## `replace-runtime-verify-options-with-verify-marker`
+
+Starting at the 0.12 release, `@prisma-next/sql-runtime` simplifies marker verification. The previous `RuntimeVerifyOptions` type and the `verify: { mode; requireMarker }` field on `RuntimeOptions` are removed; replaced by a single optional field `verifyMarker?: VerifyMarkerOption` where `VerifyMarkerOption = 'onFirstUse' | false` and `'onFirstUse'` is the runtime default.
+
+If your extension ships a convenience wrapper around `createRuntime(...)` — the pattern used by `@prisma-next/sqlite`, `@prisma-next/postgres`, and `@prisma-next/postgres/serverless` — you need four mechanical edits in the wrapper source:
+
+1. Rename the type import from `RuntimeVerifyOptions` to `VerifyMarkerOption`.
+2. Rename the option on your `*OptionsBase` interface from `verify?` to `verifyMarker?`.
+3. Drop the hard-coded default literal in the `createRuntime(...)` call.
+4. Thread the caller's value through with `ifDefined` so omitted options defer to the runtime default.
+
+The runtime's read-side behaviour also changes: it no longer throws `CONTRACT.MARKER_MISMATCH` or `CONTRACT.MARKER_MISSING` when the database marker is absent or drifted. Instead, on the first `execute()` call per runtime instance, it emits one structured `warn`-level log line (payload includes `code`, `scope`, `expected`, `actual`, `message`) and proceeds with the query. Extension authors do not need to implement this behaviour — it lives inside `@prisma-next/sql-runtime` — but tests that previously asserted thrown errors need retargeting (see *Tests and fixtures* below).
+
+### Before 0.12 — type import and options interface
+
+```ts
+import type {
+  ExecutionContext,
+  Runtime,
+  RuntimeVerifyOptions,
+  SqlExecutionStackWithDriver,
+  SqlMiddleware,
+  SqlRuntimeExtensionDescriptor,
+} from '@prisma-next/sql-runtime';
+
+export interface MyTargetOptionsBase {
+  readonly extensions?: readonly SqlRuntimeExtensionDescriptor<MyTargetId>[];
+  readonly middleware?: readonly SqlMiddleware[];
+  readonly verify?: RuntimeVerifyOptions;
+}
+```
+
+### Starting at 0.12 — type import and options interface
+
+```ts
+import type {
+  ExecutionContext,
+  Runtime,
+  SqlExecutionStackWithDriver,
+  SqlMiddleware,
+  SqlRuntimeExtensionDescriptor,
+  VerifyMarkerOption,
+} from '@prisma-next/sql-runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
+
+export interface MyTargetOptionsBase {
+  readonly extensions?: readonly SqlRuntimeExtensionDescriptor<MyTargetId>[];
+  readonly middleware?: readonly SqlMiddleware[];
+  readonly verifyMarker?: VerifyMarkerOption;
+}
+```
+
+Import `ifDefined` from `@prisma-next/utils/defined` if your wrapper does not already use it for other optional fields.
+
+### Before 0.12 — `createRuntime(...)` call inside the wrapper
+
+```ts
+const runtime = createRuntime({
+  stackInstance,
+  context,
+  driver,
+  verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+  ...ifDefined('middleware', options.middleware),
+});
+```
+
+The hard-coded `{ mode: 'onFirstUse', requireMarker: false }` default duplicated what the runtime already applied when `verify` was omitted. From 0.12 the wrapper should not inject a default — let the runtime's `'onFirstUse'` default stand.
+
+### Starting at 0.12 — `createRuntime(...)` call inside the wrapper
+
+```ts
+const runtime = createRuntime({
+  stackInstance,
+  context,
+  driver,
+  ...ifDefined('verifyMarker', options.verifyMarker),
+  ...ifDefined('middleware', options.middleware),
+});
+```
+
+When the caller omits `verifyMarker`, the spread adds nothing and the runtime default (`'onFirstUse'`) applies. When the caller passes `verifyMarker: false`, verification is skipped entirely.
+
+### Semantics mapping for callers of your wrapper
+
+| Before 0.12 (`verify`) | Starting at 0.12 (`verifyMarker`) |
+| --- | --- |
+| `{ mode: 'onFirstUse', requireMarker: false }` (or omitted — your wrapper defaulted to this) | omit `verifyMarker` (runtime default `'onFirstUse'`) |
+| `{ mode: 'onFirstUse', requireMarker: true }` | `verifyMarker: 'onFirstUse'` — but the throw-on-missing-marker semantics are removed; use the `db-verify` CLI for fail-fast deploy checks |
+| `{ mode: 'always', requireMarker: ... }` | `verifyMarker: 'onFirstUse'` — `'always'` mode is dropped; verification is once-per-runtime |
+| `{ mode: 'startup', requireMarker: ... }` | `verifyMarker: 'onFirstUse'` — `'startup'` mode is dropped for the same reason |
+| Explicit skip | `verifyMarker: false` |
+
+### Tests and fixtures
+
+Extension wrapper tests that exercised the old surface need two kinds of updates:
+
+**Option-forwarding tests** — rename the option and adjust assertions about defaults:
+
+```ts
+// Before 0.12
+it('forwards verify option to createRuntime', async () => {
+  const verify = { mode: 'always', requireMarker: true } as const;
+  const db = myTarget({ contract, verify });
+  await db.connect(/* … */);
+  expect(mocks.createRuntime).toHaveBeenCalledWith(expect.objectContaining({ verify }));
+});
+
+it('defaults verify to onFirstUse without requireMarker', async () => {
+  const db = myTarget({ contract });
+  await db.connect(/* … */);
+  expect(mocks.createRuntime).toHaveBeenCalledWith(
+    expect.objectContaining({ verify: { mode: 'onFirstUse', requireMarker: false } }),
+  );
+});
+
+// Starting at 0.12
+it('forwards verifyMarker option to createRuntime', async () => {
+  const db = myTarget({ contract, verifyMarker: false });
+  await db.connect(/* … */);
+  expect(mocks.createRuntime).toHaveBeenCalledWith(
+    expect.objectContaining({ verifyMarker: false }),
+  );
+});
+
+it('omits verifyMarker from createRuntime when not provided (runtime default applies)', async () => {
+  const db = myTarget({ contract });
+  await db.connect(/* … */);
+  expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  const callArg = mocks.createRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
+  expect(callArg).not.toHaveProperty('verifyMarker');
+});
+```
+
+**Drift / missing-marker integration tests** — grep for `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISSING' })` or `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' })`. These patterns no longer apply: the runtime logs instead of throwing. Retarget to assert on the `Log.warn` sink:
+
+```ts
+// Before 0.12
+await expect(runtime.execute(plan).toArray()).rejects.toMatchObject({
+  code: 'CONTRACT.MARKER_MISSING',
+});
+
+// Starting at 0.12
+const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } satisfies Log;
+const runtime = createRuntime({ stackInstance, context, driver, log });
+
+const rows = await runtime.execute(plan).toArray();
+expect(rows).toEqual(/* expected rows — query proceeds */);
+expect(log.warn).toHaveBeenCalledOnce();
+expect(log.warn).toHaveBeenCalledWith({
+  code: 'CONTRACT.MARKER_MISSING',
+  scope: 'marker-verification',
+  expected: { storageHash: contract.storage.storageHash, profileHash: contract.profileHash ?? null },
+  actual: null,
+  message: 'Contract marker not found in database',
+});
+```
+
+Pass a `log` object into `createRuntime(...)` (or through your wrapper if you expose a `log` option) so tests can spy on `warn` without touching stdout.
+
+### Validation
+
+After applying the edits above, run `pnpm typecheck` on your extension package. TypeScript flags every remaining `RuntimeVerifyOptions` import and every `verify?:` field on your options interface. Then run your extension's test suite — option-forwarding unit tests and any marker-drift integration tests are the sites most likely to need the retargeting described above.
+
 ## Validation by execution
 
-These entries are prose-only (no codemod scripts). The substrate diff inside `packages/3-extensions/sql-orm-client/` in this transition is the same code translation downstream extension authors will replicate by hand:
+These entries are prose-only (no codemod scripts). The substrate diffs inside `packages/3-extensions/` in this transition are the same code translations downstream extension authors will replicate by hand:
 
 - The `windowFunc` method literally added to `bindWhereExprNode`'s `ExprVisitor` literal in `where-binding.ts`.
 - The `windowFunc: rejectHavingExpr` literally added to `validateGroupedHavingExpr`'s `ExprVisitor` literal in `query-plan-aggregate.ts`.
 - The `case 'window-func':` arms in the Postgres and SQLite adapter renderers.
 - Flipped fixture row counts in the distinct integration tests.
+- The `RuntimeVerifyOptions` → `VerifyMarkerOption` import rename, `verify?` → `verifyMarker?` on `*OptionsBase`, and `...ifDefined('verifyMarker', options.verifyMarker)` thread-through in `packages/3-extensions/sqlite/src/runtime/sqlite.ts`, `packages/3-extensions/postgres/src/runtime/postgres.ts`, and `packages/3-extensions/postgres/src/runtime/postgres-serverless.ts`.
+- Retargeted option-forwarding and marker-drift tests in `packages/3-extensions/postgres/test/postgres-serverless.test.ts`.
 
-There is no scriptable transform — the right body for the `ExprVisitor` method and the right arm for the exhaustive switch depend on what the consumer's visitor / switch does. The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry; the substantive verification of the consumer-facing translation lives in the published extension-upgrade skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.
+There is no scriptable transform — the right body for the `ExprVisitor` method and the right arm for the exhaustive switch depend on what the consumer's visitor / switch does; the right test retargeting for marker drift depends on whether the test asserted throws or option forwarding. The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry; the substantive verification of the consumer-facing translation lives in the published extension-upgrade skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.

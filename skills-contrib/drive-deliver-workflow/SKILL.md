@@ -9,7 +9,7 @@ description: >
   drive-plan-project, drive-build-workflow, drive-check-health, drive-run-retro,
   drive-close-project.
 metadata:
-  version: "2026.5.18"
+  version: "2026.5.26"
 ---
 
 # Drive: Deliver Workflow
@@ -108,6 +108,8 @@ For each picked slice:
 Invoke `drive-build-workflow` on the picked slice. It pilots the dispatch loop and returns when the slice's DoD is met (slice merged) or the slice's stop-condition fires (design discussion required; assumption falsified; L/XL refusal that needs replanning).
 
 If `drive-build-workflow` returns with a stop-condition: escalate to operator via `drive-discussion`; resume on operator-authorised plan amendment.
+
+The slice's PR-open is part of `drive-build-workflow`'s own DoD-met behaviour (see its § Behavioral rules) — when the slice reaches SATISFIED, the slice loop pushes and opens the PR autonomously. `drive-deliver-workflow` does not halt for an extra operator gate between slice-SATISFIED and PR-open.
 
 ### Step 5 — On slice merge: health check + maybe retro
 

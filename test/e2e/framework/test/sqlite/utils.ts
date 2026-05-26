@@ -193,7 +193,6 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
   });
 
   return { runtime, context };
