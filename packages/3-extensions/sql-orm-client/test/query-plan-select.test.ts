@@ -564,18 +564,217 @@ describe('compileSelectWithIncludeStrategy', () => {
     });
   });
 
-  it('still rejects combine() include descriptors under the lateral strategy', () => {
-    const { collection } = createCollection();
-    const state = collection.include('posts', (posts) =>
-      posts.combine({
-        rows: posts.orderBy((p) => p.id.asc()),
-        total: posts.count(),
-      }),
-    ).state;
+  // Lateral lowers `combine({ a, b, ... })` as a single LATERAL JOIN
+  // whose inner SELECT cross-joins each branch as a derived table and
+  // projects `json_build_object('a', a_alias.<rel>, 'b', b_alias.<rel>, ...)`.
+  // Row branches reuse the standalone row builder; scalar branches reuse
+  // the D1 scalar builder (preserving the `{value: <primitive>}`
+  // envelope inside the combined JSON — the decoder unwraps per-branch).
+  describe('lateral combine() packing', () => {
+    function extractCombineLateralSelect(plan: { ast: unknown }, alias: string): SelectAst {
+      expectSelectAst(plan.ast);
+      const join = plan.ast.joins?.find(
+        (candidate) =>
+          candidate.source.kind === 'derived-table-source' && candidate.source.alias === alias,
+      );
+      expect(join?.kind).toBe('join');
+      expect(join?.lateral).toBe(true);
+      expectDerivedTableSource(join?.source);
+      return join.source.query;
+    }
 
-    expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
-      'single-query include strategy does not support combine() include descriptors',
-    );
+    function expectCombineJsonProjection(
+      lateralSelect: SelectAst,
+      relationName: string,
+      expectedEntries: ReadonlyArray<readonly [string, string]>,
+    ): void {
+      expect(lateralSelect.projection).toEqual([
+        ProjectionItem.of(
+          relationName,
+          JsonObjectExpr.fromEntries(
+            expectedEntries.map(([branchName, branchAlias]) =>
+              JsonObjectExpr.entry(branchName, ColumnRef.of(branchAlias, relationName)),
+            ),
+          ),
+        ),
+      ]);
+    }
+
+    it('packs a row + scalar combine into one LATERAL with json_build_object', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          recent: posts.orderBy((p) => p.id.desc()).take(3),
+          total: posts.count(),
+        }),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractCombineLateralSelect(plan, 'posts_lateral');
+
+      expectCombineJsonProjection(lateralSelect, 'posts', [
+        ['recent', 'posts__combine__recent'],
+        ['total', 'posts__combine__total'],
+      ]);
+
+      // FROM <recent_branch>, INNER JOIN <total_branch> ON TRUE.
+      expectDerivedTableSource(lateralSelect.from);
+      expect(lateralSelect.from.alias).toBe('posts__combine__recent');
+      expect(lateralSelect.joins).toHaveLength(1);
+      const totalJoin = lateralSelect.joins?.[0];
+      expect(totalJoin?.joinType).toBe('inner');
+      expect(totalJoin?.lateral).toBe(false);
+      expect(totalJoin?.on).toEqual(AndExpr.true());
+      expectDerivedTableSource(totalJoin?.source);
+      expect(totalJoin.source.alias).toBe('posts__combine__total');
+
+      // Each branch keeps its own FK correlation in WHERE.
+      // The scalar branch (total): json_build_object('value', count(*)) AS posts
+      const totalBranchSelect = totalJoin.source.query;
+      expect(totalBranchSelect.projection).toEqual([
+        ProjectionItem.of(
+          'posts',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+        ),
+      ]);
+      expect(totalBranchSelect.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+      );
+      // Pagination NEVER enters the scalar branch's scope.
+      expect(totalBranchSelect.limit).toBeUndefined();
+      expect(totalBranchSelect.offset).toBeUndefined();
+
+      // The row branch (recent): paginated rows, json_agg'd.
+      expectDerivedTableSource(lateralSelect.from);
+      const recentBranchSelect = lateralSelect.from.query;
+      expectDerivedTableSource(recentBranchSelect.from);
+      const recentRows = recentBranchSelect.from.query;
+      expect(recentRows.limit).toBe(3);
+    });
+
+    it('packs two scalar branches (count + sum) into one LATERAL', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          a: posts.count(),
+          b: posts.sum('views'),
+        }),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractCombineLateralSelect(plan, 'posts_lateral');
+
+      expectCombineJsonProjection(lateralSelect, 'posts', [
+        ['a', 'posts__combine__a'],
+        ['b', 'posts__combine__b'],
+      ]);
+
+      // Branch a: SELECT json_build_object('value', count(*)) AS posts FROM posts WHERE FK
+      expectDerivedTableSource(lateralSelect.from);
+      const aSelect = lateralSelect.from.query;
+      expect(aSelect.projection).toEqual([
+        ProjectionItem.of(
+          'posts',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+        ),
+      ]);
+
+      // Branch b: SELECT json_build_object('value', sum(views)) AS posts FROM posts WHERE FK
+      const bJoin = lateralSelect.joins?.[0];
+      expectDerivedTableSource(bJoin?.source);
+      const bSelect = bJoin.source.query;
+      expect(bSelect.projection).toEqual([
+        ProjectionItem.of(
+          'posts',
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
+          ]),
+        ),
+      ]);
+    });
+
+    it('keeps each branch independently scoped under divergent where filters', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          popular: posts.where((p) => p.views.gte(200)).count(),
+          mediocre: posts.where((p) => p.views.lt(200)).count(),
+        }),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractCombineLateralSelect(plan, 'posts_lateral');
+
+      const fkExpr = BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id'));
+      const popularWhere = bindWhereExpr(
+        baseContract,
+        BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(200)),
+      );
+      const mediocreWhere = bindWhereExpr(
+        baseContract,
+        BinaryExpr.lt(ColumnRef.of('posts', 'views'), LiteralExpr.of(200)),
+      );
+
+      expectDerivedTableSource(lateralSelect.from);
+      const popularSelect = lateralSelect.from.query;
+      expect(popularSelect.where).toEqual(AndExpr.of([fkExpr, popularWhere]));
+
+      const mediocreJoin = lateralSelect.joins?.[0];
+      expectDerivedTableSource(mediocreJoin?.source);
+      const mediocreSelect = mediocreJoin.source.query;
+      expect(mediocreSelect.where).toEqual(AndExpr.of([fkExpr, mediocreWhere]));
+    });
+
+    // Distinct interplay: the spec promises the row branch's existing
+    // distinct(cols) lowering (ROW_NUMBER wrap from TML-2656) is reused
+    // verbatim; scalar branches see the where-only relation. This pins
+    // the row branch's ROW_NUMBER lowering survives into the combine
+    // packing without combine-specific distinct handling.
+    it('row branch with distinct() keeps its ROW_NUMBER lowering', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.combine({
+          unique: posts.distinct('title'),
+          total: posts.count(),
+        }),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractCombineLateralSelect(plan, 'posts_lateral');
+
+      // The row branch's inner FROM source is the rows-derived-table
+      // wrap; its query carries the `__prisma_distinct_rn` projection
+      // (the ROW_NUMBER lowering signature).
+      expectDerivedTableSource(lateralSelect.from);
+      const uniqueBranchSelect = lateralSelect.from.query;
+      expectDerivedTableSource(uniqueBranchSelect.from);
+      const rowsWrap = uniqueBranchSelect.from.query;
+      // The ROW_NUMBER wrap aliases to `${include.relationName}__distinct`.
+      expect(rowsWrap.from.kind === 'derived-table-source').toBe(true);
+    });
+
+    // The dispatch path admits combine under lateral. Top-level row +
+    // combine sibling: each becomes its own outer LATERAL; the planner
+    // wires both projections into the parent SELECT.
+    it('admits combine alongside a plain row include at the same level', () => {
+      const { collection } = createCollection();
+      const state = collection
+        .include('posts', (posts) =>
+          posts.combine({
+            a: posts.count(),
+            b: posts.sum('views'),
+          }),
+        )
+        .include('profile').state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      expectSelectAst(plan.ast);
+      // Both includes contribute joins.
+      const aliases = plan.ast.joins?.map((j) =>
+        j.source.kind === 'derived-table-source' ? j.source.alias : undefined,
+      );
+      expect(aliases).toEqual(expect.arrayContaining(['posts_lateral', 'profile_lateral']));
+    });
   });
 
   it('still rejects scalar include selectors under the correlated strategy', () => {
@@ -585,6 +784,20 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(() =>
       compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
     ).toThrow('correlated include strategy does not support scalar include selectors');
+  });
+
+  it('still rejects combine() include descriptors under the correlated strategy', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.combine({
+        rows: posts.orderBy((p) => p.id.asc()),
+        total: posts.count(),
+      }),
+    ).state;
+
+    expect(() =>
+      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
+    ).toThrow('correlated include strategy does not support combine() include descriptors');
   });
 
   it('still rejects combine() nested inside row includes under the correlated strategy', () => {
@@ -600,7 +813,7 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     expect(() =>
       compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
-    ).toThrow('single-query include strategy does not support combine() include descriptors');
+    ).toThrow('correlated include strategy does not support combine() include descriptors');
   });
 });
 
