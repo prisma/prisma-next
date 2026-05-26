@@ -192,7 +192,7 @@ createRunner({
 
 ### Runtime read-side behaviour (TML-2680)
 
-The SQL runtime's marker read path no longer throws on hash mismatch or absent marker. Instead, on the first `execute()` call per runtime (unless `verifyMarker: false`), the runtime emits a structured `warn`-level log line with `code: 'CONTRACT.MARKER_MISMATCH'` or `code: 'CONTRACT.MARKER_MISSING'` and proceeds with the query. The marker write path and the explicit `db-verify` CLI verification surface are unchanged. Operators who need fail-fast verification should use `db-verify`; the runtime's role is a silent diagnostic during normal query execution.
+The SQL runtime's marker read path no longer throws on hash mismatch or absent marker. Instead, on the first `execute()` call per runtime (unless `verifyMarker: false`), the runtime emits a structured `warn`-level log line with `code: 'CONTRACT.MARKER_MISMATCH'` or `code: 'CONTRACT.MARKER_MISSING'` and proceeds with the query. The check runs **once per runtime instance**; subsequent queries skip the marker read entirely. The marker write path and the explicit `db-verify` CLI verification surface are unchanged. Operators who need fail-fast verification should use `db-verify`; the runtime's role is a silent diagnostic during normal query execution.
 
 ## Testing
 - Migration runner tests that marker is updated atomically with edge apply

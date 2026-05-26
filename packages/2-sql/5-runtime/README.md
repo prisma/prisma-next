@@ -80,7 +80,7 @@ for await (const row of runtime.execute(plan)) {
 }
 ```
 
-Use `verifyMarker: false` to skip the marker read entirely — e.g. during a known-skewed deploy window or in a perf-sensitive path that doesn't care about contract drift.
+Use `verifyMarker: false` to skip the marker read entirely — e.g. during a known-skewed deploy window where contract drift is expected and tolerated.
 
 ```typescript
 const runtime = createRuntime({
