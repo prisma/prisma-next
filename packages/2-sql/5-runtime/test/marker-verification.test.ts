@@ -343,4 +343,34 @@ describe('verifyMarker', () => {
     expect(readMarkerSpy).toHaveBeenCalledTimes(1);
     expect(log.warn).toHaveBeenCalledTimes(1);
   });
+
+  it('single-flights the marker read under concurrent first queries', async () => {
+    // Hold the marker read open until we have N concurrent execute() calls
+    // sitting at the verifyMarker gate. Without single-flight, each one would
+    // call readMarker() and emit a log line independently.
+    let releaseMarker: (result: MarkerReadResult) => void = () => {};
+    const markerPromise = new Promise<MarkerReadResult>((resolve) => {
+      releaseMarker = resolve;
+    });
+    const readMarkerSpy = vi.fn().mockImplementation(() => markerPromise);
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = buildRuntime({
+      markerResult: { kind: 'absent' },
+      log,
+      readMarkerSpy,
+    });
+
+    const inflight = [
+      runtime.execute(createPlan()).toArray(),
+      runtime.execute(createPlan()).toArray(),
+      runtime.execute(createPlan()).toArray(),
+      runtime.execute(createPlan()).toArray(),
+    ];
+
+    releaseMarker({ kind: 'absent' });
+    await Promise.all(inflight);
+
+    expect(readMarkerSpy).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledTimes(1);
+  });
 });

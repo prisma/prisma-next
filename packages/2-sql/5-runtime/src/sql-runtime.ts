@@ -179,9 +179,10 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly sqlCtx: SqlMiddlewareContext;
   private readonly verifyMarkerOption: VerifyMarkerOption;
+  // Single-flight gate. Memoises the first verifyMarker() call so concurrent first-queries share one read + one log line. `null` until the first gate hit; pre-resolved when `verifyMarkerOption === false` so the gate becomes a no-op await.
+  private verifyMarkerPromise: Promise<void> | null;
   readonly #preparedStatementHandles = new WeakMap<object, unknown>();
   private codecRegistryValidated: boolean;
-  private verified: boolean;
   private _telemetry: RuntimeTelemetryEvent | null;
 
   constructor(options: RuntimeOptions<TContract>) {
@@ -214,7 +215,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.sqlCtx = sqlCtx;
     this.verifyMarkerOption = verifyMarker ?? 'onFirstUse';
     this.codecRegistryValidated = false;
-    this.verified = this.verifyMarkerOption === false;
+    this.verifyMarkerPromise = this.verifyMarkerOption === false ? Promise.resolve() : null;
     this._telemetry = null;
   }
 
@@ -329,10 +330,10 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.familyAdapter.validatePlan(exec, this.contract);
     this._telemetry = null;
 
-    if (!this.verified) {
-      await this.verifyMarker();
-      this.verified = true;
+    if (this.verifyMarkerPromise === null) {
+      this.verifyMarkerPromise = this.verifyMarker();
     }
+    await this.verifyMarkerPromise;
 
     const startedAt = Date.now();
     let outcome: TelemetryOutcome | null = null;
