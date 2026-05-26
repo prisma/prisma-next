@@ -1,6 +1,6 @@
 # Summary
 
-Expose the existing `ContractConfig.output` plumbing on the user-facing `defineConfig` wrappers for the two first-party target wrappers that currently hide it (Mongo, Postgres) and add a matching `--output` flag to `prisma-next contract emit`. SQLite users already control the output path through the framework-level `defineConfig` and are out of scope for this project — see [TML-2677](https://linear.app/prisma-company/issue/TML-2677/add-prisma-nextsqliteconfig-defineconfig-wrapper-at-parity-with-mongo) for the follow-up that closes the ergonomic gap.
+Expose the existing contract-output plumbing on the user-facing `defineConfig` wrappers for the two first-party targets that currently hide it (Mongo, Postgres) and add a matching `--output-path` flag to `prisma-next contract emit`. The user-facing knob is a **directory path** (`outputPath`); the emitter writes `contract.json` and `contract.d.ts` (canonical filenames) inside that directory. SQLite users already control the output path through the framework-level `defineConfig` and are out of scope for this project — see [TML-2677](https://linear.app/prisma-company/issue/TML-2677/add-prisma-nextsqliteconfig-defineconfig-wrapper-at-parity-with-mongo) for the follow-up that closes the ergonomic gap.
 
 # Purpose
 
@@ -8,7 +8,7 @@ Give Prisma Next users control over where the contract emitter writes its two ge
 
 # At a glance
 
-The new surface is one optional field on `defineConfig` and one optional flag on the CLI. Both target the path of `contract.json`; `contract.d.ts` is always co-located beside it.
+The new surface is one optional field on `defineConfig` and one optional flag on the CLI. Both take a **directory** value; the emitter writes `contract.json` and `contract.d.ts` inside it (the filenames are canonical — users pick the directory, not the filename).
 
 ```ts
 // prisma-next.config.ts
@@ -16,71 +16,74 @@ import { defineConfig } from '@prisma-next/mongo/config'; // or /postgres/config
 
 export default defineConfig({
   contract: './src/contract.prisma',
-  output: './generated/contract.json',   // ← new, optional, identical surface across Mongo + Postgres wrappers
+  outputPath: './generated',   // ← new, optional; identical surface across Mongo + Postgres wrappers
   db: { connection: process.env['MONGODB_URL']! },
 });
 ```
 
 ```bash
-prisma-next contract emit --output ./generated/contract.json
+prisma-next contract emit --output-path ./generated
 ```
 
-The plumbing already supports this end-to-end (`ContractConfig.output` is threaded through provider → normalizer → CLI emit → `executeContractEmit` → `getEmittedArtifactPaths`). This project's surface is the two `defineConfig` wrappers (which currently hard-wire the path) and the CLI command (which has no flag).
+In both cases the emitter writes `./generated/contract.json` and `./generated/contract.d.ts`.
+
+The framework-level plumbing (`ContractConfig.output` → `normalizeContractConfig` → `executeContractEmit` → `getEmittedArtifactPaths`) still operates on file paths internally and is unchanged. The wrappers and the CLI operation convert `<dir>` to `<dir>/contract.json` before handing off — the framework boundary is unmoved.
 
 SQLite users today wire `coreDefineConfig` from `@prisma-next/cli/config-types` directly and already pass the output path explicitly as the second argument to `typescriptContract(contract, 'src/prisma/contract.json')`. The ergonomic wrapper at parity with Mongo + Postgres is tracked separately at [TML-2677](https://linear.app/prisma-company/issue/TML-2677/add-prisma-nextsqliteconfig-defineconfig-wrapper-at-parity-with-mongo).
 
 ```mermaid
 flowchart LR
-  Config[prisma-next.config.ts<br/>output?: string] --> Define[defineConfig]
-  CLI[--output flag] -.precedence.-> Emit
-  Define --> Provider[ContractConfig.output]
+  Config[prisma-next.config.ts<br/>outputPath?: string<br/>directory] --> Define[defineConfig wrapper]
+  CLI[--output-path dir flag] -.precedence.-> Emit
+  Define -- join dir, contract.json --> Provider[ContractConfig.output<br/>file path]
   Provider --> Norm[normalizeContractConfig]
   Norm --> Emit[executeContractEmit]
   Emit --> Paths[getEmittedArtifactPaths]
   Paths --> JSON[contract.json]
-  Paths --> DTS[contract.d.ts<br/>derived from JSON path]
+  Paths --> DTS[contract.d.ts]
 ```
 
 # Scope
 
 ## In scope
 
-- A new optional `output?: string` field on the two target `defineConfig` wrappers that currently hard-wire the path: `@prisma-next/mongo/config` and `@prisma-next/postgres/config`. Identical semantics, name, defaults, and resolution rules across both.
-- A new `--output <path>` flag on `prisma-next contract emit`, with precedence over the config value.
-- Path resolution relative to the directory containing the `prisma-next.config.ts` file (consistent with how `contract` is resolved).
+- A new optional `outputPath?: string` field on the two target `defineConfig` wrappers that currently hard-wire the path: `@prisma-next/mongo/config` and `@prisma-next/postgres/config`. **Directory semantics** — value is the directory the emitter writes into; the emitted filenames are canonical (`contract.json`, `contract.d.ts`). Identical surface across both wrappers.
+- A new `--output-path <dir>` flag on `prisma-next contract emit`, with the same directory semantics, taking precedence over the config value.
 - A short documentation update covering the new knob, its default, and CLI/config precedence.
-- Test coverage for each wrapper, the CLI flag, the precedence rule, and the "no override → unchanged default behaviour" invariant.
+- Test coverage for both wrappers, the CLI flag, the precedence rule, and the "no override → unchanged default behaviour" invariant.
 
 ## Non-goals
 
 - Adding a `@prisma-next/sqlite/config` `defineConfig` wrapper at ergonomic parity. SQLite already supports a custom output path through the framework-level `defineConfig` + `typescriptContract(contract, output)` plumbing; the ergonomic wrapper is tracked at [TML-2677](https://linear.app/prisma-company/issue/TML-2677/add-prisma-nextsqliteconfig-defineconfig-wrapper-at-parity-with-mongo).
-- Independent control over `.json` and `.d.ts` paths. The two stay co-located, derived by the existing `getEmittedArtifactPaths`.
-- Directory-shaped `output` semantics. The value is a file path to a `.json` file; directory paths are not accepted.
+- Independent control over `.json` and `.d.ts` paths. The two stay co-located inside the chosen directory, derived by the existing `getEmittedArtifactPaths`.
+- Letting users pick the filename. `contract.json` and `contract.d.ts` are canonical; user-supplied filenames are not supported. The wrapper / CLI surface accepts a directory only.
 - Changes to the contract surface, contract schema, or emitter algorithm. Output *location* only.
+- Changes to the framework-level `ContractConfig.output` shape. It remains a file path internally; the wrappers / CLI convert directory → file path before the framework boundary.
 - Changes to migration manifest output. `migrations.dir` continues to govern that surface unchanged.
 - Post-emit transformation hooks, formatters, or codegen plugins.
-- Rewriting the [`contract-space-package-layout`](../../.cursor/rules/contract-space-package-layout.mdc) rule. It remains the recommended default for application/extension authors. A one-line clarification ("convention, not mandate; overridable via `output`") may land at close-out but isn't load-bearing for this project.
-- Hard validation of the supplied path (escape-traversal blocking, `node_modules` blocking, overwrite protection). Soft warnings only.
+- Rewriting the [`contract-space-package-layout`](../../.cursor/rules/contract-space-package-layout.mdc) rule. It remains the recommended default for application/extension authors. A one-line clarification ("convention, not mandate; overridable via `outputPath`") may land at close-out but isn't load-bearing for this project.
+- Soft warnings on unusual paths (non-`.json` extension, directory-shaped path, collision with contract source). The earlier file-path design treated these as edge cases worth surfacing; under directory semantics they either don't apply or are simpler concerns left to filesystem-level errors.
+- Hard validation of the supplied path (escape-traversal blocking, `node_modules` blocking, overwrite protection).
 
 # Approach
 
-The change is a thin user-facing extension over plumbing that already exists. The framework-level `ContractConfig.output` is already optional, already threaded through the entire emit pipeline, and already honoured by `getEmittedArtifactPaths`. The two affected layers are:
+The change is a thin user-facing extension over plumbing that already exists. The framework-level `ContractConfig.output` (a file path) is already optional, already threaded through the entire emit pipeline, and already honoured by `getEmittedArtifactPaths`. The two affected layers are:
 
-1. **The `defineConfig` wrappers in two target extension packages (Mongo + Postgres).** Today each hard-wires `output = deriveOutputPath(options.contract)`. The change is to accept `output` in the options type, default to `deriveOutputPath(options.contract)` if absent, and pass through unchanged otherwise. Identical surface across Mongo + Postgres is an invariant (I-output-3). Both wrappers already share an identical inline `deriveOutputPath` helper that's a candidate for extraction; whether to extract is a slice-time judgment call. (SQLite has no `defineConfig` wrapper today; users go through `coreDefineConfig` directly and explicitly pass the output path. Closing the SQLite ergonomic gap is tracked at TML-2677.)
+1. **The `defineConfig` wrappers in two target extension packages (Mongo + Postgres).** Today each hard-wires `output = deriveOutputPath(options.contract)`. The change is to accept an optional `outputPath` (directory) in the options type and convert it to a file path internally by `join(options.outputPath, 'contract.json')` before handing to the framework-level provider. When `outputPath` is absent, the existing `deriveOutputPath(options.contract)` fallback runs unchanged. Identical surface across Mongo + Postgres is an invariant (I-output-3). (SQLite has no `defineConfig` wrapper today; users go through `coreDefineConfig` directly and explicitly pass a file path. Closing the SQLite ergonomic gap is tracked at TML-2677.)
 
-2. **The CLI `contract emit` command.** Add a `--output` flag at the command surface, thread it through the control-API operation, and have it take precedence over the value read from the config. When neither is supplied, the path comes from the normalized config (which falls back to the wrapper's derivation, which falls back to `DEFAULT_CONTRACT_OUTPUT`).
+2. **The CLI `contract emit` command.** Add a `--output-path <dir>` flag at the command surface, thread the directory value into the control-API operation as `ContractEmitOptions.outputPath`, and have the operation convert it to a file path (`join(outputPath, 'contract.json')`) before passing to `getEmittedArtifactPaths`. The CLI value takes precedence over the value read from the config. When neither is supplied, the path comes from the normalized config (which falls back to the wrapper's derivation, which falls back to `DEFAULT_CONTRACT_OUTPUT`).
 
-The `.d.ts` file's location stays a derivation of the `.json` location. The mental model is "one knob for the asset pair, co-located by construction." Lifting the co-location would require revisiting `getEmittedArtifactPaths` and downstream import expectations; no user need motivates it.
+The `.d.ts` file's location stays a derivation of the `.json` location. The mental model is **"the user picks the directory; the emitter picks the filenames."** Lifting the co-location would require revisiting `getEmittedArtifactPaths` and downstream import expectations; no user need motivates it.
 
-Validation is intentionally minimal: `mkdir -p` of the parent directory plus soft warnings on obviously-odd inputs (non-`.json` extension; directory-shaped path). The override is a config-file UX surface, not a security boundary.
+Validation is intentionally minimal: `mkdir -p` of the parent directory (existing behaviour, preserved). No soft warnings on the user's directory choice. The override is a config-file UX surface, not a security boundary.
 
 # Project Definition of Done
 
 - [ ] **PDoD1.** Single slice (per the project plan) merged.
-- [ ] **PDoD2.** `output` accepted on both Mongo + Postgres `defineConfig` wrappers with byte-identical surface (option name, type, default, resolution semantics).
-- [ ] **PDoD3.** `--output` flag accepted by `prisma-next contract emit`, with CLI > config > default precedence.
-- [ ] **PDoD4.** Default behaviour (no `output` set, no `--output` passed) is byte-identical to pre-change emit output for at least one Mongo and one Postgres fixture / example.
-- [ ] **PDoD5.** Tests covering: (a) both wrappers' new option; (b) the CLI flag; (c) precedence; (d) the default-unchanged invariant.
+- [ ] **PDoD2.** `outputPath` accepted on both Mongo + Postgres `defineConfig` wrappers with identical surface (option name, type, directory semantics, canonical filenames).
+- [ ] **PDoD3.** `--output-path <dir>` flag accepted by `prisma-next contract emit`, with CLI > config > default precedence.
+- [ ] **PDoD4.** Default behaviour (no `outputPath` set, no `--output-path` passed) is byte-identical to pre-change emit output for at least one Mongo and one Postgres fixture / example.
+- [ ] **PDoD5.** Tests covering: (a) both wrappers' new option; (b) the CLI flag; (c) precedence; (d) the default-unchanged invariant; (e) canonical filenames are written regardless of the source filename.
 - [ ] **PDoD6.** Docs updated: a short section in the relevant config / CLI reference describing the option, its default, and precedence. Examples (`examples/mongo-demo` et al.) **not** updated to use the override — keeping the default-path examples is the right baseline.
 - [ ] **PDoD7.** `pnpm build`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e`, `pnpm lint:deps`, `pnpm fixtures:check` all green.
 - [ ] **PDoD8.** Mandatory final retro complete; output landed (canonical findings / `drive/calibration/` / ADR — whichever fits).
@@ -91,13 +94,13 @@ Validation is intentionally minimal: `mkdir -p` of the parent directory plus sof
 
 # Functional Requirements
 
-- **FR1.** `@prisma-next/mongo/config`'s `defineConfig({ contract, output?, db, ... })` accepts an optional `output: string` and threads it into the contract config. If absent, behaviour is identical to today.
-- **FR2.** `@prisma-next/postgres/config`'s `defineConfig` accepts the same optional `output: string` with identical semantics.
-- **FR3.** `output`, when set, is the path to the emitted `contract.json` file. `contract.d.ts` is co-located, derived by the existing `getEmittedArtifactPaths` substitution.
-- **FR4.** `output`, when relative, resolves against the directory containing `prisma-next.config.ts`.
-- **FR5.** `prisma-next contract emit --output <path>` overrides the config-file value (and any default).
-- **FR6.** When `output` is absent from both config and CLI, the emitted paths are byte-identical to current behaviour for every existing fixture / example.
-- **FR7.** The parent directory of the resolved output path is created if missing (existing `mkdir` behaviour, preserved).
+- **FR1.** `@prisma-next/mongo/config`'s `defineConfig({ contract, outputPath?, db, ... })` accepts an optional `outputPath: string` (directory) and converts it internally to `join(outputPath, 'contract.json')` before passing to the framework-level provider. If absent, behaviour is identical to today.
+- **FR2.** `@prisma-next/postgres/config`'s `defineConfig` accepts the same optional `outputPath: string` with identical directory semantics.
+- **FR3.** When `outputPath` is set, the emitter writes `<outputPath>/contract.json` and `<outputPath>/contract.d.ts`. The filenames are canonical; the user controls the directory only.
+- **FR4.** `outputPath`, when relative, resolves against the directory containing `prisma-next.config.ts` for the config-file value, or against the current working directory for the CLI flag value (matching CLI convention for path args).
+- **FR5.** `prisma-next contract emit --output-path <dir>` overrides the config-file value (and any default).
+- **FR6.** When `outputPath` is absent from both config and CLI, the emitted paths are byte-identical to current behaviour for every existing fixture / example.
+- **FR7.** The output directory is created if missing (existing `mkdir` behaviour, preserved).
 
 # Non-Functional Requirements
 
@@ -105,8 +108,7 @@ Validation is intentionally minimal: `mkdir -p` of the parent directory plus sof
 - **NFR2.** Tests added before implementation changes (per [`AGENTS.md § Golden Rules`](../../AGENTS.md)).
 - **NFR3.** No changes to `contract.json` / `contract.d.ts` payload shape; the artifacts at the new location are byte-identical to the artifacts at the default location.
 - **NFR4.** Performance impact zero — the change is a pass-through option; no new I/O, no new computation.
-- **NFR5.** Soft warnings for unusual paths (non-`.json` extension; absolute path traversing `node_modules`) are structured + actionable; no hard failures.
-- **NFR6.** Use `pathe`, not `node:path`, for any new path manipulation (per [`use-pathe-for-paths`](../../.cursor/rules/use-pathe-for-paths.mdc)).
+- **NFR5.** Use `pathe`, not `node:path`, for any new path manipulation (per [`use-pathe-for-paths`](../../.cursor/rules/use-pathe-for-paths.mdc)).
 
 # Contract-impact
 
@@ -137,9 +139,7 @@ Likely no new ADR required — this is a config-surface extension, not an archit
 
 # Open Questions
 
-_All design-level questions resolved. See [`design-notes.md`](./design-notes.md) for the settled model. Implementation-shape question deferred to the slice author:_
-
-1. **Shared helper vs per-wrapper copies** for the three `defineConfig` wrappers. Both shapes satisfy the identical-surface invariant. Working position: prefer a shared helper if one already exists in `@prisma-next/config` core; otherwise copy across the three wrappers. Confirm during slice design.
+_All design-level questions resolved. See [`design-notes.md`](./design-notes.md) for the settled model, including the file-path → directory-path pivot during PR review._
 
 # References
 

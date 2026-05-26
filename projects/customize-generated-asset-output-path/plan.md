@@ -14,16 +14,16 @@ Single slice covering both Mongo + Postgres `defineConfig` wrappers, the CLI fla
 
 ### Single slice
 
-**Slice `output-path-override`** — expose `output?: string` on both Mongo + Postgres `defineConfig` wrappers and add `--output` to `prisma-next contract emit`, with CLI > config > default precedence. Land both wrappers + CLI + tests + docs in one PR.
+**Slice `output-path-override`** — expose `outputPath?: string` (directory) on both Mongo + Postgres `defineConfig` wrappers and add `--output-path <dir>` to `prisma-next contract emit`, with CLI > config > default precedence. Land both wrappers + CLI + tests + docs in one PR. (The slice initially shipped with file-path semantics and the field name `output`; PR review reshaped the design — see [`./slices/output-path-override/plan.md § PR-review-response round`](./slices/output-path-override/plan.md#pr-review-response-round-file-path--directory-path).)
 
 - **Purpose**: deliver every PDoD condition in one cohesive change so the user-facing surface ships consistent across Mongo + Postgres in a single rollout step.
 - **Scope**:
-  - `packages/3-extensions/mongo/src/config/define-config.ts` — add `output?: string` to `MongoConfigOptions`; default-path derivation unchanged; pass through to `ContractConfig.output`.
+  - `packages/3-extensions/mongo/src/config/define-config.ts` — add `outputPath?: string` (directory) to `MongoConfigOptions`; convert internally to `join(outputPath, 'contract.json')`; default-path derivation unchanged when absent.
   - `packages/3-extensions/postgres/src/config/define-config.ts` — same change to `PostgresConfigOptions`, identical surface.
-  - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts` — add `--output <path>` flag.
-  - `packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts` — accept CLI override; CLI > config > default precedence at the entry point.
-  - Test additions: unit tests for each wrapper (option threaded into `ContractConfig.output`); CLI test for the flag + precedence; integration / e2e test confirming an override produces artifacts at the requested path (one target is sufficient for the e2e — slice author picks).
-  - Docs: a short section in the Contract Emitter subsystem doc or the CLI reference (slice author picks the right home).
+  - `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts` — add `--output-path <dir>` flag.
+  - `packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts` — accept the CLI directory value; join to `contract.json`; CLI > config > default precedence at the entry point.
+  - Test additions: unit tests for each wrapper (`outputPath` converted to `<dir>/contract.json`); CLI test for the flag + precedence + canonical-filename invariant; integration / e2e test confirming `--output-path <dir>` produces `<dir>/contract.json` + `<dir>/contract.d.ts`.
+  - Docs: a short section in the CLI Style Guide (no architecture-doc subsection — see § PR-review-response round in the slice plan for the operator's pushback).
 - **Depends on**: nothing internal; nothing external.
 - **Linear**: [TML-2664](https://linear.app/prisma-company/issue/TML-2664/mongo-feature-request-customize-generated-asset-output-path) — the ticket *is* the slice's Linear surface; no separate slice issue.
 
@@ -40,11 +40,11 @@ None.
 | Project-DoD | Delivered by |
 |---|---|
 | **PDoD1.** Single slice merged | `output-path-override` |
-| **PDoD2.** `output` on both Mongo + Postgres `defineConfig` wrappers | `output-path-override` |
-| **PDoD3.** `--output` flag with CLI > config > default precedence | `output-path-override` |
+| **PDoD2.** `outputPath` (directory) on both Mongo + Postgres `defineConfig` wrappers | `output-path-override` |
+| **PDoD3.** `--output-path <dir>` flag with CLI > config > default precedence | `output-path-override` |
 | **PDoD4.** Default behaviour byte-identical for Mongo + Postgres fixtures | `output-path-override` (test invariant) |
-| **PDoD5.** Tests covering wrappers, CLI flag, precedence, default-unchanged | `output-path-override` |
-| **PDoD6.** Docs updated (config / CLI reference) | `output-path-override` |
+| **PDoD5.** Tests covering wrappers, CLI flag, precedence, default-unchanged, canonical-filenames | `output-path-override` |
+| **PDoD6.** Docs updated (CLI Style Guide) | `output-path-override` |
 | **PDoD7.** Repo green: build, test:packages, test:integration, test:e2e, lint:deps, fixtures:check | `output-path-override` (slice DoD gates) |
 | **PDoD8.** Final retro complete; output landed | close-out |
 | **PDoD9.** Long-lived docs migrated into `docs/` | close-out |
@@ -54,8 +54,7 @@ None.
 
 ## Risks + open questions
 
-1. **CLI flag wiring may touch more files than the two referenced.** The CLI uses a control-API split (command file ↔ operation file); the slice author may discover an args type, a control-API descriptor, or a help-text surface that also needs updating. Not a planning risk — just expect the slice's dispatch list to be 2-4 files on the CLI side rather than exactly 2.
-2. **Soft-warning surface choice.** The spec calls for soft warnings on unusual paths; the slice author picks the warning mechanism (existing diagnostic infrastructure vs `console.warn`). Working position: use whatever the CLI already uses for emit warnings.
+_All resolved during slice execution + PR-review-response round. No remaining open items._
 
 ## Close-out (required)
 

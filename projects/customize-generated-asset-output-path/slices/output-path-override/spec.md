@@ -9,86 +9,85 @@ This slice is the project's only slice. The project spec + design notes are auth
 
 ## In scope
 
-- Add an optional `output?: string` field to `MongoConfigOptions` in `packages/3-extensions/mongo/src/config/define-config.ts`. When provided, use it; when absent, fall back to the existing `deriveOutputPath(options.contract)`.
+- Add an optional `outputPath?: string` field (directory path) to `MongoConfigOptions` in `packages/3-extensions/mongo/src/config/define-config.ts`. When provided, the wrapper converts it to `join(outputPath, 'contract.json')` and passes that file path to the framework-level provider. When absent, the existing `deriveOutputPath(options.contract)` fallback runs unchanged.
 - Add the same field to `PostgresConfigOptions` in `packages/3-extensions/postgres/src/config/define-config.ts`. Identical semantics.
-- Add a `--output <path>` flag to `prisma-next contract emit` in `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`.
-- Thread the CLI value through `packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts` so it overrides `contractConfig.output` at the point where `getEmittedArtifactPaths` is called.
-- Soft warnings (using whatever diagnostic mechanism the CLI emit path already uses) when:
-  - The supplied path doesn't end in `.json`.
-  - The supplied path resolves to a directory (e.g. ends in `/` or names an existing directory).
+- Add a `--output-path <dir>` flag to `prisma-next contract emit` in `packages/1-framework/3-tooling/cli/src/commands/contract-emit.ts`.
+- Thread the CLI value through `packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts` as `ContractEmitOptions.outputPath`. The operation performs the `join(outputPath, 'contract.json')` conversion before calling `getEmittedArtifactPaths`. CLI value takes precedence over the value read from the config.
 - Path resolution: relative paths resolve against the directory containing the `prisma-next.config.ts` file when the config-file value is used. When the CLI flag is used and the value is relative, resolve against the cwd (consistent with other CLI path args).
-- Unit tests for both wrappers verifying the option is threaded into `ContractConfig.output`.
-- CLI tests verifying the flag is accepted, the precedence rule (CLI > config > default) holds, and the default-unchanged invariant holds.
-- One end-to-end / integration test (one target is sufficient) that runs `prisma-next contract emit` against a fixture with an `output` override and asserts the artifacts land at the requested path.
-- A short documentation update covering the new knob, its default, and the precedence rule. Land it wherever the existing `defineConfig` options are documented; if no such section exists, the slice author picks the closest home (likely the Contract Emitter subsystem doc or the CLI reference).
+- Unit tests for both wrappers verifying `outputPath` is converted to `<outputPath>/contract.json` and threaded into `ContractConfig.output`.
+- CLI tests verifying the flag is accepted, the precedence rule (CLI > config > default) holds, the default-unchanged invariant holds, and the canonical-filename invariant holds (the user does not control the filename).
+- One end-to-end / integration test (one target is sufficient) that runs `prisma-next contract emit --output-path <dir>` and asserts artifacts land at `<dir>/contract.json` and `<dir>/contract.d.ts`.
+- A short documentation update covering the new knob, its default, and the precedence rule. Land it in the CLI Style Guide (the canonical home for flag-precedence rules); skip the architecture / subsystem docs (the operator pushed back on that surface as too detailed during PR review).
 
 ## Out of scope
 
 - Any change to `@prisma-next/sqlite` (no wrapper exists; tracked at [TML-2677](https://linear.app/prisma-company/issue/TML-2677/add-prisma-nextsqliteconfig-defineconfig-wrapper-at-parity-with-mongo)).
-- Any change to `ContractConfig.output`'s underlying semantics or to `getEmittedArtifactPaths`.
-- Adding a `--output` flag to commands other than `contract emit` (e.g. `migrate` doesn't get one).
+- Any change to `ContractConfig.output`'s underlying semantics or to `getEmittedArtifactPaths`. The framework-level shape stays a file path; the wrapper / CLI operation converts directory → file path at the boundary.
+- Letting the user pick the emitted filenames. `contract.json` and `contract.d.ts` are canonical.
+- Adding a `--output-path` flag to commands other than `contract emit` (e.g. `migrate` doesn't get one).
+- Soft warnings on the user's directory choice (the file-path-era warnings — non-`.json` extension, directory-shape, source-collision — were removed in PR review along with the file-path semantics that motivated them).
 - Updating existing demo / example `prisma-next.config.ts` files to *use* the new option. Keeping the existing examples on the default path is the right baseline; users discover the option via docs, not via examples.
 - Modifying the `contract-space-package-layout` rule beyond an optional one-line "convention, not mandate" clarification at close-out.
 
 # Approach
 
-The two `defineConfig` wrappers each gain one option in their options interface and one line of fallback logic:
+The two `defineConfig` wrappers each gain one option in their options interface and one branch of conversion logic:
 
 ```ts
 export interface MongoConfigOptions {
   readonly contract: string;
-  readonly output?: string;  // ← new
+  readonly outputPath?: string;  // directory
   readonly db?: { readonly connection?: string };
 }
 
 export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mongo', 'mongo'> {
-  const output = options.output ?? deriveOutputPath(options.contract);  // ← was: `const output = deriveOutputPath(options.contract);`
-  // rest unchanged
+  const output = options.outputPath !== undefined
+    ? join(options.outputPath, 'contract.json')
+    : deriveOutputPath(options.contract);
+  // rest unchanged — `output` is still a file path internally; `ContractConfig.output` is unchanged
 }
 ```
 
-The Postgres wrapper gets the same change against `PostgresConfigOptions`. Both wrappers already carry an identical inline `deriveOutputPath` helper; the slice author decides whether to lift it (extract into a shared module that both wrappers import) or leave it inline. Working position from `design-notes.md § Open questions`: extract only if the move is a clean 1-file lift; otherwise leave inline and let TML-2677 do the extraction.
+The Postgres wrapper gets the same change against `PostgresConfigOptions`. Both wrappers continue to carry an identical inline `deriveOutputPath` helper for the absent-`outputPath` case; lifting it is a future cleanup (when TML-2677 adds a third wrapper).
 
-The CLI flag adds an `--output` option that the command parses and forwards into the control-API operation. Inside `contract-emit.ts` (control-API), the operation prefers the CLI override when present, falling back to `contractConfig.output`, falling back to the normalizer's default:
+The CLI flag adds an `--output-path <dir>` option that the command parses (resolving relative values against cwd) and forwards into the control-API operation as `ContractEmitOptions.outputPath`. Inside the operation, the join happens before the call to the emitter:
 
 ```ts
-// pseudo-code; slice author writes the actual change against current shape
-const resolvedOutput = cliOutputOverride ?? contractConfig.output;
-const paths = getEmittedArtifactPaths(resolvedOutput);
+const effectiveOutput = outputPath !== undefined
+  ? join(outputPath, 'contract.json')
+  : contractConfig.output;
+outputPaths = getEmittedArtifactPaths(effectiveOutput);
 ```
 
-Soft warnings fire at the same entry point. Validation policy: warn-then-continue, never throw.
+No soft warnings. The wrapper / CLI surface is the user's choice of directory; filesystem errors (e.g. permission denied, parent doesn't exist) surface naturally.
 
 Tests follow the AGENTS.md "tests before implementation" golden rule: each dispatch starts by adding the failing tests for that dispatch's behavior, then implementing.
 
 # Example-Mapping edge cases
 
-Pre-named edge cases with dispositions per `drive-specify-slice § Step 6`. Severity discipline per `drive-build-workflow § Findings discipline`.
+Pre-named edge cases under the directory-semantics design that landed during PR review. (The earlier file-path design had additional edge cases — non-`.json` extensions, directory-shape warnings, source-file collisions — that were removed when the surface changed shape; see [`../../design-notes.md § Design pivot`](../../design-notes.md#design-pivot-file-path--directory-path) for the rationale.)
 
 | # | Edge case | Disposition |
 |---|---|---|
-| 1 | `output` unset; `--output` absent. | **Handle** — invariant I-output-1 (default behaviour byte-identical). Covered by a regression test that snapshots emit output for the existing Mongo + Postgres fixtures. |
-| 2 | `output` set in config; `--output` absent. | **Handle** — output lands at the config path. Covered by wrapper unit tests + the end-to-end test. |
-| 3 | `output` unset in config; `--output` passed on CLI. | **Handle** — output lands at the CLI path. Covered by CLI test. |
-| 4 | `output` set in config; `--output` also passed. | **Handle** — CLI wins (invariant I-output-4). Covered by CLI test. |
-| 5 | `output` path is relative, config value. | **Handle** — resolves against the directory containing `prisma-next.config.ts`. Covered by wrapper unit test + integration test. |
-| 6 | `output` path is relative, CLI value. | **Handle** — resolves against cwd (CLI convention). Covered by CLI test. |
-| 7 | `output` path is absolute. | **Handle** — used as-is. Covered by CLI test. |
-| 8 | `output` path has a non-`.json` extension (e.g. `./generated/contract.txt`). | **Handle** — soft warning emitted; proceed with the requested path. The `.d.ts` companion still derives by suffix substitution; the warning surfaces in test output. |
-| 9 | `output` path looks like a directory (trailing `/` or matches an existing directory). | **Handle** — soft warning emitted; proceed (writes will fail at the file-creation step, which is the expected error mode). |
-| 10 | `output` path's parent directory does not exist. | **Handle** — `mkdir -p` of the parent runs as today (FR7); no change in behavior. |
-| 11 | `output` path traverses outside the project root (e.g. `../../../../tmp/contract.json`). | **Explicitly out** — no hard validation; soft warnings handle the obvious-looking cases (extension, directory shape) only. Path-traversal blocking is a separate security concern, not part of this slice. |
-| 12 | `output` path points inside `node_modules`. | **Explicitly out** — same rationale as #11. |
-| 13 | Output path collides with the contract source file (`contract` and `output` both point at `./src/contract.prisma`). | **Handle** — emit would overwrite the source; existing `mkdir`/`writeFile` behavior would do the overwrite; a soft warning fires. The slice does **not** add overwrite-protection logic. |
-| 14 | `output` set on a contract that has no `.json` extension. | **Handle** — the value is used verbatim; no extension manipulation. Soft warning per #8 if the extension is wrong. |
-| 15 | Wrapper called with `output` but the contract is a TS-authored contract (`.ts` extension). | **Handle** — both wrappers already special-case `.ts` and route to `typescriptContractFromPath(options.contract, output)`. The `output` option threads in the same way. Covered by wrapper unit test. |
+| 1 | `outputPath` unset; `--output-path` absent. | **Handle** — invariant I-output-1 (default behaviour byte-identical). Covered by the regression tests for the existing Mongo + Postgres fixtures. |
+| 2 | `outputPath` set in config; `--output-path` absent. | **Handle** — output lands at `<outputPath>/contract.json` and `<outputPath>/contract.d.ts`. Covered by wrapper unit tests + the integration test. |
+| 3 | `outputPath` unset in config; `--output-path` passed on CLI. | **Handle** — output lands at `<cli-value>/contract.json` and `<cli-value>/contract.d.ts`. Covered by CLI test. |
+| 4 | `outputPath` set in config; `--output-path` also passed. | **Handle** — CLI wins (invariant I-output-4). Covered by CLI test. |
+| 5 | `outputPath` is relative, config value. | **Handle** — resolves against the directory containing `prisma-next.config.ts`. Covered by wrapper unit test + integration test. |
+| 6 | `outputPath` is relative, CLI value. | **Handle** — resolves against cwd (CLI convention). Covered by CLI test using `pathjoin(process.cwd(), ...)` as the OS-agnostic assertion target. |
+| 7 | `outputPath` is absolute. | **Handle** — used as-is. Covered by CLI test. |
+| 8 | Output directory does not exist. | **Handle** — `mkdir -p` runs as today (FR7); no change in behavior. |
+| 9 | `outputPath` traverses outside the project root (e.g. `../../tmp`). | **Explicitly out** — no hard validation; trust the user. Path-traversal blocking is a separate security concern, not part of this slice. |
+| 10 | `outputPath` points inside `node_modules`. | **Explicitly out** — same rationale as #9. |
+| 11 | Canonical filenames invariant — `<outputPath>/contract.json` is written regardless of the contract source filename (`schema.prisma`, `contract.prisma`, `contract.ts`, etc.). | **Handle** — invariant I-output-2 (filenames are canonical, not derived from source). Covered by an explicit wrapper unit test. |
+| 12 | Wrapper called with `outputPath` but the contract is a TS-authored contract (`.ts` extension). | **Handle** — both wrappers already special-case `.ts` and route to `typescriptContractFromPath(options.contract, output)`. The `output` file path the wrapper computes (`<outputPath>/contract.json`) threads through the same provider call. Covered by wrapper unit test. |
 
 # Slice DoD
 
-- [ ] **SDoD1.** All pre-named edge cases (#1-10, #13-15) handled with corresponding tests; #11-12 explicitly documented as out-of-scope (no test required).
-- [ ] **SDoD2.** Unit tests for both wrappers green: `pnpm test:packages -- @prisma-next/mongo` and `pnpm test:packages -- @prisma-next/postgres` (or workspace equivalent).
-- [ ] **SDoD3.** CLI tests green covering the flag, the precedence rule, and the default-unchanged invariant.
-- [ ] **SDoD4.** End-to-end / integration test green confirming an `output` override produces artifacts at the requested path.
+- [ ] **SDoD1.** All in-scope edge cases (#1-8, #11-12) handled with corresponding tests; #9-10 explicitly documented as out-of-scope (no test required).
+- [ ] **SDoD2.** Unit tests for both wrappers green: `pnpm --filter @prisma-next/mongo test` and `pnpm --filter @prisma-next/postgres test`.
+- [ ] **SDoD3.** CLI tests green covering the flag, the precedence rule, the default-unchanged invariant, and the OS-agnostic assertion of resolved relative-path values.
+- [ ] **SDoD4.** End-to-end / integration test green confirming `--output-path <dir>` produces `<dir>/contract.json` and `<dir>/contract.d.ts`.
 - [ ] **SDoD5.** `pnpm fixtures:check` clean — no fixture drift introduced.
 - [ ] **SDoD6.** `pnpm lint:deps` clean.
 - [ ] **SDoD7.** `pnpm typecheck` clean across the workspace.
@@ -98,7 +97,7 @@ Pre-named edge cases with dispositions per `drive-specify-slice § Step 6`. Seve
 - [ ] **SDoD11.** All path manipulation uses `pathe`, not `node:path` (per `.cursor/rules/use-pathe-for-paths.mdc`).
 - [ ] **SDoD12.** Documentation update landed in the chosen surface.
 - [ ] **SDoD13.** Reviewer subagent reports `SATISFIED` per `drive-build-workflow`.
-- [ ] **SDoD14.** Manual-QA: emit a fixture contract twice, once with the default path and once with `--output ./tmp-out/contract.json`, and confirm both produce byte-identical JSON content at the respective paths. Land the run as a `wip/manual-qa-output-path-override.md` note (gitignored).
+- [ ] **SDoD14.** Manual-QA: emit a fixture contract twice, once with the default path and once with `--output-path ./tmp-out`, and confirm both produce byte-identical JSON content at the respective paths (`./tmp-out/contract.json` for the override run). Land the run as a `wip/manual-qa-output-path-override.md` note (gitignored).
 
 # References
 

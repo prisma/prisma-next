@@ -4,7 +4,9 @@
 **Project spec:** [`../../spec.md`](../../spec.md)
 **Project design notes:** [`../../design-notes.md`](../../design-notes.md)
 
-Three sequential dispatches. Each follows the tests-before-implementation rule from AGENTS.md.
+Originally planned as three sequential dispatches; a fourth PR-review-response round shifted the design from file-path semantics to directory semantics — see [`../../design-notes.md § Design pivot`](../../design-notes.md#design-pivot-file-path--directory-path) for the rationale and § PR-review-response round below for the dispatch summary. Each dispatch follows the tests-before-implementation rule from AGENTS.md.
+
+> The d1/d2/d3 sections below are preserved as the historical record of what was originally planned and executed. They reference the file-path-era field name `output` and the file-path-era CLI flag `--output`. The PR-review-response round renamed everything to `outputPath` / `--output-path` and shifted the semantics; the slice spec is the source of truth for the **current** design.
 
 ## Dispatch plan
 
@@ -139,9 +141,40 @@ The slice merges only when, on the final round, all of these pass:
 - Manual-QA note in `wip/manual-qa-output-path-override.md`
 - Reviewer subagent `SATISFIED` verdict in `projects/customize-generated-asset-output-path/reviews/code-review.md`.
 
+---
+
+## PR-review-response round: file-path → directory-path
+
+**Trigger.** Operator review of PR #584 flagged two structural issues:
+
+1. The `output` field on the wrappers and the `outputOverride` field on the control-API were poorly named — operator asked for `outputPath` everywhere ("`output` should be `outputPath`"; "do not name this an 'override'").
+2. The file-path semantics ("you supply `./generated/contract.json`, we substitute `.d.ts` for the companion file") were called out as nonsensical: the user is given control over a filename they can't actually pick. Operator's verbatim feedback: *"It's fucking dumb that it takes a file ending in `.json` and then strips the file extension off it."*
+
+Plus CodeRabbit raised three minor findings (one heading-level lint, one path-normalization in the collision-warning helper, one OS-agnostic test assertion).
+
+**Resolution.**
+
+- Rename `output` → `outputPath` (wrappers + slice spec + design notes + integration test + docs).
+- Rename `outputOverride` → `outputPath` (`ContractEmitOptions` field, CLI flag, help text).
+- Rename CLI flag `--output <path>` → `--output-path <dir>`.
+- Switch semantics: `outputPath` is a directory; the wrapper / CLI operation converts to `<dir>/contract.json` before crossing the framework boundary. `contract.json` and `contract.d.ts` become canonical filenames.
+- Delete the entire `computeOutputWarnings` helper (non-`.json` extension / directory-shape / source-collision warnings). All three become moot under directory semantics.
+- Simplify `resolveHeaderPaths` back to its pre-d2 shape (the defensive non-`.json` branch is no longer needed — the conversion always produces a `.json` path).
+- Delete the `#### Controlling the output path` subsection from the Contract Emitter subsystem doc (operator feedback: "too detailed for architecture documents; not a user-facing usage guide"). The CLI Style Guide entry stays, updated for the new naming + semantics.
+- CodeRabbit findings: MD001 + path normalization become moot with the doc deletion + warning helper deletion. OS-agnostic test assertion fix applied in the rewritten CLI tests using `pathjoin(process.cwd(), …)`.
+- Plus housekeeping: rebase onto `origin/main` (one conflict in mongo wrapper resolved by keeping both `extensions` and `outputPath` lines); all 7 commits backfilled with `Signed-off-by` trailers to clear the DCO check.
+
+**Commits (post-rebase):**
+
+- d1 → `feat(mongo,postgres): add output path override to defineConfig` (rebased + signoff).
+- d2 → `feat(cli): add --output flag to contract emit command` (rebased + signoff).
+- d3 (test) → `test(integration): end-to-end test for output path override` (rebased + signoff).
+- d3 (docs) → `docs: document output path override option and --output CLI flag` (rebased + signoff).
+- PR-response → `refactor(emit): rename output→outputPath with directory semantics`.
+- PR-response → `docs(emit): remove architecture subsection, update CLI Style Guide`.
+
+The d1/d2/d3 commits remain in the history with their original (file-path-era) commit messages; the two PR-response commits are the diff that lands the final design. Reading the diff between origin/main and HEAD shows the end state directly without needing to reconcile against the original commit messages.
+
 ## Open items
 
-_Surfaced during slice execution; resolved before the slice closes._
-
-- Whether to extract `deriveOutputPath` into `@prisma-next/config` (dispatch 1 working position: yes if clean 1-file lift, else no).
-- The exact docs surface for the new option (dispatch 3 working position: slice author picks the closest existing home — CLI reference, subsystem doc, or both).
+_All resolved by the PR-review-response round. No remaining open items._
