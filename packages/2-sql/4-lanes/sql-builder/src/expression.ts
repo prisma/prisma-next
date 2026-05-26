@@ -61,7 +61,10 @@ type DeriveExtFunctions<OT extends QueryOperationTypesBase> = {
   [K in keyof OT]: OT[K]['impl'];
 };
 
-export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
+export type BuiltinFunctions<
+  CT extends Record<string, { readonly input: unknown }>,
+  RS extends RawSqlTag | undefined = undefined,
+> = {
   eq: <CodecId extends string>(
     a: CodecExpression<CodecId, boolean, CT> | null,
     b: CodecExpression<CodecId, boolean, CT> | null,
@@ -113,15 +116,14 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
       values: Array<CodecExpression<CodecId, boolean, CT>>,
     ): Expression<BooleanCodecType>;
   };
+
+  readonly rawSql: RS;
 };
 
 export type Functions<
   QC extends QueryContext,
   RS extends RawSqlTag | undefined = undefined,
-> = BuiltinFunctions<QC['codecTypes']> &
-  DeriveExtFunctions<QC['queryOperationTypes']> & {
-    readonly rawSql: RS;
-  };
+> = BuiltinFunctions<QC['codecTypes'], RS> & DeriveExtFunctions<QC['queryOperationTypes']>;
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
 

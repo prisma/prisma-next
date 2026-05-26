@@ -135,7 +135,7 @@ function numericAgg(
   });
 }
 
-function createBuiltinFunctions() {
+function createBuiltinFunctions(rawSqlTag: RawSqlTag | undefined) {
   return {
     eq: (a: ExprOrVal, b: ExprOrVal) => eq(a, b),
     ne: (a: ExprOrVal, b: ExprOrVal) => ne(a, b),
@@ -159,7 +159,8 @@ function createBuiltinFunctions() {
       expr: Expression<ScopeField>,
       valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
     ) => inOrNotIn(expr, valuesOrSubquery, 'notIn'),
-  } satisfies BuiltinFunctions<CodecTypes>;
+    rawSql: rawSqlTag,
+  } satisfies BuiltinFunctions<CodecTypes, RawSqlTag | undefined>;
 }
 
 function createAggregateOnlyFunctions() {
@@ -194,14 +195,13 @@ export function createFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
   rawSqlTag?: RawSqlTag,
 ): Functions<QC, RawSqlTag | undefined> {
-  const builtins = createBuiltinFunctions();
+  const builtins = createBuiltinFunctions(rawSqlTag);
 
   return new Proxy({} as Functions<QC, RawSqlTag | undefined>, {
     get(_target, prop: string) {
-      if (prop === 'rawSql') return rawSqlTag;
-
-      const builtin = (builtins as Record<string, unknown>)[prop];
-      if (builtin) return builtin;
+      if (Object.hasOwn(builtins, prop)) {
+        return (builtins as Record<string, unknown>)[prop];
+      }
 
       const op = operations[prop];
       if (op) return op.impl;
@@ -231,8 +231,6 @@ export function createAggregateFunctions<QC extends QueryContext>(
 
   return new Proxy({} as AggregateFunctions<QC, RawSqlTag | undefined>, {
     get(_target, prop: string) {
-      if (prop === 'rawSql') return rawSqlTag;
-
       const agg = (aggregates as Record<string, unknown>)[prop];
       if (agg) return agg;
 
