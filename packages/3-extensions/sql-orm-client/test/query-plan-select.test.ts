@@ -1,11 +1,14 @@
 import {
+  AggregateExpr,
   AndExpr,
+  type AnyExpression,
   type AnyParamRef,
   BinaryExpr,
   ColumnRef,
   DerivedTableSource,
   EqColJoinOn,
   JoinAst,
+  JsonObjectExpr,
   ListExpression,
   LiteralExpr,
   OperationExpr,
@@ -344,34 +347,247 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(childRows.limit).toBe(2);
   });
 
-  it('rejects scalar include selectors for single-query include strategies', () => {
-    const { collection } = createCollection();
-    const state = collection.include('posts', (posts) => posts.count()).state;
+  // Lateral lowers scalar reducers as `LEFT JOIN LATERAL (SELECT
+  // json_build_object('value', AGG(...)) AS <rel> FROM <child> WHERE
+  // <fk> = <parent>.<pk> [AND <user where>]) AS <alias> ON TRUE`.
+  // The JSON wrapper lets the value travel through the existing
+  // include-payload decoder (which JSON.parse'es the column and pulls
+  // `.value` out) — no codec wiring needed on the outer projection,
+  // and JSON-level numeric encoding matches the multi-query path's
+  // observable shape (count: number, sum/avg/min/max: number | null).
+  describe('lateral scalar reducers', () => {
+    function extractScalarLateralSelect(plan: { ast: unknown }, alias: string): SelectAst {
+      expectSelectAst(plan.ast);
+      const join = plan.ast.joins?.find(
+        (candidate) =>
+          candidate.source.kind === 'derived-table-source' && candidate.source.alias === alias,
+      );
+      expect(join?.kind).toBe('join');
+      expect(join?.lateral).toBe(true);
+      expectDerivedTableSource(join?.source);
+      return join.source.query;
+    }
 
-    expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
-      'single-query include strategy does not support scalar include selectors or combine()',
-    );
+    function expectAggregateProjection(
+      lateralSelect: SelectAst,
+      relationName: string,
+      expectedAggregate: AnyExpression,
+    ): void {
+      expect(lateralSelect.projection).toEqual([
+        ProjectionItem.of(
+          relationName,
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', expectedAggregate)]),
+        ),
+      ]);
+    }
+
+    it('emits LATERAL COUNT(*) for a bare count() include with no refinements', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) => posts.count()).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expectAggregateProjection(lateralSelect, 'posts', AggregateExpr.count());
+      expect(lateralSelect.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+      );
+      // Aggregate scope must not carry pagination clauses.
+      expect(lateralSelect.limit).toBeUndefined();
+      expect(lateralSelect.offset).toBeUndefined();
+      expect(lateralSelect.orderBy).toBeUndefined();
+
+      // Outer projection references the lateral alias's relation column.
+      expectSelectAst(plan.ast);
+      const outerPostsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
+      expect(outerPostsProjection?.expr).toEqual(ColumnRef.of('posts_lateral', 'posts'));
+    });
+
+    it('emits LATERAL COUNT(*) over the where-filtered relation', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.where((post) => post.views.gte(100)).count(),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expectAggregateProjection(lateralSelect, 'posts', AggregateExpr.count());
+      expect(lateralSelect.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+          bindWhereExpr(
+            baseContract,
+            BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+          ),
+        ]),
+      );
+    });
+
+    // TML-2498 fix, baked in by construction: a `take(N)` / `skip(N)` on
+    // a scalar refine is meaningless for an aggregate. The current
+    // multi-query path silently mis-counts in this shape (the LIMIT
+    // leaks into the row-fetch that feeds JS-side counting). The lateral
+    // emission MUST omit LIMIT/OFFSET from the aggregate scope.
+    it('TML-2498: LIMIT and OFFSET from take()/skip() do not enter COUNT scope', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts
+          .where((post) => post.views.gte(100))
+          .skip(5)
+          .take(10)
+          .count(),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expect(lateralSelect.limit).toBeUndefined();
+      expect(lateralSelect.offset).toBeUndefined();
+      // The where survives — the unpaginated-but-filtered scope is
+      // exactly the root-level `aggregate()` semantics this slice aligns
+      // include-scalar with.
+      expect(lateralSelect.where).toEqual(
+        AndExpr.of([
+          BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
+          bindWhereExpr(
+            baseContract,
+            BinaryExpr.gte(ColumnRef.of('posts', 'views'), LiteralExpr.of(100)),
+          ),
+        ]),
+      );
+    });
+
+    it('emits LATERAL SUM(col) for sum()', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) => posts.sum('views')).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expectAggregateProjection(
+        lateralSelect,
+        'posts',
+        AggregateExpr.sum(ColumnRef.of('posts', 'views')),
+      );
+    });
+
+    it('emits LATERAL AVG(col) for avg()', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) => posts.avg('views')).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expectAggregateProjection(
+        lateralSelect,
+        'posts',
+        AggregateExpr.avg(ColumnRef.of('posts', 'views')),
+      );
+    });
+
+    it('emits LATERAL MIN(col) for min()', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) => posts.min('views')).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expectAggregateProjection(
+        lateralSelect,
+        'posts',
+        AggregateExpr.min(ColumnRef.of('posts', 'views')),
+      );
+    });
+
+    it('emits LATERAL MAX(col) for max()', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) => posts.max('views')).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      expectAggregateProjection(
+        lateralSelect,
+        'posts',
+        AggregateExpr.max(ColumnRef.of('posts', 'views')),
+      );
+    });
+
+    // `orderBy` on a scalar refine is meaningless for an aggregate.
+    // Silently drop it at SQL level — matches existing behaviour for
+    // other irrelevant clauses (e.g. ignoring select() in scalar context).
+    it('silently drops orderBy() applied to a scalar refine', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.orderBy((post) => post.id.asc()).count(),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+      expect(lateralSelect.orderBy).toBeUndefined();
+    });
+
+    // Recursive carve-out: a `count()` nested inside a row include must
+    // produce its own LATERAL inside the parent row's SELECT, and the
+    // parent's json_object payload should reference that nested lateral's
+    // column verbatim — JSON-on-JSON nesting Just Works because PG's
+    // json_build_object embeds json values directly.
+    it('emits a nested LATERAL for a count() inside a row include', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts.include('comments', (comments) => comments.count()),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      expectSelectAst(plan.ast);
+
+      // Top-level posts lateral.
+      const postsLateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+      // Posts' inner SELECT (rows feeding the json_agg) carries the
+      // nested comments lateral.
+      expectDerivedTableSource(postsLateralSelect.from);
+      const postsRows = postsLateralSelect.from.query;
+      const commentsJoin = postsRows.joins?.find(
+        (candidate) =>
+          candidate.source.kind === 'derived-table-source' &&
+          candidate.source.alias === 'comments_lateral',
+      );
+      expect(commentsJoin?.lateral).toBe(true);
+      expectDerivedTableSource(commentsJoin?.source);
+      expect(commentsJoin.source.query.projection).toEqual([
+        ProjectionItem.of(
+          'comments',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+        ),
+      ]);
+    });
   });
 
-  // Planner invariant: scalar / combine descriptors must be rejected at
-  // every depth, not just the top level. The dispatch path already gates
-  // these via its own `hasScalarOrCombineIncludeDescriptors` recursively,
-  // but the planner is exported and called directly by tests and rich-plan
-  // callers. Without recursive rejection here, a nested `count()` inside a
-  // row include would silently produce a malformed lateral / correlated
-  // plan instead of failing fast at the boundary.
-  it('rejects scalar include selectors nested inside row includes', () => {
+  it('still rejects combine() include descriptors under the lateral strategy', () => {
     const { collection } = createCollection();
     const state = collection.include('posts', (posts) =>
-      posts.include('comments', (comments) => comments.count()),
+      posts.combine({
+        rows: posts.orderBy((p) => p.id.asc()),
+        total: posts.count(),
+      }),
     ).state;
 
     expect(() => compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral')).toThrow(
-      'single-query include strategy does not support scalar include selectors or combine()',
+      'single-query include strategy does not support combine() include descriptors',
     );
   });
 
-  it('rejects combine() include descriptors nested inside row includes', () => {
+  it('still rejects scalar include selectors under the correlated strategy', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) => posts.count()).state;
+
+    expect(() =>
+      compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
+    ).toThrow('correlated include strategy does not support scalar include selectors');
+  });
+
+  it('still rejects combine() nested inside row includes under the correlated strategy', () => {
     const { collection } = createCollection();
     const state = collection.include('posts', (posts) =>
       posts.include('comments', (comments) =>
@@ -384,9 +600,7 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     expect(() =>
       compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated'),
-    ).toThrow(
-      'single-query include strategy does not support scalar include selectors or combine()',
-    );
+    ).toThrow('single-query include strategy does not support combine() include descriptors');
   });
 });
 
