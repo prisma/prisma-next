@@ -200,6 +200,8 @@ function resolveInterpolation(
   ) {
     return ParamRef.of(value, { codec: { codecId: adapter.inferCodec(value) } });
   }
+
+  value satisfies never;
   throw runtimeError(
     'RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION',
     'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',

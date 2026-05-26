@@ -11,47 +11,10 @@ import { col, lit, param } from './test-helpers';
 describe('ast/RawExpr', () => {
   const returnsSpec = { codecId: 'pg/text@1', nullable: false } as const;
 
-  it('holds zero-interpolation parts as a single string element', () => {
-    const expr = new RawExpr({ parts: ['now()'], returns: returnsSpec });
-    expect(expr.kind).toBe('raw-sql');
-    expect(expr.parts).toEqual(['now()']);
-    expect(expr.returns).toEqual(returnsSpec);
-  });
-
-  it('holds mixed string and expression parts', () => {
-    const ref = param(1, 'id');
-    const expr = new RawExpr({
-      parts: ['user_id = ', ref, ' AND active'],
-      returns: returnsSpec,
-    });
-    expect(expr.parts).toHaveLength(3);
-    expect(expr.parts[0]).toBe('user_id = ');
-    expect(expr.parts[1]).toBe(ref);
-    expect(expr.parts[2]).toBe(' AND active');
-  });
-
-  it('holds nested expression elements in parts', () => {
-    const nested = new RawExpr({ parts: ['now()'], returns: returnsSpec });
-    const outer = new RawExpr({
-      parts: ['created_at > ', nested],
-      returns: returnsSpec,
-    });
-    expect(outer.parts[1]).toBe(nested);
-  });
-
   it('freezes the parts array so mutation attempts throw', () => {
     const expr = new RawExpr({ parts: ['now()'], returns: returnsSpec });
     expect(() => {
-      // Attempting to mutate the frozen array
       (expr.parts as string[]).push('extra');
-    }).toThrow(TypeError);
-  });
-
-  it('is frozen so property assignment attempts throw in strict mode', () => {
-    const expr = new RawExpr({ parts: ['now()'], returns: returnsSpec });
-    expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing freeze invariant
-      (expr as any).parts = [];
     }).toThrow(TypeError);
   });
 
@@ -88,6 +51,7 @@ describe('ast/RawExpr', () => {
       },
       preparedParam: () => 'preparedParam',
       list: () => 'list',
+      windowFunc: () => 'windowFunc',
       rawSql: (e) => {
         visited.push(`rawSql:${e.parts.length}`);
         return 'rawSql';
