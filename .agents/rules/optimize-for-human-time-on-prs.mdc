@@ -1,3 +1,8 @@
+---
+description: Don't open one-line / chore PRs on their own; batch ancillary work into in-flight PRs
+alwaysApply: true
+---
+
 # Optimize for human time when opening PRs
 
 The golden rule: **PRs have enormous human-time overhead.** Every PR costs the reviewer context-switch time, the merge-coordinator time, CI/wait-time on the operator's queue, and Linear/notification noise. A one-line PR is not "small" — its review burden has the same fixed overhead as a large PR.
