@@ -55,8 +55,10 @@ function countCastsInDir(scanDir) {
   let parsed;
   try {
     parsed = JSON.parse(raw);
-  } catch {
-    return { count: 0, sites: [] };
+  } catch (e) {
+    throw new Error(
+      `biome JSON parse failed: ${e.message}\nraw output (first 500 chars): ${raw.slice(0, 500)}`,
+    );
   }
 
   const diags = filterNoBarecastDiags(parsed.diagnostics ?? []);
@@ -125,4 +127,4 @@ function main() {
   }
 }
 
-main();
+if (process.argv[1] === import.meta.filename) main();

@@ -80,6 +80,5 @@
       "minimatch@9.0.5": "9.0.7",
       "rollup": "4.59.0"
     }
-  },
-  "//lint-staged": "config lives in lint-staged.config.mjs so we can filter out biome-plugins/fixtures/** (intentional rule-violation fixtures for the no-bare-cast plugin)"
+  }
 }
