@@ -494,7 +494,10 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
         ...ifDefined('expireAfterSeconds', data.expireAfterSeconds),
         ...ifDefined('partialFilterExpression', data.partialFilterExpression),
         ...ifDefined('name', data.name),
-        ...ifDefined('wildcardProjection', data.wildcardProjection as Record<string, 0 | 1> | undefined),
+        ...ifDefined(
+          'wildcardProjection',
+          data.wildcardProjection as Record<string, 0 | 1> | undefined,
+        ),
         ...ifDefined('collation', data.collation),
         ...ifDefined('weights', data.weights as Record<string, number> | undefined),
         ...ifDefined('default_language', data.default_language),
