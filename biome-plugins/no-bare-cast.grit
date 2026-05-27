@@ -1,13 +1,25 @@
-file($name, $body) where {
-  // Exclude test files — mirrors biome's existing overrides § includes patterns.
-  // Biome's GritQL regex matching is anchored full-match, so patterns require a .* prefix.
-  not $name <: r".*\.(?:test|test-d)\.ts",
-  not $name <: r".*/test/.*\.ts",
-  $body <: contains `$x as $t` where {
-    not $t <: r"^const$",
-    register_diagnostic(
-      span = $x,
-      message = "no-bare-cast: bare `as` cast — replace with blindCast<T, \"reason\">(...) or castAs<T>(value), or rewrite the code to eliminate the cast"
-    )
-  }
+// Recognise every `as` token except `as const`, and skip test files.
+//
+// The pattern is at the top level (not wrapped in `file(...)`) so it iterates
+// over every match in the file — wrapping in `file($name, $body) where { $body
+// <: contains <pattern> }` only fires on the first occurrence, which would
+// undercount casts for the D3 ratchet.
+//
+// `$filename` is biome's built-in for the current file path. Biome's GritQL
+// regex matching is anchored full-match, so patterns need a `.*` prefix.
+// The three exclusion regexes mirror biome's existing test-file `overrides §
+// includes` patterns (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`).
+//
+// The message avoids escape sequences (e.g. `\"`) because biome's GritQL
+// engine appears to mis-parse subsequent characters in the string when an
+// escape sequence is present (`r` → CR, `t` → TAB, `n` → LF, …).
+
+`$x as $t` where {
+  not $t <: r"^const$",
+  not $filename <: r".*\.(?:test|test-d)\.ts",
+  not $filename <: r".*/test/.*\.ts",
+  register_diagnostic(
+    span = $x,
+    message = "no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast"
+  )
 }
