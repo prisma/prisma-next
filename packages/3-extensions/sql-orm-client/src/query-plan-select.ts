@@ -627,16 +627,26 @@ function buildDistinctNonLeafChildRowsSelect(options: {
  * `sum` / `avg` / `min` / `max`).
  *
  * Emits one row containing `json_build_object('value', AGG(...))`
- * over the **where-filtered, unpaginated** child relation correlated
- * to the parent via the FK. The JSON wrap lets the value flow through
- * the existing include-payload decoder unchanged (it JSON.parses the
- * column and the scalar branch pulls `.value` out).
+ * over the child relation correlated to the parent via the FK. The
+ * JSON wrap lets the value flow through the existing include-payload
+ * decoder unchanged (it JSON.parses the column and the scalar branch
+ * pulls `.value` out).
  *
- * `take` / `skip` are intentionally NOT applied here — they're
- * meaningless for an aggregate over a relation and would silently
- * miscount (TML-2498). `orderBy` is similarly meaningless for a
- * scalar aggregate and is dropped at the SQL level. Distinct / cursor
- * pagination likewise have no place inside an aggregate scope.
+ * The refine state's pipeline composes through to the aggregate's
+ * input set: `where` / `orderBy` / `take` / `skip` / `distinct` shape
+ * the rows the aggregate sees, matching the natural compositional
+ * semantic of
+ *
+ *   `db.User.include('posts', p => p.where(W).take(N).count())  // ≤ N`
+ *
+ * When `take` / `skip` / `distinct` is set, the aggregate's input
+ * cannot just be the bare correlated table — a top-level `LIMIT` on
+ * the aggregating SELECT only trims the (already one-row) output, not
+ * the rows being aggregated. We therefore wrap the source in a
+ * derived SELECT that materialises the shaped row set, then
+ * aggregate over that. `orderBy` alone (no `take` / `skip` /
+ * `distinct`) is dropped at the SQL level since reordering does not
+ * change which rows are aggregated.
  */
 function buildIncludeChildScalarSelect(
   contract: Contract<SqlStorage>,
@@ -647,28 +657,96 @@ function buildIncludeChildScalarSelect(
   const childTableAlias =
     include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
   const childTableRef = childTableAlias ?? include.relatedTableName;
+  const state = scalar.state;
 
   const joinExpr = BinaryExpr.eq(
     ColumnRef.of(childTableRef, include.targetColumn),
     ColumnRef.of(parentTableName, include.localColumn),
   );
-  // Reuse the row-include where machinery: handles user filters,
-  // self-relation column remapping, cursor binding. Pagination clauses
-  // (`limit` / `offset`) on the scalar's CollectionState are read by
-  // `buildStateWhere` only for cursor bounds; the SELECT we assemble
-  // below never reads `scalar.state.limit` / `scalar.state.offset`
-  // directly, so the TML-2498 invariant holds by construction.
-  const childWhere = buildStateWhere(contract, childTableRef, scalar.state, {
+  const childWhere = buildStateWhere(contract, childTableRef, state, {
     filterTableName: include.relatedTableName,
   });
   const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
-  const aggregateExpr = buildIncludeAggregateExpr(scalar, childTableRef);
-  const jsonObjectExpr = JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', aggregateExpr)]);
+  // Self-relations rename the inner table source via `childTableAlias`;
+  // remap any ColumnRef the user-supplied `orderBy` carries against
+  // the original table name to the alias — mirrors the row-include
+  // path.
+  const remappedOrderBy =
+    childTableAlias && state.orderBy
+      ? state.orderBy.map((item) =>
+          item.rewrite(createTableRefRemapper(include.relatedTableName, childTableRef)),
+        )
+      : state.orderBy;
 
-  return SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
-    .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
+  const hasPagination = state.limit !== undefined || state.offset !== undefined;
+  const hasDistinct =
+    (state.distinct !== undefined && state.distinct.length > 0) ||
+    (state.distinctOn !== undefined && state.distinctOn.length > 0);
+  const needsInnerScoping = hasPagination || hasDistinct;
+
+  if (!needsInnerScoping) {
+    const aggregateExpr = buildIncludeAggregateExpr(scalar, childTableRef);
+    const jsonObjectExpr = JsonObjectExpr.fromEntries([
+      JsonObjectExpr.entry('value', aggregateExpr),
+    ]);
+    return SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+      .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
+      .withWhere(whereExpr);
+  }
+
+  // Inner SELECT: materialise the shaped row set. Project only what
+  // the outer aggregate needs (the aggregate's column, or a constant
+  // for COUNT). ORDER BY columns are accessible via the FROM scope
+  // and don't need to be in the projection. Distinct columns are
+  // accessible to ROW_NUMBER OVER PARTITION BY the same way.
+  const innerAlias = `${include.relationName}__scalar`;
+  const innerProjection: ProjectionItem[] =
+    scalar.column !== undefined
+      ? [ProjectionItem.of(scalar.column, ColumnRef.of(childTableRef, scalar.column))]
+      : [ProjectionItem.of('__row', LiteralExpr.of(1))];
+
+  let inner = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+    .withProjection(innerProjection)
     .withWhere(whereExpr);
+
+  if (state.distinctOn !== undefined && state.distinctOn.length > 0) {
+    inner = inner.withDistinctOn(
+      state.distinctOn.map((column) => ColumnRef.of(childTableRef, column)),
+    );
+    if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
+      inner = inner.withOrderBy(remappedOrderBy);
+    }
+  } else if (state.distinct !== undefined && state.distinct.length > 0) {
+    // Prisma-style `.distinct(cols)`: ROW_NUMBER dedup, mirroring
+    // `buildIncludeChildRowsSelect`'s distinct lowering.
+    const rankedAlias = `${include.relationName}__scalar_distinct`;
+    inner = wrapWithRowNumberDedup({
+      base: inner,
+      distinctColumnRefs: state.distinct.map((column) => ColumnRef.of(childTableRef, column)),
+      rankingOrderBy: remappedOrderBy ?? [],
+      rankedAlias,
+    });
+  } else if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
+    inner = inner.withOrderBy(remappedOrderBy);
+  }
+
+  if (state.limit !== undefined) {
+    inner = inner.withLimit(state.limit);
+  }
+  if (state.offset !== undefined) {
+    inner = inner.withOffset(state.offset);
+  }
+
+  // Outer aggregating SELECT over the shaped inner row set.
+  const outerAggregateExpr = buildIncludeAggregateExpr(scalar, innerAlias);
+  const outerJsonObjectExpr = JsonObjectExpr.fromEntries([
+    JsonObjectExpr.entry('value', outerAggregateExpr),
+  ]);
+
+  return SelectAst.from(DerivedTableSource.as(innerAlias, inner)).withProjection([
+    ProjectionItem.of(include.relationName, outerJsonObjectExpr),
+  ]);
 }
 
 function buildIncludeAggregateExpr(

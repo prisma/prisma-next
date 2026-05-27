@@ -493,10 +493,10 @@ describe('integration/nested-includes/strategy', () => {
       timeouts.spinUpPpgDev,
     );
 
-    // TML-2498 mirror under correlated: `take(N)` on a count() refine
-    // must NOT enter the aggregate scope.
+    // Correlated mirror: `take(N)` on a count() refine composes
+    // through to the aggregate scope, same as the lateral path.
     it(
-      'TML-2498: count().take() returns the unpaginated total under correlated capabilities',
+      'pagination composes through to scalar aggregate scope under correlated',
       async () => {
         await withCollectionRuntime(async (runtime) => {
           await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
@@ -518,7 +518,8 @@ describe('integration/nested-includes/strategy', () => {
             )
             .all();
 
-          // Three posts match views >= 200; take(2) is irrelevant.
+          // Three posts match views >= 200; take(2) caps the row set
+          // the aggregate sees — count = 2.
           expect(rows).toEqual([
             {
               id: 1,
@@ -526,7 +527,7 @@ describe('integration/nested-includes/strategy', () => {
               email: 'alice@example.com',
               invitedById: null,
               address: null,
-              posts: 3,
+              posts: 2,
             },
           ]);
           expect(runtime.executions).toHaveLength(1);

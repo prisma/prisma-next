@@ -424,12 +424,13 @@ describe('compileSelectWithIncludeStrategy', () => {
       );
     });
 
-    // TML-2498 fix, baked in by construction: a `take(N)` / `skip(N)` on
-    // a scalar refine is meaningless for an aggregate. The current
-    // multi-query path silently mis-counts in this shape (the LIMIT
-    // leaks into the row-fetch that feeds JS-side counting). The lateral
-    // emission MUST omit LIMIT/OFFSET from the aggregate scope.
-    it('TML-2498: LIMIT and OFFSET from take()/skip() do not enter COUNT scope', () => {
+    // Pagination on a scalar refine composes through to the aggregate
+    // scope: `take(N)` / `skip(M)` shape the row set the aggregate
+    // sees, matching the natural compositional semantic of the chain.
+    // The lateral SELECT wraps the source in a derived inner SELECT
+    // that materialises the where-filtered, paginated rows; the outer
+    // aggregate then runs over that.
+    it('pagination composes through to the LATERAL COUNT scope', () => {
       const { collection } = createCollection();
       const state = collection.include('posts', (posts) =>
         posts
@@ -442,12 +443,22 @@ describe('compileSelectWithIncludeStrategy', () => {
       const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
       const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
 
+      // Outer aggregating SELECT: COUNT(*) over the derived inner table,
+      // no top-level LIMIT/OFFSET (those would only trim the one-row
+      // aggregate output, not the rows being aggregated).
+      expectAggregateProjection(lateralSelect, 'posts', AggregateExpr.count());
       expect(lateralSelect.limit).toBeUndefined();
       expect(lateralSelect.offset).toBeUndefined();
-      // The where survives — the unpaginated-but-filtered scope is
-      // exactly the root-level `aggregate()` semantics this slice aligns
-      // include-scalar with.
-      expect(lateralSelect.where).toEqual(
+      expect(lateralSelect.where).toBeUndefined();
+      expectDerivedTableSource(lateralSelect.from);
+      expect(lateralSelect.from.alias).toBe('posts__scalar');
+
+      // Inner SELECT carries the where + pagination. The join condition
+      // and the user's filter both live in the inner where.
+      const innerSelect = lateralSelect.from.query;
+      expect(innerSelect.limit).toBe(10);
+      expect(innerSelect.offset).toBe(5);
+      expect(innerSelect.where).toEqual(
         AndExpr.of([
           BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
           bindWhereExpr(
@@ -825,9 +836,9 @@ describe('compileSelectWithIncludeStrategy', () => {
       expect(subquery.orderBy).toBeUndefined();
     });
 
-    // TML-2498 mirror under correlated: pagination on a scalar refine
-    // must not enter the aggregate scope.
-    it('TML-2498: LIMIT and OFFSET do not enter the correlated COUNT scope', () => {
+    // Correlated mirror: pagination on a scalar refine composes
+    // through to the aggregate scope, same as the lateral path.
+    it('pagination composes through to the correlated COUNT scope', () => {
       const { collection } = createCollection();
       const state = collection.include('posts', (posts) =>
         posts
@@ -840,9 +851,17 @@ describe('compileSelectWithIncludeStrategy', () => {
       const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
       const subquery = extractScalarCorrelatedSubquery(plan, 'posts');
 
+      expectAggregateProjection(subquery, 'posts', AggregateExpr.count());
       expect(subquery.limit).toBeUndefined();
       expect(subquery.offset).toBeUndefined();
-      expect(subquery.where).toEqual(
+      expect(subquery.where).toBeUndefined();
+      expectDerivedTableSource(subquery.from);
+      expect(subquery.from.alias).toBe('posts__scalar');
+
+      const innerSelect = subquery.from.query;
+      expect(innerSelect.limit).toBe(10);
+      expect(innerSelect.offset).toBe(5);
+      expect(innerSelect.where).toEqual(
         AndExpr.of([
           BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
           bindWhereExpr(

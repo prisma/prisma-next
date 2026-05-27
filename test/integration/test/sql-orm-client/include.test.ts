@@ -190,16 +190,14 @@ describe('integration/include', () => {
     timeouts.spinUpPpgDev,
   );
 
-  // TML-2498 regression guard: `take(N)` / `skip(N)` on a scalar
-  // refine must not affect the aggregate scope. The pre-fix
-  // multi-query path would silently mis-count by letting LIMIT/OFFSET
-  // leak into the row-fetch that fed the JS-side reducer. The lateral
-  // builder emits the aggregate over the where-filtered, unpaginated
-  // relation by construction, so a paginated count() still returns
-  // the total matching `where` — matching root-level `aggregate()`
-  // semantics.
+  // Pagination composes through to the scalar aggregate scope: a
+  // `take(N)` / `skip(M)` on a count() refine shapes the row set the
+  // aggregate sees, so `where(W).take(N).count()` returns at most N.
+  // The lateral builder wraps the source in a derived SELECT that
+  // materialises the paginated rows and aggregates over that, in a
+  // single SQL execution.
   it(
-    'TML-2498: include().where().take().count() returns the unpaginated total',
+    'pagination composes through to scalar aggregate scope under lateral',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -223,9 +221,9 @@ describe('integration/include', () => {
           )
           .all();
 
-        // Four posts match `views >= 200`; `take(2)` is irrelevant for
-        // a scalar aggregate — the count is over the matching set, not
-        // a page of it.
+        // Four posts match `views >= 200`; `take(2)` caps the row set
+        // the aggregate sees — the count is over the paginated page,
+        // not the unpaginated total.
         expect(rows).toEqual([
           {
             id: 1,
@@ -233,7 +231,7 @@ describe('integration/include', () => {
             email: 'alice@example.com',
             invitedById: null,
             address: null,
-            posts: 4,
+            posts: 2,
           },
         ]);
         expect(runtime.executions).toHaveLength(1);
