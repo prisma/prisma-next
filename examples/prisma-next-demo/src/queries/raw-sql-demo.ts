@@ -23,15 +23,15 @@ import { db } from '../prisma/db';
 export async function rawSqlDemo(limit = 10) {
   const plan = db.sql.user
     .select('id', 'email')
-    .select('upper_email', (f, fns) => fns.raw`UPPER(${f.email})`.returns('pg/text@1'))
-    .select('kind_label', (f, fns) =>
+    .select('upperEmail', (f, fns) => fns.raw`UPPER(${f.email})`.returns('pg/text@1'))
+    .select('kindLabel', (f, fns) =>
       fns.raw`CASE WHEN ${fns.eq(f.kind, 'admin')} THEN 'admin' ELSE 'regular user' END`.returns(
         'pg/text@1',
       ),
     )
-    .where((f, fns) => fns.raw`LENGTH(${f.email}) > 10`.returns('pg/bool@1'))
+    .where((f, fns) => fns.gt(fns.raw`LENGTH(${f.email})`.returns('pg/int4@1'), 10))
     .orderBy('email')
     .limit(limit)
     .build();
-  return db.runtime().execute(plan);
+  return await db.runtime().execute(plan);
 }
