@@ -1,6 +1,6 @@
 export type { Contract, ContractExecutionSection } from '../contract-types';
 export type { CrossReference } from '../cross-reference';
-export { CrossReferenceSchema } from '../cross-reference';
+export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,

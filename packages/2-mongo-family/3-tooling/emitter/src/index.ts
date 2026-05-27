@@ -162,10 +162,10 @@ export const mongoEmission = {
       }
 
       if (model.base) {
-        const baseModel = models[model.base];
+        const baseModel = models[model.base.model];
         if (!baseModel) {
           throw new Error(
-            `Model "${modelName}" declares base "${model.base}" which does not exist in models`,
+            `Model "${modelName}" declares base "${model.base.model}" which does not exist in models`,
           );
         }
         const variantCollection = collection;
@@ -190,7 +190,8 @@ export const mongoEmission = {
 
       for (const [relName, rel] of Object.entries(model.relations)) {
         const relObj = rel as Record<string, unknown>;
-        const targetModelName = relObj['to'] as string | undefined;
+        const targetRef = relObj['to'] as { readonly model?: string } | undefined;
+        const targetModelName = targetRef?.model;
         if (targetModelName) {
           const targetModel = models[targetModelName];
           if (targetModel?.owner === modelName && !storageRelations?.[relName]) {

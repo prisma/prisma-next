@@ -9,6 +9,7 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
@@ -22,6 +23,7 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
@@ -1303,6 +1305,7 @@ function resolvePolymorphism(
   baseDeclarations: Map<string, BaseDeclaration>,
   modelNames: Set<string>,
   modelMappings: ReadonlyMap<string, ModelNameMapping>,
+  modelNamespaceIds: ReadonlyMap<string, string>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): Record<string, ContractModel> {
@@ -1406,7 +1409,10 @@ function resolvePolymorphism(
       ...patched,
       [variantName]: {
         ...variantModel,
-        base: baseDecl.baseName,
+        base: crossRef(
+          baseDecl.baseName,
+          modelNamespaceIds.get(baseDecl.baseName) ?? UNBOUND_NAMESPACE_ID,
+        ),
         ...(resolvedTable ? { storage: { ...variantModel.storage, table: resolvedTable } } : {}),
       },
     };
@@ -1680,6 +1686,7 @@ export function interpretPslDocumentToSqlContract(
     baseDeclarations,
     modelNames,
     modelMappings,
+    modelNamespaceIds,
     sourceId,
     polyDiagnostics,
   );
@@ -1693,7 +1700,9 @@ export function interpretPslDocumentToSqlContract(
 
   const variantModelNames = new Set(baseDeclarations.keys());
   const filteredRoots = Object.fromEntries(
-    Object.entries(contract.roots).filter(([, modelName]) => !variantModelNames.has(modelName)),
+    Object.entries(contract.roots).filter(
+      ([, crossReference]) => !variantModelNames.has(crossReference.model),
+    ),
   );
 
   const patchedContract: Contract = {

@@ -3,6 +3,7 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
+  RootModelName,
 } from '@prisma-next/mongo-contract';
 import type { AnyMongoCommand, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { asMongoContract, type CollectionHandle, createCollectionHandle } from './state-classes';
@@ -23,7 +24,7 @@ export interface QueryRoot<
 > {
   from<K extends keyof TContract['roots'] & string>(
     rootName: K,
-  ): CollectionHandle<TContract, TContract['roots'][K] & string & keyof TContract['models']>;
+  ): CollectionHandle<TContract, RootModelName<TContract, K>>;
   rawCommand<C extends AnyMongoCommand>(command: C): MongoQueryPlan<unknown, C>;
 }
 

@@ -1,3 +1,5 @@
+import type { CrossReference } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -60,7 +62,7 @@ export type DecodeFixtureContract = MongoContract & {
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: CrossReference & { readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: ['userId'];
@@ -72,8 +74,8 @@ export type DecodeFixtureContract = MongoContract & {
     };
   };
   readonly roots: {
-    readonly users: 'User';
-    readonly posts: 'Post';
+    readonly users: CrossReference & { readonly model: 'User' };
+    readonly posts: CrossReference & { readonly model: 'Post' };
   };
 };
 
@@ -95,7 +97,7 @@ export type TDecodeFixtureContract = MongoContractWithTypeMaps<
 
 export const decodeFixtureContractJson = {
   targetFamily: 'mongo' as const,
-  roots: { users: 'User', posts: 'Post' },
+  roots: { users: crossRef('User'), posts: crossRef('Post') },
   storage: {
     namespaces: {
       __unbound__: {
@@ -134,7 +136,7 @@ export const decodeFixtureContractJson = {
       storage: { collection: 'posts' },
       relations: {
         user: {
-          to: 'User',
+          to: crossRef('User'),
           cardinality: 'N:1',
           on: { localFields: ['userId'], targetFields: ['_id'] },
         },

@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -38,12 +39,12 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.roots).toEqual({ user: 'User', post: 'Post' });
+    expect(result.value.roots).toEqual({ user: crossRef('User'), post: crossRef('Post') });
 
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['User']?.relations).toMatchObject({
       posts: {
-        to: 'Post',
+        to: crossRef('Post'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -53,7 +54,7 @@ model Post {
     });
     expect(models['Post']?.relations).toMatchObject({
       user: {
-        to: 'User',
+        to: crossRef('User'),
         cardinality: 'N:1',
         on: {
           localFields: ['userId'],
@@ -90,7 +91,7 @@ model Post {
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['User']?.relations).toMatchObject({
       authored: {
-        to: 'Post',
+        to: crossRef('Post'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -98,7 +99,7 @@ model Post {
         },
       },
       reviewed: {
-        to: 'Post',
+        to: crossRef('Post'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -140,21 +141,21 @@ model Member {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({
-      user: 'User',
-      post: 'Post',
-      team: 'Team',
-      member: 'Member',
+      user: crossRef('User'),
+      post: crossRef('Post'),
+      team: crossRef('Team'),
+      member: crossRef('Member'),
     });
 
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['User']?.relations).toMatchObject({
-      posts: { to: 'Post', cardinality: '1:N' },
+      posts: { to: crossRef('Post'), cardinality: '1:N' },
     });
     expect(models['Post']?.relations).toMatchObject({
-      user: { to: 'User', cardinality: 'N:1' },
+      user: { to: crossRef('User'), cardinality: 'N:1' },
     });
     expect(models['Member']?.relations).toMatchObject({
-      team: { to: 'Team', cardinality: 'N:1' },
+      team: { to: crossRef('Team'), cardinality: 'N:1' },
     });
   });
 
@@ -178,7 +179,7 @@ model Member {
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['Employee']?.relations).toMatchObject({
       manager: {
-        to: 'Employee',
+        to: crossRef('Employee'),
         cardinality: 'N:1',
         on: {
           localFields: ['managerId'],
@@ -186,7 +187,7 @@ model Member {
         },
       },
       reports: {
-        to: 'Employee',
+        to: crossRef('Employee'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -250,7 +251,10 @@ model Member {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
+    expect(result.value.roots).toEqual({
+      org_team: crossRef('Team'),
+      team_member: crossRef('Member'),
+    });
 
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     const memberTable = unboundTables(storage)['team_member'];

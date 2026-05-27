@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AnyExpression,
@@ -97,7 +98,7 @@ describe('mutation-executor', () => {
               },
             },
             badCols: {
-              to: 'Post',
+              to: crossRef('Post'),
               cardinality: '1:N',
               on: {
                 parentCols: 'id',
@@ -105,7 +106,7 @@ describe('mutation-executor', () => {
               },
             },
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               cardinality: 'INVALID',
               on: {
                 localFields: ['id'],

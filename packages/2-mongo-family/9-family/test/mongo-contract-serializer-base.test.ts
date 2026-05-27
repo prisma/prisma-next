@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
@@ -7,7 +8,7 @@ import { MongoContractSerializerBase } from '../src/core/ir/mongo-contract-seria
 function makeValidContractJson() {
   return {
     targetFamily: 'mongo',
-    roots: { items: 'Item' },
+    roots: { items: crossRef('Item') },
     storage: {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: { items: {} } },

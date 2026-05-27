@@ -1,4 +1,4 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -99,11 +99,15 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             foreignKeys: [
               {
                 source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                   tableName: 'post',
                   columns: ['userId'],
                 },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                target: {
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                  tableName: 'user',
+                  columns: ['id'],
+                },
                 index: true,
                 constraint: true,
               },
@@ -147,11 +151,15 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             foreignKeys: [
               {
                 source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                   tableName: 'post',
                   columns: ['userId'],
                 },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                target: {
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                  tableName: 'user',
+                  columns: ['id'],
+                },
                 index: true,
                 constraint: true,
               },
@@ -314,11 +322,15 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             foreignKeys: [
               {
                 source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                   tableName: 'post',
                   columns: ['userId'],
                 },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                target: {
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                  tableName: 'user',
+                  columns: ['id'],
+                },
                 index: true,
                 constraint: true,
               },

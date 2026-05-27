@@ -113,7 +113,7 @@ type GeneratedLikeContractBase = Contract<
       };
       relations: {
         posts: {
-          to: 'Post';
+          to: { readonly namespace: '__unbound__'; readonly model: 'Post' };
           cardinality: '1:N';
           on: {
             localFields: readonly ['id'];

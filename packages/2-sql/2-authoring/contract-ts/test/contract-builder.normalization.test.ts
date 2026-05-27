@@ -122,8 +122,10 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.models.User).toHaveProperty('relations');
-    const userModel = contract.models.User as { relations?: Record<string, unknown> };
+    const userModel = (contract.models as Record<string, { relations?: Record<string, unknown> }>)[
+      'User'
+    ]!;
+    expect(userModel).toHaveProperty('relations');
     expect(userModel.relations).toEqual({});
     expect(typeof userModel.relations).toBe('object');
     expect(Array.isArray(userModel.relations)).toBe(false);
@@ -158,8 +160,12 @@ describe('contract builder normalization', () => {
     expect(unboundTables(contract.storage)['post']!.foreignKeys).toEqual([]);
 
     // Verify all models have normalized relations
-    const userModel = contract.models.User as { relations?: Record<string, unknown> };
-    const postModel = contract.models.Post as { relations?: Record<string, unknown> };
+    const userModel = (contract.models as Record<string, { relations?: Record<string, unknown> }>)[
+      'User'
+    ]!;
+    const postModel = (contract.models as Record<string, { relations?: Record<string, unknown> }>)[
+      'Post'
+    ]!;
     expect(userModel.relations).toEqual({});
     expect(postModel.relations).toEqual({});
 

@@ -132,6 +132,12 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         currentPath[1] === 'types' &&
         key === 'typeParams';
 
+      const isDomainUnboundTypeParams =
+        currentPath.length === 5 &&
+        currentPath[0] === 'domain' &&
+        currentPath[2] === 'types' &&
+        key === 'typeParams';
+
       const isFkBooleanField =
         currentPath.length === 7 &&
         currentPath[0] === 'storage' &&
@@ -161,7 +167,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isNamespaceTableForeignKeys &&
         !isFkBooleanField &&
         !isNullableField &&
-        !isStorageTypeTypeParams
+        !isStorageTypeTypeParams &&
+        !isDomainUnboundTypeParams
       ) {
         continue;
       }

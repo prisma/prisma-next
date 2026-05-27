@@ -1,12 +1,12 @@
+import { crossRef } from '@prisma-next/contract/types';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { RawMongoCommand } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { mongoRaw } from '../src/mongo-raw';
+import { hydrateOrmContractJson, type OrmTestContract } from './hydrate-contract-cross-refs';
 
-// JSON import loses literal types; typed Contract .d.ts is the source of truth
-const contract = ormContractJson as unknown as Contract;
+const contract = hydrateOrmContractJson(ormContractJson) as OrmTestContract;
 
 describe('mongoRaw', () => {
   const raw = mongoRaw({ contract });
@@ -23,10 +23,10 @@ describe('mongoRaw', () => {
     });
 
     it('throws when root maps to a missing model', () => {
-      const badContract = {
+      const badContract = hydrateOrmContractJson({
         ...ormContractJson,
-        roots: { ghost: 'NoSuchModel' },
-      } as unknown as MongoContract;
+        roots: { ghost: crossRef('NoSuchModel') },
+      }) as unknown as MongoContract;
       const badRaw = mongoRaw({ contract: badContract });
       expect(() => badRaw.collection('ghost')).toThrow(
         'Unknown model "NoSuchModel" for root "ghost"',

@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
-import { createMockRuntime, type TestContract } from './helpers';
+import { createMockRuntime, type RuntimeTestContract, type TestContract } from './helpers';
 
 type RowOf<TCollection> =
   TCollection extends Collection<
@@ -20,7 +20,7 @@ type Equal<A, B> =
 type Assert<T extends true> = T;
 
 const runtime = createMockRuntime();
-const context = {} as ExecutionContext<TestContract>;
+const context = {} as ExecutionContext<RuntimeTestContract>;
 
 const userCollection = new Collection({ runtime, context }, 'User');
 const postCollection = new Collection({ runtime, context }, 'Post');
@@ -64,7 +64,7 @@ type UsersWithPostCountRow = RowOf<typeof usersWithPostCount>;
 type UsersWithSelectedPostsRow = RowOf<typeof usersWithSelectedPosts>;
 
 export type IncludeCardinalityTypeAssertions = [
-  Assert<Equal<UsersWithPostsRow['posts'], Array<RowOf<Collection<TestContract, 'Post'>>>>>,
+  Assert<Equal<UsersWithPostsRow['posts'], Array<RowOf<Collection<RuntimeTestContract, 'Post'>>>>>,
   Assert<Equal<UsersWithPostCountRow['posts'], number>>,
   Assert<Equal<keyof UsersWithSelectedPostsRow['posts'][number], 'title'>>,
   // 1:1 non-FK side (parentCols = PK) → nullable

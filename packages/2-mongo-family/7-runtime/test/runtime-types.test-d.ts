@@ -1,3 +1,4 @@
+import type { CrossReference } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
@@ -30,7 +31,7 @@ type TestContract = MongoContract & {
       readonly storage: { readonly collection: 'orders' };
     };
   };
-  readonly roots: { readonly orders: 'Order' };
+  readonly roots: { readonly orders: CrossReference & { readonly model: 'Order' } };
 };
 
 type TestCodecTypes = {

@@ -10,7 +10,7 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import { freezeNode } from '@prisma-next/framework-components/ir';
+import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
 /**
@@ -485,4 +485,14 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
       },
     ],
   };
+}
+
+export function documentScopedTypes(contract: {
+  readonly domain?: Record<string, { readonly types?: Record<string, unknown> } | undefined>;
+  readonly storage?: unknown;
+}) {
+  const storageTypes = (
+    contract.storage as { readonly types?: Record<string, unknown> } | undefined
+  )?.types;
+  return contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] ?? storageTypes;
 }

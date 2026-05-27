@@ -8,7 +8,7 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
@@ -217,11 +217,15 @@ describe('SQLite planner + introspection round-trip', () => {
           foreignKeys: [
             {
               source: {
-                namespaceId: UNBOUND_NAMESPACE_ID,
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                 tableName: 'posts',
                 columns: ['author_id'],
               },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'authors', columns: ['id'] },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'authors',
+                columns: ['id'],
+              },
               onDelete: 'cascade',
               constraint: true,
               index: true,

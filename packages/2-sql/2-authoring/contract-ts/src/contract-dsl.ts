@@ -1208,8 +1208,12 @@ export type ContractInput<
       SqlStageSpec | undefined
     >
   > = Record<never, never>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined =
+    | Record<string, ExtensionPackRef<'sql', string>>
+    | undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined =
+    | Record<string, Record<string, boolean>>
+    | undefined,
 > = {
   readonly family: Family;
   readonly target: Target;

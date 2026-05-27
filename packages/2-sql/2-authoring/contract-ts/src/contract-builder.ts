@@ -47,32 +47,6 @@ type ModelLike = {
   buildSqlSpec(): SqlStageSpec | undefined;
 };
 
-type ContractDefinition<
-  Family extends FamilyPackRef<string>,
-  Target extends TargetPackRef<'sql', string>,
-  Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
-  Models extends Record<string, ModelLike>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
-  Naming extends ContractInput['naming'] | undefined,
-  StorageHash extends string | undefined,
-  ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
-  Namespaces extends readonly string[] | undefined = undefined,
-> = {
-  readonly family: Family;
-  readonly target: Target;
-  readonly extensionPacks?: ExtensionPacks;
-  readonly naming?: Naming;
-  readonly storageHash?: StorageHash;
-  readonly foreignKeyDefaults?: ForeignKeyDefaults;
-  readonly capabilities?: Capabilities;
-  readonly namespaces?: Namespaces;
-  readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
-  readonly types?: Types;
-  readonly models?: Models;
-  readonly codecLookup?: CodecLookup;
-};
-
 type ContractScaffold<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
@@ -92,6 +66,8 @@ type ContractScaffold<
   readonly capabilities?: Capabilities;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly types?: never;
+  readonly models?: never;
   readonly codecLookup?: CodecLookup;
 };
 
@@ -274,11 +250,7 @@ function validateExtensionPackRefs(
 
 function buildContractFromDsl<Definition extends ContractInput>(
   definition: Definition,
-): SqlContractResult<Definition>;
-
-function buildContractFromDsl(
-  definition: ContractInput,
-): ReturnType<typeof buildSqlContractFromDefinition> {
+): SqlContractResult<Definition> {
   validateTargetPackRef(definition.family, definition.target);
   validateExtensionPackRefs(definition.target, definition.extensionPacks);
   validateNamespaceDeclarations(definition.target, definition.namespaces);
@@ -291,52 +263,10 @@ function buildContractFromDsl(
   return buildSqlContractFromDefinition(
     buildContractDefinition(definition),
     definition.codecLookup,
-  );
+  ) as unknown as SqlContractResult<Definition>;
 }
 
-export function defineContract<
-  const Family extends FamilyPackRef<string>,
-  const Target extends TargetPackRef<'sql', string>,
-  const Types extends Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = Record<
-    never,
-    never
-  >,
-  const Models extends Record<string, ModelLike> = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
-  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-  const Naming extends ContractInput['naming'] | undefined = undefined,
-  const StorageHash extends string | undefined = undefined,
-  const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
-  const Namespaces extends readonly string[] | undefined = undefined,
->(
-  definition: ContractDefinition<
-    Family,
-    Target,
-    Types,
-    Models,
-    ExtensionPacks,
-    Capabilities,
-    Naming,
-    StorageHash,
-    ForeignKeyDefaults,
-    Namespaces
-  >,
-): SqlContractResult<
-  ContractDefinition<
-    Family,
-    Target,
-    Types,
-    Models,
-    ExtensionPacks,
-    Capabilities,
-    Naming,
-    StorageHash,
-    ForeignKeyDefaults,
-    Namespaces
-  >
->;
+export function defineContract(definition: ContractInput): SqlContractResult<ContractInput>;
 export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
@@ -365,20 +295,7 @@ export function defineContract<
     Namespaces
   >,
   factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks>,
-): SqlContractResult<
-  ContractDefinition<
-    Family,
-    Target,
-    Types,
-    Models,
-    ExtensionPacks,
-    Capabilities,
-    Naming,
-    StorageHash,
-    ForeignKeyDefaults,
-    Namespaces
-  >
->;
+): SqlContractResult<ContractInput>;
 export function defineContract(
   definition: ContractInput,
   factory?: ContractFactory<
@@ -388,7 +305,7 @@ export function defineContract(
     Record<string, ModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined
   >,
-): SqlContractResult<ContractInput> {
+) {
   if (!isContractInput(definition)) {
     throw new TypeError(
       'defineContract expects a contract definition object. Define your contract with defineContract({ family, target, models, ... }).',

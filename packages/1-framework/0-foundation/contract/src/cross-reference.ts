@@ -1,5 +1,5 @@
 import { type } from 'arktype';
-import type { NamespaceId } from './namespace-id';
+import { asNamespaceId, type NamespaceId } from './namespace-id';
 
 export interface CrossReference {
   readonly namespace: NamespaceId;
@@ -11,3 +11,12 @@ export const CrossReferenceSchema = type({
   namespace: 'string',
   model: 'string',
 });
+
+const DEFAULT_CROSS_REF_NAMESPACE = '__unbound__';
+
+export function crossRef(
+  model: string,
+  namespace: string = DEFAULT_CROSS_REF_NAMESPACE,
+): CrossReference {
+  return { namespace: asNamespaceId(namespace), model };
+}

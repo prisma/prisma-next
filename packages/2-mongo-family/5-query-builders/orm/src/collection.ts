@@ -243,14 +243,15 @@ class MongoCollectionImpl<
       throw new Error(`Compound references are not yet supported: relation "${relationName}"`);
     }
 
-    const targetModel = this.#contract.models[ref.to] as MongoModelDefinition | undefined;
+    const targetModelName = ref.to.model;
+    const targetModel = this.#contract.models[targetModelName] as MongoModelDefinition | undefined;
     if (!targetModel) {
-      throw new Error(`Target model "${ref.to}" not found for relation "${relationName}"`);
+      throw new Error(`Target model "${targetModelName}" not found for relation "${relationName}"`);
     }
 
     const includeExpr: MongoIncludeExpr = {
       relationName,
-      from: resolveCollectionName(targetModel, ref.to),
+      from: resolveCollectionName(targetModel, targetModelName),
       localField,
       foreignField,
       cardinality: ref.cardinality,

@@ -538,15 +538,23 @@ type BuiltStorageTables<Definition> = {
     : Record<string, never>);
 };
 
-type BuiltStorageTypes<Definition> = {
+type BuiltDocumentScopedTypes<Definition> = {
   readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends PostgresEnumStorageEntry
     ? never
     : K]: DefinitionTypes<Definition>[K];
 };
 
+type BuiltDomain<Definition> = keyof BuiltDocumentScopedTypes<Definition> extends never
+  ? Record<string, never>
+  : {
+      readonly __unbound__: {
+        readonly types: BuiltDocumentScopedTypes<Definition>;
+      };
+    };
+
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly types: BuiltStorageTypes<Definition>;
+  readonly types?: BuiltDocumentScopedTypes<Definition>;
   // SQL contracts always carry a literal `__unbound__` namespace whose tables
   // slot is narrowed to the actual built table shape so downstream DSL
   // surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
@@ -604,17 +612,19 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
     readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-  } & {
-    readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
+  } & (keyof BuiltDocumentScopedTypes<Definition> extends never
       ? Record<string, never>
-      : DefinitionExtensionPacks<Definition>;
-    readonly capabilities: DefinitionCapabilities<Definition> extends Record<
-      string,
-      Record<string, boolean>
-    >
-      ? DefinitionCapabilities<Definition>
-      : Record<string, Record<string, boolean>>;
-  },
+      : { readonly domain: BuiltDomain<Definition> }) & {
+      readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
+        ? Record<string, never>
+        : DefinitionExtensionPacks<Definition>;
+      readonly capabilities: DefinitionCapabilities<Definition> extends Record<
+        string,
+        Record<string, boolean>
+      >
+        ? DefinitionCapabilities<Definition>
+        : Record<string, Record<string, boolean>>;
+    },
   TypeMaps<
     CodecTypesFromDefinition<Definition>,
     Record<string, never>,

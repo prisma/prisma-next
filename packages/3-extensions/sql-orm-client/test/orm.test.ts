@@ -3,21 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
 import type { TestContract } from './helpers';
-import { createMockRuntime, getTestContext } from './helpers';
+import { createMockRuntime, getTestContext, type RuntimeTestContract } from './helpers';
 
-class UserCollection extends Collection<TestContract, 'User'> {
+class UserCollection extends Collection<RuntimeTestContract, 'User'> {
   named(name: string) {
     return this.where((user) => user.name.eq(name));
   }
 }
 
-class PostCollection extends Collection<TestContract, 'Post'> {
+class PostCollection extends Collection<RuntimeTestContract, 'Post'> {
   popular() {
     return this.where((p) => p.views.gt(1000));
   }
 }
 
-class CommentCollection extends Collection<TestContract, 'Comment'> {
+class CommentCollection extends Collection<RuntimeTestContract, 'Comment'> {
   withBody(body: string) {
     return this.where((comment) => comment.body.eq(body));
   }
@@ -99,7 +99,7 @@ describe('orm()', () => {
   it('instantiates custom collections lazily and caches by model', () => {
     const runtime = createMockRuntime();
     let constructions = 0;
-    class LazyPostCollection extends Collection<TestContract, 'Post'> {
+    class LazyPostCollection extends Collection<RuntimeTestContract, 'Post'> {
       readonly instanceMarker = ++constructions;
     }
 

@@ -2,6 +2,7 @@ import type {
   ContractField,
   ContractModel,
   ContractValueObject,
+  CrossReference,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
@@ -45,9 +46,9 @@ export function serializeObjectKey(key: string): string {
   return serializeValue(key);
 }
 
-export function generateRootsType(roots: Record<string, string> | undefined): string {
+export function generateRootsType(roots: Record<string, CrossReference> | undefined): string {
   if (!roots || Object.keys(roots).length === 0) {
-    return 'Record<string, string>';
+    return 'Record<string, CrossReference>';
   }
   const entries = Object.entries(roots)
     .map(([key, value]) => `readonly ${serializeObjectKey(key)}: ${serializeValue(value)}`)

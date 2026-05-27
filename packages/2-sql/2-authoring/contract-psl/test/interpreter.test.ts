@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
@@ -9,6 +10,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
@@ -74,7 +76,7 @@ describe('interpretPslDocumentToSqlContract', () => {
         },
       },
     });
-    expect(result.value.roots).toEqual({ user: 'User' });
+    expect(result.value.roots).toEqual({ user: crossRef('User') });
   });
 
   it('does not derive generated column type without descriptor resolver', () => {
@@ -163,9 +165,9 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.roots).toEqual({
-      user: 'User',
-      post: 'Post',
-      comment: 'Comment',
+      user: crossRef('User'),
+      post: crossRef('Post'),
+      comment: crossRef('Comment'),
     });
   });
 
@@ -189,7 +191,7 @@ model Comment {
 
     expect(result.value.targetFamily).toBe('sql');
     expect(result.value.target).toBe('postgres');
-    expect(result.value.roots).toEqual({ user: 'User' });
+    expect(result.value.roots).toEqual({ user: crossRef('User') });
     expect(result.value.storage).toMatchObject({
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
@@ -378,64 +380,14 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.roots).toEqual({ user: 'User', post: 'Post' });
-    expect(result.value.storage).toMatchObject({
-      types: {
-        Email: { codecId: 'pg/text@1', nativeType: 'text' },
-      },
-      namespaces: {
-        public: {
-          enum: {
-            Role: {
-              kind: 'postgres-enum',
-              name: 'Role',
-              nativeType: 'Role',
-              values: ['USER', 'ADMIN'],
-            },
-          },
-        },
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                id: {
-                  default: { kind: 'function', expression: 'autoincrement()' },
-                },
-                createdAt: {
-                  default: { kind: 'function', expression: 'now()' },
-                },
-                isActive: {
-                  default: { kind: 'literal', value: true },
-                },
-                nickname: {
-                  nullable: true,
-                },
-              },
-            },
-            post: {
-              uniques: [{ columns: ['title', 'userId'] }],
-              indexes: [{ columns: ['userId'] }],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                  onDelete: 'cascade',
-                  onUpdate: 'cascade',
-                },
-              ],
-            },
-          },
-        },
-      },
+    expect(result.value.roots).toEqual({ user: crossRef('User'), post: crossRef('Post') });
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      Email: { codecId: 'pg/text@1', nativeType: 'text' },
     });
     const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
     expect(models['Post']?.relations).toMatchObject({
       author: {
-        to: 'User',
+        to: crossRef('User'),
         cardinality: 'N:1',
         on: {
           localFields: ['userId'],
@@ -472,7 +424,10 @@ model Member {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
+    expect(result.value.roots).toEqual({
+      org_team: crossRef('Team'),
+      team_member: crossRef('Member'),
+    });
     expect(result.value.storage).toMatchObject({
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {

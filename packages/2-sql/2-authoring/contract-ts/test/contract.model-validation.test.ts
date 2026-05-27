@@ -3,6 +3,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { crossRef } from './cross-ref-helpers';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 
 describe('SqlContractSerializer model validation', () => {
@@ -180,7 +181,7 @@ describe('SqlContractSerializer model validation', () => {
           },
           relations: {
             user: {
-              to: 'User',
+              to: crossRef('User'),
               on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
@@ -246,7 +247,7 @@ describe('SqlContractSerializer model validation', () => {
           },
           relations: {
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
@@ -320,7 +321,7 @@ describe('SqlContractSerializer model validation', () => {
           },
           relations: {
             user: {
-              to: 'User',
+              to: crossRef('User'),
               on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },

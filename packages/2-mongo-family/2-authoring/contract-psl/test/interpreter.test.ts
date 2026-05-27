@@ -3,6 +3,7 @@ import type {
   ContractReferenceRelation,
   StorageHashBase,
 } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoCollection, MongoStorage, MongoValidator } from '@prisma-next/mongo-contract';
@@ -334,7 +335,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(model(ir, 'Post').relations).toMatchObject({
         author: {
-          to: 'User',
+          to: crossRef('User'),
           cardinality: 'N:1',
           on: {
             localFields: ['authorId'],
@@ -349,7 +350,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(model(ir, 'User').relations).toMatchObject({
         posts: {
-          to: 'Post',
+          to: crossRef('Post'),
           cardinality: '1:N',
           on: {
             localFields: ['_id'],
@@ -375,7 +376,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(model(ir, 'Child').relations).toMatchObject({
         parent: {
-          to: 'Parent',
+          to: crossRef('Parent'),
           on: {
             localFields: ['parent_id'],
             targetFields: ['_id'],
@@ -416,12 +417,12 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(model(ir, 'User').relations).toMatchObject({
         createdTasks: {
-          to: 'Task',
+          to: crossRef('Task'),
           cardinality: '1:N',
           on: { localFields: ['_id'], targetFields: ['creatorId'] },
         },
         assignedTasks: {
-          to: 'Task',
+          to: crossRef('Task'),
           cardinality: '1:N',
           on: { localFields: ['_id'], targetFields: ['assigneeId'] },
         },
@@ -471,7 +472,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 
       expect(model(ir, 'User').relations).toMatchObject({
         profile: {
-          to: 'Profile',
+          to: crossRef('Profile'),
           cardinality: '1:1',
           on: {
             localFields: ['_id'],
@@ -481,7 +482,7 @@ describe('interpretPslDocumentToMongoContract', () => {
       });
       expect(model(ir, 'Profile').relations).toMatchObject({
         user: {
-          to: 'User',
+          to: crossRef('User'),
           cardinality: 'N:1',
           on: {
             localFields: ['userId'],
@@ -561,8 +562,8 @@ describe('interpretPslDocumentToMongoContract', () => {
       `);
 
       expect(ir.roots).toEqual({
-        user: 'User',
-        blog_posts: 'Post',
+        user: crossRef('User'),
+        blog_posts: crossRef('Post'),
       });
     });
 
@@ -765,8 +766,8 @@ describe('interpretPslDocumentToMongoContract', () => {
         targetFamily: 'mongo',
         target: 'mongo',
         roots: {
-          users: 'User',
-          posts: 'Post',
+          users: crossRef('User'),
+          posts: crossRef('Post'),
         },
         models: {
           User: {
@@ -778,7 +779,7 @@ describe('interpretPslDocumentToMongoContract', () => {
             },
             relations: {
               posts: {
-                to: 'Post',
+                to: crossRef('Post'),
                 cardinality: '1:N',
                 on: { localFields: ['_id'], targetFields: ['authorId'] },
               },
@@ -795,7 +796,7 @@ describe('interpretPslDocumentToMongoContract', () => {
             },
             relations: {
               author: {
-                to: 'User',
+                to: crossRef('User'),
                 cardinality: 'N:1',
                 on: { localFields: ['authorId'], targetFields: ['_id'] },
               },

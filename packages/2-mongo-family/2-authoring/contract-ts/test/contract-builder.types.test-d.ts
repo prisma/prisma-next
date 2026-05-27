@@ -85,7 +85,7 @@ const polymorphicContract = defineContract({
 type UserRow = InferModelRow<typeof contract, 'User'>;
 
 test('contract roots stay specific', () => {
-  expectTypeOf(contract.roots.users).toEqualTypeOf<'User'>();
+  expectTypeOf(contract.roots.users.model).toEqualTypeOf<'User'>();
 });
 
 test('polymorphic variants keep literal model keys', () => {

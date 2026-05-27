@@ -3,6 +3,7 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it, vi } from 'vitest';
@@ -178,13 +179,14 @@ describe('generateModelsType', () => {
     const models: Record<string, ContractModel> = {
       User: makeModel({
         fields: { name: { type: { kind: 'scalar', codecId: 'sql/text@1' }, nullable: false } },
-        relations: { posts: { to: 'Post', cardinality: '1:N' } },
+        relations: { posts: { to: crossRef('Post'), cardinality: '1:N' } },
       }),
     };
     const result = generateModelsType(models, () => "{ readonly table: 'users' }");
     expect(result).toContain('readonly User:');
     expect(result).toContain("readonly codecId: 'sql/text@1'");
-    expect(result).toContain("readonly to: 'Post'");
+    expect(result).toContain("readonly namespace: '__unbound__'");
+    expect(result).toContain("readonly model: 'Post'");
     expect(result).toContain("readonly table: 'users'");
   });
 
@@ -235,26 +237,31 @@ describe('generateModelsType', () => {
 
   it('includes base when present', () => {
     const models: Record<string, ContractModel> = {
-      Dog: makeModel({ base: 'Animal' }),
+      Dog: makeModel({ base: crossRef('Animal') }),
     };
     const result = generateModelsType(models, noopStorage);
-    expect(result).toContain("readonly base: 'Animal'");
+    expect(result).toContain("readonly namespace: '__unbound__'");
+    expect(result).toContain("readonly model: 'Animal'");
   });
 });
 
 describe('generateRootsType', () => {
-  it('returns Record<string, string> for undefined roots', () => {
-    expect(generateRootsType(undefined)).toBe('Record<string, string>');
+  it('returns Record<string, CrossReference> for undefined roots', () => {
+    expect(generateRootsType(undefined)).toBe('Record<string, CrossReference>');
   });
 
-  it('returns Record<string, string> for empty roots', () => {
-    expect(generateRootsType({})).toBe('Record<string, string>');
+  it('returns Record<string, CrossReference> for empty roots', () => {
+    expect(generateRootsType({})).toBe('Record<string, CrossReference>');
   });
 
   it('generates literal object type for roots', () => {
-    const result = generateRootsType({ users: 'User', posts: 'Post' });
-    expect(result).toContain("readonly users: 'User'");
-    expect(result).toContain("readonly posts: 'Post'");
+    const result = generateRootsType({ users: crossRef('User'), posts: crossRef('Post') });
+    expect(result).toContain(
+      "readonly users: { readonly namespace: '__unbound__'; readonly model: 'User' }",
+    );
+    expect(result).toContain(
+      "readonly posts: { readonly namespace: '__unbound__'; readonly model: 'Post' }",
+    );
   });
 });
 
@@ -265,21 +272,22 @@ describe('generateModelRelationsType', () => {
 
   it('generates relation with to and cardinality', () => {
     const result = generateModelRelationsType({
-      posts: { to: 'Post', cardinality: '1:N' },
+      posts: { to: crossRef('Post'), cardinality: '1:N' },
     });
-    expect(result).toContain("readonly to: 'Post'");
+    expect(result).toContain("readonly namespace: '__unbound__'");
+    expect(result).toContain("readonly model: 'Post'");
     expect(result).toContain("readonly cardinality: '1:N'");
   });
 
   it('generates relation with on (localFields/targetFields)', () => {
     const result = generateModelRelationsType({
       author: {
-        to: 'User',
+        to: crossRef('User'),
         cardinality: 'N:1',
         on: { localFields: ['authorId'], targetFields: ['_id'] },
       },
     });
-    expect(result).toContain("readonly to: 'User'");
+    expect(result).toContain("readonly model: 'User'");
     expect(result).toContain("readonly cardinality: 'N:1'");
     expect(result).toContain("readonly localFields: readonly ['authorId']");
     expect(result).toContain("readonly targetFields: readonly ['_id']");
@@ -294,8 +302,8 @@ describe('generateModelRelationsType', () => {
 
   it('generates multiple relations', () => {
     const result = generateModelRelationsType({
-      author: { to: 'User', cardinality: 'N:1' },
-      comments: { to: 'Comment', cardinality: '1:N' },
+      author: { to: crossRef('User'), cardinality: 'N:1' },
+      comments: { to: crossRef('Comment'), cardinality: '1:N' },
     });
     expect(result).toContain('readonly author:');
     expect(result).toContain('readonly comments:');
@@ -311,9 +319,9 @@ describe('generateModelRelationsType', () => {
 
   it('omits cardinality when missing from relation', () => {
     const result = generateModelRelationsType({
-      rel: { to: 'Post' },
+      rel: { to: crossRef('Post') },
     });
-    expect(result).toContain("readonly to: 'Post'");
+    expect(result).toContain("readonly model: 'Post'");
     expect(result).not.toContain('readonly cardinality:');
   });
 

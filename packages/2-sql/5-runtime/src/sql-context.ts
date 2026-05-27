@@ -22,6 +22,7 @@ import {
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
@@ -38,6 +39,16 @@ import {
 // cast (not `as unknown as`) keeps Pattern C walks readable without
 // weakening the substrate type.
 type SqlNamespaceTables = Readonly<Record<string, StorageTable>>;
+
+function documentScopedCodecTypes(
+  contract: Contract<SqlStorage>,
+): Record<string, StorageTypeInstance> | undefined {
+  const fromDomain = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'];
+  if (fromDomain !== undefined && typeof fromDomain === 'object') {
+    return fromDomain as Record<string, StorageTypeInstance>;
+  }
+  return contract.storage.types as Record<string, StorageTypeInstance> | undefined;
+}
 
 import {
   createSqlOperationRegistry,
@@ -343,18 +354,18 @@ function collectTypeRefSites(
 
 function initializeTypeHelpers(
   storage: SqlStorage,
+  documentTypes: Record<string, StorageTypeInstance> | undefined,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): TypeHelperRegistry {
   const helpers: TypeHelperRegistry = {};
-  const storageTypes = storage.types;
 
-  if (!storageTypes) {
+  if (!documentTypes) {
     return helpers;
   }
 
   const typeRefSites = collectTypeRefSites(storage);
 
-  for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
+  for (const [typeName, typeInstance] of Object.entries(documentTypes)) {
     const enumView = readEnumViewIfApplicable(typeInstance);
     const codecId = enumView ? enumView.codecId : (typeInstance as StorageTypeInstance).codecId;
     const typeParams = enumView
@@ -505,7 +516,7 @@ function buildContractCodecRegistry(
   const nameByKey = new Map<string, string>();
 
   const typeRefSites = collectTypeRefSites(contract.storage);
-  for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
+  for (const [typeName, typeInstance] of Object.entries(documentScopedCodecTypes(contract) ?? {})) {
     const enumView = readEnumViewIfApplicable(typeInstance);
     const ref: CodecRef = enumView
       ? {
@@ -789,7 +800,11 @@ export function createExecutionContext<
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
   }
 
-  const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
+  const types = initializeTypeHelpers(
+    contract.storage,
+    documentScopedCodecTypes(contract),
+    parameterizedCodecDescriptors,
+  );
 
   const contractCodecs = buildContractCodecRegistry(contract, codecDescriptors);
 

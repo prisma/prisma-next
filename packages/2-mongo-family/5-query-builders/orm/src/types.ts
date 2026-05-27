@@ -62,19 +62,27 @@ type ResolvedInputRow<
       }
     : InferModelRow<TContract, ModelName>;
 
+type RelationTargetModel<TContract extends MongoContract, R> = R extends {
+  readonly to: { readonly model: infer M extends string & keyof TContract['models'] };
+}
+  ? M
+  : never;
+
 type EmbedRelationRowType<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
   RelKey extends keyof ModelRelations<TContract, ModelName>,
-> = ModelRelations<TContract, ModelName>[RelKey] extends {
-  readonly to: infer To extends string & keyof TContract['models'];
-  readonly cardinality: infer C;
-}
-  ? ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
-    ? never
-    : C extends '1:N'
-      ? ResolvedOutputRow<TContract, To>[]
-      : ResolvedOutputRow<TContract, To>
+> = ModelRelations<TContract, ModelName>[RelKey] extends infer R
+  ? R extends { readonly cardinality: infer C }
+    ? ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
+      ? never
+      : RelationTargetModel<TContract, R> extends infer To extends string &
+            keyof TContract['models']
+        ? C extends '1:N'
+          ? ResolvedOutputRow<TContract, To>[]
+          : ResolvedOutputRow<TContract, To>
+        : never
+    : never
   : never;
 
 export type InferFullRow<
@@ -150,13 +158,15 @@ type IncludeRelationRowType<
   ModelName extends string & keyof TContract['models'],
   RelKey extends keyof ModelRelations<TContract, ModelName>,
 > = ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
-  ? ModelRelations<TContract, ModelName>[RelKey] extends {
-      readonly to: infer To extends string & keyof TContract['models'];
-      readonly cardinality: infer C;
-    }
-    ? C extends 'N:1' | '1:1'
-      ? InferFullRow<TContract, To> | null
-      : InferFullRow<TContract, To>[]
+  ? ModelRelations<TContract, ModelName>[RelKey] extends infer R
+    ? R extends { readonly cardinality: infer C }
+      ? RelationTargetModel<TContract, R> extends infer To extends string &
+          keyof TContract['models']
+        ? C extends 'N:1' | '1:1'
+          ? InferFullRow<TContract, To> | null
+          : InferFullRow<TContract, To>[]
+        : never
+      : never
     : never
   : never;
 

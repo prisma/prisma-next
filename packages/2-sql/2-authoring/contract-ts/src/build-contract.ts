@@ -4,6 +4,7 @@ import {
   computeStorageHash,
 } from '@prisma-next/contract/hashing';
 import {
+  asNamespaceId,
   type ColumnDefault,
   type ColumnDefaultLiteralInputValue,
   type Contract,
@@ -11,7 +12,9 @@ import {
   type ContractModel,
   type ContractRelation,
   type ContractValueObject,
+  type CrossReference,
   coreHash,
+  crossRef,
   type ExecutionMutationDefault,
   type JsonValue,
   type StorageHashBase,
@@ -145,6 +148,16 @@ function isValueObjectField(
 
 const JSONB_CODEC_ID = 'pg/jsonb@1';
 const JSONB_NATIVE_TYPE = 'jsonb';
+
+function resolveModelNamespaceId(
+  model: ModelNode,
+  modelNameToNamespaceId: ReadonlyMap<string, string>,
+): string {
+  if (model.namespaceId !== undefined && model.namespaceId.length > 0) {
+    return model.namespaceId;
+  }
+  return modelNameToNamespaceId.get(model.modelName) ?? UNBOUND_NAMESPACE_ID;
+}
 
 function buildStorageColumn(
   field: FieldNode | ValueObjectFieldNode,
@@ -286,13 +299,19 @@ export function buildSqlContractFromDefinition(
 
   const tablesByNamespace: Record<string, Record<string, StorageTable>> = {};
   const tableNameToNamespaceId = new Map<string, string>();
+  const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const models: Record<string, ContractModel> = {};
-  const roots: Record<string, string> = {};
+  const roots: Record<string, CrossReference> = {};
 
   for (const semanticModel of definition.models) {
     const tableName = semanticModel.tableName;
-    roots[tableName] = semanticModel.modelName;
+    const namespaceId =
+      semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
+        ? semanticModel.namespaceId
+        : UNBOUND_NAMESPACE_ID;
+    modelNameToNamespaceId.set(semanticModel.modelName, namespaceId);
+    roots[tableName] = crossRef(semanticModel.modelName, namespaceId);
 
     // --- Build storage table ---
 
@@ -344,11 +363,6 @@ export function buildSqlContractFromDefinition(
       }
     }
 
-    const namespaceId =
-      semanticModel.namespaceId !== undefined && semanticModel.namespaceId.length > 0
-        ? semanticModel.namespaceId
-        : UNBOUND_NAMESPACE_ID;
-
     const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
       const targetModel = assertKnownTargetModel(
         modelsByName,
@@ -368,9 +382,9 @@ export function buildSqlContractFromDefinition(
           ? targetModel.namespaceId
           : UNBOUND_NAMESPACE_ID);
       return {
-        source: { namespaceId, tableName, columns: fk.columns },
+        source: { namespaceId: asNamespaceId(namespaceId), tableName, columns: fk.columns },
         target: {
-          namespaceId: targetNamespaceId,
+          namespaceId: asNamespaceId(targetNamespaceId),
           tableName: fk.references.table,
           columns: fk.references.columns,
         },
@@ -461,7 +475,10 @@ export function buildSqlContractFromDefinition(
       );
 
       modelRelations[relation.fieldName] = {
-        to: relation.toModel,
+        to: crossRef(
+          relation.toModel,
+          resolveModelNamespaceId(targetModel, modelNameToNamespaceId),
+        ),
         // RelationDefinition.cardinality includes 'N:M' which isn't in
         // ContractReferenceRelation yet — cast is needed until the contract
         // type is extended to cover many-to-many.
@@ -537,8 +554,11 @@ export function buildSqlContractFromDefinition(
       return [id, createNamespace ? createNamespace(nsInput) : nsInput];
     }),
   );
+  const domainUnboundTypes =
+    Object.keys(documentTypes).length > 0 ? { types: documentTypes } : undefined;
+  const domain =
+    domainUnboundTypes !== undefined ? { [UNBOUND_NAMESPACE_ID]: domainUnboundTypes } : undefined;
   const storageWithoutHash = {
-    types: documentTypes,
     namespaces,
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
@@ -624,6 +644,7 @@ export function buildSqlContractFromDefinition(
     models,
     roots,
     storage,
+    ...(domain !== undefined ? { domain } : {}),
     ...(executionWithHash ? { execution: executionWithHash } : {}),
     ...ifDefined('valueObjects', valueObjects),
     extensionPacks,

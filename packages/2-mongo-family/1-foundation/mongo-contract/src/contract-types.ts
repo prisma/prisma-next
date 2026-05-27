@@ -71,6 +71,13 @@ export type MongoContract<
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = Contract<S, M>;
 
+export type RootModelName<
+  TContract extends MongoContract,
+  RootName extends keyof TContract['roots'] & string,
+> = TContract['roots'][RootName] extends { readonly model: infer M extends string }
+  ? M & keyof TContract['models']
+  : never;
+
 export type MongoTypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
   TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<

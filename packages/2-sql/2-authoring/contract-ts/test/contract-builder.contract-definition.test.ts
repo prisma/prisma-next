@@ -3,6 +3,7 @@ import type { TargetPackRef } from '@prisma-next/framework-components/components
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
+import { crossRef, documentScopedTypes } from './cross-ref-helpers';
 import { unboundTables } from './unbound-tables';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
@@ -128,9 +129,6 @@ describe('shared contract definition lowering', () => {
       ],
     });
 
-    const storage = contract.storage as {
-      readonly types?: Record<string, unknown>;
-    };
     const models = contract.models as Record<
       string,
       | {
@@ -141,7 +139,7 @@ describe('shared contract definition lowering', () => {
       | undefined
     >;
 
-    expect(storage['types']?.['Role']).toEqual({
+    expect(documentScopedTypes(contract)?.['Role']).toEqual({
       kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'role',
@@ -165,7 +163,7 @@ describe('shared contract definition lowering', () => {
       },
     ]);
     expect(models['User']?.relations['posts']).toEqual({
-      to: 'Post',
+      to: crossRef('Post'),
       cardinality: '1:N',
       on: {
         localFields: ['id'],

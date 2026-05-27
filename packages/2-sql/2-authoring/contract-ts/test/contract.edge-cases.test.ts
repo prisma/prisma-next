@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { crossRef } from './cross-ref-helpers';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 
 describe('SqlContractSerializer edge cases', () => {
@@ -128,7 +129,7 @@ describe('SqlContractSerializer edge cases', () => {
           },
           relations: {
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               cardinality: '1:N',
             },
           },
@@ -196,11 +197,11 @@ describe('SqlContractSerializer edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
-      /does not exist in models/,
+      /relations\.posts\.to must be an object/,
     );
   });
 
-  it('accepts relation using old parentCols/childCols format (format validated by emitter)', () => {
+  it('accepts relation with localFields/targetFields on shape', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -218,8 +219,8 @@ describe('SqlContractSerializer edge cases', () => {
           },
           relations: {
             posts: {
-              to: 'Post',
-              on: { parentCols: ['id'], childCols: ['userId'] },
+              to: crossRef('Post'),
+              on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
           },
