@@ -139,6 +139,30 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
         run: node scripts/publish-packages.mjs --tag "${{ steps.version.outputs.tag }}"
 
+      # Lightweight git tag for non-stable publishes (dev / beta / …). Stable
+      # publishes get a tag implicitly via `gh release create` below; dev-channel
+      # builds need one too because `prisma-next init` resolves its skill-cluster
+      # URL via `#v<cliVersion>` (see packages/1-framework/3-tooling/cli/src/
+      # commands/init/skill-install.ts), which 404s without a matching git ref.
+      # Tag-only is intentional — a full Release per dev build would drown out
+      # the changelog signal. (TML-2696)
+      #
+      # Idempotent on workflow rerun: if `v$VERSION` already exists, skip.
+      - name: Create lightweight git tag for non-stable publishes
+        if: ${{ steps.version.outputs.tag != 'latest' && (github.event_name != 'workflow_dispatch' || github.event.inputs.dry-run != 'true') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists; skipping"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+              -X POST \
+              -f ref="refs/tags/v$VERSION" \
+              -f "sha=$GITHUB_SHA"
+          fi
+
       # Emit a GitHub Release for stable publishes only (dist-tag `latest`).
       # Dev / PR / beta builds publish to npm but do not produce a Release —
       # those would drown out the changelog signal. The Release is created at
