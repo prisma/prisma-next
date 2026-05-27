@@ -1,10 +1,10 @@
 # Slice: SQL ORM single-query include aggregates
 
-_Single-slice project: the project boundary and the slice boundary coincide. One PR closes TML-2595, TML-2588, and TML-2498. The downstream dead-code deletion (TML-2657) is a separate PR, tracked under its own ticket._
+_Single-slice project: the project boundary and the slice boundary coincide. One PR closes TML-2595 and TML-2588. The downstream dead-code deletion (TML-2657) is a separate PR, tracked under its own ticket. (TML-2498 was initially in scope but reversed mid-slice and closed as not-a-bug; see [`design-decisions.md`](./design-decisions.md) for the trail.)_
 
 ## At a glance
 
-Lower include-scalar reducers (`count` / `sum` / `avg` / `min` / `max`) and `combine()` branches into the active single-query strategy (LATERAL on Postgres, correlated subquery on SQLite + future jsonAgg-only targets) instead of falling back to the multi-query stitcher. As a byproduct, fix the silent count miscount under `take` / `skip` (TML-2498) by emitting the aggregate over the where-filtered, unpaginated relation — matching root-level `aggregate()` semantics.
+Lower include-scalar reducers (`count` / `sum` / `avg` / `min` / `max`) and `combine()` branches into the active single-query strategy (LATERAL on Postgres, correlated subquery on SQLite + future jsonAgg-only targets) instead of falling back to the multi-query stitcher. The aggregate runs over the full refine state — `where`, `take`, `skip`, `orderBy`, `distinct` all compose through to the scalar scope, matching the natural pipeline semantic users derive from method-chaining.
 
 After this slice, the only remaining caller of `dispatchWithMultiQueryIncludes` for in-tree targets is the synthetic test fixture; removing the path itself is TML-2657.
 
@@ -88,7 +88,7 @@ LEFT JOIN LATERAL (
 ) AS posts_count ON TRUE
 ```
 
-The `LIMIT` from any `take` / `skip` on the refine is **not** applied — that resolves TML-2498 by construction.
+Any `take` / `skip` / `orderBy` / `distinct` from the refine state composes into the scalar inner SELECT — `r.where(W).take(10).count()` returns a count of up to 10 (the rows the chain selects), matching the natural compositional semantic. For an unpaginated count, the user drops `take`; for both paginated rows + total, the user uses `combine({ page: r.take(10), total: r.count() })`.
 
 **Correlated, scalar branch** — same query, jsonAgg-only target:
 
@@ -138,8 +138,8 @@ The defensive throw in the decoder goes away — the recursion now handles the c
 |---|---|---|
 | `include('rel', r => r.count())` — bare count, no refinement | Handle | Aggregate over unfiltered relation, scoped by FK. Lateral + correlated. |
 | `include('rel', r => r.where(W).count())` — count with where | Handle | Aggregate over where-filtered relation. Lateral + correlated. |
-| `include('rel', r => r.where(W).take(N).count())` — TML-2498 case | Handle | LIMIT does **not** enter the COUNT scope. Returns total matching `where`, not the page size. Test asserts this explicitly. |
-| `include('rel', r => r.where(W).skip(N).count())` — skip case | Handle | Same — OFFSET does not enter COUNT scope. |
+| `include('rel', r => r.where(W).take(N).count())` — pagination composes through | Handle | LIMIT and OFFSET ENTER the COUNT scope. The aggregate runs over the refine's full state, so the count is over the paginated row-set (returns ≤ N). Matches the natural pipeline semantic; users wanting the unpaginated total drop `take`. Test asserts this explicitly. |
+| `include('rel', r => r.where(W).skip(N).count())` — skip case | Handle | Same — OFFSET enters COUNT scope. |
 | `include('rel', r => r.sum('field'))` / `avg` / `min` / `max` | Handle | Same shape as count; aggregate function differs. One test per reducer in each strategy. |
 | `include('rel', r => r.combine({ rows: r.take(N), count: r.count() }))` — TML-2595 worked example | Handle | Single query, two branches packed into one `json_build_object`. The Pothos `totalCount` shape. |
 | `include('rel', r => r.combine({ a: r.count(), b: r.sum('field') }))` — multiple scalar branches | Handle | All branches resolve in one query. |
@@ -161,14 +161,13 @@ The defensive throw in the decoder goes away — the recursion now handles the c
 - [ ] **SDoD3.** Acceptance criteria from all three Linear tickets satisfied:
   - **TML-2595.** `include('posts', p => p.combine({ recent: p.take(3), count: p.count() }))` resolves in 1 SQL execution on a Postgres-capability test contract; same in 1 execution on a SQLite-capability contract via correlated subqueries. `include('posts', p => p.count())` resolves in 1 SQL execution on capable targets.
   - **TML-2588.** Public API `count() / sum() / avg() / min() / max()` semantics on `include(...)` refinements compile to SQL aggregates (verified by inspecting `compileSelect*` output in unit tests + counting executions in integration tests). No O(N) child-row materialization in process for the default path.
-  - **TML-2498.** `include(rel, r => r.where(...).take(N).count())` returns the total count matching `where`, irrespective of `take` / `skip`. Behaviour matches root-level `aggregate()` semantics (where-only).
 - [ ] **SDoD4.** Manual-QA: **explicit N/A.** Rationale: the slice changes only how the SQL ORM emits queries and decodes their results. The public API surface (method names, return shapes, types) is unchanged. Correctness of emitted SQL and result decoding is covered exhaustively by unit tests (planner shape) + integration tests (PGlite + memory SQLite). No UX surface to walk through.
 - [ ] **SDoD5.** Slice doesn't touch any of: `dispatchWithMultiQueryIncludes`, the stitcher helpers, `compileRelationSelect`, the `IncludeStrategy` type, or any mutation-path code. Anti-corruption check: a `git diff --stat` against `main` shows changes only in the files listed under § Scope.
-- [ ] **SDoD6.** PR description references all three closed Linear tickets (TML-2595, TML-2588, TML-2498), states that TML-2657 is the deletion follow-up, and includes the SQL-shape illustrative snippets above (or equivalent) so reviewers don't have to derive the new query shapes themselves.
+- [ ] **SDoD6.** PR description references both closed Linear tickets (TML-2595, TML-2588), states that TML-2657 is the deletion follow-up, notes TML-2498's mid-slice reversal (closed as not-a-bug), and includes the SQL-shape illustrative snippets above (or equivalent) so reviewers don't have to derive the new query shapes themselves.
 
 ## Open Questions
 
-1. **How loudly is TML-2498 biting real consumers right now?** Working position: assume latent footgun (no Pothos demo actively breaking on it this week). If that's wrong — Pothos plugin author or EA dogfooders surface a live impact during this slice's execution — re-triage: carve TML-2498 out as a precursor minimal patch, or accelerate this slice's completion. The minimal patch per option 1 of TML-2498's spec *is* the work in this slice, so the carve-out has cost.
+1. _(resolved — mid-slice)_ **TML-2498 urgency re-check.** Working position at spec-write time was "latent footgun." Reversed during PR self-review: the TML-2498 framing was a misreading; the page-capped count is the natural compositional semantic, not a bug. Ticket closed as not-a-bug by the PR author. See [`design-decisions.md`](./design-decisions.md) D1.
 
 2. **NULL/empty-relation return shape for `sum` / `avg` / `min` / `max`.** Working position: match the JS-side reducer's current return shape (`null` for empty; `0` for `count`). Confirm against today's tests during implementation. If the JS reducer was returning something wrong (e.g. `NaN` from `0/0` on `avg`), the SQL emission is a chance to fix it — flag in PR description, don't sneak it in.
 
@@ -178,7 +177,8 @@ The defensive throw in the decoder goes away — the recursion now handles the c
 
 ## References
 
-- **Linear tickets closed by this slice:** [TML-2595](https://linear.app/prisma-company/issue/TML-2595), [TML-2588](https://linear.app/prisma-company/issue/TML-2588), [TML-2498](https://linear.app/prisma-company/issue/TML-2498).
+- **Linear tickets closed by this slice:** [TML-2595](https://linear.app/prisma-company/issue/TML-2595), [TML-2588](https://linear.app/prisma-company/issue/TML-2588).
+- **Linear ticket related to but NOT closed by this slice:** [TML-2498](https://linear.app/prisma-company/issue/TML-2498) (initial in-scope target; reversed mid-slice and closed by the author as not-a-bug — see [`design-decisions.md`](./design-decisions.md) D1).
 - **Follow-up ticket (separate PR):** [TML-2657 — remove multi-query include strategy from read path](https://linear.app/prisma-company/issue/TML-2657). Its acceptance criteria already enumerate the deletion + test-repurposing scope.
 - **Discovery from this design-discussion (separate work, blocked by TML-2657):** [TML-2683 — `.include()` silently degrades on polymorphic target models](https://linear.app/prisma-company/issue/TML-2683). Pre-existing gap surfaced while pressure-testing the polymorphism edge case in this spec; not introduced by this slice.
 - **Predecessor PRs that brought the read path to its current shape:**
