@@ -3,7 +3,7 @@
 // The pattern is at the top level (not wrapped in `file(...)`) so it iterates
 // over every match in the file — wrapping in `file($name, $body) where { $body
 // <: contains <pattern> }` only fires on the first occurrence, which would
-// undercount casts for the D3 ratchet.
+// undercount the cast total the CI ratchet checks.
 //
 // `$filename` is biome's built-in for the current file path. Biome's GritQL
 // regex matching is anchored full-match, so patterns need a `.*` prefix.
@@ -16,7 +16,7 @@
 //
 // Severity is "info" so the plugin can run repo-wide without breaking
 // existing builds (the codebase has thousands of pre-existing `as` casts
-// that this rule reports). The D3 ratchet enforces the actual gate by
+// that this rule reports). The CI ratchet enforces the actual gate by
 // counting diagnostics from biome's JSON reporter; "info" entries still
 // appear there with the distinctive `no-bare-cast: ` prefix.
 

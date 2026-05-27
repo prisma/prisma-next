@@ -6,5 +6,5 @@ declare const input: unknown;
 // bare `as Foo` — rule fires here
 export const x = input as string;
 
-// `as unknown as Foo` (double cast) — rule fires on the first `as`
+// `as unknown as Foo` (double cast) — rule fires on each `as` token
 export const y = input as unknown as number;

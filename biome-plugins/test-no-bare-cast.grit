@@ -1,8 +1,0 @@
-`$x as $t` where {
-  not $t <: r"^const$",
-  not $x <: `input`,
-  register_diagnostic(
-    span = $x,
-    message = "test: exclude input"
-  )
-}
