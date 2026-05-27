@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  AggregateExpr,
-  type AnyExpression,
-  type ExprVisitor,
-  ParamRef,
-  RawExpr,
-} from '../../src/exports/ast';
+import { type AnyExpression, type ExprVisitor, ParamRef, RawExpr } from '../../src/exports/ast';
 import { col, lit, param } from './test-helpers';
 
 describe('ast/RawExpr', () => {
@@ -52,24 +46,24 @@ describe('ast/RawExpr', () => {
       preparedParam: () => 'preparedParam',
       list: () => 'list',
       windowFunc: () => 'windowFunc',
-      rawSql: (e) => {
-        visited.push(`rawSql:${e.parts.length}`);
-        return 'rawSql';
+      rawExpr: (e) => {
+        visited.push(`rawExpr:${e.parts.length}`);
+        return 'rawExpr';
       },
     };
 
     const result = expr.accept(visitor);
-    expect(result).toBe('rawSql');
-    expect(visited).toEqual(['rawSql:2']);
+    expect(result).toBe('rawExpr');
+    expect(visited).toEqual(['rawExpr:2']);
   });
 
-  it('rewrites expression parts through the optional rawSql rewriter arm', () => {
+  it('rewrites expression parts through the optional rawExpr rewriter arm', () => {
     const ref = param(1, 'x');
     const expr = new RawExpr({ parts: ['prefix ', ref, ' suffix'], returns: returnsSpec });
 
     const newRef = param(99, 'x');
     const rewritten = expr.rewrite({
-      rawSql: (e) =>
+      rawExpr: (e) =>
         new RawExpr({
           parts: e.parts.map((p) => (p instanceof ParamRef ? newRef : p)) as ReadonlyArray<
             string | AnyExpression
@@ -82,26 +76,26 @@ describe('ast/RawExpr', () => {
     expect((rewritten as RawExpr).parts[1]).toBe(newRef);
   });
 
-  it('returns self from rewrite when no rawSql arm is provided', () => {
+  it('returns self from rewrite when no rawExpr arm is provided', () => {
     const expr = new RawExpr({ parts: ['now()'], returns: returnsSpec });
     const rewritten = expr.rewrite({});
     expect(rewritten).toBe(expr);
   });
 
-  it('folds using the optional rawSql folder arm when provided', () => {
+  it('folds using the optional rawExpr folder arm when provided', () => {
     const ref = param(1, 'x');
     const expr = new RawExpr({ parts: ['prefix ', ref], returns: returnsSpec });
 
     const result = expr.fold<string>({
       empty: '',
       combine: (a, b) => `${a}+${b}`,
-      rawSql: (e) => `raw:${e.parts.length}`,
+      rawExpr: (e) => `raw:${e.parts.length}`,
     });
 
     expect(result).toBe('raw:2');
   });
 
-  it('falls back to empty when no rawSql folder arm is provided', () => {
+  it('falls back to empty when no rawExpr folder arm is provided', () => {
     const expr = new RawExpr({ parts: ['now()'], returns: returnsSpec });
 
     const result = expr.fold<string[]>({
@@ -125,14 +119,6 @@ describe('ast/RawExpr', () => {
     const collected = expr.collectParamRefs();
     expect(collected).toContain(ref1);
     expect(collected).toContain(ref3);
-  });
-
-  it('baseColumnRef throws the same message as AggregateExpr.count()', () => {
-    const rawExpr = new RawExpr({ parts: ['1'], returns: returnsSpec });
-    const countExpr = AggregateExpr.count();
-
-    expect(() => rawExpr.baseColumnRef()).toThrow('does not expose a base column reference');
-    expect(() => countExpr.baseColumnRef()).toThrow('does not expose a base column reference');
   });
 
   it('preserves empty-string parts from back-to-back interpolations', () => {

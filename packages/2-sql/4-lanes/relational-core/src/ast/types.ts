@@ -20,7 +20,7 @@ export type AggregateFn = AggregateCountFn | AggregateOpFn;
  */
 export type WindowFn = 'row_number' | 'rank' | 'dense_rank';
 
-/** Scalar JS values that map directly to a SQL wire type. `Date` is excluded — it must be routed through `param(date, { codecId })` to select the target codec (timestamp vs. timestamptz, precision, timezone semantics). */
+/** Scalar JS values that map directly to a SQL wire type. Values outside this set must be routed through `param(value, { codecId })` to declare the target codec explicitly. */
 export type RawSqlLiteral = number | bigint | string | boolean | Uint8Array;
 
 export interface ExpressionSource {
@@ -35,7 +35,7 @@ export interface ExpressionRewriter {
   literal?(expr: LiteralExpr): LiteralExpr;
   list?(expr: ListExpression): ListExpression | LiteralExpr;
   select?(ast: SelectAst): SelectAst;
-  rawSql?(expr: RawExpr): AnyExpression;
+  rawExpr?(expr: RawExpr): AnyExpression;
 }
 
 export interface AstRewriter extends ExpressionRewriter {
@@ -62,7 +62,7 @@ export interface ExprVisitor<R> {
   param(expr: ParamRef): R;
   preparedParam(expr: PreparedParamRef): R;
   list(expr: ListExpression): R;
-  rawSql(expr: RawExpr): R;
+  rawExpr(expr: RawExpr): R;
 }
 
 export interface ExpressionFolder<T> {
@@ -76,7 +76,7 @@ export interface ExpressionFolder<T> {
   literal?(expr: LiteralExpr): T;
   list?(expr: ListExpression): T;
   select?(ast: SelectAst): T;
-  rawSql?(expr: RawExpr): T;
+  rawExpr?(expr: RawExpr): T;
 }
 
 export type ProjectionExpr = AnyExpression;
@@ -639,16 +639,16 @@ export class RawExpr extends Expression {
   }
 
   override accept<R>(visitor: ExprVisitor<R>): R {
-    return visitor.rawSql(this);
+    return visitor.rawExpr(this);
   }
 
   override rewrite(rewriter: ExpressionRewriter): AnyExpression {
-    return rewriter.rawSql ? rewriter.rawSql(this) : this;
+    return rewriter.rawExpr ? rewriter.rawExpr(this) : this;
   }
 
   override fold<T>(folder: ExpressionFolder<T>): T {
-    if (folder.rawSql) {
-      return folder.rawSql(this);
+    if (folder.rawExpr) {
+      return folder.rawExpr(this);
     }
     return combineAll(
       folder,

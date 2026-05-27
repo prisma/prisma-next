@@ -90,7 +90,7 @@ function bindWhereExprNode(contract: Contract<SqlStorage>, expr: AnyExpression):
     not(expr) {
       return new NotExpr(bindWhereExprNode(contract, expr.expr));
     },
-    rawSql(expr) {
+    rawExpr(expr) {
       return expr;
     },
   });

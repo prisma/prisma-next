@@ -160,7 +160,18 @@ export function buildOperation<R extends ScopeField>(spec: BuildOperationSpec<R>
   };
 }
 
-/** Minimal contract a target must satisfy to construct a {@link RawSqlTag} via {@link createRawSql} — looks up the codec id for a bare-literal interpolation. */
+/**
+ * Resolves a codec id for a bare JavaScript value interpolated into a raw-SQL
+ * template — e.g. `` rawSql`SELECT ${42}` `` calls `inferCodec(42)` to pick
+ * the codec id (`pg/int4`, `sqlite/integer@1`, etc.) that will encode the
+ * value as a bound parameter.
+ *
+ * Targets implement this once per dialect: examine the JS value's runtime
+ * shape (number, bigint, string, boolean, `Uint8Array`) and return a codec
+ * id known to the target's codec registry. Throw when the value falls
+ * outside the supported set — callers should wrap such values with
+ * `param(value, { codecId })` to declare the codec explicitly.
+ */
 export interface RawCodecInferer {
   inferCodec(value: RawSqlLiteral): string;
 }

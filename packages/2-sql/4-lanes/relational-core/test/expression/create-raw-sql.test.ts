@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ColumnRef, ParamRef, RawExpr, type RawSqlLiteral } from '../../src/exports/ast';
 import { buildOperation, createRawSql, param } from '../../src/exports/expression';
 
-// Stub adapter used throughout — applies simple type-based codec resolution.
+// Stub inferer used throughout — applies simple type-based codec resolution.
 // Safe-integer integers → 'test/int'; fractions / out-of-safe-int numbers → 'test/float';
 // bigint → 'test/bigint'; string → 'test/str'; boolean → 'test/bool'; Uint8Array → 'test/bytes'.
-const stubAdapter = {
+const stubInferer = {
   inferCodec(value: RawSqlLiteral): string {
     if (typeof value === 'bigint') return 'test/bigint';
     if (typeof value === 'string') return 'test/str';
@@ -18,7 +18,7 @@ const stubAdapter = {
   },
 };
 
-const rawSql = createRawSql(stubAdapter);
+const rawSql = createRawSql(stubInferer);
 
 describe('createRawSql factory', () => {
   describe('zero-interpolation template', () => {
@@ -47,8 +47,8 @@ describe('createRawSql factory', () => {
     });
   });
 
-  describe('bare RawSqlLiteral interpolation routes through adapter.inferCodec', () => {
-    it('wraps a number (safe integer) as a ParamRef with codec from adapter', () => {
+  describe('bare RawSqlLiteral interpolation routes through inferer.inferCodec', () => {
+    it('wraps a number (safe integer) as a ParamRef with codec from inferer', () => {
       const expr = rawSql`${42}`.returns('test/int');
       const rawExpr = expr.buildAst() as RawExpr;
       const part = rawExpr.parts[1];
@@ -57,7 +57,7 @@ describe('createRawSql factory', () => {
       expect((part as ParamRef).codec?.codecId).toBe('test/int');
     });
 
-    it('wraps a bigint as a ParamRef with codec from adapter', () => {
+    it('wraps a bigint as a ParamRef with codec from inferer', () => {
       const expr = rawSql`${9007199254740993n}`.returns('test/bigint');
       const rawExpr = expr.buildAst() as RawExpr;
       const part = rawExpr.parts[1];
@@ -66,7 +66,7 @@ describe('createRawSql factory', () => {
       expect((part as ParamRef).codec?.codecId).toBe('test/bigint');
     });
 
-    it('wraps a string as a ParamRef with codec from adapter', () => {
+    it('wraps a string as a ParamRef with codec from inferer', () => {
       const expr = rawSql`${'hello'}`.returns('test/str');
       const rawExpr = expr.buildAst() as RawExpr;
       const part = rawExpr.parts[1];
@@ -75,7 +75,7 @@ describe('createRawSql factory', () => {
       expect((part as ParamRef).codec?.codecId).toBe('test/str');
     });
 
-    it('wraps a boolean as a ParamRef with codec from adapter', () => {
+    it('wraps a boolean as a ParamRef with codec from inferer', () => {
       const expr = rawSql`${true}`.returns('test/bool');
       const rawExpr = expr.buildAst() as RawExpr;
       const part = rawExpr.parts[1];
@@ -84,7 +84,7 @@ describe('createRawSql factory', () => {
       expect((part as ParamRef).codec?.codecId).toBe('test/bool');
     });
 
-    it('wraps a Uint8Array as a ParamRef with codec from adapter', () => {
+    it('wraps a Uint8Array as a ParamRef with codec from inferer', () => {
       const bytes = new Uint8Array([1, 2, 3]);
       const expr = rawSql`${bytes}`.returns('test/bytes');
       const rawExpr = expr.buildAst() as RawExpr;
@@ -123,27 +123,27 @@ describe('createRawSql factory', () => {
     });
   });
 
-  describe('number boundary cases routed through adapter', () => {
-    it('routes a safe integer to test/int via stub adapter', () => {
+  describe('number boundary cases routed through inferer', () => {
+    it('routes a safe integer to test/int via stub inferer', () => {
       const expr = rawSql`${42}`.returns('test/int');
       const rawExpr = expr.buildAst() as RawExpr;
       expect((rawExpr.parts[1] as ParamRef).codec?.codecId).toBe('test/int');
     });
 
-    it('routes a fractional number to test/float via stub adapter', () => {
+    it('routes a fractional number to test/float via stub inferer', () => {
       const expr = rawSql`${1.5}`.returns('test/float');
       const rawExpr = expr.buildAst() as RawExpr;
       expect((rawExpr.parts[1] as ParamRef).codec?.codecId).toBe('test/float');
     });
 
-    it('routes a number beyond safe-integer range to test/float via stub adapter', () => {
+    it('routes a number beyond safe-integer range to test/float via stub inferer', () => {
       const beyondSafe = Number.MAX_SAFE_INTEGER + 1;
       const expr = rawSql`${beyondSafe}`.returns('test/float');
       const rawExpr = expr.buildAst() as RawExpr;
       expect((rawExpr.parts[1] as ParamRef).codec?.codecId).toBe('test/float');
     });
 
-    it('routes -0 to test/int via stub adapter (isSafeInteger(-0) is true)', () => {
+    it('routes -0 to test/int via stub inferer (isSafeInteger(-0) is true)', () => {
       const expr = rawSql`${-0}`.returns('test/int');
       const rawExpr = expr.buildAst() as RawExpr;
       expect((rawExpr.parts[1] as ParamRef).codec?.codecId).toBe('test/int');
@@ -151,7 +151,7 @@ describe('createRawSql factory', () => {
   });
 
   describe('param() override produces different codec than bare literal', () => {
-    it('bare 42 uses adapter-inferred codec while param(42, { codecId }) uses the specified one', () => {
+    it('bare 42 uses inferer-inferred codec while param(42, { codecId }) uses the specified one', () => {
       const withBare = rawSql`${42}`.returns('test/int').buildAst() as RawExpr;
       const withParam = rawSql`${param(42, { codecId: 'pg/int8' })}`
         .returns('test/int')
@@ -201,7 +201,7 @@ describe('createRawSql factory', () => {
     });
   });
 
-  describe('defence-in-depth throw for off-union values', () => {
+  describe('runtime throw when interpolating an off-union value via type cast', () => {
     type AnyTemplate = (
       strings: TemplateStringsArray,
       ...values: unknown[]
