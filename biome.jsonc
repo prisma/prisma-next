@@ -28,6 +28,7 @@
     "lineWidth": 100,
     "lineEnding": "lf"
   },
+  "plugins": ["./biome-plugins/no-bare-cast.grit"],
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
