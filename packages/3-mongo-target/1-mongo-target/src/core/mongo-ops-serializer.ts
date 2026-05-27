@@ -489,16 +489,19 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
     case 'createIndex': {
       const data = validate(CreateIndexJson, json, 'createIndex command');
       return new CreateIndexCommand(data.collection, data.keys, {
-        unique: data.unique,
-        sparse: data.sparse,
-        expireAfterSeconds: data.expireAfterSeconds,
-        partialFilterExpression: data.partialFilterExpression,
-        name: data.name,
-        wildcardProjection: data.wildcardProjection as Record<string, 0 | 1> | undefined,
-        collation: data.collation,
-        weights: data.weights as Record<string, number> | undefined,
-        default_language: data.default_language,
-        language_override: data.language_override,
+        ...ifDefined('unique', data.unique),
+        ...ifDefined('sparse', data.sparse),
+        ...ifDefined('expireAfterSeconds', data.expireAfterSeconds),
+        ...ifDefined('partialFilterExpression', data.partialFilterExpression),
+        ...ifDefined('name', data.name),
+        ...ifDefined(
+          'wildcardProjection',
+          data.wildcardProjection as Record<string, 0 | 1> | undefined,
+        ),
+        ...ifDefined('collation', data.collation),
+        ...ifDefined('weights', data.weights as Record<string, number> | undefined),
+        ...ifDefined('default_language', data.default_language),
+        ...ifDefined('language_override', data.language_override),
       });
     }
     case 'dropIndex': {
