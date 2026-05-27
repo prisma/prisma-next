@@ -123,6 +123,7 @@ function createTestAdapterDescriptor(
   const descriptors = descriptorsFromCodecs(adapter.profile.codecs());
   return {
     kind: 'adapter',
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
@@ -130,7 +131,7 @@ function createTestAdapterDescriptor(
     codecs: () => descriptors,
     create() {
       return Object.assign(
-        { familyId: 'sql' as const, targetId: 'postgres' as const, inferCodec: () => 'pg/text' },
+        { familyId: 'sql' as const, targetId: 'postgres' as const },
         adapter,
       ) as SqlRuntimeAdapterInstance<'postgres'>;
     },

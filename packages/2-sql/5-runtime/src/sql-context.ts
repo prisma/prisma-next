@@ -135,7 +135,12 @@ export interface SqlRuntimeAdapterDescriptor<
     TTargetId
   > = SqlRuntimeAdapterInstance<TTargetId>,
 > extends RuntimeAdapterDescriptor<'sql', TTargetId, TAdapterInstance>,
-    SqlStaticContributions {}
+    SqlStaticContributions {
+  /**
+   * Codec inferer used by `fns.raw` to look up the codec id for a bare-literal interpolation. Required on every SQL adapter descriptor — the facade reads it off the descriptor at client-construction time without instantiating the runtime adapter.
+   */
+  readonly rawCodecInferer: RawCodecInferer;
+}
 
 export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string>
   extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>>,
@@ -174,8 +179,7 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
   'sql',
   TTargetId
 > &
-  Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement> &
-  RawCodecInferer;
+  Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
 
 /**
  * NOTE: Binding type is intentionally erased to unknown at this shared runtime layer. Target clients (for example `postgres()`) validate and construct the concrete binding before calling `driver.connect(binding)`, which keeps runtime behavior safe today. A future follow-up can preserve TBinding through stack/context generics end-to-end.

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
-import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
+import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
@@ -96,7 +96,7 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
     ...(middleware ? { middleware } : {}),
   });
 
-  const adapter = createSqliteAdapter();
+  const adapter = sqliteRawCodecInferer;
   const db: Db<Contract> = sql<Contract>({ context, rawCodecInferer: adapter });
 
   return {

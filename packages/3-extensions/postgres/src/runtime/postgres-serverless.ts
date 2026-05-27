@@ -130,7 +130,7 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
 
   const sql: Db<TContract> = sqlBuilder<TContract>({
     context,
-    rawCodecInferer: stack.adapter.create(stack),
+    rawCodecInferer: stack.adapter.rawCodecInferer,
   });
 
   return {

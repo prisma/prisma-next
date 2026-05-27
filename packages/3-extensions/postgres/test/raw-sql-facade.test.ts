@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import { createContract } from '@prisma-next/contract/testing';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { type ParamRef, RawExpr } from '@prisma-next/sql-relational-core/ast';
@@ -75,7 +75,8 @@ function setupMocks() {
     target: { id: 'target-postgres' },
     adapter: {
       id: 'adapter-postgres',
-      create: () => ({ inferCodec: () => 'pg/text' }),
+      rawCodecInferer: { inferCodec: () => 'pg/text' },
+      create: () => ({}),
     },
     driver: { create: mocks.driverCreate },
     extensionPacks: [],
@@ -109,7 +110,7 @@ describe('postgres client rawSql surface', () => {
 
 describe('param() override beats adapter inferCodec through rawSql tag', () => {
   it('bare number interpolation uses adapter inferCodec (pg/int4 for safe integer)', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`SELECT ${42}`.returns('pg/int4');
     const ast = expr.buildAst();
@@ -121,7 +122,7 @@ describe('param() override beats adapter inferCodec through rawSql tag', () => {
   });
 
   it('param() with explicit codecId overrides adapter inferCodec default', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const overridden = param(42, { codecId: 'pg/int8' });
     const expr = tag`SELECT ${overridden}`.returns('pg/int8');
@@ -136,7 +137,7 @@ describe('param() override beats adapter inferCodec through rawSql tag', () => {
 
 describe('bare literal interpolation resolves codec via adapter inferCodec', () => {
   it('bare number interpolation resolves to pg/int4 via inferCodec (safe integer)', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${42})`.returns('pg/int4');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -145,7 +146,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare fractional number interpolation resolves to pg/float8 via inferCodec', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${3.14})`.returns('pg/float8');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -154,7 +155,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare string interpolation resolves to pg/text via inferCodec', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${'hello'})`.returns('pg/text');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -163,7 +164,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare bigint interpolation resolves to pg/int8 via inferCodec', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${9n ** 18n})`.returns('pg/int8');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -172,7 +173,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare boolean interpolation resolves to pg/bool via inferCodec', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${true})`.returns('pg/bool');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -181,7 +182,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare Uint8Array interpolation resolves to pg/bytea via inferCodec', () => {
-    const adapter = createPostgresAdapter();
+    const adapter = postgresRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${new Uint8Array([1, 2, 3])})`.returns('pg/bytea');
     const rawExpr = expr.buildAst() as RawExpr;

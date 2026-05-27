@@ -1,4 +1,4 @@
-import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
+import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import type { Contract } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { AggregateFunctions, Db, QueryContext } from '@prisma-next/sql-builder/types';
@@ -16,13 +16,13 @@ import { assertType, test } from 'vitest';
 const stubContext = {} as unknown as ExecutionContext<Contract<SqlStorage>>;
 
 test('sql() returns Db<C> and fns.raw is RawSqlTag in every callback', () => {
-  const adapter = createSqliteAdapter();
+  const adapter = sqliteRawCodecInferer;
   const db = sql({ context: stubContext, rawCodecInferer: adapter });
   assertType<Db<Contract<SqlStorage>>>(db);
 });
 
 test('field reference typechecks as rawSql interpolation', () => {
-  const adapter = createSqliteAdapter();
+  const adapter = sqliteRawCodecInferer;
   const db = sql({
     context: stubContext,
     rawCodecInferer: adapter,
@@ -45,7 +45,7 @@ test('field reference typechecks as rawSql interpolation', () => {
 });
 
 test('operation result typechecks as rawSql interpolation', () => {
-  const tag = createRawSql(createSqliteAdapter());
+  const tag = createRawSql(sqliteRawCodecInferer);
 
   const countExpr: Expression<{ codecId: 'sqlite/integer@1'; nullable: false }> = {
     returnType: { codecId: 'sqlite/integer@1', nullable: false },
@@ -59,7 +59,7 @@ test('operation result typechecks as rawSql interpolation', () => {
 });
 
 test('aggregate result composition typechecks', () => {
-  const adapter = createSqliteAdapter();
+  const adapter = sqliteRawCodecInferer;
   const db = sql({
     context: stubContext,
     rawCodecInferer: adapter,

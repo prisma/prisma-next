@@ -1,1 +1,1 @@
-export { createSqliteAdapter } from '../core/adapter';
+export { createSqliteAdapter, sqliteRawCodecInferer } from '../core/adapter';

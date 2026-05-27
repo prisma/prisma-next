@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createSqliteAdapter } from '../src/core/adapter';
+import { sqliteRawCodecInferer } from '../src/core/adapter';
 
-const adapter = createSqliteAdapter();
+const adapter = sqliteRawCodecInferer;
 
 describe('inferCodec', () => {
   describe('number → sqlite/integer@1 or sqlite/real@1', () => {

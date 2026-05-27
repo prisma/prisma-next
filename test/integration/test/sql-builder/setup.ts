@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
@@ -152,7 +152,7 @@ export function setupIntegrationTest() {
   });
 
   return {
-    db: () => sql({ context, rawCodecInferer: createPostgresAdapter() }),
+    db: () => sql({ context, rawCodecInferer: postgresRawCodecInferer }),
     runtime: () => runtime,
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../src/core/adapter';
+import { postgresRawCodecInferer } from '../src/core/adapter';
 
-const adapter = createPostgresAdapter();
+const adapter = postgresRawCodecInferer;
 
 describe('inferCodec', () => {
   describe('number → pg/int4 or pg/float8', () => {

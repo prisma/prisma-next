@@ -93,7 +93,11 @@ describe('postgresServerless', () => {
     });
     mocks.createSqlExecutionStack.mockReturnValue({
       target: { id: 'target-postgres' },
-      adapter: { id: 'adapter-postgres', create: () => ({ inferCodec: () => 'pg/text' }) },
+      adapter: {
+        id: 'adapter-postgres',
+        rawCodecInferer: { inferCodec: () => 'pg/text' },
+        create: () => ({}),
+      },
       driver: { create: mocks.driverCreate },
       extensionPacks: [],
     });

@@ -200,5 +200,5 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
     driver,
   });
 
-  return { runtime, context, rawCodecInferer: stackInstance.adapter };
+  return { runtime, context, rawCodecInferer: stack.adapter.rawCodecInferer };
 }

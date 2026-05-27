@@ -221,6 +221,7 @@ export function createTestAdapterDescriptor(
   const descriptors = descriptorsFromCodecs(adapter.__codecs);
   return {
     kind: 'adapter' as const,
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
@@ -228,14 +229,7 @@ export function createTestAdapterDescriptor(
     codecs: () => descriptors,
     mutationDefaultGenerators: createTestMutationDefaultGenerators,
     create(_stack): SqlRuntimeAdapterInstance<'postgres'> {
-      return Object.assign(
-        {
-          familyId: 'sql' as const,
-          targetId: 'postgres' as const,
-          inferCodec: () => 'pg/text',
-        },
-        adapter,
-      );
+      return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },
   };
 }
@@ -303,7 +297,6 @@ export function createTestStackInstance(options?: {
  */
 export type StubAdapter = Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> & {
   readonly __codecs: ReadonlyArray<Codec<string>>;
-  inferCodec(value: unknown): string;
 };
 
 /**
@@ -382,7 +375,6 @@ export function createStubAdapter(): StubAdapter {
 
   return {
     __codecs: codecs,
-    inferCodec: () => 'pg/text',
     profile: {
       id: 'stub-profile',
       target: 'postgres',

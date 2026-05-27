@@ -113,7 +113,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
-  const rawCodecInferer = stack.adapter.create(stack);
+  const rawCodecInferer = stack.adapter.rawCodecInferer;
   const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
   const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });

@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
@@ -157,7 +157,7 @@ describe('integration: rawSql expression in typed builder', {
 
   describe('rawSql expression survives the full pipeline and returns expected rows', () => {
     it('rawSql in aliased select produces correct computed values from the database', async () => {
-      const adapter = createPostgresAdapter();
+      const adapter = postgresRawCodecInferer;
       const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime();
 
@@ -177,7 +177,7 @@ describe('integration: rawSql expression in typed builder', {
     });
 
     it('rawSql with a literal scalar expression returns the same value for every row', async () => {
-      const adapter = createPostgresAdapter();
+      const adapter = postgresRawCodecInferer;
       const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime();
 
@@ -209,7 +209,7 @@ describe('integration: rawSql expression in typed builder', {
         },
       };
 
-      const adapter = createPostgresAdapter();
+      const adapter = postgresRawCodecInferer;
       const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime([middleware]);
 
@@ -251,7 +251,7 @@ describe('integration: rawSql expression in typed builder', {
         },
       };
 
-      const adapter = createPostgresAdapter();
+      const adapter = postgresRawCodecInferer;
       const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime([middleware]);
 

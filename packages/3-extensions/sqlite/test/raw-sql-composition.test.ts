@@ -1,4 +1,4 @@
-import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
+import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import type { Contract } from '@prisma-next/contract/types';
 import { createAggregateFunctions, sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -69,7 +69,7 @@ function rawSqlOf(fns: unknown, tag: ReturnType<typeof createRawSql>): typeof ta
 
 describe('rawSql composition with the typed builder', () => {
   it('aliased single-column select emits a RawExpr in the projection list', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const ctx = makeStubContext();
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
@@ -105,7 +105,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('aliased single-column select with field interpolation produces the correct RawExpr parts', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
 
     // Use createAggregateFunctions directly — same dispatch path as the aliased-select branch.
@@ -132,7 +132,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('bulk-object select AST contains a ColumnRef entry and a RawExpr entry', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
 
     // Use createAggregateFunctions directly — same dispatch path as the bulk-object-select branch.
@@ -151,7 +151,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('bulk-object select via the typed builder wires the RawExpr through the AST', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const ctx = makeStubContext();
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
@@ -187,7 +187,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('where with fns.gt(rawSql, literal) produces a BinaryExpr whose left operand is a RawExpr', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
 
     // Use createAggregateFunctions directly — same dispatch path as the .where branch.
@@ -221,7 +221,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('fns.count(rawSql) produces an AggregateExpr whose argument is a RawExpr', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
 
     const fns = createAggregateFunctions({}, adapter);
@@ -253,7 +253,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('nested rawSql: outer parts array contains inner RawExpr as an expression element', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
 
     const fns = createAggregateFunctions({}, adapter);
@@ -287,7 +287,7 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('nested rawSql: inner IdentifierRef descends correctly through the outer RawExpr fold', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
 
     const fns = createAggregateFunctions({}, adapter);

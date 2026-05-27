@@ -70,7 +70,7 @@ async function buildHarness(log: Log): Promise<Harness> {
   const runtime = createRuntime({ stackInstance, context, driver, log });
   const db: Db<Contract> = sqlBuilder<Contract>({
     context,
-    rawCodecInferer: stackInstance.adapter,
+    rawCodecInferer: stack.adapter.rawCodecInferer,
   });
 
   return {

@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { postgresRawCodecInferer } from '@prisma-next/adapter-postgres/adapter';
 import type { Contract } from '@prisma-next/contract/types';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { AggregateFunctions, Db, QueryContext } from '@prisma-next/sql-builder/types';
@@ -16,13 +16,13 @@ import { assertType, test } from 'vitest';
 const stubContext = {} as unknown as ExecutionContext<Contract<SqlStorage>>;
 
 test('sql() returns Db<C> and fns.raw is RawSqlTag in every callback', () => {
-  const adapter = createPostgresAdapter();
+  const adapter = postgresRawCodecInferer;
   const db = sql({ context: stubContext, rawCodecInferer: adapter });
   assertType<Db<Contract<SqlStorage>>>(db);
 });
 
 test('field reference typechecks as rawSql interpolation', () => {
-  const adapter = createPostgresAdapter();
+  const adapter = postgresRawCodecInferer;
   const db = sql({
     context: stubContext,
     rawCodecInferer: adapter,
@@ -46,7 +46,7 @@ test('field reference typechecks as rawSql interpolation', () => {
 });
 
 test('operation result typechecks as rawSql interpolation', () => {
-  const tag = createRawSql(createPostgresAdapter());
+  const tag = createRawSql(postgresRawCodecInferer);
 
   // An expression produced by a builder function (e.g. count()) also satisfies
   // RawSqlInterpolation (it is Expression<ScopeField>).
@@ -63,7 +63,7 @@ test('operation result typechecks as rawSql interpolation', () => {
 });
 
 test('aggregate result composition typechecks', () => {
-  const adapter = createPostgresAdapter();
+  const adapter = postgresRawCodecInferer;
   const db = sql({
     context: stubContext,
     rawCodecInferer: adapter,

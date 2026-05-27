@@ -1,4 +1,4 @@
-import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
+import { sqliteRawCodecInferer } from '@prisma-next/adapter-sqlite/adapter';
 import { createContract } from '@prisma-next/contract/testing';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { type ParamRef, RawExpr } from '@prisma-next/sql-relational-core/ast';
@@ -64,7 +64,11 @@ function setupMocks() {
   });
   mocks.createSqlExecutionStack.mockReturnValue({
     target: { id: 'target-sqlite' },
-    adapter: { id: 'adapter-sqlite', create: () => ({ inferCodec: () => 'sqlite/text@1' }) },
+    adapter: {
+      id: 'adapter-sqlite',
+      rawCodecInferer: { inferCodec: () => 'sqlite/text@1' },
+      create: () => ({}),
+    },
     driver: { create: mocks.driverCreate },
     extensionPacks: [],
   });
@@ -102,7 +106,7 @@ describe('sqlite client rawSql surface', () => {
 
 describe('param() override beats adapter inferCodec through rawSql tag', () => {
   it('bare number interpolation uses adapter inferCodec (sqlite/integer@1 for safe integer)', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`SELECT ${42}`.returns('sqlite/integer@1');
     const ast = expr.buildAst();
@@ -114,7 +118,7 @@ describe('param() override beats adapter inferCodec through rawSql tag', () => {
   });
 
   it('param() with explicit codecId overrides adapter inferCodec default', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const overridden = param(42, { codecId: 'sqlite/real@1' });
     const expr = tag`SELECT ${overridden}`.returns('sqlite/real@1');
@@ -129,7 +133,7 @@ describe('param() override beats adapter inferCodec through rawSql tag', () => {
 
 describe('bare literal interpolation resolves codec via adapter inferCodec', () => {
   it('bare number interpolation resolves to sqlite/integer@1 via inferCodec (safe integer)', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${42})`.returns('sqlite/integer@1');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -138,7 +142,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare fractional number interpolation resolves to sqlite/real@1 via inferCodec', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${1.5})`.returns('sqlite/real@1');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -147,7 +151,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare bigint interpolation resolves to sqlite/bigint@1 via inferCodec', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${9n ** 18n})`.returns('sqlite/bigint@1');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -156,7 +160,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare string interpolation resolves to sqlite/text@1 via inferCodec', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${'hello'})`.returns('sqlite/text@1');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -165,7 +169,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare boolean interpolation resolves to sqlite/integer@1 via inferCodec', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${true})`.returns('sqlite/integer@1');
     const rawExpr = expr.buildAst() as RawExpr;
@@ -174,7 +178,7 @@ describe('bare literal interpolation resolves codec via adapter inferCodec', () 
   });
 
   it('bare Uint8Array interpolation resolves to sqlite/blob@1 via inferCodec', () => {
-    const adapter = createSqliteAdapter();
+    const adapter = sqliteRawCodecInferer;
     const tag = createRawSql(adapter);
     const expr = tag`f(${new Uint8Array([1, 2, 3])})`.returns('sqlite/blob@1');
     const rawExpr = expr.buildAst() as RawExpr;

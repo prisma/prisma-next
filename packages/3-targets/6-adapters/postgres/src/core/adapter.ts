@@ -9,6 +9,7 @@ import type {
   RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
@@ -51,6 +52,13 @@ class PostgresAdapterImpl
     });
   }
 
+  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
+    return renderLoweredSql(ast, context.contract, this.codecLookup);
+  }
+}
+
+/** Codec-id lookup for bare-literal interpolations used by `fns.raw` on a postgres client. Contributed as the descriptor's static `rawCodecInferer` slot. */
+export const postgresRawCodecInferer: RawCodecInferer = {
   inferCodec(value: RawSqlLiteral): string {
     switch (typeof value) {
       case 'number':
@@ -67,12 +75,8 @@ class PostgresAdapterImpl
     throw new Error(
       'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
     );
-  }
-
-  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
-    return renderLoweredSql(ast, context.contract, this.codecLookup);
-  }
-}
+  },
+};
 
 async function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
   const exists = await queryable.query(

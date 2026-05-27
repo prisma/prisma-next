@@ -166,7 +166,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
-  const rawCodecInferer = stack.adapter.create(stack);
+  const rawCodecInferer = stack.adapter.rawCodecInferer;
   const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;

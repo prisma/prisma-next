@@ -32,6 +32,7 @@ import type {
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
@@ -62,6 +63,13 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     });
   }
 
+  lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
+    return renderLoweredSql(ast, context.contract);
+  }
+}
+
+/** Codec-id lookup for bare-literal interpolations used by `fns.raw` on a sqlite client. Contributed as the descriptor's static `rawCodecInferer` slot. */
+export const sqliteRawCodecInferer: RawCodecInferer = {
   inferCodec(value: RawSqlLiteral): string {
     switch (typeof value) {
       case 'number':
@@ -80,12 +88,8 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     throw new Error(
       'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
     );
-  }
-
-  lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
-    return renderLoweredSql(ast, context.contract);
-  }
-}
+  },
+};
 
 /**
  * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
