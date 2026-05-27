@@ -76,7 +76,7 @@ describe('sqlite close()', () => {
     });
     mocks.createSqlExecutionStack.mockReturnValue({
       target: { id: 'target-sqlite' },
-      adapter: { id: 'adapter-sqlite' },
+      adapter: { id: 'adapter-sqlite', create: () => ({ inferCodec: () => 'sqlite/text@1' }) },
       driver: { create: mocks.driverCreate },
       extensionPacks: [],
     });
