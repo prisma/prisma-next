@@ -24,16 +24,14 @@ One slice landing the helpers (`blindCast`, `castAs`), the biome custom rule, th
    - `castAs<T>(value: T): T` (per [`./reference/castAs.ts`](./reference/castAs.ts))
    - Package boilerplate, `package.json` workspace registration, `tsdown` config, tsconfig.
 
-2. **Biome custom rule** — fires on every `as` token in production code except:
-   - `as const` (pass-through).
-   - The single line `return input as TargetType` inside `blindCast`'s body (covered by an in-file `// biome-ignore lint/casts/no-bare-cast: this is the helper itself` magic comment).
+2. **Biome custom rule** — fires on every `as` token in production code except `as const` (pass-through). No `blindCast.ts`-body self-exemption is needed: `blindCast`'s body is reshaped to avoid the `as` keyword (going through a hyper-local `any` instead), so the rule has no token in the helper to fire on. The `any` is suppressed with a built-in `// biome-ignore lint/suspicious/noExplicitAny: <reason>` comment — see [`./design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs).
 
-   *Verification step before committing:* a small prototype that confirms biome's plugin DSL can express the recognition surface (A2). If it can't, fall back to a ts-morph standalone script.
+   *Verification step before committing:* a small prototype that confirms biome's plugin DSL can express the recognition surface (A2). **Outcome (recorded in spec § Assumptions):** A2 confirmed for recognition + `as const` carve-out; biome's GritQL plugin diagnostics do not support `// biome-ignore` suppression (resolved by the `any`-relocation tactic above) or `--only=<rule-id>` filtering (resolved in D3 via `--reporter=json` + filter).
 
 3. **Biome test-file override** — extend the existing `overrides` block in `biome.jsonc` (the one already disabling `noNonNullAssertion` for tests) to turn the cast rule off for `**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`.
 
 4. **CI ratchet script** — wrapper that:
-   - Runs biome with `--only=<rule-id> --reporter=json` on HEAD.
+   - Runs biome with `--reporter=json` on HEAD and filters the diagnostic list by `category == "plugin"` *and* the `no-bare-cast` plugin's distinctive message prefix (rationale: biome's `--only` flag does not work for GritQL plugin diagnostics; see [`./design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs)).
    - Uses `git worktree add --detach $(git merge-base origin/main HEAD)` to materialize the merge-base.
    - Runs the same biome invocation on the merge-base worktree.
    - Counts violations on each, fails if HEAD's count exceeds merge-base.
@@ -109,35 +107,36 @@ Four dispatches, sequential. Each is M-sized or smaller; no L/XL per the M-cap. 
 
 ### Dispatch 2: Biome custom rule + helper self-exemption + test-file override + rule fixture test
 
-**Intent.** Add a biome custom plugin (per biome v2's plugin DSL — verify expressiveness first per A2) that fires on every `as` token in production code, except `as const` and the single line in `blindCast.ts` whitelisted by an in-file `// biome-ignore` comment. Extend `biome.jsonc`'s existing test-file `overrides` block to disable the rule for tests. Add fixture tests for the rule (positive case fires; `as const` doesn't; whitelisted line doesn't; test file doesn't).
+**Intent.** Add a biome GritQL plugin that fires on every `as` token in production code, except `as const`. Extend `biome.jsonc`'s existing test-file `overrides` block to disable the rule for tests. Reshape `blindCast`'s body to avoid the `as` keyword (so the rule has nothing to fire on inside the helper, and no plugin-suppression is needed — see [`../design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs)). Add fixture tests for the rule (positive case fires; `as const` doesn't; `blindCast.ts` doesn't; test file doesn't).
 
-**A2 verification step (first sub-task).** Before committing to the biome plugin path, write a small GritQL (or whichever DSL biome 2.4.14 ships) prototype that confirms the recognition surface is expressible. If it isn't, **halt the dispatch and route to `drive-discussion`** per stop-condition #2 (unpinned design decision: fallback to ts-morph standalone script needs operator authorisation).
+**A2 verification: completed.** The verification prototype was committed in D2 R1 as `d8cb7f90a` and confirmed (a) recognition + `as const` carve-out work; (b) biome's GritQL plugin diagnostics do not support `// biome-ignore` suppression or `--only=<rule-id>` filtering. Resolutions are recorded in [`./design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs); this dispatch now lands the production rule with those resolutions baked in.
 
 **Files in play.**
 
-- Biome plugin source — location depends on biome's plugin layout convention (likely `biome-plugins/no-bare-cast.grit` at repo root, or under a tooling package; implementer picks during the verification step).
-- `biome.jsonc` (root) — register the plugin under `plugins`; add the rule to the existing test-file `overrides` block with `"off"`.
-- `packages/0-shared/cast-utils/src/blindCast.ts` — add `// biome-ignore lint/casts/no-bare-cast: this is the helper itself` on the line `return input as TargetType`.
-- Plugin test fixtures — at least: (a) a file with bare `as Foo` (must fire); (b) a file with `as const` (must NOT fire); (c) verification that `blindCast.ts`'s body line does NOT fire (self-exemption honoured); (d) a `.test.ts` file with `as Foo` (must NOT fire — test override honoured).
+- Biome plugin source (production rule) — location: `biome-plugins/no-bare-cast.grit` (or equivalent path; implementer picks the final convention).
+- `biome.jsonc` (root) — register the plugin under `plugins`; extend the existing test-file `overrides` block to disable the new rule on test files (alongside the existing `noNonNullAssertion: off`).
+- `packages/0-shared/cast-utils/src/blindCast.ts` — reshape body from `return input as TargetType` to `const x: any = input; return x;` (or semantically equivalent); add a `// biome-ignore lint/suspicious/noExplicitAny: <Reason articulating why this helper is the canonical home for the type-system escape>` on the `: any` line. Update the TSDoc if necessary to keep the last-resort framing internally consistent.
+- Plugin test fixtures — at least: (a) a file with bare `as Foo` and `as unknown as Foo` (must fire); (b) a file with `as const` (must NOT fire); (c) verification that `blindCast.ts` produces zero new-rule diagnostics (because no `as` token exists in the body any more); (d) a `.test.ts` file with `as Foo` (must NOT fire — test override honoured).
 
 **"Done when":**
 
-- [ ] A2 verification prototype committed and confirms biome plugin expressiveness (or, on falsification, dispatch halted via stop-condition).
-- [ ] Plugin file checked in; biome.jsonc registers it.
-- [ ] Running `pnpm biome check` on the fixture with bare `as` reports the violation under the rule's ID.
-- [ ] Running `pnpm biome check` on the `as const` fixture does not report.
-- [ ] Running `pnpm biome check` on `packages/0-shared/cast-utils/src/blindCast.ts` does not report (the in-file `// biome-ignore` is honoured).
-- [ ] Running `pnpm biome check` on a `.test.ts` fixture with bare `as` does not report.
+- [x] A2 verification prototype committed (`d8cb7f90a`); biome plugin expressiveness confirmed for recognition; gaps for suppression + `--only` resolved per design-notes.
+- [ ] Production plugin file checked in (replaces or renames `biome-plugins/test-no-bare-cast.grit`); `biome.jsonc` registers it.
+- [ ] `blindCast.ts` body reshaped to use `any` (no `as` token in the body); built-in `noExplicitAny` suppression carries a `Reason`-style justification.
+- [ ] Running `pnpm biome check` (or `pnpm biome lint`) on the bare-`as` fixture reports the violation.
+- [ ] Running it on the `as const` fixture does not report.
+- [ ] Running it on `packages/0-shared/cast-utils/src/blindCast.ts` produces no new-rule diagnostics, and the built-in `noExplicitAny` is suppressed at the one `: any` line.
+- [ ] Running it on a `.test.ts` fixture with bare `as` does not report (test override honoured).
 - [ ] Existing `pnpm lint:packages` / `pnpm lint:code` / `pnpm typecheck` / `pnpm test:packages` clean (the rule is loaded but no production-file violation count rose this dispatch — D3 wires the ratchet).
-- [ ] Intent-validation: diff is biome plugin + biome.jsonc + the one `// biome-ignore` line + fixtures. No other surfaces touched.
+- [ ] Intent-validation: diff is biome plugin + biome.jsonc + the one-line `blindCast.ts` body reshape + the suppression comment + fixtures. No other surfaces touched.
 
-**Size.** M (with A2 risk — could expand if biome plugin DSL falls short; the verification step is the early-exit).
+**Size.** M.
 
 **DoR confirmed:** [✓]
 
 ### Dispatch 3: CI ratchet script + `pnpm lint:casts` + CI workflow integration + smoke test
 
-**Intent.** Add a wrapper script that runs biome with `--only=<rule-id> --reporter=json` on HEAD and on `git merge-base origin/main HEAD` (via `git worktree add --detach`), counts the violation lists, fails if HEAD's count exceeds merge-base. Register as `pnpm lint:casts`. Wire into `.github/workflows/ci.yml`'s existing Lint job. Add a smoke test that simulates the three scenarios (+1 / −1 / 0 delta) end-to-end.
+**Intent.** Add a wrapper script that runs biome with `--reporter=json` on HEAD and on `git merge-base origin/main HEAD` (via `git worktree add --detach`), filters the JSON diagnostic list to entries from the `no-bare-cast` plugin (by `category == "plugin"` *and* the plugin's distinctive message-text prefix — biome's `--only` flag does not work for GritQL plugin diagnostics; see [`./design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs)), counts each side, fails if HEAD's count exceeds merge-base. Register as `pnpm lint:casts`. Wire into `.github/workflows/ci.yml`'s existing Lint job. Add a smoke test that simulates the three scenarios (+1 / −1 / 0 delta) end-to-end.
 
 **Files in play.**
 

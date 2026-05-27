@@ -18,10 +18,9 @@
 
 ### Recognition surface
 
-The biome custom rule fires on the syntactic `as` token in production code. The carve-outs are exactly two:
+The biome custom rule fires on the syntactic `as` token in production code. The only carve-out at the `as`-token level is **`as const`** — a syntactic operator producing a `readonly` literal type, not a type assertion. (Biome already enforces `useAsConstAssertion`; this rule complements rather than conflicts.)
 
-1. **`as const`** — pass-through. It's a syntactic operator producing a `readonly` literal type, not a type assertion. (Biome already enforces `useAsConstAssertion`; this rule complements rather than conflicts.)
-2. **One in-file exception inside `blindCast.ts`** — the helper's body (`return input as TargetType`) is the one legitimate `as Foo` in the repo. Covered by an in-file `// biome-ignore lint/casts/no-bare-cast: this is the helper itself` comment.
+The helper's body does **not** need a self-exemption: `blindCast` is implemented without using the `as` keyword. The escape goes through a hyper-local intermediate `any`, suppressed with a built-in `// biome-ignore lint/suspicious/noExplicitAny` comment carrying the justification at exactly the spot the original spec wanted the marker. See [§ Accepted trade-offs](#accepted-trade-offs) for why this shape rather than an in-file plugin-suppression.
 
 Everything else — `as Foo`, `as unknown as Foo`, `as never`, `as Brand<…>`, generic-constrained casts in type helpers, `<T>x` (the old angle-bracket form), etc. — must be eliminated or routed through `blindCast` / `castAs`.
 
@@ -43,7 +42,7 @@ CI counts cast-rule violations at HEAD and at `git merge-base origin/main HEAD`.
 
 Mechanism:
 
-1. Run `biome check --only=lint/casts/no-bare-cast --reporter=json` on HEAD. Parse the diagnostic list; count.
+1. Run `biome lint --reporter=json` on HEAD. Filter the diagnostic list to entries from the `no-bare-cast` GritQL plugin (filter by `category == "plugin"` *and* a distinctive message-text prefix the plugin emits — see [§ Accepted trade-offs](#accepted-trade-offs)). Count.
 2. Materialize merge-base in a fresh worktree: `git worktree add --detach <merge-base>`.
 3. Run the same biome invocation in the merge-base worktree. Count.
 4. Compare. If HEAD > merge-base, fail with per-site diagnostics for the *added* casts.
@@ -89,11 +88,9 @@ The lint rule prevents *new* abuses; the agent surfaces drive the count *down* o
 
 ## Open questions
 
-Working positions live in [`./spec.md § Open Questions`](./spec.md#open-questions). The discussion resolved the load-bearing ones; the four remaining are implementer-decided or verify-by-prototype.
+Working positions live in [`./spec.md § Open Questions`](./spec.md#open-questions). The discussion resolved the load-bearing ones; OQ1, OQ2, OQ3 were resolved during D1 and D2 (see § Accepted trade-offs below for OQ1/OQ3 specifics). OQ4 remains an implementer-decided refinement.
 
-- **OQ1 — Biome plugin DSL expressiveness.** Working position: biome's plugin syntax (GritQL or whichever DSL biome v2.4.14 ships) can express the recognition surface. Verification: small prototype before committing. Fallback: ts-morph.
-- **OQ2 — Helper package name.** Working position: `cast-utils`. Alternatives: `typesafe-utils`, `type-escapes`. Implementer-decided.
-- **OQ3 — Biome rule ID.** Working position: `lint/casts/no-bare-cast`. Implementer-decided per biome plugin convention.
+- ~~OQ1, OQ2, OQ3~~ — resolved (see [`./spec.md § Open Questions`](./spec.md#open-questions) for the current state).
 - **OQ4 — Per-site error message format.** Working position: `file:line — replace with blindCast<T, "reason">(...) or castAs<T>(value)`. Implementer can refine.
 
 ## Accepted trade-offs
@@ -101,6 +98,8 @@ Working positions live in [`./spec.md § Open Questions`](./spec.md#open-questio
 - **Agent defeat via delete-here-add-there.** Whole-repo count survives this; an agent who *really* wants to add a cast could delete an unrelated one as a net-zero move. We tolerate it: the case is rare, the agent rule + skill catch it on review, and per-file ratcheting is worse on more axes.
 - **`satisfies` not actively promoted.** Outside this rule's scope. Authors who prefer `satisfies` can use it; authors who don't get the lint rule's `as`-token failure and reach for `castAs` instead. Future work could promote `satisfies` more aggressively.
 - **Test-code casts unbounded.** Tests routinely abuse `as` for stubbing; we accept this in exchange for not having to retrofit every test. If a future agent disguises production code as test code to bypass the rule, that's a real bug, not a rule gap.
+- **`blindCast` body uses `any`, not `as`, to relocate the escape away from the new rule's recognition surface.** Biome 2.4.x's GritQL plugin diagnostics do not honour per-line `// biome-ignore` suppression (biome [#2582](https://github.com/biomejs/biome/issues/2582), "not in progress"). Rather than encoding the helper's self-exemption inside the plugin source as a file-pattern carve-out (which removes the auditable in-file marker the original spec wanted), the helper's body shifts to `const x: any = input; return x;`. The new rule has no `as` token to fire on; the `any` is suppressed with a built-in `// biome-ignore lint/suspicious/noExplicitAny: <reason>` carrying the same kind of justification we wanted on the original `as`. Trade-off accepted: the escape's spelling changes from `as` to `any`, both of which are universally forbidden outside this helper. Both rules' suppression sits at the same single line in the same single helper body in the same single package.
+- **CI ratchet filters biome's `--reporter=json` output by category + message-text, not by `--only=<rule-id>`.** Biome 2.4.x's `--only` flag does not apply to GritQL plugin diagnostics; all GritQL plugins share `category: "plugin"`. The ratchet script filters JSON output instead. To future-proof against a second GritQL plugin landing later, the `no-bare-cast` plugin's `register_diagnostic` message is given a distinctive prefix the ratchet can match against. Cost: the ratchet's filter is slightly more code than a single `--only` flag would have been; benefit: stays in biome, no second lint tool, no second `pnpm` command.
 
 ## References
 
