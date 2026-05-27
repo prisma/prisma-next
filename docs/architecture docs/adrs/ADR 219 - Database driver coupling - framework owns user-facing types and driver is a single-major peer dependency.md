@@ -1,14 +1,10 @@
 # ADR 219 — Database driver coupling: framework owns user-facing types; driver is a single-major peer dependency
 
-## Status
-
-**Accepted.** First instance lands in [PR #597](https://github.com/prisma/prisma-next/pull/597) for `@prisma-next/mongo` and siblings (closes [TML-2663](https://linear.app/prisma-company/issue/TML-2663/mongo-driver-is-pinned-to-version-6-cant-support-7-or-8)). The policy is framework-wide and applies to every database extension; current divergence in other extensions (notably `@prisma-next/postgres`) is implementation status to be migrated on each extension's own cadence, not a contradiction of the policy.
-
 ## At a glance
 
 Prisma Next's database extensions (`@prisma-next/mongo`, `@prisma-next/postgres`, `@prisma-next/sqlite`, …) couple to their underlying database drivers (`mongodb`, `pg`, `better-sqlite3`, …) under two framework-wide rules:
 
-1. The framework **owns the user-facing type surface**. Users importing database-driver types in application code import them from `@prisma-next/<extension>/*` — never directly from the driver. The framework re-exports those types from the driver; it does not wrap them in its own type identities.
+1. The framework **owns the user-facing type surface**. Users importing database-driver types in application code import them from `@prisma-next/<extension>/*` — never directly from the driver. The framework re-exports those types from the driver; it does not wrap them in framework-owned type identities.
 2. The driver is declared as a **single-major peer dependency** on the framework's runtime-consumer packages. Users declare and install the driver themselves; the framework supports exactly one driver major at a time.
 
 Major driver bumps are breaking framework releases following a documented audit cadence (§ Major-bump cadence).
@@ -19,7 +15,7 @@ Every database extension faces the same coupling question: where do users get th
 
 The questions are coupled because the answer to "which types do users import" constrains the answer to "how do we declare the driver." If the framework owns the user-facing types by re-exporting them, the framework is forced into a single supported driver major (cross-major class realms break the re-export's identity guarantees). If the framework supports multiple majors, it cannot re-export the driver's types — it must wrap them in framework-owned identities or push users at the driver directly. Picking the policy on one question implies the policy on the other.
 
-The first concrete instance is mongo: PR #597 migrates `@prisma-next/mongo` from `mongodb` as a regular `dependency` on a pinned major (`^6`) to `mongodb` as a `peerDependency` with a single supported major (`^7`), while preserving the `@prisma-next/mongo/bson` re-export barrel that has been the user-facing import path since the extension was created. The same policy shape applies to every other database extension: `@prisma-next/postgres` should declare `pg` as a peer (currently in `dependencies`), `@prisma-next/sqlite` likewise for whichever sqlite driver it depends on, and so on. Migration of each extension to this posture is its own work; this ADR codifies the policy so the next migration starts from settled ground.
+The policy is framework-wide. Every database extension that wraps a driver — mongo, postgres, sqlite, future additions — adopts the same posture; migration of any extension whose declarations currently diverge is implementation work, not a re-litigation of the policy.
 
 ## Decision
 
@@ -43,7 +39,7 @@ The framework re-exports these types from the underlying driver (`@prisma-next/m
 The framework's runtime-consumer packages declare the driver in `peerDependencies` with a single-major range:
 
 ```jsonc
-// packages/3-extensions/mongo/package.json (after PR #597)
+// packages/3-extensions/mongo/package.json
 {
   "peerDependencies": { "mongodb": "^7.0.0" }
 }
@@ -65,7 +61,7 @@ Users declare the driver in their own `package.json` and choose their install wi
 
 **Why peer dependency and not regular dependency.** Declaring the driver as a regular `dependency` in the framework's packages hides it from the user's `package.json` and lockfile — the user can see two majors in their tree if any other dependency also installs the driver, with no clear control over which wins. Peer-dep declaration makes the driver visible in the user's own install graph, gives them explicit control over minor / patch within the supported major, and surfaces version conflicts at install time rather than at runtime.
 
-**Non-consumer packages.** Workspace packages that don't `import from '<driver>'` in `src/` (e.g. `@prisma-next/family-mongo` after the mongo extension was decomposed) declare the driver in neither `dependencies` nor `peerDependencies`. `devDependencies: { <driver>: catalog: }` is permitted on a non-consumer package when its own test code imports from the driver — `devDependencies` do not propagate to end-users' install graphs, so they are a build-time concern that doesn't affect the public coupling shape.
+**Non-consumer packages.** Workspace packages that don't `import from '<driver>'` in `src/` (e.g. `@prisma-next/family-mongo`) declare the driver in neither `dependencies` nor `peerDependencies`. `devDependencies: { <driver>: catalog: }` is permitted on a non-consumer package when its own test code imports from the driver — `devDependencies` do not propagate to end-users' install graphs, so they are a build-time concern that doesn't affect the public coupling shape.
 
 **Workspace catalog.** The workspace catalog (`pnpm-workspace.yaml`) pins a concrete version inside the supported major (e.g. `mongodb: ^7.2.0`) for the framework's own dev / test / CI builds. Internal `devDependencies` reference the catalog. The catalog moves to a new minor (or major, on a bump) in lockstep with the peer range.
 
@@ -92,24 +88,18 @@ When the upstream driver publishes a new major, the framework's adoption follows
 ### Negative
 
 - **Forced upgrades on driver major bumps.** Users on the previous catalog accept a forced upgrade in lockstep with the framework's breaking release. There is no "stay on the old driver while using the new framework" path.
-- **Public-API breaks on every driver major.** Class-shape changes in the driver's types propagate through the framework's re-export barrels. The framework's migration notes carry these breaks to users (e.g. BSON v7's removal of the `new ObjectId(numericTimestamp)` constructor is now a Prisma Next migration-note item).
+- **Public-API breaks on every driver major.** Class-shape changes in the driver's types propagate through the framework's re-export barrels. The framework's migration notes carry these breaks to users (for example, BSON v7's removal of the `new ObjectId(numericTimestamp)` constructor surfaces as a Prisma Next migration-note item).
 - **Maintenance cost per driver major.** Each driver major requires the framework to walk the audit cadence (§ 3). Acceptable cost — drivers publish majors at year-plus cadences and the audit is bounded.
-
-### Neutral
-
-- **Some extensions currently diverge.** As of this ADR's acceptance, `@prisma-next/postgres` declares `pg` in `dependencies` (not `peerDependencies`); `@prisma-next/sqlite` does not declare a driver at all (its driver model is out of scope for this ADR). Migration of these extensions to the policy is each extension's own work — a follow-up rather than a re-litigation of the policy.
 
 ## Alternatives considered
 
-- **A. Pin the driver in `dependencies` (driver is the framework's implementation detail).** Rejected because the install-graph honesty argument (peer-dep makes the driver visible in the user's `package.json`) outweighs the surface uniformity argument. Framework packages declaring the driver as a regular dep hide it from user tooling and prevent users from controlling minor / patch within the major. This is the posture the framework had before PR #597 and the posture other extensions still hold; migrating away from it is part of conforming to this ADR.
+- **A. Pin the driver in `dependencies` (driver is the framework's implementation detail).** Rejected because the install-graph honesty argument (peer-dep makes the driver visible in the user's `package.json`) outweighs the surface uniformity argument. Framework packages declaring the driver as a regular dep hide it from user tooling and prevent users from controlling minor / patch within the major.
 - **B. Multi-major peer range (`^N || ^N+1`).** Rejected because it forces dropping the type re-export (cross-major class realms break `instanceof` and shape compatibility), forces structural typing of every driver-typed surface, doubles or triples the test matrix, and multiplies maintenance cost on every breaking change in any in-range major. The complexity-cost / value-delivered ratio is wrong.
-- **C. Drop the framework-owned type re-exports; users import driver types directly from the driver package.** Rejected because the framework's role as the ORM means it owns the types user code touches. Forcing users to import `ObjectId` from `'mongodb'` (or `Pool` from `'pg'`) directly contradicts the framework's surface-ownership commitment and tightens user-side coupling to the driver beyond what the framework controls. The barrel earns its keep as the PN-owned import path for these classes.
+- **C. Drop the framework-owned type re-exports; users import driver types directly from the driver package.** Rejected because the framework's role as the ORM means it owns the types user code touches. Forcing users to import `ObjectId` from `'mongodb'` (or `Pool` from `'pg'`) directly contradicts the framework's surface-ownership commitment and tightens user-side coupling to the driver beyond what the framework controls. The barrel earns its keep as the framework-owned import path for these classes.
 - **D. Wrap driver types with framework-owned identities (`PrismaObjectId`, `PrismaPool`, …).** Rejected because wrapping forces conversion at every boundary, denormalises the type surface, couples the framework's release cadence to maintaining a wrapper layer, and decouples framework-emitted types from the driver's own type evolution (deprecated symbols persist past upstream removal). The framework owns the *import path* but defers the *type identity* to the driver per-supported-major.
 - **E. "Pin to latest now, add multi-major support as a follow-up feature later".** Rejected because the framing is incoherent — adding multi-major support is not an additive feature on top of single-major, it requires breaking the type re-export (rule 1) and restructuring every nominally-typed driver surface, both of which are public-API breaks. If multi-major ever becomes necessary, it is correctly framed as a future breaking-change project with its own design.
 
 ## References
 
-- Linear ticket (first instance): [TML-2663 — mongo driver pinned to v6, can't support v7 or v8](https://linear.app/prisma-company/issue/TML-2663/mongo-driver-is-pinned-to-version-6-cant-support-7-or-8)
-- Pull request (first instance): [PR #597](https://github.com/prisma/prisma-next/pull/597)
-- Calibration: [`drive/calibration/failure-modes.md § F8`](../../../drive/calibration/failure-modes.md#f8-recon-specialist-classifies-dependency-usage-by-src-only-scan) — recon-scan-tests discipline for major-bump audits.
-- npm: [mongodb driver release notes](https://github.com/mongodb/node-mongodb-native/releases), [bson release notes](https://github.com/mongodb/js-bson/releases).
+- [`drive/calibration/failure-modes.md § F8`](../../../drive/calibration/failure-modes.md#f8-recon-specialist-classifies-dependency-usage-by-src-only-scan) — recon-scan-tests discipline for major-bump audits.
+- Upstream release notes: [mongodb driver](https://github.com/mongodb/node-mongodb-native/releases), [bson](https://github.com/mongodb/js-bson/releases).
