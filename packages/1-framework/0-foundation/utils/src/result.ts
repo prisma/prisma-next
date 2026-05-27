@@ -10,6 +10,8 @@
  * - `failure` property distinguishes from JS Error semantics
  */
 
+import { blindCast } from '@prisma-next/cast-utils';
+
 /**
  * Represents a successful result containing a value.
  */
@@ -76,18 +78,20 @@ class ResultImpl<T, F> {
    * Creates a successful result.
    */
   static ok<T, F = never>(value: T): Ok<T> {
-    // TypeScript cannot express discriminated return types for a single implementation.
-    // Cast is safe: ok=true guarantees this is an Ok<T> at runtime.
-    return new ResultImpl<T, F>(true, value) as unknown as Ok<T>;
+    return blindCast<
+      Ok<T>,
+      'ResultImpl is the single implementation of the Result discriminated union; TypeScript cannot express discriminated return types for a single class. ok=true guarantees this is an Ok<T> at runtime.'
+    >(new ResultImpl<T, F>(true, value));
   }
 
   /**
    * Creates an unsuccessful result.
    */
   static notOk<T = never, F = unknown>(failure: F): NotOk<F> {
-    // TypeScript cannot express discriminated return types for a single implementation.
-    // Cast is safe: ok=false guarantees this is a NotOk<F> at runtime.
-    return new ResultImpl<T, F>(false, failure) as unknown as NotOk<F>;
+    return blindCast<
+      NotOk<F>,
+      'ResultImpl is the single implementation of the Result discriminated union; TypeScript cannot express discriminated return types for a single class. ok=false guarantees this is a NotOk<F> at runtime.'
+    >(new ResultImpl<T, F>(false, failure));
   }
 
   /**
