@@ -91,6 +91,7 @@ ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';

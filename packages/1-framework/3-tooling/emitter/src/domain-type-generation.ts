@@ -46,12 +46,18 @@ export function serializeObjectKey(key: string): string {
   return serializeValue(key);
 }
 
+export function serializeCrossReference(ref: CrossReference): string {
+  const namespace = serializeValue(String(ref.namespace));
+  const model = serializeValue(ref.model);
+  return `{ readonly namespace: ${namespace} & NamespaceId; readonly model: ${model} }`;
+}
+
 export function generateRootsType(roots: Record<string, CrossReference> | undefined): string {
   if (!roots || Object.keys(roots).length === 0) {
     return 'Record<string, CrossReference>';
   }
   const entries = Object.entries(roots)
-    .map(([key, value]) => `readonly ${serializeObjectKey(key)}: ${serializeValue(value)}`)
+    .map(([key, value]) => `readonly ${serializeObjectKey(key)}: ${serializeCrossReference(value)}`)
     .join('; ');
   return `{ ${entries} }`;
 }
@@ -94,7 +100,8 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
     const relObj = rel as Record<string, unknown>;
     const parts: string[] = [];
 
-    if (relObj['to']) parts.push(`readonly to: ${serializeValue(relObj['to'])}`);
+    if (relObj['to'])
+      parts.push(`readonly to: ${serializeCrossReference(relObj['to'] as CrossReference)}`);
     if (relObj['cardinality'])
       parts.push(`readonly cardinality: ${serializeValue(relObj['cardinality'])}`);
 
@@ -154,7 +161,7 @@ export function generateModelsType(
       modelParts.push(`readonly variants: ${serializeValue(model.variants)}`);
     }
     if (model.base) {
-      modelParts.push(`readonly base: ${serializeValue(model.base)}`);
+      modelParts.push(`readonly base: ${serializeCrossReference(model.base)}`);
     }
 
     modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
