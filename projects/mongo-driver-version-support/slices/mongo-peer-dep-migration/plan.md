@@ -45,12 +45,20 @@ rg '^\s*/mongodb@6\.' pnpm-lock.yaml || echo "OK: no mongodb@6 entries"
 # 2. Catalog declares ^7.x.y.
 rg '^\s+mongodb: \^7\.' pnpm-workspace.yaml
 
-# 3. Peer-dep posture: declared on the three consumers, absent on the two non-consumers.
+# 3. Peer-dep posture (JSON-aware): mongodb in peerDependencies on the three
+#    consumers; mongodb absent from dependencies + peerDependencies on the two
+#    non-consumers (devDependencies permitted per FR2 if in-package tests
+#    import from 'mongodb').
 for pkg in packages/3-mongo-target/3-mongo-driver packages/3-mongo-target/2-mongo-adapter packages/3-extensions/mongo; do
-  rg '"mongodb":' "$pkg/package.json" | rg -q peer || echo "FAIL: $pkg missing peerDependencies entry"
+  jq -r '.peerDependencies.mongodb // "MISSING"' "$pkg/package.json" | grep -q '\^7' || echo "FAIL: $pkg missing peerDependencies.mongodb ^7.x"
 done
 for pkg in packages/3-mongo-target/1-mongo-target packages/2-mongo-family/9-family; do
-  rg -q '"mongodb":' "$pkg/package.json" && echo "FAIL: $pkg still declares mongodb" || echo "OK: $pkg has no mongodb declaration"
+  runtime=$(jq -r '(.dependencies.mongodb // "") + (.peerDependencies.mongodb // "")' "$pkg/package.json")
+  if [ -n "$runtime" ]; then
+    echo "FAIL: $pkg declares mongodb in dependencies or peerDependencies"
+  else
+    echo "OK: $pkg has no runtime mongodb declaration"
+  fi
 done
 ```
 

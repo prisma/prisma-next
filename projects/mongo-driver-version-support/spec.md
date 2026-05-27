@@ -90,7 +90,7 @@ The workspace catalog (`pnpm-workspace.yaml`) holds the concrete version inside 
 - [ ] **PDoD5.** Repo-wide references to `projects/mongo-driver-version-support/**` removed or replaced with `docs/` links.
 - [ ] **PDoD6.** `projects/mongo-driver-version-support/` deleted.
 - [ ] **PDoD7.** Linear ticket [TML-2663](https://linear.app/prisma-company/issue/TML-2663/mongo-driver-is-pinned-to-version-6-cant-support-7-or-8) marked Completed.
-- [ ] **PDoD8.** Workspace catalog and all five workspace mongo packages reflect the settled posture: catalog at `mongodb: ^7.x.y`; `peerDependencies: { mongodb: ^7.0.0 }` on `@prisma-next/driver-mongo`, `@prisma-next/adapter-mongo`, `@prisma-next/mongo`; no `mongodb` declaration on `@prisma-next/target-mongo` or `@prisma-next/family-mongo`.
+- [ ] **PDoD8.** Workspace catalog and all five workspace mongo packages reflect the settled posture: catalog at `mongodb: ^7.x.y`; `peerDependencies: { mongodb: ^7.0.0 }` on `@prisma-next/driver-mongo`, `@prisma-next/adapter-mongo`, `@prisma-next/mongo`; neither `dependencies` nor `peerDependencies` declare `mongodb` on `@prisma-next/target-mongo` or `@prisma-next/family-mongo` (`devDependencies` is permitted when in-package tests import from `'mongodb'`).
 - [ ] **PDoD9.** `pnpm-lock.yaml` resolves a single `mongodb` major (driver-7) — verified by inspecting the lockfile's `mongodb` entries.
 - [ ] **PDoD10.** All three example apps (`mongo-demo`, `retail-store`, `mongo-blog-leaderboard`) and the `cli-e2e-test-app` fixture continue to declare `mongodb: catalog:` and continue to build + test green against the catalog-resolved v7 driver.
 - [ ] **PDoD11.** The `collection.drop()` audit at `packages/3-mongo-target/2-mongo-adapter/src/core/command-executor.ts:58` is documented in the PR description (either "no caller relied on the throw, behaviour is now a silent no-op on NamespaceNotFound" or the explicit code-level adjustment that was made).
@@ -99,7 +99,7 @@ The workspace catalog (`pnpm-workspace.yaml`) holds the concrete version inside 
 # Functional Requirements
 
 - **FR1.** `@prisma-next/driver-mongo`, `@prisma-next/adapter-mongo`, and `@prisma-next/mongo` declare `mongodb` in `peerDependencies` with the range `^7.0.0`, and do **not** declare `mongodb` in `dependencies`.
-- **FR2.** `@prisma-next/target-mongo` and `@prisma-next/family-mongo` declare `mongodb` in neither `dependencies` nor `peerDependencies` — the field is absent from their `package.json` entirely.
+- **FR2.** `@prisma-next/target-mongo` and `@prisma-next/family-mongo` declare `mongodb` in neither `dependencies` nor `peerDependencies`. `devDependencies: { mongodb: catalog: }` is permitted on a non-consumer package when its own test code imports from `'mongodb'` (a build-time concern that does not propagate to end-users' install graphs).
 - **FR3.** The workspace catalog (`pnpm-workspace.yaml`) pins `mongodb` to a concrete v7 minor (`^7.x.y`, latest at land time).
 - **FR4.** The three example apps and the `cli-e2e-test-app` fixture continue to declare `mongodb: catalog:`; the workspace catalog is the source of the `^7.0.0`-compatible constraint.
 - **FR5.** The `@prisma-next/mongo/bson` barrel continues to re-export `Binary`, `Decimal128`, `Long`, `MongoClient`, `ObjectId`, `Timestamp` from `'mongodb'` (no shape change; the barrel itself is the user-facing surface commitment).
