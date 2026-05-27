@@ -20,7 +20,7 @@ catalog:
   '@types/pg': 8.20.0
   arktype: ^2.2.0
   gray-matter: ^4.0.3
-  mongodb: ^6.16.0
+  mongodb: ^7.2.0
   mongodb-memory-server: 11.1.0
   pg: 8.20.0
   tsdown: 0.22.0
