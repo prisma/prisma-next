@@ -2,6 +2,16 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-27 · drive-build-workflow · friction (reviewer prompt self-contradiction: "do not run pnpm" rule + Section-C "Gate verification" heading drove the reviewer to run pnpm anyway)
+
+After the 2026-05-27 reviewer-scope retro, I re-dispatched the S1.C D1 reviewer with a hard `Do NOT run validation gates` rule at the top of the prompt. The reviewer (Opus 4.7) ran the full gate suite anyway — `pnpm install --frozen-lockfile` + `rm -rf .turbo` + `pnpm build` + `pnpm typecheck` + `pnpm lint:deps` + `pnpm test:packages` per workspace — and produced a Section-C table titled "Gate verification" with PASS/FAIL columns. Root cause: the prompt's hard prohibition lived in the preamble, but the body still had a section titled **"Gate verification"** that listed individual gates to "confirm" — the reviewer reasonably parsed "confirm the gates pass" as "run the gates and check," not as "read the implementer's report and judge the evidence." Two layers of guidance pointed in different directions; the section heading won.
+
+Lesson: section headings carry stronger signal than prompt-preamble prohibitions. The reviewer-brief template needs the section renamed (e.g., **"Functional gate inspection"** with "read the test file, judge it for adequacy; do NOT execute") and the per-gate enumeration removed in favour of a single instruction to read the test file. The implementer's wrap-up artifact is the gate state of record.
+
+The reviewer's report was high-quality regardless, and the cycle time was acceptable because the dispatch was backgrounded — but the cost compounded with the previous foreground dispatch's interruption to ~40 min of wasted reviewer cycles across the two attempts before the lesson landed.
+
+**Suggested action.** Update the reviewer-brief template to rename Section C to "Functional gate inspection" and have it instruct read-only verification of the test file the implementer added (`expect…toEqual(…)` shape, validator-parse-then-hydrate ordering, byte-equal vs shape-equal assertion). Drop the per-gate enumeration — implementer's wrap-up table is the gate state. Add a closing reminder: *"if you find yourself wanting to type `pnpm`, stop and re-read this section."*
+
 ## 2026-05-27 · drive-build-workflow · gap (reviewer dispatched with redundant gate-run scope; ran ~20 min before operator interrupted)
 
 S1.C D1 reviewer brief instructed the Opus 4.7 reviewer to perform its own `pnpm install` + `rm -rf .turbo` + `pnpm build --force` + `pnpm typecheck` + `pnpm test:packages` + `pnpm lint:deps` walk "with the stale-dist pre-flight" as Section C verification. This duplicated the implementer's gate run (which had already reported PASS in its wrap-up artifact) and added ~20 min of cycle time to the review with no judgment yield — the gates already passed; the reviewer's job is design judgment, not gate re-execution. Operator interrupted at 20-min mark and corrected: *"reviewers should not be running validation gates' tests etc, it's way too slow. It's enough that the implementer has run them."*
