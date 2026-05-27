@@ -536,6 +536,53 @@ describe('integration/nested-includes/strategy', () => {
       timeouts.spinUpPpgDev,
     );
 
+    // Correlated mirror of the lateral `distinct(cols).orderBy().take().sum()`
+    // integration test. The fix in `buildIncludeChildScalarSelect`
+    // reapplies orderBy after the ROW_NUMBER dedup wrap for both
+    // strategies; this pins the correlated path produces the same
+    // ordered-top-N sum (700) rather than an insertion-order slice.
+    it(
+      'distinct(cols).orderBy().take().sum() aggregates the ordered top-N deduped rows under correlated',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+          await seedPosts(runtime, [
+            { id: 10, title: 'A', userId: 1, views: 100 },
+            { id: 11, title: 'A', userId: 1, views: 200 },
+            { id: 12, title: 'B', userId: 1, views: 50 },
+            { id: 13, title: 'B', userId: 1, views: 300 },
+            { id: 14, title: 'C', userId: 1, views: 400 },
+          ]);
+
+          const users = collectionWithCapabilities(runtime, 'User', CORRELATED_CAPABILITIES);
+          runtime.resetExecutions();
+          const rows = await users
+            .include('posts', (posts) =>
+              posts
+                .distinct('title')
+                .orderBy((post) => post.views.desc())
+                .take(2)
+                .sum('views'),
+            )
+            .all();
+
+          // Deduped reps: views = [200, 300, 400]; ordered top 2 = [400, 300]; sum = 700.
+          expect(rows).toEqual([
+            {
+              id: 1,
+              name: 'Alice',
+              email: 'alice@example.com',
+              invitedById: null,
+              address: null,
+              posts: 700,
+            },
+          ]);
+          expect(runtime.executions).toHaveLength(1);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
     // Combine under correlated: same Pothos `totalCount` worked
     // example as the lateral version, validated against the correlated
     // emission shape (one correlated subquery whose FROM cross-joins

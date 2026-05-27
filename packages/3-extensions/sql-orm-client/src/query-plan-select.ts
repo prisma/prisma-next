@@ -700,11 +700,32 @@ function buildIncludeChildScalarSelect(
   // for COUNT). ORDER BY columns are accessible via the FROM scope
   // and don't need to be in the projection. Distinct columns are
   // accessible to ROW_NUMBER OVER PARTITION BY the same way.
+  //
+  // Exception: when `state.distinct` (Prisma-style ROW_NUMBER dedup)
+  // is combined with `orderBy`, we must reapply the ordering on the
+  // wrapped (post-dedup) result so subsequent LIMIT / OFFSET slices
+  // the ordered deduped rows. Postgres has no contract that rows
+  // exit the `WHERE rn=1` wrap in any particular order. To do that
+  // we carry hidden order columns through the wrap and re-reference
+  // them on the wrapped alias — mirrors the row-include lowering in
+  // `buildIncludeChildRowsSelect`'s distinct branch.
   const innerAlias = `${include.relationName}__scalar`;
-  const innerProjection: ProjectionItem[] =
-    scalar.column !== undefined
+  const needsHiddenOrderProjection =
+    state.distinct !== undefined &&
+    state.distinct.length > 0 &&
+    remappedOrderBy !== undefined &&
+    remappedOrderBy.length > 0;
+  const hiddenOrderProjection: ReadonlyArray<ProjectionItem> = needsHiddenOrderProjection
+    ? remappedOrderBy.map((item, index) =>
+        ProjectionItem.of(`${include.relationName}__order_${index}`, item.expr),
+      )
+    : [];
+  const innerProjection: ProjectionItem[] = [
+    ...(scalar.column !== undefined
       ? [ProjectionItem.of(scalar.column, ColumnRef.of(childTableRef, scalar.column))]
-      : [ProjectionItem.of('__row', LiteralExpr.of(1))];
+      : [ProjectionItem.of('__row', LiteralExpr.of(1))]),
+    ...hiddenOrderProjection,
+  ];
 
   let inner = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
     .withProjection(innerProjection)
@@ -719,7 +740,10 @@ function buildIncludeChildScalarSelect(
     }
   } else if (state.distinct !== undefined && state.distinct.length > 0) {
     // Prisma-style `.distinct(cols)`: ROW_NUMBER dedup, mirroring
-    // `buildIncludeChildRowsSelect`'s distinct lowering.
+    // `buildIncludeChildRowsSelect`'s distinct lowering. The ranking
+    // orderBy feeds the OVER clause so dedup picks the right
+    // representative; the reapplied orderBy below sequences the
+    // surviving rows for LIMIT / OFFSET.
     const rankedAlias = `${include.relationName}__scalar_distinct`;
     inner = wrapWithRowNumberDedup({
       base: inner,
@@ -727,6 +751,17 @@ function buildIncludeChildScalarSelect(
       rankingOrderBy: remappedOrderBy ?? [],
       rankedAlias,
     });
+    if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
+      inner = inner.withOrderBy(
+        remappedOrderBy.map(
+          (item, index) =>
+            new OrderByItem(
+              ColumnRef.of(rankedAlias, `${include.relationName}__order_${index}`),
+              item.dir,
+            ),
+        ),
+      );
+    }
   } else if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
     inner = inner.withOrderBy(remappedOrderBy);
   }
