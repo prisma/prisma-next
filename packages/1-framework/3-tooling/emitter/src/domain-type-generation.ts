@@ -46,10 +46,14 @@ export function serializeObjectKey(key: string): string {
   return serializeValue(key);
 }
 
+export function serializeNamespaceId(value: string): string {
+  return `${serializeValue(value)} & NamespaceId`;
+}
+
 export function serializeCrossReference(ref: CrossReference): string {
-  const namespace = serializeValue(String(ref.namespace));
+  const namespace = serializeNamespaceId(String(ref.namespace));
   const model = serializeValue(ref.model);
-  return `{ readonly namespace: ${namespace} & NamespaceId; readonly model: ${model} }`;
+  return `{ readonly namespace: ${namespace}; readonly model: ${model} }`;
 }
 
 export function generateRootsType(roots: Record<string, CrossReference> | undefined): string {

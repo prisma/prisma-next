@@ -1,5 +1,9 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
-import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
+import {
+  serializeNamespaceId,
+  serializeObjectKey,
+  serializeValue,
+} from '@prisma-next/emitter/domain-type-generation';
 import type {
   GenerateContractTypesOptions,
   ValidationContext,
@@ -514,8 +518,8 @@ function generateTableLiteralType(table: StorageTable): string {
       const srcCols = fk.source.columns.map((c: string) => serializeValue(c)).join(', ');
       const tgtCols = fk.target.columns.map((c: string) => serializeValue(c)).join(', ');
       const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
-      const srcRef = `{ readonly namespaceId: ${serializeValue(fk.source.namespaceId)}; readonly tableName: ${serializeValue(fk.source.tableName)}; readonly columns: readonly [${srcCols}] }`;
-      const tgtRef = `{ readonly namespaceId: ${serializeValue(fk.target.namespaceId)}; readonly tableName: ${serializeValue(fk.target.tableName)}; readonly columns: readonly [${tgtCols}] }`;
+      const srcRef = `{ readonly namespaceId: ${serializeNamespaceId(String(fk.source.namespaceId))}; readonly tableName: ${serializeValue(fk.source.tableName)}; readonly columns: readonly [${srcCols}] }`;
+      const tgtRef = `{ readonly namespaceId: ${serializeNamespaceId(String(fk.target.namespaceId))}; readonly tableName: ${serializeValue(fk.target.tableName)}; readonly columns: readonly [${tgtCols}] }`;
       return `{ readonly source: ${srcRef}; readonly target: ${tgtRef}${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
     })
     .join(', ');

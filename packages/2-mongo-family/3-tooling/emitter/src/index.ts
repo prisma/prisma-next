@@ -1,7 +1,18 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
+
+const MONGO_NAMESPACE_KIND_FALLBACK = 'mongo-namespace' as const;
+
+function mongoNamespaceSerializedKind(ns: Namespace): string {
+  const kind = (ns as { kind?: unknown }).kind;
+  if (typeof kind === 'string') {
+    return `readonly kind: ${serializeValue(kind)}`;
+  }
+  return `readonly kind: '${MONGO_NAMESPACE_KIND_FALLBACK}'`;
+}
 
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
@@ -54,7 +65,7 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
       ns.collections as Readonly<Record<string, MongoCollection>>,
     );
     parts.push(
-      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly kind: ${serializeValue(ns.kind)}; readonly collections: ${collectionsType} }`,
+      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly collections: ${collectionsType} }`,
     );
   }
   return `{ ${parts.join('; ')} }`;
