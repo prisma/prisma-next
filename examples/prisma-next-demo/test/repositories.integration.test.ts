@@ -117,7 +117,7 @@ function makeVector(leadingValues: number[]): number[] {
 }
 
 async function seedOrmClientData(runtime: Runtime): Promise<void> {
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
   const users = [
     {
@@ -193,7 +193,7 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
 }
 
 async function seedEmbeddingPosts(runtime: Runtime): Promise<void> {
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
   const posts = [
     {
       id: embeddingPostIds.reference,

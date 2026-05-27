@@ -150,7 +150,7 @@ describe('integration: rawSql expression in typed builder', {
       stackInstance,
       context,
       driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+      verifyMarker: false,
       ...(middleware ? { middleware } : {}),
     });
   }

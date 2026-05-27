@@ -68,7 +68,10 @@ async function buildHarness(log: Log): Promise<Harness> {
   await driver.connect({ kind: 'path', path: dbPath });
 
   const runtime = createRuntime({ stackInstance, context, driver, log });
-  const db: Db<Contract> = sqlBuilder<Contract>({ context });
+  const db: Db<Contract> = sqlBuilder<Contract>({
+    context,
+    rawCodecInferer: stackInstance.adapter,
+  });
 
   return {
     db,
