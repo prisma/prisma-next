@@ -538,10 +538,12 @@ function decodeIncludePayload(
  *
  * On a parent with zero matching child rows the LATERAL still produces
  * one row (aggregates collapse the empty input to a single row), so
- * the combine envelope here is always present. The empty-shape
- * fallback below is defensive: it returns the same empty per-branch
- * shape `assignEmptyIncludeResult` produces when the LATERAL is
- * bypassed (e.g. parent-result-empty short-circuit).
+ * the combine envelope here is always present. The `assignEmptyIncludeResult`
+ * no-LATERAL-row short-circuit writes the empty per-branch shape
+ * directly to `parent.mapped[relationName]` and never enters the
+ * decoder, so a missing or non-object envelope here is always a
+ * planner/decoder bug — `parseCombineEnvelope` throws loudly rather
+ * than papering over it with an empty shape.
  */
 function decodeCombineIncludePayload(
   contract: Contract<SqlStorage>,
@@ -549,10 +551,10 @@ function decodeCombineIncludePayload(
   branches: Readonly<Record<string, IncludeCombineBranch>>,
   raw: unknown,
 ): Record<string, unknown> {
-  const parsed = parseCombineEnvelope(raw);
+  const parsed = parseCombineEnvelope(include, raw);
   const result: Record<string, unknown> = {};
   for (const [branchName, branch] of Object.entries(branches)) {
-    const branchRaw = parsed?.[branchName];
+    const branchRaw = parsed[branchName];
     if (branch.kind === 'rows') {
       const syntheticInclude: IncludeExpr = {
         ...include,
@@ -568,15 +570,25 @@ function decodeCombineIncludePayload(
   return result;
 }
 
-function parseCombineEnvelope(raw: unknown): Record<string, unknown> | undefined {
+function parseCombineEnvelope(include: IncludeExpr, raw: unknown): Record<string, unknown> {
   if (raw === null || raw === undefined) {
-    return undefined;
+    throw new Error(
+      `combine() envelope for include "${include.relationName}" is missing (got ${raw === null ? 'null' : 'undefined'}); the LATERAL / correlated subquery should always produce a JSON object — this indicates a planner or decoder bug.`,
+    );
   }
   const parsed = parseIncludePayload(raw);
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return undefined;
+  if (Array.isArray(parsed) || typeof parsed !== 'object' || parsed === null) {
+    throw new Error(
+      `combine() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
+    );
   }
   return parsed as Record<string, unknown>;
+}
+
+function describeEnvelopeShape(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
 }
 
 /**
