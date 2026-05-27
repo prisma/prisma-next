@@ -507,7 +507,7 @@ function decodeIncludePayload(
   raw: unknown,
 ): unknown {
   if (include.scalar) {
-    return decodeScalarIncludePayload(include.scalar, raw);
+    return decodeScalarIncludePayload(include, include.scalar, raw);
   }
   if (include.combine) {
     return decodeCombineIncludePayload(contract, include, include.combine, raw);
@@ -567,7 +567,7 @@ function decodeCombineIncludePayload(
       };
       result[branchName] = decodeIncludePayload(contract, syntheticInclude, branchRaw);
     } else {
-      result[branchName] = decodeScalarIncludePayload(branch.selector, branchRaw);
+      result[branchName] = decodeScalarIncludePayload(include, branch.selector, branchRaw);
     }
   }
   return result;
@@ -596,9 +596,17 @@ function describeEnvelopeShape(value: unknown): string {
 
 /**
  * Pull the primitive scalar value out of the JSON envelope emitted by
- * the lateral / correlated scalar builder. The envelope is
- * `{ value: <primitive> }` (or `{ value: null }` when the aggregate
- * falls on an empty relation for sum/avg/min/max).
+ * the lateral / correlated scalar builder.
+ *
+ * Contract: the envelope is always either
+ *   - a `{ value: <primitive> }` JSON object (the SQL path), or
+ *   - `null` / `undefined` (the `assignEmptyIncludeResult`
+ *     no-LATERAL-row short-circuit before this decoder runs).
+ *
+ * Any other shape — array, primitive, string that JSON-parses to
+ * non-object — indicates a planner / decoder bug, so we throw
+ * loudly naming the include relation rather than soft-handling.
+ * Mirrors `parseCombineEnvelope`'s strict shape gate.
  *
  * Values are passed through unchanged — no JS-side `Number()` coercion
  * and no JS-side empty-relation defaulting. SQL semantics drive the
@@ -609,13 +617,19 @@ function describeEnvelopeShape(value: unknown): string {
  * dispatch the LATERAL / correlated subquery always produces a row,
  * so the inner envelope's `value` is always set by SQL.
  */
-function decodeScalarIncludePayload(scalar: IncludeScalar<unknown>, raw: unknown): unknown {
+function decodeScalarIncludePayload(
+  include: IncludeExpr,
+  scalar: IncludeScalar<unknown>,
+  raw: unknown,
+): unknown {
   if (raw === null || raw === undefined) {
     return emptyScalarResult(scalar.fn);
   }
   const parsed = parseIncludePayload(raw);
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return emptyScalarResult(scalar.fn);
+  if (Array.isArray(parsed) || typeof parsed !== 'object' || parsed === null) {
+    throw new Error(
+      `scalar() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
+    );
   }
   return (parsed as { value?: unknown }).value;
 }
