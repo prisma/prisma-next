@@ -90,7 +90,7 @@ describe('postgres', () => {
     });
     mocks.createSqlExecutionStack.mockReturnValue({
       target: { id: 'target-postgres' },
-      adapter: { id: 'adapter-postgres' },
+      adapter: { id: 'adapter-postgres', create: () => ({ inferCodec: () => 'pg/text' }) },
       driver: { create: mocks.driverCreate },
       extensionPacks: [],
     });
