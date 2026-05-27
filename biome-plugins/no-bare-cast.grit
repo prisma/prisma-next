@@ -13,6 +13,12 @@
 // The message avoids escape sequences (e.g. `\"`) because biome's GritQL
 // engine appears to mis-parse subsequent characters in the string when an
 // escape sequence is present (`r` → CR, `t` → TAB, `n` → LF, …).
+//
+// Severity is "info" so the plugin can run repo-wide without breaking
+// existing builds (the codebase has thousands of pre-existing `as` casts
+// that this rule reports). The D3 ratchet enforces the actual gate by
+// counting diagnostics from biome's JSON reporter; "info" entries still
+// appear there with the distinctive `no-bare-cast: ` prefix.
 
 `$x as $t` where {
   not $t <: r"^const$",
@@ -20,6 +26,7 @@
   not $filename <: r".*/test/.*\.ts",
   register_diagnostic(
     span = $x,
-    message = "no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast"
+    message = "no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast",
+    severity = "info"
   )
 }
