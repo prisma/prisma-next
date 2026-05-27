@@ -6,7 +6,7 @@ import type { IRNode } from './ir-node';
  * The slot is polymorphic at the framework level: a family or target can
  * persist either a JSON-clean codec-triple object literal (carrying
  * `kind: 'codec-instance'`) or a class-instance IR node with a narrower
- * kind discriminator (e.g. `'postgres-enum'`). Hydration walkers,
+ * kind discriminator (e.g. `'<kind>'`). Hydration walkers,
  * verifiers, and planners dispatch on the `kind` literal to recover the
  * precise variant.
  *

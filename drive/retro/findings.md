@@ -2,6 +2,40 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-22 · drive-build-workflow + agent self-discipline · gap (two adjacent subagents both false-failed typecheck on stale dist despite explicit brief guidance)
+
+Both the D2-R2 implementer and the D2-R2/D2 combined reviewer reported the same `@prisma-next/integration-tests/test/contract-builder.types.test-d.ts` typecheck failure as a "pre-existing on `origin/main`" claim. Both were wrong: orchestrator-side cache-bypass force build (`rm -rf .turbo test/integration/.tsbuildinfo && pnpm build --force`) followed by `pnpm typecheck` is **137/137 GREEN** on both slice HEAD and a fresh `origin/main` checkout. Both subagents had stale `dist/*.d.mts` state (either from partial filter builds that didn't propagate through `contract-ts`, or from a turbo cache that returned cached typecheck output without re-running) and misdiagnosed the cached/stale-state failure as a real pre-existing bug.
+
+This is the **second instance** of the 2026-05-21 QA-run stale-dist hygiene failure mode. The first instance led to: extend the relevant brief with explicit "run `pnpm install && pnpm build` before typecheck" guidance + a verify-on-main verification protocol. **Both mitigations were present in the D2 reviewer brief** (the orchestrator wrote them in after D2-R2's miss, prefixed with "⚠ MANDATORY pre-flight") — and the reviewer still tripped the failure mode. The reviewer subsequently performed a verify-on-main pass, but landed on the wrong conclusion (their force-build / install protocol was incomplete vs orchestrator's, missing the `.turbo` + `.tsbuildinfo` wipe).
+
+Three structural takeaways:
+
+1. **Brief-text guidance is necessary but insufficient.** Even when the brief explicitly warns "do not run typecheck on stale dist" with a recipe to avoid it, agents under time pressure or unfamiliar with the workspace's specific cache topology slip past the warning. The mitigation is to **make the trap unreachable**, not to ask the agent to remember to avoid it. The right `pnpm typecheck` runner script should `rm -rf .turbo && pnpm build --force` as its own first action — or `turbo run typecheck --force` should propagate `--force` upstream through `build` dependencies. Whichever way, the verify-on-main protocol should reset to a known-clean state, not rely on the agent to know what "clean" means in this workspace.
+2. **"Pre-existing on main" is a high-confidence claim with a small verification cost.** When a subagent reports it, the orchestrator's standing protocol from the 2026-05-21 QA-run retro should be invoked unconditionally: `git checkout origin/main`, full force-build, full force-typecheck, compare. The orchestrator did this here and caught the false-fail — but ideally the subagent's own report would carry the verification artifact (command output, env state captured), and the orchestrator wouldn't need to re-verify. Brief should require the verification artifact in the wrap-up, not just the claim.
+3. **Reviewer subagents are not immune to implementer failure modes.** The reviewer is supposed to be the QA gate on the implementer's report; if the reviewer reproduces the implementer's hygiene gap, the QA gate collapses to "two agents made the same mistake." For this slice, the orchestrator's own re-verification caught it — but the verification-cost-to-trust-cost ratio favoured the re-check, and that's not always going to be the case. A reviewer brief should demand the reviewer perform the verify-on-main step (with the orchestrator's exact recipe) before flagging anything as pre-existing, and the orchestrator should spot-check the reviewer's verification before accepting it.
+
+**Suggested action.** Two layered fixes:
+
+- **Runner script change** (highest-leverage): the workspace's `pnpm typecheck` should be wired so that running it from a stale state either (a) succeeds because the dist is rebuilt as a dependency, or (b) fails with a clear error pointing at the stale state. Today it silently false-passes-or-fails depending on cache topology, and the cache topology depends on what the operator (or previous agent) was doing.
+- **Brief template change**: any dispatch or reviewer brief whose gates include `pnpm typecheck` should require, in the wrap-up template, the verification artifact (command output + the recipe used to reach known-clean state). "PASS" without the recipe doesn't count. "Pre-existing on main" without a captured `git diff origin/main..HEAD -- packages/` walk + a fresh-checkout typecheck artifact doesn't count.
+
+**Upstream candidate?** Yes — the brief-template change is universal to any drive-* workflow that has a typecheck gate, not Prisma Next-specific. The runner-script change is Prisma Next-specific but the underlying pattern (build-graph caching makes stale-state failures look identical to real failures) is universal.
+
+## 2026-05-22 · drive-specify-slice · gap (over-strict grep gate conflated slot relocation with type retirement)
+
+S1.B slice spec's `SDoD6` translated project PDoD3 — *"no hardcoded `'postgres-enum'` paths or codec-hook hacks in framework or SQL-family"* — into the grep `rg "PostgresEnumStorageEntry|'postgres-enum'" packages/1-framework/ packages/2-sql/9-family/ → zero matches`. PDoD3's actual wording only audits the literal `'postgres-enum'` string; the slice author added `PostgresEnumStorageEntry` to the pattern thinking it tightened the gate. It didn't tighten — it changed the scope. PDoD3 is about retiring hardcoded discriminator paths; `PostgresEnumStorageEntry` type imports in family-sql are a legitimate bridging-adapter signature (a deliberate post-S1.A design that lets the family verifier walk enums natively while leaving target-specific schema introspection to the Postgres target).
+
+D1 hit the actual PDoD3 cleanly (zero literal `'postgres-enum'` in family-sql source) but tripped the over-strict SDoD6 gate (37 `PostgresEnumStorageEntry` type-import hits in family-sql). The post-flight DoD walk surfaced the gate defect, the slice spec was patched to match PDoD3's actual wording verbatim, and the descriptor-driven verifier generalization (the work the over-strict gate would have demanded) was filed as a separate ticket ([TML-2667](https://linear.app/prisma-company/issue/TML-2667), Low priority, related to the parent project).
+
+Two failure modes compounded:
+
+1. **Translating a project-DoD audit into a slice-DoD gate via paraphrase rather than copy-paste.** When the project spec gives the exact grep, the slice spec should reproduce it verbatim and add scope-narrowing exceptions rather than re-typing the pattern. Paraphrase = drift.
+2. **Pattern-tightening that's actually scope-broadening.** Adding a token to a regex makes the gate match more; whether that matches the right *more* depends on whether the added token names the same surface as the rest of the pattern. Here, `'postgres-enum'` names a discriminator literal (a behaviour-laden code path) and `PostgresEnumStorageEntry` names a type symbol (a structural import); they live on different axes. Tightening one axis under cover of "tightening the gate" hid the scope change.
+
+**Suggested action:** `drive-specify-slice` should call out, when a slice spec's SDoD lifts a project-DoD audit gate (especially grep gates), that the gate text must be **verbatim** with any scope exceptions added as explicit carve-outs rather than by adjusting the pattern itself. The retrofit pattern is *"copy the project-DoD gate, then `MINUS …` for slice-specific exceptions"* — never *"re-type the pattern from intent."*
+
+**Upstream candidate?** Yes — the pitfall is structural to any project-→-slice DoD translation, not Drive-specific.
+
 ## 2026-05-21 · drive-run-retro · boundary
 
 First in-anger use of `drive-run-retro` in this trial, triggered by an

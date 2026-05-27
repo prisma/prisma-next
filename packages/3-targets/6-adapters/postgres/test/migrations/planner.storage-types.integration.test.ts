@@ -40,7 +40,7 @@ const contractWithEnum: Contract<SqlStorage> = {
             foreignKeys: [],
           },
         },
-        types: {
+        enum: {
           Role: new PostgresEnumType({
             name: 'Role',
             nativeType: 'role',

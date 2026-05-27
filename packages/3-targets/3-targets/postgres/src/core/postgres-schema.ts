@@ -15,7 +15,7 @@ import { escapeLiteral } from './sql-utils';
 export interface PostgresSchemaInput {
   readonly id: string;
   readonly tables?: Record<string, StorageTable | StorageTableInput>;
-  readonly types?: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
+  readonly enum?: Record<string, PostgresEnumType | PostgresEnumTypeInput>;
 }
 
 /**
@@ -44,7 +44,7 @@ export class PostgresSchema extends NamespaceBase {
   declare readonly kind: 'schema';
   readonly id: string;
   readonly tables: Readonly<Record<string, StorageTable>>;
-  readonly types: Readonly<Record<string, PostgresEnumType>>;
+  readonly enum: Readonly<Record<string, PostgresEnumType>>;
 
   constructor(input: PostgresSchemaInput) {
     super();
@@ -57,9 +57,9 @@ export class PostgresSchema extends NamespaceBase {
         ]),
       ),
     );
-    this.types = Object.freeze(
+    this.enum = Object.freeze(
       Object.fromEntries(
-        Object.entries(input.types ?? {}).map(([name, ty]) => [
+        Object.entries(input.enum ?? {}).map(([name, ty]) => [
           name,
           ty instanceof PostgresEnumType ? ty : new PostgresEnumType(ty),
         ]),

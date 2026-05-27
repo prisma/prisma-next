@@ -3,7 +3,7 @@ import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { dirname, relative, resolve } from 'pathe';
+import { dirname, join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { executeContractEmit } from '../control-api/operations/contract-emit';
 import type { ContractEmitResult } from '../control-api/types';
@@ -27,6 +27,7 @@ import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
+  readonly outputPath?: string;
 }
 
 interface HeaderPaths {
@@ -43,6 +44,7 @@ interface HeaderPaths {
  */
 async function resolveHeaderPaths(
   configOption: string | undefined,
+  outputPath: string | undefined,
 ): Promise<Result<HeaderPaths, CliStructuredError>> {
   const displayConfigPath = configOption
     ? relative(process.cwd(), resolve(configOption))
@@ -62,7 +64,10 @@ async function resolveHeaderPaths(
     );
   }
 
-  if (!config.contract?.output) {
+  const effectiveJsonPath =
+    outputPath !== undefined ? join(outputPath, 'contract.json') : config.contract?.output;
+
+  if (!effectiveJsonPath) {
     return notOk(
       errorContractConfigMissing({
         why: 'Config.contract.output is required for emit. Define it in your config: contract: { source: ..., output: ... }',
@@ -71,9 +76,8 @@ async function resolveHeaderPaths(
   }
 
   try {
-    const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = getEmittedArtifactPaths(
-      config.contract.output,
-    );
+    const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } =
+      getEmittedArtifactPaths(effectiveJsonPath);
     return ok({ displayConfigPath, outputJsonPath, outputDtsPath });
   } catch (error) {
     return notOk(
@@ -90,7 +94,9 @@ async function executeContractEmitCommand(
   ui: TerminalUI,
   startTime: number,
 ): Promise<Result<EmitContractResult, CliStructuredError>> {
-  const headerPathsResult = await resolveHeaderPaths(options.config);
+  const outputPath = options.outputPath !== undefined ? resolve(options.outputPath) : undefined;
+
+  const headerPathsResult = await resolveHeaderPaths(options.config, outputPath);
   if (!headerPathsResult.ok) {
     return headerPathsResult;
   }
@@ -117,7 +123,11 @@ async function executeContractEmitCommand(
 
   let result: ContractEmitResult;
   try {
-    result = await executeContractEmit({ configPath, onProgress });
+    result = await executeContractEmit({
+      configPath,
+      onProgress,
+      ...ifDefined('outputPath', outputPath),
+    });
   } catch (error) {
     if (CliStructuredError.is(error)) {
       return notOk(error);
@@ -155,9 +165,11 @@ export function createContractEmitCommand(): Command {
   setCommandExamples(command, [
     'prisma-next contract emit',
     'prisma-next contract emit --config ./custom-config.ts',
+    'prisma-next contract emit --output-path ./generated',
   ]);
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--output-path <dir>', 'Directory to write contract.json and contract.d.ts into')
     .action(async (options: ContractEmitOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);

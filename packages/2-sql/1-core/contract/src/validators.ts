@@ -98,7 +98,7 @@ const StorageTypeInstanceSchema = type
   });
 
 /**
- * Postgres native enum entry under `storage.namespaces[namespaceId].types[name]`.
+ * Postgres native enum entry under `storage.namespaces[namespaceId].enum[name]`.
  * Document-scoped `storage.types` carries codec aliases only
  * (`DocumentScopedStorageTypeSchema`).
  */
@@ -226,11 +226,7 @@ function namespaceSlotEntrySchema(
  * Builds the per-namespace entry schema for `storage.namespaces[id]`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
  * descriptor's `discriminator` — validate each entry by matching the
- * entry's `kind` field. The hardcoded `'types?'` slot is preserved
- * unconditionally: it coexists additively with any contributed fragment
- * that validates the same shape today. The full rename of `types` →
- * `postgresEnums` lands later; until then, the redundancy is the F1 cure
- * (no relocated dual-shape probe).
+ * entry's `kind` field on the `'enum?'` slot.
  */
 export function createNamespaceEntrySchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
@@ -240,7 +236,7 @@ export function createNamespaceEntrySchema(
     id: 'string',
     'kind?': 'string',
     'tables?': type({ '[string]': StorageTableSchema }),
-    'types?': type({
+    'enum?': type({
       '[string]': namespaceSlotEntrySchema(PostgresEnumTypeSchema, 'postgres-enum', fragments),
     }),
   }) as Type<unknown>;

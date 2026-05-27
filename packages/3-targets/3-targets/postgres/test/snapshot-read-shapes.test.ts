@@ -88,11 +88,7 @@ describe('snapshot-read shape fixtures — per-kind round-trip (TML-2536)', () =
     const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, 'postgres-enum.json'), 'utf-8'));
     const contract = serializer.deserializeContract(raw);
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    // Postgres enums live under the per-namespace `types` slot
-    // (`storage.namespaces[<ns>].types`), not at the document-scoped
-    // top-level `storage.types`. The enum here is declared in the
-    // `public` namespace via the fixture.
-    const entry = contract.storage.namespaces['public']?.types?.['user_role'];
+    const entry = contract.storage.namespaces['public']?.enum?.['user_role'];
     expect(entry).toBeInstanceOf(PostgresEnumType);
     expect(entry).toMatchObject({
       kind: 'postgres-enum',

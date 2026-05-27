@@ -8,7 +8,7 @@
 
 ## At a glance
 
-Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack contributes its own kind) is satisfied at the end of S1.B. Each slice ships as one PR per drive's slice = PR coupling; multi-step internal work decomposes into dispatches within the slice rather than into sibling slices.
+Five slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack contributes its own kind) is satisfied at the end of S1.B. S1.E is a follow-on correctness fix surfaced by CodeRabbit on the S1.B PR (pre-existing Postgres planner bug, not a new PDoD). Each slice ships as one PR per drive's slice = PR coupling; multi-step internal work decomposes into dispatches within the slice rather than into sibling slices.
 
 ## Composition
 
@@ -119,11 +119,42 @@ Four slices. The PDoD3 bar (enum out of framework-shared `types` slot; pack cont
 - `pnpm lint:deps`
 - **Project-specific:** PDoD5 grep gate (see D3 above)
 
+#### S1.E — Namespace-aware enum planning (Postgres planner correctness fix)
+
+**Purpose.** Follow-on correctness fix surfaced by CodeRabbit on the S1.B enum-migration PR (#595). The Postgres migration planner keys enum lookups by bare TypeScript name across all namespaces, so two namespaces holding `enum.<sameName>` collide silently — `locateNamespaceType` returns first-match-wins, `collectPostgresEnumTypes` returns last-write-wins, `locateNamespaceTypeInStorage` shares the first-match-wins shape. The same algorithm exists on `origin/main` (pre-S1.B); S1.B D1 only renamed `.types.` → `.enum.` inside the existing loops — pre-existing bug, surfaced by the slot rename touching the line.
+
+This slice does not satisfy a new PDoD — it closes a Postgres-internal planner correctness bug that the project's structural work made visible. The fix threads `namespaceId` through the planner pipeline: enum lookup, enum collection, the consuming strategies (`nativeEnumPlanCallStrategy` + `enumRebuildCallRecipe`), and the live-schema `readExistingEnumValues` lookup (which has the same collision shape via shared `nativeType`). The framework `SchemaIssue` shape gains required `namespaceId` on `EnumValuesChangedIssue`; verifier paths producing `type_missing` / `type_values_mismatch` for enum subjects populate the existing optional `BaseSchemaIssue.namespaceId`. No on-disk `contract.json` format change.
+
+**Dispatches (within this slice):**
+
+1. **D1 — Issue shape extension.** `EnumValuesChangedIssue` gains required `namespaceId`. Verifier-side construction sites producing enum-related issues populate the existing optional `BaseSchemaIssue.namespaceId`. No planner consumer changes yet — the field is populated but unused until D2/D3 land the compound-key matching.
+2. **D2 — Helper rewrites.** `locateNamespaceType` and `locateNamespaceTypeInStorage` take `(namespaceId, typeName)` and read the named namespace directly. Three callsites updated to thread the coordinate from `issue.namespaceId` (D1 contract) or the outer loop's namespace coordinate.
+3. **D3 — Collection rewrite + `readExistingEnumValues` fold.** `collectPostgresEnumTypes` returns a compound-keyed map; `nativeEnumPlanCallStrategy`'s loop + `enumRebuildCallRecipe` updated; `readExistingEnumValues` keyed by `(schemaName, nativeType)` so two namespaces sharing a `nativeType` resolve distinctly.
+4. **D4 — Two-namespace-same-name fixture + regression test.** New test exercising introduce + rebuild + add-values + drop paths under collision. Pre-fix regression test (snapshot or assertion) demonstrably red against pre-D1 codebase, green after.
+5. **D5 — Slice validation + PR open.** Full validation gate + SDoD audit + PR body authoring.
+
+**Scope.** ~4–6 substrate + planner source files (D1+D2+D3) + 1 test file (D4). One PR.
+
+**Depends on.** S1.D (operator decision: sequence after the critical path for focus). Technically the bug pre-dates S1.B; the slice could in principle parallelise with S1.C/S1.D but is sequenced after S1.D so reviewer attention stays on the structural slices first.
+
+**Linear:** [TML-2686](https://linear.app/prisma-company/issue/TML-2686).
+
+**Validation gate:**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration`
+- `pnpm fixtures:check`
+- `pnpm lint:deps`
+- **Slice-specific:** functional gate (two distinct `CreateEnumTypeCall` from two-namespace fixture); collision grep gate (zero bare-name-keyed enum maps); regression coverage (pre-fix test demonstrably red on revert)
+
 ### Parallel groups
 
-None. Single stack thread S1.A → S1.B → S1.C → S1.D.
+None. Single stack thread S1.A → S1.B → S1.C → S1.D → S1.E.
 
-Each slice's substrate is required by the next. The "could S1.B and S1.C parallelise?" question fails the validation-gate test — both regenerate fixtures, and the goldens churn would conflict at merge time if they raced.
+Each structural slice's substrate is required by the next. The "could S1.B and S1.C parallelise?" question fails the validation-gate test — both regenerate fixtures, and the goldens churn would conflict at merge time if they raced.
+
+S1.E is the one slice that could in theory parallelise with S1.C / S1.D — the planner correctness fix is Postgres-internal and touches a disjoint code surface from the structural slices. **Operator decision:** sequenced after S1.D anyway, so reviewer attention stays on the critical path until the structural slices close.
 
 ## Dependencies (external)
 
@@ -135,7 +166,7 @@ Each slice's substrate is required by the next. The "could S1.B and S1.C paralle
 
 | Project-DoD | Delivered by |
 |---|---|
-| **PDoD1.** All slices delivered or deferred | All 4 slices |
+| **PDoD1.** All slices delivered or deferred | All 5 slices (S1.A–S1.D structural + S1.E correctness follow-on) |
 | **PDoD2.** All in-tree contracts follow canonical shape | S1.B (enum-shape regen) + S1.C (cross-ref regen) |
 | **PDoD3.** Postgres enum at `storage.<ns>.enum`; framework no longer references `'postgres-enum'` | S1.B (grep gate enforces) |
 | **PDoD4.** Cross-namespace references use object pairs | S1.C |
@@ -154,6 +185,7 @@ Each slice's substrate is required by the next. The "could S1.B and S1.C paralle
 3. **A7 falsification — canonicalizer family-contribution hook circular dependency.** The framework canonicalizer cleanup (subsumed TML-2579) introduces a hook the family packs implement. If the hook design needs framework to import family code, the cleanup pattern doesn't work and S1.D's scope shrinks (TML-2579 stays open as a separate followup). Discussion-mode re-entry trigger.
 4. **OQ resolutions before S1.A starts.** OQ1 (slot key naming) **settled in S1.A D4** at *essence + singular* per artefact-review architect finding A08; ADR Decision 5 carries the rule. OQ3 (`EntityKindDescriptor` extends or parallel), OQ4 (`elementCoordinates()` return shape), OQ5 (validator-schema contribution mechanism) all resolved during S1.A execution. None are project-purpose-affecting; settled at brief-assembly time.
 5. **Inherited decisions propagate without challenge.** S1.B / S1.C / S1.D briefs that lift spec-level "settled" decisions without re-justifying each one at brief-assembly time risk repeating the D2 → D3 surface-then-retire cycle that produced four retro findings and ~13 files of retirement in S1.A. The 2026-05-21 retro entry names the root cause. Mitigation: every brief assembled for the remaining slices answers two pre-flight questions before locking decisions — *(a) for every field in any public surface this dispatch touches, what does it add that an existing field doesn't already say?* *(b) for every framework-layer data structure that encodes target/family identity, what enforcement does it provide that contract hydration / validation doesn't already structurally provide?* Both questions together would have caught both compounding S1.A issues; either alone catches only one. Brief-assembly DoR overlay (slice plan § Per-dispatch DoR overlay) carries these gates.
+6. **S1.E `SchemaIssue` shape blast radius.** S1.E's D1 extends `EnumValuesChangedIssue` with required `namespaceId` and tightens the population contract on the existing optional `BaseSchemaIssue.namespaceId` at every verifier-side enum-related issue construction site. If integration-test goldens snapshot Issue payloads (likely in `packages/3-targets/3-targets/postgres/test/migrations/`), they shift shape-only (`+ namespaceId`) — D1 explicitly defers regen to D4. Risk materialises if the goldens audit at D4 surfaces shape *and* content drift (issue ordering changes, or a verifier site populates the namespaceId with an unexpected value) — would expand D4 beyond mechanical regen. Mitigation: D4 grep inventory; refusal trigger on content drift beyond the field addition.
 
 ## Sequencing visualisation
 
@@ -165,9 +197,11 @@ S1.B (enum migration off types slot — 3 dispatches inside)  ← PDoD3 satisfie
 S1.C (cross-reference encoding — 2 dispatches inside)
   ↓
 S1.D (cleanup + Linear close-outs — 4 dispatches inside)
+  ↓
+S1.E (namespace-aware enum planning — 5 dispatches inside; follow-on correctness fix, no new PDoD)
 ```
 
-Realistic budget: **~2-3 days per slice × 4 = ~10-12 days** for the sub-project. S1.A's two dispatches likely compress (mechanical class shape changes); S1.B is the largest and most likely to spawn unforeseen sub-work (A4 / A6 falsification triggers); S1.D mechanical.
+Realistic budget: **~2-3 days per slice × 4 structural slices + ~0.5 day for S1.E = ~10.5-12.5 days** for the sub-project. S1.A's two dispatches likely compress (mechanical class shape changes); S1.B is the largest and most likely to spawn unforeseen sub-work (A4 / A6 falsification triggers); S1.D mechanical; S1.E is the smallest (planner-internal, no on-disk format change, ~half-day focused dispatch loop).
 
 ## Close-out (required)
 

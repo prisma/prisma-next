@@ -263,9 +263,7 @@
         }
       },
       "public": {
-        "id": "public",
-        "tables": {},
-        "types": {
+        "enum": {
           "Role": {
             "codecId": "pg/enum@1",
             "kind": "postgres-enum",
@@ -273,10 +271,12 @@
             "nativeType": "Role",
             "values": ["USER", "ADMIN"]
           }
-        }
+        },
+        "id": "public",
+        "tables": {}
       }
     },
-    "storageHash": "sha256:b6a07cf933f780f0be10605786b9d3434fda472d5327582cbe8dc7bf3551644e",
+    "storageHash": "sha256:a0eae5e868776b85d3a394fe5d916c1518660c9e7cf7ab5f3ece00a05b27190d",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

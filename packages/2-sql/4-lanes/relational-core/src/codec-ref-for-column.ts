@@ -38,9 +38,9 @@ export function codecRefForStorageColumn(
     let instance: unknown = storage.types?.[columnDef.typeRef];
     if (!instance) {
       for (const ns of Object.values(storage.namespaces)) {
-        const nsTypes = (ns as { types?: Record<string, unknown> }).types;
-        if (nsTypes) {
-          const nsEntry = nsTypes[columnDef.typeRef];
+        const nsEnums = (ns as { enum?: Record<string, unknown> }).enum;
+        if (nsEnums) {
+          const nsEntry = nsEnums[columnDef.typeRef];
           if (nsEntry !== undefined) {
             instance = nsEntry;
             break;

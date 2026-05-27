@@ -126,15 +126,15 @@ export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: 
 /**
  * Finds a type entry by name across all namespace type registries.
  * Namespace types (e.g. Postgres enums) live under
- * `storage.namespaces[nsId].types`, not under `storage.types`.
+ * `storage.namespaces[nsId].enum`, not under `storage.types`.
  */
 function locateNamespaceType(
   storage: SqlStorage,
   typeName: string,
 ): PostgresEnumStorageEntry | undefined {
   for (const ns of Object.values(storage.namespaces)) {
-    if (!('types' in ns) || ns.types == null) continue;
-    const entry = (ns.types as Record<string, PostgresEnumStorageEntry>)[typeName];
+    if (!('enum' in ns) || ns.enum == null) continue;
+    const entry = (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
     if (entry !== undefined) return entry;
   }
   return undefined;
@@ -541,9 +541,9 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
 function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
   for (const ns of Object.values(storage.namespaces)) {
-    if (!('types' in ns) || ns.types == null) continue;
-    const nsTypes = ns.types as Record<string, unknown>;
-    for (const [name, instance] of Object.entries(nsTypes).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!('enum' in ns) || ns.enum == null) continue;
+    const nsEnums = ns.enum as Record<string, unknown>;
+    for (const [name, instance] of Object.entries(nsEnums).sort(([a], [b]) => a.localeCompare(b))) {
       if (instance instanceof PostgresEnumType) {
         result.set(name, instance);
       }

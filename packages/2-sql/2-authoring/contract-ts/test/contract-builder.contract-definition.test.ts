@@ -363,7 +363,7 @@ describe('shared contract definition lowering', () => {
     );
   });
 
-  it('routes namespaceTypes enums to storage.namespaces[nsId].types', () => {
+  it('routes namespaceTypes enums to storage.namespaces[nsId].enum', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       namespaceTypes: {
@@ -396,11 +396,11 @@ describe('shared contract definition lowering', () => {
     });
 
     const nsStorage = contract.storage as unknown as {
-      namespaces: Record<string, { types?: Record<string, unknown> }>;
+      namespaces: Record<string, { enum?: Record<string, unknown> }>;
     };
-    expect(nsStorage.namespaces['auth']?.types).toMatchObject({
+    expect(nsStorage.namespaces['auth']?.enum).toMatchObject({
       user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
     });
-    expect(nsStorage.namespaces['public']?.types).toBeUndefined();
+    expect(nsStorage.namespaces['public']?.enum).toBeUndefined();
   });
 });

@@ -296,9 +296,9 @@ export function contractToSchemaIR(
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
   for (const ns of Object.values(storage.namespaces)) {
-    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
-    if (nsTypes) {
-      for (const [k, v] of Object.entries(nsTypes)) {
+    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    if (nsEnums) {
+      for (const [k, v] of Object.entries(nsEnums)) {
         allTypes[k] = v;
       }
     }
@@ -344,9 +344,9 @@ function deriveAnnotations(
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
   for (const ns of Object.values(storage.namespaces)) {
-    const nsTypes = (ns as { types?: Record<string, PostgresEnumStorageEntry> }).types;
-    if (nsTypes) {
-      for (const [k, v] of Object.entries(nsTypes)) {
+    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    if (nsEnums) {
+      for (const [k, v] of Object.entries(nsEnums)) {
         allTypes[k] = v;
       }
     }

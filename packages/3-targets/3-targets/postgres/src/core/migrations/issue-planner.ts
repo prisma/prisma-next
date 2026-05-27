@@ -65,8 +65,8 @@ export type { CallMigrationStrategy, StrategyContext };
 
 function locateNamespaceTypeInStorage(storage: SqlStorage, typeName: string): unknown {
   for (const ns of Object.values(storage.namespaces)) {
-    if (!('types' in ns) || ns.types == null) continue;
-    const entry = (ns.types as Record<string, unknown>)[typeName];
+    if (!('enum' in ns) || ns.enum == null) continue;
+    const entry = (ns.enum as Record<string, unknown>)[typeName];
     if (entry !== undefined) return entry;
   }
   return undefined;
@@ -596,7 +596,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      // Enum types live in namespace.types; codec aliases live in storage.types.
+      // Enum types live in namespace.enum; codec aliases live in storage.types.
       // Check both so the planner handles whichever slot the type is in.
       const typeInstance: unknown =
         ctx.toContract.storage.types?.[issue.typeName] ??

@@ -54,6 +54,49 @@ describe('defineConfig facade', () => {
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 
+  it('writes into the given outputPath directory when provided', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+      outputPath: './custom/dir',
+    });
+
+    expect(config.contract?.output).toBe('custom/dir/contract.json');
+  });
+
+  it('always uses the canonical filename contract.json regardless of contract source name', () => {
+    const config = defineConfig({
+      contract: './prisma/my-schema.prisma',
+      outputPath: './out',
+    });
+
+    expect(config.contract?.output).toBe('out/contract.json');
+  });
+
+  it('threads outputPath through TypeScript contract provider', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.ts',
+      outputPath: './custom/dir',
+    });
+
+    expect(config.contract?.output).toBe('custom/dir/contract.json');
+    expect(config.contract?.source.inputs).toEqual(['./prisma/contract.ts']);
+  });
+
+  it('accepts absolute outputPath', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+      outputPath: '/abs/path/to/dir',
+    });
+
+    expect(config.contract?.output).toBe('/abs/path/to/dir/contract.json');
+  });
+
+  it('falls back to derived output when outputPath is not provided', () => {
+    const config = defineConfig({ contract: './prisma/contract.prisma' });
+
+    expect(config.contract?.output).toBe('./prisma/contract.json');
+  });
+
   it('passes db config through', () => {
     const config = defineConfig({
       contract: './prisma/contract.prisma',
