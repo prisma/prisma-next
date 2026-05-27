@@ -539,6 +539,54 @@ describe('compileSelectWithIncludeStrategy', () => {
       expect(lateralSelect.orderBy).toBeUndefined();
     });
 
+    // `distinct(cols).orderBy(c).take(N).sum(...)` must aggregate the
+    // ordered top-N deduped rows, not an arbitrary N. The ROW_NUMBER
+    // dedup wrap strips ordering from its output, so without an explicit
+    // reapplication of orderBy on the wrapped alias, LIMIT picks an
+    // implementation-defined subset — wrong for SUM/AVG/MIN/MAX over
+    // a top-N slice. Mirrors the row-include path's distinct lowering.
+    it('reapplies orderBy after the ROW_NUMBER dedup wrap so LIMIT slices the ordered top N', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts
+          .distinct('title')
+          .orderBy((post) => post.views.desc())
+          .take(2)
+          .sum('views'),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+      const lateralSelect = extractScalarLateralSelect(plan, 'posts_lateral');
+
+      // Outer aggregating SELECT: SUM(<inner_alias>.views) over the
+      // derived inner table. No top-level LIMIT — that lives on the inner.
+      expectAggregateProjection(
+        lateralSelect,
+        'posts',
+        AggregateExpr.sum(ColumnRef.of('posts__scalar', 'views')),
+      );
+      expect(lateralSelect.limit).toBeUndefined();
+      expect(lateralSelect.offset).toBeUndefined();
+      expectDerivedTableSource(lateralSelect.from);
+      expect(lateralSelect.from.alias).toBe('posts__scalar');
+
+      // Inner SELECT: post-ROW_NUMBER-dedup wrap. The wrap is itself a
+      // derived `posts__scalar_distinct` source; subsequent LIMIT and
+      // the reapplied ORDER BY live on the outer of that wrap.
+      const innerSelect = lateralSelect.from.query;
+      expect(innerSelect.limit).toBe(2);
+      expect(innerSelect.offset).toBeUndefined();
+      expectDerivedTableSource(innerSelect.from);
+      expect(innerSelect.from.alias).toBe('posts__scalar_distinct');
+
+      // The reapplied orderBy references the hidden order column on the
+      // ranked alias, NOT the bare `posts.views` (which is out of scope
+      // post-wrap). The hidden column is named `${relName}__order_${idx}`.
+      expect(innerSelect.orderBy).toEqual([
+        new OrderByItem(ColumnRef.of('posts__scalar_distinct', 'posts__order_0'), 'desc'),
+      ]);
+    });
+
     // Recursive carve-out: a `count()` nested inside a row include must
     // produce its own LATERAL inside the parent row's SELECT, and the
     // parent's json_object payload should reference that nested lateral's
@@ -870,6 +918,40 @@ describe('compileSelectWithIncludeStrategy', () => {
           ),
         ]),
       );
+    });
+
+    // Correlated mirror of the lateral `reapplies orderBy after the
+    // ROW_NUMBER dedup wrap` test. `buildIncludeChildScalarSelect` is
+    // shared by both strategies so the fix lands once; this pins that
+    // the correlated subquery shape is symmetric.
+    it('reapplies orderBy after the ROW_NUMBER dedup wrap under correlated', () => {
+      const { collection } = createCollection();
+      const state = collection.include('posts', (posts) =>
+        posts
+          .distinct('title')
+          .orderBy((post) => post.views.desc())
+          .take(2)
+          .sum('views'),
+      ).state;
+
+      const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
+      const subquery = extractScalarCorrelatedSubquery(plan, 'posts');
+
+      expectAggregateProjection(
+        subquery,
+        'posts',
+        AggregateExpr.sum(ColumnRef.of('posts__scalar', 'views')),
+      );
+      expectDerivedTableSource(subquery.from);
+      expect(subquery.from.alias).toBe('posts__scalar');
+
+      const innerSelect = subquery.from.query;
+      expect(innerSelect.limit).toBe(2);
+      expectDerivedTableSource(innerSelect.from);
+      expect(innerSelect.from.alias).toBe('posts__scalar_distinct');
+      expect(innerSelect.orderBy).toEqual([
+        new OrderByItem(ColumnRef.of('posts__scalar_distinct', 'posts__order_0'), 'desc'),
+      ]);
     });
 
     it('emits correlated SUM / AVG / MIN / MAX over the column reference', () => {
