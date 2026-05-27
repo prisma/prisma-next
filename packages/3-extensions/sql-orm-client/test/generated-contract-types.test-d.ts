@@ -1,4 +1,4 @@
-import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
+import type { Contract, NamespaceId, StorageHashBase } from '@prisma-next/contract/types';
 import type { ContractWithTypeMaps, SqlStorage, TypeMaps } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
@@ -113,7 +113,7 @@ type GeneratedLikeContractBase = Contract<
       };
       relations: {
         posts: {
-          to: 'Post';
+          to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           cardinality: '1:N';
           on: {
             localFields: readonly ['id'];
@@ -454,7 +454,9 @@ type VOContractBase = Contract<
   }
 > & {
   readonly target: 'postgres';
-  readonly roots: { readonly users: 'User' };
+  readonly roots: {
+    readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+  };
   readonly valueObjects: {
     readonly Address: {
       readonly fields: {

@@ -31,7 +31,9 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     );
     expect(types).toContain('export type CodecTypes = MongoCodecTypes');
 
-    expect(types).toContain("readonly users: 'User'");
+    expect(types).toContain(
+      "readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' }",
+    );
     expect(types).toContain("readonly posts: 'Post'");
 
     expect(types).toContain('readonly User:');
@@ -48,7 +50,9 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
       "readonly bio: { readonly nullable: true; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } }",
     );
 
-    expect(types).toContain("readonly to: 'Post'");
+    expect(types).toContain(
+      "readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
+    );
     expect(types).toContain("readonly cardinality: '1:N'");
     expect(types).toContain("readonly localFields: readonly ['_id']");
     expect(types).toContain("readonly targetFields: readonly ['authorId']");

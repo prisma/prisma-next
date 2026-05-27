@@ -257,10 +257,10 @@ describe('generateRootsType', () => {
   it('generates literal object type for roots', () => {
     const result = generateRootsType({ users: crossRef('User'), posts: crossRef('Post') });
     expect(result).toContain(
-      "readonly users: { readonly namespace: '__unbound__'; readonly model: 'User' }",
+      "readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' }",
     );
     expect(result).toContain(
-      "readonly posts: { readonly namespace: '__unbound__'; readonly model: 'Post' }",
+      "readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
     );
   });
 });

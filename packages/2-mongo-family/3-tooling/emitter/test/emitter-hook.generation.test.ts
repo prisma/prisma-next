@@ -90,7 +90,9 @@ describe('mongoEmission.generateContractTypes', () => {
       roots: { users: 'User', posts: 'Post' },
     });
     const types = generateContractDts(contract, mongoEmission, [], testHashes);
-    expect(types).toContain("readonly users: 'User'");
+    expect(types).toContain(
+      "readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' }",
+    );
     expect(types).toContain("readonly posts: 'Post'");
   });
 
@@ -131,7 +133,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {
               posts: {
-                to: 'Post',
+                to: { model: 'Post', namespace: '__unbound__' },
                 cardinality: '1:N',
                 on: { localFields: ['_id'], targetFields: ['authorId'] },
               },
@@ -145,7 +147,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {
               author: {
-                to: 'User',
+                to: { model: 'User', namespace: '__unbound__' },
                 cardinality: 'N:1',
                 on: { localFields: ['authorId'], targetFields: ['_id'] },
               },
@@ -156,7 +158,9 @@ describe('mongoEmission.generateContractTypes', () => {
         storage: namespacedMongoStorageFromCollections({ users: {}, posts: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
-      expect(types).toContain("readonly to: 'Post'");
+      expect(types).toContain(
+        "readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
+      );
       expect(types).toContain("readonly cardinality: '1:N'");
       expect(types).toContain("readonly localFields: readonly ['_id']");
       expect(types).toContain("readonly targetFields: readonly ['authorId']");
@@ -187,7 +191,9 @@ describe('mongoEmission.generateContractTypes', () => {
             fields: {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
-            relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+            relations: {
+              addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+            },
             storage: {
               collection: 'users',
               relations: { addresses: { field: 'addresses' } },
@@ -216,7 +222,9 @@ describe('mongoEmission.generateContractTypes', () => {
             fields: {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
-            relations: { comments: { to: 'Comment', cardinality: '1:N' } },
+            relations: {
+              comments: { to: { model: 'Comment', namespace: '__unbound__' }, cardinality: '1:N' },
+            },
             storage: { collection: 'posts' },
           },
           Comment: {
@@ -280,7 +288,9 @@ describe('mongoEmission.generateContractTypes', () => {
             fields: {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
-            relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+            relations: {
+              addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+            },
             storage: {
               collection: 'users',
               relations: { addresses: { field: 'addresses' } },

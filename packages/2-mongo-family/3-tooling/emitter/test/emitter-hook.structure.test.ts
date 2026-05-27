@@ -140,7 +140,9 @@ describe('mongoEmission.validateStructure', () => {
           fields: {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
-          relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+          relations: {
+            addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+          },
           storage: {
             collection: 'users',
             relations: { addresses: { field: 'addresses' } },
@@ -259,7 +261,9 @@ describe('mongoEmission.validateStructure', () => {
           fields: {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
-          relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+          relations: {
+            addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+          },
           storage: { collection: 'users' },
         },
         Address: {

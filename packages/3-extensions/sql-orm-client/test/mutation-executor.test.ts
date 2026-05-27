@@ -97,7 +97,7 @@ describe('mutation-executor', () => {
               },
             },
             badCols: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
               on: {
                 parentCols: 'id',
@@ -105,7 +105,7 @@ describe('mutation-executor', () => {
               },
             },
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: 'INVALID',
               on: {
                 localFields: ['id'],

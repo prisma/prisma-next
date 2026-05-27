@@ -94,7 +94,7 @@ describe('collection-contract capability detection', () => {
           ...contract.models.User,
           relations: {
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               on: { localFields: 'id', targetFields: ['userId'] },
             },
           },
@@ -116,7 +116,7 @@ describe('collection-contract capability detection', () => {
           ...contract.models.User,
           relations: {
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: 'unsupported',
               on: {
                 localFields: [],
