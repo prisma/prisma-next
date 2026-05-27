@@ -22,12 +22,13 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:01622b3970e0ee2a582cc4c857bca7f6ed970f21b23f44e3f2781eea0be7d5eb'>;
+  StorageHashBase<'sha256:59877923532fc526703f572f1d54bdd6050502ef30ede3333ee1393ea93b9716'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -50,9 +51,16 @@ export type TypeMaps = TypeMapsType<
 
 type ContractBase = ContractType<
   {
-    readonly tables: {};
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {};
+      };
+    };
     readonly types: {
       readonly geometry: {
+        readonly kind: 'codec-instance';
         readonly codecId: 'pg/geometry@1';
         readonly nativeType: 'geometry';
         readonly typeParams: Record<string, never>;
@@ -64,7 +72,7 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: Record<string, string>;
+  readonly roots: Record<string, CrossReference>;
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
@@ -87,5 +95,5 @@ type ContractBase = ContractType<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Tables = Contract['storage']['tables'];
+export type Namespaces = Contract['storage']['namespaces'];
 export type Models = Contract['models'];

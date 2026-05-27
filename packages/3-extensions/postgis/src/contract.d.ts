@@ -22,12 +22,13 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9f708ee91f4d72f868ef5e93ce6dd13ccf48bab53c8015241a6e808c6f853584'>;
+  StorageHashBase<'sha256:59877923532fc526703f572f1d54bdd6050502ef30ede3333ee1393ea93b9716'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -71,7 +72,7 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: Record<string, string>;
+  readonly roots: Record<string, CrossReference>;
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
