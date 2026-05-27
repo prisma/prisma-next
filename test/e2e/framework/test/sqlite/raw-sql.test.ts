@@ -92,7 +92,7 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
     stackInstance,
     context,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
+    verifyMarker: false,
     ...(middleware ? { middleware } : {}),
   });
 

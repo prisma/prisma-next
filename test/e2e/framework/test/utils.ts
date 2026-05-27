@@ -272,7 +272,10 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
         });
 
         try {
-          const db = sqlBuilder<TContract>({ context });
+          const db = sqlBuilder<TContract>({
+            context,
+            rawCodecInferer: { inferCodec: () => 'pg/text' },
+          });
           await callback({ contract, context, runtime, db, client, sql });
         } finally {
           await runtime.close();

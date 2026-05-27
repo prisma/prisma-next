@@ -303,6 +303,7 @@ export function createTestStackInstance(options?: {
  */
 export type StubAdapter = Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> & {
   readonly __codecs: ReadonlyArray<Codec<string>>;
+  inferCodec(value: unknown): string;
 };
 
 /**
@@ -381,6 +382,7 @@ export function createStubAdapter(): StubAdapter {
 
   return {
     __codecs: codecs,
+    inferCodec: () => 'pg/text',
     profile: {
       id: 'stub-profile',
       target: 'postgres',
