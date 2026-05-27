@@ -491,8 +491,11 @@ function uniqueValues(values: unknown[]): unknown[] {
  *
  * Scalar leaves arrive wrapped in a `{ value: <primitive> }` JSON
  * envelope (see `buildIncludeChildScalarSelect`); the branch below
- * unwraps that envelope and applies the empty-relation default
- * (`0` for count; `null` for sum/avg/min/max).
+ * unwraps that envelope and passes the value straight through. The
+ * empty-relation default is driven by SQL semantics, not the decoder:
+ * `COUNT(*)` over an empty input set is `0`; `SUM` / `AVG` / `MIN` /
+ * `MAX` over an empty input set are SQL `NULL`, which surfaces as
+ * `null` in TS — the documented contract for those reducers.
  *
  * Combine descriptors arrive as a JSON object keyed by branch name;
  * each branch is dispatched to the row or scalar decoder per its
@@ -593,16 +596,18 @@ function describeEnvelopeShape(value: unknown): string {
 
 /**
  * Pull the primitive scalar value out of the JSON envelope emitted by
- * the lateral scalar builder. The envelope is `{ value: <primitive> }`
- * (or `{ value: null }` when the aggregate falls on an empty relation
- * for sum/avg/min/max).
+ * the lateral / correlated scalar builder. The envelope is
+ * `{ value: <primitive> }` (or `{ value: null }` when the aggregate
+ * falls on an empty relation for sum/avg/min/max).
  *
  * Values are passed through unchanged — no JS-side `Number()` coercion
- * happens here. Whatever the JSON parse produced (a JS number for
- * `count` and most aggregates over int columns; `null` when the
- * underlying SQL aggregate returned NULL) flows straight to the
- * caller. The empty-relation default mirrors the JS-side reducer's
- * historical shape (`0` for `count`, `null` for the rest).
+ * and no JS-side empty-relation defaulting. SQL semantics drive the
+ * empty-relation case: `COUNT(*)` over an empty input set is `0`;
+ * `SUM` / `AVG` / `MIN` / `MAX` over an empty input set return SQL
+ * `NULL`, which surfaces as `null` here. The outer `raw === null`
+ * fallback is defensive cover for an empty parent set; in single-query
+ * dispatch the LATERAL / correlated subquery always produces a row,
+ * so the inner envelope's `value` is always set by SQL.
  */
 function decodeScalarIncludePayload(scalar: IncludeScalar<unknown>, raw: unknown): unknown {
   if (raw === null || raw === undefined) {
@@ -612,11 +617,7 @@ function decodeScalarIncludePayload(scalar: IncludeScalar<unknown>, raw: unknown
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return emptyScalarResult(scalar.fn);
   }
-  const value = (parsed as { value?: unknown }).value;
-  if (value === undefined || value === null) {
-    return emptyScalarResult(scalar.fn);
-  }
-  return value;
+  return (parsed as { value?: unknown }).value;
 }
 
 function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {
