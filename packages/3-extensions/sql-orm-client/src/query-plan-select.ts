@@ -691,6 +691,8 @@ function buildIncludeAggregateExpr(
       return AggregateExpr.min(columnRef);
     case 'max':
       return AggregateExpr.max(columnRef);
+    default:
+      throw new Error(`Unsupported aggregate selector: ${scalar.fn satisfies never}`);
   }
 }
 
