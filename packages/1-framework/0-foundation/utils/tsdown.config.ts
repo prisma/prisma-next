@@ -6,6 +6,7 @@ export default defineConfig({
     'src/exports/assertions.ts',
     'src/exports/abortable.ts',
     'src/exports/canonical-stringify.ts',
+    'src/exports/casts.ts',
     'src/exports/defined.ts',
     'src/exports/hash-content.ts',
     'src/exports/json.ts',

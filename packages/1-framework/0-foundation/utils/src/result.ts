@@ -10,7 +10,7 @@
  * - `failure` property distinguishes from JS Error semantics
  */
 
-import { blindCast } from '@prisma-next/cast-utils';
+import { blindCast } from './casts';
 
 /**
  * Represents a successful result containing a value.

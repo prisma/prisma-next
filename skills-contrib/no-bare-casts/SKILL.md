@@ -24,7 +24,7 @@ Work through these in order before writing or keeping a cast:
 ## Import
 
 ```typescript
-import { blindCast, castAs } from '@prisma-next/cast-utils';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 ```
 
 ## Helper signatures
