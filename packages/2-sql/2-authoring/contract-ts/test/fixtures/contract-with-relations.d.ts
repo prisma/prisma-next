@@ -64,7 +64,7 @@ export type Contract = ContractWithTypeMaps<BaseContract<
       };
       readonly relations: {
         readonly posts: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__'; readonly model: 'Post' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -103,7 +103,7 @@ export type Contract = ContractWithTypeMaps<BaseContract<
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__'; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];

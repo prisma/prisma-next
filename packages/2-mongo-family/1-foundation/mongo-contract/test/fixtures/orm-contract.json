@@ -2,8 +2,14 @@
   "targetFamily": "mongo",
   "storageHash": "fixture-hash",
   "roots": {
-    "tasks": "Task",
-    "users": "User"
+    "tasks": {
+      "model": "Task",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "storage": {
     "namespaces": {
@@ -20,20 +26,48 @@
     "Task": {
       "storage": {
         "collection": "tasks",
-        "relations": { "comments": { "field": "comments" } }
+        "relations": {
+          "comments": {
+            "field": "comments"
+          }
+        }
       },
       "fields": {
-        "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
-        "title": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "type": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "_id": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
+          "nullable": false
+        },
+        "title": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "type": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
         "assigneeId": {
-          "type": { "kind": "scalar", "codecId": "mongo/objectId@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         }
       },
       "relations": {
         "assignee": {
-          "to": "User",
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          },
           "cardinality": "N:1",
           "on": {
             "localFields": ["assigneeId"],
@@ -41,69 +75,137 @@
           }
         },
         "comments": {
-          "to": "Comment",
+          "to": {
+            "model": "Comment",
+            "namespace": "__unbound__"
+          },
           "cardinality": "1:N"
         }
       },
-      "discriminator": { "field": "type" },
+      "discriminator": {
+        "field": "type"
+      },
       "variants": {
-        "Bug": { "value": "bug" },
-        "Feature": { "value": "feature" }
+        "Bug": {
+          "value": "bug"
+        },
+        "Feature": {
+          "value": "feature"
+        }
       }
     },
     "Bug": {
-      "storage": { "collection": "tasks" },
-      "fields": {
-        "severity": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
+      "storage": {
+        "collection": "tasks"
       },
-      "relations": {},
-      "base": "Task"
-    },
-    "Feature": {
-      "storage": { "collection": "tasks" },
       "fields": {
-        "priority": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
-          "nullable": false
-        },
-        "targetRelease": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+        "severity": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       },
       "relations": {},
-      "base": "Task"
+      "base": {
+        "model": "Task",
+        "namespace": "__unbound__"
+      }
+    },
+    "Feature": {
+      "storage": {
+        "collection": "tasks"
+      },
+      "fields": {
+        "priority": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "targetRelease": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        }
+      },
+      "relations": {},
+      "base": {
+        "model": "Task",
+        "namespace": "__unbound__"
+      }
     },
     "User": {
       "storage": {
         "collection": "users",
-        "relations": { "addresses": { "field": "addresses" } }
+        "relations": {
+          "addresses": {
+            "field": "addresses"
+          }
+        }
       },
       "fields": {
-        "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
-        "name": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "email": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
+        "_id": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
+          "nullable": false
+        },
+        "name": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "email": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
         "loginCount": {
-          "type": { "kind": "scalar", "codecId": "mongo/int32@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/int32@1"
+          },
           "nullable": false
         },
         "tags": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false,
           "many": true
         },
         "homeAddress": {
-          "type": { "kind": "valueObject", "name": "HomeAddress" },
+          "type": {
+            "kind": "valueObject",
+            "name": "HomeAddress"
+          },
           "nullable": true
         }
       },
       "relations": {
         "addresses": {
-          "to": "Address",
+          "to": {
+            "model": "Address",
+            "namespace": "__unbound__"
+          },
           "cardinality": "1:N"
         },
         "tasks": {
-          "to": "Task",
+          "to": {
+            "model": "Task",
+            "namespace": "__unbound__"
+          },
           "cardinality": "1:N",
           "on": {
             "localFields": ["_id"],
@@ -115,9 +217,27 @@
     "Address": {
       "storage": {},
       "fields": {
-        "street": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "city": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "zip": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
+        "street": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "city": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "zip": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        }
       },
       "relations": {},
       "owner": "User"
@@ -125,9 +245,27 @@
     "Comment": {
       "storage": {},
       "fields": {
-        "_id": { "type": { "kind": "scalar", "codecId": "mongo/objectId@1" }, "nullable": false },
-        "text": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "createdAt": { "type": { "kind": "scalar", "codecId": "mongo/date@1" }, "nullable": false }
+        "_id": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
+          "nullable": false
+        },
+        "text": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "createdAt": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/date@1"
+          },
+          "nullable": false
+        }
       },
       "relations": {},
       "owner": "Task"
@@ -136,8 +274,20 @@
   "valueObjects": {
     "HomeAddress": {
       "fields": {
-        "city": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false },
-        "country": { "type": { "kind": "scalar", "codecId": "mongo/string@1" }, "nullable": false }
+        "city": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        },
+        "country": {
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
+          "nullable": false
+        }
       }
     }
   }
