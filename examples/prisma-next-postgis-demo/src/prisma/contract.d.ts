@@ -25,12 +25,13 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:05692bcae4c7e37855a66f6bbd809676cfa57fc42fa985e465846615cc3c715f'>;
+  StorageHashBase<'sha256:8bc2d0d5119e61bc7de13fc01dd70279a8e711ebc786d66d1823676352ce84ec'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:815d2a9f2f35488d3bb0aeba687849e2475b621c331c1d27ad79e37b6e56182f'>;
 export type ProfileHash =
@@ -273,9 +274,12 @@ type ContractBase = ContractType<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly cafe: 'Cafe';
-    readonly route: 'Route';
-    readonly neighborhood: 'Neighborhood';
+    readonly cafe: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Cafe' };
+    readonly route: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Route' };
+    readonly neighborhood: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Neighborhood';
+    };
   };
   readonly capabilities: {
     readonly postgres: {

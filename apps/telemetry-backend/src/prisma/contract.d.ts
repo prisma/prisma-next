@@ -22,6 +22,7 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -276,7 +277,12 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: { readonly telemetry_event: 'TelemetryEvent' };
+  readonly roots: {
+    readonly telemetry_event: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'TelemetryEvent';
+    };
+  };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;

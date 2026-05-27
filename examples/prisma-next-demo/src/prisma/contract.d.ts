@@ -25,12 +25,13 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e75bed0cca186c56a9b3b0e93e70c90e3fec8900f565c602c229e44979e4d83d'>;
+  StorageHashBase<'sha256:71967f6c42e19a8241e9b392bc1fe94508230c162e6a3a5c74b1399767ee316e'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -208,12 +209,12 @@ type ContractBase = ContractType<
             foreignKeys: readonly [
               {
                 readonly source: {
-                  readonly namespaceId: '__unbound__';
+                  readonly namespaceId: '__unbound__' & NamespaceId;
                   readonly tableName: 'post';
                   readonly columns: readonly ['userId'];
                 };
                 readonly target: {
-                  readonly namespaceId: '__unbound__';
+                  readonly namespaceId: '__unbound__' & NamespaceId;
                   readonly tableName: 'user';
                   readonly columns: readonly ['id'];
                 };
@@ -272,12 +273,12 @@ type ContractBase = ContractType<
             foreignKeys: readonly [
               {
                 readonly source: {
-                  readonly namespaceId: '__unbound__';
+                  readonly namespaceId: '__unbound__' & NamespaceId;
                   readonly tableName: 'task';
                   readonly columns: readonly ['userId'];
                 };
                 readonly target: {
-                  readonly namespaceId: '__unbound__';
+                  readonly namespaceId: '__unbound__' & NamespaceId;
                   readonly tableName: 'user';
                   readonly columns: readonly ['id'];
                 };
@@ -365,7 +366,7 @@ type ContractBase = ContractType<
           readonly stepsToRepro: { readonly column: 'stepsToRepro' };
         };
       };
-      readonly base: 'Task';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
     };
     readonly Feature: {
       readonly fields: {
@@ -386,7 +387,7 @@ type ContractBase = ContractType<
           readonly targetRelease: { readonly column: 'targetRelease' };
         };
       };
-      readonly base: 'Task';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
     };
     readonly Post: {
       readonly fields: {
@@ -417,7 +418,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -473,7 +474,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -532,7 +533,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly posts: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -540,7 +541,7 @@ type ContractBase = ContractType<
           };
         };
         readonly tasks: {
-          readonly to: 'Task';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -564,7 +565,11 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: { readonly user: 'User'; readonly post: 'Post'; readonly task: 'Task' };
+  readonly roots: {
+    readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+    readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+    readonly task: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+  };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;

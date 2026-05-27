@@ -4,13 +4,25 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "post": "Post",
-    "task": "Task",
-    "user": "User"
+    "post": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "task": {
+      "model": "Task",
+      "namespace": "__unbound__"
+    },
+    "user": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Bug": {
-      "base": "Task",
+      "base": {
+        "model": "Task",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "severity": {
           "nullable": false,
@@ -41,7 +53,10 @@
       }
     },
     "Feature": {
-      "base": "Task",
+      "base": {
+        "model": "Task",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "priority": {
           "nullable": false,
@@ -123,7 +138,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -216,7 +234,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -313,7 +334,10 @@
               "userId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         },
         "tasks": {
           "cardinality": "1:N",
@@ -325,7 +349,10 @@
               "userId"
             ]
           },
-          "to": "Task"
+          "to": {
+            "model": "Task",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -638,17 +665,7 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:e75bed0cca186c56a9b3b0e93e70c90e3fec8900f565c602c229e44979e4d83d",
-    "types": {
-      "Embedding1536": {
-        "codecId": "pg/vector@1",
-        "kind": "codec-instance",
-        "nativeType": "vector",
-        "typeParams": {
-          "length": 1536
-        }
-      }
-    }
+    "storageHash": "sha256:71967f6c42e19a8241e9b392bc1fe94508230c162e6a3a5c74b1399767ee316e"
   },
   "execution": {
     "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",

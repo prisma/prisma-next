@@ -8,6 +8,7 @@ import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mong
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -138,7 +139,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'tasks' };
-      readonly base: 'Task';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
     };
     readonly Comment: {
       readonly fields: {
@@ -172,7 +173,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'tasks' };
-      readonly base: 'Task';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
     };
     readonly Task: {
       readonly fields: {
@@ -195,14 +196,20 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly assignee: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['assigneeId'];
             readonly targetFields: readonly ['_id'];
           };
         };
-        readonly comments: { readonly to: 'Comment'; readonly cardinality: '1:N' };
+        readonly comments: {
+          readonly to: {
+            readonly namespace: '__unbound__' & NamespaceId;
+            readonly model: 'Comment';
+          };
+          readonly cardinality: '1:N';
+        };
       };
       readonly storage: {
         readonly collection: 'tasks';
@@ -230,7 +237,13 @@ type ContractBase = ContractType<
         };
       };
       readonly relations: {
-        readonly addresses: { readonly to: 'Address'; readonly cardinality: '1:N' };
+        readonly addresses: {
+          readonly to: {
+            readonly namespace: '__unbound__' & NamespaceId;
+            readonly model: 'Address';
+          };
+          readonly cardinality: '1:N';
+        };
       };
       readonly storage: {
         readonly collection: 'users';
@@ -241,7 +254,10 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
-  readonly roots: { readonly tasks: 'Task'; readonly users: 'User' };
+  readonly roots: {
+    readonly tasks: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+    readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+  };
   readonly capabilities: {};
   readonly extensionPacks: {};
   readonly meta: {};

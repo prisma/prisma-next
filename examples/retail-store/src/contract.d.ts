@@ -8,6 +8,7 @@ import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mong
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -666,7 +667,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'events' };
-      readonly base: 'Event';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
     };
     readonly Cart: {
       readonly fields: {
@@ -686,7 +687,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -762,7 +763,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly order: {
-          readonly to: 'Order';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Order' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['orderId'];
@@ -833,7 +834,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -841,7 +842,10 @@ type ContractBase = ContractType<
           };
         };
         readonly invoices: {
-          readonly to: 'Invoice';
+          readonly to: {
+            readonly namespace: '__unbound__' & NamespaceId;
+            readonly model: 'Invoice';
+          };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['_id'];
@@ -915,7 +919,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'events' };
-      readonly base: 'Event';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
     };
     readonly User: {
       readonly fields: {
@@ -938,7 +942,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly carts: {
-          readonly to: 'Cart';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Cart' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['_id'];
@@ -946,7 +950,7 @@ type ContractBase = ContractType<
           };
         };
         readonly orders: {
-          readonly to: 'Order';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Order' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['_id'];
@@ -977,20 +981,29 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'events' };
-      readonly base: 'Event';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
     };
   }
 > & {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
   readonly roots: {
-    readonly products: 'Product';
-    readonly users: 'User';
-    readonly carts: 'Cart';
-    readonly orders: 'Order';
-    readonly locations: 'Location';
-    readonly invoices: 'Invoice';
-    readonly events: 'Event';
+    readonly products: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Product';
+    };
+    readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+    readonly carts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Cart' };
+    readonly orders: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Order' };
+    readonly locations: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Location';
+    };
+    readonly invoices: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Invoice';
+    };
+    readonly events: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
   };
   readonly capabilities: {};
   readonly extensionPacks: {};

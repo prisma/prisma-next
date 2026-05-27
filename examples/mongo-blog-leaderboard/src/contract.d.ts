@@ -8,6 +8,7 @@ import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mong
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -187,7 +188,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'posts' };
-      readonly base: 'Post';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
     };
     readonly Post: {
       readonly fields: {
@@ -218,7 +219,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly author: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['authorId'];
@@ -246,7 +247,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'posts' };
-      readonly base: 'Post';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
     };
     readonly User: {
       readonly fields: {
@@ -273,7 +274,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly posts: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['_id'];
@@ -287,7 +288,10 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
-  readonly roots: { readonly users: 'User'; readonly posts: 'Post' };
+  readonly roots: {
+    readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+    readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+  };
   readonly capabilities: {};
   readonly extensionPacks: {};
   readonly meta: {};

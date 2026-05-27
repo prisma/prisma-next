@@ -4,11 +4,26 @@
   "target": "postgres",
   "profileHash": "sha256:03c90a412dcfe182a475d25eae8cbf5c56fba67009defe8713eaf0b7fbd66b13",
   "roots": {
-    "articles": "Article",
-    "comments": "Comment",
-    "posts": "Post",
-    "profiles": "Profile",
-    "users": "User"
+    "articles": {
+      "model": "Article",
+      "namespace": "__unbound__"
+    },
+    "comments": {
+      "model": "Comment",
+      "namespace": "__unbound__"
+    },
+    "posts": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "profiles": {
+      "model": "Profile",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Article": {
@@ -136,7 +151,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "comments": {
           "cardinality": "1:N",
@@ -148,7 +166,10 @@
               "postId"
             ]
           },
-          "to": "Comment"
+          "to": {
+            "model": "Comment",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -254,7 +275,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "invitedUsers": {
           "cardinality": "1:N",
@@ -266,7 +290,10 @@
               "invitedById"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "posts": {
           "cardinality": "1:N",
@@ -278,7 +305,10 @@
               "userId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         },
         "profile": {
           "cardinality": "1:1",
@@ -290,7 +320,10 @@
               "userId"
             ]
           },
-          "to": "Profile"
+          "to": {
+            "model": "Profile",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

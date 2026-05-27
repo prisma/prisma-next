@@ -10,6 +10,7 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -352,7 +353,10 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly comments: {
-          readonly to: 'Comment';
+          readonly to: {
+            readonly namespace: '__unbound__' & NamespaceId;
+            readonly model: 'Comment';
+          };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -360,7 +364,7 @@ type ContractBase = ContractType<
           };
         };
         readonly author: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -459,7 +463,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly posts: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -467,7 +471,10 @@ type ContractBase = ContractType<
           };
         };
         readonly profile: {
-          readonly to: 'Profile';
+          readonly to: {
+            readonly namespace: '__unbound__' & NamespaceId;
+            readonly model: 'Profile';
+          };
           readonly cardinality: '1:1';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -490,12 +497,21 @@ type ContractBase = ContractType<
   readonly target: 'sqlite';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly users: 'User';
-    readonly posts: 'Post';
-    readonly comments: 'Comment';
-    readonly profiles: 'Profile';
-    readonly typed_rows: 'TypedRow';
-    readonly items: 'Item';
+    readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+    readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+    readonly comments: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Comment';
+    };
+    readonly profiles: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Profile';
+    };
+    readonly typed_rows: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'TypedRow';
+    };
+    readonly items: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Item' };
   };
   readonly capabilities: {
     readonly sql: {

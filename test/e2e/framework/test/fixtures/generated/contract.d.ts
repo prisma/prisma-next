@@ -26,6 +26,7 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -559,7 +560,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly post: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['postId'];
@@ -833,7 +834,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly author: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -841,7 +842,10 @@ type ContractBase = ContractType<
           };
         };
         readonly comments: {
-          readonly to: 'Comment';
+          readonly to: {
+            readonly namespace: '__unbound__' & NamespaceId;
+            readonly model: 'Comment';
+          };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -891,7 +895,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly posts: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -915,13 +919,25 @@ type ContractBase = ContractType<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
-    readonly user: 'User';
-    readonly post: 'Post';
-    readonly comment: 'Comment';
-    readonly param_types: 'ParamTypes';
-    readonly event: 'Event';
-    readonly literal_defaults: 'LiteralDefaults';
-    readonly embedding: 'Embedding';
+    readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+    readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+    readonly comment: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Comment';
+    };
+    readonly param_types: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'ParamTypes';
+    };
+    readonly event: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Event' };
+    readonly literal_defaults: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'LiteralDefaults';
+    };
+    readonly embedding: {
+      readonly namespace: '__unbound__' & NamespaceId;
+      readonly model: 'Embedding';
+    };
   };
   readonly capabilities: {
     readonly postgres: {

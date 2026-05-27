@@ -10,6 +10,7 @@ import type {
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -102,12 +103,12 @@ type ContractBase = ContractType<
             foreignKeys: readonly [
               {
                 readonly source: {
-                  readonly namespaceId: '__unbound__';
+                  readonly namespaceId: '__unbound__' & NamespaceId;
                   readonly tableName: 'post';
                   readonly columns: readonly ['userId'];
                 };
                 readonly target: {
-                  readonly namespaceId: '__unbound__';
+                  readonly namespaceId: '__unbound__' & NamespaceId;
                   readonly tableName: 'user';
                   readonly columns: readonly ['id'];
                 };
@@ -182,7 +183,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly user: {
-          readonly to: 'User';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
           readonly cardinality: 'N:1';
           readonly on: {
             readonly localFields: readonly ['userId'];
@@ -225,7 +226,7 @@ type ContractBase = ContractType<
       };
       readonly relations: {
         readonly posts: {
-          readonly to: 'Post';
+          readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
           readonly cardinality: '1:N';
           readonly on: {
             readonly localFields: readonly ['id'];
@@ -247,7 +248,10 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'sqlite';
   readonly targetFamily: 'sql';
-  readonly roots: { readonly user: 'User'; readonly post: 'Post' };
+  readonly roots: {
+    readonly user: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+    readonly post: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' };
+  };
   readonly capabilities: {
     readonly sql: {
       readonly autoIndexesForeignKeys: false;
