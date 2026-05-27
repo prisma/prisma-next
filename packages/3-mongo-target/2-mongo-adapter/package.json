@@ -30,10 +30,13 @@
     "@prisma-next/mongo-wire": "workspace:0.11.0",
     "@prisma-next/operations": "workspace:0.11.0",
     "@prisma-next/utils": "workspace:0.11.0",
-    "arktype": "catalog:",
-    "mongodb": "catalog:"
+    "arktype": "catalog:"
+  },
+  "peerDependencies": {
+    "mongodb": "^7.0.0"
   },
   "devDependencies": {
+    "mongodb": "catalog:",
     "@prisma-next/driver-mongo": "workspace:0.11.0",
     "@prisma-next/errors": "workspace:0.11.0",
     "@prisma-next/mongo-contract-psl": "workspace:0.11.0",
