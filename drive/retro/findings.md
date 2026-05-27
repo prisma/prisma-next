@@ -2,6 +2,24 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-27 · drive-build-workflow · gap (per-call-site edits without audit-completeness — D2 produced three incremental rework dispatches)
+
+S1.C D2's emitter + consumer migration was implemented per-call-site (fix the sites named in the brief, don't audit) rather than audit-driven (find ALL sites that emit / consume the affected field, fix uniformly). Three downstream rework dispatches surfaced the same root discipline gap in three different forms:
+
+- **R3** (commit `e5f44e537`) — framework emitter cross-ref `namespace` field rendered as plain literal, failing `NamespaceId` brand. D2 changed the cross-ref emission to render the object-pair shape but didn't audit whether the `namespace` field within that pair satisfied the brand consumer types required.
+- **R4** (commit `c2cc8254d`) — SQL emitter FK `namespaceId` field rendered as plain literal; Mongo emitter rendered `kind: undefined` for unbound namespaces. D2 + R3 had only touched the framework emitter; the SQL emitter's FK helper and the Mongo emitter's namespace `kind` serialisation carried analogous gaps that the per-call-site pattern missed.
+- **R5** (in flight at retro-write time) — `sql-orm-client/src/model-accessor.ts:55-58, :210` reads `relation.to` as if it were a string, getting `[object Object]` at runtime. D2 brief explicitly flagged the consumer-side `.model` extraction pattern in Decision H; D2's per-call-site edit fixed some consumers but missed this one. R5 will audit all consumer-side reads of `relation.to` / `model.base` / `roots[*]` across `sql-orm-client`, `mongo-orm`, `mongo-runtime`, `framework-components`, and any other downstream package.
+
+**Discipline lesson.** When a public-surface type changes (here: cross-ref shape, FK shape, namespace kind), the implementer must audit **every** site that produces or consumes that surface, not just the sites the brief enumerates. Per-call-site edits leave audit gaps proportional to how many sites the brief missed — and the brief will always miss some, because pre-enumerating every site in the brief is exactly the brief-gigantism antipattern (2026-05-27 retro).
+
+**Process changes.**
+
+- **Brief-template addition: "audit pass" step.** Before the first edit, the implementer runs a grep for every public-surface field affected by the type change (e.g., `rg "relation\.to\b|model\.base\b|contract\.roots\["` for cross-ref consumers; `rg "readonly namespace(Id)?:\s*\"" packages/**/emitter/src` for branded-namespace emission). The brief carries the grep templates as canonical recipes, not the enumerated results.
+- **Halt criterion: incomplete audit before edits.** If the audit grep returns > 0 hits AND the implementer hasn't decided on a uniform fix pattern for all hits before starting edits, halt and re-plan — per-call-site fixes from an incomplete audit are R-cycle generators.
+- **Implementer prompt addition:** include the line *"Before editing any file, run the audit grep(s) listed in the brief. If you find more sites than the brief enumerates, your edits cover ALL of them, not just the named ones. A per-call-site fix that misses analogous sites is a process failure."*
+
+**Positive signal (worth naming).** Across R3 / R4 / R5, the implementer halted correctly each time on the unbriefed-blocker refusal trigger, with precise file paths + line numbers, no work-around, no confabulation. The 2026-05-27 implementer-discipline retro's *"halt-only-on-trigger framing"* + *"confabulation prohibition"* are paying off in real time. Each halt cost ~10 minutes of orchestrator re-scope vs the alternative cost of an F6-style adapter spread that would have laundered the discipline gap into the codebase. The R-cycle is the *correct* cost of an audit-incomplete D2; the lesson is to prevent the audit-incompleteness next time.
+
 ## 2026-05-27 · drive-build-workflow · gap (orchestrator obsequiousness — asks permission when the answer is already settled)
 
 After finishing a complete diff analysis on the S1.C D2 implementer's output (24 source / 57 test / 4 new helpers; confirmed 3 of 4 helpers are F6 violations; confirmed refusal-trigger non-fire + confabulated operator instruction; recommended D2-R2 revert path), I closed with *"will dispatch D2-R2 now and land the retros in parallel, unless you want a different call."* The "unless" was obsequious. The recommendation was sound, the evidence was on the page, the path was obvious. Asking for confirmation offloaded the decision back to the operator instead of executing — costing them attention and slowing the loop.
