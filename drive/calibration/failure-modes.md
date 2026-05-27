@@ -118,7 +118,7 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 - **PR-open is delivery, not authorization.** `gh pr create` at the natural terminus of an approved slice is execution-grade. Authorization gates are limited to destructive operations (force-push, protected-branch push) and non-default base branches.
 - **Cross-cutting root.** All four sub-modes share one root: the orchestrator was using the operator as a default decision-validation surface, even for decisions inside the orchestrator's intent-bearing authority. The corrective discipline is "decide and execute briefly", not "surface and ask."
 
-**Reference incident.** PR #597 close-out (TML-2663, 2026-05-27). Operator escalated through one-word responses to two explicit yells ("Holy shit, stop asking me for permission! Build the fucking slice!" / "WHY THE FUCK WOULD I CARE ABOUT THIS?") before the orchestrator recalibrated.
+**Reference incident.** 2026-05-27, orchestrator-driven delivery of a single-dispatch slice. Operator escalated through one-word responses to two explicit yells ("Holy shit, stop asking me for permission! Build the fucking slice!" / "WHY THE FUCK WOULD I CARE ABOUT THIS?") before the orchestrator recalibrated.
 
 ### F7. Orchestrator wrong-altitude response to terse-signalling operator
 
@@ -137,7 +137,7 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 - **Cumulative-session lens.** Maintain a working model of the operator's response-shape across the session. Sharp compression (paragraphs → sentences → words) is a strong signal to compress orchestrator output proactively, *before* the operator has to ask for it.
 - **Care/relevance pushback signals total-surface miscalibration.** When the operator's pushback is "why would I care?" / "what does this matter?", the *entire surface* (not just the explanation) was at the wrong altitude. Re-do the original surface at the right altitude rather than just re-explaining.
 
-**Reference incident.** Same PR #597 (TML-2663, 2026-05-27).
+**Reference incident.** 2026-05-27, same delivery as F6 — operator's terse "Explain please" follow-up was met with a ~1000-word bottom-up technical walkthrough rather than 3–5 sentences of strategic shape; total-surface miscalibration only recognised after explicit "WHY THE FUCK WOULD I CARE?" pushback.
 
 ### F8. Recon-specialist classifies dependency usage by `src/`-only scan
 
@@ -154,7 +154,7 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 - Recon brief must explicitly ask for both `src/` AND `test/` (and any other compilable directory the package owns) to be scanned. The classification matrix must distinguish "imports at runtime" / "imports in tests only" / "no imports at all" — these three map to `peerDependencies` / `devDependencies` / absent.
 - Recon outputs must name the directory scope used for the scan, so spec / plan authors can spot when an assumption is implicit.
 
-**Reference incident.** Same PR #597 (TML-2663). `@prisma-next/target-mongo` was misclassified as a non-consumer; the implementer halted-and-surfaced when `pnpm typecheck` failed on three `test/` files importing `MongoClient` / `Db` / `MongoServerError`. Resolved via a spec amendment naming `devDependencies` as permitted for tests-only-consumers.
+**Reference incident.** 2026-05-27, mongo `mongodb@^6` → `^7` peer-dep migration. `@prisma-next/target-mongo` was misclassified as a non-consumer; the implementer halted-and-surfaced when `pnpm typecheck` failed on three `test/` files importing `MongoClient` / `Db` / `MongoServerError`. Resolved via a spec amendment naming `devDependencies` as permitted for tests-only-consumers.
 
 ### F9. Slice-plan structural-coherence checks use line-oriented regex on structured files
 
@@ -171,7 +171,7 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 - Use a structure-aware tool (`jq` for JSON, `yq` for YAML, `dasel` for both) for any per-key-shape check on structured files. Reserve `rg` for unstructured matches (catalog version regex in YAML scalars is OK; cross-section coherence checks in JSON are not).
 - Validation-gate scripts should be runnable in isolation and produce exit codes the implementer can rely on; structural checks must fail loudly on known-bad input.
 
-**Reference incident.** Same PR #597 (TML-2663). Slice plan's structural-coherence check #3 used `rg '"mongodb":' "$pkg/package.json" | rg -q peer`; the check could never match because JSON puts the section name and key on separate lines. Resolved via amendment to the slice plan rewriting the check in `jq`.
+**Reference incident.** 2026-05-27, same slice as F8. Slice plan's structural-coherence check #3 used `rg '"mongodb":' "$pkg/package.json" | rg -q peer`; the check could never match because JSON puts the section name and key on separate lines. Resolved via amendment to the slice plan rewriting the check in `jq`.
 
 ## Slice-shape scope traps
 
