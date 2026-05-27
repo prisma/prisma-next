@@ -161,7 +161,7 @@ model User {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          types: {
+          enum: {
             UserRole: {
               kind: 'postgres-enum',
               name: 'UserRole',
@@ -306,7 +306,7 @@ model Event {
     expect(result.value.roots).toEqual({ event: 'Event' });
   });
 
-  it('lowers a top-level enum into the public namespace types slot', () => {
+  it('lowers a top-level enum into the public namespace enum slot', () => {
     const document = parsePslDocument({
       schema: `enum UserRole {
   ADMIN
@@ -333,19 +333,19 @@ model Account {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         public: {
-          types: {
+          enum: {
             UserRole: { kind: 'postgres-enum', values: ['ADMIN', 'USER'] },
           },
         },
       },
     });
     const storageNs = (
-      result.value.storage as unknown as { namespaces: Record<string, { types?: unknown }> }
+      result.value.storage as unknown as { namespaces: Record<string, { enum?: unknown }> }
     ).namespaces;
     expect(storageNs['auth']).toBeUndefined();
   });
 
-  it('lowers a namespace-scoped enum into storage.namespaces[nsId].types', () => {
+  it('lowers a namespace-scoped enum into storage.namespaces[nsId].enum', () => {
     const document = parsePslDocument({
       schema: `namespace auth {
   enum user_type {
@@ -374,15 +374,15 @@ model Account {
     expect(result.value.storage).toMatchObject({
       namespaces: {
         auth: {
-          types: {
+          enum: {
             user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
           },
         },
       },
     });
     const storageNs2 = (
-      result.value.storage as unknown as { namespaces: Record<string, { types?: unknown }> }
+      result.value.storage as unknown as { namespaces: Record<string, { enum?: unknown }> }
     ).namespaces;
-    expect(storageNs2['public']?.types).toBeUndefined();
+    expect(storageNs2['public']?.enum).toBeUndefined();
   });
 });

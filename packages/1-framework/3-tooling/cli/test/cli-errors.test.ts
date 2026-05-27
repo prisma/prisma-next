@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { errorDriverRequired, errorFamilyReadMarkerSqlRequired } from '../src/utils/cli-errors';
+import type { MigrationApplyFailure } from '../src/control-api/types';
+import {
+  errorDriverRequired,
+  errorFamilyReadMarkerSqlRequired,
+  errorPathUnreachable,
+  errorRefSetEmptySentinel,
+  errorRefSetHashNotInGraph,
+} from '../src/utils/cli-errors';
 
 describe('CliStructuredError.toEnvelope()', () => {
   it('converts driver required error to envelope with PN-CLI-4010', () => {
@@ -26,5 +33,88 @@ describe('CliStructuredError.toEnvelope()', () => {
       'Ensure family.verify.readMarker() is exported by your family package',
     );
     expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/db-verify');
+  });
+});
+
+describe('errorPathUnreachable', () => {
+  const targetHash = `sha256:${'a'.repeat(64)}`;
+  const fromHash = `sha256:${'b'.repeat(64)}`;
+
+  it('emits a fully-qualified --from --to fix line for the pathUnreachable runner kind', () => {
+    const failure: MigrationApplyFailure = {
+      code: 'MIGRATION_PATH_NOT_FOUND',
+      summary: 'Current contract has no planned migration path',
+      why: 'Cannot reach target.',
+      meta: { spaceId: 'app', kind: 'pathUnreachable', fromHash, targetHash },
+    };
+    const envelope = errorPathUnreachable(failure).toEnvelope();
+    expect(envelope.meta?.['code']).toBe('MIGRATION.PATH_UNREACHABLE');
+    expect(envelope.fix).toContain(
+      `prisma-next migration plan --from ${fromHash} --to ${targetHash}`,
+    );
+    expect(envelope.fix).toContain('prisma-next migration list');
+    expect(envelope.fix).toContain('prisma-next migration show');
+  });
+
+  it('omits the --from clause when the runner kind is neverPlanned (no fromHash in meta)', () => {
+    const failure: MigrationApplyFailure = {
+      code: 'MIGRATION_PATH_NOT_FOUND',
+      summary: 'No on-disk migrations for contract space "app"',
+      why: 'migrate is replay-only.',
+      meta: { spaceId: 'app', kind: 'neverPlanned', target: targetHash },
+    };
+    const envelope = errorPathUnreachable(failure).toEnvelope();
+    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash}`);
+    expect(envelope.fix).not.toContain('--from');
+    expect(envelope.fix).not.toContain('<unknown>');
+  });
+
+  it('falls back to a bare `migration plan` suggestion when both hashes are absent', () => {
+    const failure: MigrationApplyFailure = {
+      code: 'MIGRATION_PATH_NOT_FOUND',
+      summary: 'Migration runner reported an unreachable target',
+      why: 'No detail available.',
+      meta: { spaceId: 'app' },
+    };
+    const envelope = errorPathUnreachable(failure).toEnvelope();
+    expect(envelope.fix).toContain(
+      'Run `prisma-next migration plan` to introduce the missing path.',
+    );
+    expect(envelope.fix).not.toContain('--from');
+    expect(envelope.fix).not.toContain('--to');
+    expect(envelope.fix).not.toContain('<unknown>');
+  });
+});
+
+describe('errorRefSetHashNotInGraph', () => {
+  const resolvedHash = `sha256:${'x'.repeat(64)}`;
+  const reachableHashes = [`sha256:${'a'.repeat(64)}`, `sha256:${'b'.repeat(64)}`];
+  const graphTip = reachableHashes[1]!;
+
+  it('emits MIGRATION.HASH_NOT_IN_GRAPH with reachable hashes and graph tip', () => {
+    const envelope = errorRefSetHashNotInGraph(
+      resolvedHash,
+      reachableHashes,
+      graphTip,
+    ).toEnvelope();
+    expect(envelope.meta?.['code']).toBe('MIGRATION.HASH_NOT_IN_GRAPH');
+    expect(envelope.meta?.['resolvedHash']).toBe(resolvedHash);
+    expect(envelope.meta?.['reachableHashes']).toEqual(reachableHashes);
+    expect(envelope.meta?.['graphTipHash']).toBe(graphTip);
+    expect(envelope.fix).toContain(graphTip);
+  });
+
+  it('describes an empty migration graph in the why line', () => {
+    const envelope = errorRefSetHashNotInGraph(resolvedHash, [], null).toEnvelope();
+    expect(envelope.why).toContain('empty');
+    expect(envelope.fix).toContain('migration plan');
+  });
+});
+
+describe('errorRefSetEmptySentinel', () => {
+  it('emits MIGRATION.REF_SET_EMPTY_SENTINEL', () => {
+    const envelope = errorRefSetEmptySentinel('sha256:empty').toEnvelope();
+    expect(envelope.meta?.['code']).toBe('MIGRATION.REF_SET_EMPTY_SENTINEL');
+    expect(envelope.summary).toContain('empty-database sentinel');
   });
 });

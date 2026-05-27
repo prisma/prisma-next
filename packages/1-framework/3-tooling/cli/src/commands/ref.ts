@@ -1,18 +1,26 @@
+import { readFile } from 'node:fs/promises';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
-  deleteRef,
+  deleteRefPaired,
   readRefs,
   validateRefName,
   validateRefValue,
-  writeRef,
+  writeRefPaired,
 } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { join } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
+  errorFileNotFound,
+  errorRefSetBundleNotFound,
+  errorRefSetEmptySentinel,
+  errorRefSetHashNotInGraph,
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
@@ -26,6 +34,7 @@ import {
 } from '../utils/command-helpers';
 import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { readContractIR } from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI } from '../utils/terminal-ui';
 
@@ -73,13 +82,13 @@ export async function executeRefSetCommand(
   try {
     const config = await loadConfig(options.config);
     const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
+    const { graph, bundles } = await loadMigrationPackages(appMigrationsDir);
+    const refs = await readRefs(refsDir);
 
     let resolvedHash: string;
     if (validateRefValue(contractInput)) {
       resolvedHash = contractInput;
     } else {
-      const { graph } = await loadMigrationPackages(appMigrationsDir);
-      const refs = await readRefs(refsDir);
       const refResult = parseContractRef(contractInput, { graph, refs });
       if (!refResult.ok) {
         return notOk(mapRefResolutionError(refResult.failure));
@@ -87,8 +96,39 @@ export async function executeRefSetCommand(
       resolvedHash = refResult.value.hash;
     }
 
+    if (resolvedHash === EMPTY_CONTRACT_HASH) {
+      return notOk(errorRefSetEmptySentinel(resolvedHash));
+    }
+    if (!isGraphNode(resolvedHash, graph)) {
+      const graphTip = findLatestMigration(graph)?.to ?? null;
+      return notOk(errorRefSetHashNotInGraph(resolvedHash, [...graph.nodes].sort(), graphTip));
+    }
+
+    const matchingBundle = bundles.find((bundle) => bundle.metadata.to === resolvedHash);
+    if (!matchingBundle) {
+      return notOk(errorRefSetBundleNotFound(resolvedHash));
+    }
+
+    const contractJsonPath = join(matchingBundle.dirPath, 'end-contract.json');
+    let contractJson: Record<string, unknown>;
+    try {
+      const raw = await readFile(contractJsonPath, 'utf-8');
+      contractJson = JSON.parse(raw) as Record<string, unknown>;
+    } catch (readError) {
+      if (readError instanceof Error && (readError as NodeJS.ErrnoException).code === 'ENOENT') {
+        return notOk(
+          errorFileNotFound(contractJsonPath, {
+            why: `Migration bundle for hash ${resolvedHash} is missing its end-contract snapshot at ${contractJsonPath}`,
+            fix: 'Run `pnpm fixtures:check`, or re-emit the migration so its end-contract.json is restored.',
+          }),
+        );
+      }
+      throw readError;
+    }
+
+    const contractIR = await readContractIR(contractJson, contractJsonPath);
     const entry: RefEntry = { hash: resolvedHash, invariants: [] };
-    await writeRef(refsDir, name, entry);
+    await writeRefPaired(refsDir, name, entry, contractIR);
     return ok({ ok: true as const, ref: name, hash: resolvedHash, invariants: [] });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
@@ -103,7 +143,7 @@ export async function executeRefDeleteCommand(
   try {
     const config = await loadConfig(options.config);
     const { refsDir } = resolveMigrationPaths(options.config, config);
-    await deleteRef(refsDir, name);
+    await deleteRefPaired(refsDir, name);
     return ok({ ok: true as const, ref: name, deleted: true as const });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);

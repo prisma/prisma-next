@@ -1004,7 +1004,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 foreignKeys: [],
               },
             },
-            types: {
+            enum: {
               status_type: new PostgresEnumType({
                 name: 'status_type',
                 nativeType: 'status_type',
@@ -1280,7 +1280,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 foreignKeys: [],
               },
             },
-            types: {
+            enum: {
               StatusType: new PostgresEnumType({
                 name: 'StatusType',
                 nativeType: 'StatusType',

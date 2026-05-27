@@ -77,6 +77,55 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.value.roots).toEqual({ user: 'User' });
   });
 
+  it('does not synthesise capabilities the target did not contribute', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  email String
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // The test `postgresTarget` fixture has `capabilities: {}`; with no
+    // extension packs and no author-declared capabilities, the interpreter
+    // must not inject anything of its own. Adapter and driver contributions
+    // are layered in later by CLI emit, not here.
+    expect(result.value.capabilities).toEqual({});
+  });
+
+  it('flows capabilities declared on the target pack through to the contract', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  email String
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const targetWithCapabilities = {
+      ...postgresTarget,
+      capabilities: { sql: { returning: true }, postgres: { lateral: true } },
+    } as const;
+
+    const result = interpretPslDocumentToSqlContractInternal({
+      document,
+      target: targetWithCapabilities,
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.capabilities).toEqual({
+      sql: { returning: true },
+      postgres: { lateral: true },
+    });
+  });
+
   it('does not derive generated column type without descriptor resolver', () => {
     const document = parsePslDocument({
       schema: `model User {
@@ -385,7 +434,7 @@ model Post {
       },
       namespaces: {
         public: {
-          types: {
+          enum: {
             Role: {
               kind: 'postgres-enum',
               name: 'Role',
@@ -905,9 +954,9 @@ namespace tenant_a {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const types = storage.namespaces['tenant_a']?.types ?? {};
-      expect(types).toHaveProperty('Status');
-      expect(types).toHaveProperty('Tier');
+      const enums = storage.namespaces['tenant_a']?.enum ?? {};
+      expect(enums).toHaveProperty('Status');
+      expect(enums).toHaveProperty('Tier');
     });
 
     it('Postgres routes a mixed top-level + multi-namespace document into the right slots', () => {

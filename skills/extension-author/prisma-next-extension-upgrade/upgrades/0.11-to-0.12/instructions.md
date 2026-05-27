@@ -37,6 +37,15 @@ changes:
         - "RuntimeVerifyOptions"
         - "verify: {"
       anyMatch: true
+  - id: define-contract-drop-capabilities-generic
+    summary: |
+      The `Capabilities` type parameter is removed from the framework `baseDefineContract` factory and from `ContractInput` in `@prisma-next/contract`. Extension authors who ship their own target-facade-style `defineContract` (a thin wrapper that re-exports `baseDefineContract` with `family` / `target` pre-bound) must drop the `Capabilities` generic from every facade type alias (`*Result`, `*BaseScaffold`, `*Definition`, `*Scaffold`) and from every overload signature; the corresponding `ContractInput<…, Capabilities>` and `baseDefineContract<…, Capabilities>` instantiations lose their trailing argument. Extensions that don't ship a facade have no source change — their emitted `contract.json` / `contract.d.ts` will pick up two new auto-contributed capabilities (`postgres.distinctOn`, `sql.lateral`) on re-emit; re-run `pnpm fixtures:emit` (or the equivalent for your extension) to refresh fixtures.
+    detection:
+      glob: "**/*.ts"
+      contains:
+        - "baseDefineContract"
+        - "Capabilities"
+      anyMatch: false
 ---
 
 # 0.11 → 0.12 — Extension-author upgrade instructions
@@ -361,6 +370,143 @@ Pass a `log` object into `createRuntime(...)` (or through your wrapper if you ex
 ### Validation
 
 After applying the edits above, run `pnpm typecheck` on your extension package. TypeScript flags every remaining `RuntimeVerifyOptions` import and every `verify?:` field on your options interface. Then run your extension's test suite — option-forwarding unit tests and any marker-drift integration tests are the sites most likely to need the retargeting described above.
+
+## `define-contract-drop-capabilities-generic`
+
+Starting at the 0.12 release, the framework `baseDefineContract` factory in `@prisma-next/contract` drops its `Capabilities` type parameter, and the `ContractInput<Family, Target, Types, Models, ExtensionPacks, Capabilities>` shape loses its trailing argument. Capabilities are no longer declared at authoring time — they are contributed automatically by target components and extension packs, and flow into the emitted `contract.json` / `contract.d.ts` from there.
+
+There are two kinds of impact on an extension, depending on what your extension ships:
+
+- **Extensions that ship their own target-facade `defineContract`** (the pattern used by `@prisma-next/postgres`, `@prisma-next/sqlite`, and any third-party adapter that pre-binds `family` + `target` for its consumers): you need to drop the `Capabilities` generic from every facade type alias and overload signature. TypeScript will pinpoint every site once you bump.
+- **Extensions that only contribute pack metadata + emit fixtures** (the more common shape — `@prisma-next/pgvector`, `@prisma-next/paradedb`, etc.): no source change. Re-emit your contract fixtures (`pnpm fixtures:emit` or the equivalent script for your package) so the regenerated `contract.json` / `contract.d.ts` picks up the new auto-contributed capability keys — in the 0.12 line, `postgres.distinctOn: true` and `sql.lateral: true` appear in every SQL-target fixture that loads the relevant adapter.
+
+### Facade-style extensions — drop the generic
+
+If your extension ships a `defineContract` that wraps `baseDefineContract` with `family` / `target` pre-bound, walk every type alias and every overload signature in your facade and remove the `Capabilities` parameter.
+
+#### Before 0.12
+
+```ts
+import { defineContract as baseDefineContract } from '@prisma-next/contract';
+import type { ContractInput, ExtensionPackRef } from '@prisma-next/contract';
+
+type MyTargetResult<
+  Types extends TypesConstraint,
+  Models extends ModelsConstraint,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined,
+> = Omit<
+  ReturnType<
+    typeof baseDefineContract<
+      MyFamily,
+      MyTargetPack,
+      Types,
+      Models,
+      ExtensionPacks,
+      Capabilities
+    >
+  >,
+  'target' | 'targetFamily'
+> & {
+  readonly target: MyTargetPack['targetId'];
+  readonly targetFamily: MyFamily['familyId'];
+};
+
+type MyTargetBaseScaffold<
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Capabilities extends Record<string, Record<string, boolean>> | undefined,
+> = Omit<
+  ContractInput<
+    MyFamily,
+    MyTargetPack,
+    Record<never, never>,
+    Record<never, never>,
+    ExtensionPacks,
+    Capabilities
+  >,
+  'family' | 'target' | 'types' | 'models'
+>;
+
+export function defineContract<
+  const Types extends TypesConstraint = Record<never, never>,
+  const Models extends ModelsConstraint = Record<never, never>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<'sql', string>>
+    | undefined = undefined,
+  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
+>(
+  definition: MyTargetDefinition<Types, Models, ExtensionPacks, Capabilities>,
+): MyTargetResult<Types, Models, ExtensionPacks, Capabilities>;
+```
+
+#### Starting at 0.12
+
+```ts
+import { defineContract as baseDefineContract } from '@prisma-next/contract';
+import type { ContractInput, ExtensionPackRef } from '@prisma-next/contract';
+
+type MyTargetResult<
+  Types extends TypesConstraint,
+  Models extends ModelsConstraint,
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+> = Omit<
+  ReturnType<
+    typeof baseDefineContract<MyFamily, MyTargetPack, Types, Models, ExtensionPacks>
+  >,
+  'target' | 'targetFamily'
+> & {
+  readonly target: MyTargetPack['targetId'];
+  readonly targetFamily: MyFamily['familyId'];
+};
+
+type MyTargetBaseScaffold<
+  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+> = Omit<
+  ContractInput<
+    MyFamily,
+    MyTargetPack,
+    Record<never, never>,
+    Record<never, never>,
+    ExtensionPacks
+  >,
+  'family' | 'target' | 'types' | 'models'
+>;
+
+export function defineContract<
+  const Types extends TypesConstraint = Record<never, never>,
+  const Models extends ModelsConstraint = Record<never, never>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<'sql', string>>
+    | undefined = undefined,
+>(
+  definition: MyTargetDefinition<Types, Models, ExtensionPacks>,
+): MyTargetResult<Types, Models, ExtensionPacks>;
+```
+
+Drop the same parameter from every other overload signature (the factory-form overload, any convenience overload). Drop the matching entry from the type alias for `*Definition` and `*Scaffold` shapes. Drop the `Capabilities` argument from every internal `baseDefineContract<…, Capabilities>` instantiation and every internal `ContractInput<…, Capabilities>` instantiation. TypeScript will flag any remaining occurrence after the bump.
+
+### Type tests that asserted authoring-time capability literals
+
+If your facade ships a `define-contract.test-d.ts` (or similar) that asserts a `capabilities` literal is acceptable as an input to your `defineContract` — flip the assertion. The literal is now refused at the type level:
+
+```ts
+// Starting at 0.12
+// @ts-expect-error — capabilities are contributed by components, not authoring input
+defineContract({ capabilities: { sql: { lateral: true } } });
+```
+
+### Extensions that only emit fixtures — re-emit
+
+If your extension does not ship a facade, you have no source change. The contract fixtures your extension emits as part of its test suite will, however, gain new capability keys after the bump. Re-run your fixture-emit script (commonly `pnpm fixtures:emit` or `pnpm test:fixtures:emit`) and commit the regenerated `contract.json` / `contract.d.ts`. Expect to see:
+
+- `postgres.distinctOn: true` (added when a Postgres adapter is in the component graph)
+- `sql.lateral: true` (added when the SQL family + a supporting adapter is in the component graph)
+
+No fixture-shape changes other than capability additions; if your re-emit produces diffs in other sections of `contract.json`, that's a separate framework change, not this entry.
+
+### Validation
+
+After applying the edits, run `pnpm typecheck` and the matching test suite for your extension package. For facade-style extensions, the typecheck pinpoints every remaining occurrence of the `Capabilities` generic at compile time. For fixture-only extensions, the regenerated `contract.json` / `contract.d.ts` diff is the signal — review it to confirm the new capability keys landed where you expect.
 
 ## Validation by execution
 

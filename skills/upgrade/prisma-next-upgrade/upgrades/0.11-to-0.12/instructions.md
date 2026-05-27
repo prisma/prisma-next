@@ -11,6 +11,15 @@ changes:
         - "verify:"
         - "requireMarker"
       anyMatch: false
+  - id: remove-capabilities-from-define-contract
+    summary: |
+      The `capabilities` field on the first argument of `defineContract({...}, ...)` is removed. Capabilities are now contributed automatically by extension packs and target components; declaring them by hand is no longer accepted and the contract builder will refuse the literal. Delete the `capabilities: { ... }` block from every `defineContract` call site, then re-emit your contract artefacts (`pnpm emit`, which runs `prisma-next contract emit`) to refresh `contract.json` / `contract.d.ts`. The regenerated artefacts pick up the contributor-declared capabilities — including two new ones in the 0.12 line, `postgres.distinctOn` and `sql.lateral`, which extensions contribute on your behalf when their pack is in `extensionPacks`.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "defineContract"
+        - "capabilities:"
+      anyMatch: false
 ---
 
 # 0.11 → 0.12 — User upgrade instructions
@@ -99,3 +108,69 @@ The `RuntimeVerifyOptions` type is removed from `@prisma-next/sql-runtime` expor
 ### Validation
 
 After applying the rule above, run `pnpm typecheck && pnpm test` (or your application's equivalent). The change is mechanical: TypeScript flags every `verify: {...}` call site as a type error after the bump, and every `RuntimeVerifyOptions` import similarly. Once those errors are resolved, the behaviour change (warn-log instead of throw on drift) shows up only at runtime when a marker mismatch actually occurs.
+
+## `remove-capabilities-from-define-contract`
+
+Starting at the 0.12 release, the `capabilities` field on the first argument of `defineContract({...}, ...)` is removed. Capabilities are now contributed automatically by the target's components and the extension packs you load via `extensionPacks: { ... }`; the contract builder will refuse a literal `capabilities` key. Hand-declaring capabilities was redundant with — and frequently drifted from — the contributor-declared set, so the authoring surface drops the field outright.
+
+Two consumer-visible consequences:
+
+- **Source change**: delete the `capabilities: { ... }` block from every `defineContract` call site.
+- **Emitted artefacts**: the regenerated `contract.json` / `contract.d.ts` will pick up the contributor-declared capabilities. In the 0.12 line, two new capability keys land automatically — `postgres.distinctOn` and `sql.lateral` — when the matching adapter / target component is in the contract's component graph.
+
+### Before 0.12
+
+```ts
+import { defineContract } from '@prisma-next/postgres/contract-builder';
+import { pgvector } from '@prisma-next/pgvector';
+
+export const contract = defineContract(
+  {
+    extensionPacks: { pgvector },
+    capabilities: {
+      postgres: {
+        lateral: true,
+        jsonAgg: true,
+        returning: true,
+        'pgvector.cosine': true,
+      },
+    },
+  },
+  ({ field, model }) => {
+    // … model definitions …
+  },
+);
+```
+
+### Starting at 0.12
+
+```ts
+import { defineContract } from '@prisma-next/postgres/contract-builder';
+import { pgvector } from '@prisma-next/pgvector';
+
+export const contract = defineContract(
+  {
+    extensionPacks: { pgvector },
+  },
+  ({ field, model }) => {
+    // … model definitions …
+  },
+);
+```
+
+If your first argument becomes `{}` after the deletion (the only field it carried was `capabilities`), simplify to `defineContract({}, ({ field, model }) => { … })`. TypeScript flags any remaining `capabilities:` key on a `defineContract` call as an excess-property error after the bump, so every affected site is pinpointed at compile time.
+
+### Re-emit your contract
+
+After updating the source, regenerate the emitted artefacts so the new contributor-declared capabilities land in `contract.json` and `contract.d.ts`:
+
+```bash
+pnpm emit
+# (runs `prisma-next contract emit` under the hood)
+```
+
+You should see capability keys appear in the regenerated `contract.json` — for SQL targets, expect `postgres.distinctOn: true` and `sql.lateral: true` to show up if your contract uses the matching adapter / extensions.
+
+### Validation
+
+After applying the rule above, run `pnpm typecheck && pnpm test` (or your application's equivalent). The change is mechanical and TypeScript pinpoints every affected call site; the regenerated `contract.json` diff confirms the capabilities flowed through unchanged.

@@ -621,10 +621,7 @@
         }
       },
       "public": {
-        "id": "public",
-        "kind": "postgres-schema",
-        "tables": {},
-        "types": {
+        "enum": {
           "user_type": {
             "codecId": "pg/enum@1",
             "kind": "postgres-enum",
@@ -635,10 +632,13 @@
               "user"
             ]
           }
-        }
+        },
+        "id": "public",
+        "kind": "postgres-schema",
+        "tables": {}
       }
     },
-    "storageHash": "sha256:7926114e786c1a8fcc103d295a0c7fe5eb414b669ebb5b06a1e816d0019cbe7f",
+    "storageHash": "sha256:e75bed0cca186c56a9b3b0e93e70c90e3fec8900f565c602c229e44979e4d83d",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -689,6 +689,7 @@
   },
   "capabilities": {
     "postgres": {
+      "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -699,6 +700,7 @@
     "sql": {
       "defaultInInsert": true,
       "enums": true,
+      "lateral": true,
       "returning": true
     }
   },

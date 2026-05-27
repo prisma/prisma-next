@@ -177,6 +177,24 @@ describe('formatMigrationPlanOutput', () => {
 
     expect(stripped).toContain('Total time: 42ms');
   });
+
+  it('shows planned ref advancement when plannedAdvanceRef is set', () => {
+    const result = createPlanResult({
+      plannedAdvanceRef: { name: 'db', hash: 'sha256:planned-hash' },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+
+    expect(stripped).toContain('Would advance ref "db" → sha256:planned-hash');
+  });
+
+  it('omits planned ref advancement when plannedAdvanceRef is null', () => {
+    const result = createPlanResult({ plannedAdvanceRef: null });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+
+    expect(stripped).not.toContain('Would advance ref');
+  });
 });
 
 describe('formatMigrationApplyOutput', () => {
@@ -322,6 +340,24 @@ describe('formatMigrationApplyOutput', () => {
     expect(stripped).toContain('Database already matches contract');
     expect(stripped).not.toContain('Applied 0');
   });
+
+  it('shows advanced ref when advancedRef is set', () => {
+    const result = createApplyResult({
+      advancedRef: { name: 'db', hash: 'sha256:applied-hash' },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationApplyOutput(result, flags));
+
+    expect(stripped).toContain('Advanced ref "db" → sha256:applied-hash');
+  });
+
+  it('omits advanced ref line when advancedRef is null', () => {
+    const result = createApplyResult({ advancedRef: null });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationApplyOutput(result, flags));
+
+    expect(stripped).not.toContain('Advanced ref');
+  });
 });
 
 describe('formatMigrationJson', () => {
@@ -370,6 +406,34 @@ describe('formatMigrationJson', () => {
       execution: { operationsPlanned: 1, operationsExecuted: 1 },
       marker: { storageHash: 'sha256:dest-hash' },
     });
+  });
+
+  it('includes plannedAdvanceRef in plan JSON output when set', () => {
+    const result = createPlanResult({
+      plannedAdvanceRef: { name: 'staging', hash: 'sha256:planned-hash' },
+    });
+    const parsed = JSON.parse(formatMigrationJson(result)) as MigrationCommandResult;
+
+    expect(parsed.plannedAdvanceRef).toEqual({ name: 'staging', hash: 'sha256:planned-hash' });
+    expect(parsed.advancedRef).toBeUndefined();
+  });
+
+  it('includes advancedRef in apply JSON output when set', () => {
+    const result = createApplyResult({
+      advancedRef: { name: 'db', hash: 'sha256:applied-hash' },
+    });
+    const parsed = JSON.parse(formatMigrationJson(result)) as MigrationCommandResult;
+
+    expect(parsed.advancedRef).toEqual({ name: 'db', hash: 'sha256:applied-hash' });
+    expect(parsed.plannedAdvanceRef).toBeUndefined();
+  });
+
+  it('serializes null ref advancement fields in JSON output', () => {
+    const result = createApplyResult({ advancedRef: null, plannedAdvanceRef: null });
+    const parsed = JSON.parse(formatMigrationJson(result)) as MigrationCommandResult;
+
+    expect(parsed.advancedRef).toBeNull();
+    expect(parsed.plannedAdvanceRef).toBeNull();
   });
 
   it('uses 2-space indentation', () => {

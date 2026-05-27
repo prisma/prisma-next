@@ -18,97 +18,75 @@ type PostgresPack = typeof postgresPack;
 type TypesConstraint = Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
 type ModelsConstraint = Record<string, ModelLike>;
 
-// Return type threaded with all inferred type params.
-// We override target/targetFamily via intersection to preserve the literal values
-// ('postgres', 'sql') even when TypeScript defers conditional-type evaluation on
-// unresolved generic params.
 type PostgresResult<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
 > = Omit<
-  ReturnType<
-    typeof baseDefineContract<SqlFamily, PostgresPack, Types, Models, ExtensionPacks, Capabilities>
-  >,
+  ReturnType<typeof baseDefineContract<SqlFamily, PostgresPack, Types, Models, ExtensionPacks>>,
   'target' | 'targetFamily'
 > & {
   readonly target: PostgresPack['targetId'];
   readonly targetFamily: SqlFamily['familyId'];
 };
 
-// Scaffold that carries all ContractInput fields EXCEPT family, target, types, models.
-// Built from ContractInput with concrete Record<never, never> defaults to avoid
-// the ContractInput Models constraint (which requires ContractModelBuilder, not ModelLike).
 type PostgresBaseScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
 > = Omit<
   ContractInput<
     SqlFamily,
     PostgresPack,
     Record<never, never>,
     Record<never, never>,
-    ExtensionPacks,
-    Capabilities
+    ExtensionPacks
   >,
   'family' | 'target' | 'types' | 'models'
 >;
 
-// Definition form: inline types + models (uses ModelLike for models, not ContractModelBuilder)
 type PostgresDefinition<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
-> = PostgresBaseScaffold<ExtensionPacks, Capabilities> & {
+> = PostgresBaseScaffold<ExtensionPacks> & {
   readonly types?: Types;
   readonly models?: Models;
 };
 
-// Factory form: scaffold without types/models (factory provides them)
 type PostgresScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-  Capabilities extends Record<string, Record<string, boolean>> | undefined,
-> = PostgresBaseScaffold<ExtensionPacks, Capabilities>;
+> = PostgresBaseScaffold<ExtensionPacks>;
 
-// Overload 1: definition form (models/types inline in scaffold)
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
-  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 >(
-  definition: PostgresDefinition<Types, Models, ExtensionPacks, Capabilities>,
-): PostgresResult<Types, Models, ExtensionPacks, Capabilities>;
+  definition: PostgresDefinition<Types, Models, ExtensionPacks>,
+): PostgresResult<Types, Models, ExtensionPacks>;
 
-// Overload 2: factory form (scaffold without models/types; factory provides them)
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
     | undefined = undefined,
-  const Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 >(
-  scaffold: PostgresScaffold<ExtensionPacks, Capabilities>,
+  scaffold: PostgresScaffold<ExtensionPacks>,
   factory: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, ExtensionPacks>) => {
     readonly types?: Types;
     readonly models?: Models;
   },
-): PostgresResult<Types, Models, ExtensionPacks, Capabilities>;
+): PostgresResult<Types, Models, ExtensionPacks>;
 
-// Implementation — the runtime type is richer than the wide impl signature;
-// as unknown is safe because every declared overload produces a PostgresResult.
 export function defineContract(
   scaffold: Omit<ContractInput, 'family' | 'target'>,
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, undefined>) => {
     readonly types?: TypesConstraint;
     readonly models?: ModelsConstraint;
   },
-): PostgresResult<TypesConstraint, ModelsConstraint, undefined, undefined> {
+): PostgresResult<TypesConstraint, ModelsConstraint, undefined> {
   const full = {
     ...scaffold,
     family: sqlFamilyPack,
@@ -118,12 +96,11 @@ export function defineContract(
     return baseDefineContract(
       full,
       factory as Parameters<typeof baseDefineContract>[1],
-    ) as unknown as PostgresResult<TypesConstraint, ModelsConstraint, undefined, undefined>;
+    ) as unknown as PostgresResult<TypesConstraint, ModelsConstraint, undefined>;
   }
   return baseDefineContract(full) as unknown as PostgresResult<
     TypesConstraint,
     ModelsConstraint,
-    undefined,
     undefined
   >;
 }

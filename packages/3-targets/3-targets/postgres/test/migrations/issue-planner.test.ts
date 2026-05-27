@@ -18,13 +18,13 @@ import { PostgresEnumType } from '../../src/exports/types';
 function makeContract(
   overrides: {
     tables?: Record<string, StorageTableInput>;
-    types?: Record<string, PostgresEnumStorageEntry>;
+    enum?: Record<string, PostgresEnumStorageEntry>;
   } = {},
 ): Contract<SqlStorage> {
   const unboundNs: SqlNamespaceTablesInput = {
     id: UNBOUND_NAMESPACE_ID,
     tables: overrides.tables ?? {},
-    ...(overrides.types !== undefined ? { types: overrides.types } : {}),
+    ...(overrides.enum !== undefined ? { enum: overrides.enum } : {}),
   };
   return {
     target: 'postgres',
@@ -364,7 +364,7 @@ describe('planIssues', () => {
     it('emits AddEnumValuesCall for add-only', () => {
       const toContract = makeContract({
         tables: {},
-        types: {
+        enum: {
           status: new PostgresEnumType({
             name: 'status',
             values: ['active', 'inactive', 'archived'],
@@ -373,7 +373,7 @@ describe('planIssues', () => {
       });
       const fromContract = makeContract({
         tables: {},
-        types: {
+        enum: {
           status: new PostgresEnumType({
             name: 'status',
             values: ['active', 'inactive'],
@@ -425,7 +425,7 @@ describe('planIssues', () => {
             foreignKeys: [],
           },
         },
-        types: {
+        enum: {
           status: new PostgresEnumType({
             name: 'status',
             values: ['active'],
@@ -450,7 +450,7 @@ describe('planIssues', () => {
             foreignKeys: [],
           },
         },
-        types: {
+        enum: {
           status: new PostgresEnumType({
             name: 'status',
             values: ['active', 'inactive'],

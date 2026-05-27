@@ -38,11 +38,18 @@ import {
   addMigrationCommandOptions,
   prepareMigrationContext,
 } from '../utils/migration-command-scaffold';
+import {
+  buildRefAdvancementFields,
+  computeRefAdvancementName,
+  type RefAdvancementFields,
+  readContractIR,
+} from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
 interface DbUpdateOptions extends MigrationCommandOptions {
   readonly to?: string;
+  readonly advanceRef?: string;
 }
 
 /**
@@ -101,6 +108,7 @@ async function executeDbUpdateCommand(
   }
   const { client, config, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
   let { contractJson } = ctxResult.value;
+  let contractJsonPathForSnapshot = contractPathAbsolute;
   const { migrationsDir, appMigrationsDir, refsDir } = resolveMigrationPaths(
     options.config,
     config,
@@ -130,6 +138,7 @@ async function executeDbUpdateCommand(
       const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
       const raw = await readFile(endContractPath, 'utf-8');
       contractJson = JSON.parse(raw) as Record<string, unknown>;
+      contractJsonPathForSnapshot = endContractPath;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -155,6 +164,39 @@ async function executeDbUpdateCommand(
     // Handle failures by mapping to CLI structured error
     if (!result.ok) {
       return notOk(mapDbUpdateFailure(result.failure));
+    }
+
+    const advancementHash =
+      result.value.mode === 'apply'
+        ? (result.value.marker?.storageHash ?? result.value.destination.storageHash)
+        : result.value.destination.storageHash;
+
+    let refAdvancementFields: RefAdvancementFields = {
+      advancedRef: null,
+      plannedAdvanceRef: null,
+    };
+    if (
+      computeRefAdvancementName({
+        ...ifDefined('advanceRef', options.advanceRef),
+        ...ifDefined('db', options.db),
+      }) !== null
+    ) {
+      try {
+        const contractIR = await readContractIR(contractJson, contractJsonPathForSnapshot);
+        refAdvancementFields = await buildRefAdvancementFields({
+          ...ifDefined('advanceRef', options.advanceRef),
+          ...ifDefined('db', options.db),
+          refsDir,
+          contractIR,
+          mode: result.value.mode,
+          hash: advancementHash,
+        });
+      } catch (error) {
+        if (MigrationToolsError.is(error)) {
+          return notOk(mapMigrationToolsError(error));
+        }
+        throw error;
+      }
     }
 
     // Convert success result to CLI output format
@@ -193,6 +235,8 @@ async function executeDbUpdateCommand(
           : undefined,
       ),
       ...ifDefined('perSpace', result.value.perSpace),
+      advancedRef: refAdvancementFields.advancedRef,
+      plannedAdvanceRef: refAdvancementFields.plannedAdvanceRef,
       summary: result.value.summary,
       timings: { total: Date.now() - startTime },
     };
@@ -245,6 +289,7 @@ export function createDbUpdateCommand(): Command {
     '--to <contract>',
     'Target contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
   );
+  command.option('--advance-ref <name>', 'Ref to advance to the post-command contract hash');
   command.action(async (options: DbUpdateOptions) => {
     const flags = parseGlobalFlagsOrExit(options);
     const startTime = Date.now();

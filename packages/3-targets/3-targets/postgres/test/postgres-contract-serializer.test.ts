@@ -118,7 +118,7 @@ describe('PostgresContractSerializer', () => {
                 columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
               },
             },
-            types: {},
+            enum: {},
           },
         },
       },

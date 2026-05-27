@@ -192,17 +192,19 @@ function trackAbortListeners(signal: AbortSignal): {
   const removed: AbortListenerArg[] = [];
   const originalAdd = signal.addEventListener.bind(signal);
   const originalRemove = signal.removeEventListener.bind(signal);
-  signal.addEventListener = ((type, listener, options) => {
+  signal.addEventListener = ((...args: Parameters<typeof signal.addEventListener>) => {
+    const [type, listener] = args;
     if (type === 'abort' && listener) {
       added.push(listener);
     }
-    return originalAdd(type, listener, options);
+    return originalAdd(...args);
   }) as typeof signal.addEventListener;
-  signal.removeEventListener = ((type, listener, options) => {
+  signal.removeEventListener = ((...args: Parameters<typeof signal.removeEventListener>) => {
+    const [type, listener] = args;
     if (type === 'abort' && listener) {
       removed.push(listener);
     }
-    return originalRemove(type, listener, options);
+    return originalRemove(...args);
   }) as typeof signal.removeEventListener;
   return { added, removed };
 }

@@ -17,6 +17,7 @@
   },
   "capabilities": {
     "postgres": {
+      "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -26,6 +27,7 @@
     "sql": {
       "defaultInInsert": true,
       "enums": true,
+      "lateral": true,
       "returning": true
     }
   },

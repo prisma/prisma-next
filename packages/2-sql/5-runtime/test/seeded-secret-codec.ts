@@ -18,14 +18,21 @@ function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64');
 }
 
-function fromBase64(value: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(value, 'base64'));
+// Return a `Uint8Array<ArrayBuffer>` (not `Uint8Array<ArrayBufferLike>`) so the value
+// satisfies WebCrypto's `BufferSource` parameters, which require an `ArrayBuffer`-
+// backed view in newer DOM lib typings.
+function fromBase64(value: string): Uint8Array<ArrayBuffer> {
+  const decoded = Buffer.from(value, 'base64');
+  const out = new Uint8Array(decoded.byteLength);
+  out.set(decoded);
+  return out;
 }
 
-async function digestBytes(value: string): Promise<Uint8Array> {
-  return new Uint8Array(
-    await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(value)),
-  );
+async function digestBytes(value: string): Promise<Uint8Array<ArrayBuffer>> {
+  const encoded = textEncoder.encode(value);
+  const input = new Uint8Array(encoded.byteLength);
+  input.set(encoded);
+  return new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', input));
 }
 
 async function importSeedKey(seed: string) {

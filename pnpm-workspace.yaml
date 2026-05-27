@@ -16,11 +16,11 @@ blockExoticSubdeps: true
 
 catalog:
   '@prisma/dev': 0.24.7
-  '@types/node': 24.10.4
+  '@types/node': 25.6.0
   '@types/pg': 8.20.0
   arktype: ^2.2.0
   gray-matter: ^4.0.3
-  mongodb: ^6.16.0
+  mongodb: ^7.2.0
   mongodb-memory-server: 11.1.0
   pg: 8.20.0
   tsdown: 0.22.0

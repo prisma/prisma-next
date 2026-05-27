@@ -69,11 +69,35 @@ type DefinitionExtensionPacks<Definition> = Definition extends {
   ? Packs
   : Record<never, never>;
 
-type DefinitionCapabilities<Definition> = Definition extends {
-  readonly capabilities?: infer Capabilities extends Record<string, Record<string, boolean>>;
+type ExtractPackCapabilities<P> = P extends {
+  readonly capabilities?: infer Caps extends Record<string, Record<string, boolean>>;
 }
-  ? Capabilities
-  : undefined;
+  ? Caps
+  : never;
+
+type MergeExtensionPackCapabilities<Packs> =
+  Packs extends Record<string, unknown>
+    ? keyof Packs extends never
+      ? Record<string, never>
+      : UnionToIntersection<
+          {
+            [K in keyof Packs]: ExtractPackCapabilities<Packs[K]>;
+          }[keyof Packs]
+        >
+    : Record<string, never>;
+
+type Defaulted<T, Fallback> = [T] extends [never] ? Fallback : T;
+
+// Build-time capability derivation no longer reads an author-declared
+// `capabilities` block — that field was removed from the `defineContract`
+// input. The build-time matrix is the merge of the target pack's caps and
+// every extension pack's caps; adapter and driver caps are layered in by
+// `enrichContract` at CLI emit time.
+type DerivedCapabilities<Definition> = Defaulted<
+  ExtractPackCapabilities<DefinitionTarget<Definition>>,
+  Record<string, never>
+> &
+  MergeExtensionPackCapabilities<DefinitionExtensionPacks<Definition>>;
 
 type DefinitionTargetId<Definition> = Definition extends {
   readonly target: TargetPackRef<'sql', infer Target>;
@@ -561,14 +585,14 @@ type BuiltStorage<Definition> = {
       readonly id: '__unbound__';
       readonly kind: string;
       readonly tables: BuiltStorageTables<Definition>;
-      readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+      readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
     };
   } & {
     readonly [Ns in Exclude<DefinitionNamespaces<Definition>, '__unbound__'>]: {
       readonly id: Ns;
       readonly kind: string;
       readonly tables: Record<never, never>;
-      readonly types?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+      readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
     };
   };
 };
@@ -608,12 +632,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
     readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
       : DefinitionExtensionPacks<Definition>;
-    readonly capabilities: DefinitionCapabilities<Definition> extends Record<
-      string,
-      Record<string, boolean>
-    >
-      ? DefinitionCapabilities<Definition>
-      : Record<string, Record<string, boolean>>;
+    readonly capabilities: DerivedCapabilities<Definition>;
   },
   TypeMaps<
     CodecTypesFromDefinition<Definition>,

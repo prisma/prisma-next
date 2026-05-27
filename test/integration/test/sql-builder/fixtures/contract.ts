@@ -59,28 +59,6 @@ const User = UserBase.relations({
 
 export const contract = defineContract({
   extensionPacks: { pgvector },
-  capabilities: {
-    sql: {
-      lateral: true,
-      returning: true,
-      jsonAgg: true,
-      enums: true,
-      foreignKeys: true,
-      autoIndexesForeignKeys: false,
-    },
-    postgres: {
-      partialIndex: true,
-      deferrableConstraints: true,
-      savepoints: true,
-      transactionalDDL: true,
-      distinctOn: true,
-    },
-    pgvector: {
-      ivfflat: true,
-      hnsw: true,
-      vector: true,
-    },
-  },
   models: {
     User,
     Post,

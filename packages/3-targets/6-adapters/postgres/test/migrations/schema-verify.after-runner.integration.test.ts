@@ -205,7 +205,7 @@ describe.sequential('Schema verification after runner - integration', () => {
                   foreignKeys: [],
                 },
               },
-              types: {
+              enum: {
                 BillingState: new PostgresEnumType({
                   name: 'BillingState',
                   nativeType: 'BillingState',
