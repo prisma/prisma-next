@@ -2,6 +2,45 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-27 · drive-build-workflow · gap (brief gigantism — orchestrator pre-decomposes the implementer's work into a multi-hundred-line brief)
+
+S1.C D2 brief assembly surfaced two compounding failures the operator named on two separate calls:
+
+1. **Composition outsourced to a subagent.** I dispatched the D2-brief-assembly task to a subagent with a ~250-line prompt that dictated every design decision, refusal trigger, gate, decision rationale, and section structure. The subagent's job became "transcribe what I already wrote and grep for some line numbers." Token cost: high. Value-add: marginal (the grep findings were real but cost-disproportionate). Operator called this out: *"if you have all the context to write the brief, just write the fucking brief. Stop using the subagent."*
+
+2. **Brief gigantism.** Even setting (1) aside, the brief itself was wrong-shaped. The subagent produced 321 lines / 60KB; the S1.C D1 brief weighs 275 lines; the S1.B D1 brief weighs 135 lines. The implementer's first execution step is a grep pre-flight to enumerate authoring/consumer sites — pre-enumerating every file, every line number, every consumer call site, every Risk #5 (a)+(b) row in the brief duplicates work the implementer must do anyway. Operator called this out: *"the agent that picks this up is more than capable of finding the authoring sites themselves. You don't need to do all of this work upfront, and it's making the process incredibly slow."*
+
+**Root cause.** Both failures share the same misconception: *brief = comprehensive pre-decomposed work plan*. Treating the brief as a defensive contract that pre-empts every possible implementer mistake makes the orchestrator do the implementer's discovery work AND turns brief-assembly into a multi-hour composition task. Combined with operator-facing dispatch cadence (one brief blocks one dispatch), the inflation directly slows the project.
+
+**The correct shape of a dispatch brief.** A brief is a **settled-decisions + boundary + gates** document, not a work plan. It carries:
+
+- **Intent** — what this dispatch makes true (1–3 sentences).
+- **Pre-locked design decisions** — each as one paragraph: choice + one-sentence rationale + one-sentence rejected alternative. NOT multi-section essays.
+- **Scope boundary** — what's in, what's out, with pointers to D1 / D3 / sibling slices. NOT pre-enumerated file lists.
+- **Done-when gates** — testable conditions (build/typecheck/lint/test cascades + intent-validation greps + functional gate description). NOT pre-enumerated consumer site audits.
+- **Refusal triggers** — short list of halts (F1/F5/F6/F7 patterns + slice-specific scope guardrails). NOT verbose multi-paragraph elaborations.
+- **Model tier**.
+- **Wrap-up format** — 5–8 bullets covering HEAD SHA, gate results, decisions-as-implemented, refusal-trigger fires, handoff stubs. NOT 13-item report-back checklists.
+
+What the brief does NOT carry:
+
+- Pre-enumerated file lists with line numbers — the implementer's first step (grep pre-flight) produces this.
+- Pre-walked Risk #5 (a)+(b) overlay table — the implementer walks it as part of executing each surface; the brief carries the *default stance* + the halt condition.
+- Multi-paragraph design-decision rationales — one paragraph each.
+- Exhaustive consumer call-site audits — the implementer greps.
+- Step-by-step execution scripts — the implementer chooses ordering.
+
+**Target length.** ≤ 120 lines. S1.B D1 brief at 135 lines is the upper bound; aim for 80–100. If the orchestrator's brief authoring is taking > 15 minutes (excluding settling open design decisions, which is a separate task), the orchestrator is doing the implementer's work.
+
+**Process change.**
+
+- **Briefs are written by the orchestrator, full stop.** No subagent dispatch for brief composition. Subagent dispatches are for: substantive discovery (where existing brief context is insufficient and the orchestrator cannot cheaply grep), implementation (code authoring), or review (judgment on landed code).
+- **Design-decision settlement is a separate task** that can precede brief authoring. It can warrant a subagent dispatch if discovery is substantive. But once decisions are settled, the brief is a 10–15 minute composition the orchestrator does.
+- **Spec + plan + D1 reviewer output are the orchestrator's context.** If the brief is being authored without all three already loaded, that's the gap — load them, don't dispatch around them.
+- **Update brief template** at `skills-contrib/drive-plan-slice/templates/dispatch-brief.md` (if it exists) to reflect the lean shape, OR draft one if it doesn't.
+
+**Suggested follow-up.** Audit existing S1.A / S1.B / S1.C briefs against the lean target. The shrinkage is consistent (D1@275 → likely ~90; D2@321 → likely ~80). The exercise itself isn't urgent — but the pattern catch in *future* briefs is, starting with this S1.C D2 rewrite.
+
 ## 2026-05-27 · drive-build-workflow · friction (reviewer prompt self-contradiction: "do not run pnpm" rule + Section-C "Gate verification" heading drove the reviewer to run pnpm anyway)
 
 After the 2026-05-27 reviewer-scope retro, I re-dispatched the S1.C D1 reviewer with a hard `Do NOT run validation gates` rule at the top of the prompt. The reviewer (Opus 4.7) ran the full gate suite anyway — `pnpm install --frozen-lockfile` + `rm -rf .turbo` + `pnpm build` + `pnpm typecheck` + `pnpm lint:deps` + `pnpm test:packages` per workspace — and produced a Section-C table titled "Gate verification" with PASS/FAIL columns. Root cause: the prompt's hard prohibition lived in the preamble, but the body still had a section titled **"Gate verification"** that listed individual gates to "confirm" — the reviewer reasonably parsed "confirm the gates pass" as "run the gates and check," not as "read the implementer's report and judge the evidence." Two layers of guidance pointed in different directions; the section heading won.
