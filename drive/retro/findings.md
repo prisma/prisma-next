@@ -2,6 +2,16 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-27 · drive-discussion + drive-build-workflow · win
+
+`forbid-casts` (TML-2685) project close. The spec's A1–A5 assumption block earned its cost during D2 verification: three consecutive load-bearing assumptions falsified in sequence (A2 sub-clause — per-line `// biome-ignore` doesn't apply to plugin diagnostics, [biome#2582](https://github.com/biomejs/biome/issues/2582); A3 — `--only=<rule-id>` doesn't apply to plugin rules; an unnumbered sub-clause around `biome.jsonc § overrides` not clearing plugins inherited from the top-level config). Each falsification triggered the documented halt-and-route-to-discussion mechanism: implementer paused with a concrete falsifier artefact, orchestrator surfaced the pivot to the operator, operator approved a small reshape (relocate the helper's escape from `as` to `any`; filter `--reporter=json` output by category + message-prefix; hoist test-file exclusion into the plugin's `file()` predicate), implementer resumed cleanly. The mechanism prevented sunk-cost-driven workarounds in three independent places. Total cost: three ~30-minute discussion-mode pivots; total avoided cost: an unknown number of brittle in-config carve-outs that would have aged badly.
+
+The pattern that emerged across the three falsifications: each one was a *tooling capability gap* (biome 2.4.x's plugin DSL is less expressive than the spec's design needed), not a design error. The assumption block was load-bearing precisely because the team hadn't written a Biome plugin before — A2/A3 were "I think this works" not "I've confirmed this works." Writing them down forced verification before downstream design committed.
+
+**Suggested action:** none for the framework — the halt-on-falsification mechanism is already in `drive-discussion`'s scope and `drive-build-workflow`'s WIP-inspection guidance. This entry confirms the mechanism works when the assumption block names the load-bearing claims concretely (not vaguely). The repo-specific gotchas (biome plugin DSL gaps) landed inline in `biome-plugins/no-bare-cast.grit` + `scripts/lint-casts.mjs` comments — the template a future plugin author would look at.
+
+**Upstream candidate?** No new mechanism — this is a "the existing protocol works" finding. The repo-specific tooling knowledge lands at the artefact level.
+
 ## 2026-05-21 · drive-run-retro · boundary
 
 First in-anger use of `drive-run-retro` in this trial, triggered by an
