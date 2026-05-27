@@ -80,13 +80,5 @@
       "rollup": "4.59.0"
     }
   },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,json,jsonc,css}": [
-      "biome format --write --no-errors-on-unmatched",
-      "biome check --write --no-errors-on-unmatched"
-    ],
-    "*.{ts,tsx,js,jsx}": [
-      "node scripts/lint-deps-focused.mjs"
-    ]
-  }
+  "//lint-staged": "config lives in lint-staged.config.mjs so we can filter out biome-plugins/fixtures/** (intentional rule-violation fixtures for the no-bare-cast plugin)"
 }

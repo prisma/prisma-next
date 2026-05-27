@@ -1,7 +1,7 @@
 file($name, $body) where {
   // Exclude test files — mirrors biome's existing overrides § includes patterns.
   // Biome's GritQL regex matching is anchored full-match, so patterns require a .* prefix.
-  not $name <: r".*\.(test|test-d)\.ts",
+  not $name <: r".*\.(?:test|test-d)\.ts",
   not $name <: r".*/test/.*\.ts",
   $body <: contains `$x as $t` where {
     not $t <: r"^const$",
