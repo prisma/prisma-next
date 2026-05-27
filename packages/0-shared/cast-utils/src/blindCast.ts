@@ -34,5 +34,7 @@
  *                     Only meaningful at compile time. The reviewer evaluates whether it justifies the unsafety.
  */
 export function blindCast<TargetType, _Reason extends string>(input: unknown): TargetType {
-  return input as TargetType;
+  // biome-ignore lint/suspicious/noExplicitAny: this helper is the single canonical escape hatch for type-unsafe casts in the codebase; the `any` is hyper-local, the unsafety is made explicit at every call site via the call's own `Reason` literal, and the reviewer evaluates whether that justification holds
+  const x: any = input;
+  return x;
 }
