@@ -39,14 +39,14 @@ Both helpers live in a new `packages/0-shared/cast-utils/` package (name TBD per
 
 ### Functional requirements
 
-- **FR1** — `blindCast<T, Reason extends string>(input: unknown): T` is exported from `packages/0-shared/cast-utils/` and importable by every workspace package.
+- **FR1** — `blindCast<T, Reason extends string>(input: unknown): T` is exported from `packages/0-shared/cast-utils/` and importable by every workspace package. The helper's TSDoc comment frames it as a **last resort, not a sanctioned tool to reach for**: it names rewriting the code so the cast becomes unnecessary as the first option, and tells the reader that the reviewer will validate whether the `Reason` justification holds up under scrutiny — an unconvincing justification is an instruction to go solve the underlying type-system problem instead.
 - **FR2** — `castAs<T>(value: T): T` is exported from the same package.
 - **FR3** — A biome custom rule at `lint/casts/no-bare-cast` (final ID per OQ3) reports every `as` token in production code except `as const` and the one whitelisted line in `blindCast.ts`'s body.
 - **FR4** — The rule is disabled for test files via biome's existing `overrides` block matching `**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`.
 - **FR5** — A CI ratchet script runs the rule on HEAD and on `git merge-base origin/main HEAD`, fails the CI step if HEAD's violation count exceeds the merge-base count. Skipped on `main` itself.
 - **FR6** — The ratchet's failure message lists per-site `file:line` locations for the *added* casts and suggests `blindCast`/`castAs` as alternatives.
-- **FR7** — A `.cursor/rules/no-bare-casts.mdc` rule documents the contract for agents in the Cursor surface.
-- **FR8** — A `skills-contrib/no-bare-casts/SKILL.md` skill fires on agent triggers (writing `as`, touching a cast site) to educate about the alternatives. The skill materializes to `.claude/skills/` and `.agents/skills/` via the existing `prepare` hook.
+- **FR7** — A `.cursor/rules/no-bare-casts.mdc` rule documents the contract for agents in the Cursor surface. The rule explicitly frames `blindCast` as a last resort (not a sanctioned tool), names rewriting the code so the cast becomes unnecessary as the first option, and tells agents the reviewer will validate the `Reason` and push back if it doesn't hold water.
+- **FR8** — A `skills-contrib/no-bare-casts/SKILL.md` skill fires on agent triggers (writing `as`, touching a cast site) to educate about the alternatives. The skill restates the rewrite-first / blindCast-as-last-resort / reviewer-validates-justification framing in agent-actionable form. The skill materializes to `.claude/skills/` and `.agents/skills/` via the existing `prepare` hook.
 - **FR9** — `AGENTS.md § Typesafety rules` is updated to point at the helpers, the lint rule, and the skill.
 
 ### Non-functional requirements
@@ -73,6 +73,7 @@ Both helpers live in a new `packages/0-shared/cast-utils/` package (name TBD per
 - **AC6** — `AGENTS.md § Typesafety rules` names `blindCast`, `castAs`, the lint rule, and links to the skill.
 - **AC7** — `.cursor/rules/no-bare-casts.mdc` is present and discoverable.
 - **AC8** — `skills-contrib/no-bare-casts/SKILL.md` is present, materializes to `.claude/skills/` and `.agents/skills/` via the `prepare` hook, and triggers on the documented surface.
+- **AC9** — `blindCast`'s TSDoc comment carries the last-resort framing explicitly: names `blindCast` as a last resort, instructs the reader to rewrite first, references the reviewer's role in validating the `Reason`. Verifiable by reading `packages/0-shared/cast-utils/src/blindCast.ts`'s top-of-function TSDoc.
 
 ## Assumptions
 

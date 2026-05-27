@@ -7,6 +7,7 @@
 ## Principles this design serves
 
 - **Casts must be visible.** An unjustified cast must not be insertable by accident or omission. The rule turns silent compromise into explicit compromise.
+- **Rewrite first; cast as last resort; reviewer validates the justification.** When an author (agent or human) reaches for `blindCast`, the first action is to ask whether the code can be rewritten so the cast becomes unnecessary. Only when no rewrite is feasible does the cast happen, and the `Reason` literal must articulate the compromise in language a reviewer can evaluate. An unconvincing `Reason` is the reviewer's signal to push back — and the author's signal to go solve the underlying type-system problem properly. `blindCast` is **not** a sanctioned tool to reach for; it is the auditable escape hatch when everything else has been tried.
 - **Compromise must be named at the call site.** When `blindCast` is the right answer, the `Reason` literal forces the author to articulate what guarantee they're giving up — at the cast site, where future readers will find it.
 - **Mechanical recognition beats reviewer judgement.** The rule fires on a syntactic token (`as`), not on intent. The reviewer never has to relitigate "is this cast OK?" The only mental load is "is this `blindCast` reason good enough?" — which is a much sharper question.
 - **The escape hatches must remain.** Some casts are genuinely necessary (type-system gaps, third-party typing, generic-bound limitations). `blindCast` and `castAs` are the named, auditable escape hatches.
