@@ -552,7 +552,7 @@ function decodeCombineIncludePayload(
   const parsed = parseCombineEnvelope(raw);
   const result: Record<string, unknown> = {};
   for (const [branchName, branch] of Object.entries(branches)) {
-    const branchRaw = parsed ? parsed[branchName] : undefined;
+    const branchRaw = parsed?.[branchName];
     if (branch.kind === 'rows') {
       const syntheticInclude: IncludeExpr = {
         ...include,
