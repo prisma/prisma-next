@@ -260,7 +260,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return renderLiteral(node);
     case 'list':
       return renderListLiteral(node);
-    case 'raw-sql':
+    case 'raw-expr':
       return renderRawExpr(node, contract);
     default:
       throw new Error(`Unsupported expression node kind: ${(node as { kind: string }).kind}`);

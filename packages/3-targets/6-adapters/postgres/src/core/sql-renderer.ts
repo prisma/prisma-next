@@ -348,7 +348,7 @@ function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
     case 'exists':
     case 'null-check':
     case 'not':
-    case 'raw-sql':
+    case 'raw-expr':
       return false;
   }
 }
@@ -552,7 +552,7 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
       return renderLiteral(node);
     case 'list':
       return renderListLiteral(node, contract, pim);
-    case 'raw-sql':
+    case 'raw-expr':
       return renderRawExpr(node, contract, pim);
     // v8 ignore next 4
     default:

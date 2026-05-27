@@ -624,7 +624,7 @@ export class OperationExpr extends Expression {
 }
 
 export class RawExpr extends Expression {
-  readonly kind = 'raw-sql' as const;
+  readonly kind = 'raw-expr' as const;
   readonly parts: ReadonlyArray<string | AnyExpression>;
   readonly returns: ParamSpec;
 
