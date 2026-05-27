@@ -113,7 +113,7 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
     ): Expression<BooleanCodecType>;
   };
 
-  readonly rawSql: RawSqlTag;
+  readonly raw: RawSqlTag;
 };
 
 export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &

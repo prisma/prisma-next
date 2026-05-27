@@ -158,16 +158,16 @@ describe('integration: rawSql expression in typed builder', {
   describe('rawSql expression survives the full pipeline and returns expected rows', () => {
     it('rawSql in aliased select produces correct computed values from the database', async () => {
       const adapter = createPostgresAdapter();
-      const db = sql({ context, adapter });
+      const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime();
 
       // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
-      // fns.rawSql is RawSqlTag (always present) because BuiltinFunctions declares it
+      // fns.raw is RawSqlTag (always present) because BuiltinFunctions declares it
       // concretely; the callback receives AggregateFunctions<QC>.
       const rows = await runtime.execute(
         db.posts
           .select('id')
-          .select('doubled', (f, fns) => fns.rawSql`${f.views} * 2`.returns('pg/int4@1'))
+          .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('pg/int4@1'))
           .orderBy('id')
           .build(),
       );
@@ -178,13 +178,13 @@ describe('integration: rawSql expression in typed builder', {
 
     it('rawSql with a literal scalar expression returns the same value for every row', async () => {
       const adapter = createPostgresAdapter();
-      const db = sql({ context, adapter });
+      const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime();
 
       const rows = await runtime.execute(
         db.posts
           .select('id')
-          .select('magic', (_f, fns) => fns.rawSql`42`.returns('pg/int4@1'))
+          .select('magic', (_f, fns) => fns.raw`42`.returns('pg/int4@1'))
           .orderBy('id')
           .build(),
       );
@@ -210,20 +210,20 @@ describe('integration: rawSql expression in typed builder', {
       };
 
       const adapter = createPostgresAdapter();
-      const db = sql({ context, adapter });
+      const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime([middleware]);
 
       // The where clause embeds a param() inside a rawSql expression.
       // After lowering, the plan carries one ParamRef (value 50, codec pg/int4@1).
       // The middleware's beforeExecute should see it via params.entries().
-      // fns.rawSql is RawSqlTag (non-optional) — callable directly as a template tag.
+      // fns.raw is RawSqlTag (non-optional) — callable directly as a template tag.
       await runtime.execute(
         db.posts
           .select('id')
           .where((_f, fns) =>
             fns.gt(
-              fns.rawSql`${param(50, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
-              fns.rawSql`0`.returns('pg/int4@1'),
+              fns.raw`${param(50, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+              fns.raw`0`.returns('pg/int4@1'),
             ),
           )
           .build(),
@@ -252,7 +252,7 @@ describe('integration: rawSql expression in typed builder', {
       };
 
       const adapter = createPostgresAdapter();
-      const db = sql({ context, adapter });
+      const db = sql({ context, rawCodecInferer: adapter });
       const runtime = buildRuntime([middleware]);
 
       // Two param() calls: param(10) and param(200).
@@ -263,12 +263,12 @@ describe('integration: rawSql expression in typed builder', {
           .where((_f, fns) =>
             fns.and(
               fns.gt(
-                fns.rawSql`${param(10, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
-                fns.rawSql`0`.returns('pg/int4@1'),
+                fns.raw`${param(10, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+                fns.raw`0`.returns('pg/int4@1'),
               ),
               fns.lt(
-                fns.rawSql`${param(200, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
-                fns.rawSql`1000`.returns('pg/int4@1'),
+                fns.raw`${param(200, { codecId: 'pg/int4@1' })}`.returns('pg/int4@1'),
+                fns.raw`1000`.returns('pg/int4@1'),
               ),
             ),
           )

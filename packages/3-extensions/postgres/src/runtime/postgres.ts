@@ -1,4 +1,3 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
@@ -51,7 +50,7 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
-  readonly rawSql: RawSqlTag;
+  readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
@@ -167,8 +166,8 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
-  const adapter = createPostgresAdapter();
-  const rawSqlTag: RawSqlTag = createRawSql(adapter);
+  const rawCodecInferer = stack.adapter.create(stack);
+  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
@@ -254,12 +253,12 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     context,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, adapter });
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
 
   return {
     sql,
     orm,
-    rawSql: rawSqlTag,
+    raw: rawSqlTag,
     context,
     stack,
 
@@ -310,7 +309,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       return withTransaction(getRuntime(), (txCtx) => {
         const txSql: Db<TContract> = sqlBuilder<TContract>({
           context,
-          adapter,
+          rawCodecInferer,
         });
 
         const txOrm: OrmClient<TContract> = ormBuilder({

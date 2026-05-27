@@ -13,7 +13,7 @@ import {
   OrExpr,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import type { RawSqlAdapter } from '@prisma-next/sql-relational-core/expression';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { codecOf, createRawSql, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type {
   AggregateFunctions,
@@ -135,7 +135,7 @@ function numericAgg(
   });
 }
 
-function createBuiltinFunctions(adapter: RawSqlAdapter) {
+function createBuiltinFunctions(rawCodecInferer: RawCodecInferer) {
   return {
     eq: (a: ExprOrVal, b: ExprOrVal) => eq(a, b),
     ne: (a: ExprOrVal, b: ExprOrVal) => ne(a, b),
@@ -159,7 +159,7 @@ function createBuiltinFunctions(adapter: RawSqlAdapter) {
       expr: Expression<ScopeField>,
       valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
     ) => inOrNotIn(expr, valuesOrSubquery, 'notIn'),
-    rawSql: createRawSql(adapter),
+    raw: createRawSql(rawCodecInferer),
   } satisfies BuiltinFunctions<CodecTypes>;
 }
 
@@ -181,9 +181,9 @@ function createAggregateOnlyFunctions() {
 
 export function createFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
-  adapter: RawSqlAdapter,
+  rawCodecInferer: RawCodecInferer,
 ): Functions<QC> {
-  const builtins = createBuiltinFunctions(adapter);
+  const builtins = createBuiltinFunctions(rawCodecInferer);
 
   return new Proxy({} as Functions<QC>, {
     get(_target, prop: string) {
@@ -200,9 +200,9 @@ export function createFunctions<QC extends QueryContext>(
 
 export function createAggregateFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
-  adapter: RawSqlAdapter,
+  rawCodecInferer: RawCodecInferer,
 ): AggregateFunctions<QC> {
-  const baseFns = createFunctions<QC>(operations, adapter);
+  const baseFns = createFunctions<QC>(operations, rawCodecInferer);
   const aggregates = createAggregateOnlyFunctions();
 
   return new Proxy({} as AggregateFunctions<QC>, {

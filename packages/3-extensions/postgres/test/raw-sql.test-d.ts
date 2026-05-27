@@ -15,9 +15,9 @@ import { assertType, test } from 'vitest';
 // fixture exists in this package, and the types are the only thing under test here.
 const stubContext = {} as unknown as ExecutionContext<Contract<SqlStorage>>;
 
-test('sql() returns Db<C> and fns.rawSql is RawSqlTag in every callback', () => {
+test('sql() returns Db<C> and fns.raw is RawSqlTag in every callback', () => {
   const adapter = createPostgresAdapter();
-  const db = sql({ context: stubContext, adapter });
+  const db = sql({ context: stubContext, rawCodecInferer: adapter });
   assertType<Db<Contract<SqlStorage>>>(db);
 });
 
@@ -25,7 +25,7 @@ test('field reference typechecks as rawSql interpolation', () => {
   const adapter = createPostgresAdapter();
   const db = sql({
     context: stubContext,
-    adapter,
+    rawCodecInferer: adapter,
   }) as unknown as {
     users: {
       select: (
@@ -39,9 +39,9 @@ test('field reference typechecks as rawSql interpolation', () => {
   };
 
   // f.name is Expression<{codecId: 'pg/text@1'; nullable: false}>, which satisfies
-  // RawSqlInterpolation (Expression<ScopeField>). fns.rawSql: RawSqlTag is callable
+  // RawSqlInterpolation (Expression<ScopeField>). fns.raw: RawSqlTag is callable
   // directly as a template tag.
-  const sel = db.users.select('alias', (f, fns) => fns.rawSql`upper(${f.name})`.returns('pg/text'));
+  const sel = db.users.select('alias', (f, fns) => fns.raw`upper(${f.name})`.returns('pg/text'));
   assertType<unknown>(sel);
 });
 
@@ -66,7 +66,7 @@ test('aggregate result composition typechecks', () => {
   const adapter = createPostgresAdapter();
   const db = sql({
     context: stubContext,
-    adapter,
+    rawCodecInferer: adapter,
   }) as unknown as {
     users: {
       select: (
@@ -79,10 +79,10 @@ test('aggregate result composition typechecks', () => {
     };
   };
 
-  // fns.count(fns.rawSql`...`.returns('pg/int4')) must typecheck: the rawSql
+  // fns.count(fns.raw`...`.returns('pg/int4')) must typecheck: the rawSql
   // expression satisfies the Expression<ScopeField> argument type of count().
   const sel = db.users.select('n', (_f, fns) =>
-    fns.count(fns.rawSql`coalesce(score, 0)`.returns('pg/int4')),
+    fns.count(fns.raw`coalesce(score, 0)`.returns('pg/int4')),
   );
   assertType<unknown>(sel);
 });

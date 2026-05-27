@@ -152,7 +152,7 @@ export function setupIntegrationTest() {
   });
 
   return {
-    db: () => sql({ context, adapter: createPostgresAdapter() }),
+    db: () => sql({ context, rawCodecInferer: createPostgresAdapter() }),
     runtime: () => runtime,
   };
 }

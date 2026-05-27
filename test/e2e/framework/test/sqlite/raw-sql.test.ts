@@ -97,7 +97,7 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
   });
 
   const adapter = createSqliteAdapter();
-  const db: Db<Contract> = sql<Contract>({ context, adapter });
+  const db: Db<Contract> = sql<Contract>({ context, rawCodecInferer: adapter });
 
   return {
     db,
@@ -133,7 +133,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
       const rows = await harness.runtime.execute(
         harness.db.posts
           .select('id')
-          .select('doubled', (f, fns) => fns.rawSql`${f.views} * 2`.returns('sqlite/integer@1'))
+          .select('doubled', (f, fns) => fns.raw`${f.views} * 2`.returns('sqlite/integer@1'))
           .orderBy('id')
           .build(),
       );
@@ -149,7 +149,7 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
       const rows = await harness.runtime.execute(
         harness.db.posts
           .select('id')
-          .select('magic', (_f, fns) => fns.rawSql`42`.returns('sqlite/integer@1'))
+          .select('magic', (_f, fns) => fns.raw`42`.returns('sqlite/integer@1'))
           .orderBy('id')
           .build(),
       );
@@ -185,8 +185,8 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
           .select('id')
           .where((_f, fns) =>
             fns.gt(
-              fns.rawSql`${param(50, { codecId: 'sqlite/integer@1' })}`.returns('sqlite/integer@1'),
-              fns.rawSql`0`.returns('sqlite/integer@1'),
+              fns.raw`${param(50, { codecId: 'sqlite/integer@1' })}`.returns('sqlite/integer@1'),
+              fns.raw`0`.returns('sqlite/integer@1'),
             ),
           )
           .build(),
@@ -222,16 +222,12 @@ describe('e2e: rawSql expression on SQLite', { timeout: timeouts.databaseOperati
           .where((_f, fns) =>
             fns.and(
               fns.gt(
-                fns.rawSql`${param(10, { codecId: 'sqlite/integer@1' })}`.returns(
-                  'sqlite/integer@1',
-                ),
-                fns.rawSql`0`.returns('sqlite/integer@1'),
+                fns.raw`${param(10, { codecId: 'sqlite/integer@1' })}`.returns('sqlite/integer@1'),
+                fns.raw`0`.returns('sqlite/integer@1'),
               ),
               fns.lt(
-                fns.rawSql`${param(200, { codecId: 'sqlite/integer@1' })}`.returns(
-                  'sqlite/integer@1',
-                ),
-                fns.rawSql`1000`.returns('sqlite/integer@1'),
+                fns.raw`${param(200, { codecId: 'sqlite/integer@1' })}`.returns('sqlite/integer@1'),
+                fns.raw`1000`.returns('sqlite/integer@1'),
               ),
             ),
           )

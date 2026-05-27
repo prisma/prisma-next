@@ -64,7 +64,7 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
 // casting via `as unknown as { rawSql: RawSqlTag }` is safe here and avoids
 // propagating the generic QC type into test scaffolding.
 function rawSqlOf(fns: unknown, tag: ReturnType<typeof createRawSql>): typeof tag {
-  return (fns as unknown as { rawSql: typeof tag }).rawSql;
+  return (fns as unknown as { raw: typeof tag }).raw;
 }
 
 describe('rawSql composition with the typed builder', () => {
@@ -75,7 +75,7 @@ describe('rawSql composition with the typed builder', () => {
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
     // the narrow structural subset that this test exercises so TypeScript can typecheck
     // the call site without requiring the full contract-typed DB surface.
-    const db = sql({ context: ctx, adapter }) as unknown as {
+    const db = sql({ context: ctx, rawCodecInferer: adapter }) as unknown as {
       users: {
         select: (
           alias: string,
@@ -84,7 +84,7 @@ describe('rawSql composition with the typed builder', () => {
               string,
               { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
             >,
-            fns: { rawSql: typeof tag },
+            fns: { raw: typeof tag },
           ) => { buildAst(): AnyExpression; returnType: unknown },
         ) => { buildAst(): import('@prisma-next/sql-relational-core/ast').SelectAst };
       };
@@ -93,7 +93,7 @@ describe('rawSql composition with the typed builder', () => {
     let capturedAst: AnyExpression | undefined;
     db.users
       .select('greeting', (_f, fns) => {
-        const expr = fns.rawSql`'hello'`.returns('pg/text@1');
+        const expr = fns.raw`'hello'`.returns('pg/text@1');
         capturedAst = expr.buildAst();
         return expr;
       })
@@ -156,7 +156,7 @@ describe('rawSql composition with the typed builder', () => {
     const ctx = makeStubContext();
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
     // the narrow structural subset that this test exercises.
-    const db = sql({ context: ctx, adapter }) as unknown as {
+    const db = sql({ context: ctx, rawCodecInferer: adapter }) as unknown as {
       users: {
         select: (
           cb: (
@@ -164,7 +164,7 @@ describe('rawSql composition with the typed builder', () => {
               string,
               { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
             >,
-            fns: { rawSql: typeof tag },
+            fns: { raw: typeof tag },
           ) => Record<
             string,
             { buildAst(): AnyExpression; returnType: { codecId: string; nullable: boolean } }
@@ -212,7 +212,7 @@ describe('rawSql composition with the typed builder', () => {
     expect(whereAst).toBeInstanceOf(BinaryExpr);
     const binary = whereAst as BinaryExpr;
     expect(binary.op).toBe('gt');
-    // The left operand must be the RawExpr produced by fns.rawSql`extract(...)`.
+    // The left operand must be the RawExpr produced by fns.raw`extract(...)`.
     expect(binary.left).toBeInstanceOf(RawExpr);
     const leftRaw = binary.left as RawExpr;
     expect(leftRaw.parts[0]).toBe('extract(epoch from ');
@@ -244,7 +244,7 @@ describe('rawSql composition with the typed builder', () => {
     expect(countAst).toBeInstanceOf(AggregateExpr);
     const agg = countAst as AggregateExpr;
     expect(agg.fn).toBe('count');
-    // The argument passed to COUNT must be the RawExpr produced by fns.rawSql`coalesce(...)`.
+    // The argument passed to COUNT must be the RawExpr produced by fns.raw`coalesce(...)`.
     expect(agg.expr).toBeInstanceOf(RawExpr);
     const argRaw = agg.expr as RawExpr;
     expect(argRaw.parts[0]).toBe('coalesce(');

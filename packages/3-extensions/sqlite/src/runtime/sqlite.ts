@@ -1,4 +1,3 @@
-import { createSqliteAdapter } from '@prisma-next/adapter-sqlite/adapter';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
@@ -39,7 +38,7 @@ type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBu
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
-  readonly rawSql: RawSqlTag;
+  readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
   connect(bindingInput?: { readonly path: string }): Promise<Runtime>;
@@ -114,10 +113,10 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
-  const adapter = createSqliteAdapter();
-  const rawSqlTag: RawSqlTag = createRawSql(adapter);
+  const rawCodecInferer = stack.adapter.create(stack);
+  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, adapter });
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -196,7 +195,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   return {
     sql,
     orm,
-    rawSql: rawSqlTag,
+    raw: rawSqlTag,
     context,
     stack,
     async connect(bindingInput) {

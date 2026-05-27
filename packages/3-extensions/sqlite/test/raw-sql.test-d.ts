@@ -15,9 +15,9 @@ import { assertType, test } from 'vitest';
 // fixture exists in this package, and the types are the only thing under test here.
 const stubContext = {} as unknown as ExecutionContext<Contract<SqlStorage>>;
 
-test('sql() returns Db<C> and fns.rawSql is RawSqlTag in every callback', () => {
+test('sql() returns Db<C> and fns.raw is RawSqlTag in every callback', () => {
   const adapter = createSqliteAdapter();
-  const db = sql({ context: stubContext, adapter });
+  const db = sql({ context: stubContext, rawCodecInferer: adapter });
   assertType<Db<Contract<SqlStorage>>>(db);
 });
 
@@ -25,7 +25,7 @@ test('field reference typechecks as rawSql interpolation', () => {
   const adapter = createSqliteAdapter();
   const db = sql({
     context: stubContext,
-    adapter,
+    rawCodecInferer: adapter,
   }) as unknown as {
     users: {
       select: (
@@ -39,7 +39,7 @@ test('field reference typechecks as rawSql interpolation', () => {
   };
 
   const sel = db.users.select('alias', (f, fns) =>
-    fns.rawSql`upper(${f.name})`.returns('sqlite/text@1'),
+    fns.raw`upper(${f.name})`.returns('sqlite/text@1'),
   );
   assertType<unknown>(sel);
 });
@@ -62,7 +62,7 @@ test('aggregate result composition typechecks', () => {
   const adapter = createSqliteAdapter();
   const db = sql({
     context: stubContext,
-    adapter,
+    rawCodecInferer: adapter,
   }) as unknown as {
     users: {
       select: (
@@ -76,7 +76,7 @@ test('aggregate result composition typechecks', () => {
   };
 
   const sel = db.users.select('n', (_f, fns) =>
-    fns.count(fns.rawSql`coalesce(score, 0)`.returns('sqlite/integer@1')),
+    fns.count(fns.raw`coalesce(score, 0)`.returns('sqlite/integer@1')),
   );
   assertType<unknown>(sel);
 });

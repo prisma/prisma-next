@@ -17,11 +17,14 @@ const stubBase = {
   applyMutationDefaults: () => [],
 };
 
+const stubInferer = { inferCodec: () => 'pg/text@1' };
+
 function db() {
   return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
     >,
+    rawCodecInferer: stubInferer,
   });
 }
 

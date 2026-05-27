@@ -73,6 +73,7 @@ import type {
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type {
   AppliedMutationDefault,
   CodecDescriptorRegistry,
@@ -173,7 +174,8 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
   'sql',
   TTargetId
 > &
-  Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
+  Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement> &
+  RawCodecInferer;
 
 /**
  * NOTE: Binding type is intentionally erased to unknown at this shared runtime layer. Target clients (for example `postgres()`) validate and construct the concrete binding before calling `driver.connect(binding)`, which keeps runtime behavior safe today. A future follow-up can preserve TBinding through stack/context generics end-to-end.

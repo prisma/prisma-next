@@ -181,7 +181,7 @@ export class TableProxyImpl<
         setOrCallback as UpdateSetCallback,
         this.#scope,
         this.ctx.queryOperationTypes,
-        this.ctx.adapter,
+        this.ctx.rawCodecInferer,
       );
       const setExpressions = buildSetExpressions(
         callbackExprs,

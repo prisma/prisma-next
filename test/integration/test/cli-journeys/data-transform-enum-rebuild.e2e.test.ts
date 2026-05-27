@@ -12,7 +12,7 @@
  * therefore has two `placeholder("…")` stubs the user must fill in
  * to remap any rows still carrying the doomed value before the
  * rebuild swap-over. This test simulates the user editing the file
- * (string-patching the stubs and injecting a `db = sql({ context })`
+ * (string-patching the stubs and injecting a `db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } })`
  * setup), then runs `migration emit` + `migration apply` and asserts
  * the post-apply enum has only the surviving values and the doomed
  * row was remapped.

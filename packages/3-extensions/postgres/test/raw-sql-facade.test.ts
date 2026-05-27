@@ -89,18 +89,18 @@ describe('postgres client rawSql surface', () => {
 
   it('exposes rawSql as a function on the client', () => {
     const db = postgres({ contract });
-    expect(typeof db.rawSql).toBe('function');
+    expect(typeof db.raw).toBe('function');
   });
 
   it('rawSql is bound once — distinct clients get distinct tags', () => {
     const db1 = postgres({ contract });
     const db2 = postgres({ contract });
-    expect(db1.rawSql).not.toBe(db2.rawSql);
+    expect(db1.raw).not.toBe(db2.raw);
   });
 
   it('rawSql is stable across repeated accesses on the same client', () => {
     const db = postgres({ contract });
-    expect(db.rawSql).toBe(db.rawSql);
+    expect(db.raw).toBe(db.raw);
   });
 });
 

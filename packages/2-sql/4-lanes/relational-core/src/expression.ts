@@ -160,8 +160,8 @@ export function buildOperation<R extends ScopeField>(spec: BuildOperationSpec<R>
   };
 }
 
-/** Minimal contract a target adapter must satisfy to construct a {@link RawSqlTag} via {@link createRawSql}. */
-export interface RawSqlAdapter {
+/** Minimal contract a target must satisfy to construct a {@link RawSqlTag} via {@link createRawSql} — looks up the codec id for a bare-literal interpolation. */
+export interface RawCodecInferer {
   inferCodec(value: RawSqlLiteral): string;
 }
 
@@ -183,7 +183,7 @@ export type RawSqlTag = (
 type RawSqlInterpolation = Expression<ScopeField> | ParamRef | RawSqlLiteral;
 
 function resolveInterpolation(
-  adapter: RawSqlAdapter,
+  adapter: RawCodecInferer,
   value: RawSqlInterpolation,
 ): AstExpression | ParamRef {
   if (isExpressionLike(value)) {
@@ -214,7 +214,7 @@ function resolveInterpolation(
  *
  * Bare {@link RawSqlLiteral} interpolations are wrapped as `ParamRef` nodes with the codec resolved via `adapter.inferCodec(value)`. Use {@link param} when the codec cannot be inferred from the value alone (e.g. `Date`).
  */
-export function createRawSql(adapter: RawSqlAdapter): RawSqlTag {
+export function createRawSql(adapter: RawCodecInferer): RawSqlTag {
   return (strings, ...values) => {
     const parts: (string | AstExpression | ParamRef)[] = [];
     for (let i = 0; i < strings.length; i++) {

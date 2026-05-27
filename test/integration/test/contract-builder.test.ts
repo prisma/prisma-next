@@ -161,7 +161,7 @@ describe('builder integration', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
 
-    const db = sql<typeof contract>({ context });
+    const db = sql<typeof contract>({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
     const plan = db.user.select('id', 'email').build();
 
     // Runtime checks
@@ -200,7 +200,7 @@ describe('builder integration', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contract, adapter);
 
-    const db = sql<typeof contract>({ context });
+    const db = sql<typeof contract>({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
     const _plan = db.user.select('id', 'email', 'createdAt').build();
 
     type Row = ResultType<typeof _plan>;

@@ -1,4 +1,3 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver, {
@@ -131,7 +130,7 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
 
   const sql: Db<TContract> = sqlBuilder<TContract>({
     context,
-    adapter: createPostgresAdapter(),
+    rawCodecInferer: stack.adapter.create(stack),
   });
 
   return {

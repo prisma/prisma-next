@@ -24,13 +24,13 @@ import { joinedScope, makeSubquery, usersScope } from './test-helpers';
 const f = () => createFieldProxy(usersScope);
 const jf = () => createFieldProxy(joinedScope);
 
-const stubAdapter = { inferCodec: () => 'pg/text@1' };
+const stubInferer = { inferCodec: () => 'pg/text@1' };
 
 describe('createFunctions', () => {
   let fns: ReturnType<typeof createFunctions>;
 
   beforeEach(() => {
-    fns = createFunctions({}, stubAdapter);
+    fns = createFunctions({}, stubInferer);
   });
 
   describe('comparison operators', () => {
@@ -243,7 +243,7 @@ describe('createAggregateFunctions', () => {
   let fns: ReturnType<typeof createAggregateFunctions>;
 
   beforeEach(() => {
-    fns = createAggregateFunctions({}, stubAdapter);
+    fns = createAggregateFunctions({}, stubInferer);
   });
 
   it('count() produces AggregateExpr with fn count and no expr', () => {
@@ -334,7 +334,7 @@ describe('extension functions', () => {
       },
     };
 
-    const fns = createFunctions(operations, stubAdapter);
+    const fns = createFunctions(operations, stubInferer);
 
     const expr1 = new ExpressionImpl(ColumnRef.of('posts', 'embedding'), vectorField);
     const expr2 = new ExpressionImpl(ColumnRef.of('other', 'embedding'), vectorField);
@@ -365,7 +365,7 @@ describe('extension functions', () => {
 
 describe('parameter embedding', () => {
   it('inline literal values are embedded as ParamRef nodes', () => {
-    const fns = createFunctions({}, stubAdapter);
+    const fns = createFunctions({}, stubInferer);
     const fields = f();
 
     const r1 = fns.eq(fields.id, 42);
@@ -378,7 +378,7 @@ describe('parameter embedding', () => {
   });
 
   it('expression-to-expression comparisons do not create ParamRefs', () => {
-    const fns = createFunctions({}, stubAdapter);
+    const fns = createFunctions({}, stubInferer);
     const fields = jf();
 
     const result = fns.eq(fields.users.id, fields.posts.user_id);
