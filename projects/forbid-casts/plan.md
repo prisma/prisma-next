@@ -28,7 +28,7 @@ One slice landing the helpers (`blindCast`, `castAs`), the biome custom rule, th
 
    *Verification step before committing:* a small prototype that confirms biome's plugin DSL can express the recognition surface (A2). **Outcome (recorded in spec § Assumptions):** A2 confirmed for recognition + `as const` carve-out; biome's GritQL plugin diagnostics do not support `// biome-ignore` suppression (resolved by the `any`-relocation tactic above) or `--only=<rule-id>` filtering (resolved in D3 via `--reporter=json` + filter).
 
-3. **Biome test-file override** — extend the existing `overrides` block in `biome.jsonc` (the one already disabling `noNonNullAssertion` for tests) to turn the cast rule off for `**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`.
+3. **Test-file exclusion** — implemented inside the GritQL plugin source as a `file()` predicate matching `**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`. Biome 2.4.x's `overrides` mechanism cannot clear GritQL plugins inherited from the top-level config (verified during D2); the exclusion lives in the plugin source instead. Patterns mirror biome's existing test-file `overrides § includes` so the two lists stay legible side-by-side. See [`./design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs).
 
 4. **CI ratchet script** — wrapper that:
    - Runs biome with `--reporter=json` on HEAD and filters the diagnostic list by `category == "plugin"` *and* the `no-bare-cast` plugin's distinctive message prefix (rationale: biome's `--only` flag does not work for GritQL plugin diagnostics; see [`./design-notes.md § Accepted trade-offs`](./design-notes.md#accepted-trade-offs)).
@@ -113,10 +113,10 @@ Four dispatches, sequential. Each is M-sized or smaller; no L/XL per the M-cap. 
 
 **Files in play.**
 
-- Biome plugin source (production rule) — location: `biome-plugins/no-bare-cast.grit` (or equivalent path; implementer picks the final convention).
-- `biome.jsonc` (root) — register the plugin under `plugins`; extend the existing test-file `overrides` block to disable the new rule on test files (alongside the existing `noNonNullAssertion: off`).
+- Biome plugin source (production rule) — location: `biome-plugins/no-bare-cast.grit` (or equivalent path; implementer picks the final convention). The plugin source carries both (i) the `as const` carve-out via the regex condition on `$t`, and (ii) the test-file exclusion via a `file()` predicate matching `**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`.
+- `biome.jsonc` (root) — register the plugin under `plugins`. (No new `overrides` block entry is needed for test-file exclusion: that's handled inside the plugin per the design pivot.)
 - `packages/0-shared/cast-utils/src/blindCast.ts` — reshape body from `return input as TargetType` to `const x: any = input; return x;` (or semantically equivalent); add a `// biome-ignore lint/suspicious/noExplicitAny: <Reason articulating why this helper is the canonical home for the type-system escape>` on the `: any` line. Update the TSDoc if necessary to keep the last-resort framing internally consistent.
-- Plugin test fixtures — at least: (a) a file with bare `as Foo` and `as unknown as Foo` (must fire); (b) a file with `as const` (must NOT fire); (c) verification that `blindCast.ts` produces zero new-rule diagnostics (because no `as` token exists in the body any more); (d) a `.test.ts` file with `as Foo` (must NOT fire — test override honoured).
+- Plugin test fixtures — at least: (a) a file with bare `as Foo` and `as unknown as Foo` (must fire); (b) a file with `as const` (must NOT fire); (c) verification that `blindCast.ts` produces zero new-rule diagnostics (because no `as` token exists in the body any more); (d) a `.test.ts` file with `as Foo` (must NOT fire — `file()` predicate honoured); (e) a file under a nested `test/` directory like `test/sub/foo.ts` (must NOT fire — verifies the regex matches the same depth as biome's `**/test/**/*.ts` glob).
 
 **"Done when":**
 
