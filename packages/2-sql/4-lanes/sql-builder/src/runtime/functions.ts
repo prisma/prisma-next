@@ -13,8 +13,8 @@ import {
   OrExpr,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
-import { codecOf, toExpr } from '@prisma-next/sql-relational-core/expression';
+import type { RawSqlAdapter } from '@prisma-next/sql-relational-core/expression';
+import { codecOf, createRawSql, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type {
   AggregateFunctions,
   AggregateOnlyFunctions,
@@ -135,7 +135,7 @@ function numericAgg(
   });
 }
 
-function createBuiltinFunctions(rawSqlTag: RawSqlTag | undefined) {
+function createBuiltinFunctions(adapter: RawSqlAdapter) {
   return {
     eq: (a: ExprOrVal, b: ExprOrVal) => eq(a, b),
     ne: (a: ExprOrVal, b: ExprOrVal) => ne(a, b),
@@ -159,8 +159,8 @@ function createBuiltinFunctions(rawSqlTag: RawSqlTag | undefined) {
       expr: Expression<ScopeField>,
       valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
     ) => inOrNotIn(expr, valuesOrSubquery, 'notIn'),
-    rawSql: rawSqlTag,
-  } satisfies BuiltinFunctions<CodecTypes, RawSqlTag | undefined>;
+    rawSql: createRawSql(adapter),
+  } satisfies BuiltinFunctions<CodecTypes>;
 }
 
 function createAggregateOnlyFunctions() {
@@ -181,23 +181,11 @@ function createAggregateOnlyFunctions() {
 
 export function createFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag: RawSqlTag,
-): Functions<QC, RawSqlTag>;
-export function createFunctions<QC extends QueryContext>(
-  operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag?: undefined,
-): Functions<QC, undefined>;
-export function createFunctions<QC extends QueryContext>(
-  operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag: RawSqlTag | undefined,
-): Functions<QC, RawSqlTag | undefined>;
-export function createFunctions<QC extends QueryContext>(
-  operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag?: RawSqlTag,
-): Functions<QC, RawSqlTag | undefined> {
-  const builtins = createBuiltinFunctions(rawSqlTag);
+  adapter: RawSqlAdapter,
+): Functions<QC> {
+  const builtins = createBuiltinFunctions(adapter);
 
-  return new Proxy({} as Functions<QC, RawSqlTag | undefined>, {
+  return new Proxy({} as Functions<QC>, {
     get(_target, prop: string) {
       if (Object.hasOwn(builtins, prop)) {
         return (builtins as Record<string, unknown>)[prop];
@@ -212,24 +200,12 @@ export function createFunctions<QC extends QueryContext>(
 
 export function createAggregateFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag: RawSqlTag,
-): AggregateFunctions<QC, RawSqlTag>;
-export function createAggregateFunctions<QC extends QueryContext>(
-  operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag?: undefined,
-): AggregateFunctions<QC, undefined>;
-export function createAggregateFunctions<QC extends QueryContext>(
-  operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag: RawSqlTag | undefined,
-): AggregateFunctions<QC, RawSqlTag | undefined>;
-export function createAggregateFunctions<QC extends QueryContext>(
-  operations: Readonly<Record<string, SqlOperationEntry>>,
-  rawSqlTag?: RawSqlTag,
-): AggregateFunctions<QC, RawSqlTag | undefined> {
-  const baseFns = createFunctions<QC>(operations, rawSqlTag);
+  adapter: RawSqlAdapter,
+): AggregateFunctions<QC> {
+  const baseFns = createFunctions<QC>(operations, adapter);
   const aggregates = createAggregateOnlyFunctions();
 
-  return new Proxy({} as AggregateFunctions<QC, RawSqlTag | undefined>, {
+  return new Proxy({} as AggregateFunctions<QC>, {
     get(_target, prop: string) {
       const agg = (aggregates as Record<string, unknown>)[prop];
       if (agg) return agg;

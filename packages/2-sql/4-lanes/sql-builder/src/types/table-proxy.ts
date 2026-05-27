@@ -5,7 +5,7 @@ import type {
   ExtractQueryOperationTypes,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { Expression, FieldProxy, Functions, RawSqlTag } from '../expression';
+import type { Expression, FieldProxy, Functions } from '../expression';
 import type {
   DefaultScope,
   EmptyRow,
@@ -132,13 +132,12 @@ export interface TableProxy<
   Alias extends string = Name,
   AvailableScope extends Scope = DefaultScope<Name, UnboundTables<C>[Name]>,
   QC extends QueryContext = ContractToQC<C, Name>,
-  RS extends RawSqlTag | undefined = undefined,
 > extends JoinSource<StorageTableToScopeTable<UnboundTables<C>[Name]>, Alias>,
-    WithSelect<QC, AvailableScope, EmptyRow, RS>,
+    WithSelect<QC, AvailableScope, EmptyRow>,
     WithJoin<QC, AvailableScope, C['capabilities']> {
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC, RS>;
+  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC>;
 
   insert(
     rows: ReadonlyArray<
@@ -165,7 +164,7 @@ export interface TableProxy<
   update(
     callback: (
       fields: FieldProxy<AvailableScope>,
-      fns: Functions<QC, RS>,
+      fns: Functions<QC>,
     ) => ResolvedUpdateExpressions<UnboundTables<C>[Name]>,
   ): UpdateQuery<QC, AvailableScope, EmptyRow>;
 

@@ -5,7 +5,6 @@ import type {
   ExpressionBuilder,
   ExtractScopeFields,
   FieldProxy,
-  RawSqlTag,
   TraitExpression,
   WithField,
   WithFields,
@@ -38,23 +37,19 @@ export interface WithSelect<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField> = EmptyRow,
-  RS extends RawSqlTag | undefined = undefined,
 > {
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQuery<QC, AvailableScope, WithFields<RowType, AvailableScope['topLevel'], Columns>, RS>;
+  ): SelectQuery<QC, AvailableScope, WithFields<RowType, AvailableScope['topLevel'], Columns>>;
 
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
-    expr: (
-      fields: FieldProxy<AvailableScope>,
-      fns: AggregateFunctions<QC, RS>,
-    ) => Expression<Field>,
-  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>, RS>;
+    expr: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Expression<Field>,
+  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>>;
 
   select<Result extends Record<string, Expression<ScopeField>>>(
-    callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC, RS>) => Result,
-  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>, RS>;
+    callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
+  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
 }
 
 export interface WithJoin<QC extends QueryContext, AvailableScope extends Scope, Capabilities> {

@@ -9,7 +9,7 @@ import {
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { createRawSql, param } from '@prisma-next/sql-relational-core/expression';
+import { param } from '@prisma-next/sql-relational-core/expression';
 import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
@@ -157,13 +157,13 @@ describe('integration: rawSql expression in typed builder', {
 
   describe('rawSql expression survives the full pipeline and returns expected rows', () => {
     it('rawSql in aliased select produces correct computed values from the database', async () => {
-      const rawSqlTag = createRawSql(createPostgresAdapter());
-      const db = sql({ context, rawSqlTag });
+      const adapter = createPostgresAdapter();
+      const db = sql({ context, adapter });
       const runtime = buildRuntime();
 
       // posts.views values: 100, 50, 200, 10 — doubled they become 200, 100, 400, 20.
-      // fns.rawSql is RawSqlTag (non-optional) because sql() with rawSqlTag returns
-      // Db<C, RawSqlTag>, so the callback receives AggregateFunctions<QC, RawSqlTag>.
+      // fns.rawSql is RawSqlTag (always present) because BuiltinFunctions declares it
+      // concretely; the callback receives AggregateFunctions<QC>.
       const rows = await runtime.execute(
         db.posts
           .select('id')
@@ -177,8 +177,8 @@ describe('integration: rawSql expression in typed builder', {
     });
 
     it('rawSql with a literal scalar expression returns the same value for every row', async () => {
-      const rawSqlTag = createRawSql(createPostgresAdapter());
-      const db = sql({ context, rawSqlTag });
+      const adapter = createPostgresAdapter();
+      const db = sql({ context, adapter });
       const runtime = buildRuntime();
 
       const rows = await runtime.execute(
@@ -209,8 +209,8 @@ describe('integration: rawSql expression in typed builder', {
         },
       };
 
-      const rawSqlTag = createRawSql(createPostgresAdapter());
-      const db = sql({ context, rawSqlTag });
+      const adapter = createPostgresAdapter();
+      const db = sql({ context, adapter });
       const runtime = buildRuntime([middleware]);
 
       // The where clause embeds a param() inside a rawSql expression.
@@ -251,8 +251,8 @@ describe('integration: rawSql expression in typed builder', {
         },
       };
 
-      const rawSqlTag = createRawSql(createPostgresAdapter());
-      const db = sql({ context, rawSqlTag });
+      const adapter = createPostgresAdapter();
+      const db = sql({ context, adapter });
       const runtime = buildRuntime([middleware]);
 
       // Two param() calls: param(10) and param(200).

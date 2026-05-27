@@ -69,12 +69,13 @@ function rawSqlOf(fns: unknown, tag: ReturnType<typeof createRawSql>): typeof ta
 
 describe('rawSql composition with the typed builder', () => {
   it('aliased single-column select emits a RawExpr in the projection list', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
     const ctx = makeStubContext();
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
     // the narrow structural subset that this test exercises so TypeScript can typecheck
     // the call site without requiring the full contract-typed DB surface.
-    const db = sql({ context: ctx, rawSqlTag: tag }) as unknown as {
+    const db = sql({ context: ctx, adapter }) as unknown as {
       users: {
         select: (
           alias: string,
@@ -104,10 +105,11 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('aliased single-column select with field interpolation produces the correct RawExpr parts', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
 
     // Use createAggregateFunctions directly — same dispatch path as the aliased-select branch.
-    const fns = createAggregateFunctions({}, tag);
+    const fns = createAggregateFunctions({}, adapter);
     const rawSql = rawSqlOf(fns, tag);
 
     // Field proxy top-level access produces IdentifierRef (not ColumnRef); simulate that here.
@@ -130,10 +132,11 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('bulk-object select AST contains a ColumnRef entry and a RawExpr entry', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
 
     // Use createAggregateFunctions directly — same dispatch path as the bulk-object-select branch.
-    const fns = createAggregateFunctions({}, tag);
+    const fns = createAggregateFunctions({}, adapter);
     const rawSql = rawSqlOf(fns, tag);
 
     const idExpr = {
@@ -148,11 +151,12 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('bulk-object select via the typed builder wires the RawExpr through the AST', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
     const ctx = makeStubContext();
     // sql() returns a deeply-generic proxy type that is opaque to this package; cast to
     // the narrow structural subset that this test exercises.
-    const db = sql({ context: ctx, rawSqlTag: tag }) as unknown as {
+    const db = sql({ context: ctx, adapter }) as unknown as {
       users: {
         select: (
           cb: (
@@ -183,10 +187,11 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('where with fns.gt(rawSql, literal) produces a BinaryExpr whose left operand is a RawExpr', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
 
     // Use createAggregateFunctions directly — same dispatch path as the .where branch.
-    const fns = createAggregateFunctions({}, tag);
+    const fns = createAggregateFunctions({}, adapter);
     const rawSql = rawSqlOf(fns, tag);
 
     // Top-level field proxy produces IdentifierRef for createdAt.
@@ -216,9 +221,10 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('fns.count(rawSql) produces an AggregateExpr whose argument is a RawExpr', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
 
-    const fns = createAggregateFunctions({}, tag);
+    const fns = createAggregateFunctions({}, adapter);
     const rawSql = rawSqlOf(fns, tag);
 
     // Top-level field proxy produces IdentifierRef for score.
@@ -247,9 +253,10 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('nested rawSql: outer parts array contains inner RawExpr as an expression element', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
 
-    const fns = createAggregateFunctions({}, tag);
+    const fns = createAggregateFunctions({}, adapter);
     const rawSql = rawSqlOf(fns, tag);
 
     const scoreExpr = {
@@ -280,9 +287,10 @@ describe('rawSql composition with the typed builder', () => {
   });
 
   it('nested rawSql: inner IdentifierRef descends correctly through the outer RawExpr fold', () => {
-    const tag = createRawSql(createSqliteAdapter());
+    const adapter = createSqliteAdapter();
+    const tag = createRawSql(adapter);
 
-    const fns = createAggregateFunctions({}, tag);
+    const fns = createAggregateFunctions({}, adapter);
     const rawSql = rawSqlOf(fns, tag);
 
     const scoreExpr = {

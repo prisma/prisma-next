@@ -37,7 +37,7 @@ export type SqliteTargetId = 'sqlite';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
-  readonly sql: Db<TContract, RawSqlTag>;
+  readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly rawSql: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
@@ -50,7 +50,7 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
     CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
   >(
     declaration: D,
-    callback: (sql: Db<TContract, RawSqlTag>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+    callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
   ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
   close(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
@@ -114,9 +114,10 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
-  const rawSqlTag: RawSqlTag = createRawSql(createSqliteAdapter());
+  const adapter = createSqliteAdapter();
+  const rawSqlTag: RawSqlTag = createRawSql(adapter);
 
-  const sql: Db<TContract, RawSqlTag> = sqlBuilder<TContract, RawSqlTag>({ context, rawSqlTag });
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, adapter });
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -236,7 +237,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
       CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
     >(
       declaration: D,
-      callback: (sql: Db<TContract, RawSqlTag>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+      callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
     ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
       return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },

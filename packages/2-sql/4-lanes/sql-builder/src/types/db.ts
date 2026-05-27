@@ -1,5 +1,4 @@
 import type { StorageTable } from '@prisma-next/sql-contract/types';
-import type { RawSqlTag } from '../expression';
 import type { DefaultScope } from '../scope';
 import type { ContractToQC, TableProxy } from './table-proxy';
 
@@ -37,13 +36,12 @@ type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
     : never;
 }[keyof C['storage']['namespaces']];
 
-export type Db<C extends TableProxyContract, RS extends RawSqlTag | undefined = undefined> = {
+export type Db<C extends TableProxyContract> = {
   [Name in TableNamesAcrossNamespaces<C>]: TableProxy<
     C,
     Name,
     Name,
     DefaultScope<Name, UnboundTables<C>[Name]>,
-    ContractToQC<C, Name>,
-    RS
+    ContractToQC<C, Name>
   >;
 };

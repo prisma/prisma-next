@@ -35,11 +35,10 @@ export type FieldProxy<AvailableScope extends Scope> = {
   };
 };
 
-export type ExpressionBuilder<
-  AvailableScope extends Scope,
-  QC extends QueryContext,
-  RS extends RawSqlTag | undefined = undefined,
-> = (fields: FieldProxy<AvailableScope>, fns: Functions<QC, RS>) => Expression<BooleanCodecType>;
+export type ExpressionBuilder<AvailableScope extends Scope, QC extends QueryContext> = (
+  fields: FieldProxy<AvailableScope>,
+  fns: Functions<QC>,
+) => Expression<BooleanCodecType>;
 
 export type OrderByDirection = 'asc' | 'desc';
 export type OrderByNulls = 'first' | 'last';
@@ -61,10 +60,7 @@ type DeriveExtFunctions<OT extends QueryOperationTypesBase> = {
   [K in keyof OT]: OT[K]['impl'];
 };
 
-export type BuiltinFunctions<
-  CT extends Record<string, { readonly input: unknown }>,
-  RS extends RawSqlTag | undefined = undefined,
-> = {
+export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
   eq: <CodecId extends string>(
     a: CodecExpression<CodecId, boolean, CT> | null,
     b: CodecExpression<CodecId, boolean, CT> | null,
@@ -117,13 +113,11 @@ export type BuiltinFunctions<
     ): Expression<BooleanCodecType>;
   };
 
-  readonly rawSql: RS;
+  readonly rawSql: RawSqlTag;
 };
 
-export type Functions<
-  QC extends QueryContext,
-  RS extends RawSqlTag | undefined = undefined,
-> = BuiltinFunctions<QC['codecTypes'], RS> & DeriveExtFunctions<QC['queryOperationTypes']>;
+export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &
+  DeriveExtFunctions<QC['queryOperationTypes']>;
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
 
@@ -143,7 +137,4 @@ export type AggregateOnlyFunctions = {
   ) => Expression<{ codecId: T['codecId']; nullable: true }>;
 };
 
-export type AggregateFunctions<
-  QC extends QueryContext,
-  RS extends RawSqlTag | undefined = undefined,
-> = Functions<QC, RS> & AggregateOnlyFunctions;
+export type AggregateFunctions<QC extends QueryContext> = Functions<QC> & AggregateOnlyFunctions;

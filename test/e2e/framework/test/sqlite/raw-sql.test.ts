@@ -10,8 +10,7 @@ import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import type { RawSqlTag } from '@prisma-next/sql-relational-core/expression';
-import { createRawSql, param } from '@prisma-next/sql-relational-core/expression';
+import { param } from '@prisma-next/sql-relational-core/expression';
 import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
 import {
   createExecutionContext,
@@ -29,7 +28,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 interface Harness {
-  readonly db: Db<Contract, RawSqlTag>;
+  readonly db: Db<Contract>;
   readonly runtime: Runtime;
   readonly close: () => Promise<void>;
 }
@@ -97,8 +96,8 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
     ...(middleware ? { middleware } : {}),
   });
 
-  const rawSqlTag: RawSqlTag = createRawSql(createSqliteAdapter());
-  const db: Db<Contract, RawSqlTag> = sql<Contract, RawSqlTag>({ context, rawSqlTag });
+  const adapter = createSqliteAdapter();
+  const db: Db<Contract> = sql<Contract>({ context, adapter });
 
   return {
     db,

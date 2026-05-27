@@ -160,7 +160,8 @@ export function buildOperation<R extends ScopeField>(spec: BuildOperationSpec<R>
   };
 }
 
-interface RawSqlAdapter {
+/** Minimal contract a target adapter must satisfy to construct a {@link RawSqlTag} via {@link createRawSql}. */
+export interface RawSqlAdapter {
   inferCodec(value: RawSqlLiteral): string;
 }
 
