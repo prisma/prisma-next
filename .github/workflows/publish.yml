@@ -154,7 +154,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/v$VERSION" >/dev/null 2>&1; then
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
             echo "Tag v$VERSION already exists; skipping"
           else
             gh api "repos/$GITHUB_REPOSITORY/git/refs" \
