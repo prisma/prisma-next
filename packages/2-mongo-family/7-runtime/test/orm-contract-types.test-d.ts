@@ -1,9 +1,9 @@
 import type { InferModelRow } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
-import type { OrmTestContract } from './orm-test-contract-type';
+import type { Contract } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 
 test('InferModelRow resolves Task fields', () => {
-  type TaskRow = InferModelRow<OrmTestContract, 'Task'>;
+  type TaskRow = InferModelRow<Contract, 'Task'>;
   expectTypeOf({} as TaskRow).toEqualTypeOf<{
     _id: string;
     title: string;
@@ -13,7 +13,7 @@ test('InferModelRow resolves Task fields', () => {
 });
 
 test('InferModelRow resolves User fields', () => {
-  type UserRow = InferModelRow<OrmTestContract, 'User'>;
+  type UserRow = InferModelRow<Contract, 'User'>;
   expectTypeOf({} as UserRow).toEqualTypeOf<{
     _id: string;
     name: string;
@@ -25,7 +25,7 @@ test('InferModelRow resolves User fields', () => {
 });
 
 test('InferModelRow resolves embedded model fields', () => {
-  type AddressRow = InferModelRow<OrmTestContract, 'Address'>;
+  type AddressRow = InferModelRow<Contract, 'Address'>;
   expectTypeOf({} as AddressRow).toEqualTypeOf<{
     street: string;
     city: string;
@@ -34,8 +34,8 @@ test('InferModelRow resolves embedded model fields', () => {
 });
 
 test('InferModelRow resolves variant model fields', () => {
-  type BugRow = InferModelRow<OrmTestContract, 'Bug'>;
-  type FeatureRow = InferModelRow<OrmTestContract, 'Feature'>;
+  type BugRow = InferModelRow<Contract, 'Bug'>;
+  type FeatureRow = InferModelRow<Contract, 'Feature'>;
   expectTypeOf({} as BugRow).toEqualTypeOf<{ severity: string }>();
   expectTypeOf({} as FeatureRow).toEqualTypeOf<{
     priority: string;
@@ -44,7 +44,7 @@ test('InferModelRow resolves variant model fields', () => {
 });
 
 test('InferModelRow resolves Comment with date field', () => {
-  type CommentRow = InferModelRow<OrmTestContract, 'Comment'>;
+  type CommentRow = InferModelRow<Contract, 'Comment'>;
   expectTypeOf({} as CommentRow).toEqualTypeOf<{
     _id: string;
     text: string;

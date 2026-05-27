@@ -1,4 +1,3 @@
-import { crossRef } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   assertReturningCapability,
@@ -95,7 +94,7 @@ describe('collection-contract capability detection', () => {
           ...contract.models.User,
           relations: {
             posts: {
-              to: crossRef('Post'),
+              to: 'Post',
               on: { localFields: 'id', targetFields: ['userId'] },
             },
           },
@@ -117,7 +116,7 @@ describe('collection-contract capability detection', () => {
           ...contract.models.User,
           relations: {
             posts: {
-              to: crossRef('Post'),
+              to: 'Post',
               cardinality: 'unsupported',
               on: {
                 localFields: [],

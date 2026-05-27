@@ -13,6 +13,7 @@ import {
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
+import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { createMongoCollection } from '../src/collection';
 import type { MongoQueryExecutor } from '../src/executor';
@@ -22,9 +23,8 @@ import {
   type FieldAccessor,
   type FieldOperation,
 } from '../src/field-accessor';
-import { hydrateOrmContractJson, type OrmTestContract } from './hydrate-contract-cross-refs';
 
-const contract = hydrateOrmContractJson(ormContractJson) as OrmTestContract;
+const contract = ormContractJson as unknown as Contract;
 
 const defaultUserData = {
   name: 'Alice',
@@ -235,7 +235,7 @@ describe('MongoCollection object-based where()', () => {
 
 describe('createFieldAccessor()', () => {
   it('property access returns FieldExpression for top-level field', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.name.set('Bob');
     expect(op.operator).toBe('$set');
     expect(op.field).toBe('name');
@@ -243,21 +243,21 @@ describe('createFieldAccessor()', () => {
   });
 
   it('set() produces $set operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.name.set('Alice');
     expect(op.operator).toBe('$set');
     expect(op.field).toBe('name');
   });
 
   it('unset() produces $unset operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.name.unset();
     expect(op.operator).toBe('$unset');
     expect(op.field).toBe('name');
   });
 
   it('inc() produces $inc operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.loginCount.inc(1);
     expect(op.operator).toBe('$inc');
     expect(op.field).toBe('loginCount');
@@ -265,7 +265,7 @@ describe('createFieldAccessor()', () => {
   });
 
   it('mul() produces $mul operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.loginCount.mul(2);
     expect(op.operator).toBe('$mul');
     expect(op.field).toBe('loginCount');
@@ -273,7 +273,7 @@ describe('createFieldAccessor()', () => {
   });
 
   it('push() produces $push operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.tags.push('admin');
     expect(op.operator).toBe('$push');
     expect(op.field).toBe('tags');
@@ -281,7 +281,7 @@ describe('createFieldAccessor()', () => {
   });
 
   it('pull() produces $pull operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.tags.pull('admin');
     expect(op.operator).toBe('$pull');
     expect(op.field).toBe('tags');
@@ -289,14 +289,14 @@ describe('createFieldAccessor()', () => {
   });
 
   it('addToSet() produces $addToSet operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.tags.addToSet('admin');
     expect(op.operator).toBe('$addToSet');
     expect(op.field).toBe('tags');
   });
 
   it('pop() produces $pop operation', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u.tags.pop(1);
     expect(op.operator).toBe('$pop');
     expect(op.field).toBe('tags');
@@ -304,7 +304,7 @@ describe('createFieldAccessor()', () => {
   });
 
   it('call signature returns FieldExpression for dot-path', () => {
-    const u = createFieldAccessor<OrmTestContract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User'>();
     const op = u('homeAddress.city').set('NYC');
     expect(op.operator).toBe('$set');
     expect(op.field).toBe('homeAddress.city');
@@ -399,7 +399,7 @@ describe('MongoCollection variant()', () => {
   it('returns self when model has no discriminator (non-polymorphic)', () => {
     const executor = createMockExecutor();
     const col = createMongoCollection(contract, 'User', executor);
-    // @ts-expect-error VariantNames<OrmTestContract, 'User'> is never
+    // @ts-expect-error VariantNames<Contract, 'User'> is never
     const result = col.variant('NonExistent');
     expect(result).toBe(col);
   });
@@ -785,7 +785,7 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       await col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
         create: defaultUserData,
-        update: (u: FieldAccessor<OrmTestContract, 'User'>) => [u.loginCount.inc(1)],
+        update: (u: FieldAccessor<Contract, 'User'>) => [u.loginCount.inc(1)],
       });
       const command = executor.lastCommand!;
       if (command.kind === 'findOneAndUpdate') {
@@ -1107,7 +1107,7 @@ describe('MongoCollection write methods', () => {
       const col = createMongoCollection(contract, 'User', executor);
       const result = col
         .where(MongoFieldFilter.eq('_id', 'id-1'))
-        .updateAll((u: FieldAccessor<OrmTestContract, 'User'>) => [u._id.set('new-id')]);
+        .updateAll((u: FieldAccessor<Contract, 'User'>) => [u._id.set('new-id')]);
       await expect(async () => {
         for await (const _ of result) {
           /* drain */
@@ -1121,7 +1121,7 @@ describe('MongoCollection write methods', () => {
       await expect(
         col.where(MongoFieldFilter.eq('email', 'a@b.c')).upsert({
           create: defaultUserData,
-          update: (u: FieldAccessor<OrmTestContract, 'User'>) => [u._id.set('new-id')],
+          update: (u: FieldAccessor<Contract, 'User'>) => [u._id.set('new-id')],
         }),
       ).rejects.toThrow('_id');
     });

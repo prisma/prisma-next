@@ -6,7 +6,7 @@ import {
 import { describe, expectTypeOf, test } from 'vitest';
 import type { Collection } from '../src/collection';
 import type { GroupedCollection } from '../src/grouped-collection';
-import type { RuntimeTestContract, TestContract } from './helpers';
+import type { TestContract } from './helpers';
 
 /**
  * Type-level tests for the ORM `Collection` terminal annotations.
@@ -25,7 +25,7 @@ import type { RuntimeTestContract, TestContract } from './helpers';
  *    an explicit `undefined` first argument).
  */
 
-declare const userCollection: Collection<RuntimeTestContract, 'User'>;
+declare const userCollection: Collection<TestContract, 'User'>;
 
 const cacheAnnotation = defineAnnotation<{ ttl: number; skip?: boolean }>()({
   namespace: 'cache',
@@ -150,7 +150,7 @@ describe('Collection has no chainable .annotate (intentional scope cut)', () => 
   // the terminal's operation kind, so a chainable form on Collection
   // would have fought the per-terminal kind binding.
   test('Collection does not expose an annotate method', () => {
-    type Keys = keyof Collection<RuntimeTestContract, 'User'>;
+    type Keys = keyof Collection<TestContract, 'User'>;
     type HasAnnotate = 'annotate' extends Keys ? true : false;
     expectTypeOf<HasAnnotate>().toEqualTypeOf<false>();
   });
@@ -436,7 +436,7 @@ describe('Collection.aggregate (read-typed)', () => {
   });
 });
 
-declare const userGroupedCollection: GroupedCollection<RuntimeTestContract, 'Post', ['userId']>;
+declare const userGroupedCollection: GroupedCollection<TestContract, 'Post', ['userId']>;
 
 describe('GroupedCollection.aggregate (read-typed)', () => {
   test('accepts a configurator that applies a read-only annotation', () => {

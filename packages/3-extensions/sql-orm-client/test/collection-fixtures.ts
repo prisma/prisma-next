@@ -1,23 +1,25 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
-import type { MockRuntime, RuntimeTestContract, TestContract } from './helpers';
+import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
 export type TestModelName = Extract<keyof TestContract['models'], string>;
 
 export const baseContract = getTestContract();
 
-function contextForContract(contract: RuntimeTestContract): ExecutionContext<RuntimeTestContract> {
+function contextForContract(contract: Contract<SqlStorage>): ExecutionContext<TestContract> {
   const base = getTestContext();
   if (contract === baseContract) return base;
-  return { ...base, contract };
+  return { ...base, contract } as ExecutionContext<TestContract>;
 }
 
 export function createCollectionFor<ModelName extends TestModelName>(
   modelName: ModelName,
-  contract: RuntimeTestContract = baseContract,
+  contract: Contract<SqlStorage> = baseContract,
 ): {
-  collection: Collection<RuntimeTestContract, ModelName>;
+  collection: Collection<TestContract, ModelName>;
   runtime: MockRuntime;
 } {
   const runtime = createMockRuntime();
@@ -33,9 +35,7 @@ export function createCollection() {
   return createCollectionFor('User');
 }
 
-export function withReturningCapability(
-  contract: RuntimeTestContract = baseContract,
-): RuntimeTestContract {
+export function withReturningCapability(contract: TestContract = baseContract): TestContract {
   return {
     ...contract,
     capabilities: {
@@ -44,12 +44,10 @@ export function withReturningCapability(
         enabled: true,
       },
     },
-  };
+  } as TestContract;
 }
 
-export function withoutDefaultInInsert(
-  contract: RuntimeTestContract = baseContract,
-): RuntimeTestContract {
+export function withoutDefaultInInsert(contract: TestContract = baseContract): TestContract {
   const clone = structuredClone(contract);
   if (clone.capabilities?.['sql']) {
     delete (clone.capabilities['sql'] as Record<string, unknown>)['defaultInInsert'];
@@ -60,7 +58,7 @@ export function withoutDefaultInInsert(
 export function createReturningCollectionWithoutDefaultInInsert<ModelName extends TestModelName>(
   modelName: ModelName,
 ): {
-  collection: Collection<RuntimeTestContract, ModelName>;
+  collection: Collection<TestContract, ModelName>;
   runtime: MockRuntime;
 } {
   const runtime = createMockRuntime();
@@ -72,7 +70,7 @@ export function createReturningCollectionWithoutDefaultInInsert<ModelName extend
 export function createReturningCollectionFor<ModelName extends TestModelName>(
   modelName: ModelName,
 ): {
-  collection: Collection<RuntimeTestContract, ModelName>;
+  collection: Collection<TestContract, ModelName>;
   runtime: MockRuntime;
 } {
   const runtime = createMockRuntime();

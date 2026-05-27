@@ -11,12 +11,12 @@ import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from '../../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import type { FieldAccessor } from '../../src/field-accessor';
 import { mongoOrm } from '../../src/mongo-orm';
-import { hydrateOrmContractJson, type OrmTestContract } from '../hydrate-contract-cross-refs';
 
-const contract = hydrateOrmContractJson(ormContractJson) as OrmTestContract;
+const contract = ormContractJson as unknown as Contract;
 
 const defaultUserData = {
   name: 'Alice',
@@ -159,7 +159,7 @@ describe('ORM ergonomics integration (FL-04, FL-06, FL-08)', {
       const rows: unknown[] = [];
       for await (const row of orm.users
         .where({ loginCount: 0 })
-        .updateAll((u: FieldAccessor<OrmTestContract, 'User'>) => [u.loginCount.inc(1)])) {
+        .updateAll((u: FieldAccessor<Contract, 'User'>) => [u.loginCount.inc(1)])) {
         rows.push(row);
       }
       expect(rows).toHaveLength(2);

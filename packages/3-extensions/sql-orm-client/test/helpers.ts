@@ -1,5 +1,4 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import { type Contract, crossRef } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type {
   CodecDescriptor,
@@ -7,7 +6,6 @@ import type {
 } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -19,27 +17,20 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { RuntimeQueryable } from '../src/types';
+import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
-import type { OrmTestContract } from './hydrate-contract-cross-refs';
-import { hydrateOrmContractJson } from './hydrate-contract-cross-refs';
 import { defineTestCodec } from './test-codec';
 
 export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
 }
 
-const baseTestContract = new SqlContractSerializer().deserializeContract(
-  hydrateOrmContractJson(contractJson),
-) as OrmTestContract;
+const baseTestContract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
-export type TestContract = OrmTestContract;
+export type TestContract = Contract;
 
-export type RuntimeTestContract = Contract<SqlStorage>;
-
-export type TestModelName = Extract<keyof TestContract['models'], string>;
-
-export function getTestContract(): RuntimeTestContract {
-  return structuredClone(baseTestContract) as RuntimeTestContract;
+export function getTestContract(): TestContract {
+  return structuredClone(baseTestContract);
 }
 
 /**
@@ -102,8 +93,8 @@ const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = ((
   };
 })();
 
-const testContext: ExecutionContext<RuntimeTestContract> = createExecutionContext({
-  contract: baseTestContract as RuntimeTestContract,
+const testContext: ExecutionContext<TestContract> = createExecutionContext({
+  contract: baseTestContract,
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
@@ -111,7 +102,7 @@ const testContext: ExecutionContext<RuntimeTestContract> = createExecutionContex
   }),
 });
 
-export function getTestContext(): ExecutionContext<RuntimeTestContract> {
+export function getTestContext(): ExecutionContext<TestContract> {
   return testContext;
 }
 
@@ -131,7 +122,7 @@ export interface MockRuntime extends RuntimeQueryable {
  * - Bug (STI, table: tasks, value: bug) with `severity` field
  * - Feature (MTI, table: features, value: feature) with `priority` field
  */
-export function buildMixedPolyContract(): RuntimeTestContract {
+export function buildMixedPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
 
   raw.models.Task = {
@@ -153,14 +144,14 @@ export function buildMixedPolyContract(): RuntimeTestContract {
     fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'tasks', fields: { severity: { column: 'severity' } } },
-    base: crossRef('Task'),
+    base: 'Task',
   };
 
   raw.models.Feature = {
     fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
     relations: {},
     storage: { table: 'features', fields: { priority: { column: 'priority' } } },
-    base: crossRef('Task'),
+    base: 'Task',
   };
 
   raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
@@ -187,7 +178,7 @@ export function buildMixedPolyContract(): RuntimeTestContract {
     foreignKeys: [],
   };
 
-  return raw as RuntimeTestContract;
+  return raw as TestContract;
 }
 
 /**
@@ -196,7 +187,7 @@ export function buildMixedPolyContract(): RuntimeTestContract {
  * - Admin (STI, table: users, value: admin) with `role` field
  * - Regular (STI, table: users, value: regular) with `plan` field
  */
-export function buildStiPolyContract(): RuntimeTestContract {
+export function buildStiPolyContract(): TestContract {
   const raw = JSON.parse(JSON.stringify(getTestContract()));
 
   raw.models.User.fields.kind = {
@@ -214,14 +205,14 @@ export function buildStiPolyContract(): RuntimeTestContract {
     fields: { role: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { role: { column: 'role' } } },
-    base: crossRef('User'),
+    base: 'User',
   };
 
   raw.models.Regular = {
     fields: { plan: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
     relations: {},
     storage: { table: 'users', fields: { plan: { column: 'plan' } } },
-    base: crossRef('User'),
+    base: 'User',
   };
 
   raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
@@ -240,7 +231,7 @@ export function buildStiPolyContract(): RuntimeTestContract {
     nullable: true,
   };
 
-  return raw as RuntimeTestContract;
+  return raw as TestContract;
 }
 
 export function createMockRuntime(): MockRuntime {

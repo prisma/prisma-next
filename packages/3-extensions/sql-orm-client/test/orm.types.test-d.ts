@@ -1,19 +1,14 @@
 import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
-import {
-  createMockRuntime,
-  getTestContext,
-  type RuntimeTestContract,
-  type TestContract,
-} from './helpers';
+import { createMockRuntime, getTestContext, type TestContract } from './helpers';
 
-class UserCollection extends Collection<RuntimeTestContract, 'User'> {
+class UserCollection extends Collection<TestContract, 'User'> {
   named(name: string) {
     return this.where((user) => user.name.eq(name));
   }
 }
 
-class PostCollection extends Collection<RuntimeTestContract, 'Post'> {
+class PostCollection extends Collection<TestContract, 'Post'> {
   published() {
     return this.where((post) => post.views.gte(100));
   }

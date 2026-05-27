@@ -11,11 +11,11 @@ import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from '../../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { mongoOrm } from '../../src/mongo-orm';
-import { hydrateOrmContractJson, type OrmTestContract } from '../hydrate-contract-cross-refs';
 
-const contract = hydrateOrmContractJson(ormContractJson) as OrmTestContract;
+const contract = ormContractJson as unknown as Contract;
 
 describe('Mongo ORM polymorphism integration', {
   timeout: timeouts.spinUpMongoMemoryServer,

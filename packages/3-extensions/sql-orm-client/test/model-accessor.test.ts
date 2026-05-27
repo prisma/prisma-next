@@ -1,4 +1,3 @@
-import { crossRef } from '@prisma-next/contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -237,7 +236,7 @@ describe('createModelAccessor', () => {
           ...base.models.User,
           relations: {
             posts: {
-              to: crossRef('Post'),
+              to: 'Post',
               cardinality: '1:N',
               on: {
                 localFields: [],
@@ -274,7 +273,7 @@ describe('createModelAccessor', () => {
           relations: {
             ...base.models.User.relations,
             posts: {
-              to: crossRef('Post'),
+              to: 'Post',
               cardinality: '1:N',
               on: {
                 localFields: ['id', 'email'],
@@ -315,7 +314,7 @@ describe('createModelAccessor', () => {
           relations: {
             ...base.models.User.relations,
             posts: {
-              to: crossRef('Post'),
+              to: 'Post',
               cardinality: '1:N',
               on: {
                 localFields: ['id', 'name'],
@@ -406,7 +405,7 @@ describe('createModelAccessor', () => {
           ...base.models.User,
           relations: {
             posts: {
-              to: crossRef('Post'),
+              to: 'Post',
               cardinality: '1:N',
             },
           },

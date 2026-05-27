@@ -2,9 +2,9 @@ import { BinaryExpr, ColumnRef, ParamRef } from '@prisma-next/sql-relational-cor
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import type { TestContract } from './helpers';
-import { createMockRuntime, getTestContext, type RuntimeTestContract } from './helpers';
+import { createMockRuntime, getTestContext } from './helpers';
 
-class PostCollection extends Collection<RuntimeTestContract, 'Post'> {
+class PostCollection extends Collection<TestContract, 'Post'> {
   popular() {
     return this.where((p) => p.views.gt(1000));
   }

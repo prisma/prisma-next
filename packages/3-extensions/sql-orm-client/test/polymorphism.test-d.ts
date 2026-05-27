@@ -129,7 +129,7 @@ type PolyContract = Contract<
           readonly severity: { readonly column: 'severity' };
         };
       };
-      readonly base: { readonly namespace: '__unbound__'; readonly model: 'Task' };
+      readonly base: 'Task';
     };
     readonly Feature: {
       readonly fields: {
@@ -145,7 +145,7 @@ type PolyContract = Contract<
           readonly priority: { readonly column: 'priority' };
         };
       };
-      readonly base: { readonly namespace: '__unbound__'; readonly model: 'Task' };
+      readonly base: 'Task';
     };
     readonly PlainModel: {
       readonly fields: {
