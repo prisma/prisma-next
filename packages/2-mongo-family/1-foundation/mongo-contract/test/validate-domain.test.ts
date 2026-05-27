@@ -1,5 +1,10 @@
+import { asNamespaceId } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { describe, expect, it } from 'vitest';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
@@ -10,7 +15,7 @@ function makeMinimalModel(overrides: Record<string, unknown> = {}) {
 
 function makeValidContract(overrides: Record<string, unknown> = {}) {
   return {
-    roots: { items: 'Item' },
+    roots: { items: crossRef('Item') },
     models: {
       Item: makeMinimalModel({
         fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
@@ -28,14 +33,14 @@ describe('validateContractDomain()', () => {
 
     it('rejects duplicate root values', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item', things: 'Item' },
+        roots: { items: crossRef('Item'), things: crossRef('Item') },
       });
       expect(() => validateContractDomain(contract)).toThrow(/duplicate root.*Item/i);
     });
 
     it('rejects root referencing non-existent model', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item', ghosts: 'Ghost' },
+        roots: { items: crossRef('Item'), ghosts: crossRef('Ghost') },
       });
       expect(() => validateContractDomain(contract)).toThrow(/root.*ghosts.*Ghost.*not exist/i);
     });
@@ -44,7 +49,7 @@ describe('validateContractDomain()', () => {
   describe('variant-base bidirectional consistency', () => {
     it('accepts consistent variant-base relationships', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel({
             fields: {
@@ -53,7 +58,7 @@ describe('validateContractDomain()', () => {
             discriminator: { field: 'type' },
             variants: { SpecialItem: { value: 'special' } },
           }),
-          SpecialItem: makeMinimalModel({ base: 'Item' }),
+          SpecialItem: makeMinimalModel({ base: crossRef('Item') }),
         },
       });
       expect(() => validateContractDomain(contract)).not.toThrow();
@@ -76,7 +81,7 @@ describe('validateContractDomain()', () => {
 
     it('rejects variant whose base does not match the declaring model', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel({
             fields: {
@@ -92,7 +97,7 @@ describe('validateContractDomain()', () => {
             discriminator: { field: 'type' },
             variants: {},
           }),
-          Child: makeMinimalModel({ base: 'Other' }),
+          Child: makeMinimalModel({ base: crossRef('Other') }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -102,7 +107,7 @@ describe('validateContractDomain()', () => {
 
     it('rejects model with base that does not list it as a variant', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel({
             fields: {
@@ -111,7 +116,7 @@ describe('validateContractDomain()', () => {
             discriminator: { field: 'type' },
             variants: {},
           }),
-          Orphan: makeMinimalModel({ base: 'Item' }),
+          Orphan: makeMinimalModel({ base: crossRef('Item') }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -122,7 +127,7 @@ describe('validateContractDomain()', () => {
     it('rejects model with base referencing non-existent model', () => {
       const contract = makeValidContract({
         models: {
-          Item: makeMinimalModel({ base: 'Ghost' }),
+          Item: makeMinimalModel({ base: crossRef('Ghost') }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(/base.*Ghost.*not exist/i);
@@ -132,12 +137,12 @@ describe('validateContractDomain()', () => {
   describe('relation target validation', () => {
     it('accepts relations with valid targets', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel({
             relations: {
               owner: {
-                to: 'User',
+                to: crossRef('User'),
                 cardinality: 'N:1',
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
@@ -155,7 +160,7 @@ describe('validateContractDomain()', () => {
           Item: makeMinimalModel({
             relations: {
               owner: {
-                to: 'Ghost',
+                to: crossRef('Ghost'),
                 cardinality: 'N:1',
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
@@ -196,7 +201,7 @@ describe('validateContractDomain()', () => {
             discriminator: { field: 'kind' },
             variants: { Special: { value: 'special' } },
           }),
-          Special: makeMinimalModel({ base: 'Item' }),
+          Special: makeMinimalModel({ base: crossRef('Item') }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -206,7 +211,7 @@ describe('validateContractDomain()', () => {
 
     it('rejects model with base that also has discriminator', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel({
             fields: {
@@ -216,7 +221,7 @@ describe('validateContractDomain()', () => {
             variants: { Child: { value: 'child' } },
           }),
           Child: makeMinimalModel({
-            base: 'Item',
+            base: crossRef('Item'),
             discriminator: { field: 'type' },
           }),
         },
@@ -235,7 +240,7 @@ describe('validateContractDomain()', () => {
             },
             variants: { Special: { value: 'special' } },
           }),
-          Special: makeMinimalModel({ base: 'Item' }),
+          Special: makeMinimalModel({ base: crossRef('Item') }),
         },
       });
       expect(() => validateContractDomain(contract)).toThrow(
@@ -245,7 +250,7 @@ describe('validateContractDomain()', () => {
 
     it('rejects model with base that also has variants', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel({
             fields: {
@@ -255,7 +260,7 @@ describe('validateContractDomain()', () => {
             variants: { Child: { value: 'child' } },
           }),
           Child: makeMinimalModel({
-            base: 'Item',
+            base: crossRef('Item'),
             variants: { Grandchild: { value: 'grandchild' } },
           }),
         },
@@ -269,7 +274,7 @@ describe('validateContractDomain()', () => {
   describe('orphaned models', () => {
     it('does not reject orphaned models', () => {
       const contract = makeValidContract({
-        roots: { items: 'Item' },
+        roots: { items: crossRef('Item') },
         models: {
           Item: makeMinimalModel(),
           Orphan: makeMinimalModel(),
@@ -282,7 +287,7 @@ describe('validateContractDomain()', () => {
   describe('happy path', () => {
     it('validates a complex contract with polymorphism and relations', () => {
       const contract = {
-        roots: { tasks: 'Task', users: 'User' },
+        roots: { tasks: crossRef('Task'), users: crossRef('User') },
         models: {
           Task: makeMinimalModel({
             fields: {
@@ -296,12 +301,12 @@ describe('validateContractDomain()', () => {
             },
             relations: {
               assignee: {
-                to: 'User',
+                to: crossRef('User'),
                 cardinality: 'N:1',
                 on: { localFields: ['assigneeId'], targetFields: ['_id'] },
               },
               comments: {
-                to: 'Comment',
+                to: crossRef('Comment'),
                 cardinality: '1:N',
               },
             },
@@ -315,7 +320,7 @@ describe('validateContractDomain()', () => {
             fields: {
               severity: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false },
             },
-            base: 'Task',
+            base: crossRef('Task'),
           }),
           Feature: makeMinimalModel({
             fields: {
@@ -325,7 +330,7 @@ describe('validateContractDomain()', () => {
                 nullable: false,
               },
             },
-            base: 'Task',
+            base: crossRef('Task'),
           }),
           User: makeMinimalModel({
             fields: {
@@ -335,7 +340,7 @@ describe('validateContractDomain()', () => {
             },
             relations: {
               addresses: {
-                to: 'Address',
+                to: crossRef('Address'),
                 cardinality: '1:N',
               },
             },

@@ -1,5 +1,6 @@
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Contract } from './contract-types';
+import type { CrossReference } from './cross-reference';
 import type {
   ContractModel,
   ContractModelBase,
@@ -16,7 +17,7 @@ type ContractOverrides<
 > = {
   target?: string;
   targetFamily?: string;
-  roots?: Record<string, string>;
+  roots?: Record<string, CrossReference>;
   models?: TModels;
   storage?: Omit<TStorage, 'storageHash'>;
   valueObjects?: Record<string, ContractValueObject>;

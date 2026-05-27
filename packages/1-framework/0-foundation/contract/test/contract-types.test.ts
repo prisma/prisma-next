@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { asNamespaceId } from '../src/namespace-id';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
+
 import type { Contract } from '../src/contract-types';
 import type { ContractModel } from '../src/domain-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '../src/types';
@@ -34,7 +40,7 @@ describe('unified contract types', () => {
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',
-        roots: { users: 'User' },
+        roots: { users: crossRef('User') },
         models: {
           User: {
             fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
@@ -49,7 +55,7 @@ describe('unified contract types', () => {
         profileHash: profHash,
       };
       expect(contract.target).toBe('postgres');
-      expect(contract.roots['users']).toBe('User');
+      expect(contract.roots['users']).toEqual(crossRef('User'));
     });
 
     it('accepts optional execution', () => {
@@ -90,7 +96,7 @@ describe('unified contract types', () => {
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',
-        roots: { users: 'User' },
+        roots: { users: crossRef('User') },
         models: {
           User: {
             fields: {

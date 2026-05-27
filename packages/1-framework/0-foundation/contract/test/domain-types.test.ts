@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { asNamespaceId } from '../src/namespace-id';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
+
 import type {
   ContractEmbedRelation,
   ContractField,
@@ -73,11 +79,11 @@ describe('contract types', () => {
 
   it('ContractReferenceRelation requires on and allows all cardinalities', () => {
     const relation: ContractReferenceRelation = {
-      to: 'Post',
+      to: crossRef('Post'),
       cardinality: '1:N',
       on: { localFields: ['id'], targetFields: ['userId'] },
     };
-    expect(relation.to).toBe('Post');
+    expect(relation.to.model).toBe('Post');
     expect(relation.on.localFields).toEqual(['id']);
 
     const _extendsRelation: AssertExtends<ContractReferenceRelation, ContractRelation> = true;
@@ -86,10 +92,10 @@ describe('contract types', () => {
 
   it('ContractEmbedRelation has no on and excludes N:1 cardinality', () => {
     const relation: ContractEmbedRelation = {
-      to: 'Address',
+      to: crossRef('Address'),
       cardinality: '1:N',
     };
-    expect(relation.to).toBe('Address');
+    expect(relation.to.model).toBe('Address');
     expect('on' in relation).toBe(false);
 
     const _extendsRelation: AssertExtends<ContractEmbedRelation, ContractRelation> = true;
@@ -103,16 +109,16 @@ describe('contract types', () => {
 
   it('ContractRelation is a union of reference and embed', () => {
     const ref: ContractRelation = {
-      to: 'Post',
+      to: crossRef('Post'),
       cardinality: 'N:1',
       on: { localFields: ['postId'], targetFields: ['id'] },
     };
     const embed: ContractRelation = {
-      to: 'Address',
+      to: crossRef('Address'),
       cardinality: '1:1',
     };
-    expect(ref.to).toBe('Post');
-    expect(embed.to).toBe('Address');
+    expect(ref.to.model).toBe('Post');
+    expect(embed.to.model).toBe('Address');
   });
 
   it('ContractModel supports polymorphism fields', () => {
@@ -134,9 +140,9 @@ describe('contract types', () => {
       fields: {},
       relations: {},
       storage: {},
-      base: 'Parent',
+      base: crossRef('Parent'),
     };
-    expect(model.base).toBe('Parent');
+    expect(model.base?.model).toBe('Parent');
   });
 
   it('ContractModel supports owner for component membership', () => {

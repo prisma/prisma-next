@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { asNamespaceId } from '../src/namespace-id';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
 
 import { createContract, createSqlContract } from '../src/testing-factories';
 
@@ -21,11 +26,11 @@ describe('createContract', () => {
       target: 'mysql',
       targetFamily: 'sql',
       capabilities: { mysql: { json: true } },
-      roots: { users: 'User' },
+      roots: { users: crossRef('User') },
     });
     expect(contract.target).toBe('mysql');
     expect(contract.capabilities).toEqual({ mysql: { json: true } });
-    expect(contract.roots).toEqual({ users: 'User' });
+    expect(contract.roots).toEqual({ users: crossRef('User') });
   });
 
   it('computes executionHash when execution is provided', () => {

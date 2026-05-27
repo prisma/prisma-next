@@ -1,3 +1,4 @@
+import type { CrossReference } from './cross-reference';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 import type {
   ExecutionHashBase,
@@ -43,7 +44,7 @@ export interface Contract<
 > {
   readonly target: string;
   readonly targetFamily: string;
-  readonly roots: Record<string, string>;
+  readonly roots: Record<string, CrossReference>;
   readonly models: TModels;
   readonly valueObjects?: Record<string, ContractValueObject>;
   /**

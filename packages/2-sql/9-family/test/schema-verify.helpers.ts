@@ -3,6 +3,7 @@
  */
 
 import {
+  asNamespaceId,
   type ColumnDefault,
   type Contract,
   profileHash,
@@ -113,6 +114,8 @@ export function createContractTable(
     ),
     foreignKeys: (options?.foreignKeys ?? []).map((fk) => ({
       ...fk,
+      source: { ...fk.source, namespaceId: asNamespaceId(fk.source.namespaceId) },
+      target: { ...fk.target, namespaceId: asNamespaceId(fk.target.namespaceId) },
       ...applyFkDefaults(fk),
     })),
     uniques: options?.uniques ?? [],

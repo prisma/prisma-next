@@ -1,5 +1,9 @@
 import type { MongoContract } from './contract-types';
 
+function formatCrossRef(crossRef: { readonly namespace: string; readonly model: string }): string {
+  return `${crossRef.namespace}.${crossRef.model}`;
+}
+
 function storageDeclaresCollection(
   storage: MongoContract['storage'],
   collectionName: string,
@@ -25,10 +29,8 @@ export function validateMongoStorage(contract: MongoContract): void {
       );
     }
 
-    // Mongo does not support multi-table inheritance (ADR 2): all variants of a base
-    // must share the same collection (single-table inheritance only).
     if (model.base) {
-      const baseModel = contract.models[model.base];
+      const baseModel = contract.models[model.base.model];
       if (baseModel) {
         const variantCollection = model.storage.collection;
         const baseCollection = baseModel.storage.collection;
@@ -41,17 +43,18 @@ export function validateMongoStorage(contract: MongoContract): void {
     }
 
     for (const [relName, relation] of Object.entries(model.relations ?? {})) {
-      const targetModel = contract.models[relation.to];
+      const targetModel = contract.models[relation.to.model];
+      const targetLabel = formatCrossRef(relation.to);
 
       if (targetModel?.owner) {
         if (targetModel.owner !== modelName) {
           errors.push(
-            `Embed relation "${relName}" targets "${relation.to}" which is owned by "${targetModel.owner}", not "${modelName}"`,
+            `Embed relation "${relName}" targets "${targetLabel}" which is owned by "${targetModel.owner}", not "${modelName}"`,
           );
         }
         if (targetModel.storage.collection) {
           errors.push(
-            `Embed relation "${relName}" targets "${relation.to}" which must not have a collection`,
+            `Embed relation "${relName}" targets "${targetLabel}" which must not have a collection`,
           );
         }
       } else if ('on' in relation && relation.on) {
@@ -67,7 +70,7 @@ export function validateMongoStorage(contract: MongoContract): void {
           for (const targetField of relation.on.targetFields) {
             if (!(targetField in targetModel.fields)) {
               errors.push(
-                `Reference relation "${relName}": targetField "${targetField}" is not a field on model "${relation.to}"`,
+                `Reference relation "${relName}": targetField "${targetField}" is not a field on model "${targetLabel}"`,
               );
             }
           }

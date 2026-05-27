@@ -1,3 +1,5 @@
+import type { CrossReference } from './cross-reference';
+
 export type ScalarFieldType = {
   readonly kind: 'scalar';
   readonly codecId: string;
@@ -29,13 +31,13 @@ export type ContractRelationOn = {
 };
 
 export type ContractReferenceRelation = {
-  readonly to: string;
+  readonly to: CrossReference;
   readonly cardinality: '1:1' | '1:N' | 'N:1';
   readonly on: ContractRelationOn;
 };
 
 export type ContractEmbedRelation = {
-  readonly to: string;
+  readonly to: CrossReference;
   readonly cardinality: '1:1' | '1:N';
 };
 
@@ -61,7 +63,7 @@ export interface ContractModelBase<TModelStorage extends ModelStorageBase = Mode
   readonly storage: TModelStorage;
   readonly discriminator?: ContractDiscriminator;
   readonly variants?: Record<string, ContractVariantEntry>;
-  readonly base?: string;
+  readonly base?: CrossReference;
   readonly owner?: string;
 }
 

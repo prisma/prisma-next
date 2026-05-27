@@ -1,4 +1,4 @@
-import type { ScalarFieldType } from '@prisma-next/contract/types';
+import { asNamespaceId, type ScalarFieldType } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
@@ -38,7 +38,7 @@ export function fk(
   opts?: ForeignKeyOptions & { constraint?: boolean; index?: boolean; namespaceId?: string },
 ): ForeignKey {
   const defaults = applyFkDefaults({ constraint: opts?.constraint, index: opts?.index });
-  const namespaceId = opts?.namespaceId ?? UNBOUND_NAMESPACE_ID;
+  const namespaceId = asNamespaceId(opts?.namespaceId ?? UNBOUND_NAMESPACE_ID);
   return new ForeignKey({
     source: { namespaceId, tableName: srcTableName, columns: srcColumns },
     target: { namespaceId, tableName: targetTableName, columns: targetColumns },

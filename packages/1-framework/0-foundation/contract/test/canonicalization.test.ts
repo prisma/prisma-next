@@ -1,5 +1,11 @@
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
+import { asNamespaceId } from '../src/namespace-id';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
+
 import {
   type CanonicalizeContractOptions,
   canonicalizeContract as canonicalizeContractRaw,
@@ -91,8 +97,8 @@ describe('canonicalizeContractToObject', () => {
   });
 
   it('includes roots when provided', () => {
-    const result = canonicalizeContractToObject(minimal({ roots: { users: 'User' } }));
-    expect(result['roots']).toEqual({ users: 'User' });
+    const result = canonicalizeContractToObject(minimal({ roots: { users: crossRef('User') } }));
+    expect(result['roots']).toEqual({ users: crossRef('User') });
   });
 
   it('includes execution when provided', () => {

@@ -1,4 +1,4 @@
-import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
+import type { CrossReference, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type {
   ExtractMongoFieldInputTypes,
@@ -35,7 +35,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
-    readonly roots: { readonly users: 'User' };
+    readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
     readonly models: {
       readonly User: {
         readonly fields: {

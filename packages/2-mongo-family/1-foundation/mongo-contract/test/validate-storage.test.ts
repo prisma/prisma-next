@@ -1,6 +1,11 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
+
 import type { MongoContract } from '../src/contract-types';
 import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoStorage } from '../src/ir/mongo-storage';
@@ -23,7 +28,7 @@ function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContr
   return {
     target: 'mongo',
     targetFamily: 'mongo',
-    roots: { items: 'Item' },
+    roots: { items: crossRef('Item') },
     storage: storageWithItemsCollections({ items: new MongoCollection() }),
     models: {
       Item: {
@@ -58,7 +63,7 @@ describe('validateMongoStorage()', () => {
               relations: { tags: { field: 'tags' } },
             },
             relations: {
-              tags: { to: 'Tag', cardinality: '1:N' as const },
+              tags: { to: crossRef('Tag'), cardinality: '1:N' as const },
             },
           },
           Tag: {
@@ -83,7 +88,7 @@ describe('validateMongoStorage()', () => {
             },
             storage: { collection: 'items' },
             relations: {
-              tags: { to: 'Tag', cardinality: '1:N' as const },
+              tags: { to: crossRef('Tag'), cardinality: '1:N' as const },
             },
           },
           Other: {
@@ -120,7 +125,7 @@ describe('validateMongoStorage()', () => {
               relations: { tags: { field: 'tags' } },
             },
             relations: {
-              tags: { to: 'Tag', cardinality: '1:N' as const },
+              tags: { to: crossRef('Tag'), cardinality: '1:N' as const },
             },
           },
           Tag: {
@@ -148,7 +153,7 @@ describe('validateMongoStorage()', () => {
             storage: { collection: 'items' },
             relations: {
               owner: {
-                to: 'User',
+                to: crossRef('User'),
                 cardinality: 'N:1' as const,
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
@@ -179,7 +184,7 @@ describe('validateMongoStorage()', () => {
             storage: { collection: 'items' },
             relations: {
               owner: {
-                to: 'User',
+                to: crossRef('User'),
                 cardinality: 'N:1' as const,
                 on: { localFields: ['ownerId'], targetFields: ['userId'] },
               },
@@ -214,7 +219,7 @@ describe('validateMongoStorage()', () => {
             storage: { collection: 'items' },
             relations: {
               owner: {
-                to: 'User',
+                to: crossRef('User'),
                 cardinality: 'N:1' as const,
                 on: { localFields: ['ownerId'], targetFields: ['_id'] },
               },
@@ -257,7 +262,7 @@ describe('validateMongoStorage()', () => {
             },
             storage: { collection: 'other' },
             relations: {},
-            base: 'Item',
+            base: crossRef('Item'),
           },
         },
       });
@@ -286,7 +291,7 @@ describe('validateMongoStorage()', () => {
             },
             storage: { collection: 'items' },
             relations: {},
-            base: 'Item',
+            base: crossRef('Item'),
           },
         },
       });
