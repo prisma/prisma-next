@@ -1,7 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-
-type CapabilityMatrix = Record<string, Record<string, boolean>>;
+import {
+  mergeCapabilityMatrices,
+  type TargetBoundComponentDescriptor,
+} from '@prisma-next/framework-components/components';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -24,37 +25,6 @@ function sortDeep(value: unknown): unknown {
 
 function sortDeepTyped<T>(value: T): T {
   return sortDeep(value) as T;
-}
-
-function extractCapabilityMatrix(value: unknown): CapabilityMatrix {
-  if (!isPlainObject(value)) return {};
-
-  const out: CapabilityMatrix = {};
-  for (const [namespace, maybeCaps] of Object.entries(value)) {
-    if (!isPlainObject(maybeCaps)) continue;
-    const caps: Record<string, boolean> = {};
-    for (const [key, flag] of Object.entries(maybeCaps)) {
-      if (typeof flag === 'boolean') {
-        caps[key] = flag;
-      }
-    }
-    if (Object.keys(caps).length > 0) {
-      out[namespace] = caps;
-    }
-  }
-
-  return out;
-}
-
-function mergeCapabilities(left: CapabilityMatrix, right: CapabilityMatrix): CapabilityMatrix {
-  const next: CapabilityMatrix = { ...left };
-  for (const [namespace, capabilities] of Object.entries(right)) {
-    next[namespace] = {
-      ...(left[namespace] ?? {}),
-      ...capabilities,
-    };
-  }
-  return next;
 }
 
 function extractExtensionPackMeta(
@@ -93,16 +63,10 @@ export function enrichContract(
   ir: Contract,
   components: ReadonlyArray<TargetBoundComponentDescriptor<string, string>>,
 ): Contract {
-  let mergedCapabilities = ir.capabilities;
-  const extensionPacksMeta: Record<string, unknown> = {};
+  const mergedCapabilities = mergeCapabilityMatrices(ir.capabilities, components);
 
+  const extensionPacksMeta: Record<string, unknown> = {};
   for (const component of components) {
-    if (component.capabilities) {
-      mergedCapabilities = mergeCapabilities(
-        mergedCapabilities,
-        extractCapabilityMatrix(component.capabilities),
-      );
-    }
     if (component.kind === 'extension') {
       extensionPacksMeta[component.id] = extractExtensionPackMeta(component);
     }
