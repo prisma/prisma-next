@@ -568,13 +568,14 @@ type BuiltDocumentScopedTypes<Definition> = {
     : K]: DefinitionTypes<Definition>[K];
 };
 
-type BuiltDomain<Definition> = keyof BuiltDocumentScopedTypes<Definition> extends never
-  ? Record<string, never>
-  : {
-      readonly __unbound__: {
-        readonly types: BuiltDocumentScopedTypes<Definition>;
+type BuiltDomain<Definition> =
+  BuiltDocumentScopedTypes<Definition> extends Record<never, never>
+    ? Record<string, never>
+    : {
+        readonly __unbound__: {
+          readonly types: BuiltDocumentScopedTypes<Definition>;
+        };
       };
-    };
 
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
@@ -636,14 +637,12 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
     readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-  } & (keyof BuiltDocumentScopedTypes<Definition> extends never
+  } & { readonly domain: BuiltDomain<Definition> } & {
+    readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
-      : { readonly domain: BuiltDomain<Definition> }) & {
-      readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
-        ? Record<string, never>
-        : DefinitionExtensionPacks<Definition>;
-      readonly capabilities: DerivedCapabilities<Definition>;
-    },
+      : DefinitionExtensionPacks<Definition>;
+    readonly capabilities: DerivedCapabilities<Definition>;
+  },
   TypeMaps<
     CodecTypesFromDefinition<Definition>,
     Record<string, never>,
