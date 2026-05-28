@@ -23,7 +23,7 @@ Decompose a slice into the sequence of dispatches that delivers it. The plan ans
 2. **In what order?** Dispatches inside a slice are typically sequential (each builds on the previous's hand-off); parallel-within-slice is rare and usually means the slice should be split.
 3. **At what size?** Each dispatch is M-sized or smaller (the M-cap). L/XL dispatches are refused; re-decompose into multiple Ms.
 
-The slice plan is the artefact `drive-build-workflow` reads to pilot the dispatch loop. **Handoff contracts catch non-linear dependencies** — dispatch N may depend on N-2's hand-off, not N-1's; explicit `builds on` per dispatch surfaces this where order alone hides it.
+The slice plan is the artifact `drive-build-workflow` reads to pilot the dispatch loop. **Handoff contracts catch non-linear dependencies** — dispatch N may depend on N-2's hand-off, not N-1's; explicit `builds on` per dispatch surfaces this where order alone hides it.
 
 ## When to use
 
@@ -175,7 +175,7 @@ _(Repeat per dispatch; total ≤ 10.)_
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that simplified slice-plan entries to outcome / builds-on / hands-to / focus and moved per-dispatch DoR into the brief
+- [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that simplified slice-plan entries to outcome / builds-on / hands-to / focus and moved per-dispatch DoR into the brief
 - [`drive/plan/README.md`](../../drive/plan/README.md) — two-cap sizing system, team-specific overlays
 - [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) — S/M/L/XL reference cases for this repo
 - [`drive-build-workflow/SKILL.md`](../drive-build-workflow/SKILL.md) — dispatch loop this plan feeds

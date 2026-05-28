@@ -29,7 +29,7 @@ The skill is the *mode of operation*: the operating rules, the response shape, t
 
 ## When to use
 
-**Discussion is signal-triggered, not mandatory on every entry.** The orchestrator's workflow skills (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) are responsible for detecting signals and routing here; this skill is the destination, not the gatekeeper. See [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) § Cross-cutting principles for the signal definitions.
+**Discussion is signal-triggered, not mandatory on every entry.** The orchestrator's workflow skills (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) are responsible for detecting signals and routing here; this skill is the destination, not the gatekeeper. See [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) § Cross-cutting principles for the signal definitions.
 
 Five canonical triggers (design discussion at triage / spec / mid-flight boundaries — see `drive/triage/README.md` for team overlays):
 

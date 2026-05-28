@@ -43,7 +43,7 @@ A brief may add gates specific to the work:
 
 - [ ] Brief's referenced [`failure-modes.md`](./failure-modes.md) entries were checked during execution and noted as "avoided" in the dispatch summary.
 - [ ] No new TODOs left behind by this dispatch.
-- [ ] Per-commit messages reference the source spike artefact / slice spec where appropriate.
+- [ ] Per-commit messages reference the source spike artifact / slice spec where appropriate.
 - [ ] If the dispatch touched test fixtures: `fixtures:check` passes; drift in unrelated fixture files is investigated, not committed.
 
 ## Slice-DoD overlay

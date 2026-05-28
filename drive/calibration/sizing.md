@@ -2,7 +2,7 @@
 
 How big is this work, and which slices can run in parallel? This file is the team's pinned reference. When a new piece of work doesn't obviously match a reference task, pick the nearest one and ask: *is this harder, easier, or about the same?*
 
-> **Post-pilot revisit (2026-05-28).** The current matrix is calibrated against the codebase as of the artefact-cascade-redesign discussion; running observations are it's too conservative for cheap-tier dispatches (mechanical-fanout M dispatches routinely close in well under the time-box). Slice-cap (one PR per slice) and project-cap (1–4 slices) anchors are added below; the dispatch matrix itself will be re-calibrated after the redesign pilot on the next 1–2 projects.
+> **Post-pilot revisit (2026-05-28).** The current matrix is calibrated against the codebase as of the artifact-cascade-redesign discussion; running observations are it's too conservative for cheap-tier dispatches (mechanical-fanout M dispatches routinely close in well under the time-box). Slice-cap (one PR per slice) and project-cap (1–4 slices) anchors are added below; the dispatch matrix itself will be re-calibrated after the redesign pilot on the next 1–2 projects.
 
 ## Dispatch-sizing reference anchors
 
