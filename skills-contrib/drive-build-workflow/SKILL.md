@@ -111,6 +111,8 @@ The implementer **never** edits `spec.md` or `plan.md`. The reviewer is **read-o
 
 ### 1. Pre-flight: per-dispatch DoR
 
+> **Emit `dispatch-start`** (once per dispatch-unit — only on **round 1** of this dispatch; do not re-emit on round 2+). Fields: `dispatch_id` (fresh UUID v4 — record for reuse through this dispatch's `dispatch-end`), `dispatch_name` (operator-authored identifier from the slice plan), `subagent_type` and `model` from the planned `drive-dispatch` / `Task` call, `parent_dispatch_id` (prior dispatch ID when resuming a cross-slice persistent implementer per § Subagent continuity, else `null`), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) for the payload schema and [`docs/drive/trace-emission.md`](../../docs/drive/trace-emission.md) for the file-append mechanics.
+
 Before delegating, walk:
 
 - [ ] Slice-plan entry has outcome / builds-on / hands-to / focus filled.
@@ -121,9 +123,13 @@ Before delegating, walk:
 
 Any DoR item that fails: fix the gap, OR halt and surface to the operator. Do not delegate over a failed DoR.
 
+> **Emit `round-start`** (once per round, after DoR passes, before brief assembly — per-round sequence: `round-start → brief-issued → drive-dispatch → … → round-end`). Fields: `dispatch_id` (from this dispatch's `dispatch-start`), `round_id` (fresh UUID v4 — record for the matching `brief-issued` and `round-end`), `round_number` (1-indexed count of rounds opened within this `dispatch_id`), plus envelope fields. See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) for the payload schema and [`docs/drive/trace-emission.md`](../../docs/drive/trace-emission.md) for the file-append mechanics.
+
 ### 2. Dispatch the implementer (via `drive-dispatch`)
 
 Assemble the dispatch brief from [`drive-dispatch/templates/dispatch-brief.template.md`](../drive-dispatch/templates/dispatch-brief.template.md). Briefs are lean: the same implementer runs every dispatch in a slice, so the brief restates only what's dispatch-specific. See [`docs/drive/principles/brief-discipline.md`](../../docs/drive/principles/brief-discipline.md) for the principle.
+
+> **Emit `brief-issued`** (once per round, after the brief is fully assembled and immediately before calling `drive-dispatch`; slice 1 tracks the implementer brief only). Fields: `dispatch_id` and `round_id` from the round in progress, `brief_byte_length` (UTF-8 byte length of the assembled brief text), `brief_content_hash` (sha256 hex of the same text), `brief_disposition` (`"initial"` on round 1 of this dispatch, `"reissue"` when the hash matches a prior brief in this dispatch verbatim, `"amended"` otherwise), plus envelope fields. See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) for the payload schema and [`docs/drive/trace-emission.md`](../../docs/drive/trace-emission.md) for the file-append mechanics.
 
 Call `drive-dispatch` with:
 
@@ -193,6 +199,10 @@ Triage the (post-intent-validation) verdict:
 - `SATISFIED` → next dispatch, or close the slice and auto-open the PR if this was the last dispatch.
 - `ANOTHER ROUND NEEDED` → loop to step 2 with the reviewer's findings as carry-over in the next dispatch call.
 - `ESCALATING TO USER` → surface as a structured decision (§ Escalation surface).
+
+> **Emit `round-end`** (once per round, after triage records the verdict — all branches). Fields: `dispatch_id` and `round_id` from the round, `verdict` mapped from triage (`SATISFIED → "satisfied"`, `ANOTHER ROUND NEEDED → "another-round-needed"`, `ESCALATING TO USER → "escalating-to-user"`, halt routed to `drive-discussion` per § Stop conditions → `"stop-condition"`), `findings_filed` (count of new entries appended this round to `code-review.md § Findings log`, best-effort), `wall_clock_ms` (`now − round-start.ts` for this `round_id`), plus envelope fields. See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) for the payload schema and [`docs/drive/trace-emission.md`](../../docs/drive/trace-emission.md) for the file-append mechanics.
+
+> **Emit `dispatch-end`** (once per dispatch-unit, when the dispatch terminates — not on every round). Fire after the matching `round-end` when triage is `SATISFIED` and no further dispatches remain in the slice (close-slice path), or when a § Stop conditions halt ends the dispatch without a clean `SATISFIED` (`result`: `"completed"` when the subagent delegation finished and review captured on `round-end`, `"failed"` when the implementer surfaced a stop condition, `"aborted"` when the orchestrator killed the dispatch — e.g. WIP-inspection drift). Fields: `dispatch_id` from this dispatch's `dispatch-start`, `result`, `wall_clock_ms` (`now − dispatch-start.ts`), plus envelope fields. See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) for the payload schema and [`docs/drive/trace-emission.md`](../../docs/drive/trace-emission.md) for the file-append mechanics.
 
 ## Stop conditions
 
