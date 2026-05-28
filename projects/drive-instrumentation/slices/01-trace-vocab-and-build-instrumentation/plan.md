@@ -10,7 +10,7 @@ Slice spec: [`spec.md`](./spec.md). Spec re-specified 2026-05-28 to expand scope
 - **D2: SATISFIED** — `42feffeb4`. Five emit-sites in `skills-contrib/drive-build-workflow/SKILL.md` at canonical anchors.
 - **D3: SATISFIED** — `849f10598`. `manual-qa.md` + `qa-run-01.md` + `qa-trace-01.jsonl` (build-loop event coverage; 13 events across a synthetic 2-dispatch / 3-round scenario).
 - **D4: SATISFIED** — `4156a84c8` + orchestrator fixup `7a8b3e6fe`. Six planning-chain event types added to `docs/drive/trace-events.md`; existence-check subsection added to `docs/drive/trace-emission.md`. F2 + F3 (low/process JSONL + anchor nits) closed in fixup commit.
-- **D5a: pending** — instrumentation of spec + plan lifecycle skills (4 skills).
+- **D5a: SATISFIED** — `21dc8c0d0`. Four spec+plan lifecycle skills instrumented with existence-check-gated Emit blockquotes (+2 lines each, +8 total). `drive-specify-slice` correctly gates emission on in-project mode; `drive-plan-slice` correctly handles both inline-in-spec and separate-plan.md write modes with mode-specific `plan_path` resolution. Two non-blocking findings (F4 ⚠️ Concern, F5 💡 Suggestion) about abbreviated payload listings — consistent with D2's blockquote-density pattern, doc cites cover the full schema; orchestrator accepts as-is.
 - **D5b: pending** — instrumentation of triage + I12 skills (2 skills).
 - **D6: pending** — manual-QA expansion + second walkthrough run covering all eleven event types.
 
