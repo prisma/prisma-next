@@ -55,14 +55,14 @@ sequenceDiagram
 - **Runtime overrides any caller-supplied value.** If a caller hands the runtime a plan with `planExecutionId` already set, the runtime overrides it. Every execute is a fresh identity by contract.
 - **Excluded from hashing.** `planExecutionId` does not participate in `computeSqlContentHash` (which picks `storageHash`, `sql`, `params`) or in `computeSqlFingerprint` (which operates on normalised SQL text). Same query shape, same hash — regardless of execute identity.
 
-### Why runtime-assigned, not builder-assigned
-
-The first design tied the ID to plan construction. Two consequences sank it:
-
-1. **Reused plans would share an ID.** A plan built once and executed many times — the idiomatic shape for prepared queries and repeated requests — would emit the same `planExecutionId` for every execution. Middleware could not distinguish two distinct execute calls of the same plan, which is the entire point of the field.
-2. **Construction-site coverage is a moving target.** Twelve plan-builder sites across SQL ORM, raw SQL, SQL DSL, and Mongo builders would all have to remember to generate the ID. A new builder added later would silently omit it. The runtime is one place; SQL and Mongo runtimes inherit (or duplicate, in the case of family runtimes that override `execute()`) one consistent rule.
+### Why the runtime owns this
 
 The lifecycle the name describes — "the ID of an execution of a plan" — is a runtime lifecycle, not a builder lifecycle. The identity belongs at the boundary that owns the lifecycle.
+
+Two concrete properties fall out of this choice:
+
+1. **Plan reuse stays a first-class pattern.** A plan built once and executed many times (the idiomatic shape for prepared queries and repeated requests) emits a distinct `planExecutionId` for every execution, because the runtime mints a fresh value at each `execute()` call. Middleware can tell two execute calls of the same plan apart — which is the entire point of the field.
+2. **One assignment site per runtime, not one per builder.** `RuntimeCore.execute()` covers any future family runtime that delegates to `super`. Family runtimes that override `execute()` (SQL and Mongo today) apply the same wrap at the top of their generator — a single, greppable rule per runtime rather than per-builder coverage that has to be re-audited every time a new plan builder lands.
 
 ### Why a new field, not `planId`
 
@@ -110,7 +110,7 @@ Both family runtimes — SQL and Mongo — inherit the field on `PlanMeta` from 
 
 ## Alternatives considered
 
-- **Assign at plan construction (the first design).** Rejected — reused plans share IDs, and the construction-site coverage problem keeps regenerating itself.
+- **Assign at plan construction.** Rejected — would tie identity to the plan instance, which means two `execute()` calls of the same plan share an ID. Also requires every plan builder (across SQL ORM, raw SQL, SQL DSL, Mongo) to remember to mint one, which scales poorly as new builders land.
 - **Reuse ADR 013's `planId`.** Rejected — different concept. Content-based identity is per-query-shape; execution identity is per-execute call.
 - **`AsyncLocalStorage` for execution context.** Rejected — implicit propagation conflicts with the codebase's "explicit over implicit" stance (cf. ADR 160's reasoning for `groupingKey`).
 - **Per-hook ID parameter.** Add `planExecutionId` to every middleware hook signature. Rejected — changes the hook API surface for a value that fits naturally on `PlanMeta`.
