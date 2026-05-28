@@ -58,7 +58,7 @@ export function serializeCrossReference(ref: CrossReference): string {
 
 export function generateRootsType(roots: Record<string, CrossReference> | undefined): string {
   if (!roots || Object.keys(roots).length === 0) {
-    return 'Record<string, CrossReference>';
+    return 'Record<string, never>';
   }
   const entries = Object.entries(roots)
     .map(([key, value]) => `readonly ${serializeObjectKey(key)}: ${serializeCrossReference(value)}`)

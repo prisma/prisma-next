@@ -75,7 +75,7 @@ type ContractBase = Omit<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: Record<string, CrossReference>;
+  readonly roots: Record<string, never>;
   readonly capabilities: {
     readonly postgres: {
       readonly distinctOn: true;
