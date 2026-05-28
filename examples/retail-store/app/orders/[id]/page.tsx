@@ -54,9 +54,9 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           <div>
             <h2 className="font-semibold mb-3">Items</h2>
             <div className="flex flex-col gap-2">
-              {order.items.map((item, i) => (
+              {order.items.map((item) => (
                 <div
-                  key={`${item.productId}-${i}`}
+                  key={item.productId}
                   className="flex justify-between py-2 border-b border-border last:border-0"
                 >
                   <div>

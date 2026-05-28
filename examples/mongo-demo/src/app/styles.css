@@ -53,6 +53,15 @@ header h1 {
   margin-top: 0.25rem;
 }
 
+/* Generic section heading; declared before `.error h2` so the more
+   specific selector below can override the cascade as intended. */
+section h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-dim);
+}
+
 .loading,
 .error {
   text-align: center;
@@ -303,13 +312,6 @@ header h1 {
 /* Sections */
 section {
   margin-bottom: 2rem;
-}
-
-section h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-  color: var(--text-dim);
 }
 
 .user-list h2 {
