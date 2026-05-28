@@ -1,4 +1,3 @@
-import type { NamespaceId } from '@prisma-next/contract/types';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -35,7 +34,7 @@ export interface ForeignKeySpec {
   readonly name: string;
   readonly columns: readonly string[];
   readonly references: {
-    readonly schema: NamespaceId;
+    readonly schema: string;
     readonly table: string;
     readonly columns: readonly string[];
   };

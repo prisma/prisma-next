@@ -1,4 +1,4 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -44,11 +44,15 @@ function createFkTestContract(fkConfig: {
               foreignKeys: [
                 {
                   source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                     tableName: 'post',
                     columns: ['userId'],
                   },
-                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                  target: {
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                    tableName: 'user',
+                    columns: ['id'],
+                  },
                   constraint: fkConfig.constraint,
                   index: fkConfig.index,
                 },

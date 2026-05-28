@@ -1,4 +1,4 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -44,12 +44,12 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
               foreignKeys: [
                 {
                   source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                     tableName: 'post',
                     columns: ['author_id'],
                   },
                   target: {
-                    namespaceId: 'auth',
+                    namespaceId: asNamespaceId('auth'),
                     tableName: 'user',
                     columns: ['id'],
                   },

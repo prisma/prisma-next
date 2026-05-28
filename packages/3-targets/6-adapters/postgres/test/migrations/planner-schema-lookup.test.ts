@@ -1,3 +1,4 @@
+import { asNamespaceId } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -164,8 +165,16 @@ describe('hasForeignKey', () => {
       hasForeignKey(
         lookup,
         fk({
-          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['author_id'] },
-          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+          source: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'post',
+            columns: ['author_id'],
+          },
+          target: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'user',
+            columns: ['id'],
+          },
         }),
       ),
     ).toBe(true);
@@ -177,12 +186,12 @@ describe('hasForeignKey', () => {
         lookup,
         fk({
           source: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
             tableName: 'post',
             columns: ['org_id', 'team_id'],
           },
           target: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
             tableName: 'team',
             columns: ['org_id', 'id'],
           },
@@ -196,8 +205,16 @@ describe('hasForeignKey', () => {
       hasForeignKey(
         lookup,
         fk({
-          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['author_id'] },
-          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'account', columns: ['id'] },
+          source: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'post',
+            columns: ['author_id'],
+          },
+          target: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'account',
+            columns: ['id'],
+          },
         }),
       ),
     ).toBe(false);
@@ -208,8 +225,16 @@ describe('hasForeignKey', () => {
       hasForeignKey(
         lookup,
         fk({
-          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['author_id'] },
-          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['uid'] },
+          source: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'post',
+            columns: ['author_id'],
+          },
+          target: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'user',
+            columns: ['uid'],
+          },
         }),
       ),
     ).toBe(false);
@@ -220,8 +245,16 @@ describe('hasForeignKey', () => {
       hasForeignKey(
         lookup,
         fk({
-          source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['user_id'] },
-          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+          source: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'post',
+            columns: ['user_id'],
+          },
+          target: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'user',
+            columns: ['id'],
+          },
         }),
       ),
     ).toBe(false);
