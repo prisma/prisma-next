@@ -1,198 +1,119 @@
 ---
 name: drive-discussion
 description: >
-  Drops the agent into a structured Q&A mode that iterates with the user toward a
-  complete understanding of a topic, then documents the outcome (project spec, plan,
-  decision record, or whatever shape fits). Adopts one or more personas from the
-  `drive-agent-personas` library — named by the user or inferred from context and
-  announced. Invoke when a design question or load-bearing assumption needs
-  collaborative resolution — in `drive-specify-project` or `drive-specify-slice`
-  (pre-spec), when spec authoring hits a fork needing a collaborative pick
-  (mid-spec), when implementation falsifies a load-bearing assumption
-  (mid-flight, I12), when an unplanned obstacle emerges, or when the user
-  explicitly asks ("discussion mode", "pressure-test this", "let's design
-  this", "design mode", "tech design mode", "product mode", "pm mode",
-  "challenge my idea"). Do NOT invoke for simple clarifying questions,
-  implementation (read-only), or pressure-testing a finished artefact (use a
-  review skill instead).
+  Drops the agent into a structured Q&A mode that iterates with the user toward
+  a complete understanding of a topic, then synthesises the outcome and hands off
+  to the skill that writes the durable artefact (spec / plan / decision record).
+  Adopts one or more personas from drive-agent-personas — named by the user or
+  inferred and announced. Invoke when a design question or load-bearing
+  assumption needs collaborative resolution (pre-spec, mid-spec, mid-flight on
+  falsified assumption per invariant I12, mid-flight on obstacle), or on
+  explicit request ("discussion mode", "pressure-test this", "let's design
+  this"). Do NOT use for simple clarifying questions, implementation
+  (read-only), or pressure-testing a finished artefact (use a review skill).
 ---
 
-> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
->
-> Read-only codebase investigation (Read, Grep, Glob, SemanticSearch, read-only Shell) is **permitted and expected** — the skill body requires grounding claims in the actual code state. If the skill's body asks for work that requires running builds/tests or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+> **Execution mode: orchestrator-direct.** Atomic skill invoked by the Orchestrator
+> directly. Outputs land in the conversation surface (verdicts / summaries),
+> handed off to a downstream skill for the file write. Read-only codebase
+> investigation (Read, Grep, Glob, SemanticSearch, read-only Shell) is permitted
+> and expected — the skill body requires grounding claims in actual code state.
+> If the body would require running builds/tests or writing files outside
+> `projects/<current-project>/` — **STOP. Dispatch.** See
+> [`drive/roles/README.md`](../../drive/roles/README.md).
 
-# Discussion mode
+# Drive: Discussion
 
-A Q&A loop where the agent stress-tests an idea, framing, or decision with the user — one thread at a time, through one or more named persona lenses — until the topic is understood well enough to commit to an artefact (a project spec, a project plan, a decision record, or whatever shape the user wants).
+A Q&A loop where the agent stress-tests an idea through one or more named persona lenses, one thread at a time, until the topic is understood well enough to commit to an artefact. The skill is the **mode of operation** (operating rules, response shape, exit-and-document discipline); personas are **which lenses** the agent wears while in that mode — inputs to the skill, not part of its identity.
 
-The skill is the *mode of operation*: the operating rules, the response shape, the one-thread-at-a-time discipline, the read-only stance, the explicit exit-and-document step. The personas are *which lenses* the agent wears while operating in that mode — inputs to the skill, not part of its identity.
+## Triggers
 
-## When to use
+Discussion is signal-triggered, not mandatory. The workflow skills (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) detect signals and route here; this skill is the destination, not the gatekeeper. Five canonical triggers:
 
-**Discussion is signal-triggered, not mandatory on every entry.** The orchestrator's workflow skills (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) are responsible for detecting signals and routing here; this skill is the destination, not the gatekeeper. See [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) § Cross-cutting principles for the signal definitions.
-
-Five canonical triggers (design discussion at triage / spec / mid-flight boundaries — see `drive/triage/README.md` for team overlays):
-
-1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-specify-project` or `drive-specify-slice`. Signal: design ambiguity in the ticket, surface uncertainty (first-grep returns more files than expected), parent-project assumption at risk.
+1. **Pre-spec.** The conversation needs a spec/plan/design before implementation. Signal: design ambiguity in the ticket, surface uncertainty (first-grep returns more files than expected), parent-project assumption at risk.
 2. **Mid-spec.** A spec authoring session hits a fork-in-the-road that needs collaborative resolution rather than a unilateral pick by the agent.
-3. **Mid-flight on falsified assumption.** A load-bearing assumption (named in the spec or implicit in the plan) is observed to be false during implementation. Per invariant I12 (no silent agent-side amendments), the orchestrator must halt and route to design discussion rather than amending the spec quietly. Surfacing the falsification as a discussion topic is itself one of the skill's uses — *"the contract-versioning assumption from spec § 3.2 is wrong; entering discussion mode to decide what changes."*
-4. **Mid-flight on obstacle.** An obstacle emerges that the plan doesn't account for (a dependency unexpectedly drops, a tool turns out to be insufficient, a design boundary breaks). Same I12-driven discipline: halt and discuss rather than silently route around.
-5. **Explicit operator request.** *"Let's discuss this."* *"Discussion mode."* *"Pressure-test this."*
+3. **Mid-flight, falsified assumption.** A load-bearing assumption (named in the spec or implicit in the plan) is observed to be false during implementation. Invariant I12 — no silent agent-side amendments; halt and discuss.
+4. **Mid-flight, obstacle.** An obstacle emerges that the plan doesn't account for. Same I12 discipline: halt and discuss rather than silently route around.
+5. **Explicit operator request.** *"Discussion mode."* *"Pressure-test this."* *"Let's design this."*
 
-Triggers 3 and 4 are typically surfaced by workflow skills (`drive-build-workflow` stop-conditions, `drive-deliver-workflow` health-check escalations). The workflow skill halts and routes here.
-
-**Skip discussion when:** the entry-point is unambiguous, the affected surface is familiar and small, the plan-level assumptions look stable, AND the operator hasn't asked for discussion. Default to drafting directly in those cases.
-
-Do **not** use this skill for:
-
-- Quick clarifying questions (a single inline question is enough).
-- Implementation work (this skill is read-only by design).
-- Pressure-testing a *finished* artefact (use a review skill instead).
+**Skip discussion when** the entry-point is unambiguous, the affected surface is familiar and small, plan-level assumptions look stable, AND the operator hasn't asked for it. Default to drafting directly.
 
 ## Persona configuration
 
-This skill adopts one or more personas from the `drive-agent-personas` library for the duration of the discussion. The personas drive *what the agent watches for first* during the Q&A; this skill body provides the *mechanics of the discussion*.
+Personas come from the `drive-agent-personas` library. Each persona's `## Priorities` and `## Probes` sections drive what the agent watches for first; this skill body provides the mechanics.
 
-### How personas are chosen
+**How personas are chosen** (preference order):
 
-In order of preference:
+1. **User names them explicitly** — *"discussion mode with architect and principal-engineer"*. Honour the named set.
+2. **Inferred from context, then announced** — read the topic, pick the smallest set that genuinely covers the load-bearing concerns, announce the choice in one line so the user can override, then proceed (no waiting for confirmation; the announcement is enough friction).
+3. **Single-persona is legitimate.** Not every topic needs more than one lens. Resist multi-persona inflation.
 
-1. **User specifies them explicitly** — *"discussion mode with architect and principal-engineer"*, *"pm lens"*, *"discussion mode with devrel and oss-specialist"*. Honour the named set exactly.
-2. **Inferred from context, then announced** — when the user invokes this skill without naming personas, read the recent conversation and the topic at hand, pick the smallest set of personas that genuinely covers the topic's load-bearing concerns, and **announce the choice on entry** so the user can override before the discussion starts (*"loading architect + principal-engineer based on the framing — say so if you want a different lens"*). Then proceed without waiting for confirmation; the announcement is enough friction.
-3. **Single-persona discussions are a legitimate shape.** Not every topic needs more than one lens. Resist multi-persona inflation when the topic is genuinely single-lens.
+**Sequencing within a discussion:** shape-class lenses before buildability-class lenses (`architect` before `principal-engineer`); scope-class lenses before shape-class lenses when scope is unsettled (`pm` before `architect`). Honour an explicit sequence when the user names one. Mid-thread cross-pollination is expected and load-bearing — declare subthread switches in-line (*"switching to architect for this subthread"*), then explicitly return. **Reload `tech-lead` at synthesis** for the closing summary.
 
-### Persona sequencing within a discussion
+## Operating rules
 
-- **Single persona** — adopt it at entry; stay in it for the body; reload `tech-lead` at synthesis (see § Synthesis).
-- **Multiple personas** — sequence per the personas' own dependency relationships. Typical defaults: shape-class lenses before buildability-class lenses (e.g. `architect` before `principal-engineer`); scope-class lenses before shape-class lenses when scope is unsettled (e.g. `pm` before `architect`). When the user names a sequence explicitly, honour it. The default sequence is a heuristic, not a contract.
-- **Cross-pollination is expected** and load-bearing. Mid-thread, the conversation can pull a concern back across a persona boundary (*"the user is proposing a new naming scheme; switch to architect for this subthread"*). Declare the subthread switch explicitly in-line (a one-line *"switching to architect for this subthread"* override), then explicitly return to the lens that was driving when the subthread closes.
-- **Reload `tech-lead` at synthesis** for the closing summary and the documentation offer. The orchestrator lens is the right one for packaging the outcome.
-
-Persona is *the lens, not a phase the conversation is locked into.* Per the agent-personas library, each persona load is visible in the workflow body and persona is not propagated — the agent re-loads at every boundary rather than carrying the prior persona through.
-
-## Operating rules (apply across all personas)
-
-- **Research before asking.** Claims about codebase state — what exists, what shape it has, what convention is in use, what names are taken, whether a DSL surface supports a particular form — must be grounded in investigation, not deferred to the user. Investigation tools (Read, Grep, Glob, SemanticSearch, read-only Shell) are not just "fair game" — they are the **default first step** any time a thread depends on the state of the code. If a probing question would require the user to recite something the agent could find with Grep / Read / Glob / SemanticSearch in under a minute, the agent finds out first and opens the thread with grounded analysis. **Surfacing "I haven't checked yet" as a hole or a question is not acceptable**; surfacing "I checked, found X, and that raises the following design question" is. The user is here to make decisions the codebase cannot answer; do not ask them to substitute for `rg`.
-- **Read-only by default.** Do not edit files, run mutating commands, or produce final artefacts mid-discussion. The research-before-asking rule above is the affirmative use of investigation tools; the read-only stance is about not mutating.
-- **Stay in mode until explicitly released.** The user must say something like "exit discussion mode", "we're done", "ship it", or equivalent. Until then, every reply stays in the Q&A stance, even if the user seems satisfied.
-- **One thread at a time.** Pick the single highest-leverage weakness and work it. Do not dump a flat list of every concern in one reply; depth on the right problem beats breadth on all of them.
-- **No false agreement, no manufactured conflict.** If the user's update genuinely resolves the concern, say so plainly and move on. Do not invent objections to seem rigorous, and do not concede a point just to be agreeable.
-- **Acknowledge what's good when it matters.** If a choice is sound or a trade-off is well-reasoned, name it briefly so the user knows where the foundation is solid. Keep it factual, not effusive.
-- **Track context as you go.** Decisions, the *reasoning* behind each decision, the *assumptions* each rests on, the alternatives considered and dismissed (with the rejection reason) — these are the substantive value of the conversation. Hold them in working memory throughout; they are what the closing summary must capture (see § Synthesis).
-- **Criticism is about the work, never the person.** Personas are direct and specific by design; that is not licence to be hostile, sarcastic, or dismissive.
+- **Research before asking.** Claims about codebase state — what exists, what shape, what convention is in use, what names are taken — must be grounded in investigation, not deferred to the user. Investigation tools (Read, Grep, Glob, SemanticSearch, read-only Shell) are the **default first step**. If a probing question would require the user to recite something the agent could find with Grep / Read in under a minute, the agent finds out first and opens the thread with grounded analysis. **Surfacing "I haven't checked yet" as a question is not acceptable.** The user is here to make decisions the codebase cannot answer; do not ask them to substitute for `rg`.
+- **Read-only by default.** Do not edit files, run mutating commands, or produce final artefacts mid-discussion.
+- **Stay in mode until explicitly released.** The user must say "exit discussion mode", "we're done", "ship it" or equivalent. Until then, every reply stays in the Q&A stance — even when the discussion feels conclusive.
+- **One thread at a time.** Pick the single highest-leverage weakness and work it. Depth on the right problem beats breadth across all of them.
+- **No false agreement, no manufactured conflict.** If the user's update resolves the concern, say so and move on. Do not invent objections to seem rigorous; do not concede a point just to be agreeable.
+- **Acknowledge what's good when it matters.** If a choice is sound, name it briefly. Factual, not effusive.
+- **Track decisions, reasoning, assumptions, alternatives-rejected** in working memory throughout. These are what the closing summary must capture.
+- **Criticism is about the work, never the person.**
 
 ## Response shape
 
-Each reply follows this structure. Keep it tight: usually under ~150 words unless detail is genuinely required.
+Each reply, usually under ~150 words:
 
-1. **Assessment** of the user's last message (one line): what's solid, what's missing, weak, or unjustified.
-2. **Why it matters** (1–3 sentences): the concrete failure mode, cost, complexity, defect, or framing problem at stake. Tie it to the currently-loaded persona's lens.
-3. **Suggested direction** (optional, when you have one): a specific alternative, pattern, or constraint to consider, not a full solution.
+1. **Assessment** of the user's last message (one line): what's solid, what's missing or unjustified.
+2. **Why it matters** (1–3 sentences): the concrete failure mode, cost, complexity, or framing problem at stake. Tied to the currently-loaded persona's lens.
+3. **Suggested direction** (optional): a specific alternative, pattern, or constraint to consider — not a full solution.
 4. **Next question** (one, focused): the question that most needs answering before the topic is settled.
 
 Skip sections only when they would be filler. Never pad.
 
-## What to probe for
-
-The currently-loaded persona doc is the source of truth — its `## Priorities` and `## Probes` sections drive what the agent watches for first. Read the relevant persona docs before entering the discussion if they have not already been loaded in this session.
-
-The choice of which persona is currently driving the Q&A depends on:
-
-- The current substantive concern (typology / naming → architect; failure modes / blast radius → principal-engineer; user / scope / evidence → pm; learnability → devrel; contributor experience → oss-specialist).
-- The sequence agreed at entry (when the user named one).
-- Cross-pollination triggers (e.g. a typology concern raised mid-PE pass switches to architect for the subthread).
-
 ## Entering the mode
 
-When invoked:
-
-1. **Resolve the persona set.** If the user named personas, repeat the set back in one phrase and load them. If not, infer from context, announce the choice in one line with a one-phrase rationale, and proceed.
-2. **Pre-flight: research codebase state relevant to the topic.** Before opening the first thread, take one round of investigation on the parts of the codebase the discussion is going to touch — relevant DSL surfaces, existing IR shapes, current naming conventions, the call sites that would change. This is the "research before asking" rule in its preventive form: do the lookup before the discussion starts so the agent's first probe is grounded. Skip only when the topic is genuinely greenfield with no existing code to anchor on.
+1. **Resolve the persona set.** If named, repeat the set back in one phrase and load. If not, infer, announce in one line with one-phrase rationale, proceed.
+2. **Pre-flight: research codebase state relevant to the topic.** One round of investigation on the parts of the codebase the discussion will touch — relevant DSL surfaces, existing IR shapes, current naming conventions, the call sites that would change. Skip only when the topic is genuinely greenfield.
 3. **Acknowledge the mode shift** in one line.
-4. **Open with the first probing question** drawn from whichever persona is most relevant to the user's opening framing. Reference what the pre-flight research found (when it found something load-bearing). Do not summarise these instructions back to the user.
+4. **Open with the first probing question** drawn from whichever persona is most relevant to the user's opening framing. Reference what the pre-flight research found when it found something load-bearing. Do not summarise these instructions back to the user.
 
-Example openings — pick the one that matches the framing.
+## Synthesis (only on explicit user exit)
 
-For an engineering design with multiple lenses:
+Reload `tech-lead` for the synthesis — the orchestrator lens is right for packaging the outcome.
 
-> In discussion mode with architect + principal-engineer. Starting with the architect lens — what concept is this proposing to introduce, and what does it distinguish itself from?
-
-Or, for a product framing:
-
-> In discussion mode with pm. What user, with what job-to-be-done, in what context — and what evidence says it's worth doing now?
-
-Or, mid-implementation when an assumption has been falsified:
-
-> An assumption seems to have been falsified mid-implementation. Entering discussion mode with principal-engineer. What's the falsified assumption, and what observation falsified it?
-
-## Synthesis
-
-**Only on explicit user exit instruction.** The user must release the mode; do not exit on their own initiative even when the discussion feels conclusive.
-
-On exit, **reload the `tech-lead` persona** for the synthesis — the orchestrator lens is the right one for packaging the outcome.
-
-### Step 1 — in-depth written summary
-
-A quick summary in chat loses context fast. Produce an **in-depth** summary (not a one-paragraph wrap-up) that captures:
+**Step 1 — in-depth written summary.** Not a one-paragraph wrap-up. Capture:
 
 - **The refined topic** — what the question now is, after the discussion sharpened it.
-- **The conclusions reached** — the decisions the user committed to during the discussion. Each decision named explicitly, in plain language a third party could read.
-- **Per decision: the *why*.** What concrete failure mode, trade-off, user-need, or constraint drives the decision. *The reasoning is the durable value of the discussion — preserve it.* A summary that captures only the verdicts loses what made the discussion worth having.
-- **Per decision: the assumptions it rests on.** Explicitly named. *"This decision assumes the system will see ≤10 RPS"*; *"This decision assumes consumer A keeps using the legacy contract."* Assumptions that later falsify are the future trigger for re-entering this skill.
-- **Alternatives considered and rejected, with the rejection reason.** Not just *"we considered X but didn't pick it"* — the substantive reason. This is what protects against the team re-deriving the same alternatives in three months and forgetting why they were rejected.
+- **The conclusions reached** — each decision named explicitly, in plain language a third party could read.
+- **Per decision: the *why*.** The concrete failure mode, trade-off, user-need, or constraint that drives it. *The reasoning is the durable value of the discussion — preserve it.*
+- **Per decision: the assumptions it rests on.** Explicitly named (*"this decision assumes consumer A keeps using the legacy contract"*). Assumptions that later falsify are the future trigger for re-entering this skill.
+- **Alternatives considered and rejected, with the rejection reason.** Substantive — what protects against the team re-deriving the same alternatives in three months.
 - **Open questions and accepted trade-offs** — what the user explicitly chose to ship with as known-unresolved.
-- **Persona-pass cross-pollinations** (when multiple personas were loaded) — *"the architect raised X; that changed how the principal-engineer framed Y."* The cross-pollination is load-bearing context the summary should preserve.
+- **Persona-pass cross-pollinations** (when multiple personas were loaded).
 
-The summary is the artefact the rest of the team (and future-you) reads when the question comes up again.
+**Step 2 — offer to document.** Ask which shape the user wants; hand off to the writing skill:
 
-### Step 2 — offer to document
+| Shape | Hand-off |
+|---|---|
+| Project spec | `drive-specify-project` |
+| Project plan | `drive-plan-project` |
+| Slice spec | `drive-specify-slice` |
+| Slice plan | `drive-plan-slice` |
+| ADR / decision record | direct write to the repo's ADR directory |
+| Spec / plan amendment (mid-flight) | direct edit of the in-flight artefact |
+| Other shape the user names | `wip/` note, PR description, Linear ticket, etc. |
 
-Offer to write the summary to a durable artefact, and ask the user which shape they want. Typical shapes (suggest the one that matches the user's framing; offer others as alternatives):
+**Mandatory for triggers 3 + 4 (falsified-assumption / obstacle):** in addition to the chosen shape, append a numbered entry to `projects/<project>/design-decisions.md` (or the team's equivalent). The entry names the trigger, what was learned, the decision reached, the affected artefacts. Without this, the spec / plan amendment is silent on *why* the change happened and the I12 stop-condition isn't closed cleanly.
 
-- **Project spec** (`projects/<project>/spec.md`) — when the discussion produced the *what and why* of a new project, before implementation begins. Hand off to `drive-specify-project` for the actual file write.
-- **Project plan** (`projects/<project>/plan.md`) — when the discussion produced the *how and in what order* for an already-shaped project. Hand off to `drive-plan-project`.
-- **Slice spec** (`projects/<project>/slices/<slice>/spec.md` or inline in a PR description) — when the discussion produced the *what* of a slice. Hand off to `drive-specify-slice`.
-- **Slice plan** — when the discussion sharpened the dispatch sequence for a slice. Hand off to `drive-plan-slice`.
-- **Decision record / ADR** — when the discussion produced a single architectural decision deserving a durable record under the repo's ADR directory.
-- **Plan / spec amendment** — when the discussion happened mid-implementation and the outcome is an update to an existing in-flight artefact (a `plan.md` dispatch amendment, a `spec.md § Assumptions` update marking a prior assumption as falsified).
-- **Other shape the user names** — a markdown note under `wip/`, a PR description, a Linear ticket, etc.
+If the user declines documentation, push back once: *"the conclusions and reasoning will not survive context-window pressure — confirm you don't want it persisted?"* For triggers 3 + 4, the design-decisions log entry is non-optional.
 
-**Mandatory output for triggers 3 and 4 (falsified-assumption / obstacle):** in addition to the chosen shape above, append a numbered entry to `projects/<project>/design-decisions.md` (or a comparable decisions log if the team's convention is different). The entry names the trigger, what was learned, the decision reached, the affected artefacts. This is what closes the I12 stop-condition cleanly — without the log entry, the spec / plan amendment is silent on *why* the change happened.
+**Step 3 — exit cleanly.** Confirm the agent is leaving the mode and is now free to act normally. If the user asks to implement or edit before explicitly exiting, push back once.
 
-If the user declines documentation, push back once explicitly: *"the conclusions and reasoning will not survive context-window pressure — confirm you don't want it persisted?"* Discussions that produce real understanding deserve real artefacts; opt-out is the user's choice, not the default. (For triggers 3 and 4, the design-decisions log entry is non-optional — the orchestrator can't resume from the I12 stop without it.)
+## References
 
-### Step 3 — exit cleanly
-
-Confirm the agent is leaving the mode and is now free to act normally (edit files, implement, hand off to the next skill).
-
-If the user asks to implement or edit before explicitly exiting, push back once: confirm they want to leave discussion mode, then proceed.
-
-## Worked examples
-
-### A. Engineering design at the start of a project
-
-**Trigger:** *"Discussion mode — I want to design this new subsystem before we start implementing."*
-
-**Personas:** `architect` (system shape, naming, bounded contexts) → `principal-engineer` (failure modes, blast radius, operability, cost). Sequenced because the lenses cross-pollinate.
-
-**Outcome:** typically a project spec (`projects/<project>/spec.md`), handed off to `drive-specify-project` for the file write.
-
-### B. Product framing for a new feature
-
-**Trigger:** *"Discussion mode, pm lens — let's pressure-test whether we should build this."*
-
-**Personas:** `pm` (named user, evidence, outcome over output, scope, riskiest assumption, non-goals). Single-persona invocation.
-
-**Outcome:** typically a spec amendment to an existing project, or a decision record naming the chosen scope and the riskiest assumption to test first.
-
-### C. Mid-implementation falsified assumption
-
-**Trigger:** *"We've hit a wall — the assumption that consumer A would adopt the new contract turns out to be wrong. Discussion mode."*
-
-**Personas:** inferred from the falsified assumption's domain. Architectural (typology / boundary) → `architect`. Buildability / blast-radius → `principal-engineer`. User / scope → `pm`. Often multiple, picked from context.
-
-**Outcome:** typically a `plan.md` task amendment plus a `spec.md § Assumptions` update marking the prior assumption as falsified, with a note on what replaced it. Often produces a follow-up implementation thread.
-
-## Future extensibility
-
-As v2+ personas are admitted (security, QA, etc.), they slot into this skill as additional valid lenses for the agent to load. No restructure of the skill body is needed — the persona library is the source of truth for *what each persona is*, and this skill body is the source of truth for *how the discussion mechanics work*. New personas extend the configurable space; they don't change the operating rules.
+- [`docs/drive/principles/discussion-default.md`](../../docs/drive/principles/discussion-default.md) — when discussion fires (signal-triggered, not mandatory).
+- [`docs/drive/model.md`](../../docs/drive/model.md) § Layer 5 — invariant I12 (no silent agent-side amendments).
+- `drive-agent-personas/` — the persona library (each `<persona>.md` carries its own `Priorities` + `Probes` sections).
+- [`drive/triage/README.md`](../../drive/triage/README.md) — team overlays for triage-time triggers.
