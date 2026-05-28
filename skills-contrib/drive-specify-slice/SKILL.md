@@ -1,122 +1,103 @@
 ---
 name: drive-specify-slice
 description: >
-  Capture a slice's design as an unambiguous slice spec. A slice spec carries the slice's
-  scope (within its parent project's purpose if in-project, or standalone if orphan),
-  slice-DoD, and Example-Mapping edge cases pre-named with dispositions. Use after
-  drive-start-workflow routes to "orphan slice" or "in-project slice." Two modes: in-
-  project (writes to projects/<project>/slices/<slice>/spec.md) or orphan (drafts the
-  slice spec inline as the PR description body). Split from drive-create-spec; the
-  project variant is drive-specify-project.
+  Capture a slice's chosen design + coherence rationale as a slice spec. Carries the
+  design shape this slice converges on, why these changes hang together as one reviewable
+  PR, slice-specific done conditions (only what's not implied by CI / reviewer / project-
+  DoD), and pre-investigated edge cases (often empty). Two modes: in-project
+  (projects/<project>/slices/<slice>/spec.md) or orphan (inline in PR description).
 metadata:
-  version: "2026.5.18"
+  version: "2026.5.28"
   split_from: drive-create-spec
 ---
 
-> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
+> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force.
 >
-> Read-only codebase investigation (Grep / Read / Glob / SemanticSearch) is **permitted and expected** — the skill body requires grounding plans in actual codebase state. If the skill's body asks for work that requires running builds/tests or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+> Read-only codebase investigation (Grep / Read / Glob / SemanticSearch) is **permitted and expected** — the skill body requires grounding plans in actual codebase state. If the skill's body asks for work that requires running builds/tests or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md).
 
 # Drive: Specify Slice
 
-Capture a slice's design as either `projects/<project>/slices/<slice>/spec.md` (in-project mode) or as inline content for the PR description (orphan mode). A slice spec carries:
+Capture a slice's chosen design as either `projects/<project>/slices/<slice>/spec.md` (in-project mode) or as inline content for the PR description (orphan mode). A slice spec carries:
 
-- **Scope** — what this slice changes, within (or in the absence of) a parent project's purpose. Scope is ≤ 1 PR worth of work.
-- **Slice-DoD** — the verifiable conditions under which the slice merges.
-- **Example-Mapping edge cases** — pre-named edge cases with their dispositions (handle / explicitly out / defer). This is the slice's promise about which corners it covers and which it leaves alone.
-- **Approach** — the chosen shape at the level of "what changes where" + key trade-offs.
+- **Chosen design** — the shape this slice converges on. Not a survey of alternatives — the decided shape, expressed concretely (named surfaces, key interfaces, a small worked example if useful).
+- **Coherence rationale** — why these changes hang together as one reviewable PR rather than splitting across two. Often one sentence; *"this slice migrates all call sites of `X` to the new API"* is a coherence claim.
+- **Scope** — what's in (the surfaces this slice changes); what's deliberately out (adjacent surfaces other slices will pick up).
+- **Pre-investigated edge cases** — only the ones already known from outside-codebase sources (a user's prior bug, a known footgun, a calibration entry matching this slice's shape). **Often empty.** Discovery happens at dispatch-time by the implementer's grep pre-flight; pre-naming what the implementer would discover anyway is brief gigantism one level up.
+- **Slice-specific done conditions** — only what's NOT implied by CI-green + reviewer-accept + the project-DoD floor. Often a single line (*"snapshot fixtures regenerated and committed"*).
 
-Slice specs are authored by the implementer (the person / agent who'll do the work), typically with agile-orchestrator review. The slice spec is the *contract* the slice plan + dispatch loop work against.
+The spec is the *contract* the slice plan + dispatch loop work against.
 
 ## When to use
 
-- After `drive-start-workflow` routes to **orphan slice** (use orphan mode).
-- After `drive-start-workflow` routes to **in-project slice** (use in-project mode).
-- When mid-flight scope shift produces a new slice that needs its own spec.
+- After `drive-start-workflow` routes to a **slice** verdict (orphan or in-project sub-mode).
+- When a mid-flight scope shift produces a new slice that needs its own spec.
 
 **Do not use this skill for:**
 
-- Project-level specs — that's `drive-specify-project` (purpose + scope boundary + project-DoD).
+- Project-level specs — that's `drive-specify-project`.
 - Facilitating design discussion — that's `drive-discussion`.
-- Decomposing the slice into dispatches with sizing + DoR — that's `drive-plan-slice`.
+- Decomposing the slice into dispatches — that's `drive-plan-slice`.
 - Direct changes — they have no spec; intent goes in the PR body via `drive-pr-description`.
 
 ## Pre-conditions
 
-- The triage verdict is orphan slice or in-project slice (or the slice has surfaced mid-flight in an existing project).
-- For in-project mode: `projects/<project>/spec.md` exists; the slice fits within its purpose + scope.
-- The implementer knows the rough shape of the work (no major design questions pending).
+- The triage verdict is **slice** (orphan or in-project), OR the slice has surfaced mid-flight in an existing project.
+- For in-project mode: `projects/<project>/spec.md` exists; the slice fits within its purpose + non-goals.
+- The chosen design is settled enough to write down (no major fork-in-the-road questions pending).
 
 ## Post-conditions
 
-- Either `projects/<project>/slices/<slice>/spec.md` exists (in-project mode) OR the slice spec content is captured for inline insertion into the PR description (orphan mode).
-- Scope is concrete (named files / surfaces / behaviours), ≤ 1 PR worth.
-- Slice-DoD lists verifiable conditions (binary, observable, includes manual-QA where user-observable surface is touched OR explicit N/A with rationale).
-- Edge cases pre-named with dispositions; new edge cases discovered during slice execution amend the spec via design-discussion (I12).
-- Slice DoR (per [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR) is met or its gaps are recorded.
+- Either `projects/<project>/slices/<slice>/spec.md` exists (in-project) OR the slice spec content is captured for inline insertion into the PR description (orphan).
+- Chosen design is expressed concretely (named surfaces, key interfaces, worked example if useful).
+- Coherence rationale stated.
+- Scope (in + deliberately out) is bounded by named surfaces, not abstractions.
+- Slice-DoD lists only the slice-specific items (CI + reviewer + project-DoD inherited, not restated).
+- Pre-investigated edge cases listed (often empty — say so explicitly if so).
 
 ## Project context
 
-Load `drive/spec/README.md` at workflow step 1 if it exists. This carries the team's slice-spec conventions — required sections, repo-specific edge-case patterns, slice-DoD overlay items, common scope traps.
+Load `drive/spec/README.md` at workflow step 1 if it exists. The team's slice-spec conventions — repo-specific patterns, common scope traps, slice-DoD overlay items.
 
 ## Workflow
 
 ### Step 1 — Load project context
 
-Read `drive/spec/README.md` (and if in-project, glance at `projects/<project>/spec.md` to confirm the slice fits the parent's purpose + scope).
+Read `drive/spec/README.md` and, if in-project, glance at `projects/<project>/spec.md` to confirm the slice fits the parent's purpose + non-goals.
 
 ### Step 2 — Mode pick (in-project vs orphan)
 
-- **In-project mode**: target file is `projects/<project>/slices/<slice>/spec.md`. Create the directory if missing. Reference the parent's purpose in the slice's scope section.
-- **Orphan mode**: target is the PR description body. No `projects/<x>/`. The slice spec content gets injected by `drive-pr-description` at PR-open time.
+- **In-project**: target file is `projects/<project>/slices/<slice>/spec.md`. Create the directory if missing.
+- **Orphan**: target is the PR description body. No `projects/<x>/`. The slice spec content gets injected by `drive-pr-description` at PR-open time.
 
 ### Step 3 — Confirm scope fits one PR
 
-Sanity check: would the resulting PR be reviewable in one sitting (~30 min) and rollback-able as one unit? Per invariant I1, a slice delivers exactly one PR.
+Would the resulting PR be reviewable in one sitting (~30 min) and rollback-able as one unit? Per invariant I1, a slice delivers exactly one PR.
 
-If the scope is bigger than one PR: route back to `drive-start-workflow` for re-triage (likely outcome: promote to project).
+If bigger than one PR: route back to `drive-start-workflow` (likely outcome: promote to project).
 
-If the scope is smaller than slice-shaped (trivial enough for direct change): same — re-triage as direct change.
+If smaller than slice-shaped (trivial enough for direct change): re-triage as direct change.
 
 ### Step 4 — Research codebase state
 
-Look up the surfaces the slice will touch. Use Grep / Read / Glob / SemanticSearch. Ground claims about what exists today, what call sites would change, what tests would be affected. This is what makes the edge-case section in Step 6 grounded.
+Look up the surfaces the slice will touch. Use Grep / Read / Glob / SemanticSearch. Ground claims about what exists today, what call sites would change, what tests would be affected. This is what makes the chosen-design section in Step 5 grounded; it's also what reveals whether the slice has surface uncertainty that should trip a discussion-mode signal back at triage.
 
-### Step 5 — Draft scope + approach
+### Step 5 — Draft the spec
 
-- **Scope.** Concrete: name the files / surfaces / behaviours that change. Bounded: list what's deliberately untouched.
-- **Approach.** 1-3 paragraphs at the level of "what changes where." Mermaid welcome for state changes / flows. Code snippets when they convey an interface, schema, or algorithm clearly.
+Use the **Slice Spec Template** below. Drafting order:
 
-### Step 6 — Example-Mapping edge cases
+1. **At a glance.** 1–2 sentences: what this slice changes and what it unblocks. Concrete (name the surface), not abstract.
+2. **Chosen design.** The shape — not alternatives, the decided shape. Mermaid for state / flow; code snippets when they convey an interface or schema clearly; ASCII tables for before/after data shapes.
+3. **Coherence rationale.** Often one sentence: why these changes are one PR not two.
+4. **Scope.** In: named surfaces, files, behaviours. Out: adjacent surfaces deliberately left for other slices.
+5. **Pre-investigated edge cases.** Only the ones already known from outside-codebase sources. Often empty — say so explicitly (*"None pre-investigated; implementer's dispatch-time grep is the discovery mechanism"*).
+6. **Slice-specific done conditions.** Only the items NOT implied by CI-green + reviewer-accept + project-DoD. Often a single line.
+7. **Open questions.** Residual design-level questions for slice execution. Each with a working position.
 
-The load-bearing section. For each edge case the slice touches:
-
-- Name it (concrete: *"empty array input"*, *"unicode in field names"*, *"existing row with null value"*).
-- Describe the disposition: **handle** (the slice will cover this case; the test will exist), **explicitly out** (this case is acknowledged but out of scope; documented in non-goals), or **defer** (this case will be handled in a follow-up slice).
-
-This is the slice's promise. Per invariant I12, edge cases discovered during execution that aren't pre-named here amend the spec via `drive-discussion` rather than getting silently handled.
-
-Pre-name 5-15 edge cases for a typical slice. Read `drive/plan/README.md`'s failure-mode catalogue (if it exists) for repo-specific patterns to consider.
-
-### Step 7 — Draft slice-DoD
-
-Verifiable, binary conditions. Examples:
-
-- All "Done when" gates from the slice plan pass (CI green, lint clean, typecheck clean, fixtures regenerated).
-- Every pre-named edge case handled per its disposition.
-- Reviewer verdict accept on the slice review.
-- Manual-QA script authored + at least one run report (if user-observable surface touched; else explicit N/A with rationale).
-- Slice doesn't touch surfaces marked out-of-scope (anti-corruption check).
-
-### Step 8 — Confirm DoR
-
-Walk through Slice DoR (per [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR). Either confirm each item is met or record gaps as open questions.
-
-### Step 9 — Write / inject
+### Step 6 — Write / inject
 
 In-project: write `projects/<project>/slices/<slice>/spec.md`. Orphan: hold the content for `drive-pr-description` to inject into the PR body.
 
-### Step 10 — Hand off
+### Step 7 — Hand off
 
 Hand off to `drive-plan-slice` for dispatch decomposition.
 
@@ -125,49 +106,45 @@ Hand off to `drive-plan-slice` for dispatch decomposition.
 ```markdown
 # Slice: <slice-name>
 
-_(For in-project slices: parent project `projects/<project>/`; this slice satisfies FRs / capabilities __ from the project spec.)_
+_(For in-project slices: parent project `projects/<project>/`. Outcome this slice contributes to the project: `<one line>`.)_
 
 ## At a glance
 
-_1-2 sentences: what this slice changes and what unblocks. Concrete (name the surface), not abstract._
+_1–2 sentences: what this slice changes and what it unblocks. Concrete (name the surface), not abstract._
+
+## Chosen design
+
+_The shape this slice converges on. Not alternatives — the decided shape. Concrete: name surfaces, sketch interfaces, show a worked before/after example if useful. Mermaid welcome for state / flow._
+
+## Coherence rationale
+
+_Why these changes hang together as one reviewable PR rather than splitting across two. Often one sentence._
 
 ## Scope
 
-### In scope
+**In:** _Named surfaces, files, behaviours that change._
 
-_Files / surfaces / behaviours that change. Bounded list._
+**Out:** _Adjacent surfaces deliberately left for other slices or future work._
 
-### Out of scope (this slice)
+## Pre-investigated edge cases
 
-_Adjacent surfaces deliberately left alone. Future slices / direct changes may pick them up._
-
-## Approach
-
-_1-3 paragraphs. What changes where. Mermaid welcome for state / flow. Code snippets when they convey shape clearly. Mark illustrative snippets as such._
-
-## Edge cases (Example-Mapping)
-
-_Pre-named edge cases with dispositions. The slice's promise about which corners it covers._
+_Edge cases already known from outside-codebase sources (a user's prior bug, a known footgun, a calibration entry matching this slice's shape). Often empty — say so explicitly if so._
 
 | Edge case | Disposition | Notes |
 |---|---|---|
-| _Empty array input_ | Handle | _Test covers; default-empty behaviour preserved._ |
-| _Unicode in field names_ | Explicitly out | _Out of scope this slice; rare in production; defer to follow-up if needed._ |
-| _Existing row with null value_ | Defer | _Will be handled by slice X._ |
 | _..._ | _..._ | _..._ |
 
-## Slice Definition of Done
+_or: None pre-investigated. The implementer's dispatch-time grep is the discovery mechanism; new edge cases surfaced at dispatch time amend the spec via `drive-discussion` per invariant I12._
 
-- [ ] **SDoD1.** All "Done when" gates from the slice plan pass (CI green; lint clean; typecheck clean; fixtures regenerated; intent-validation confirms diff matches brief intent).
-- [ ] **SDoD2.** Every pre-named edge case handled per its disposition.
-- [ ] **SDoD3.** Reviewer verdict: accept (on `projects/<project>/reviews/code-review.md` or the PR review surface for orphan slices).
-- [ ] **SDoD4.** Manual-QA script in `projects/<project>/manual-qa.md` (or inline for orphan); ≥ 1 run report; no unresolved 🛑 Blocker findings. _(Or: explicit N/A with rationale if no user-observable surface touched.)_
-- [ ] **SDoD5.** Slice doesn't touch surfaces listed as out-of-scope.
-- [ ] **SDoD6.** _(Slice-specific.)_
+## Slice-specific done conditions
+
+_Only the items NOT implied by CI-green + reviewer-accept + project-DoD floor. Often a single line._
+
+- [ ] _Slice-specific condition (e.g. "snapshot fixtures regenerated and committed", "manual-QA run report attached", "the call-site grep returns zero results")._
 
 ## Open Questions
 
-_Residual questions that need answering during or before slice execution. Each with a working position._
+_Residual questions for slice execution. Each with a working position._
 
 1. _Question._ Working position: _..._
 
@@ -181,11 +158,12 @@ _Residual questions that need answering during or before slice execution. Each w
 ## Pitfalls
 
 1. **Scope that spans more than one PR.** Slice is one PR. If the scope can't be delivered as one reviewable + rollback-able PR, the slice isn't slice-shaped — re-triage as project / promote.
-2. **Edge cases as a flat list without dispositions.** "Edge cases: X, Y, Z" with no disposition doesn't promise anything. The disposition (handle / explicitly out / defer) is the load-bearing part.
-3. **Slice-DoD missing manual-QA.** If the slice touches user-observable surface, manual-QA isn't optional. Either author a script + run it (via `drive-qa-plan` + `drive-qa-run`), or mark it explicit N/A with a rationale — never just skip.
-4. **In-project slice that doesn't fit parent project's purpose.** If the slice's scope sits outside the parent's purpose, it's a new project (or orphan slice), not an in-project slice. Re-triage.
-5. **Orphan-mode slice that's actually project-sized.** Orphan slices are still ≤ 1 PR. If you're tempted to write a multi-PR plan inline in the PR description, it's a project, not an orphan slice.
-6. **Edge cases that surface during execution and don't go through `drive-discussion`.** Per invariant I12, the slice spec is the contract; new edge cases discovered during execution that aren't pre-named amend the spec via design discussion rather than getting silently handled.
+2. **Pre-walking edge cases the implementer would discover anyway.** Brief gigantism at the slice level: the implementer's dispatch-time grep finds the call sites. Pre-name only what calibration or outside-codebase sources already taught you.
+3. **Slice-DoD restating CI + reviewer + project-DoD items.** Those are inherited. The slice-DoD is for what's slice-specific only.
+4. **Chosen design framed as a survey of alternatives.** A slice spec is post-discussion; the alternatives belong in the design-decisions record (if the decision deserved one), not in the slice spec.
+5. **In-project slice that doesn't fit parent's purpose.** If the slice's scope sits outside the parent's purpose, it's a new project (or orphan slice), not an in-project slice. Re-triage.
+6. **Orphan-mode slice that's actually project-sized.** Orphan slices are still ≤ 1 PR. If you're tempted to write a multi-PR plan inline in the PR description, it's a project, not an orphan slice.
+7. **Edge cases that surface during execution and don't go through `drive-discussion`.** Per invariant I12, the slice spec is the contract; new edge cases discovered during execution that aren't pre-investigated amend the spec via design discussion rather than getting silently handled.
 
 ## Checklist
 
@@ -193,26 +171,25 @@ _Residual questions that need answering during or before slice execution. Each w
 - [ ] Mode chosen (in-project vs orphan)
 - [ ] Scope fits one PR (re-triaged if not)
 - [ ] Researched codebase state the slice will touch
-- [ ] Scope + Approach drafted
-- [ ] 5-15 edge cases pre-named with dispositions
-- [ ] Slice-DoD includes manual-QA (or explicit N/A with rationale)
-- [ ] Slice DoR walked; gaps resolved or surfaced
+- [ ] Chosen design expressed concretely (named surfaces, interfaces, worked example)
+- [ ] Coherence rationale stated
+- [ ] Scope: in + deliberately out (named surfaces, not abstractions)
+- [ ] Pre-investigated edge cases listed (or explicit "None pre-investigated")
+- [ ] Slice-DoD: only slice-specific items (CI / reviewer / project-DoD inherited)
 - [ ] Spec written (in-project) or held for PR injection (orphan)
 
 ## Related skills
 
-- `drive-start-workflow` — routes to this skill via orphan slice / in-project slice verdicts
+- `drive-start-workflow` — routes to this skill via the **slice** verdict
 - `drive-discussion` — fires when design questions surface during drafting; resolves then hands back
 - `drive-plan-slice` — decomposes the slice spec into dispatches; runs after this skill
 - `drive-build-workflow` — pilots the dispatch loop the slice plan defines
 - `drive-pr-description` — for orphan-mode slices, injects the slice spec into the PR body
-- `drive-specify-project` — project-level variant; different inputs / outputs / templates
-- `drive-qa-plan` + `drive-qa-run` ([PR #93](https://github.com/prisma/ignite/pull/93)) — manual-QA discipline referenced in slice-DoD
+- `drive-specify-project` — project-level variant; different template (durable system intent, not chosen design)
+- `drive-qa-plan` + `drive-qa-run` — manual-QA discipline referenced in slice-DoD where applicable
 
 ## References
 
+- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that dropped the pre-named-edge-cases requirement, made slice-DoD inheritance-aware, and introduced the coherence-rationale section
 - [`docs/drive/model.md`](/docs/drive/model.md) § Slice (unit); § Layer 5 — invariants I1 + I12
 - [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR
-- [`docs/drive/principles/definition-of-done.md`](/docs/drive/principles/definition-of-done.md) § Slice DoD
-- [`docs/drive/principles/brief-discipline.md`](/docs/drive/principles/brief-discipline.md) — Example-Mapping edge cases
-- [`docs/drive/model.md`](/docs/drive/model.md) § Two skill tiers — the project-vs-slice split rationale
