@@ -72,7 +72,7 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: Record<string, CrossReference>;
+  readonly roots: Record<string, never>;
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
