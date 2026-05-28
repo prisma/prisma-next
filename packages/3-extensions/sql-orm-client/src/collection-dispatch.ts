@@ -580,12 +580,16 @@ function parseCombineEnvelope(include: IncludeExpr, raw: unknown): Record<string
     );
   }
   const parsed = parseIncludePayload(raw);
-  if (Array.isArray(parsed) || typeof parsed !== 'object' || parsed === null) {
+  if (!isPlainObjectEnvelope(parsed)) {
     throw new Error(
       `combine() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
     );
   }
-  return parsed as Record<string, unknown>;
+  return parsed;
+}
+
+function isPlainObjectEnvelope(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function describeEnvelopeShape(value: unknown): string {
@@ -626,12 +630,12 @@ function decodeScalarIncludePayload(
     return emptyScalarResult(scalar.fn);
   }
   const parsed = parseIncludePayload(raw);
-  if (Array.isArray(parsed) || typeof parsed !== 'object' || parsed === null) {
+  if (!isPlainObjectEnvelope(parsed)) {
     throw new Error(
       `scalar() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
     );
   }
-  return (parsed as { value?: unknown }).value;
+  return parsed['value'];
 }
 
 function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {
