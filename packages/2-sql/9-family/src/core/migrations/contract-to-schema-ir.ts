@@ -152,6 +152,8 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
     referencedSchema: fk.target.namespaceId,
     referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
+    ...ifDefined('onDelete', fk.onDelete),
+    ...ifDefined('onUpdate', fk.onUpdate),
   };
 }
 
