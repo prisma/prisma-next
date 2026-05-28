@@ -104,20 +104,26 @@ export function setupIntegrationTest() {
       `);
     });
 
+    const cursorDisabledDriver = {
+      ...postgresDriver,
+      create() {
+        return postgresDriver.create({ cursor: { disabled: true } });
+      },
+    };
+
     const stack = createSqlExecutionStack({
       target: postgresTarget,
       adapter: postgresAdapter,
-      driver: {
-        ...postgresDriver,
-        create() {
-          return postgresDriver.create({ cursor: { disabled: true } });
-        },
-      },
+      driver: cursorDisabledDriver,
       extensionPacks: [pgvector],
     });
 
     const stackInstance = instantiateExecutionStack(stack);
-    context = createExecutionContext({ contract: sqlContract, stack, driver: stack.driver });
+    context = createExecutionContext({
+      contract: sqlContract,
+      stack,
+      driver: cursorDisabledDriver,
+    });
     const driver = stackInstance.driver!;
     await driver.connect({ kind: 'pgClient', client });
 
