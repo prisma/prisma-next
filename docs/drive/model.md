@@ -493,7 +493,7 @@ Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/mai
 - **`drive-<verb>-workflow`** for the workflow tier (e.g. `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`). The `-workflow` suffix is the visible cue.
 - **`drive-<verb>-<noun>`** for atomic action skills producing an artefact (e.g. `drive-close-project`, `drive-review-code`, `drive-triage-work`, `drive-check-health`).
 - **`drive-<sub-namespace>-<verb>`** for atomic skills under a focused area (e.g. `drive-pr-description` / `drive-pr-walkthrough`; `drive-qa-plan` / `drive-qa-run`; `drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`; `drive-run-retro`).
-- **`drive-<verb>`** or **`drive-<noun>`** for single-name atomic skills (e.g. `drive-list`, `drive-discussion`).
+- **`drive-<verb>`** or **`drive-<noun>`** for single-name atomic skills (e.g. `drive-dispatch`, `drive-list`, `drive-discussion`).
 
 *Scope units* (project / slice) are not sub-namespaces — they show up as the **noun** in `drive-<verb>-<noun>`, not as a leading namespace token. The verb leads so the skill reads as a command (*"drive specify project"*, *"drive plan slice"*, *"drive check health"*).
 
@@ -515,6 +515,7 @@ Specs and plans are per-scope (project / slice) because the inputs, outputs, and
 | `drive-specify-slice` | Slice | Slice spec: scope-within-project + slice-DoD + Example-Mapping edge cases. |
 | `drive-plan-project` | Project | Project plan: slice composition; stack / parallel sequencing. |
 | `drive-plan-slice` | Slice | Slice plan: dispatch sequence; sizing discipline; DoR-per-dispatch. |
+| `drive-dispatch` | Dispatch | Executes one dispatch: assemble brief, delegate implementer, monitor heartbeats, return report. Called by `drive-build-workflow` (in the slice loop) and by `drive-start-workflow` (one-shot, for direct-change verdicts). Owns the dispatch-brief template, implementer delegation prompt, and implementer persona. |
 | `drive-triage-work` | Cross-cutting | Runs the triage decision tree and outputs one of the eight verdicts. Called by `drive-start-workflow`; operators can invoke directly. |
 | `drive-create-project` | Project | Scaffolds `projects/<x>/`; seeds slice template + project-context links. Called by `drive-deliver-workflow` at project init. |
 | `drive-close-project` | Project | Verifies project DoD, prose-audits long-lived candidates, migrates / lifts / softens, deletes the project folder, opens the close-out PR. Mandatory final retro step. Called by `drive-deliver-workflow` at project close. |
@@ -530,9 +531,9 @@ Specs and plans are per-scope (project / slice) because the inputs, outputs, and
 | `drive-discussion` (mode) | Cross-cutting | Operator + agile orchestrator design discussion. Fires on trigger from any workflow skill or operator invocation. |
 | `drive-list` (in `.system/`) | Cross-cutting | Lists / discoverability helper. |
 
-### Direct change has no dedicated skill
+### Direct change shares the dispatch primitive
 
-Triage's "direct change" verdict routes the developer straight to `gh pr create`. No Drive skill is involved in execution; the implementer reads the intent, makes the edit, opens the PR. `drive-start-workflow` orchestrates this path by calling `drive-pr-description` (in its direct-change framing) and then returning; the path is deliberately ceremonial-light.
+Triage's "direct change" verdict reuses `drive-dispatch` for execution — one-shot, fresh implementer, no reviewer cycle. `drive-start-workflow` orchestrates this path by calling `drive-pr-description` (direct-change framing), then `drive-dispatch` (one-off), then `gh pr create`. The slice loop in `drive-build-workflow` calls the same `drive-dispatch` primitive in its dispatch-after-dispatch sequence. Both paths share the brief template, the delegation prompt, the implementer persona, and the heartbeat contract; what differs is the wrapping loop (one-shot vs. iterate-implement-review).
 
 ## What this document does *not* decide
 

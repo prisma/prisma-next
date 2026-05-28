@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Status:** Accepted; pilot rollout starting immediately
-**Touches:** `drive-specify-project`, `drive-plan-project`, `drive-specify-slice`, `drive-plan-slice`, `drive-build-workflow`, `drive-discussion`, `drive-triage-work`, `drive-start-workflow`, `docs/drive/principles/brief-discipline.md`, `docs/drive/principles/sizing.md` (new), `docs/drive/principles/decomposition-and-cost.md`, `drive/calibration/dod.md`, `drive/calibration/sizing.md`
+**Touches:** `drive-specify-project`, `drive-plan-project`, `drive-specify-slice`, `drive-plan-slice`, `drive-build-workflow`, `drive-discussion`, `drive-triage-work`, `drive-start-workflow`, `drive-dispatch` (new — factored out of `drive-build-workflow`; shared with `drive-start-workflow`'s direct-change path), `docs/drive/principles/brief-discipline.md`, `docs/drive/principles/sizing.md` (new), `docs/drive/principles/decomposition-and-cost.md`, `drive/calibration/dod.md`, `drive/calibration/sizing.md`
 
 ## Decision
 
