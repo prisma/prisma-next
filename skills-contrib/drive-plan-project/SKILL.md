@@ -7,7 +7,6 @@ description: >
   the spec. Outputs projects/<project>/plan.md. Hands off to drive-deliver-workflow.
 metadata:
   version: "2026.5.28"
-  split_from: drive-create-plan
 ---
 
 > **Execution mode: orchestrator-direct.** Atomic skill invoked by the Orchestrator

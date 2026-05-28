@@ -491,7 +491,7 @@ The distinction matters because it sets human expectations and supports gradual 
 Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/main/skills/README.md), the only hard rule is "consistency with existing skills." Three shapes cover the drive-* family:
 
 - **`drive-<verb>-workflow`** for the workflow tier (e.g. `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`). The `-workflow` suffix is the visible cue.
-- **`drive-<verb>-<noun>`** for atomic action skills producing an artefact (e.g. `drive-create-spec`, `drive-close-project`, `drive-review-code`, `drive-triage-work`, `drive-check-health`).
+- **`drive-<verb>-<noun>`** for atomic action skills producing an artefact (e.g. `drive-close-project`, `drive-review-code`, `drive-triage-work`, `drive-check-health`).
 - **`drive-<sub-namespace>-<verb>`** for atomic skills under a focused area (e.g. `drive-pr-description` / `drive-pr-walkthrough`; `drive-qa-plan` / `drive-qa-run`; `drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`; `drive-run-retro`).
 - **`drive-<verb>`** or **`drive-<noun>`** for single-name atomic skills (e.g. `drive-list`, `drive-discussion`).
 

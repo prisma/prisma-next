@@ -39,9 +39,9 @@ Each category corresponds to a family of drive-* skills that share project-speci
 
 | Category | Skills served | What the README typically captures |
 | --- | --- | --- |
-| `spec` | `drive-specify-project`, `drive-specify-slice`, `drive-create-spec` (deprecated) | Spec template variations, required sections beyond the canonical skeleton, project-specific stakeholders. |
+| `spec` | `drive-specify-project`, `drive-specify-slice` | Spec template variations, required sections beyond the canonical skeleton, project-specific stakeholders. |
 | `project` | `drive-create-project`, `drive-close-project` | Project-tracking conventions (Linear board, project-file layout, close-out destinations, archive location). |
-| `plan` | `drive-plan-project`, `drive-plan-slice`, `drive-create-plan` (deprecated) | Plan-shape conventions, test-design table variations, parallelism rules for this codebase. |
+| `plan` | `drive-plan-project`, `drive-plan-slice` | Plan-shape conventions, test-design table variations, parallelism rules for this codebase. |
 | `qa` | `drive-qa-plan`, `drive-qa-run` | Consumer audiences, substrate locations, known coverage-gate gaps, fixture catalogues. |
 | `code-review` | `drive-code-review` | Project-specific anti-patterns, review focus areas, ownership map. |
 | `pr` | `drive-pr-description`, `drive-pr-walkthrough` | PR template variations, label conventions, CI gate context. |

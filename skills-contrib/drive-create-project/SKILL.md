@@ -59,7 +59,7 @@ Notes:
 
 ## Stub files (optional)
 
-If stubs are requested (or defaulted) **and** the developer is **not** immediately starting shaping via `drive-create-spec`:
+If stubs are requested (or defaulted) **and** the developer is **not** immediately starting shaping via `drive-specify-project`:
 
 - `projects/{project}/spec.md` (project spec placeholder)
 - `projects/{project}/plan.md` (project plan placeholder)
@@ -72,7 +72,7 @@ Use these minimal stubs:
 ```markdown
 # Summary
 
-_Drafted via drive-create-spec. Replace this placeholder._
+_Drafted via drive-specify-project. Replace this placeholder._
 
 # Description
 
@@ -102,7 +102,7 @@ _Problem, users, scope. Replace this placeholder._
 
 ## Summary
 
-_Drafted via drive-create-plan. Replace this placeholder._
+_Drafted via drive-plan-project. Replace this placeholder._
 
 **Spec:** `projects/{project}/spec.md`
 
@@ -168,8 +168,6 @@ If the developer wants to start shaping now (default), hand off immediately:
 
 - Run `drive-specify-project` targeting `projects/{project}/spec.md`.
 - Then run `drive-plan-project` targeting `projects/{project}/plan.md`.
-
-(For consumers still calling the deprecated `drive-create-spec` / `drive-create-plan`, those skills now point at the split variants — handoff still works but is one indirection level deep.)
 
 ## Promote-ceremony specifics
 

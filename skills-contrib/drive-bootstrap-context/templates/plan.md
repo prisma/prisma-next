@@ -1,8 +1,8 @@
 # Drive `plan` context
 
-> Read by `drive-create-plan` and `drive-orchestrate-plan` before they start. Capture project-specific facts the generic skills can't know. Update when a drive run surfaces something the next run should inherit.
+> Read by `drive-plan-project`, `drive-plan-slice`, and `drive-build-workflow` before they start. Capture project-specific facts the generic skills can't know. Update when a drive run surfaces something the next run should inherit.
 
-**Skills served:** `drive-create-plan`, `drive-orchestrate-plan`
+**Skills served:** `drive-plan-project`, `drive-plan-slice`, `drive-build-workflow`
 
 ## Plan shape
 

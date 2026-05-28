@@ -8,7 +8,6 @@ description: >
   + why, before scaffolding slices. Hands off to drive-plan-project.
 metadata:
   version: "2026.5.28"
-  split_from: drive-create-spec
 ---
 
 > **Execution mode: orchestrator-direct.** Atomic skill invoked by the Orchestrator
