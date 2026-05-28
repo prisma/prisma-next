@@ -83,7 +83,35 @@ Instrumented skills grow by ~one line per transition point. Each emit step names
 
 > **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see [`trace-events.md`](./trace-events.md) § `{event_type}`). Append one JSON line per [`trace-emission.md`](./trace-emission.md) § Append protocol (`Shell` + `mkdir -p` + `printf … >> trace file`).
 
-Replace `{event_type}` with `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, or `brief-issued`. Resolve `TRACE_FILE` from § Trace file path resolution before the first emit in the session.
+Replace `{event_type}` with the event name for the transition point. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. For spec/plan writes, apply § Existence-check pattern before choosing `*-authored` vs `*-amended`. Resolve `TRACE_FILE` from § Trace file path resolution before the first emit in the session.
+
+## Existence-check pattern for `*-authored` vs `*-amended` events
+
+Four planning-chain write events — [`spec-authored`](./trace-events.md), [`spec-amended`](./trace-events.md), [`plan-authored`](./trace-events.md), [`plan-amended`](./trace-events.md) — share a gating decision at emit time: did the target artefact file already exist on disk immediately before this write?
+
+The emitting skill (`drive-specify-project`, `drive-specify-slice`, `drive-plan-project`, `drive-plan-slice`) checks file existence **before** committing the write, then emits exactly one event:
+
+- Target path **absent** → emit `*-authored` with the first-write payload fields.
+- Target path **present** → emit `*-amended` with amendment fields (`bytes_delta`, `reason`, and type-specific deltas).
+
+This is not a separate trace event — it selects which of two documented event types to append using the same § Append protocol mechanics.
+
+**Shell sketch** (adapt paths and payload construction to the skill's write step):
+
+```bash
+SPEC_PATH="projects/drive-instrumentation/spec.md"
+if [ -f "$SPEC_PATH" ]; then
+  EVENT_TYPE="spec-amended"
+else
+  EVENT_TYPE="spec-authored"
+fi
+# Build EVENT_JSON for $EVENT_TYPE per docs/drive/trace-events.md, then:
+mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FILE"
+```
+
+Equivalent one-liner gate: `[ -f "<path>" ] && emit "*-amended" || emit "*-authored"`.
+
+The check uses the orchestrator's filesystem view at write time. A same-session re-author of a spec just written sees the file present and correctly emits `spec-amended` on the second write.
 
 ## Operator checklist (emit time)
 
