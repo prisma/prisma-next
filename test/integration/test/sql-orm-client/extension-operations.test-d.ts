@@ -1,4 +1,4 @@
-import type { ComparisonMethods, ModelAccessor } from '@prisma-next/sql-orm-client';
+import type { ModelAccessor } from '@prisma-next/sql-orm-client';
 import { describe, expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/generated/contract';
 
@@ -62,41 +62,74 @@ describe('extension operation argument types', () => {
   });
 });
 
-describe('extension ops return ComparisonMethods with return-codec traits', () => {
+describe('extension ops return registry-derived chained methods filtered by return-codec traits', () => {
   type CosineDistanceResult = ReturnType<PostAccessor['embedding']['cosineDistance']>;
 
-  test('cosineDistance returns numeric comparison methods', () => {
-    expectTypeOf<CosineDistanceResult>().toEqualTypeOf<
-      ComparisonMethods<number, 'equality' | 'order' | 'numeric'>
-    >();
-  });
+  // The chained-result surface is derived from the SQL family registry
+  // (via `ChainedResultMethods` in sql-orm-client/src/types.ts) filtered
+  // by `OpMatchesField` against the return codec's traits. Concretely:
+  // cosineDistance returns a pg/float8@1-like numeric codec carrying the
+  // `equality + order + numeric` trait set, so the chained surface
+  // exposes every family entry whose `self` matches.
 
-  test('cosineDistance result exposes eq', () => {
+  test('exposes eq (equality trait)', () => {
     expectTypeOf<CosineDistanceResult>().toHaveProperty('eq');
   });
 
-  test('cosineDistance result exposes gt', () => {
+  test('exposes neq (equality trait)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('neq');
+  });
+
+  test('exposes in (equality trait)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('in');
+  });
+
+  test('exposes notIn (equality trait)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('notIn');
+  });
+
+  test('exposes gt (order trait)', () => {
     expectTypeOf<CosineDistanceResult>().toHaveProperty('gt');
   });
 
-  test('cosineDistance result exposes lt', () => {
+  test('exposes gte (order trait)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('gte');
+  });
+
+  test('exposes lt (order trait)', () => {
     expectTypeOf<CosineDistanceResult>().toHaveProperty('lt');
   });
 
-  test('cosineDistance result exposes asc for ordering', () => {
+  test('exposes lte (order trait)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('lte');
+  });
+
+  test('exposes isNull (any-codec)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('isNull');
+  });
+
+  test('exposes isNotNull (any-codec)', () => {
+    expectTypeOf<CosineDistanceResult>().toHaveProperty('isNotNull');
+  });
+
+  test('exposes asc for ordering (LegacyOrderingMethods, transient until slice 3b)', () => {
     expectTypeOf<CosineDistanceResult>().toHaveProperty('asc');
   });
 
-  test('cosineDistance result exposes desc for ordering', () => {
+  test('exposes desc for ordering (LegacyOrderingMethods, transient until slice 3b)', () => {
     expectTypeOf<CosineDistanceResult>().toHaveProperty('desc');
   });
 
-  test('cosineDistance result does not expose like (textual-only)', () => {
+  test('does not expose like (textual trait absent on the numeric return codec)', () => {
     expectTypeOf<CosineDistanceResult>().not.toHaveProperty('like');
   });
 
-  test('cosineDistance result does not expose ilike (extension op, not comparison method)', () => {
+  test('does not expose ilike (extension op gated on textual trait, absent on the numeric return codec)', () => {
     expectTypeOf<CosineDistanceResult>().not.toHaveProperty('ilike');
+  });
+
+  test('does not expose cosineDistance (extension op gated on the pgvector codec, not the numeric return codec)', () => {
+    expectTypeOf<CosineDistanceResult>().not.toHaveProperty('cosineDistance');
   });
 });
 
