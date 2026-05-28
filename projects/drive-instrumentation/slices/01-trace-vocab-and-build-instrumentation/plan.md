@@ -2,80 +2,73 @@
 
 Three dispatches, strictly sequential. Each is M-sized; no L/XL.
 
-Slice spec: [`spec.md`](./spec.md).
+Slice spec: [`spec.md`](./spec.md). Spec re-specified 2026-05-28 against canonical `drive-build-workflow` structure (D2's instrumentation table now references the canonical 6-step loop instead of the stale 5-step protocol).
+
+## Status
+
+- **D1: SATISFIED** — commit `5bdc19013`. Docs landed at `docs/drive/trace-events.md` + `docs/drive/trace-emission.md`. Reviewer verdict ANOTHER ROUND NEEDED on round 1 with one finding F1 (`low/process`); F1 has since been resolved environmentally (the cited path `skills-contrib/drive-build-workflow/SKILL.md` is correct against the canonical-vs-presentation contract, restored by wiping `.agents/skills/` + re-running `pnpm install`). No D1 doc edit required.
+- **D2: pending re-dispatch** — instrumentation of `skills-contrib/drive-build-workflow/SKILL.md` (canonical path) at the new anchors documented in `spec.md § Approach § drive-build-workflow instrumentation`.
+- **D3: pending** — manual-QA script + first run.
 
 ## Failure modes threaded into briefs
 
 Each dispatch's brief threads the applicable entries from [`drive/calibration/failure-modes.md`](../../../../drive/calibration/failure-modes.md):
 
-- **F5 (destructive git ops by subagents)** — non-negotiable, threaded into every dispatch's brief edge-case table per the team's slice-DoR overlay.
+- **F5 (destructive git ops by subagents)** — non-negotiable, threaded into every dispatch's brief.
 - **F4 (feature-sized dispatch with no inspection cadence)** — Dispatch 2 is the most-at-risk (skill-body instrumentation that could spread). WIP-inspection cadence at the midpoint enforced.
 - **F3 (discovery via test suite vs grep)** — Dispatch 3's verification could fall into "re-run drive-build-workflow to discover what's broken" if the instrumentation is wrong. Threaded into D3 with a pre-computed checklist of what to read from the trace.
 
-Not directly applicable to slice 1's shape: F1, F2, F6 (orchestrator-side, not subagent-side), F7 (same), F8, F9 (no structured-file grep gates in this slice).
+Not directly applicable to slice 1's shape: F1 (dual-shape support relocated), F2 (constructor magic), F6 / F7 (orchestrator-side, not subagent-side), F8 (recon scan scope), F9 (line-oriented grep on structured files).
 
-Scope traps from [`drive/calibration/failure-modes.md § Slice-shape scope traps`](../../../../drive/calibration/failure-modes.md#slice-shape-scope-traps) do not apply directly — slice 1 is well-scoped (two new docs + one skill-body edit + verification artefacts). The most plausible scope creep is "while I'm here, instrument one more drive-* skill" — explicitly out per slice spec § Out of scope.
+Scope traps from [`drive/calibration/failure-modes.md § Slice-shape scope traps`](../../../../drive/calibration/failure-modes.md#slice-shape-scope-traps) do not apply directly. The most plausible scope creep is "while I'm here, instrument `drive-dispatch` too" — explicitly out per slice spec § Out of scope.
 
 ## Grep gates
 
-No entries from [`drive/calibration/grep-library.md`](../../../../drive/calibration/grep-library.md) directly apply to this slice's shape — slice 1 doesn't introduce any cross-codebase anti-pattern to grep for. The verification path is "read the produced trace.jsonl," not "grep the codebase."
+No entries from [`drive/calibration/grep-library.md`](../../../../drive/calibration/grep-library.md) directly apply to this slice's shape. The verification path is "read the produced trace.jsonl," not "grep the codebase."
 
 ## Dispatches
 
-### Dispatch 1: Vocabulary + emission-protocol docs
+### Dispatch 1: Vocabulary + emission-protocol docs — SATISFIED
 
-**Intent.** Write the two canonical methodology docs the rest of the slice (and subsequent slices) references: `docs/drive/trace-events.md` (the event vocabulary with envelope + slice-1 event payloads + arktype schemas) and `docs/drive/trace-emission.md` (the emission protocol with file-path resolution, append rules, the canonical "Emit" snippet, and the `wip/drive-trace/` orphan/direct-change path). Both files derive directly from `spec.md § Approach` — minimal interpretation, mostly translation from spec to doc.
+**Intent.** Write `docs/drive/trace-events.md` and `docs/drive/trace-emission.md` per `spec.md § Approach`.
 
-**Files in play.**
+**Status.** SATISFIED. Commit `5bdc19013`, signoff present, scope strictly 2 files (+283 lines). Reviewer round 1 verdict (`ANOTHER ROUND NEEDED` with F1) was based on a transient drift state in `.agents/skills/` vs `skills-contrib/` that has since been reconciled. F1's recommended action ("change line 180 to point at `.agents/skills/...`") is now incorrect — the original `skills-contrib/...` reference is right against the canonical contract. F1 closed as obsolete; no further D1 action required.
 
-- `docs/drive/trace-events.md` (new).
-- `docs/drive/trace-emission.md` (new).
-
-**"Done when":**
-
-- [ ] Both files exist at the named paths.
-- [ ] `trace-events.md` carries: vocabulary version (`schema_version: "1"`), common envelope table, payload schema for each of the five event types (`dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`), arktype type definitions matching the documented payload, examples of each event-type in JSONL form.
-- [ ] `trace-emission.md` carries: trace-file-path resolution rules (in-project / orphan-slice / direct-change), append-only JSONL conventions, the canonical "Emit" snippet a skill body can paste-by-reference, the file-write tool to use (StrReplace append / shell append — implementer picks the more reliable one and documents the choice).
-- [ ] `wip/drive-trace/` is added to `.gitignore` if not already covered by the existing `wip/` rule (verify; do not duplicate).
-- [ ] Markdown lint clean on both new files (whatever the team's markdown lint is — implementer infers from existing docs/drive/ markdown style if no explicit lint config).
-- [ ] Intent-validation: diff is strictly limited to the two new files + an optional `.gitignore` line; no other files touched.
-- [ ] Edge cases (from slice spec) covered: trace-file-path-on-first-emit (file + parent dir created on first append; documented in emission-protocol); schema version field present (handled by `schema_version: "1"` in envelope); orphan / direct-change paths defined.
-
-**Size.** M (~1.5h estimated).
-
-**DoR confirmed:** ✓ — intent clear, files-in-play named, "done when" binary, size M, F5 + F4 considered (F5 threaded; F4 not relevant — docs-only dispatch with no spread risk), no silent design decisions (the vocab + protocol design is fully settled in `spec.md`).
+**Done.** D1 needs no further work.
 
 ---
 
 ### Dispatch 2: Instrument drive-build-workflow
 
-**Intent.** Add five "Emit" steps to `.agents/skills/drive-build-workflow/SKILL.md`, one per slice-1 event type, at the anchors named in `spec.md § Approach § drive-build-workflow instrumentation`. Each emit step is a one-line instruction referencing `docs/drive/trace-emission.md § Append protocol` for the file-append mechanics, plus a payload-table reference to `docs/drive/trace-events.md` for the event's expected fields. The skill body grows by ~5-15 lines total; the existing per-dispatch-protocol structure is the anchor — no restructuring.
+**Intent.** Add five "Emit" steps to `skills-contrib/drive-build-workflow/SKILL.md`, one per slice-1 event type, at the anchors named in `spec.md § Approach § drive-build-workflow instrumentation`. Each emit step is a 1–3-line instruction referencing `docs/drive/trace-emission.md § Append protocol` for the file-append mechanics and `docs/drive/trace-events.md` for the payload schema. The skill body grows by ~30–75 lines total; the existing `## The per-dispatch loop` structure is the anchor — no restructuring, additive-only edits.
 
 **Files in play.**
 
-- `.agents/skills/drive-build-workflow/SKILL.md` (edit).
+- `skills-contrib/drive-build-workflow/SKILL.md` (edit).
+
+NOT in play: `.agents/skills/drive-build-workflow/SKILL.md` (gitignored; regenerated from `skills-contrib/` at install time), `skills-contrib/drive-dispatch/SKILL.md` (slice 2's territory).
 
 **"Done when":**
 
-- [ ] Five emit-sites land in the skill body, at the anchors named in `spec.md § Approach § drive-build-workflow instrumentation`. The corrected per-round temporal sequence (`round-start → brief-issued → delegate → round-end`) is reflected in where the emit sites sit in the skill body.
-- [ ] Each emit-site cites `docs/drive/trace-emission.md` and `docs/drive/trace-events.md`.
-- [ ] No other section of the skill body is materially changed (the implementer can fix typos / formatting touched incidentally but cannot alter workflow semantics).
-- [ ] Behaviour-preservation check: the implementer reads the skill body before and after the patch and confirms — in their report — that the workflow's semantic behaviour is unchanged. The emit steps are *additions*, not edits to existing steps. (Spot-running the workflow is Dispatch 3's job; this dispatch's intent-validation is a reading-level check.)
-- [ ] Markdown lint clean.
-- [ ] Intent-validation: diff strictly limited to the named skill file; no other drive-* skills touched (F4-style spread prevention).
-- [ ] Edge cases (from slice spec) covered: "Operator amends drive-build-workflow skill body mid-slice" — explicitly out-of-scope, but if a structural change is required to land the emit-sites cleanly (e.g. the cited anchor doesn't actually exist in the skill body anymore), halt-and-surface to the orchestrator rather than improvising.
+- [ ] Five emit-sites land in `skills-contrib/drive-build-workflow/SKILL.md` at the five anchors named in `spec.md § Approach § drive-build-workflow instrumentation`. The per-round temporal sequence is honoured (`dispatch-start → round-start → brief-issued → drive-dispatch → ... → round-end → next round | dispatch-end`).
+- [ ] Each emit-site cites both `docs/drive/trace-events.md` (payload schema) and `docs/drive/trace-emission.md` (file-append mechanics).
+- [ ] No other section of the skill body is materially changed. Incidental typos / formatting tolerated; workflow semantics untouched; no restructuring.
+- [ ] Behaviour-preservation check (reading-level): before and after the patch, the workflow's described behaviour for each loop step is unchanged. Confirm in the return report by quoting one before/after fragment for a step you didn't touch (to demonstrate surrounding prose intact) and the diff fragment for a step you did touch (to demonstrate additive insertion).
+- [ ] Markdown well-formed.
+- [ ] Intent-validation: `git diff --stat 5bdc19013..HEAD` lists exactly one file: `skills-contrib/drive-build-workflow/SKILL.md`. Any other file in the diff is an out-of-scope leak — halt and surface.
+- [ ] Edge cases (from slice spec) addressed where applicable: "Operator amends drive-build-workflow skill body mid-slice" — if the cited anchor doesn't actually exist in the skill body, halt and surface rather than improvising. "Canonical-vs-presentation drift" — if the implementer observes that `.agents/skills/` does not match `skills-contrib/` for `drive-build-workflow` at start-of-dispatch, halt and surface.
 
-**Size.** M (~1.5-2h estimated).
+**Size.** M (~1.5–2h estimated). The canonical body is 29.6kb (~600 lines); the per-dispatch-loop section is well-bounded. Five emit-sites at well-named anchors.
 
-**DoR confirmed:** ✓ — intent clear, file named, "done when" binary, size M (no spread to other skills, M-capped), F4 + F5 threaded, the cited anchors in `spec.md § Approach` are concrete locations the implementer can find by Read on the skill body. No silent design decisions — the emit-site placement table in `spec.md` pins each event's anchor.
+**DoR confirmed:** ✓ — intent clear, file named (the canonical, tracked one), "done when" binary, size M, F4 + F5 threaded, anchors are concrete sections the implementer can find with `rg '^### ' skills-contrib/drive-build-workflow/SKILL.md`. No silent design decisions — the emit-site placement table in `spec.md § Approach` pins each event's anchor.
 
-**WIP-inspection cadence** (per F4 mitigation): one inspection at the implementer's first heartbeat after starting the file edit, OR at ~30 min in if no heartbeat fired. The inspection reads the diff to confirm scope is still strictly the named skill file.
+**WIP-inspection cadence** (per F4 mitigation): one inspection at the implementer's first heartbeat after starting the file edit, OR at ~30 min in if no heartbeat fired. Inspection reads the diff to confirm scope is still strictly `skills-contrib/drive-build-workflow/SKILL.md`.
 
 ---
 
 ### Dispatch 3: Manual-QA script + first run
 
-**Intent.** Author `manual-qa.md` (the QA script that exercises the instrumented `drive-build-workflow` end-to-end on a small in-repo task) and execute one run end-to-end, producing `qa-run-01.md` (the run report) + `qa-trace-01.jsonl` (the emitted trace as evidence). The run does not need to be a full real-agent dispatch loop — a walkthrough where the implementer simulates the orchestrator's emit decisions at each anchor in the instrumented skill body and writes the expected JSONL is acceptable. The verification is structural (does the trace match the documented vocabulary?) plus metric-computable (can `rounds_per_dispatch` and the narrow brief-churn metric be computed by hand from the trace?).
+**Intent.** Author `manual-qa.md` (the QA script that exercises the instrumented `drive-build-workflow` end-to-end on a small in-repo task) and execute one run end-to-end, producing `qa-run-01.md` (the run report) + `qa-trace-01.jsonl` (the emitted trace as evidence). The run may be a walkthrough where the implementer simulates the orchestrator's emit decisions at each anchor in the instrumented skill body and writes the expected JSONL; full-real-agent dispatch is not required. Verification is structural (trace matches the documented vocabulary?) and metric-computable (`rounds_per_dispatch` + narrow brief-churn metric hand-computable from the trace?).
 
 **Files in play.**
 
@@ -85,21 +78,20 @@ No entries from [`drive/calibration/grep-library.md`](../../../../drive/calibrat
 
 **"Done when":**
 
-- [ ] `manual-qa.md` exists, describes the seven QA checks named in `spec.md § Approach § Demo + manual QA`, and is structured as a re-runnable checklist (re-runnable: the next QA pass can pick it up cold without context).
-- [ ] `qa-run-01.md` records the run: date, the small in-repo task chosen for the demo, observations against each of the seven QA checks, pass/fail per check, and a "no unresolved 🛑 Blocker findings" status line at the end.
+- [ ] `manual-qa.md` exists; describes the seven QA checks named in `spec.md § Approach § Demo + manual QA`; is structured as a re-runnable checklist.
+- [ ] `qa-run-01.md` records the run: date, task chosen for the demo, observations against each of the seven QA checks, pass/fail per check, "no unresolved 🛑 Blocker findings" status line at the end.
 - [ ] `qa-trace-01.jsonl` exists, contains at least one event of each of the five slice-1 event types, every line parses as JSON, every event matches the documented payload shape from `docs/drive/trace-events.md`.
-- [ ] `rounds_per_dispatch` (count of `round-end` events grouped by `dispatch_id`) is shown computed by hand in `qa-run-01.md` for at least one dispatch in the trace.
-- [ ] Brief-churn narrow metric (sum of `brief-issued.brief_byte_length` per dispatch / max `brief-issued.brief_byte_length` per dispatch) is shown computed by hand in `qa-run-01.md`.
-- [ ] Behaviour-preservation check (carried over from D2): the diff produced on the small in-repo task by the instrumented `drive-build-workflow` walkthrough matches what an uninstrumented walkthrough would produce. Recorded in `qa-run-01.md`.
-- [ ] Intent-validation: diff strictly limited to the three new files in the slice folder; no other files touched.
-- [ ] No silent design decisions — if the implementer hits a fork during walkthrough simulation (e.g. "which task is the small in-repo task?"), surface to orchestrator rather than picking unilaterally.
-- [ ] Edge cases (from slice spec) covered: trace-file-on-first-emit (verified in the run); each event-type schema is exercised; the seven QA checks together cover the load-bearing slice spec edge cases that aren't structurally out-of-scope.
+- [ ] `rounds_per_dispatch` (count of `round-end` events grouped by `dispatch_id`) shown computed by hand in `qa-run-01.md` for at least one dispatch.
+- [ ] Brief-churn narrow metric (sum of `brief-issued.brief_byte_length` per dispatch / max `brief-issued.brief_byte_length` per dispatch) shown computed by hand.
+- [ ] Behaviour-preservation check: the diff produced on the small in-repo task by the instrumented `drive-build-workflow` walkthrough matches what an uninstrumented walkthrough would produce. Recorded in `qa-run-01.md`.
+- [ ] Intent-validation: diff strictly limited to the three new files in the slice folder.
+- [ ] Edge cases (from slice spec) covered: trace-file-on-first-emit verified; each event-type schema exercised; the seven QA checks cover the load-bearing slice spec edge cases that aren't structurally out-of-scope.
 
-**Size.** M (~1.5-2h estimated, dominated by the walkthrough execution).
+**Size.** M (~1.5–2h estimated, dominated by the walkthrough execution).
 
-**DoR confirmed:** ✓ — intent clear, files named, "done when" binary, size M, F3 + F5 threaded (F3: do not re-run drive-build-workflow as a discovery mechanism; the implementer reads the instrumented skill body once + simulates each emit). The "small in-repo task" choice is a spec § Open Questions item that the implementer surfaces during dispatch rather than picking unilaterally.
+**DoR confirmed:** ✓ — intent clear, files named, "done when" binary, size M, F3 + F5 threaded.
 
-**WIP-inspection cadence** (per F4 mitigation): one inspection mid-walkthrough — read the partial qa-trace-01.jsonl + the partial qa-run-01.md to confirm structural coherence before the dispatch completes.
+**WIP-inspection cadence** (per F4 mitigation): one inspection mid-walkthrough.
 
 ---
 
@@ -107,10 +99,10 @@ No entries from [`drive/calibration/grep-library.md`](../../../../drive/calibrat
 
 - ✓ Each dispatch sized M (none L/XL).
 - ✓ Each dispatch's "done when" is binary + verifiable on disk.
-- ✓ Every slice-spec edge case is either covered by a dispatch's "done when" or explicitly out-of-scope in the spec.
-- ✓ Slice-DoD's eight items are reachable from the dispatch sequence: SDoD1 (CI green) via D1+D2+D3's lint/markdown gates; SDoD2 (edge cases handled per disposition) via each dispatch's edge-case coverage; SDoD3 (reviewer SATISFIED) via the reviewer's per-dispatch verdicts; SDoD4 (manual-QA + run report) via D3; SDoD5 (no out-of-scope surface touched) via each dispatch's intent-validation; SDoD6 (vocab + protocol docs exist + linked) via D1+D2; SDoD7 (instrumentation non-regressing) via D2's reading check + D3's run-evidence check; SDoD8 (qa-trace-01.jsonl committed) via D3.
-- ✓ Sequence is acyclic: D1 outputs the docs D2 references; D2's instrumented skill is what D3 exercises.
+- ✓ Every slice-spec edge case is either covered by a dispatch's "done when" or explicitly out-of-scope.
+- ✓ Slice-DoD's eight items are reachable from the dispatch sequence.
+- ✓ Sequence is acyclic: D1's docs are inputs to D2's emit-site citations; D2's instrumented skill is what D3 exercises.
 
 ## Hand-off
 
-Hand off to [`drive-build-workflow`](../../../../.agents/skills/drive-build-workflow/SKILL.md) to pilot the dispatch loop. Starting dispatch: D1.
+Hand off to [`drive-build-workflow`](../../../../skills-contrib/drive-build-workflow/SKILL.md) to pilot the dispatch loop. Next dispatch: D2 (re-dispatch against canonical anchors).
