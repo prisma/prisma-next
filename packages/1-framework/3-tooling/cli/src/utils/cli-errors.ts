@@ -108,6 +108,57 @@ export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
   });
 }
 
+/**
+ * `--space <id>` was given a value that doesn't satisfy the contract-space
+ * naming rule (`[A-Za-z][A-Za-z0-9_-]*` per `isValidSpaceId`). Fires before
+ * any fs work — the input is syntactically rejected the same way an on-disk
+ * directory with that name would be skipped by the enumerator.
+ */
+export function errorInvalidSpaceId(spaceId: string): CliStructuredError {
+  return errorRuntime(`Invalid contract space id: ${spaceId}`, {
+    why: 'Contract space ids must match [A-Za-z][A-Za-z0-9_-]* (the rule applied to every on-disk space directory).',
+    fix: 'Pass a space id that matches the directory naming rule, or omit --space to list every space.',
+    meta: {
+      code: 'MIGRATION.INVALID_SPACE_ID',
+      spaceId,
+    },
+  });
+}
+
+/**
+ * `migration list --space <id>` was given a contract-space id that has no
+ * directory under `migrations/`. Distinct from "the space exists but is
+ * empty" — that path renders the empty-state line and exits 0 per the
+ * slice spec § Empty-state. This error fires only when `<projectMigrationsDir>/<spaceId>`
+ * does not exist on disk.
+ *
+ * `availableSpaces` lists the contract-space directory names actually
+ * present, sorted lex-asc, so the diagnostic can suggest a near match
+ * without making the user reach for `ls`.
+ */
+export function errorSpaceNotFound(
+  spaceId: string,
+  availableSpaces: readonly string[],
+): CliStructuredError {
+  const availableList =
+    availableSpaces.length > 0
+      ? availableSpaces.join(', ')
+      : '(none — no contract spaces on disk yet)';
+  const fix =
+    availableSpaces.length > 0
+      ? `Pick one of: ${availableList}. Run \`prisma-next migration list\` (no --space) to see every space's migrations.`
+      : 'Author a migration with `prisma-next migration new` to create the first contract-space directory.';
+  return errorRuntime(`Unknown contract space: ${spaceId}`, {
+    why: `No directory named "${spaceId}" exists under the migrations root.`,
+    fix,
+    meta: {
+      code: 'MIGRATION.SPACE_NOT_FOUND',
+      spaceId,
+      availableSpaces: [...availableSpaces],
+    },
+  });
+}
+
 export function errorRefSetBundleNotFound(hash: string): CliStructuredError {
   return errorRuntime(`No migration bundle matches graph-node hash ${hash}`, {
     why: `The hash is a graph node but no on-disk bundle has metadata.to = ${hash}.`,
