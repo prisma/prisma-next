@@ -105,9 +105,12 @@ export type FieldOutputTypes = ${fieldTypesMaps.output};
 export type FieldInputTypes = ${fieldTypesMaps.input};
 export type TypeMaps = ${typeMapsExpr};
 
-type ContractBase = ContractType<
+type ContractBase = Omit<
+  ContractType<
 ${storageType},
 ${modelsType}
+  >,
+  'roots'
 > & {
   readonly target: ${serializeValue(contract.target)};
   readonly targetFamily: ${serializeValue(contract.targetFamily)};

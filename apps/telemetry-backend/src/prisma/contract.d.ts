@@ -85,195 +85,198 @@ export type TypeMaps = TypeMapsType<
   FieldInputTypes
 >;
 
-type ContractBase = ContractType<
-  {
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly telemetry_event: {
-            columns: {
-              readonly id: {
-                readonly nativeType: 'int8';
-                readonly codecId: 'pg/int8@1';
-                readonly nullable: false;
-                readonly default: {
-                  readonly kind: 'function';
-                  readonly expression: 'autoincrement()';
+type ContractBase = Omit<
+  ContractType<
+    {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly tables: {
+            readonly telemetry_event: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'int8';
+                  readonly codecId: 'pg/int8@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                };
+                readonly ingestedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly installationId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly version: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly command: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly flags: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                };
+                readonly runtimeName: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly runtimeVersion: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly os: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly arch: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly packageManager: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly databaseTarget: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly tsVersion: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly agent: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly extensions: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
                 };
               };
-              readonly ingestedAt: {
-                readonly nativeType: 'timestamptz';
-                readonly codecId: 'pg/timestamptz@1';
-                readonly nullable: false;
-                readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-              };
-              readonly installationId: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly version: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly command: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly flags: {
-                readonly nativeType: 'jsonb';
-                readonly codecId: 'pg/jsonb@1';
-                readonly nullable: false;
-              };
-              readonly runtimeName: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly runtimeVersion: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly os: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly arch: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly packageManager: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: true;
-              };
-              readonly databaseTarget: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: true;
-              };
-              readonly tsVersion: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: true;
-              };
-              readonly agent: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: true;
-              };
-              readonly extensions: {
-                readonly nativeType: 'jsonb';
-                readonly codecId: 'pg/jsonb@1';
-                readonly nullable: false;
-              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [{ readonly columns: readonly ['ingestedAt'] }];
+              foreignKeys: readonly [];
             };
-            primaryKey: { readonly columns: readonly ['id'] };
-            uniques: readonly [];
-            indexes: readonly [{ readonly columns: readonly ['ingestedAt'] }];
-            foreignKeys: readonly [];
           };
         };
       };
-    };
-    readonly storageHash: StorageHash;
-  },
-  {
-    readonly TelemetryEvent: {
-      readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int8@1' };
-        };
-        readonly ingestedAt: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
-        };
-        readonly installationId: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly version: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly command: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly flags: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly many: true;
-        };
-        readonly runtimeName: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly runtimeVersion: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly os: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly arch: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly packageManager: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly databaseTarget: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly tsVersion: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly agent: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly extensions: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-          readonly many: true;
-        };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: {
-        readonly table: 'telemetry_event';
+      readonly storageHash: StorageHash;
+    },
+    {
+      readonly TelemetryEvent: {
         readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly ingestedAt: { readonly column: 'ingestedAt' };
-          readonly installationId: { readonly column: 'installationId' };
-          readonly version: { readonly column: 'version' };
-          readonly command: { readonly column: 'command' };
-          readonly flags: { readonly column: 'flags' };
-          readonly runtimeName: { readonly column: 'runtimeName' };
-          readonly runtimeVersion: { readonly column: 'runtimeVersion' };
-          readonly os: { readonly column: 'os' };
-          readonly arch: { readonly column: 'arch' };
-          readonly packageManager: { readonly column: 'packageManager' };
-          readonly databaseTarget: { readonly column: 'databaseTarget' };
-          readonly tsVersion: { readonly column: 'tsVersion' };
-          readonly agent: { readonly column: 'agent' };
-          readonly extensions: { readonly column: 'extensions' };
+          readonly id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int8@1' };
+          };
+          readonly ingestedAt: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+          };
+          readonly installationId: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly version: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly command: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly flags: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+            readonly many: true;
+          };
+          readonly runtimeName: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly runtimeVersion: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly os: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly arch: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly packageManager: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly databaseTarget: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly tsVersion: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly agent: {
+            readonly nullable: true;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly extensions: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+            readonly many: true;
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'telemetry_event';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly ingestedAt: { readonly column: 'ingestedAt' };
+            readonly installationId: { readonly column: 'installationId' };
+            readonly version: { readonly column: 'version' };
+            readonly command: { readonly column: 'command' };
+            readonly flags: { readonly column: 'flags' };
+            readonly runtimeName: { readonly column: 'runtimeName' };
+            readonly runtimeVersion: { readonly column: 'runtimeVersion' };
+            readonly os: { readonly column: 'os' };
+            readonly arch: { readonly column: 'arch' };
+            readonly packageManager: { readonly column: 'packageManager' };
+            readonly databaseTarget: { readonly column: 'databaseTarget' };
+            readonly tsVersion: { readonly column: 'tsVersion' };
+            readonly agent: { readonly column: 'agent' };
+            readonly extensions: { readonly column: 'extensions' };
+          };
         };
       };
-    };
-  }
+    }
+  >,
+  'roots'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';

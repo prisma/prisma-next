@@ -78,146 +78,149 @@ export type TypeMaps = TypeMapsType<
   FieldInputTypes
 >;
 
-type ContractBase = ContractType<
-  {
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly users: {
-            columns: {
-              readonly id: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly email: {
-                readonly nativeType: 'eql_v2_encrypted';
-                readonly codecId: 'cipherstash/string@1';
-                readonly nullable: false;
-                readonly typeParams: {
-                  readonly equality: true;
-                  readonly freeTextSearch: true;
-                  readonly orderAndRange: true;
+type ContractBase = Omit<
+  ContractType<
+    {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly tables: {
+            readonly users: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly email: {
+                  readonly nativeType: 'eql_v2_encrypted';
+                  readonly codecId: 'cipherstash/string@1';
+                  readonly nullable: false;
+                  readonly typeParams: {
+                    readonly equality: true;
+                    readonly freeTextSearch: true;
+                    readonly orderAndRange: true;
+                  };
+                };
+                readonly salary: {
+                  readonly nativeType: 'eql_v2_encrypted';
+                  readonly codecId: 'cipherstash/double@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+                };
+                readonly accountid: {
+                  readonly nativeType: 'eql_v2_encrypted';
+                  readonly codecId: 'cipherstash/bigint@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+                };
+                readonly birthday: {
+                  readonly nativeType: 'eql_v2_encrypted';
+                  readonly codecId: 'cipherstash/date@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+                };
+                readonly emailverified: {
+                  readonly nativeType: 'eql_v2_encrypted';
+                  readonly codecId: 'cipherstash/boolean@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly equality: true };
+                };
+                readonly preferences: {
+                  readonly nativeType: 'eql_v2_encrypted';
+                  readonly codecId: 'cipherstash/json@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly searchableJson: true };
                 };
               };
-              readonly salary: {
-                readonly nativeType: 'eql_v2_encrypted';
-                readonly codecId: 'cipherstash/double@1';
-                readonly nullable: false;
-                readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-              };
-              readonly accountid: {
-                readonly nativeType: 'eql_v2_encrypted';
-                readonly codecId: 'cipherstash/bigint@1';
-                readonly nullable: false;
-                readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-              };
-              readonly birthday: {
-                readonly nativeType: 'eql_v2_encrypted';
-                readonly codecId: 'cipherstash/date@1';
-                readonly nullable: false;
-                readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-              };
-              readonly emailverified: {
-                readonly nativeType: 'eql_v2_encrypted';
-                readonly codecId: 'cipherstash/boolean@1';
-                readonly nullable: false;
-                readonly typeParams: { readonly equality: true };
-              };
-              readonly preferences: {
-                readonly nativeType: 'eql_v2_encrypted';
-                readonly codecId: 'cipherstash/json@1';
-                readonly nullable: false;
-                readonly typeParams: { readonly searchableJson: true };
-              };
-            };
-            primaryKey: { readonly columns: readonly ['id'] };
-            uniques: readonly [];
-            indexes: readonly [];
-            foreignKeys: readonly [];
-          };
-        };
-      };
-    };
-    readonly storageHash: StorageHash;
-  },
-  {
-    readonly User: {
-      readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly email: {
-          readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'cipherstash/string@1';
-            readonly typeParams: {
-              readonly equality: true;
-              readonly freeTextSearch: true;
-              readonly orderAndRange: true;
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
           };
         };
-        readonly salary: {
-          readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'cipherstash/double@1';
-            readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-          };
-        };
-        readonly accountId: {
-          readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'cipherstash/bigint@1';
-            readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-          };
-        };
-        readonly birthday: {
-          readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'cipherstash/date@1';
-            readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-          };
-        };
-        readonly emailVerified: {
-          readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'cipherstash/boolean@1';
-            readonly typeParams: { readonly equality: true };
-          };
-        };
-        readonly preferences: {
-          readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'cipherstash/json@1';
-            readonly typeParams: { readonly searchableJson: true };
-          };
-        };
       };
-      readonly relations: Record<string, never>;
-      readonly storage: {
-        readonly table: 'users';
+      readonly storageHash: StorageHash;
+    },
+    {
+      readonly User: {
         readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly email: { readonly column: 'email' };
-          readonly salary: { readonly column: 'salary' };
-          readonly accountId: { readonly column: 'accountid' };
-          readonly birthday: { readonly column: 'birthday' };
-          readonly emailVerified: { readonly column: 'emailverified' };
-          readonly preferences: { readonly column: 'preferences' };
+          readonly id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly email: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'cipherstash/string@1';
+              readonly typeParams: {
+                readonly equality: true;
+                readonly freeTextSearch: true;
+                readonly orderAndRange: true;
+              };
+            };
+          };
+          readonly salary: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'cipherstash/double@1';
+              readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+            };
+          };
+          readonly accountId: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'cipherstash/bigint@1';
+              readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+            };
+          };
+          readonly birthday: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'cipherstash/date@1';
+              readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+            };
+          };
+          readonly emailVerified: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'cipherstash/boolean@1';
+              readonly typeParams: { readonly equality: true };
+            };
+          };
+          readonly preferences: {
+            readonly nullable: false;
+            readonly type: {
+              readonly kind: 'scalar';
+              readonly codecId: 'cipherstash/json@1';
+              readonly typeParams: { readonly searchableJson: true };
+            };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'users';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly email: { readonly column: 'email' };
+            readonly salary: { readonly column: 'salary' };
+            readonly accountId: { readonly column: 'accountid' };
+            readonly birthday: { readonly column: 'birthday' };
+            readonly emailVerified: { readonly column: 'emailverified' };
+            readonly preferences: { readonly column: 'preferences' };
+          };
         };
       };
-    };
-  }
+    }
+  >,
+  'roots'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';

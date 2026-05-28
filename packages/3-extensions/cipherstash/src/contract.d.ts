@@ -61,68 +61,71 @@ export type TypeMaps = TypeMapsType<
   FieldInputTypes
 >;
 
-type ContractBase = ContractType<
-  {
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly eql_v2_configuration: {
-            columns: {
-              readonly id: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
+type ContractBase = Omit<
+  ContractType<
+    {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly tables: {
+            readonly eql_v2_configuration: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly state: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly data: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                };
               };
-              readonly state: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly data: {
-                readonly nativeType: 'jsonb';
-                readonly codecId: 'pg/jsonb@1';
-                readonly nullable: false;
-              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
-            primaryKey: { readonly columns: readonly ['id'] };
-            uniques: readonly [];
-            indexes: readonly [];
-            foreignKeys: readonly [];
           };
         };
       };
-    };
-    readonly storageHash: StorageHash;
-  },
-  {
-    readonly EqlV2Configuration: {
-      readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly state: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly data: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
-        };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: {
-        readonly table: 'eql_v2_configuration';
+      readonly storageHash: StorageHash;
+    },
+    {
+      readonly EqlV2Configuration: {
         readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly state: { readonly column: 'state' };
-          readonly data: { readonly column: 'data' };
+          readonly id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly state: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly data: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'eql_v2_configuration';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly state: { readonly column: 'state' };
+            readonly data: { readonly column: 'data' };
+          };
         };
       };
-    };
-  }
+    }
+  >,
+  'roots'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
