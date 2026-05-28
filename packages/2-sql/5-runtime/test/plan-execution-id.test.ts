@@ -1,0 +1,234 @@
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import type {
+  PreparedExecuteRequest,
+  SqlDriver,
+  SqlExecuteRequest,
+} from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  collectOrderedParamRefs,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
+import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { describe, expect, it, vi } from 'vitest';
+import type { SqlMiddleware } from '../src/middleware/sql-middleware';
+import { createSqlExecutionStack } from '../src/sql-context';
+import { createRuntime } from '../src/sql-runtime';
+import {
+  createStubAdapter,
+  createTestAdapterDescriptor,
+  createTestContext,
+  createTestContract,
+  createTestTargetDescriptor,
+} from './utils';
+
+/**
+ * Pins ADR 220 semantics for the SQL runtime: every `execute()` and every
+ * `executePrepared()` call stamps a fresh `meta.planExecutionId` onto the
+ * dispatched plan. Hooks within one call observe the same ID; hooks across
+ * two calls of the same plan/prepared-statement observe distinct IDs.
+ */
+
+const testContract = createTestContract({ targetFamily: 'sql', target: 'postgres' });
+
+function createMockDriver(rows: ReadonlyArray<Record<string, unknown>> = []): SqlDriver {
+  const execute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
+    for (const row of rows) yield row;
+  });
+  const executePrepared = vi.fn().mockImplementation(async function* (
+    _request: PreparedExecuteRequest,
+  ) {
+    for (const row of rows) yield row;
+  });
+  return {
+    execute,
+    executePrepared,
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+    connect: vi.fn().mockResolvedValue(undefined),
+    acquireConnection: vi.fn(),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createSetup(middleware: readonly SqlMiddleware[]) {
+  const adapter = createStubAdapter();
+  const driver = createMockDriver([{ id: 1 }]);
+  const targetDescriptor = createTestTargetDescriptor();
+  const adapterDescriptor = createTestAdapterDescriptor(adapter);
+  const stack = createSqlExecutionStack({
+    target: targetDescriptor,
+    adapter: adapterDescriptor,
+    extensionPacks: [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createTestContext(testContract, adapter);
+  const runtime = createRuntime({
+    stackInstance,
+    context,
+    driver,
+    verifyMarker: false,
+    middleware,
+  });
+  return { runtime, adapter, driver };
+}
+
+const meta = {
+  target: testContract.target,
+  storageHash: testContract.storage.storageHash,
+  lane: 'dsl' as const,
+};
+
+function buildSelectAllUsersPlan(): SqlQueryPlan<{ id: number }> {
+  const users = TableSource.named('users');
+  const ast = SelectAst.from(users).withProjection([
+    ProjectionItem.of('id', ColumnRef.of('id', 'users'), { codecId: 'pg/int4@1' }),
+  ]);
+  return Object.freeze({
+    ast,
+    params: collectOrderedParamRefs(ast).map((r) => (r.kind === 'param-ref' ? r.value : undefined)),
+    meta,
+  });
+}
+
+function buildEqUserIdPlan(userId: Expression<ScopeField>): SqlQueryPlan<{ id: number }> {
+  const users = TableSource.named('users');
+  const ast = SelectAst.from(users)
+    .withProjection([
+      ProjectionItem.of('id', ColumnRef.of('id', 'users'), { codecId: 'pg/int4@1' }),
+    ])
+    .withWhere(BinaryExpr.eq(ColumnRef.of('id', 'users'), userId.buildAst()));
+  return Object.freeze({
+    ast,
+    params: collectOrderedParamRefs(ast).map((r) => (r.kind === 'param-ref' ? r.value : undefined)),
+    meta,
+  });
+}
+
+interface Observation {
+  readonly hook: 'beforeExecute' | 'afterExecute';
+  readonly planExecutionId: string | undefined;
+}
+
+function observerMiddleware(log: Observation[]): SqlMiddleware {
+  return {
+    name: 'observer',
+    familyId: 'sql',
+    async beforeExecute(plan) {
+      log.push({ hook: 'beforeExecute', planExecutionId: plan.meta.planExecutionId });
+    },
+    async afterExecute(plan) {
+      log.push({ hook: 'afterExecute', planExecutionId: plan.meta.planExecutionId });
+    },
+  };
+}
+
+describe('SqlRuntime.execute planExecutionId (ADR 220)', () => {
+  it('assigns the same planExecutionId to beforeExecute and afterExecute within one execute call', async () => {
+    const log: Observation[] = [];
+    const { runtime } = createSetup([observerMiddleware(log)]);
+    const plan = buildSelectAllUsersPlan();
+
+    await runtime.execute(plan).toArray();
+
+    expect(log).toHaveLength(2);
+    expect(log[0]?.hook).toBe('beforeExecute');
+    expect(log[1]?.hook).toBe('afterExecute');
+    expect(log[0]?.planExecutionId).toBeTypeOf('string');
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+  });
+
+  it('assigns distinct planExecutionIds to two executions of the same plan instance', async () => {
+    const log: Observation[] = [];
+    const { runtime } = createSetup([observerMiddleware(log)]);
+    const plan = buildSelectAllUsersPlan();
+
+    await runtime.execute(plan).toArray();
+    await runtime.execute(plan).toArray();
+
+    expect(log).toHaveLength(4);
+    const firstExecId = log[0]?.planExecutionId;
+    const secondExecId = log[2]?.planExecutionId;
+    expect(firstExecId).toBeTypeOf('string');
+    expect(secondExecId).toBeTypeOf('string');
+    // Within one execute: beforeExecute and afterExecute share the ID.
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+    expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
+    // Across two executes: distinct IDs.
+    expect(firstExecId).not.toBe(secondExecId);
+  });
+
+  it('overrides a caller-supplied planExecutionId on every execute call', async () => {
+    const log: Observation[] = [];
+    const { runtime } = createSetup([observerMiddleware(log)]);
+    const basePlan = buildSelectAllUsersPlan();
+    const plan: SqlQueryPlan<{ id: number }> = Object.freeze({
+      ...basePlan,
+      meta: { ...basePlan.meta, planExecutionId: 'caller-supplied' },
+    });
+
+    await runtime.execute(plan).toArray();
+
+    expect(log[0]?.planExecutionId).toBeTypeOf('string');
+    expect(log[0]?.planExecutionId).not.toBe('caller-supplied');
+  });
+
+  it('accepts a pre-lowered execution plan and stamps a fresh planExecutionId', async () => {
+    const log: Observation[] = [];
+    const { runtime } = createSetup([observerMiddleware(log)]);
+    const queryPlan = buildSelectAllUsersPlan();
+    const exec: SqlExecutionPlan<{ id: number }> = Object.freeze({
+      sql: 'select id from users',
+      params: [],
+      ast: queryPlan.ast,
+      meta,
+    });
+
+    await runtime.execute(exec).toArray();
+    await runtime.execute(exec).toArray();
+
+    expect(log).toHaveLength(4);
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+    expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
+    expect(log[0]?.planExecutionId).not.toBe(log[2]?.planExecutionId);
+  });
+});
+
+describe('SqlRuntime.executePrepared planExecutionId (ADR 220)', () => {
+  it('assigns the same planExecutionId to beforeExecute and afterExecute within one executePrepared call', async () => {
+    const log: Observation[] = [];
+    const { runtime } = createSetup([observerMiddleware(log)]);
+    const ps = await runtime.prepare({ userId: 'pg/int4@1' as const }, (params) =>
+      buildEqUserIdPlan(
+        (params as { readonly userId: Expression<ScopeField> }).userId,
+      ),
+    );
+
+    await ps.execute(runtime, { userId: 1 }).toArray();
+
+    expect(log).toHaveLength(2);
+    expect(log[0]?.planExecutionId).toBeTypeOf('string');
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+  });
+
+  it('assigns distinct planExecutionIds to two executePrepared calls on the same prepared statement', async () => {
+    const log: Observation[] = [];
+    const { runtime } = createSetup([observerMiddleware(log)]);
+    const ps = await runtime.prepare({ userId: 'pg/int4@1' as const }, (params) =>
+      buildEqUserIdPlan(
+        (params as { readonly userId: Expression<ScopeField> }).userId,
+      ),
+    );
+
+    await ps.execute(runtime, { userId: 1 }).toArray();
+    await ps.execute(runtime, { userId: 2 }).toArray();
+
+    expect(log).toHaveLength(4);
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+    expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
+    expect(log[0]?.planExecutionId).not.toBe(log[2]?.planExecutionId);
+  });
+});
