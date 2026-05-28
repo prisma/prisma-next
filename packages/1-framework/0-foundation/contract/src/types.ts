@@ -203,6 +203,14 @@ export interface PlanMeta {
   readonly storageHash: string;
   readonly profileHash?: string;
   readonly lane: string;
+  /**
+   * Runtime-assigned identity for one `execute()` invocation. Fresh per call;
+   * never set by plan builders. Middleware observing `beforeExecute` and
+   * `afterExecute` for the same execute call see the same value; two
+   * executions of the same plan instance see different values. Excluded
+   * from content hashing and fingerprinting. See ADR 220.
+   */
+  readonly planExecutionId?: string;
   readonly annotations?: {
     readonly [key: string]: unknown;
   };
