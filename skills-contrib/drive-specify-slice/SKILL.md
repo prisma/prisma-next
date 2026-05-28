@@ -190,6 +190,6 @@ _Residual questions for slice execution. Each with a working position._
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that dropped the pre-named-edge-cases requirement, made slice-DoD inheritance-aware, and introduced the coherence-rationale section
+- [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that dropped the pre-named-edge-cases requirement, made slice-DoD inheritance-aware, and introduced the coherence-rationale section
 - [`docs/drive/model.md`](/docs/drive/model.md) § Slice (unit); § Layer 5 — invariants I1 + I12
 - [`docs/drive/principles/definition-of-ready.md`](/docs/drive/principles/definition-of-ready.md) § Slice DoR

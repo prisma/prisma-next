@@ -106,7 +106,7 @@ Stay focused on the goal; control scope. Trivial-and-related fixes that obviousl
 - Slice spec: `<path>` (chosen design + coherence rationale + slice-DoD)
 - Slice plan entry: `<path>` § Dispatch N (outcome / builds-on / hands-to / focus)
 - Calibration entries from project context matching this dispatch's shape: `<links>` (only the ones that apply — not a generic catalogue dump)
-- Prior dispatch artefacts in this slice (if any): `<links>`
+- Prior dispatch artifacts in this slice (if any): `<links>`
 
 ## Operational metadata
 

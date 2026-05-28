@@ -1,10 +1,10 @@
 ---
 name: drive-plan-project
 description: >
-  Compose a project's slices + direct changes into a sequenced project plan. Each entry
-  carries outcome + builds-on + hands-to + focus. Parallelisation opportunities must be
-  surfaced explicitly. Use after drive-specify-project has settled the project spec.
-  Outputs projects/<project>/plan.md.
+  Compose a project's slices into a sequenced project plan. Each entry carries outcome +
+  builds-on + hands-to + focus. Parallelisation opportunities must be surfaced explicitly.
+  Use after drive-specify-project has settled the project spec. Outputs
+  projects/<project>/plan.md.
 metadata:
   version: "2026.5.28"
   split_from: drive-create-plan
@@ -16,13 +16,13 @@ metadata:
 
 # Drive: Plan Project
 
-Compose a project into its sequence of slices + direct changes. The plan answers:
+Compose a project into its sequence of slices. The plan answers:
 
-1. **What units of work make up this project?** A list of slices + direct changes.
+1. **What slices make up this project?** A list, sized 1–4 (5+ flagged for re-boundary).
 2. **In what order — and what can run in parallel?** Planning bias is sequential by default; a project plan that doesn't surface parallel branches misses real schedule wins.
-3. **What does each unit deliver to the next?** Per-entry handoff contracts — *what state does this unit leave for downstream units to build on?*
+3. **What does each slice deliver to the next?** Per-entry handoff contracts — *what state does this slice leave for downstream slices to build on?*
 
-The plan does NOT decompose each slice into dispatches — that's `drive-plan-slice`'s job, fired when the slice is picked up.
+A project is composed of slices, never direct changes. Direct changes are an alternative to a project, chosen at triage time, and never appear in a project plan. The plan also does NOT decompose each slice into dispatches — that's `drive-plan-slice`'s job, run when the slice is picked up.
 
 ## When to use
 
@@ -33,7 +33,7 @@ The plan does NOT decompose each slice into dispatches — that's `drive-plan-sl
 
 - Slice-level dispatch planning — that's `drive-plan-slice`.
 - The project spec — that's `drive-specify-project`.
-- Direct-change planning — direct changes have no plan; intent goes in the PR body.
+- Direct changes — a direct change is an alternative to a project (chosen at triage), not a unit inside one. Direct changes have no plan; intent goes in the PR body. If you find yourself with a 30-second-verifiable diff and no project context, re-route to `drive-triage-work`.
 
 ## Pre-conditions
 
@@ -43,11 +43,11 @@ The plan does NOT decompose each slice into dispatches — that's `drive-plan-sl
 
 ## Post-conditions
 
-- `projects/<project>/plan.md` exists; lists each slice + direct change with outcome, builds-on, hands-to, focus, Linear issue.
+- `projects/<project>/plan.md` exists; lists each slice with outcome, builds-on, hands-to, focus, Linear issue.
 - Parallelisation is explicit — the plan names which slices can proceed independently and which must stack.
-- Each unit is sized correctly (slice ≤ 1 PR; direct change ≤ 30-second-verifiable diff).
+- Each slice is sized correctly (≤ 1 PR worth of work).
 - Slice count is in the 1–4 sweet spot (5+ flagged for project re-boundary).
-- Linear Project has corresponding issues for each unit (created via Linear MCP if missing).
+- Linear Project has corresponding issues for each slice (created via Linear MCP if missing).
 
 ## Project context
 
@@ -63,22 +63,23 @@ Read `drive/plan/README.md` + `drive/project/README.md` and re-read `projects/<p
 
 Before sequencing, look up the packages, IR shapes, test infrastructure, and call sites the plan will touch. Use Grep / Read / Glob / SemanticSearch. Slice boundaries depend on accurate cost / blast-radius estimation; estimates ungrounded in the codebase produce slices that don't survive contact with the code. **"I'm not sure how many call sites this touches" as a planning hole is not acceptable** — search.
 
-### Step 3 — Decompose the project into slices + direct changes
+### Step 3 — Decompose the project into slices
 
 Walk the project's cross-cutting requirements + transitional-shape constraints. For each chunk of work:
 
-- Is it ≤ 30-second-verifiable diff? → **direct change**.
 - Is it ≤ 1 PR worth of work with a coherent purpose? → **slice**.
-- Is it bigger? → **needs further decomposition** (split) OR **needs re-triage as its own project** (if the chunk has its own purpose).
+- Is it bigger? → **needs further decomposition** (split into multiple slices) OR **needs re-triage as its own project** (if the chunk has its own purpose).
+
+If a chunk turns out to be a 30-second-verifiable diff with no dependency on other slices, that's a sign this chunk shouldn't be in the project — re-route to `drive-triage-work`; it's probably a direct change that escaped triage.
 
 **Sweet spot: 1–4 slices per project.** Fewer is fine (a one-slice project warranted by design depth). 5+ slices probably means two projects — the coordination overhead and branch-stacking cost of a long project chain dominates the value. If you find yourself listing 5+ slices, stop and consider whether this is one project or two.
 
 ### Step 4 — Identify dependencies + parallelisation
 
-For each slice / direct change:
+For each slice:
 
-- **Builds on** — which other units (inside or outside this project) must land first for this one to be coherent? Direct dependencies only — don't transitively list grandparents.
-- **Hands to** — what state does this unit leave for downstream units to consume? (The next unit's `builds on` should reference this hand-off.)
+- **Builds on** — which other slices (inside or outside this project) must land first for this one to be coherent? Direct dependencies only — don't transitively list grandparents.
+- **Hands to** — what state does this slice leave for downstream slices to consume? (The next slice's `builds on` should reference this hand-off.)
 
 Then group:
 
@@ -89,7 +90,7 @@ A typical project plan has one stack thread + 1–2 parallel groups, OR all-para
 
 ### Step 5 — Linear sync
 
-For each slice + direct change, create (or align with existing) Linear issue under the project's Linear Project. Use Linear MCP tools. Record the issue ID in the plan entry.
+For each slice, create (or align with existing) Linear issue under the project's Linear Project. Use Linear MCP tools. Record the issue ID in the plan entry.
 
 If the project has no Linear Project yet: surface this and route back to `drive-start-workflow` to scaffold it (this is part of the promote / new-project ceremony).
 
@@ -100,11 +101,10 @@ Write `projects/<project>/plan.md` using the **Project Plan Template** below.
 ### Step 7 — Sanity checks
 
 - Each slice ≤ 1 PR? (If any are over: split.)
-- Each direct change ≤ 30-second-verifiable? (If any are over: re-classify as slice.)
 - Slice count ≤ 4? (If over: probably two projects.)
 - Stack acyclic? (No A→B→A loops.)
 - Parallelisation maximised? (Anything sequenced that could be parallel?)
-- Every project-DoD condition reachable from the slices + direct changes?
+- Every project-DoD condition reachable from the slices?
 
 ### Step 8 — Hand off
 
@@ -120,7 +120,7 @@ Hand off to `drive-deliver-workflow` to pilot delivery.
 
 ## At a glance
 
-_1–2 sentences: what slices + direct changes make up this project, in what shape (stack-heavy / parallel-heavy / mostly-direct-changes)._
+_1–2 sentences: what slices make up this project, in what shape (stack-heavy / parallel-heavy / mixed)._
 
 ## Composition
 
@@ -148,9 +148,11 @@ _1–2 sentences: what slices + direct changes make up this project, in what sha
 
 ### Parallel group B (independent of stack and group A)
 
-- **Direct change `<name>`** — Linear: `<issue>`
+- **Slice `<name>`** — Linear: `<issue>`
   - **Outcome:** _..._
   - **Builds on:** _None._
+  - **Hands to:** _..._
+  - **Focus:** _..._
 
 ## Dependencies (external)
 
@@ -166,7 +168,7 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 ## Pitfalls
 
 1. **Slices that are actually their own projects.** Symptom: a "slice" in the plan would itself need 5+ dispatches with cross-area dependencies. Re-triage as project (promote).
-2. **Direct changes that aren't 30-second-verifiable.** A direct change isn't a synonym for "small slice." If the diff isn't obviously-correct from reading any one chunk, it's a slice, not a direct change.
+2. **Listing direct changes in the project plan.** A direct change is an alternative to a project (chosen at triage), not a unit inside one. If a chunk of work would be a 30-second-verifiable diff with no dependency on other slices, it doesn't belong in this plan — route it back through `drive-triage-work` as its own direct change.
 3. **Sequencing that collapses parallelisation opportunities.** Default to parallel unless there's a real dependency. Project plans that sequence everything serially lose the throughput their dependency graph would allow.
 4. **Per-slice DoD coverage maps inherited from the old template.** The project-DoD is checked at close-out directly; restating it per slice is noise. Drop it.
 5. **Per-slice "Files in play" or "Predicted size" entries.** Those are slice-author work, done at slice-pickup time. Including them here pretends the project plan can predict slice-internals; it can't.
@@ -178,13 +180,13 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 
 - [ ] Loaded `drive/plan/README.md` + `drive/project/README.md` (if exist)
 - [ ] Researched codebase the plan will touch
-- [ ] Decomposed into slices + direct changes
-- [ ] Each unit sized correctly (slice ≤ 1 PR; direct change ≤ 30-sec)
+- [ ] Decomposed into slices (no direct changes in the plan)
+- [ ] Each slice sized correctly (≤ 1 PR worth of work)
 - [ ] Slice count ≤ 4 (if over: re-consider project boundary)
 - [ ] Each entry has outcome / builds-on / hands-to / focus
 - [ ] Parallelisation explicit; default-to-parallel applied
 - [ ] Stack acyclic
-- [ ] Linear issues created / aligned for each unit
+- [ ] Linear issues created / aligned for each slice
 - [ ] Plan drafted using template
 
 ## Related skills
@@ -197,6 +199,6 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that introduced outcome / builds-on / hands-to / focus entries, required explicit parallelisation, and pinned the 1–4-slice sweet spot
+- [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that introduced outcome / builds-on / hands-to / focus entries, required explicit parallelisation, and pinned the 1–4-slice sweet spot
 - [`drive/plan/README.md`](../../drive/plan/README.md) — stack vs parallel heuristics, sizing reference cases
 - [`drive/project/README.md`](../../drive/project/README.md) — slice-composition patterns for this repo

@@ -189,7 +189,7 @@ _Residual design-level questions the project ships with as known-unresolved. Eac
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that stripped FR / NFR / Constraints ceremony, introduced transitional-shape constraints + place-in-larger-world, and pinned the team-DoD-inheritance rule
+- [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that stripped FR / NFR / Constraints ceremony, introduced transitional-shape constraints + place-in-larger-world, and pinned the team-DoD-inheritance rule
 - [`drive/spec/README.md`](../../drive/spec/README.md) — project-spec authoring overlays
 - [`drive/calibration/dod.md`](../../drive/calibration/dod.md) — team's project-DoD floor (inherited by every project's spec in this repo)
 - Invariant I7 (immutable purpose after first dispatch) — enforced by this skill and `drive-discussion` stop-conditions

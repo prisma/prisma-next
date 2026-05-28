@@ -6,7 +6,7 @@
 
 ## Decision
 
-The Drive methodology is restructured around eight rules. Each rule is self-contained; together they replace the previous artefact templates.
+The Drive methodology is restructured around eight rules. Each rule is self-contained; together they replace the previous artifact templates.
 
 ### Rule 1 — Project, slice, and dispatch each get their own template
 
@@ -18,9 +18,9 @@ A project, a slice, and a dispatch are three different shapes of work. A single 
 
 ### Rule 2 — Content lives at the lowest level where it doesn't lose information
 
-If a section can move from a higher-level artefact to a lower-level one without losing meaning, it belongs at the lower level. Project specs become short by construction: they only carry what's true at the system level and nowhere else.
+If a section can move from a higher-level artifact to a lower-level one without losing meaning, it belongs at the lower level. Project specs become short by construction: they only carry what's true at the system level and nowhere else.
 
-This rule resolves what to put where. It is also why the per-artefact templates below look the way they do.
+This rule resolves what to put where. It is also why the per-artifact templates below look the way they do.
 
 ### Rule 3 — Triage produces one of three delivery shapes
 
@@ -53,11 +53,11 @@ The instruction is: stay focused on the goal; control scope. Trivial, obviously-
 
 This instruction appears verbatim in every dispatch brief.
 
-### Rule 6 — The reviewer's pnpm budget is zero for routine review
+### Rule 6 — The reviewer does not re-run validation commands during routine review
 
-The implementer ran the validation gates. The reviewer trusts the run and focuses on design judgment. Re-running gates per dispatch added ~5 minutes per review for near-zero new signal.
+The implementer ran `pnpm typecheck`, `pnpm test`, and the rest of the validation gates as part of the dispatch's Definition of Done. The reviewer trusts that run and focuses on design judgment. Re-running the same commands added ~5 minutes per review for near-zero new signal.
 
-The exception is the verify-on-main protocol: when an implementer claims a failure is pre-existing on `main`, the reviewer verifies that claim with a focused force-build + typecheck. Not the full suite.
+The one exception is the verify-on-main protocol: when an implementer claims a failure is pre-existing on `main`, the reviewer verifies that claim with a focused force-build plus typecheck — not the full suite.
 
 ### Rule 7 — The team-level Definition of Done lives in project context, not in the skill
 
@@ -65,9 +65,9 @@ Different teams and repos have different DoD floors. The skill body shouldn't pi
 
 ### Rule 8 — Internal project labels stay out of operator-facing communication
 
-Linear tickets, PR titles and bodies, public commit messages, ADRs, release notes, and chat messages to the operator must be readable by someone without project context. Refer to slices and dispatches by what they do, not by their internal ID. Internal shorthand (slice IDs, dispatch numbers, finding labels) is fine inside intra-project artefacts — dispatch briefs, reviewer reports, retro entries — but not outside them.
+Linear tickets, PR titles and bodies, public commit messages, ADRs, release notes, and chat messages to the operator must be readable by someone without project context. Refer to slices and dispatches by what they do, not by their internal ID. Internal shorthand (slice IDs, dispatch numbers, finding labels) is fine inside intra-project artifacts — dispatch briefs, reviewer reports, retro entries — but not outside them.
 
-## Per-artefact templates
+## Per-artifact templates
 
 Each template below applies Rule 2 (content lives at the lowest level where it doesn't lose information) to the level it covers.
 
@@ -138,7 +138,7 @@ The order encodes the migration shape — incremental delivery, keep-tests-green
 
 ### Dispatch brief
 
-The full template lives at [`docs/drive/principles/brief-discipline.md`](../principles/brief-discipline.md). In summary: six sections — Task, Scope, Completed when, Standing instruction (verbatim across all briefs), References, Operational metadata. Briefs get shorter as the slice progresses because the same executor runs every dispatch in the slice and Cursor's selective context compaction preserves prior priming.
+The full template lives at [`docs/drive/principles/brief-discipline.md`](../principles/brief-discipline.md). In summary: six sections — Task, Scope, Completed when, Standing instruction (verbatim across all briefs), References, Operational metadata. Briefs get shorter as the slice progresses because the same executor subagent runs every dispatch in the slice and retains the priming context from earlier dispatches when it's resumed.
 
 ## Sizing anchors
 
@@ -154,9 +154,9 @@ Single-slice projects exist when discussion-first reveals one slice that needs d
 
 After roughly a week running the previous Drive model end-to-end on the target-extensible IR project (5 slices, ~30 dispatches, two reset-and-replan moments), five concrete complaints surfaced. The redesign answers each.
 
-- **Process slowness.** Brief assembly was a 15-minute orchestrator task; per-dispatch ceremony added up. → Lean six-section briefs; reviewer pnpm budget zero; same executor across the slice so briefs thin out.
-- **Wordy artefacts.** Specs and plans grew structural sections that restated information visible elsewhere. → Rule 2 (content lives at the lowest level where it doesn't lose information) plus per-level templates pruned accordingly.
-- **Unintelligible operator-facing communication.** Internal shorthand ("Path B," "S1.C D2-R6") leaked into Linear tickets and PR bodies. → Rule 8 (internal labels stay inside intra-project artefacts).
+- **Process slowness.** Brief assembly was a 15-minute orchestrator task; per-dispatch ceremony added up. → Lean six-section briefs; reviewer skips re-running validation commands; same executor across the slice so briefs thin out.
+- **Wordy artifacts.** Specs and plans grew structural sections that restated information visible elsewhere. → Rule 2 (content lives at the lowest level where it doesn't lose information) plus per-level templates pruned accordingly.
+- **Unintelligible operator-facing communication.** Internal shorthand ("Path B," "S1.C D2-R6") leaked into Linear tickets and PR bodies. → Rule 8 (internal labels stay inside intra-project artifacts).
 - **Auto-promotion of orphan slices to projects.** Project bias dominated triage. → Three-shape triage with orphan-slice default and a 1–4-slices-per-project anchor.
 - **`drive-start-workflow` chattiness.** Confirmed every verdict even when no authorisation was needed. → Confirm only for promote, demote, or operator-flagged project creation; otherwise decide and execute.
 
@@ -172,7 +172,7 @@ Once these amendments land, these retro entries are encoded into canonical skill
 
 These remain unresolved:
 
-- "Stale-dist false-fail" — environmental, not artefact-shape.
+- "Stale-dist false-fail" — environmental, not artifact-shape.
 - "Orchestrator over-asking permission" — behavioural, ongoing self-discipline.
 - "Implementer discipline failure (refusal-trigger non-fire, defensive adapters, confabulation)" — executor-side discipline.
 - "CI-fix dispatch shipped a layering-violation workaround" — executor judgment.
@@ -183,7 +183,7 @@ The next project IS the pilot. Rather than running the new model against one pro
 
 **Success criterion (operator-set):** *"I can do detailed design work with my agent, then hand off execution to the orchestrator, which will plan the project and slices and iterate through delegating the dispatches until the project is complete, without my involvement, and the result meets my project success criteria."*
 
-Measurements at pilot retro: operator interventions per dispatch; cycle time from project-start to project-done; retro-finding count generated during the pilot; artefact line counts (project spec, slice spec, slice plan, dispatch brief); reviewer wallclock per dispatch.
+Measurements at pilot retro: operator interventions per dispatch; cycle time from project-start to project-done; retro-finding count generated during the pilot; artifact line counts (project spec, slice spec, slice plan, dispatch brief); reviewer wallclock per dispatch.
 
 ## Held thread
 

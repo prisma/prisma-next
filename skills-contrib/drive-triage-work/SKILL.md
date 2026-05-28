@@ -38,7 +38,7 @@ These are state-changes you might make on a piece of work, whether or not it's b
 |---|---|---|
 | **Promote** | An in-flight slice has grown beyond one PR. | Promotion ceremony (Linear MCP + `drive-create-project` + `drive-specify-project`). |
 | **Demote** | An in-flight project has shrunk to one PR (or one slice). | Demotion ceremony (Linear MCP + on-disk migration + delete `projects/<project>/`). |
-| **Spike** | The entry-point can't be sized without a probe. | `drive-build-workflow` with a spike-flavoured brief; re-triage on artefact. |
+| **Spike** | The entry-point can't be sized without a probe. | `drive-build-workflow` with a spike-flavoured brief; re-triage on artifact. |
 | **Defer** | Out-of-scope for now; don't lose. | Record in `projects/<x>/deferred.md` or operator scratch. |
 
 **Promote** and **demote** only fire on in-flight work. **Spike** and **defer** can fire on either fresh entries or in-flight work.
@@ -191,7 +191,7 @@ Defaults; teams should override / extend in `drive/triage/README.md`.
 4. **Defaulting work to project when it could be a slice.** The methodology rewards keeping work small. If you're uncertain between slice and project, draft the slice spec first; if it grows past one PR you can promote.
 5. **Triage that consults calibration but ignores operator context.** The operator may know things calibration doesn't (e.g. "this user-visible string is being deprecated next week" → defer). Treat calibration as one input.
 6. **Promote / demote without operator authorisation.** Linear side-effects are visible. Always set the authorisation flag.
-7. **Spike that becomes implementation by stealth.** Spike DoD is "the artefact answers the planning question," not "code committed."
+7. **Spike that becomes implementation by stealth.** Spike DoD is "the artifact answers the planning question," not "code committed."
 8. **Skipping Step 2 (discussion-mode signal check).** If a signal fires and the agent triages on the raw ticket text anyway, the verdict will reflect uninformed reading. The discussion-mode step exists precisely to sharpen the input before triage runs.
 
 ## Checklist
@@ -215,6 +215,6 @@ Defaults; teams should override / extend in `drive/triage/README.md`.
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that introduced the 3-shape + 4-transition split, the orphan-first default, and the 1–4-slices-per-project anchor
+- [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that introduced the 3-shape + 4-transition split, the orphan-first default, and the 1–4-slices-per-project anchor
 - [`drive/triage/README.md`](../../drive/triage/README.md) — team-specific triage protocol, calibration anchors, spike-first conventions
 - [`drive/plan/README.md`](../../drive/plan/README.md) — sizing discipline this skill enforces

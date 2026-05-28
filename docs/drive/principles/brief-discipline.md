@@ -8,10 +8,10 @@ A dispatch brief is the document the orchestrator hands to an executor subagent 
 | **Scope** | Two lists: what's in this dispatch and what's explicitly out. The "out" list pre-empts "while I was in there I also fixed X." |
 | **Completed when** | One to three binary, dispatch-specific conditions. Not slice-wide gates. Not anything CI / reviewer / project-DoD already implies. |
 | **Standing instruction** | The same paragraph in every brief, every time: *"Stay focused on the goal; control scope. Trivial, obviously-related fixes that serve the goal go in the same dispatch with a one-line note in the wrap-up. Anything that pulls you off the goal — even if it looks useful — halts and surfaces."* |
-| **References** | Links to: the slice spec; this dispatch's slice-plan entry; any spike artefact this dispatch consumes; prior dispatch artefacts in this slice. Plus team-context entries that match this dispatch's shape (failure modes the team has hit before, grep patterns from the team's catalogue). |
+| **References** | Links to: the slice spec; this dispatch's slice-plan entry; any spike artifact this dispatch consumes; prior dispatch artifacts in this slice. Plus team-context entries that match this dispatch's shape (failure modes the team has hit before, grep patterns from the team's catalogue). |
 | **Operational metadata** | Three things: model tier (with a one-line rationale), time-box (overrun means halt and surface), halt conditions (the specific situations under which the executor stops and asks). |
 
-A spike dispatch swaps "Completed when" for an artefact specification — see [`spikes.md`](spikes.md).
+A spike dispatch swaps "Completed when" for an artifact specification — see [`spikes.md`](spikes.md).
 
 That's the whole rule. Everything below explains why each section is what it is and how to keep briefs from drifting back into bigger shapes.
 
@@ -22,19 +22,19 @@ That's the whole rule. Everything below explains why each section is what it is 
 
 ## Task
 
-Migrate the 8 in-source test sites listed in the spike artefact to the new shape.
+Migrate the 8 in-source test sites listed in the spike artifact to the new shape.
 One commit per file. No other consumers touched.
 
 ## Scope
 
-**In:** The 8 test sites named in the spike artefact (linked below).
+**In:** The 8 test sites named in the spike artifact (linked below).
 
 **Out:** Authoring-layer consumers (next dispatch); introspector tightening (dispatch 3);
-any fixture or consumer NOT in the spike artefact.
+any fixture or consumer NOT in the spike artifact.
 
 ## Completed when
 
-- [ ] All 8 sites updated; per-site commits reference the spike artefact.
+- [ ] All 8 sites updated; per-site commits reference the spike artifact.
 - [ ] `rg "old-shape-literal"` returns empty in the migrated files.
 - [ ] Package typecheck clean for the affected packages.
 
@@ -48,7 +48,7 @@ off the goal — even if it looks useful — halts and surfaces.
 
 - Slice spec: `projects/<project>/slices/<slice>/spec.md`
 - Slice-plan entry: `projects/<project>/slices/<slice>/plan.md` § Dispatch 2
-- Spike artefact: `projects/<project>/spikes/<date>-test-sites.md`
+- Spike artifact: `projects/<project>/spikes/<date>-test-sites.md`
 - Team context: `drive/calibration/sizing.md` § Migration-shaped dispatches
 
 ## Operational metadata
@@ -62,7 +62,7 @@ There's nothing to interpret. The task is named. The scope is bounded. The compl
 
 ## Briefs get shorter as a slice progresses
 
-The same executor subagent runs every dispatch in a slice — it's resumed across dispatches rather than spawned fresh each time. Cursor's selective context compaction keeps the priming context from earlier dispatches even as the transcript grows.
+The same executor subagent runs every dispatch in a slice — it's resumed across dispatches rather than spawned fresh each time. Because the subagent is resumed, it retains the priming context from earlier dispatches even as its transcript grows. (Different agent harnesses keep that context in different ways — context-window expansion, selective compaction, summarisation — but the rule "same executor, resumed across dispatches" is what makes the briefs thin out, not the specific mechanism.)
 
 What this means in practice:
 
@@ -116,7 +116,7 @@ off the goal — even if it looks useful — halts and surfaces.
 - Slice spec: <path>
 - Slice-plan entry: <path> § Dispatch N
 - Team context entries that match this dispatch's shape: <links — only the ones that apply>
-- Prior dispatch artefacts in this slice (if any): <links>
+- Prior dispatch artifacts in this slice (if any): <links>
 
 ## Operational metadata
 
@@ -137,7 +137,7 @@ A spike brief swaps "Completed when" for:
 **Completed when:**
 - [ ] Artefact exists at the named path with the named shape.
 - [ ] Artefact answers the question (not "I started investigating").
-- [ ] The next dispatch's brief can be assembled using the artefact.
+- [ ] The next dispatch's brief can be assembled using the artifact.
 ```
 
 ## Things to avoid
@@ -162,4 +162,4 @@ A spike brief swaps "Completed when" for:
 - [`roles-and-personas.md`](roles-and-personas.md) — who composes the brief, who executes, who reviews.
 - [`definition-of-ready.md`](definition-of-ready.md) — what the orchestrator checks before dispatching.
 - [`definition-of-done.md`](definition-of-done.md) — what the orchestrator checks at handoff.
-- [`../design-decisions/2026-05-28-artefact-cascade-redesign.md`](../design-decisions/2026-05-28-artefact-cascade-redesign.md) — the design discussion that produced the six-section template.
+- [`../design-decisions/2026-05-28-artifact-cascade-redesign.md`](../design-decisions/2026-05-28-artifact-cascade-redesign.md) — the design discussion that produced the six-section template.

@@ -60,7 +60,7 @@ Pilots triage + setup chain. Workflow skill — invoked top-down and returns whe
                                   │                       re-route via
                                   ▼                       drive-start-
                              drive-deliver-               workflow on
-                             workflow                     artefact
+                             workflow                     artifact
 ```
 
 ## When to use
@@ -84,13 +84,13 @@ Use **mid-flight when scope shifts** — an in-flight slice is growing beyond on
 
 The verdict's setup chain has been executed, and one of the following is true:
 
-- **Direct change** → `drive-pr-description` (direct-change framing) drafted; `gh pr create` ready. No on-disk artefact under `projects/`.
+- **Direct change** → `drive-pr-description` (direct-change framing) drafted; `gh pr create` ready. No on-disk artifact under `projects/`.
 - **Slice (orphan)** → slice spec drafted inline in the PR body via `drive-specify-slice` (orphan mode); no `projects/<x>/`.
 - **Slice (in-project)** → slice spec under `projects/<project>/slices/<slice>/spec.md` via `drive-specify-slice`; ready for `drive-build-workflow`.
 - **Project** → `projects/<project>/` scaffolded via `drive-create-project`; `projects/<project>/spec.md` drafted via `drive-specify-project`; ready for `drive-plan-project` → `drive-deliver-workflow`.
 - **Promote** → Linear Project created; original ticket moved in + marked Done + renamed; `projects/<project>/` scaffolded; spec migration started; ready for `drive-specify-project`.
 - **Demote** → other open Linear issues closed with "merged into <surviving>" comments; surviving ticket moved out of Linear Project; Linear Project Cancelled or Completed; on-disk content migrated to surviving PR body; `projects/<project>/` deleted.
-- **Spike** → `drive-build-workflow` invoked with a spike-flavoured brief; artefact is the DoD; re-route via `drive-start-workflow` on the artefact.
+- **Spike** → `drive-build-workflow` invoked with a spike-flavoured brief; artifact is the DoD; re-route via `drive-start-workflow` on the artifact.
 - **Defer** → record landed in `projects/<x>/deferred.md` (if in a project) or operator scratch.
 
 ## Project context
@@ -174,8 +174,8 @@ See `model.md` § Tracker sync § Demotion pattern.
 
 #### Spike
 
-1. `drive-build-workflow` with a spike-flavoured brief: single dispatch; DoD = "the artefact answers the planning question" not "code is committed"; artefact is a doc under `projects/<project>/spikes/<date>-<question>.md` (in-project) or `wip/spikes/...` (orphan).
-2. On artefact emission: re-route via `drive-start-workflow` — the artefact carries enough information to triage the actual work to its right shape.
+1. `drive-build-workflow` with a spike-flavoured brief: single dispatch; DoD = "the artifact answers the planning question" not "code is committed"; artifact is a doc under `projects/<project>/spikes/<date>-<question>.md` (in-project) or `wip/spikes/...` (orphan).
+2. On artifact emission: re-route via `drive-start-workflow` — the artifact carries enough information to triage the actual work to its right shape.
 
 See `drive/triage/README.md` for spike-first conventions and team overlays.
 
@@ -206,7 +206,7 @@ If invoked without an operator session (e.g. via a watchdog hook firing on a Lin
 2. **Promotion ceremony executed without operator authorisation.** Linear side-effects are visible to the wider team. Always confirm in interactive mode; always log + halt in unattended mode.
 3. **Demotion that deletes `projects/<x>/` without migrating useful content.** The slice plan, edge cases, and learnings may still apply to the surviving work. Migrate them to the surviving PR body before deletion.
 4. **Re-triage that fires on every entry to the project loop.** Triage is for entry + scope-shift, not for double-checking. If you find yourself running triage repeatedly without a scope-shift signal, that's a workflow bug.
-5. **Spike verdict that proceeds straight into implementation rather than into a spike dispatch.** The spike's DoD is "the artefact answers the question," not "code committed." Then the artefact triggers re-triage.
+5. **Spike verdict that proceeds straight into implementation rather than into a spike dispatch.** The spike's DoD is "the artifact answers the question," not "code committed." Then the artifact triggers re-triage.
 6. **Skipping Step 2 (discussion-mode signal check).** Triaging on un-sharpened entry-points produces low-quality verdicts.
 7. **Asking the operator to confirm direct change / orphan slice / defer.** Decide and execute. The operator's attention is for genuinely high-blast-radius transitions, not routine routing.
 
@@ -231,7 +231,7 @@ If invoked without an operator session (e.g. via a watchdog hook firing on a Lin
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that simplified verdicts to 3 delivery shapes + 4 transitions, made orphan-slice the default, and made operator confirmation conditional
+- [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that simplified verdicts to 3 delivery shapes + 4 transitions, made orphan-slice the default, and made operator confirmation conditional
 - [`drive/triage/README.md`](../../drive/triage/README.md) — triage outputs, Linear-sync conventions, promotion/demotion patterns
 - [`drive/plan/README.md`](../../drive/plan/README.md) — sizing discipline triage enforces
 - [`drive/README.md`](../../drive/README.md) — protocol-as-memory; operators can run `drive-triage-work` manually instead of this workflow
