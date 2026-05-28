@@ -2,6 +2,7 @@ import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
@@ -375,11 +376,20 @@ describe('createModelAccessor', () => {
       },
     }));
 
-    expect(
-      createModelAccessor({ ...context, contract: modelNameFallbackContract } as never, 'User')[
-        'name'
-      ]!.isNull(),
-    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users', 'name')));
+    // `as never` collapses TContract to its constraint here, so the
+    // resulting accessor's per-field shape comes from a mapped type
+    // whose keys TS treats as an index signature. Mirror the existing
+    // `as unknown as Record<string, ...>` precedent further up in this
+    // file (the relation-fallback case) to project the accessor onto
+    // the minimal callable shape this assertion needs.
+    type IsNullCallable = { isNull(): AnyExpression };
+    const accessor = createModelAccessor(
+      { ...context, contract: modelNameFallbackContract } as never,
+      'User',
+    ) as unknown as Record<string, IsNullCallable>;
+    expect(accessor['name']!.isNull()).toEqual(
+      NullCheckExpr.isNull(ColumnRef.of('users', 'name')),
+    );
   });
 
   it('combines relation shorthand fields with and() and rejects missing join arrays', () => {

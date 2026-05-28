@@ -1,20 +1,29 @@
 import type { Contract, NamespaceId, StorageHashBase } from '@prisma-next/contract/types';
+import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';
 import type { ContractWithTypeMaps, SqlStorage, TypeMaps } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 
 import { createMockRuntime } from './helpers';
 
+// Codec-types fixture matches the shape `ExtractCodecTypes<TContract>`
+// presents to the column-method derivation: each codec carries `input`
+// and `output` JS types plus a union of trait names. `pg/bool@1` is
+// included because the family-SQL registry's predicate ops return it;
+// without it the `IsBooleanReturn` check downstream can't resolve.
 type GeneratedLikeCodecTypes = {
   'pg/text@1': {
+    input: string;
     output: string;
     traits: 'equality' | 'order' | 'textual';
   };
   'pg/bool@1': {
+    input: boolean;
     output: boolean;
     traits: 'equality' | 'boolean';
   };
   'pg/jsonb@1': {
+    input: unknown;
     output: unknown;
     traits: 'equality';
   };
@@ -35,9 +44,19 @@ type GeneratedLikeFieldOutputTypes = {
   };
 };
 
+// Query-operation types come straight from the SQL family registry --
+// mirrors the shape a real generated `Contract.d.ts` carries post-D1
+// (the family pack contributes `SqlFamilyQueryOperationTypes<CT>` into
+// the contract's `queryOperationTypes` aggregation alongside the
+// adapter and any extension packs). Post-R2 the column-method surface
+// derives from this slot via `FieldOperations`, so the fixture has to
+// declare it -- the `Record<string, never>` placeholder this fixture
+// carried under R1 only worked because `ScalarModelAccessor`'s
+// hand-mirrored `ComparisonMethods<T, Traits>` intersection used to
+// supply the column methods independently.
 type GeneratedLikeTypeMaps = TypeMaps<
   GeneratedLikeCodecTypes,
-  Record<string, never>,
+  SqlFamilyQueryOperationTypes<GeneratedLikeCodecTypes>,
   GeneratedLikeFieldOutputTypes
 >;
 
