@@ -55,6 +55,21 @@ For PRs routed as **direct change** by `drive-start-workflow`:
 
 - Per `.agents/skills/commit-as-you-go/SKILL.md` (canonical): small logical commits; intent-focused messages; no WIP / temp messages.
 - This repo's preference: commits within a PR can stay separate (no squash) when each commit is a coherent step. Maintainers may squash on merge based on the PR's shape.
+- **Every commit on the branch must carry a `Signed-off-by` trailer (DCO).** Use `git commit -s` (or `git commit --signoff`) for every commit. When rebasing, use `git rebase --signoff` so re-played commits get re-signed.
+
+## Reviewer pre-merge check — Signed-off-by on every commit
+
+DCO is a required check; commits without `Signed-off-by` block merge. The reviewer verifies sign-off as a pre-merge gate, regardless of CI status (CI catches it but failures land late and are expensive to fix after threads are anchored to SHAs).
+
+Reviewer command (run from the branch root):
+
+```bash
+git log --format='%h %s%n  signed: %(trailers:key=Signed-off-by,valueonly,separator=%x20)' origin/main..HEAD
+```
+
+Every commit must show a non-empty `signed:` line. If any commit lacks one, surface to the implementer **before** triggering CI re-run — the fix (rebase + sign + force-push) changes SHAs and re-anchoring review threads is costly. In practice the simplest recovery is `git rebase --signoff <merge-base>` then `git push --force-with-lease`.
+
+This check fires on every PR, regardless of authoring path. Cheap to run, expensive to skip — the cost of fixing unsigned commits *after* the review surface lands compounds with the number of resolved review threads anchored to SHAs that the rebase will rewrite.
 
 ## Walkthrough conventions
 
