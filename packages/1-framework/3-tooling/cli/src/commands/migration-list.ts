@@ -28,7 +28,8 @@ import {
   setCommandExamples,
   setCommandSeeAlso,
 } from '../utils/command-helpers';
-import { renderMigrationList } from '../utils/formatters/migration-list-render';
+import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
+import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
@@ -257,7 +258,8 @@ export function createMigrationListCommand(): Command {
         if (flags.json) {
           ui.output(JSON.stringify(listResult, null, 2));
         } else if (!flags.quiet) {
-          ui.output(renderMigrationList(listResult));
+          const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
+          ui.output(renderMigrationListWithStyle(listResult, styler));
         }
       });
       process.exit(exitCode);
