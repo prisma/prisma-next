@@ -2,12 +2,11 @@
 name: drive-build-workflow
 description: >
   Workflow skill. Pilots the slice implementation loop: per-dispatch DoR →
-  brief assembly → delegate one dispatch to the persistent implementer → WIP
-  inspection → per-dispatch DoD with intent-validation → persistent-reviewer
-  verdict + intent-validation → loop / escalate / next dispatch / close. Use
-  when a slice spec + slice plan exist and you want the dispatch loop driven
-  to slice DoD. On slice DoD met, auto-push and open the PR. Renamed and
-  augmented from drive-orchestrate-plan.
+  delegate dispatch (via drive-dispatch) → WIP inspection → per-dispatch DoD
+  with intent-validation → reviewer verdict + intent-validation → loop /
+  escalate / next dispatch / close. Use when a slice spec + slice plan exist
+  and you want the dispatch loop driven to slice DoD. On slice DoD met,
+  auto-push and open the PR. Renamed and augmented from drive-orchestrate-plan.
 metadata:
   version: "2026.5.28"
   renamed_from: drive-orchestrate-plan
@@ -38,12 +37,13 @@ metadata:
 
 # Drive: Build Workflow
 
-Pilots the slice's implementation loop. Returns when the slice DoD is met and the PR is open.
+Pilots the slice's implementation loop. Returns when the slice DoD is met and
+the PR is open.
 
 **The loop, per dispatch:**
 
 ```text
-pre-flight DoR  →  brief assembly  →  delegate implementer
+pre-flight DoR  →  drive-dispatch (assemble brief; delegate implementer)
                        │
                        ▼
                  WIP inspection
@@ -59,12 +59,17 @@ pre-flight DoR  →  brief assembly  →  delegate implementer
                                                                          └── ESCALATING → operator decision
 ```
 
+Brief assembly, implementer delegation, and the heartbeat contract are
+factored into [`drive-dispatch`](../drive-dispatch/SKILL.md). This skill owns
+the *loop* — DoR / WIP / DoD / reviewer / intent-validation / escalation /
+slice-DoD-close.
+
 ## Three roles
 
 | Role | Who | Persona / definition | Owns |
 |---|---|---|---|
 | **Orchestrator** | You (this skill) | `tech-lead` from `drive-agent-personas` + this skill's plan-loop specialisations | Sequencing; escalation; spec/plan amendments; intent-validation of reviewer verdicts |
-| **Implementer** | Subagent | [`./agents/implementer.md`](./agents/implementer.md) | Code + tests + validation gates |
+| **Implementer** | Subagent | [`drive-dispatch/agents/implementer.md`](../drive-dispatch/agents/implementer.md) | Code + tests + validation gates |
 | **Reviewer** | Subagent | [`./agents/reviewer.md`](./agents/reviewer.md) | `code-review.md` (read-only on code/tests) |
 
 **One implementer and one reviewer per project.** Resume the same subagent IDs across every round and every dispatch — never spawn fresh except on round 1 or when a prior ID becomes inaccessible. Spawning fresh because "this is a different dispatch" is **not** a legitimate reason; the persistent subagents carry their understanding of the project across dispatches, which is the point.
@@ -82,7 +87,7 @@ projects/{project}/
 │   └── code-review.md           # reviewer-maintained; scoreboard + subagent IDs + findings + round notes
 └── learnings.md                 # orchestrator-maintained; patterns surfaced this run
 
-wip/heartbeats/                  # gitignored; one file per role
+wip/heartbeats/                  # gitignored; one file per role (contract in drive-dispatch)
 ├── implementer.txt
 └── reviewer.txt
 ```
@@ -116,17 +121,25 @@ Before delegating, walk:
 
 Any DoR item that fails: fix the gap, OR halt and surface to the operator. Do not delegate over a failed DoR.
 
-### 2. Brief assembly
+### 2. Dispatch the implementer (via `drive-dispatch`)
 
-Assemble the dispatch brief from [`./templates/dispatch-brief.template.md`](./templates/dispatch-brief.template.md). Briefs are lean: the same implementer subagent runs every dispatch in a slice, so the brief restates only what's dispatch-specific. See [`docs/drive/principles/brief-discipline.md`](../../docs/drive/principles/brief-discipline.md) for the principle.
+Assemble the dispatch brief from [`drive-dispatch/templates/dispatch-brief.template.md`](../drive-dispatch/templates/dispatch-brief.template.md). Briefs are lean: the same implementer runs every dispatch in a slice, so the brief restates only what's dispatch-specific. See [`docs/drive/principles/brief-discipline.md`](../../docs/drive/principles/brief-discipline.md) for the principle.
 
-The brief feeds [`./templates/delegate-implement.md`](./templates/delegate-implement.md). On resumed dispatches (R2+ in the same slice), the brief thins further — drop the slice-spec / slice-plan pointers; the subagent already knows where they are.
+Call `drive-dispatch` with:
 
-### 3. Delegate implementer
+- The filled-in brief.
+- **The persistent implementer subagent ID** (the slice-loop continuity rule — see § Subagent continuity).
+- Context paths: slice spec, slice plan, `code-review.md`, project spec/plan for background.
+- Carry-over from the prior round (findings, decisions standing, items triaged out of scope) — empty on round 1.
+- Multitasking policy: `background` in Multitask Mode (use the wait window for prep — see § Multitasking the loop).
 
-Use [`./templates/delegate-implement.md`](./templates/delegate-implement.md) with the brief inlined. **Resume the persistent implementer subagent** (your harness's resume mechanism) — spawn fresh only on round 1 or when a prior ID is inaccessible (record any swap in `code-review.md § Subagent IDs`). **In Multitask Mode**, set `run_in_background: true` and use the wait window for prep work (see § Multitasking).
+`drive-dispatch` returns the implementer's structured report + the heartbeat tail + a halt signal (`done` / `blocked` / `stale`). Route per the signal:
 
-### 4. WIP inspection (mid-dispatch, ≤ 5 min)
+- `done` → continue to WIP inspection / DoD.
+- `blocked` → the implementer surfaced a deferral or pushback; triage via § Escalation surface.
+- `stale` → heartbeat hasn't advanced; surface the snapshot to the operator before deciding whether to wait, course-correct, or kill.
+
+### 3. WIP inspection (mid-dispatch, ≤ 5 min)
 
 Not review — a sanity check that the dispatch hasn't drifted off-brief.
 
@@ -138,24 +151,24 @@ Cadence:
 
 What you check: scope still inside files-in-play? Has the implementer started touching out-of-scope files? Early test results passing where they should? Running approach matches the brief's intent?
 
-If you find drift: re-delegate with a brief course-correction. If the drift is significant (implementer is solving a different problem): halt and re-plan via `drive-plan-slice`.
+If you find drift: re-dispatch via `drive-dispatch` with a brief course-correction (resume the same implementer; thin brief). If the drift is significant (implementer is solving a different problem): halt and re-plan via `drive-plan-slice`.
 
-### 5. Post-flight: per-dispatch DoD (with intent-validation)
+### 4. Post-flight: per-dispatch DoD (with intent-validation)
 
-After the implementer reports done and before triggering review:
+After `drive-dispatch` returns `done` and before triggering review:
 
-- [ ] All "Completed when" conditions pass.
+- [ ] All "Completed when" conditions in the brief pass.
 - [ ] **Intent-validation:** the diff matches the brief's task. No scope creep; no out-of-scope surfaces touched (the standing instruction was honoured).
 - [ ] No findings that should have surfaced as a `drive-discussion` signal during the dispatch.
 - [ ] Implementer's heartbeat report aligns with the diff (caught case: implementer claims success but the diff is empty / off-target).
 
-If DoD fails: re-delegate, OR re-plan via `drive-plan-slice` if the gap is structural. Do not proceed to reviewer until DoD passes.
+If DoD fails: re-dispatch via `drive-dispatch` with the gap restated, OR re-plan via `drive-plan-slice` if the gap is structural. Do not proceed to reviewer until DoD passes.
 
-### 6. Delegate reviewer
+### 5. Delegate reviewer
 
-Use [`./templates/delegate-review.md`](./templates/delegate-review.md), passing pointers to recent commits and the implementer's report. **Resume the persistent reviewer** (same rules as implementer). **In Multitask Mode**, background and prep.
+Use [`./templates/delegate-review.md`](./templates/delegate-review.md), passing pointers to recent commits and the implementer's report. **Resume the persistent reviewer** (same continuity rules as the implementer). **In Multitask Mode**, background and prep.
 
-### 7. Reviewer verdict + intent-validation + triage
+### 6. Reviewer verdict + intent-validation + triage
 
 Reviewer returns one of `SATISFIED` / `ANOTHER ROUND NEEDED` / `ESCALATING TO USER`.
 
@@ -178,7 +191,7 @@ Any non-pass-through action must be **visibly recorded** — in `code-review.md`
 Triage the (post-intent-validation) verdict:
 
 - `SATISFIED` → next dispatch, or close the slice and auto-open the PR if this was the last dispatch.
-- `ANOTHER ROUND NEEDED` → loop to step 2 with the reviewer's findings in the brief.
+- `ANOTHER ROUND NEEDED` → loop to step 2 with the reviewer's findings as carry-over in the next dispatch call.
 - `ESCALATING TO USER` → surface as a structured decision (§ Escalation surface).
 
 ## Stop conditions
@@ -206,11 +219,11 @@ In all cases the stop-condition is **visible** — recorded in `code-review.md`,
 
 **Spawn fresh only when:** first round of the project; prior ID inaccessible; deliberate pivot of role intent (e.g. user-requested fresh-eyes pass). Record any swap in `code-review.md § Subagent IDs`.
 
-**On resume the delegation prompt is a follow-up message, not a fresh delegation.** Use the `Resume mode` section of the templates — skip persona / spec / plan re-pointers; restate only round identifier, new findings, validation gates for this round, and decisions standing from prior rounds.
+The continuity rule is loop-level; the act of passing the ID into a dispatch call lives in `drive-dispatch`.
 
 ## Multitasking the loop
 
-When the harness supports it (Cursor IDE in Multitask Mode is canonical), background the implementer and reviewer rounds with `run_in_background: true`. The harness notifies on completion; no polling.
+When the harness supports it (Cursor IDE in Multitask Mode is canonical), `drive-dispatch` backgrounds the implementer and reviewer rounds. The harness notifies on completion; no polling.
 
 **Never run two persistent subagents of the same role in parallel** — they race on the transcript and break continuity. The loop is **sequential per role**, even when each call is backgrounded. Different roles can legitimately overlap when the orchestrator runs a one-shot side task that doesn't touch the persistent subagents.
 
@@ -223,26 +236,11 @@ When the harness supports it (Cursor IDE in Multitask Mode is canonical), backgr
 
 **Do not** poll the backgrounded subagent, write code or run validation gates yourself in parallel, or delegate a parallel subagent that touches the same surface.
 
-## Heartbeats
+## Heartbeats (loop-level use)
 
-Long-running subagent rounds occasionally hang. Without a forward signal, the orchestrator can't tell hung from working from "legitimately churning on a slow gate." Each persistent subagent writes a heartbeat file the orchestrator consults when uncertainty surfaces.
+`drive-dispatch` owns the heartbeat contract — file location, cadence, format, and the implementer-side foreground-vs-background discipline live in [`drive-dispatch/agents/implementer.md § Heartbeats`](../drive-dispatch/agents/implementer.md). The reviewer's persona at [`./agents/reviewer.md`](./agents/reviewer.md) documents the equivalent contract for `wip/heartbeats/reviewer.txt`.
 
-**Files:** `wip/heartbeats/implementer.txt`, `wip/heartbeats/reviewer.txt`. Gitignored. Rewritten in place each ping. Plain `key: value` format so `head -n 10 wip/heartbeats/*.txt` reads them in one glance:
-
-```text
-ts: <ISO 8601 UTC>
-role: <implementer|reviewer>
-agent_id: <subagent ID>
-round: <dispatch + round, e.g. m3 R2>
-phase: <current step, e.g. "running pnpm test:packages">
-last_progress: <last concrete action with citation>
-next_step: <expected next concrete action>
-expected_duration: <coarse estimate, e.g. "~5min">
-```
-
-**Cadence — subagents ping:** at round start; before each long-running shell call (> ~1 min); after each such call returns; at each task / finding / commit boundary; at least every ~5 min during any other work.
-
-**Orchestrator reads heartbeats** between turns or whenever uncertainty surfaces — never polls them. Two cases of interest: **stale `ts` (> ~10 min)** → likely hung; surface the snapshot to the user rather than silently kill. **Fresh ping but `phase` unchanged across multiple checks** → stuck in a tight loop; same surface-to-user pattern. A heartbeat in the subagent's reply message would only be visible after the round returns; the file is the opposite — readable mid-round.
+The loop reads heartbeats during § WIP inspection and whenever uncertainty surfaces between turns. Two patterns of interest: **stale `ts` (> ~10 min)** → likely hung; surface the snapshot to the user rather than silently kill. **Fresh ping but `phase` unchanged across multiple checks** → stuck in a tight loop; same surface-to-user pattern.
 
 Orchestrator never modifies heartbeat files.
 
@@ -338,12 +336,14 @@ These are the invariants the orchestrator enforces across every iteration. Each 
 4. **Spawning a fresh subagent "because this is a different dispatch."** Persistent continuity across dispatches is the point. Spawn fresh only for the cases enumerated in § Subagent continuity.
 5. **Filing a finding with "no action in this PR" as the recommendation.** That's not a finding — it's a plan amendment, a follow-up ticket, or noise. See § Findings discipline.
 6. **Asking the reviewer for SDR or walkthrough refreshes.** Those aren't per-round deliverables. The walkthrough lives at PR-open time. If you want intent context mid-loop, surface it yourself — that's your unique contribution.
+7. **Inlining brief assembly / implementer delegation.** Those are `drive-dispatch`'s job — call it. Re-implementing the dispatch mechanics inside the loop defeats the factoring and drifts the templates.
 
 ## References
 
-- [`./agents/implementer.md`](./agents/implementer.md), [`./agents/reviewer.md`](./agents/reviewer.md) — subagent personas.
-- [`./templates/dispatch-brief.template.md`](./templates/dispatch-brief.template.md) — dispatch brief skeleton.
-- [`./templates/delegate-implement.md`](./templates/delegate-implement.md), [`./templates/delegate-review.md`](./templates/delegate-review.md) — delegation prompts.
+- [`drive-dispatch/SKILL.md`](../drive-dispatch/SKILL.md) — the atomic skill this loop calls per dispatch.
+- [`drive-dispatch/agents/implementer.md`](../drive-dispatch/agents/implementer.md), [`./agents/reviewer.md`](./agents/reviewer.md) — subagent personas.
+- [`drive-dispatch/templates/dispatch-brief.template.md`](../drive-dispatch/templates/dispatch-brief.template.md), [`drive-dispatch/templates/delegate-implement.md`](../drive-dispatch/templates/delegate-implement.md) — dispatch brief skeleton and implementer delegation prompt.
+- [`./templates/delegate-review.md`](./templates/delegate-review.md), [`./templates/delegate-specialist.md`](./templates/delegate-specialist.md) — reviewer / specialist delegation prompts (loop-internal).
 - [`./templates/code-review.template.md`](./templates/code-review.template.md) — `code-review.md` scaffold.
 - [`./templates/unattended-decisions.template.md`](./templates/unattended-decisions.template.md) — decisions-log scaffold + entry format.
 - [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md), [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) — dispatch-INVEST.

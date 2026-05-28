@@ -100,7 +100,11 @@ In interactive mode: present the verdict + setup chain; wait for confirmation. I
 
 1. `drive-pr-description` (direct-change framing): intent statement, Linear ticket link, scope statement, brief verification note (*"reviewer can verify in ~30 sec by reading the diff"*).
 2. **Sanity-check the verdict** at PR-description time — if the diff is sprawling, the 30-second-verifiable claim was wrong; escalate back to `drive-triage-work` for re-routing. Direct change is a scope claim; the diff is the test.
-3. Dispatch an Implementer (branch from `main`, edit, commit, `gh pr create`). Return when the PR is open.
+3. Branch from `main`. Assemble a dispatch brief (use the *direct-change* shape of [`drive-dispatch/templates/dispatch-brief.template.md`](../drive-dispatch/templates/dispatch-brief.template.md) — references point at the PR description draft and Linear ticket, not at a slice spec).
+4. Call [`drive-dispatch`](../drive-dispatch/SKILL.md) with: the brief; **`null` implementer ID** (one-shot — no continuity to preserve); `foreground` multitasking policy (nothing to prep in parallel for a single dispatch); no carry-over.
+5. On `done` return: run `gh pr create` with the PR description body. Return the PR URL.
+6. On `blocked` return (deferral or pushback): triage as a stop-condition; route via `drive-discussion` or escalate to the operator. Do not silently re-dispatch.
+7. On `stale` return: surface the heartbeat snapshot to the operator.
 
 #### Slice (orphan or in-project)
 
@@ -174,4 +178,4 @@ Return control with a one-line summary of what was routed where and what the nex
 - [`drive/triage/README.md`](../../drive/triage/README.md) — triage outputs, Linear-sync conventions, promotion/demotion patterns.
 - [`docs/drive/model.md`](../../docs/drive/model.md) § Tracker sync — promotion / demotion canonical tool-call sequences.
 - [`drive/README.md`](../../drive/README.md) — protocol-as-memory; operators can run `drive-triage-work` manually instead of this workflow.
-- `skills-contrib/drive-triage-work/`, `drive-discussion/`, `drive-create-project/`, `drive-specify-project/`, `drive-specify-slice/`, `drive-pr-description/`, `drive-build-workflow/`, `drive-deliver-workflow/` — the skills this workflow conducts.
+- `skills-contrib/drive-triage-work/`, `drive-discussion/`, `drive-create-project/`, `drive-specify-project/`, `drive-specify-slice/`, `drive-pr-description/`, `drive-dispatch/`, `drive-build-workflow/`, `drive-deliver-workflow/` — the skills this workflow conducts.

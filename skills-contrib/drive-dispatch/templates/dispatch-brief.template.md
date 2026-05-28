@@ -23,10 +23,22 @@ Stay focused on the goal; control scope. Trivial-and-related fixes that obviousl
 
 ## References
 
+> Fill the shape that matches the caller. **Slice-loop** dispatch points at the
+> slice's spec + plan + prior dispatch artifacts. **Direct-change** dispatch
+> points at the PR description draft + Linear ticket.
+
+**Slice-loop dispatch:**
+
 - Slice spec: `<path>` — chosen design + coherence rationale + slice-DoD.
 - Slice plan entry: `<path>` § Dispatch N — outcome / builds-on / hands-to / focus.
 - Calibration entries from project context matching this dispatch's shape: `<links>` — only the ones that apply, not a generic catalogue dump.
 - Prior dispatch artifacts in this slice (if any): `<links>`.
+
+**Direct-change dispatch:**
+
+- PR description draft: `<inline content or wip path>` — the framing the reviewer will see.
+- Linear ticket: `<URL>`.
+- Related prior changes (if any): `<links>`.
 
 ## Operational metadata
 
@@ -36,4 +48,4 @@ Stay focused on the goal; control scope. Trivial-and-related fixes that obviousl
 
 ---
 
-**On resumed dispatches (R2+ in the same slice), thin the brief further.** The implementer subagent retains the prior dispatch's transcript. Drop the `References` section's slice-spec / slice-plan pointers (the subagent already knows where they are); restate only the new task, the new completed-when conditions, and any halt conditions that changed.
+**On resumed dispatches, thin the brief further.** The implementer subagent retains its prior transcript. Drop the `References` section's spec / plan / PR-description pointers (the subagent already knows where they are); restate only the new task, the new completed-when conditions, and any halt conditions or operational metadata that changed.
