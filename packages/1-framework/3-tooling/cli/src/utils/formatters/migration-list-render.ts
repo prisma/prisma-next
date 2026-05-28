@@ -32,16 +32,18 @@ function formatArrowGlyph(from: string | null, to: string): string {
   return from !== null && from === to ? '⟲' : '→';
 }
 
+const DECORATION_PREFIX = '  ';
+
 function formatDecorations(providedInvariants: readonly string[], refs: readonly string[]): string {
-  let decorations = '';
+  const blocks: string[] = [];
   if (providedInvariants.length > 0) {
-    decorations += ` {${providedInvariants.join(', ')}}`;
+    blocks.push(`{${providedInvariants.join(', ')}}`);
   }
   if (refs.length > 0) {
-    decorations +=
-      providedInvariants.length > 0 ? ` (${refs.join(', ')})` : `  (${refs.join(', ')})`;
+    blocks.push(`(${refs.join(', ')})`);
   }
-  return decorations;
+  if (blocks.length === 0) return '';
+  return `${DECORATION_PREFIX}${blocks.join(' ')}`;
 }
 
 function formatMigrationRow(migration: MigrationListEntry, dirNameWidth: number): string {

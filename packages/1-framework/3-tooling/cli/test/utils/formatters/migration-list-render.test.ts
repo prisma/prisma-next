@@ -106,7 +106,7 @@ describe('renderMigrationList', () => {
       ),
     );
     expect(output).toMatchInlineSnapshot(`
-      "20260601T1200_backfill_emails  55bada2 ⟲         {backfill_emails_v1} (production)
+      "20260601T1200_backfill_emails  55bada2 ⟲          {backfill_emails_v1} (production)
 
       1 migration(s) on disk"
     `);
@@ -259,7 +259,7 @@ describe('renderMigrationList', () => {
       ),
     );
     expect(output).toMatchInlineSnapshot(`
-      "20260601T1200_backfill  55bada2 ⟲         {a, b}
+      "20260601T1200_backfill  55bada2 ⟲          {a, b}
 
       1 migration(s) on disk"
     `);
@@ -342,6 +342,60 @@ describe('renderMigrationList', () => {
       result([{ spaceId: 'app', migrations: [] }], '0 migration(s) on disk'),
     );
     expect(output).toMatchInlineSnapshot(`"There are no migrations in migrations/app/ yet"`);
+  });
+
+  it('renders the slice-spec worked example byte-for-byte', () => {
+    const output = renderMigrationList(
+      result(
+        [
+          {
+            spaceId: 'app',
+            migrations: [
+              migration({
+                dirName: '20260601T1200_backfill_emails',
+                from: HASH_D,
+                to: HASH_D,
+                providedInvariants: ['backfill_emails_v1'],
+                refs: ['production'],
+              }),
+              migration({
+                dirName: '20260518T1701_namespaces_bookend',
+                from: HASH_E,
+                to: HASH_F,
+                refs: ['db'],
+              }),
+              migration({
+                dirName: '20260422T0748_migration',
+                from: HASH_D,
+                to: HASH_E,
+                refs: ['staging'],
+              }),
+              migration({
+                dirName: '20260422T0742_migration',
+                from: HASH_C,
+                to: HASH_D,
+                refs: ['production'],
+              }),
+              migration({
+                dirName: '20260422T0720_initial',
+                from: null,
+                to: HASH_C,
+              }),
+            ],
+          },
+        ],
+        '5 migration(s) on disk',
+      ),
+    );
+    const expected =
+      '20260601T1200_backfill_emails     55bada2 ⟲          {backfill_emails_v1} (production)\n' +
+      '20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
+      '20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
+      '20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
+      '20260422T0720_initial             ∅       → 4cb4256\n' +
+      '\n' +
+      '5 migration(s) on disk';
+    expect(output).toBe(expected);
   });
 
   it('renders empty state for multi-space with per-space headings', () => {
