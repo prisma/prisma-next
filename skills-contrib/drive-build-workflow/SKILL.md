@@ -63,59 +63,61 @@ The loop iterates **per dispatch**, not per milestone in the legacy sense. Each 
 
 ### 1. Pre-flight: per-dispatch DoR
 
-Before delegating to the implementer, walk the per-dispatch DoR (per `drive/spec/README.md` overlays and § Per-dispatch DoR in this skill's dispatch protocol). Items the dispatch must pass:
+Before delegating to the implementer, walk the per-dispatch DoR. Items the dispatch must pass:
 
-- [ ] Intent statement clear: what changes; what stays the same.
-- [ ] Files-in-play named (concrete paths, from the slice plan).
-- [ ] "Done when" gates explicit (CI commands; regenerate-fixtures; intent-validation criteria).
+- [ ] Slice-plan entry has outcome / builds-on / hands-to / focus filled (see `drive-plan-slice`).
 - [ ] Predicted size is S or M. **L/XL refusal: if the dispatch is predicted L or XL, refuse to delegate.** Route back to `drive-plan-slice` for re-decomposition. The two-cap sizing discipline (PR-cap at slice; M-cap at dispatch) is enforced here.
-- [ ] Failure modes from `drive/plan/README.md` considered.
-- [ ] Edge cases from the slice spec covered by the "done when" or explicitly named as "covered by dispatch X."
 - [ ] No silent design decisions assumed — anything unpinned surfaces as a `drive-discussion` stop-condition (see § Stop conditions) before the dispatch starts.
 
 If any DoR item fails: fix the gap, OR halt and surface to the operator. Do not delegate over a failed DoR.
 
 ### 2. Brief assembly
 
-Once DoR passes, assemble the dispatch brief. The brief is what the implementer reads as its full context for the dispatch (per `drive/plan/README.md` brief-discipline overlays).
+Once DoR passes, assemble the dispatch brief. Briefs are lean by design — the implementer carries slice context across dispatches via subagent continuity, so the brief restates only what's dispatch-specific. See [`docs/drive/principles/brief-discipline.md`](/docs/drive/principles/brief-discipline.md) for the principle.
 
 Brief template (specialise in `drive/plan/README.md`):
 
 ```markdown
-# Dispatch brief: <dispatch-name>
+# Brief: <dispatch-name>
 
-## Context (≤ 1 paragraph)
-_What slice this dispatch is in. What previous dispatches have established. The single piece of information the implementer needs to orient._
+## Task
 
-## Intent (1-3 sentences)
-_What changes. What stays the same. Anti-corruption boundary._
+_One paragraph: what this dispatch does. Unambiguous. Names the surface and the change._
 
-## Files in play
-- `path/to/file.ts` — _what changes._
-- `path/to/test.ts` — _new tests for ..._
+## Scope
 
-## Edge cases (from slice spec, this dispatch's portion)
-- _Edge case 1 — disposition._
-- _Edge case 2 — disposition._
+**In:** _The files / changes / behaviours in this dispatch. Bounded._
 
-## "Done when" gates
-- [ ] _Test command: `pnpm test:packages -- <pkg>`_
-- [ ] _Intent-validation: diff matches intent (no scope creep)._
-- [ ] _..._
+**Out:** _What the implementer must NOT touch, even if adjacent and tempting._
 
-## Failure modes to avoid (from drive/plan/README.md)
-- _Pattern A — how to avoid._
-- _Pattern B — how to avoid._
+## Completed when
 
-## Out of scope (this dispatch)
-- _Surface X — adjacent but explicitly untouched._
+_Binary, dispatch-specific conditions. NOT slice-wide gates. NOT what CI / reviewer / project-DoD already implies. Often just 1–3 items._
+
+- [ ] _Specific condition (e.g. "the `oldX` function is removed; all call sites use `newX`")._
+- [ ] _Operational gate (e.g. "package typecheck clean for `<pkg>`")._
+
+## Standing instruction
+
+Stay focused on the goal; control scope. Trivial-and-related fixes that obviously serve the goal go in the same dispatch with a one-line note in your wrap-up message. Anything that pulls you off the goal — even if it looks useful — halts and surfaces.
 
 ## References
-- Slice spec: `projects/<project>/slices/<slice>/spec.md`
-- Slice plan: `projects/<project>/slices/<slice>/plan.md` (or inline section)
+
+- Slice spec: `<path>` (chosen design + coherence rationale + slice-DoD)
+- Slice plan entry: `<path>` § Dispatch N (outcome / builds-on / hands-to / focus)
+- Calibration entries from project context matching this dispatch's shape: `<links>` (only the ones that apply — not a generic catalogue dump)
+- Prior dispatch artefacts in this slice (if any): `<links>`
+
+## Operational metadata
+
+- **Model tier:** `<cheap | mid | orchestrator>` — _one-line rationale._
+- **Time-box:** _wall-clock ceiling (overrun → halt and surface, do not extend)._
+- **Refusal triggers:** _conditions under which the implementer halts and surfaces (e.g. "diff exceeds 18 files"; "an out-of-scope surface needs touching to complete the task"; "a load-bearing assumption from the slice spec is observed to be false")._
 ```
 
 The brief feeds `./templates/delegate-implement.md` — the template's `<scope>` and `<context>` placeholders take the brief's body.
+
+**On resumed dispatches (R2+ in the same slice), the brief thins further.** The implementer subagent retains the prior dispatch's transcript. Drop the `References` section's slice-spec / slice-plan pointers (the subagent already knows where they are); restate only the new task, the new completed-when conditions, and any refusal triggers that changed.
 
 ### 3. WIP inspection (≤ 5 min, mid-dispatch)
 
@@ -138,12 +140,11 @@ If WIP inspection finds drift: surface to the implementer with a brief course-co
 
 ### 4. Post-flight: per-dispatch DoD (with intent-validation)
 
-After the implementer reports done and before triggering review, walk the per-dispatch DoD (per `drive/spec/README.md` overlays and § Per-dispatch DoD in this skill's dispatch protocol):
+After the implementer reports done and before triggering review, walk the per-dispatch DoD:
 
-- [ ] All "Done when" gates from the brief pass (CI; lint; typecheck; fixtures; etc.).
-- [ ] **Intent-validation**: the diff matches the brief's intent. No scope creep; no out-of-scope surfaces touched.
-- [ ] Edge cases handled per disposition.
-- [ ] No new findings that should have been pre-named in the slice spec (if there are: route to `drive-discussion` per stop-conditions).
+- [ ] All "Completed when" conditions from the brief pass.
+- [ ] **Intent-validation**: the diff matches the brief's task. No scope creep; no out-of-scope surfaces touched (the standing instruction was honoured).
+- [ ] No new findings that should have surfaced as a discussion-mode signal during the dispatch (if there are: route to `drive-discussion` per stop-conditions).
 - [ ] Implementer's heartbeat report aligns with the diff (caught case: implementer claims success but the diff is empty / off-target).
 
 If DoD fails: re-delegate to fix the gap, OR route to `drive-plan-slice` for re-decomposition if the gap is structural. Do not proceed to reviewer until DoD passes.
@@ -515,7 +516,7 @@ There is no "informational" tier. If you would file something with a non-actiona
 
 ## Validation gates
 
-Each milestone in `plan.md` should declare a **validation gate**: the explicit set of harness commands that must all pass before the milestone is considered done. The implementer runs the gate on their last round; the reviewer re-runs (or trusts) the gate as part of issuing `SATISFIED`. If the plan does not yet declare validation gates per milestone, the orchestrator infers them on first invocation.
+Each milestone in `plan.md` should declare a **validation gate**: the explicit set of harness commands that must all pass before the milestone is considered done. The implementer runs the gate on their last round. **The reviewer trusts the implementer's gate run and focuses on design judgment — reviewer's `pnpm` budget for routine review is zero.** Re-running the gates as part of routine review doubles wall-clock and re-derives a signal the implementer already produced. The exception is the verify-on-main protocol (a focused force-build + typecheck to investigate a "pre-existing on main" claim from the implementer); that is reviewer-side investigation, not a gate re-run. If the plan does not yet declare validation gates per milestone, the orchestrator infers them on first invocation.
 
 **Inferring a gate.** Read the plan's Test Design (and any explicit testing infrastructure references), inspect the project's harness (the package manager + test/lint/typecheck/build scripts), and propose a gate with at minimum:
 
@@ -727,6 +728,8 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 - **Fresh subagent fallback**: when a prior subagent ID is no longer accessible (resume fails), spawn fresh, append the new ID under § Subagent IDs with a swap note recording when and why, and continue.
 - **Implementer flags > silent descope.** If the implementer surfaces a deferral request, treat it as a hard pause; do not delegate review with the deferral unaddressed.
 - **Reviewer is read-only on code, tests, and planning artifacts.** Reviewer can only modify files under `reviews/`. If a reviewer attempts to amend `plan.md` or `spec.md`, treat that as a delegation-protocol failure and re-delegate.
+- **Reviewer's `pnpm` budget for routine review is zero.** The implementer's gate run is the gate; the reviewer focuses on design judgment, not gate re-running. The single exception is the verify-on-main protocol (focused force-build + typecheck to validate a "pre-existing on main" claim from the implementer). Reviewers caught re-running `pnpm test` / `pnpm typecheck` / `pnpm fixtures:check` as part of issuing a verdict are mis-scoped — re-delegate with a tightened reviewer brief. See § Validation gates.
+- **Executor's standing instruction is "stay focused on the goal; control scope" — not "minimize changes."** Minimization trains timidity; goal-focus + scope-discipline trains good judgment. Trivial-and-related fixes that serve the goal go in the same dispatch with a one-line note in the wrap-up message. Drift from the goal halts. Encode this in the brief's `Standing instruction` section so every implementer sees it.
 - **Side-quests get explicit framing + their own commit.** Out-of-scope fixes (e.g. fixing a pre-existing flake the user requests during the loop) commit separately with a scope-note in the commit message; the implementer should never bundle them with milestone work.
 - **`code-review.md` is the single per-round review artifact.** The reviewer maintains it; every round appends a terse entry under `## Round notes`. SDR and walkthrough are not per-round deliverables (see § The artifact contract). The walkthrough is generated at PR-open time by the team's PR-opening skill against the project base.
 - **Findings are work for the implementer's next round.** Every entry in `code-review.md` § Findings log is a concrete action the implementer addresses before the milestone reaches `SATISFIED`. All severities (`must-fix`, `should-fix`, `low / process`) block milestone close — severity is for within-round prioritization, not for letting items carry forward. "Consider for future," "out of scope," or "no action" findings are noise; surface plan amendments to the orchestrator instead so they land in `plan.md` (§ Open items, future milestone task list, or a follow-up ticket) before the next implementer delegation. See § Findings discipline.
