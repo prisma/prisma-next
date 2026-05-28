@@ -1,5 +1,4 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import { enrichContract } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
@@ -22,12 +21,7 @@ import type { Contract } from './fixtures/generated/contract';
 
 export { timeouts };
 
-// Mirror CLI emit-time enrichment: in-memory `defineContract` only folds in
-// target + extension-pack capabilities; adapter and driver contributions
-// land via `enrichContract` at emit time. Tests that exercise the runtime
-// builder against an in-memory contract need the same merged matrix.
-const enrichedContract = enrichContract(contract, [postgresTarget, postgresAdapter, pgvector]);
-const sqlContract = new SqlContractSerializer().deserializeContract(enrichedContract) as Contract;
+const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
 
 export function setupIntegrationTest() {
   let runtime: Runtime;
@@ -119,7 +113,7 @@ export function setupIntegrationTest() {
     });
 
     const stackInstance = instantiateExecutionStack(stack);
-    context = createExecutionContext({ contract: sqlContract, stack });
+    context = createExecutionContext({ contract: sqlContract, stack, driver: postgresDriver });
     const driver = stackInstance.driver!;
     await driver.connect({ kind: 'pgClient', client });
 
