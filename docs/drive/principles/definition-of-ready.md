@@ -8,8 +8,8 @@ The agile orchestrator runs the slice DoR check first:
 
 - [x] Slice spec exists — `projects/storage-shape-flatten/slices/round-2/spec.md`
 - [x] Slice plan exists — `projects/storage-shape-flatten/slices/round-2/plan.md`
-- [x] Every dispatch sized ≤ M — all three are M
-- [x] Outcome fits in one PR — three dispatches × M ≈ 50 files; borderline but reviewable
+- [x] Every dispatch passes dispatch-INVEST — all three have a coherent single outcome with a binary `Completed when`
+- [x] Slice passes slice-INVEST — *Small* check holds: one reviewer can read the PR in one sitting and hold the coherence
 - [ ] **Calibration entries linked — missing.** The team's project-context failure-mode catalogue has an entry for "Dual-shape support relocated under a new name" + matching grep patterns (`'columns' in`, `looksLike`) that exactly fit this slice's shape. They're not linked from the slice plan.
 - [x] Spike dependencies resolved — the test-sites spike artefact exists
 - [x] Design calls settled
@@ -25,9 +25,9 @@ DoR is the *pickup* gate — pass/fail, structural, not negotiable. Three scopes
 
 | Scope | Gate focus | Run by |
 |---|---|---|
-| **Project** (light) | Purpose + scope boundary + project-DoD exist; triage verdict is "project." | `drive-create-project` at project initiation. |
-| **Slice** (heaviest) | Slice spec + slice plan exist; every dispatch sized ≤ M; outcome fits one PR; calibration entries linked; spike dependencies resolved; design calls settled. | `drive-specify-slice` / `drive-plan-slice` at slice initiation. |
-| **Dispatch** (overlay-bound) | Brief assembled per [`brief-discipline.md`](brief-discipline.md); sized ≤ M; model tier declared; inputs loadable; gates runnable; overlay matches in edge-case table. | `drive-build-workflow` at dispatch pre-flight. |
+| **Project** (light) | Purpose + scope boundary + project-DoD exist; triage verdict is "project"; project passes project-INVEST. | `drive-create-project` at project initiation. |
+| **Slice** (heaviest) | Slice spec + slice plan exist; slice passes slice-INVEST (in particular, *Small* = manageable in a single code review); every dispatch in the plan passes dispatch-INVEST; calibration entries linked; spike dependencies resolved; design calls settled. | `drive-specify-slice` / `drive-plan-slice` at slice initiation. |
+| **Dispatch** (overlay-bound) | Brief assembled per [`brief-discipline.md`](brief-discipline.md); dispatch passes dispatch-INVEST (see [`sizing.md`](sizing.md)); model tier declared; inputs loadable; gates runnable; overlay matches in edge-case table. | `drive-build-workflow` at dispatch pre-flight. |
 
 The protocol (canonical skill bodies) carries the *shape*. Your team's `drive/<category>/README.md` carries the *content* — the team-specific items the overlay adds.
 
@@ -51,8 +51,8 @@ Project DoR is intentionally light. Most heavy lifting happens at slice DoR. A p
 A slice is ready to start when:
 
 1. **Slice spec exists** (inline in PR description for orphan; under `projects/<x>/slices/<s>/spec.md` for in-project). Has a clear outcome, scope (in / out within the parent project's purpose), and slice-DoD.
-2. **Slice plan exists.** Decomposes the slice into a dispatch sequence. Every dispatch sized ≤ M; declared DoR + DoD per dispatch; declared model tier per dispatch. Plan refuses to finalise with L or XL.
-3. **Outcome fits in one PR** (the PR-cap test, per invariant I1). If the plan reveals the work won't fit, the slice splits *now*, not after the dispatch loop starts.
+2. **Slice plan exists.** Decomposes the slice into a dispatch sequence. Every dispatch passes dispatch-INVEST (see [`sizing.md`](sizing.md)); declared DoR + DoD per dispatch; declared model tier per dispatch. Plan refuses to finalise with a dispatch that fails INVEST — it gets re-decomposed or sharpened until it passes.
+3. **Slice passes slice-INVEST** (per invariant I1). In particular, *Small* — **manageable in a single code review** — must hold: one reviewer reads the PR in one sitting and holds the coherence end-to-end. If the plan reveals the slice fails *Small*, the slice splits *now*, not after the dispatch loop starts.
 4. **Calibration entries referenced.** Any failure-mode catalogue entries / grep library patterns / reference tasks in the team's project context that apply to this slice's shape are linked from the slice plan, so dispatch briefs can thread them in.
 5. **Spike dependencies resolved.** If the slice plan depends on spike artefacts, those artefacts exist and are linked. No "we'll spike during the dispatch."
 6. **Design calls settled.** Any design call the slice's outcome turns on has been resolved (recorded in `design-decisions.md` if relevant). No "we'll decide during implementation."
@@ -64,8 +64,8 @@ Most failures we'd attribute to "the implementer drifted" are upstream — the s
 
 A dispatch is ready to delegate when:
 
-1. **Brief is assembled** per [`brief-discipline.md`](brief-discipline.md). All eight required sections present.
-2. **Brief is sized ≤ M.** Defence in depth on top of slice-plan sizing. Any dispatch whose brief is L/XL is refused at dispatch time.
+1. **Brief is assembled** per [`brief-discipline.md`](brief-discipline.md). All required sections present.
+2. **Dispatch passes dispatch-INVEST** (see [`sizing.md`](sizing.md)). Defence in depth on top of slice-plan sizing. *Small* (brief + references fit in the executor's context) and *Estimable* (`Completed when` is binary) are the most common failures; either kind refuses dispatch.
 3. **Model tier is declared** per [`decomposition-and-cost.md`](decomposition-and-cost.md). Defaulting to the parent's tier is not a valid declaration.
 4. **Inputs are loadable.** Every linked input (slice spec, spike artefact, calibration entry) is at the linked path and is readable. A broken link means the brief is not ready.
 5. **Edge-case table includes overlay matches.** Every failure-mode entry in the team's project context whose shape matches this dispatch's work is in the brief's edge-case table with a disposition.
@@ -101,8 +101,8 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 
 - [ ] Slice spec exists (path: <…>); outcome + scope + slice-DoD declared
 - [ ] Slice plan exists (path: <…>); decomposes into dispatch sequence
-- [ ] Every dispatch in plan is sized ≤ M; declares DoR + DoD + model tier
-- [ ] Outcome fits in one PR (PR-cap test passed)
+- [ ] Every dispatch in the plan passes dispatch-INVEST (Independent, Negotiable, Valuable, Estimable, Small, Testable); declares DoR + DoD + model tier
+- [ ] Slice passes slice-INVEST (in particular, Small = manageable in a single code review)
 - [ ] Calibration entries linked (failure-mode catalogue / grep library /
        reference tasks in the team's project context that apply)
 - [ ] Spike dependencies resolved (spike artefacts exist and are linked)
@@ -120,8 +120,8 @@ The protocol-layer starter templates. Your `drive/<category>/README.md` overlays
 ```markdown
 ## Dispatch DoR
 
-- [ ] Brief assembled (all eight required sections per brief-discipline.md)
-- [ ] Brief is sized ≤ M (defence in depth on top of slice-plan sizing)
+- [ ] Brief assembled (all required sections per brief-discipline.md)
+- [ ] Dispatch passes dispatch-INVEST (defence in depth on top of slice-plan sizing)
 - [ ] Model tier is declared (defaulting to parent tier is not valid)
 - [ ] All linked inputs are loadable (slice spec / spike artefact /
        calibration entries)
@@ -174,13 +174,14 @@ DoR is **not**:
 4. **Identical DoR at every scope.** Each scope has different concerns: project DoR is scope-and-purpose; slice DoR is decomposition-and-fit; dispatch DoR is brief-readiness. A single shared DoR misses per-scope concerns or imposes irrelevant ones.
 5. **Team overlay items in the shared skill body.** Team-specific gates baked into the canonical body force unaffected teams to skip or waive — which trains everyone to waive. Team-specific items live in `drive/<category>/README.md`.
 6. **DoR check skipped because "we know what we're doing."** The gate fires *especially* when the team is confident — that's when assumption-failure is most likely to slip past. A gate that doesn't fire on confident days is decorative.
-7. **Slice DoR satisfied by "the plan will figure it out."** The plan IS part of slice DoR. A slice without a dispatch sequence sized ≤ M is not ready. Marking it ✅ "the plan author will sort it" moves the work later, where it's more expensive.
+7. **Slice DoR satisfied by "the plan will figure it out."** The plan IS part of slice DoR. A slice whose dispatch sequence hasn't been INVEST-checked is not ready. Marking it ✅ "the plan author will sort it" moves the work later, where it's more expensive.
 
 ## Related principles
 
 - **[`protocol-as-memory.md`](protocol-as-memory.md)** — DoR overlays live in `drive/<category>/README.md` and accrete via retros.
+- **[`sizing.md`](sizing.md)** — the dispatch / slice / project INVEST checklists DoR actually runs.
 - **[`brief-discipline.md`](brief-discipline.md)** — dispatch DoR substantially asks "is the brief assembled per brief discipline?"
-- **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the M-cap at dispatch DoR is what cost optimisation depends on.
+- **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the dispatch-INVEST gate at DoR is what cost optimisation depends on.
 - **[`roles-and-personas.md`](roles-and-personas.md)** — the agile orchestrator runs DoR at every scope.
 - **[`definition-of-done.md`](definition-of-done.md)** — the handoff gate that bookends every unit; together with DoR they form the unit's contract.
 - **[`retro.md`](retro.md)** — when DoR catches a gap, the gate worked; when it doesn't, the retro updates the overlay.

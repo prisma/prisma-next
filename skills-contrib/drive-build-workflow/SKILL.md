@@ -17,7 +17,7 @@ Pilots the slice's implementation loop. Workflow skill — invoked top-down and 
 
 The loop: **pre-flight DoR (per dispatch) → assemble brief → delegate one dispatch → WIP inspection (≤ 5 min) → post-flight DoD (per dispatch) → reviewer verdict → triage verdict → loop / escalate / proceed** until the reviewer reports `SATISFIED` on each milestone of the slice.
 
-> **Note:** Renamed from `drive-orchestrate-plan` in 2026-05. The new "Per-dispatch protocol" and "Stop conditions" sections capture the augmentations (per-dispatch DoR pre-flight, brief template, WIP-inspection cadence, per-dispatch DoD post-flight with intent-validation, L/XL refusal, design-discussion stop-condition). The legacy "loop algorithm" section describes the delegation mechanics that fit inside one dispatch's iteration; some pre-rename phrasing remains there ("milestone" → read as "dispatch" in the current vocabulary). Consumers calling `drive-orchestrate-plan` should migrate via `drive-reconcile-skills`.
+> **Note:** Renamed from `drive-orchestrate-plan` in 2026-05. The new "Per-dispatch protocol" and "Stop conditions" sections capture the augmentations (per-dispatch DoR pre-flight, brief template, WIP-inspection cadence, per-dispatch DoD post-flight with intent-validation, dispatch-INVEST refusal at pre-flight, design-discussion stop-condition). The legacy "loop algorithm" section describes the delegation mechanics that fit inside one dispatch's iteration; some pre-rename phrasing remains there ("milestone" → read as "dispatch" in the current vocabulary). Consumers calling `drive-orchestrate-plan` should migrate via `drive-reconcile-skills`.
 
 This skill is an **orchestrator**. It delegates:
 
@@ -66,7 +66,7 @@ The loop iterates **per dispatch**, not per milestone in the legacy sense. Each 
 Before delegating to the implementer, walk the per-dispatch DoR. Items the dispatch must pass:
 
 - [ ] Slice-plan entry has outcome / builds-on / hands-to / focus filled (see `drive-plan-slice`).
-- [ ] Predicted size is S or M. **L/XL refusal: if the dispatch is predicted L or XL, refuse to delegate.** Route back to `drive-plan-slice` for re-decomposition. The two-cap sizing discipline (PR-cap at slice; M-cap at dispatch) is enforced here.
+- [ ] **Dispatch passes dispatch-INVEST** (Independent, Negotiable, Valuable, Estimable, Small, Testable — see [`docs/drive/principles/sizing.md`](/docs/drive/principles/sizing.md); per-altitude rubric specialised for this codebase at [`drive/calibration/sizing.md`](/drive/calibration/sizing.md)). If any letter fails, refuse to delegate — route back to `drive-plan-slice` for re-decomposition or refine the brief until each letter passes. *Small* is the most common failure mode: a dispatch whose brief + references don't fit in one executor session, or whose outcome covers more than one sentence, fails Small and must be split or sharpened.
 - [ ] No silent design decisions assumed — anything unpinned surfaces as a `drive-discussion` stop-condition (see § Stop conditions) before the dispatch starts.
 
 If any DoR item fails: fix the gap, OR halt and surface to the operator. Do not delegate over a failed DoR.
@@ -125,8 +125,8 @@ During a dispatch's execution, take **one** 5-minute pass on whatever the implem
 
 Cadence:
 
-- For short dispatches (S, < 30 min): no WIP inspection — the dispatch completes before drift can compound.
-- For M dispatches: one WIP inspection at roughly the midpoint OR at the implementer's first "I've made progress, here's where I am" heartbeat.
+- For short dispatches (typical: minutes): no WIP inspection — the dispatch completes before drift can compound.
+- For longer dispatches (typical: 30 min to a couple of hours): one WIP inspection at roughly the midpoint OR at the implementer's first "I've made progress, here's where I am" heartbeat.
 - For dispatches that get long unexpectedly: WIP inspection fires automatically once the dispatch crosses 90 min wallclock.
 
 What you check (≤ 5 min):
@@ -163,7 +163,7 @@ The loop halts and surfaces to the operator via `drive-discussion` when:
 
 3. **Out-of-scope surface needs touching to complete the dispatch.** If the implementer reports that completing the dispatch requires touching a surface marked out-of-scope, halt and route to `drive-discussion`. Either the scope was wrong (re-spec) or the approach was wrong (re-plan).
 
-4. **Dispatch refused at DoR as L/XL.** Not a stop-condition exactly — re-plan via `drive-plan-slice`. If the slice can't decompose into Ms cleanly, escalate via `drive-discussion`: the slice itself may need re-triaging (promote to project).
+4. **Dispatch refused at DoR for failing dispatch-INVEST.** Not a stop-condition exactly — re-plan via `drive-plan-slice`. If the slice can't decompose into INVEST-passing dispatches cleanly, escalate via `drive-discussion`: the slice itself may need re-triaging (promote to project).
 
 5. **Health check / drift signal that suggests scope shift.** Surfaced by `drive-check-health` between dispatches. Halt and route to `drive-start-workflow` for mid-flight re-triage (likely outcome: promote or demote).
 

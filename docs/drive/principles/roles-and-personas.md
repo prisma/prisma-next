@@ -12,7 +12,7 @@ Drive needs three roles and one hat. Roles are *who owns what*; the hat is *the 
 
 The hat:
 
-**Agile orchestrator** — the stance whoever is currently driving the process wears. Scope discipline (triage, deferral, in-or-out calls), sizing instinct (PR-cap at slice, M-cap at dispatch), process facilitation (DoR / DoD / WIP inspection / brief / retro), and knowing when to escalate to a design discussion. Not pinned to a person; not pinned to a role.
+**Agile orchestrator** — the stance whoever is currently driving the process wears. Scope discipline (triage, deferral, in-or-out calls), sizing instinct (slice-INVEST at slice altitude, dispatch-INVEST at dispatch altitude — coherence-driven, never file-count-driven; see [`sizing.md`](sizing.md)), process facilitation (DoR / DoD / WIP inspection / brief / retro), and knowing when to escalate to a design discussion. Not pinned to a person; not pinned to a role.
 
 Any of these — roles or hat — can be a human or an agent or a mix. Today the operator wears most of them; the orchestrator agent wears the agile-orchestrator hat during dispatch loops. The trajectory hands more and more to agents as the team's `drive/<category>/README.md` content matures.
 

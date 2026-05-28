@@ -100,7 +100,7 @@ A common temptation: combine the spike and the implementation. *"Investigate how
 
 Wrong for two reasons:
 
-- **The implementation can't be sized until the investigation completes.** Combining means the orchestrator can't apply size caps to the implementation. The dispatch silently becomes whatever size the investigation reveals — which might be L/XL.
+- **The implementation can't be sized until the investigation completes.** Combining means the orchestrator can't run dispatch-INVEST against the implementation in advance. The dispatch silently becomes whatever shape the investigation reveals — and that shape often fails INVEST's *Estimable* and *Small* once it lands.
 - **The artefact gets lost.** When the same dispatch does both, the investigation output usually becomes *"I noticed N sites need migration, then I migrated them all"* — buried in commit messages. The next agent has no spike artefact to read from.
 
 Always separate. Spike first → artefact → orchestrator reads → sizes the implementation → dispatches it as its own M-sized work (or several M-sized works if the spike revealed it should decompose further).

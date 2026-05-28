@@ -25,7 +25,7 @@ These are what work *becomes* once triaged:
 | Verdict | What it means | Routes to |
 |---|---|---|
 | **Direct change** | One dispatch's worth; spec fits in working memory; ~30-second-verifiable diff. | `gh pr create` via `drive-pr-description` (direct-change framing). |
-| **Slice** | One PR-sized unit (1–10 M-dispatches). Default: **orphan** (spec inline in PR description). If a parent project exists for this purpose: **in-project** (`projects/<project>/slices/<slice>/`). | `drive-specify-slice` → `drive-build-workflow`. |
+| **Slice** | One PR-sized unit. The size test is **slice-INVEST**, in particular *Small* = **manageable in a single code review** (one reviewer holds the coherence in one sitting). Default: **orphan** (spec inline in PR description). If a parent project exists for this purpose: **in-project** (`projects/<project>/slices/<slice>/`). | `drive-specify-slice` → `drive-build-workflow`. |
 | **Project** | Composition of 2–4 slices under one purpose. | `drive-create-project` → `drive-specify-project` → `drive-plan-project` → `drive-deliver-workflow`. |
 
 **Orphan-first default for slice work.** Most slice-sized work should be orphan slices. A project is justified when the work composes 2+ slices, OR when a one-slice project is warranted because the design needs more than the PR description can carry — but the bar is "we're about to do design work that won't fit in the PR description," not "this work is important."
@@ -115,7 +115,9 @@ Q3. Is the diff ~30-second-verifiable and the spec fits in working memory?
     │
     └─ No → continue to Q4
 
-Q4. Does the work fit in one PR (≤ 10 M-dispatches)?
+Q4. Does the work pass slice-INVEST — in particular, is it
+    manageable in a single code review (one reviewer, one sitting,
+    coherence holds end-to-end)?
     │
     ├─ Yes → SLICE (default: orphan; in-project iff parent project exists
     │                 AND slice spec needs that context)
@@ -160,12 +162,15 @@ Defaults; teams should override / extend in `drive/triage/README.md`.
 - No new design decisions; no new tests; no migration of existing call sites.
 - The spec for the change fits in working memory — if you'd need to write it down for the executor, it's a slice.
 
-**Q4 — One PR?**
+**Q4 — Slice-INVEST?**
 
-- PR-cap test: would the resulting PR be reviewable in one sitting (~30 min) and rollback-able as one unit?
-- If the work spans more than ~3 logical layers (contract IR + emitter + fixtures + adapter), it's project-sized.
+- *Small*: would one reviewer hold the PR's coherence in one sitting without re-orienting mid-review? Coherence-driven test, not LoC-driven — a 2000-LoC mechanical rename passes; a 200-LoC PR spanning three concerns fails.
+- *Independent*: does the work ship as one PR without needing a sibling slice to merge concurrently?
+- *Valuable*: does the work close a real gap on its own, or is it "preparation for slice 3"? Preparation-only is a sequencing artifact, not a slice.
 - If you'd need to stack 2+ PRs to deliver the value end-to-end, it's project-sized.
 - Spikes are slice-sized by default (single-dispatch slice plan), not project-sized.
+
+See [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) for the per-altitude INVEST rubric specialised to this codebase, including dispatch-shape patterns this repo runs cleanly.
 
 **Q4 sub-question — Orphan or in-project?**
 
@@ -180,7 +185,7 @@ Defaults; teams should override / extend in `drive/triage/README.md`.
 
 **Promote / demote.**
 
-- **Promote:** the slice's PR diff would be too big to review in one sitting, OR the slice plan now lists 5+ dispatches with cross-area dependencies, OR new work has surfaced that's clearly inside the same purpose.
+- **Promote:** the slice no longer passes slice-INVEST — one reviewer can't hold the coherence in one sitting (fails *Small*), OR the work has grown sibling outcomes that ought to ship as their own slices (fails *Independent* / *Valuable*), OR new work has surfaced that's clearly inside the same purpose and warrants a project-level umbrella.
 - **Demote:** of the project's remaining slices, only one is non-trivial; the rest are done or no longer needed; remaining work fits one PR.
 
 ## Pitfalls
@@ -215,6 +220,8 @@ Defaults; teams should override / extend in `drive/triage/README.md`.
 
 ## References
 
+- [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md) — sizing principle (logical coherence; INVEST at three altitudes; slice-Small = manageable in a single code review)
+- [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) — this codebase's INVEST rubric and dispatch/slice-shape reference patterns
 - [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that introduced the 3-shape + 4-transition split, the orphan-first default, and the 1–4-slices-per-project anchor
 - [`drive/triage/README.md`](../../drive/triage/README.md) — team-specific triage protocol, calibration anchors, spike-first conventions
-- [`drive/plan/README.md`](../../drive/plan/README.md) — sizing discipline this skill enforces
+- [`drive/plan/README.md`](../../drive/plan/README.md) — sequencing + parallelisation patterns
