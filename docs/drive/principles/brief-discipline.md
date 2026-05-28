@@ -128,15 +128,15 @@ off the goal — even if it looks useful — halts and surfaces.
 A spike brief swaps "Completed when" for:
 
 ```markdown
-## Artefact + Completed when
+## Artifact + Completed when
 
-**Artefact path:** <typically `projects/<x>/spikes/<date>-<q>.md`>
+**Artifact path:** <typically `projects/<x>/spikes/<date>-<q>.md`>
 
-**Artefact shape:** <table | list | per-section structure — be specific>
+**Artifact shape:** <table | list | per-section structure — be specific>
 
 **Completed when:**
-- [ ] Artefact exists at the named path with the named shape.
-- [ ] Artefact answers the question (not "I started investigating").
+- [ ] Artifact exists at the named path with the named shape.
+- [ ] Artifact answers the question (not "I started investigating").
 - [ ] The next dispatch's brief can be assembled using the artifact.
 ```
 
