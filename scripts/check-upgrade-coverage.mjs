@@ -274,7 +274,7 @@ export function parseArgs(args) {
  * responsible for deciding how to render the result (text vs JSON)
  * and for `process.exit`.
  */
-export function runCheck({ repoRoot, mode, head, prev }) {
+export function runCheck({ repoRoot, head, prev }) {
   const headVersion = parseVersion(readPackageJsonAtRef(repoRoot, head).version);
   const prevVersion = parseVersion(readPackageJsonAtRef(repoRoot, prev).version);
 
@@ -416,7 +416,7 @@ export function main(args = argv.slice(2), repoRoot = cwd()) {
   }
   let result;
   try {
-    result = runCheck({ repoRoot, mode: parsed.mode, head, prev });
+    result = runCheck({ repoRoot, head, prev });
   } catch (err) {
     stderr.write(`check-upgrade-coverage: ${err.message}\n`);
     return 2;

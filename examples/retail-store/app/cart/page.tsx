@@ -34,8 +34,8 @@ export default async function CartPage() {
       ) : (
         <>
           <div className="flex flex-col gap-3">
-            {items.map((item, i) => (
-              <Card key={`${item.productId}-${i}`}>
+            {items.map((item) => (
+              <Card key={item.productId}>
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
                     <p className="font-semibold">{item.name}</p>
