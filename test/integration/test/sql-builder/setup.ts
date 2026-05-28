@@ -117,7 +117,7 @@ export function setupIntegrationTest() {
     });
 
     const stackInstance = instantiateExecutionStack(stack);
-    context = createExecutionContext({ contract: sqlContract, stack, driver: postgresDriver });
+    context = createExecutionContext({ contract: sqlContract, stack, driver: stack.driver });
     const driver = stackInstance.driver!;
     await driver.connect({ kind: 'pgClient', client });
 
