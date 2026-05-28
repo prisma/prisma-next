@@ -1,4 +1,4 @@
-# Artefact redesign: per-level templates, lean briefs, orphan-slice default
+# Artifact redesign: per-level templates, lean briefs, orphan-slice default
 
 **Date:** 2026-05-28
 **Status:** Accepted; pilot rollout starting immediately
