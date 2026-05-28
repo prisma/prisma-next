@@ -22,7 +22,7 @@ Capture a slice's chosen design as either `projects/<project>/slices/<slice>/spe
 - **Chosen design** — the shape this slice converges on. Not a survey of alternatives — the decided shape, expressed concretely (named surfaces, key interfaces, a small worked example if useful).
 - **Coherence rationale** — why these changes hang together as one reviewable PR rather than splitting across two. Often one sentence; *"this slice migrates all call sites of `X` to the new API"* is a coherence claim.
 - **Scope** — what's in (the surfaces this slice changes); what's deliberately out (adjacent surfaces other slices will pick up).
-- **Pre-investigated edge cases** — only the ones already known from outside-codebase sources (a user's prior bug, a known footgun, a calibration entry matching this slice's shape). **Often empty.** Discovery happens at dispatch-time by the implementer's grep pre-flight; pre-naming what the implementer would discover anyway is brief gigantism one level up.
+- **Pre-investigated edge cases** — only the ones already known from outside the codebase (a user's prior bug, a known footgun, a calibration entry matching this slice's shape). **Often empty.** Discovery happens at dispatch time, by the implementer's grep pre-flight; pre-naming what the implementer would discover anyway makes the spec longer without adding information.
 - **Slice-specific done conditions** — only what's NOT implied by CI-green + reviewer-accept + the project-DoD floor. Often a single line (*"snapshot fixtures regenerated and committed"*).
 
 The spec is the *contract* the slice plan + dispatch loop work against.
@@ -158,7 +158,7 @@ _Residual questions for slice execution. Each with a working position._
 ## Pitfalls
 
 1. **Scope that spans more than one PR.** Slice is one PR. If the scope can't be delivered as one reviewable + rollback-able PR, the slice isn't slice-shaped — re-triage as project / promote.
-2. **Pre-walking edge cases the implementer would discover anyway.** Brief gigantism at the slice level: the implementer's dispatch-time grep finds the call sites. Pre-name only what calibration or outside-codebase sources already taught you.
+2. **Pre-walking edge cases the implementer would discover anyway.** The implementer's dispatch-time grep finds the call sites. Pre-name only what the team's calibration catalogue or outside-codebase knowledge already taught.
 3. **Slice-DoD restating CI + reviewer + project-DoD items.** Those are inherited. The slice-DoD is for what's slice-specific only.
 4. **Chosen design framed as a survey of alternatives.** A slice spec is post-discussion; the alternatives belong in the design-decisions record (if the decision deserved one), not in the slice spec.
 5. **In-project slice that doesn't fit parent's purpose.** If the slice's scope sits outside the parent's purpose, it's a new project (or orphan slice), not an in-project slice. Re-triage.

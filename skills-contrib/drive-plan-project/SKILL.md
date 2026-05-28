@@ -2,9 +2,9 @@
 name: drive-plan-project
 description: >
   Compose a project's slices + direct changes into a sequenced project plan. Each entry
-  carries outcome + builds-on + hands-to + focus. Parallelisation is load-bearing and
-  must be explicit. Use after drive-specify-project has settled the project spec. Outputs
-  projects/<project>/plan.md.
+  carries outcome + builds-on + hands-to + focus. Parallelisation opportunities must be
+  surfaced explicitly. Use after drive-specify-project has settled the project spec.
+  Outputs projects/<project>/plan.md.
 metadata:
   version: "2026.5.28"
   split_from: drive-create-plan
@@ -19,7 +19,7 @@ metadata:
 Compose a project into its sequence of slices + direct changes. The plan answers:
 
 1. **What units of work make up this project?** A list of slices + direct changes.
-2. **In what order — and what can parallelise?** Parallelisation is load-bearing; planning bias is sequential by default, so a project plan that doesn't surface parallelisation opportunities is incomplete.
+2. **In what order — and what can run in parallel?** Planning bias is sequential by default; a project plan that doesn't surface parallel branches misses real schedule wins.
 3. **What does each unit deliver to the next?** Per-entry handoff contracts — *what state does this unit leave for downstream units to build on?*
 
 The plan does NOT decompose each slice into dispatches — that's `drive-plan-slice`'s job, fired when the slice is picked up.
@@ -192,11 +192,11 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 - `drive-specify-project` — produces the spec this plan composes
 - `drive-plan-slice` — decomposes each slice into dispatches; runs when the slice is picked up
 - `drive-deliver-workflow` — pilots the project plan to delivery
-- `drive-discussion` — fires when sequencing decisions surface load-bearing design questions
+- `drive-discussion` — fires when sequencing decisions surface design questions that need a decision before planning continues
 - `drive-start-workflow` — handles mid-flight scope shifts that require re-planning
 
 ## References
 
-- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that introduced outcome / builds-on / hands-to / focus entries, made parallelisation load-bearing, and pinned the 1–4-slice sweet spot
+- [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that introduced outcome / builds-on / hands-to / focus entries, required explicit parallelisation, and pinned the 1–4-slice sweet spot
 - [`drive/plan/README.md`](../../drive/plan/README.md) — stack vs parallel heuristics, sizing reference cases
 - [`drive/project/README.md`](../../drive/project/README.md) — slice-composition patterns for this repo

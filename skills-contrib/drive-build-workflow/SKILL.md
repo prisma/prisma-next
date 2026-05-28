@@ -73,7 +73,7 @@ If any DoR item fails: fix the gap, OR halt and surface to the operator. Do not 
 
 ### 2. Brief assembly
 
-Once DoR passes, assemble the dispatch brief. Briefs are lean by design — the implementer carries slice context across dispatches via subagent continuity, so the brief restates only what's dispatch-specific. See [`docs/drive/principles/brief-discipline.md`](/docs/drive/principles/brief-discipline.md) for the principle.
+Once DoR passes, assemble the dispatch brief. Briefs are lean by design: the same implementer subagent runs every dispatch in a slice, so the brief restates only what's dispatch-specific. See [`docs/drive/principles/brief-discipline.md`](/docs/drive/principles/brief-discipline.md) for the principle.
 
 Brief template (specialise in `drive/plan/README.md`):
 
@@ -112,12 +112,12 @@ Stay focused on the goal; control scope. Trivial-and-related fixes that obviousl
 
 - **Model tier:** `<cheap | mid | orchestrator>` — _one-line rationale._
 - **Time-box:** _wall-clock ceiling (overrun → halt and surface, do not extend)._
-- **Refusal triggers:** _conditions under which the implementer halts and surfaces (e.g. "diff exceeds 18 files"; "an out-of-scope surface needs touching to complete the task"; "a load-bearing assumption from the slice spec is observed to be false")._
+- **Halt conditions:** _the specific situations under which the implementer halts and surfaces (e.g. "diff exceeds 18 files"; "an out-of-scope surface needs touching to complete the task"; "an assumption named in the slice spec is observed to be false")._
 ```
 
 The brief feeds `./templates/delegate-implement.md` — the template's `<scope>` and `<context>` placeholders take the brief's body.
 
-**On resumed dispatches (R2+ in the same slice), the brief thins further.** The implementer subagent retains the prior dispatch's transcript. Drop the `References` section's slice-spec / slice-plan pointers (the subagent already knows where they are); restate only the new task, the new completed-when conditions, and any refusal triggers that changed.
+**On resumed dispatches (R2+ in the same slice), the brief thins further.** The implementer subagent retains the prior dispatch's transcript. Drop the `References` section's slice-spec / slice-plan pointers (the subagent already knows where they are); restate only the new task, the new completed-when conditions, and any halt conditions that changed.
 
 ### 3. WIP inspection (≤ 5 min, mid-dispatch)
 
@@ -157,7 +157,7 @@ This is what the existing loop algorithm (§ The loop algorithm below) covers. A
 
 The loop halts and surfaces to the operator via `drive-discussion` when:
 
-1. **Falsified assumption.** A load-bearing assumption named in the slice spec (or implicit in the plan) is observed to be false during dispatch execution. Per invariant I12, the orchestrator does not silently amend the spec — it halts and routes to `drive-discussion`. The discussion's output includes the design-decisions log entry that closes the stop-condition (per `drive-discussion` § Synthesis).
+1. **Falsified assumption.** An assumption named in the slice spec (or implicit in the plan) is observed to be false during dispatch execution. Per invariant I12, the orchestrator does not silently amend the spec — it halts and routes to `drive-discussion`. The discussion's output includes the design-decisions log entry that closes the stop-condition (per `drive-discussion` § Synthesis).
 
 2. **Unpinned design decision encountered.** A dispatch hits a fork in the road that the slice spec didn't pin (and that's not a documented degree-of-freedom). Halt and route to `drive-discussion`; the decision lands in design-decisions.md + amends the slice spec.
 

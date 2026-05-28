@@ -204,7 +204,7 @@ If invoked without an operator session (e.g. via a watchdog hook firing on a Lin
 
 1. **Triage answers "looks like a direct change" but the change isn't 30-second-verifiable.** The verdict needs a sanity check at PR-description time — if the diff is sprawling, escalate back to triage for re-routing. Direct change is a *scope* claim; the diff is the test.
 2. **Promotion ceremony executed without operator authorisation.** Linear side-effects are visible to the wider team. Always confirm in interactive mode; always log + halt in unattended mode.
-3. **Demotion that deletes `projects/<x>/` without migrating useful content.** The slice plan, edge cases, learnings might be load-bearing for the surviving work. Migrate to the surviving PR body before deletion.
+3. **Demotion that deletes `projects/<x>/` without migrating useful content.** The slice plan, edge cases, and learnings may still apply to the surviving work. Migrate them to the surviving PR body before deletion.
 4. **Re-triage that fires on every entry to the project loop.** Triage is for entry + scope-shift, not for double-checking. If you find yourself running triage repeatedly without a scope-shift signal, that's a workflow bug.
 5. **Spike verdict that proceeds straight into implementation rather than into a spike dispatch.** The spike's DoD is "the artefact answers the question," not "code committed." Then the artefact triggers re-triage.
 6. **Skipping Step 2 (discussion-mode signal check).** Triaging on un-sharpened entry-points produces low-quality verdicts.

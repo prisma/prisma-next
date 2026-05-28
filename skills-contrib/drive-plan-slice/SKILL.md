@@ -170,7 +170,7 @@ _(Repeat per dispatch; total ≤ 10.)_
 - `drive-specify-slice` — produces the slice spec this plan decomposes
 - `drive-plan-project` — composes slices into project sequencing; the parent layer
 - `drive-build-workflow` — pilots the dispatch loop this plan defines
-- `drive-discussion` — fires when decomposition surfaces load-bearing design questions
+- `drive-discussion` — fires when decomposition surfaces design questions that need a decision before decomposition continues
 - `drive-qa-plan` — the manual-QA dispatch's plan, woven into the slice plan when applicable
 
 ## References

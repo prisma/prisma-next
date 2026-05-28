@@ -27,7 +27,7 @@ The shape:
 - **Transitional-shape constraints** — constraints on the shape of intermediate states between slices (*"each merged slice keeps CI green on `main`"*, *"no breaking change without a deprecation window of at least one minor release"*).
 - **Project-DoD** — verifiable conditions under which the project closes.
 
-A project spec does **not** carry: per-slice detail (lives in slice specs), sequencing detail (lives in the project plan), or ceremony sections (FRs / NFRs / Constraints+Assumptions enumerated separately for the sake of having them — fold load-bearing items into the sections above, drop the rest).
+A project spec does **not** carry: per-slice detail (lives in slice specs), sequencing detail (lives in the project plan), or separate FR / NFR / Constraints+Assumptions ceremony sections (fold items that matter into the sections above; drop the rest).
 
 **Rule of thumb:** if a section could move down a level (to the project plan or to a slice spec) without losing information, it belongs down the level.
 
@@ -73,7 +73,7 @@ Before drafting:
 - Is the purpose clear and shared between operator + agent?
 - Are non-goals known (or knowable)?
 - Are the project-DoD conditions known (even if not yet phrased)?
-- Are the load-bearing transitional-shape constraints explicit (or N/A)?
+- Are the transitional-shape constraints that affect every slice stated explicitly (or N/A)?
 
 If any answer is "no," route back to `drive-discussion` before drafting. A project spec written over an unsettled design will mislead every downstream slice.
 
