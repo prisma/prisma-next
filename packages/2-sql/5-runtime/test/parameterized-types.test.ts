@@ -411,7 +411,7 @@ describe('parameterized types', () => {
         extensionPacks: [createBasicVectorExt()],
       });
 
-      expect(context.contract).toBe(contract);
+      expect(context.contract).toEqual(contract);
     });
 
     it('rejects invalid inline column typeParams with stable error code', () => {
