@@ -48,27 +48,49 @@ type PgBoolReturn = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
 
 /**
  * Filter helper: the union of CT codec ids whose `traits` set contains
- * the required trait. Mirrors the unexported `CodecIdsWithTrait` helper
- * in `relational-core/src/expression.ts` — the same mechanism ADR 203
- * documents for `fns.ilike` argument resolution. Each helper below
- * specialises this filter for one framework-canonical codec trait.
+ * every required trait. Mirrors the unexported `CodecIdsWithTrait`
+ * helper in `relational-core/src/expression.ts` — the same mechanism
+ * ADR 203 documents for `fns.ilike` argument resolution.
+ *
+ * Gate shape: `[RequiredTraits[number]] extends [T]`. The bracketed
+ * form prevents conditional distribution, so the gate reads as "every
+ * required trait is present in `T`" — correct whether `T` arrives as a
+ * tuple (`readonly ['equality', 'order', 'numeric']`) or as a union
+ * (`'equality' | 'order' | 'numeric'`). `ExtractCodecTypes<TContract>`
+ * (`relational-core/src/expression.ts`) flattens descriptor `traits`
+ * tuples to unions via `DescriptorCodecTraits<D> = TTraits[number] &
+ * CodecTrait`, so in every real-contract instantiation `T` is a union;
+ * the earlier `T extends readonly string[] ? T[number] : never` gate
+ * tripped on that union case and cascaded to `never`. The three
+ * exported wrappers below pass a one-element tuple
+ * (`readonly ['<trait>']`) so the single-trait callsites read the same
+ * as before from the consumer side.
  */
-type CodecIdsWithTrait<CT extends CodecTypesBase, Trait extends string> = {
+type CodecIdsWithTrait<
+  CT extends CodecTypesBase,
+  RequiredTraits extends readonly string[],
+> = {
   [K in keyof CT & string]: CT[K] extends { readonly traits: infer T }
-    ? [Trait] extends [T extends readonly string[] ? T[number] : never]
+    ? [RequiredTraits[number]] extends [T]
       ? K
       : never
     : never;
 }[keyof CT & string];
 
 /** Codec ids in `CT` declaring the `equality` trait. */
-export type EqualityCodecId<CT extends CodecTypesBase> = CodecIdsWithTrait<CT, 'equality'>;
+export type EqualityCodecId<CT extends CodecTypesBase> = CodecIdsWithTrait<
+  CT,
+  readonly ['equality']
+>;
 
 /** Codec ids in `CT` declaring the `order` trait. */
-export type OrderCodecId<CT extends CodecTypesBase> = CodecIdsWithTrait<CT, 'order'>;
+export type OrderCodecId<CT extends CodecTypesBase> = CodecIdsWithTrait<CT, readonly ['order']>;
 
 /** Codec ids in `CT` declaring the `textual` trait. */
-export type TextualCodecId<CT extends CodecTypesBase> = CodecIdsWithTrait<CT, 'textual'>;
+export type TextualCodecId<CT extends CodecTypesBase> = CodecIdsWithTrait<
+  CT,
+  readonly ['textual']
+>;
 
 /**
  * Flat operation signatures for the SQL family. Composed into the
