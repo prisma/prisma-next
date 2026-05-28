@@ -490,6 +490,8 @@ describe('contractToSchemaIR', () => {
                   },
                   target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'User', columns: ['id'] },
                   name: 'Post_authorId_fkey',
+                  onDelete: 'cascade',
+                  onUpdate: 'restrict',
                   constraint: true,
                   index: true,
                 },
@@ -508,6 +510,8 @@ describe('contractToSchemaIR', () => {
         referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
         name: 'Post_authorId_fkey',
+        onDelete: 'cascade',
+        onUpdate: 'restrict',
       },
     ]);
   });
