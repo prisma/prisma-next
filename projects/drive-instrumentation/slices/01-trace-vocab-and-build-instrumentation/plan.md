@@ -9,7 +9,7 @@ Slice spec: [`spec.md`](./spec.md). Spec re-specified 2026-05-28 to expand scope
 - **D1: SATISFIED** — `5bdc19013`. Build-loop event vocabulary (`docs/drive/trace-events.md`) and shared emission protocol (`docs/drive/trace-emission.md`).
 - **D2: SATISFIED** — `42feffeb4`. Five emit-sites in `skills-contrib/drive-build-workflow/SKILL.md` at canonical anchors.
 - **D3: SATISFIED** — `849f10598`. `manual-qa.md` + `qa-run-01.md` + `qa-trace-01.jsonl` (build-loop event coverage; 13 events across a synthetic 2-dispatch / 3-round scenario).
-- **D4: pending** — vocabulary expansion for the six planning-chain event types.
+- **D4: SATISFIED** — `4156a84c8` + orchestrator fixup `7a8b3e6fe`. Six planning-chain event types added to `docs/drive/trace-events.md`; existence-check subsection added to `docs/drive/trace-emission.md`. F2 + F3 (low/process JSONL + anchor nits) closed in fixup commit.
 - **D5a: pending** — instrumentation of spec + plan lifecycle skills (4 skills).
 - **D5b: pending** — instrumentation of triage + I12 skills (2 skills).
 - **D6: pending** — manual-QA expansion + second walkthrough run covering all eleven event types.
