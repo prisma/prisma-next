@@ -30,9 +30,9 @@ function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
 }
 
 function generateMongoCollectionEntryType(coll: MongoCollection): string {
-  const entries = Object.entries(coll).filter(([, v]) => v !== undefined);
+  const entries = Object.entries(coll).filter(([key, v]) => v !== undefined && key !== 'kind');
   if (entries.length === 0) {
-    return 'Record<string, never>';
+    return 'MongoCollection';
   }
   return serializeValue(coll);
 }
@@ -245,6 +245,7 @@ export const mongoEmission = {
   getFamilyImports(): string[] {
     return [
       'import type {',
+      '  MongoCollection,',
       '  MongoContractWithTypeMaps,',
       '  MongoTypeMaps,',
       "} from '@prisma-next/mongo-contract';",

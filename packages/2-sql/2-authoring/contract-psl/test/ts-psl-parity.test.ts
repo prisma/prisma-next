@@ -533,8 +533,8 @@ model Post {
       models: { User, Post },
     });
 
-    const pslStorage = pslContract.value.storage as SqlStorage;
-    const tsStorage = tsContract.storage as SqlStorage;
+    const pslStorage = pslContract.value.storage as unknown as SqlStorage;
+    const tsStorage = tsContract.storage as unknown as SqlStorage;
     const pslFks: readonly ForeignKey[] =
       pslStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
     const tsFks: readonly ForeignKey[] =
