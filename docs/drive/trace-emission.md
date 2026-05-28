@@ -87,7 +87,7 @@ Replace `{event_type}` with the event name for the transition point. Build loop:
 
 ## Existence-check pattern for `*-authored` vs `*-amended` events
 
-Four planning-chain write events — [`spec-authored`](./trace-events.md), [`spec-amended`](./trace-events.md), [`plan-authored`](./trace-events.md), [`plan-amended`](./trace-events.md) — share a gating decision at emit time: did the target artefact file already exist on disk immediately before this write?
+Four planning-chain write events — [`spec-authored`](./trace-events.md#spec-authored), [`spec-amended`](./trace-events.md#spec-amended), [`plan-authored`](./trace-events.md#plan-authored), [`plan-amended`](./trace-events.md#plan-amended) — share a gating decision at emit time: did the target artefact file already exist on disk immediately before this write?
 
 The emitting skill (`drive-specify-project`, `drive-specify-slice`, `drive-plan-project`, `drive-plan-slice`) checks file existence **before** committing the write, then emits exactly one event:
 
