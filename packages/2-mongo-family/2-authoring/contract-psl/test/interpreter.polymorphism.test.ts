@@ -188,7 +188,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       `);
 
       expect(ir.roots).toHaveProperty('tasks', crossRef('Task'));
-      expect(Object.values(ir.roots)).not.toContain('Bug');
+      expect(Object.values(ir.roots)).not.toContainEqual(crossRef('Bug'));
     });
 
     it('restores base as root when variant explicitly @@map()s to same collection', () => {
@@ -212,7 +212,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       `);
 
       expect(ir.roots).toHaveProperty('tasks', crossRef('Task'));
-      expect(Object.values(ir.roots)).not.toContain('Bug');
+      expect(Object.values(ir.roots)).not.toContainEqual(crossRef('Bug'));
     });
   });
 

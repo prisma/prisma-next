@@ -34,7 +34,9 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
     expect(types).toContain(
       "readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' }",
     );
-    expect(types).toContain("readonly posts: 'Post'");
+    expect(types).toContain(
+      "readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
+    );
 
     expect(types).toContain('readonly User:');
     expect(types).toContain('readonly Post:');

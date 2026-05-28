@@ -57,7 +57,7 @@ export const blogContract: Contract = {
       },
       relations: {},
       storage: {},
-      owner: crossRef('Post'),
+      owner: 'Post',
     },
   },
   storage: {

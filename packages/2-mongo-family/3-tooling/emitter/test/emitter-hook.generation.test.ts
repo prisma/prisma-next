@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
@@ -87,13 +88,15 @@ describe('mongoEmission.generateContractTypes', () => {
 
   it('generates roots type', () => {
     const contract = createMongoContract({
-      roots: { users: 'User', posts: 'Post' },
+      roots: { users: crossRef('User'), posts: crossRef('Post') },
     });
     const types = generateContractDts(contract, mongoEmission, [], testHashes);
     expect(types).toContain(
       "readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' }",
     );
-    expect(types).toContain("readonly posts: 'Post'");
+    expect(types).toContain(
+      "readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
+    );
   });
 
   describe('model generation', () => {
@@ -261,7 +264,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {},
             storage: { collection: 'tasks' },
-            base: 'Task',
+            base: crossRef('Task'),
           },
           Feature: {
             fields: {
@@ -269,7 +272,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {},
             storage: { collection: 'tasks' },
-            base: 'Task',
+            base: crossRef('Task'),
           },
         },
         storage: namespacedMongoStorageFromCollections({ tasks: {} }),
@@ -278,7 +281,9 @@ describe('mongoEmission.generateContractTypes', () => {
       expect(types).toContain("discriminator: { readonly field: 'type' }");
       expect(types).toContain("readonly Bug: { readonly value: 'bug' }");
       expect(types).toContain("readonly Feature: { readonly value: 'feature' }");
-      expect(types).toContain("base: 'Task'");
+      expect(types).toContain(
+        "base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' }",
+      );
     });
 
     it('generates storage.relations on parent model', () => {

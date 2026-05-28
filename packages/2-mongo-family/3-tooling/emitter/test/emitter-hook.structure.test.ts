@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import {
@@ -181,7 +182,7 @@ describe('mongoEmission.validateStructure', () => {
           },
           relations: {},
           storage: { collection: 'tasks' },
-          base: 'Task',
+          base: crossRef('Task'),
         },
       },
       storage: namespacedMongoStorageFromCollections({ tasks: {} }),
@@ -208,7 +209,7 @@ describe('mongoEmission.validateStructure', () => {
           },
           relations: {},
           storage: { collection: 'bugs' },
-          base: 'Task',
+          base: crossRef('Task'),
         },
       },
       storage: namespacedMongoStorageFromCollections({ tasks: {}, bugs: {} }),
@@ -244,7 +245,7 @@ describe('mongoEmission.validateStructure', () => {
           },
           relations: {},
           storage: { collection: 'tasks' },
-          base: 'NonExistent',
+          base: crossRef('NonExistent'),
         },
       },
       storage: namespacedMongoStorageFromCollections({ tasks: {} }),
