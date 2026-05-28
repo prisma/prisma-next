@@ -74,6 +74,10 @@
       "types": "./dist/exports/migration-list-types.d.mts",
       "import": "./dist/exports/migration-list-types.mjs"
     },
+    "./enumerate-migration-spaces": {
+      "types": "./dist/exports/enumerate-migration-spaces.d.mts",
+      "import": "./dist/exports/enumerate-migration-spaces.mjs"
+    },
     "./refs": {
       "types": "./dist/exports/refs.d.mts",
       "import": "./dist/exports/refs.mjs"
