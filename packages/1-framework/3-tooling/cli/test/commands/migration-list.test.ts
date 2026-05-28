@@ -12,12 +12,13 @@ import { runMigrationList } from '../../src/commands/migration-list';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
 
 /**
- * AC-16 / AC-17 / AC-18 coverage for `migration list` (D3). Tests
- * exercise `runMigrationList`, the pure data-and-policy core of the
- * command — built so AC coverage doesn't depend on the CLI shell's
- * `loadConfig` step. No `vi.mock` / `vi.hoisted` / `vi.resetModules`
- * dance: tests build a real `migrations/` tree in a tmpdir, call the
- * core, and assert on the returned {@link MigrationListResult}.
+ * Verifies the `migration list` command's data-and-policy core:
+ * enumeration, `--space` narrowing, structured-error surfacing, and
+ * JSON shape. Tests exercise `runMigrationList` directly so coverage
+ * doesn't depend on the CLI shell's `loadConfig` step. No `vi.mock` /
+ * `vi.hoisted` / `vi.resetModules` dance: tests build a real
+ * `migrations/` tree in a tmpdir, call the core, and assert on the
+ * returned {@link MigrationListResult}.
  *
  * Human output is verified by piping the result through
  * {@link renderMigrationList} (the same renderer the CLI shell uses) —
@@ -123,7 +124,7 @@ function expectOk<T>(
   }
 }
 
-describe('runMigrationList — slice-spec worked example (AC-16/17)', () => {
+describe('runMigrationList — slice-spec worked example', () => {
   it('renders the slice-spec worked example byte-for-byte (single space)', async () => {
     const { migrationsRoot } = await setupFixture();
 
@@ -186,7 +187,7 @@ describe('runMigrationList — slice-spec worked example (AC-16/17)', () => {
     expect(renderMigrationList(result.value)).toBe(expected);
   });
 
-  it('renders every on-disk migration as exactly one row (row-count guarantee — AC-17)', async () => {
+  it('renders every on-disk migration as exactly one row (row-count guarantee)', async () => {
     // Six demo shapes from the slice DoD checklist:
     //   single-branch  — linear chain (A → B → C)
     //   sub-branches   — same source, two destinations (A → B, A → C)
@@ -258,7 +259,7 @@ describe('runMigrationList — slice-spec worked example (AC-16/17)', () => {
     expect(human.trim().endsWith(`${specs.length} migration(s) on disk`)).toBe(true);
   });
 
-  it('renders multi-contract-space output with per-space heading and 2-space indent (AC-10/13)', async () => {
+  it('renders multi-contract-space output with per-space heading and 2-space indent', async () => {
     const { migrationsRoot } = await setupFixture();
 
     await writePackage(migrationsRoot, {
@@ -372,7 +373,7 @@ describe('runMigrationList — slice-spec worked example (AC-16/17)', () => {
     expect(renderMigrationList(result.value)).toBe(expected);
   });
 
-  it('renders self-edge with invariants as `⟲ … {invariant_id}` (AC-7)', async () => {
+  it('renders self-edge with invariants as `⟲ … {invariant_id}`', async () => {
     const { migrationsRoot } = await setupFixture();
 
     await writePackage(migrationsRoot, {
@@ -421,7 +422,7 @@ describe('runMigrationList — slice-spec worked example (AC-16/17)', () => {
   });
 });
 
-describe('runMigrationList — --space flag (AC-16)', () => {
+describe('runMigrationList — --space flag', () => {
   it('narrows to a single contract space and suppresses the per-space heading', async () => {
     const { migrationsRoot } = await setupFixture();
 
@@ -523,7 +524,7 @@ describe('runMigrationList — --space flag (AC-16)', () => {
   });
 });
 
-describe('runMigrationList — JSON output shape (AC-18)', () => {
+describe('runMigrationList — JSON output shape', () => {
   it('JSON output is unconditionally grouped by contract space (single-space)', async () => {
     const { migrationsRoot } = await setupFixture();
 
