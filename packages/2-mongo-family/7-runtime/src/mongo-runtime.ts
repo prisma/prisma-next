@@ -126,9 +126,20 @@ class MongoRuntimeImpl
     const self = this;
     const signal = options?.signal;
     const codecCtx: CodecCallContext = signal === undefined ? {} : { signal };
+
+    // Per-execute identity stamped onto the plan before any hook fires (ADR
+    // 220). MongoRuntimeImpl overrides `execute()` and runs its own pipeline
+    // here rather than delegating to `RuntimeCore.execute`, so the wrap is
+    // applied at this entry point as well.
+    const planExecutionId = crypto.randomUUID();
+    const wrappedPlan = {
+      ...plan,
+      meta: { ...plan.meta, planExecutionId },
+    };
+
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
-      const compiled = await self.runBeforeCompile(plan);
+      const compiled = await self.runBeforeCompile(wrappedPlan);
       const exec = await self.lower(compiled, codecCtx);
       await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, self.ctx);
       const stream = runWithMiddleware<MongoExecutionPlan, Record<string, unknown>>(
