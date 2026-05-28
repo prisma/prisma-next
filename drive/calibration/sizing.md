@@ -2,6 +2,8 @@
 
 How big is this work, and which slices can run in parallel? This file is the team's pinned reference. When a new piece of work doesn't obviously match a reference task, pick the nearest one and ask: *is this harder, easier, or about the same?*
 
+> **Post-pilot revisit (2026-05-28).** The current matrix is calibrated against the codebase as of the artefact-cascade-redesign discussion; running observations are it's too conservative for cheap-tier dispatches (mechanical-fanout M dispatches routinely close in well under the time-box). Slice-cap (one PR per slice) and project-cap (1–4 slices) anchors are added below; the dispatch matrix itself will be re-calibrated after the redesign pilot on the next 1–2 projects.
+
 ## Dispatch-sizing reference anchors
 
 Estimate new dispatches relative to these references. If a new dispatch feels harder than its reference, size up; easier, size down. The slice-level analogue is "does the slice fit in one PR?" — these references are the **dispatch-level** cap. M is the dispatch ceiling; L and XL are refuse-to-dispatch.
@@ -60,6 +62,18 @@ Tier depends on dispatch flavour — judgment-heavy M to orchestrator tier; mech
 | Build a target-extensible something (e.g. target-contributed PSL blocks) | Multiple new framework surfaces + multiple target packs + multiple new tests |
 
 **Decomposition pattern.** Treat as a project, not a slice or dispatch. Route via `drive-triage-work` → `drive-create-project` → `drive-specify-project` → `drive-plan-project`; the plan composes slices; each slice plan is a dispatch sequence with every dispatch M-or-below.
+
+## Slice + project sizing anchors
+
+The dispatch matrix above is the M-cap for one dispatch. The slice and project caps work in the opposite direction — they bound the **container**, not the work item.
+
+### Slice cap — one PR per slice
+
+A slice must fit in one PR a human can review without losing the thread. Operational guide: ≤ 10 M-sized dispatches; if a slice plan demands more, the slice is too large — split it (per [`drive-plan-slice`](../../skills-contrib/drive-plan-slice/SKILL.md)). Slices that exceed this consistently land as PRs that humans review by skimming, which defeats the slice abstraction.
+
+### Project cap — 1–4 slices, occasionally 5
+
+The sweet spot is 1–4 slices. 5 is rare-but-acceptable when the slices are highly parallel; 6+ is a signal you've packed two projects into one project spec — re-spec into separate projects (per [`drive-specify-project`](../../skills-contrib/drive-specify-project/SKILL.md)). Larger projects suffer because the long-lived branch stack runs into rebasing overhead and the project spec's purpose statement loses sharpness.
 
 ## Parallelisation heuristics
 

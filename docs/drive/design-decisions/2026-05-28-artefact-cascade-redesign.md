@@ -128,7 +128,7 @@ The Drive cascade is redesigned around two principles:
 4. **Executor continuity across the slice.** Selective context compaction preserves early-set design context; first-dispatch primes, subsequent briefs inherit. Switching executors mid-slice forfeits the priming.
 5. **"Stay focused on the goal; control scope"** as the executor's standing instruction. Not "minimize changes" — minimization trains timidity. Goal-focused with scope discipline; trivial-and-related fixes in-line with a note; drift halts.
 6. **Reviewer pnpm budget is zero.** Implementer's gate run is the gate; reviewer judges design, not mechanics. Exception: the verify-on-main protocol when investigating a "pre-existing on main" claim, which is a focused force-build + typecheck, not the full suite.
-7. **Team-level Definition of Done lives in `drive/done/README.md`** (project context, not skill). Different teams / repos have different DoD floors; the skill body shouldn't pin one.
+7. **Team-level Definition of Done lives in project context** (this repo: `drive/calibration/dod.md`; other repos may use `drive/done/README.md` or a comparable path). Different teams / repos have different DoD floors; the skill body shouldn't pin one. Each project spec inherits the team's floor and adds project-specific conditions on top.
 8. **No project-internal labels in operator-facing communication.** Externally-discoverable artefacts (Linear tickets, PR titles + bodies, public commit messages, ADRs, release notes) must be readable by someone without project context. The same rule applies to chat messages: define internal terms on first use; refer to slices and dispatches by what they do, not by their ID. Internal shorthand (slice IDs, dispatch numbers, finding labels) is fine in intra-project artefacts (dispatch briefs, reviewer reports, retro entries) but not in conversation with the operator.
 
 ### What gets resolved
@@ -186,4 +186,5 @@ Observable measurements at pilot retro: operator interventions per dispatch; cyc
 - Discussion-mode session transcript: 2026-05-28 in the active worktree chat.
 - Retro file at the time of decision: [`drive/retro/findings.md`](../../../drive/retro/findings.md).
 - Brief discipline doc being rewritten: [`docs/drive/principles/brief-discipline.md`](../principles/brief-discipline.md).
+- Team-DoD floor inherited by project specs: [`drive/calibration/dod.md`](../../../drive/calibration/dod.md).
 - Calibration matrix being revisited: [`drive/calibration/sizing.md`](../../../drive/calibration/sizing.md).

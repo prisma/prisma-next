@@ -58,13 +58,13 @@ A project spec does **not** carry: per-slice detail (lives in slice specs), sequ
 
 ## Project context
 
-Load `drive/spec/README.md`, `drive/project/README.md`, and `drive/done/README.md` at workflow step 1 if they exist. These carry the team's project-spec conventions, the project-level overlays, and **the team-level DoD floor** (inherited by every project's DoD — added on top, not restated).
+Load `drive/spec/README.md`, `drive/project/README.md`, and the team-DoD-floor doc (this repo: `drive/calibration/dod.md`; other repos may use `drive/done/README.md`) at workflow step 1 if they exist. These carry the team's project-spec conventions, the project-level overlays, and **the team-level DoD floor** (inherited by every project's DoD — added on top, not restated).
 
 ## Workflow
 
 ### Step 1 — Load project context
 
-Read `drive/spec/README.md`, `drive/project/README.md`, and `drive/done/README.md` if they exist.
+Read `drive/spec/README.md`, `drive/project/README.md`, and the team-DoD floor doc if they exist.
 
 ### Step 2 — Confirm the design is settled
 
@@ -91,7 +91,7 @@ Use the **Project Spec Template** below. Drafting order:
 4. **Place in the larger world.** External systems, libraries, sibling projects; architectural fit; integration / API contracts.
 5. **Cross-cutting requirements.** Capabilities or constraints no individual slice carries.
 6. **Transitional-shape constraints.** Constraints on intermediate states between slices (deployability, backward-compat, observability during migration). Mark "N/A — single-slice project" if there are none.
-7. **Project-DoD.** Verifiable, binary conditions. Inherit the team's DoD floor from `drive/done/README.md`; add project-specific conditions on top.
+7. **Project-DoD.** Verifiable, binary conditions. Inherit the team's DoD floor from the team-DoD doc (this repo: `drive/calibration/dod.md`); add project-specific conditions on top.
 8. **References.** Linear Project, ADRs, sibling projects, design-discussion records.
 
 If you find yourself wanting to write a "Functional requirements" or "Constraints + assumptions" section: stop and ask whether each item belongs in cross-cutting requirements (yes if true at system level), transitional-shape constraints (yes if a shape rule for intermediate states), or *the slice that delivers it* (yes if true at slice level only).
@@ -137,9 +137,9 @@ _If the project has no transitional-shape constraints (e.g. ship-as-one-slice pr
 
 ## Project Definition of Done
 
-_Verifiable, binary conditions for closing this project. Inherit the team's DoD floor from `drive/done/README.md`. Add project-specific conditions on top. Each condition observable._
+_Verifiable, binary conditions for closing this project. Inherit the team's DoD floor (this repo: `drive/calibration/dod.md`). Add project-specific conditions on top. Each condition observable._
 
-- [ ] _Team-DoD floor items (inherited from `drive/done/README.md`)._
+- [ ] _Team-DoD floor items (inherited; see team-DoD doc for the canonical list)._
 - [ ] _Project-specific condition 1._
 - [ ] _Project-specific condition 2._
 
@@ -169,7 +169,7 @@ _Residual design-level questions the project ships with as known-unresolved. Eac
 
 ## Checklist
 
-- [ ] Loaded `drive/spec/README.md`, `drive/project/README.md`, `drive/done/README.md` (if exist)
+- [ ] Loaded `drive/spec/README.md`, `drive/project/README.md`, team-DoD floor doc (if exist)
 - [ ] Confirmed the design is settled (routed back to `drive-discussion` if not)
 - [ ] Researched codebase state the spec will anchor on
 - [ ] Purpose ≤ 3 sentences; captures *why*, not *what*
@@ -191,5 +191,5 @@ _Residual design-level questions the project ships with as known-unresolved. Eac
 
 - [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) — the redesign that stripped FR / NFR / Constraints ceremony, introduced transitional-shape constraints + place-in-larger-world, and pinned the team-DoD-inheritance rule
 - [`drive/spec/README.md`](../../drive/spec/README.md) — project-spec authoring overlays
-- [`drive/done/README.md`](../../drive/done/README.md) — team's project-DoD floor (inherited by every project)
+- [`drive/calibration/dod.md`](../../drive/calibration/dod.md) — team's project-DoD floor (inherited by every project's spec in this repo)
 - Invariant I7 (immutable purpose after first dispatch) — enforced by this skill and `drive-discussion` stop-conditions
