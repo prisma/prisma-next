@@ -61,6 +61,8 @@ Open [`./templates/spec.template.md`](./templates/spec.template.md) and fill it 
 - **In-project**: write `projects/<project>/slices/<slice>/spec.md`. Create the directory if missing.
 - **Orphan**: hold the content for `drive-pr-description` to inject at PR-open time.
 
+> **Emit `spec-authored` or `spec-amended`** (**in-project mode only** — orphan mode skips this emit; the spec lives in the PR description body, not on disk). After writing `projects/<project>/slices/<slice>/spec.md`, existence-check on `SPEC_PATH`: file present before write → `spec-amended` (`bytes_delta`, `reason`, `sections_changed`); else → `spec-authored`. Payload: `spec_kind: "slice"`, `edge_cases_count` from the pre-investigated edge cases table, `open_questions_count`, `dod_items_count`, plus envelope fields. Default `reason`: `"operator-correction"`; `"replan-from-discussion"` / `"falsified-assumption"` when the caller signals. See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) § `spec-authored` / `spec-amended` and [`docs/drive/trace-emission.md` § Existence-check pattern](../../docs/drive/trace-emission.md#existence-check-pattern-for--authored-vs--amended-events) + § Append protocol.
+
 ### Step 6 — Hand off
 
 Hand off to `drive-plan-slice` for dispatch decomposition.

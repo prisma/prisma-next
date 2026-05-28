@@ -83,6 +83,8 @@ For each dispatch, fill `builds on` and `hands to` explicitly. Two checks:
 
 Open [`./templates/plan.template.md`](./templates/plan.template.md). Write inline in the slice spec (under `## Dispatch plan`) or as `projects/<project>/slices/<slice>/plan.md`. Hand off to `drive-build-workflow`.
 
+> **Emit `plan-authored` or `plan-amended`** (immediately after writing the dispatch plan). **Two write modes:** inline — plan under `## Dispatch plan` in `projects/<project>/slices/<slice>/spec.md`, set `plan_path` to that spec path; separate — `projects/<project>/slices/<slice>/plan.md`. Existence-check on `PLAN_PATH`: file present before write → `plan-amended` (`bytes_delta`, `reason`, `dispatches_added`, `dispatches_removed`, `dispatches_resized`); else → `plan-authored` (`dispatch_count`, `dispatch_size_distribution`, `open_items_count`). Default `reason`: `"operator-correction"`; use `"dispatch-added"` / `"dispatch-removed"` / `"dispatch-resize"` when `drive-build-workflow` replan signals; `"replan-from-discussion"` / `"falsified-assumption"` when caller signals. See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) § `plan-authored` / `plan-amended` and [`docs/drive/trace-emission.md` § Existence-check pattern](../../docs/drive/trace-emission.md#existence-check-pattern-for--authored-vs--amended-events) + § Append protocol.
+
 ## Pitfalls
 
 1. **Sizing on file count or LoC instead of outcome coherence.** A 200-file mechanical codemod is one logical unit; a 3-file change with three outcomes is three. Apply dispatch-INVEST.

@@ -51,6 +51,8 @@ Open [`./templates/spec.template.md`](./templates/spec.template.md) and fill it 
 
 If you find yourself reaching for a "Functional requirements" or "Constraints + assumptions" section, stop and ask whether each item belongs in (a) cross-cutting requirements — true at system level; (b) transitional-shape constraints — a shape rule for intermediate states; or (c) the slice that delivers it — true at slice level only. There is no fourth category.
 
+> **Emit `spec-authored` or `spec-amended`** (immediately after writing `projects/<project>/spec.md`). Existence-check on `SPEC_PATH`: `[ -f "$SPEC_PATH" ]` before write → emit `spec-amended` with `bytes_delta`, `reason`, `sections_changed`; else → `spec-authored`. Shared payload: `spec_path`, `spec_kind: "project"`, `byte_length`, `edge_cases_count: null`, `open_questions_count`, `dod_items_count`, plus envelope fields. Default `reason` when not inferable: `"operator-correction"`; use `"replan-from-discussion"` after `drive-discussion` synthesis, `"falsified-assumption"` when routed from an I12 halt. A verbatim re-write still emits `spec-amended` (even when `bytes_delta = 0`). See [`docs/drive/trace-events.md`](../../docs/drive/trace-events.md) § `spec-authored` / `spec-amended` for the payload schema and [`docs/drive/trace-emission.md` § Existence-check pattern](../../docs/drive/trace-emission.md#existence-check-pattern-for--authored-vs--amended-events) + § Append protocol for file-append mechanics.
+
 ### Step 5 — Refine, then hand off
 
 Surface open questions to the operator; process answers; update the spec. If a question reveals a fundamental design call is still open, stop and route to `drive-discussion`. When the spec is settled, hand off to `drive-plan-project`.
