@@ -1,10 +1,13 @@
-import type { MigrationListEntry, MigrationListResult } from '../../commands/migration-list-types';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+} from '@prisma-next/migration-tools/migration-list-types';
 
 export type {
   MigrationListEntry,
   MigrationListResult,
   MigrationSpaceListEntry,
-} from '../../commands/migration-list-types';
+} from '@prisma-next/migration-tools/migration-list-types';
 
 const HASH_WIDTH = 7;
 const EMPTY_SOURCE = '∅';

@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import type {
   MigrationListEntry,
   MigrationListResult,
   MigrationSpaceListEntry,
-} from '../../../src/commands/migration-list-types';
+} from '@prisma-next/migration-tools/migration-list-types';
+import { describe, expect, it } from 'vitest';
 import { renderMigrationList } from '../../../src/utils/formatters/migration-list-render';
 
 const HASH_A = 'sha256:abcdef0123456789abcdef0123456789abcdef0123456789ab';

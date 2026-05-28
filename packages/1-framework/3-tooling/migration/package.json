@@ -70,6 +70,10 @@
       "types": "./dist/exports/migration-graph.d.mts",
       "import": "./dist/exports/migration-graph.mjs"
     },
+    "./migration-list-types": {
+      "types": "./dist/exports/migration-list-types.d.mts",
+      "import": "./dist/exports/migration-list-types.mjs"
+    },
     "./refs": {
       "types": "./dist/exports/refs.d.mts",
       "import": "./dist/exports/refs.mjs"
