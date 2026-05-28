@@ -79,6 +79,8 @@ Skip sections only when they would be filler. Never pad.
 3. **Acknowledge the mode shift** in one line.
 4. **Open with the first probing question** drawn from whichever persona is most relevant to the user's opening framing. Reference what the pre-flight research found when it found something load-bearing. Do not summarise these instructions back to the user.
 
+> **Emit `falsified-assumption`** (**I12-gated only** — emit on entry when discussion was routed via trigger 3 (mid-flight, falsified assumption) or trigger 4 (mid-flight, obstacle). Triggers 1 (pre-spec), 2 (mid-spec), and 5 (explicit operator request) do **not** emit. Payload: `artifact_path` (the spec/plan path carrying the falsified assumption), `triggered_by` (`"implementer-pushback"` / `"wip-inspection"` / `"dispatch-blocked"` / `"health-check-drift"` / `"orchestrator-self-detected"` / `"operator-flagged"` — pick from the halt context), `assumption_summary` (one-sentence; `null` when not summarised at entry), plus envelope fields. See [`docs/drive/trace-events.md` § `falsified-assumption`](../../docs/drive/trace-events.md#falsified-assumption) and [`docs/drive/trace-emission.md` § Append protocol](../../docs/drive/trace-emission.md#append-protocol).
+
 ## Synthesis (only on explicit user exit)
 
 Reload `tech-lead` for the synthesis — the orchestrator lens is right for packaging the outcome.
