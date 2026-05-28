@@ -8,6 +8,7 @@ import {
   type CodecRef,
   ColumnRef,
   ExistsExpr,
+  OrderByItem,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -22,12 +23,35 @@ import {
   resolveModelTableName,
 } from './collection-contract';
 import { and, not } from './filters';
-import {
-  COMPARISON_METHODS_META,
-  type ComparisonMethodFns,
-  type ModelAccessor,
-  type RelationFilterAccessor,
-} from './types';
+import type { ModelAccessor, RelationFilterAccessor } from './types';
+
+/**
+ * Trait-gated `asc` / `desc` ordering factories.
+ *
+ * **Removed by slice 3b** — when the ORM ordering registry lands, the
+ * `OrderByModelAccessor` will own these factories and the WHERE accessor
+ * will no longer surface them. Until then, they live here so that the
+ * single registry-driven loop in `createScalarFieldAccessor` (and the
+ * mirror loop in `createExtensionMethodFactory` for non-predicate
+ * chained results) can attach `m.field.asc()` / `m.field.desc()`
+ * alongside the family-SQL registry's trait-gated predicates.
+ *
+ * The framework registry intentionally excludes ordering ops (they're
+ * an ORM concern, not a SQL-builder one). The `'order'` trait gate
+ * here mirrors the gate the deleted `COMPARISON_METHODS_META.asc /
+ * .desc` carried so the WHERE-accessor surface is byte-identical for
+ * order-trait codecs.
+ */
+const LEGACY_ORDERING_METHODS = {
+  asc: {
+    traits: ['order'] as const,
+    create: (left: AnyExpression) => () => OrderByItem.asc(left),
+  },
+  desc: {
+    traits: ['order'] as const,
+    create: (left: AnyExpression) => () => OrderByItem.desc(left),
+  },
+} as const;
 
 type ResolvedModelRelation = ReturnType<typeof resolveModelRelations>[string];
 
@@ -46,36 +70,7 @@ export function createModelAccessor<
   const tableName = resolveModelTableName(contract, modelName);
   const modelRelations = resolveModelRelations(contract, modelName);
 
-  const opsByCodecId = new Map<string, NamedOp[]>();
-
-  function registerOp(codecId: string, op: NamedOp) {
-    let existing = opsByCodecId.get(codecId);
-    if (!existing) {
-      existing = [];
-      opsByCodecId.set(codecId, existing);
-    }
-    existing.push(op);
-  }
-
-  for (const [name, entry] of Object.entries(context.queryOperations.entries())) {
-    const op: NamedOp = [name, entry];
-    const self = entry.self;
-    if (!self) continue;
-    if (self.codecId !== undefined) {
-      registerOp(self.codecId, op);
-    } else if (self.traits !== undefined) {
-      for (const descriptor of context.codecDescriptors.values()) {
-        const descriptorTraits: readonly string[] = descriptor.traits;
-        if (self.traits.every((t) => descriptorTraits.includes(t))) {
-          registerOp(descriptor.codecId, op);
-        }
-      }
-    } else if (self.any === true) {
-      for (const descriptor of context.codecDescriptors.values()) {
-        registerOp(descriptor.codecId, op);
-      }
-    }
-  }
+  const opsByCodecId = buildOpsByCodecId(context);
 
   return new Proxy({} as ModelAccessor<TContract, ModelName>, {
     get(_target, prop: string | symbol): unknown {
@@ -109,10 +104,57 @@ export function createModelAccessor<
         codec,
         traits,
         operations,
+        opsByCodecId,
         context,
       );
     },
   });
+}
+
+/**
+ * Build the per-codec operations index from the execution context's
+ * registry. For each registered operation, walks the contract's codec
+ * descriptors and registers the op against every codec id that
+ * satisfies its `self` dispatch hint (codec-id match, trait subset, or
+ * unconditional `any`).
+ *
+ * The index is shared by `createScalarFieldAccessor` (column-method
+ * synthesis) and `createExtensionMethodFactory` (chained-result
+ * synthesis on a non-predicate registry op's return codec).
+ */
+function buildOpsByCodecId(context: ExecutionContext): Map<string, NamedOp[]> {
+  const opsByCodecId = new Map<string, NamedOp[]>();
+
+  function registerOp(codecId: string, op: NamedOp) {
+    let existing = opsByCodecId.get(codecId);
+    if (!existing) {
+      existing = [];
+      opsByCodecId.set(codecId, existing);
+    }
+    existing.push(op);
+  }
+
+  for (const [name, entry] of Object.entries(context.queryOperations.entries())) {
+    const op: NamedOp = [name, entry];
+    const self = entry.self;
+    if (!self) continue;
+    if (self.codecId !== undefined) {
+      registerOp(self.codecId, op);
+    } else if (self.traits !== undefined) {
+      for (const descriptor of context.codecDescriptors.values()) {
+        const descriptorTraits: readonly string[] = descriptor.traits;
+        if (self.traits.every((t) => descriptorTraits.includes(t))) {
+          registerOp(descriptor.codecId, op);
+        }
+      }
+    } else if (self.any === true) {
+      for (const descriptor of context.codecDescriptors.values()) {
+        registerOp(descriptor.codecId, op);
+      }
+    }
+  }
+
+  return opsByCodecId;
 }
 
 function resolveColumn(
@@ -136,32 +178,51 @@ function createScalarFieldAccessor(
   codec: CodecRef | undefined,
   traits: readonly string[],
   operations: readonly NamedOp[],
+  opsByCodecId: ReadonlyMap<string, readonly NamedOp[]>,
   context: ExecutionContext,
-): Partial<ComparisonMethodFns<unknown>> {
+): Expression<ScopeField> & Record<string, unknown> {
   const column = ColumnRef.of(tableName, columnName);
-  const comparisonEntries: Array<[string, unknown]> = [];
-  for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
-    if (meta.traits.some((t) => !traits.includes(t))) continue;
-    comparisonEntries.push([name, meta.create(column, codec)]);
-  }
-
+  // `codec` may be undefined when the scope was built without contract
+  // storage; `ScopeField['codec']` is exact-optional, so we keep the
+  // legacy `as` cast rather than threading a conditional spread.
   const accessor = {
     returnType: { codecId, nullable, codec },
     codec,
     buildAst: () => column,
-    ...Object.fromEntries(comparisonEntries),
   } as Expression<ScopeField> & Record<string, unknown>;
+  attachOperationMethods(accessor, column, traits, operations, opsByCodecId, context);
+  return accessor;
+}
 
+/**
+ * Single registry-driven synthesis loop: attaches each registry op
+ * applicable to this codec id as an extension-method factory, then
+ * layers on the transient `LEGACY_ORDERING_METHODS` (`asc` / `desc`)
+ * gated on the codec's trait set. Shared by `createScalarFieldAccessor`
+ * (column accessor) and `createExtensionMethodFactory` (chained-result
+ * accessor on a non-predicate op's return codec).
+ */
+function attachOperationMethods(
+  accessor: Expression<ScopeField> & Record<string, unknown>,
+  ast: AnyExpression,
+  traits: readonly string[],
+  operations: readonly NamedOp[],
+  opsByCodecId: ReadonlyMap<string, readonly NamedOp[]>,
+  context: ExecutionContext,
+): void {
   for (const [name, entry] of operations) {
-    accessor[name] = createExtensionMethodFactory(accessor, entry, context);
+    accessor[name] = createExtensionMethodFactory(accessor, entry, opsByCodecId, context);
   }
-
-  return accessor as Partial<ComparisonMethodFns<unknown>>;
+  for (const [name, factory] of Object.entries(LEGACY_ORDERING_METHODS)) {
+    if (factory.traits.some((t) => !traits.includes(t))) continue;
+    accessor[name] = factory.create(ast);
+  }
 }
 
 function createExtensionMethodFactory(
   selfExpr: Expression<ScopeField>,
   entry: SqlOperationEntry,
+  opsByCodecId: ReadonlyMap<string, readonly NamedOp[]>,
   context: ExecutionContext,
 ): (...args: unknown[]) => unknown {
   return (...args: unknown[]) => {
@@ -180,14 +241,22 @@ function createExtensionMethodFactory(
       return result.buildAst();
     }
 
+    // Non-predicate result: build a sub-accessor whose method surface
+    // is sourced from the registry's per-result-codec ops index, layered
+    // with `LEGACY_ORDERING_METHODS`. This mirrors the column-accessor
+    // synthesis above so the chained surface (e.g.
+    // `column.cosineSimilarity(v).gt(0.5)` /
+    // `column.cosineSimilarity(v).desc()`) keeps working.
     const resultAst = result.buildAst();
     const returnCodec: CodecRef = { codecId: returnCodecId };
-    const methods: Record<string, unknown> = {};
-    for (const [resultMethodName, meta] of Object.entries(COMPARISON_METHODS_META)) {
-      if (meta.traits.some((t) => !returnTraits.includes(t))) continue;
-      methods[resultMethodName] = meta.create(resultAst, returnCodec);
-    }
-    return methods;
+    const subAccessor = {
+      returnType: { codecId: returnCodecId, nullable: false, codec: returnCodec },
+      codec: returnCodec,
+      buildAst: () => resultAst,
+    } as Expression<ScopeField> & Record<string, unknown>;
+    const resultOps = opsByCodecId.get(returnCodecId) ?? [];
+    attachOperationMethods(subAccessor, resultAst, returnTraits, resultOps, opsByCodecId, context);
+    return subAccessor;
   };
 }
 
@@ -294,9 +363,12 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
       continue;
     }
 
-    const fieldAccessor = (accessor as Record<string, Partial<ComparisonMethodFns<unknown>>>)[
-      fieldName
-    ];
+    const fieldAccessor = (accessor as Record<string, unknown>)[fieldName] as
+      | {
+          eq?: (value: unknown) => AnyExpression;
+          isNull?: () => AnyExpression;
+        }
+      | undefined;
     // Unknown field in the shorthand predicate — the Proxy returns undefined
     // for fields the contract doesn't declare. Surface it explicitly: silent
     // skip would drop user intent (e.g. a typo'd `nmae: 'Alice'` filter would

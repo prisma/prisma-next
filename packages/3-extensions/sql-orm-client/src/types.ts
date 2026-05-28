@@ -7,17 +7,7 @@ import type {
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import {
-  type AnyExpression,
-  BinaryExpr,
-  type BinaryOp,
-  type CodecRef,
-  type CodecTrait,
-  ListExpression,
-  NullCheckExpr,
-  OrderByItem,
-  ParamRef,
-} from '@prisma-next/sql-relational-core/ast';
+import type { AnyExpression, OrderByItem } from '@prisma-next/sql-relational-core/ast';
 import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
@@ -135,32 +125,51 @@ export interface CollectionContext<TContract extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
 }
 
-export type ComparisonMethodFns<T> = {
-  eq(value: T): AnyExpression;
-  neq(value: T): AnyExpression;
-  gt(value: T): AnyExpression;
-  lt(value: T): AnyExpression;
-  gte(value: T): AnyExpression;
-  lte(value: T): AnyExpression;
-  like(pattern: string): AnyExpression;
-  in(values: readonly T[]): AnyExpression;
-  notIn(values: readonly T[]): AnyExpression;
-  isNull(): AnyExpression;
-  isNotNull(): AnyExpression;
-  asc(): OrderByItem;
-  desc(): OrderByItem;
-};
-
 /**
- * Trait-gated comparison methods. Only methods whose required traits are all present in `Traits` are included.
+ * Trait-gated comparison-method surface for a column whose codec
+ * declares the trait set `Traits`. Used both as the chained-result
+ * surface returned by non-predicate registry operations (see
+ * `QueryOperationMethod` below) and as the constraint surface
+ * `HavingComparisonMethods<T>` narrows for grouped builders.
  *
- * - `traits: []` → always available (isNull, isNotNull)
+ * Trait gating mirrors the family-SQL registry's `self.traits`
+ * declarations in `packages/2-sql/9-family/src/core/query-operations.ts`
+ * for the nine trait-keyed predicates plus the two unconditional null
+ * checks. `asc` / `desc` are gated on `'order'` to match the transient
+ * ordering factories in `./model-accessor.ts` — slice 3b's ORM ordering
+ * registry removes both halves of the pair.
+ *
+ * The runtime synthesis lives in `model-accessor.ts` and reads its op
+ * set from the same registry; the type-level surface here pins the
+ * shape consumers (notably the `extension-operations.test-d.ts` strict
+ * equality test) depend on.
  */
-export type ComparisonMethods<T, Traits> = {
-  [K in keyof ComparisonMethodsMeta as [ComparisonMethodsMeta[K]['traits'][number]] extends [Traits]
-    ? K
-    : never]: ComparisonMethodFns<T>[K];
-};
+export type ComparisonMethods<T, Traits> = ('equality' extends Traits
+  ? {
+      eq(value: T): AnyExpression;
+      neq(value: T): AnyExpression;
+      in(values: readonly T[]): AnyExpression;
+      notIn(values: readonly T[]): AnyExpression;
+    }
+  : Record<never, never>) &
+  ('order' extends Traits
+    ? {
+        gt(value: T): AnyExpression;
+        lt(value: T): AnyExpression;
+        gte(value: T): AnyExpression;
+        lte(value: T): AnyExpression;
+        asc(): OrderByItem;
+        desc(): OrderByItem;
+      }
+    : Record<never, never>) &
+  ('textual' extends Traits
+    ? {
+        like(pattern: string): AnyExpression;
+      }
+    : Record<never, never>) & {
+    isNull(): AnyExpression;
+    isNotNull(): AnyExpression;
+  };
 
 type QueryOperationReturnTraits<
   Returns,
@@ -269,102 +278,7 @@ type FieldOperations<
       : unknown
     : unknown;
 
-function param(codec: CodecRef | undefined, value: unknown): ParamRef {
-  if (codec === undefined) return ParamRef.of(value);
-  return ParamRef.of(value, { codec });
-}
 
-function paramList(codec: CodecRef | undefined, values: readonly unknown[]): ListExpression {
-  return ListExpression.of(values.map((value) => param(codec, value)));
-}
-
-// never[] is intentional: factories have heterogeneous signatures (value: unknown, values: readonly unknown[], pattern: string, etc.) but are only called through the typed ComparisonMethodFns interface, never through this type directly.
-type MethodFactory = (
-  left: AnyExpression,
-  codec: CodecRef | undefined,
-) => (...args: never[]) => unknown;
-
-type ComparisonMethodMeta = {
-  readonly traits: readonly CodecTrait[];
-  readonly create: MethodFactory;
-};
-
-function scalarComparisonMethod(op: BinaryOp) {
-  return ((left, codec) => (value: unknown) => {
-    if (value === null && (op === 'eq' || op === 'neq')) {
-      return op === 'eq' ? NullCheckExpr.isNull(left) : NullCheckExpr.isNotNull(left);
-    }
-    return new BinaryExpr(op, left, param(codec, value));
-  }) satisfies MethodFactory;
-}
-
-function listComparisonMethod(op: BinaryOp) {
-  return ((left, codec) => (values: readonly unknown[]) =>
-    new BinaryExpr(op, left, paramList(codec, values))) satisfies MethodFactory;
-}
-
-/**
- * Declares trait requirements and runtime factory for each comparison method.
- *
- * - `traits: []` means "no trait required" — always available
- * - Multi-trait: `traits: ['equality', 'order']` means BOTH traits are required
- */
-export const COMPARISON_METHODS_META = {
-  eq: {
-    traits: ['equality'],
-    create: scalarComparisonMethod('eq'),
-  },
-  neq: {
-    traits: ['equality'],
-    create: scalarComparisonMethod('neq'),
-  },
-  in: {
-    traits: ['equality'],
-    create: listComparisonMethod('in'),
-  },
-  notIn: {
-    traits: ['equality'],
-    create: listComparisonMethod('notIn'),
-  },
-  gt: {
-    traits: ['order'],
-    create: scalarComparisonMethod('gt'),
-  },
-  lt: {
-    traits: ['order'],
-    create: scalarComparisonMethod('lt'),
-  },
-  gte: {
-    traits: ['order'],
-    create: scalarComparisonMethod('gte'),
-  },
-  lte: {
-    traits: ['order'],
-    create: scalarComparisonMethod('lte'),
-  },
-  like: {
-    traits: ['textual'],
-    create: scalarComparisonMethod('like'),
-  },
-  asc: {
-    traits: ['order'],
-    create: (left) => () => OrderByItem.asc(left),
-  },
-  desc: {
-    traits: ['order'],
-    create: (left) => () => OrderByItem.desc(left),
-  },
-  isNull: {
-    traits: [],
-    create: (left) => () => NullCheckExpr.isNull(left),
-  },
-  isNotNull: {
-    traits: [],
-    create: (left) => () => NullCheckExpr.isNotNull(left),
-  },
-} as const satisfies Record<keyof ComparisonMethodFns<unknown>, ComparisonMethodMeta>;
-
-type ComparisonMethodsMeta = typeof COMPARISON_METHODS_META;
 
 export type RelationPredicate<TContract extends Contract<SqlStorage>, ModelName extends string> = (
   model: ModelAccessor<TContract, ModelName>,
