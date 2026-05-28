@@ -15,6 +15,7 @@ const execFileAsync = promisify(execFile);
 const TSX_BIN = resolve(__dirname, '../../../node_modules/.bin/tsx');
 
 import {
+  appendImplicitMigrationPlanFrom,
   executeCommand,
   getExitCode,
   parseJsonObjectFromCliCapture,
@@ -44,7 +45,8 @@ async function emitContract(testDir: string, configPath: string): Promise<void> 
 
 async function runMigrationPlan(testDir: string, args: readonly string[]): Promise<number> {
   const command = createMigrationPlanCommand();
-  const exit = await inDir(testDir, () => executeCommand(command, [...args]));
+  const planArgs = appendImplicitMigrationPlanFrom(testDir, args);
+  const exit = await inDir(testDir, () => executeCommand(command, [...planArgs]));
   if (exit === 0) {
     // Self-emit the freshly planned draft migration so `migration apply` will
     // accept it. Mirrors the prior `migration emit` step that `runMigrationPlan`

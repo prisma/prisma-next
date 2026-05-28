@@ -31,10 +31,10 @@
     "@prisma-next/mongo-schema-ir": "workspace:0.11.0",
     "@prisma-next/mongo-value": "workspace:0.11.0",
     "@prisma-next/utils": "workspace:0.11.0",
-    "arktype": "catalog:",
-    "mongodb": "catalog:"
+    "arktype": "catalog:"
   },
   "devDependencies": {
+    "mongodb": "catalog:",
     "@prisma-next/mongo-contract-psl": "workspace:0.11.0",
     "@prisma-next/psl-parser": "workspace:0.11.0",
     "@prisma-next/test-utils": "workspace:0.11.0",

@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "sqlite",
-  "profileHash": "sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7",
+  "profileHash": "sha256:c336398c1b6d00d93aa155a4f9072e69f55d1897ba5b9bbfd3d7d32f6b270bf4",
   "roots": {
     "post": {
       "model": "Post",

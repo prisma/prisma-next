@@ -1,212 +1,104 @@
 ---
 name: drive-triage-work
 description: >
-  Routes an incoming ask (or mid-flight scope-shift signal) to one of eight triage
-  verdicts: direct change / orphan slice / in-project slice / new project / promote /
-  demote / spike first / defer. Use when picking up a Linear ticket, bug report, customer
-  ask, or "I should do X" thought — at any fresh entry into Drive AND mid-flight when
-  scope shifts. Returns a verdict + a one-paragraph rationale; the verdict's setup chain
-  is executed by drive-start-workflow (or by the operator directly).
+  Routes an incoming entry-point to one of three delivery shapes (direct change /
+  slice / project) or four state-machine transitions (promote / demote / spike /
+  defer). Use at every fresh entry into Drive — Linear ticket, bug report, customer
+  ask, "I should do X" thought — and mid-flight when scope shifts. Returns a verdict
+  + one-paragraph rationale + operator-authorisation flag. The verdict's setup chain
+  is executed by the caller (typically `drive-start-workflow`).
 metadata:
-  version: "2026.5.18"
+  version: "2026.5.28"
 ---
 
-> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
->
-> If the skill's body asks for work that requires reading source code, running builds/tests, or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+> **Execution mode: orchestrator-direct.** Atomic skill invoked by the Orchestrator
+> directly. Running it does NOT change the Orchestrator's role. If the skill's body
+> would require reading source code, running builds/tests, or writing files outside
+> `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md).
 
 # Drive: Triage Work
 
-Runs the triage decision tree on an incoming entry-point (or a mid-flight scope-shift signal). Atomic skill — does one thing: produces a verdict.
+Triage routes work into the smallest shape it fits in. The bias is **down**: direct change before slice; slice before project; orphan slice before in-project slice. The methodology rewards keeping work small; resist the instinct to "tidy this into a project."
 
-The eight verdicts:
+## The seven verdicts
 
-| Verdict | What it means | Routes to |
-|---|---|---|
-| **Direct change** | One PR; no spec, no plan, no dispatch ceremony. Trivial enough that a reviewer can verify by reading the diff in ~30 seconds. | `gh pr create` via `drive-pr-description` (direct-change framing). |
-| **Orphan slice** | One PR-sized unit, slice spec inline in the PR description; no `projects/<x>/`. | `drive-specify-slice` (orphan mode) → `drive-build-workflow`. |
-| **In-project slice** | One PR-sized unit within an existing project's scope; slice spec under `projects/<project>/slices/<slice>/`. | `drive-specify-slice` (in-project mode) → `drive-build-workflow`. |
-| **New project** | Composition of multiple slices under one purpose; full project ceremony. | `drive-create-project` → `drive-specify-project` → `drive-plan-project` → `drive-deliver-workflow`. |
-| **Promote** | Mid-flight: an in-flight slice has grown beyond one PR; create a Linear Project and migrate. | Promotion ceremony (Linear MCP + `drive-create-project` + `drive-specify-project`). |
-| **Demote** | Mid-flight: an in-flight project has shrunk to fit one PR; close down the project ceremony. | Demotion ceremony (Linear MCP + on-disk migration + delete `projects/<project>/`). |
-| **Spike first** | The entry-point can't be sized without a probe; need an investigation dispatch. | `drive-build-workflow` with a spike-flavoured brief; re-triage on artefact. |
-| **Defer** | Out-of-scope for current work; don't act, but don't lose. | Record in `projects/<x>/deferred.md` (in-project) or operator scratch (orphan). |
+Three **delivery shapes** (what work *becomes* once triaged):
 
-## When to use
+| Verdict | Meaning |
+|---|---|
+| **Direct change** | One dispatch's worth; ~30-second-verifiable diff; spec fits in working memory. |
+| **Slice** | One PR-sized unit. Test = slice-INVEST, in particular *Small* = manageable in a single code review. Default **orphan** (spec inline in PR body); in-project iff a parent project exists AND the slice spec needs that context. |
+| **Project** | 2–4 slices under one purpose. 1-slice project is rare-but-OK when the design needs more than the PR description can carry. |
 
-Use **at every fresh entry into Drive** (typically called by `drive-start-workflow`, but invokable directly by the operator):
+Four **state-machine transitions** (state-changes on a piece of work, fresh or in-flight):
 
-- A Linear ticket lands.
-- A bug report or customer ask arrives.
-- The operator notices "I should do X."
-
-Use **mid-flight when scope shifts**:
-
-- An in-flight slice is growing beyond one PR (candidate for **promote**).
-- An in-flight project's remaining scope is now one PR (candidate for **demote**).
-- Operator-initiated scope re-evaluation.
-- `drive-check-health` surfaces a scope-shift signal.
-
-**Do not use this skill for:**
-
-- Re-checking a verdict that hasn't had a scope-shift signal. Triage is for entry + scope-shift, not for double-checking.
-- Picking *which slice to work next* within a project — that's `drive-deliver-workflow`'s pick-next-slice logic, not triage.
-- Sizing dispatches inside a slice plan — that's `drive-plan-slice`.
-
-## Pre-conditions
-
-- An entry-point input: ticket text / bug description / "I should do X" sentence / scope-shift signal.
-- For mid-flight invocations: the in-flight unit (slice path, project path, Linear ID) identified.
-- Optional: `drive/triage/README.md` exists with team-specific triage heuristics, sizing anchors, calibration.
-
-## Post-conditions
-
-- Exactly one of the eight verdicts emitted.
-- A one-paragraph rationale explaining the verdict choice (which decision-tree branches fired; what evidence the operator should re-check if disagreeing).
-- For verdicts with operator-authorisation requirements (promote / demote): a "needs operator authorisation" flag set.
-
-## Project context
-
-Load `drive/triage/README.md` at workflow step 1 if it exists. This is the team's accumulated triage protocol — reference tasks for sizing, ticket-shape patterns the team has learned to recognise, calibration ("what's a direct change in this repo vs an orphan slice"), Linear-sync conventions for promote / demote ceremonies.
+| Verdict | Meaning |
+|---|---|
+| **Promote** | In-flight slice no longer passes slice-INVEST — split into a project. |
+| **Demote** | In-flight project's remaining work fits one PR — collapse to a slice or direct change. |
+| **Spike** | Entry-point can't be sized without a probe. Single-dispatch slice with spike-flavoured brief; re-triage on the artifact. |
+| **Defer** | Out-of-scope for now; record so it isn't lost. |
 
 ## Workflow
 
-### Step 1 — Load project context
+### Step 1 — Discussion-mode signal check
 
-Read `drive/triage/README.md` if it exists.
+Before running the tree, check whether any of these fire on the entry-point:
 
-### Step 2 — Read the entry point
+- **Design ambiguity.** The ask is underspecified in a way that affects sizing or shape.
+- **Surface uncertainty.** First-grep on the obvious entry-point returns more files than expected, OR the work touches an unfamiliar area.
+- **Parent-project assumption at risk.** For mid-flight scope-shifts, the parent project's purpose may no longer hold given what this work implies.
 
-For fresh entries: read the Linear ticket / bug report / ask text. For mid-flight: read the in-flight slice spec / project spec + plan + current PR(s) in flight.
+If any fires, route to `drive-discussion` first. Triage on the post-discussion summary, not the raw entry-point.
 
-### Step 3 — Run the decision tree
+### Step 2 — Run the decision tree
 
-In order — first branch that fires wins.
+First branch that fires wins.
 
 ```text
-Q0. Is this a mid-flight scope-shift signal (rather than a fresh entry)?
-    │
-    ├─ Yes → go to Q5 (promote/demote)
-    │
-    └─ No → continue to Q1
+Q0. Is this a mid-flight scope-shift signal (not a fresh entry)?
+    ├─ Growing past one PR              → PROMOTE
+    ├─ Shrinking to one PR/slice         → DEMOTE
+    └─ Fresh entry                       → Q1
 
-Q1. Is the entry-point so unclear or open-ended that no sizing is yet possible?
-    │
-    ├─ Yes → SPIKE FIRST
-    │
-    └─ No → continue to Q2
-
-Q2. Is the work out-of-scope for what we'd want to do now?
-    │
-    ├─ Yes → DEFER
-    │
-    └─ No → continue to Q3
-
-Q3. Is the work trivial enough that a reviewer can verify the diff in ~30 seconds?
-    (One-line bugfix; config flip; copy change; small refactor whose
-    correctness is obvious from reading the diff.)
-    │
-    ├─ Yes → DIRECT CHANGE
-    │
-    └─ No → continue to Q4
-
-Q4. Does the work fit in one PR (i.e. is it slice-sized, not project-sized)?
-    │
-    ├─ Yes → continue to Q4a
-    │
-    └─ No  → continue to Q4b
-
-Q4a. Does the work fit naturally inside an existing open project's scope?
-    │
-    ├─ Yes → IN-PROJECT SLICE
-    │
-    └─ No  → ORPHAN SLICE
-
-Q4b. (Doesn't fit in one PR — therefore project-sized.) → NEW PROJECT
-
-Q5. (Mid-flight scope-shift signal.) What's the direction of the shift?
-    │
-    ├─ Growing past one PR → PROMOTE
-    │
-    └─ Shrinking to one PR → DEMOTE
+Q1. So unclear that no sizing is possible? → SPIKE.   else Q2.
+Q2. Out-of-scope for now?                  → DEFER.   else Q3.
+Q3. ~30-second-verifiable diff
+    AND spec fits in working memory?       → DIRECT CHANGE.   else Q4.
+Q4. Passes slice-INVEST — in particular,
+    manageable in a single code review?    → SLICE.   else Q5.
+Q5. Composes 2–4 slices?                   → PROJECT.
+                                             5+ slices → re-decompose into two
+                                             projects; flag for operator authorisation.
 ```
 
-### Step 4 — Sanity check the verdict against team-context calibration
+Sizing tests at each Q live in [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md) and the per-altitude INVEST rubric for this codebase in [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md).
 
-If `drive/triage/README.md` carries a reference-task table or sizing anchor: cross-check the candidate verdict against the anchors. (For example: "we said this is a direct change because it's a one-line message edit, but our reference says 'one-line message edits in user-visible surfaces are slices not direct changes due to localisation review' — re-route.")
+### Step 3 — Sanity-check against team calibration
 
-### Step 5 — Emit the verdict + rationale
+Read `drive/triage/README.md` if it exists. Team-specific overrides may apply (e.g. *"one-line user-visible string edits go through slice DoR/DoD due to localisation review"*).
 
-Output:
+### Step 4 — Emit verdict
 
-- The verdict (one of the eight).
-- A one-paragraph rationale explaining which decision-tree branches fired and what evidence supports them.
-- The "operator authorisation required" flag (true for promote / demote; false otherwise).
-- The recommended next skill / setup chain (for callers, especially `drive-start-workflow`).
+Return three things to the caller:
 
-## Sizing heuristics
+- **Verdict** — one of the seven verbs above.
+- **Rationale** — one paragraph: which branches fired, what evidence supports the choice.
+- **Operator authorisation required** — `true` for PROMOTE, DEMOTE, and any PROJECT verdict where the scope hints at more work than the entry-point implied; `false` otherwise.
 
-Default heuristics for the four "size" questions. Teams should override / extend in `drive/triage/README.md`.
-
-**Q1 — Is the work spike-shaped?**
-
-- The ask references "we should figure out…", "investigate…", "find out whether…" without a clear deliverable.
-- The agent or operator can't answer "what file or test would change?" within a couple of minutes of reading.
-- Likely scope ranges across multiple orders of magnitude depending on what's discovered.
-
-**Q3 — Is the work direct-change-shaped?**
-
-- The diff would be 1-3 files changed; the change pattern would be obvious from reading any one chunk.
-- Reviewer time: ~30 seconds to ~2 minutes.
-- No new design decisions; no new tests; no migration of existing call sites.
-- Examples: typo fix; one-line condition flip; config value bump; doc clarification.
-
-**Q4 — Does the work fit in one PR?**
-
-- PR-cap test: would the resulting PR be reviewable in one sitting (~30 min) and rollback-able as one unit?
-- If the work spans more than ~3 logical layers (e.g. contract IR + emitter + fixtures + adapter), it's likely project-sized.
-- If you'd need to stack 2+ PRs to deliver the value end-to-end, it's project-sized.
-- Spikes are slice-sized by default (single-dispatch slice plan), not project-sized.
-
-**Q4a — Does it fit inside an existing open project?**
-
-- Read the open project's spec: is the new work within the project's purpose statement?
-- If yes: in-project slice.
-- If no but adjacent: orphan slice or new project (depending on size).
-
-**Q5 — Promote or demote?**
-
-- Promote: the slice's PR diff would be too big to review in one sitting, OR the slice plan now lists 4+ dispatches with cross-area dependencies, OR new work has surfaced that's clearly inside the same purpose.
-- Demote: of the project's remaining slices, only one is non-trivial; the rest are already done or no longer needed; the remaining work fits one PR.
+The rationale is consumed in the conversation or by the verdict's downstream skill (which folds it into the spec / plan / PR body). Triage produces no on-disk artifact.
 
 ## Pitfalls
 
-1. **Defaulting to "new project" because the work feels important.** Triage is about *size and shape*, not importance. A single-line copy fix to a critical user-visible string is still a direct change; a six-PR refactor of a non-critical internal helper is still a project.
-2. **Routing trivial-but-risky work as direct change.** "Trivial" is about diff size + verifiability, not blast radius. A one-line config change that flips behaviour for all users should be an orphan slice (or in-project slice) so it goes through DoR + DoD + review.
-3. **Skipping the existing-project check (Q4a) and routing slice-sized work as a new project.** Every project has gravity; once a project exists for the purpose, additional same-purpose work is in-project, not a new project.
-4. **Triage that consults the team's calibration but ignores the operator's context.** The operator may know things the calibration doesn't (e.g. "this user-visible string is going to be deprecated next week, so the bug isn't worth shipping a fix for" → defer, not direct-change). Treat calibration as one input, not the verdict.
-5. **Promote / demote without operator authorisation.** Linear side-effects are visible. Always set the authorisation flag and let `drive-start-workflow` (or the operator) handle the confirmation step before any Linear changes happen.
-6. **Spike-first verdict that becomes implementation by stealth.** The spike's DoD is "the artefact answers the planning question." If the spike turns into a code-committing dispatch, that's not a spike — re-triage the work properly.
-
-## Checklist
-
-- [ ] Loaded `drive/triage/README.md` (if exists)
-- [ ] Read the entry-point input
-- [ ] Ran the decision tree; first-firing branch wins
-- [ ] Sanity-checked against team-context calibration anchors
-- [ ] Emitted verdict + one-paragraph rationale
-- [ ] Set "operator authorisation required" flag for promote / demote
-- [ ] Recommended next skill / setup chain for the caller
-
-## Related skills
-
-- `drive-start-workflow` — pilots triage + the verdict's setup chain; this skill is its decision-making step
-- `drive-build-workflow` — what the verdict routes to for slice-sized work
-- `drive-deliver-workflow` — what the verdict routes to for project-sized work
-- `drive-discussion` — fires when triage uncovers a question the operator needs to answer (e.g. unclear scope; ambiguous purpose)
-- `drive-pr-description` (direct-change framing) — what the verdict routes to for direct-change work
+1. **Defaulting to project because the work feels important.** Triage is about size and shape, not importance.
+2. **Defaulting slice work to in-project when it could be orphan.** Orphan-first. In-project only when a parent project actually exists AND the slice spec needs that context.
+3. **Routing trivial-but-risky work as direct change.** "Trivial" is about diff verifiability, not blast radius. A one-line config flip that changes behaviour for all users is a slice so it goes through DoR + DoD + review.
+4. **Promote/demote without operator authorisation.** Linear side-effects are visible. Always set the flag.
+5. **Spike that becomes implementation by stealth.** Spike DoD is "the artifact answers the planning question," not "code committed."
+6. **Skipping Step 1.** If a discussion-mode signal fires and the agent triages on the raw entry-point anyway, the verdict reflects uninformed reading.
 
 ## References
 
-- [`drive/triage/README.md`](../../drive/triage/README.md) — triage workflow outputs, team calibration anchors, spike-first conventions
-- [`drive/plan/README.md`](../../drive/plan/README.md) — sizing discipline this skill enforces
+- [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md) — the sizing principle (logical coherence; INVEST at three altitudes).
+- [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) — this codebase's per-altitude INVEST rubric.
+- [`drive/triage/README.md`](../../drive/triage/README.md) — team-specific triage overrides and calibration.

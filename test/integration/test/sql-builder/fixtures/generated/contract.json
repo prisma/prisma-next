@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:03c90a412dcfe182a475d25eae8cbf5c56fba67009defe8713eaf0b7fbd66b13",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "articles": {
       "model": "Article",
@@ -525,29 +525,18 @@
     }
   },
   "capabilities": {
-    "pgvector": {
-      "hnsw": true,
-      "ivfflat": true,
-      "vector": true
-    },
     "postgres": {
-      "deferrableConstraints": true,
       "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
       "orderBy": true,
-      "partialIndex": true,
       "pgvector.cosine": true,
-      "returning": true,
-      "savepoints": true,
-      "transactionalDDL": true
+      "returning": true
     },
     "sql": {
       "defaultInInsert": true,
       "enums": true,
-      "foreignKeys": true,
-      "jsonAgg": true,
       "lateral": true,
       "returning": true
     }

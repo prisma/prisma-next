@@ -334,6 +334,23 @@ describe('readRefs', () => {
     expect(refs).toEqual({ staging: ENTRY_A });
   });
 
+  it('ignores paired contract snapshot json files', async () => {
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(join(refsDir, 'db.json'), JSON.stringify(ENTRY_A));
+    await writeFile(
+      join(refsDir, 'db.contract.json'),
+      JSON.stringify({
+        targetFamily: 'sql',
+        target: 'postgres',
+        profileHash: HASH_B,
+        storage: { storageHash: HASH_A },
+        models: {},
+      }),
+    );
+    const refs = await readRefs(refsDir);
+    expect(refs).toEqual({ db: ENTRY_A });
+  });
+
   it('throws INVALID_REF_FILE for malformed file', async () => {
     await mkdir(refsDir, { recursive: true });
     await writeFile(join(refsDir, 'staging.json'), '{bad json');

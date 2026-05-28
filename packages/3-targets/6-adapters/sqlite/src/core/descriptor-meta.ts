@@ -11,6 +11,7 @@ export const sqliteAdapterDescriptorMeta = {
       lateral: false,
       jsonAgg: true,
       returning: true,
+      foreignKeys: true,
       enums: false,
     },
   },

@@ -34,7 +34,7 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 
 - **Skills — canonical home:** `skills-contrib/<skill-name>/SKILL.md`. These are the tracked, deliverable source-of-truth files.
 - **Skills — presentation symlinks:** `.claude/skills/<skill-name>` and `.agents/skills/<skill-name>` are symlink directories pointing into `skills-contrib/`. They exist so the various agent harnesses (Cursor, Claude Code, …) can find the skills at the paths they expect. Both symlink trees are gitignored.
-- **Skills — wired post-install:** the symlink trees (and any tooling-specific copies) are materialized by the `prepare` script in [`package.json`](./package.json), which runs `skills add ./skills-contrib --skill '*' --agent universal claude-code -y`. After `pnpm install`, `.claude/skills/` and `.agents/skills/` are populated automatically — no manual setup. If you add a new skill under `skills-contrib/`, re-run `pnpm install` (or just the prepare hook) to wire it into the tooling locations.
+- **Skills — wired post-install:** the symlink trees (and any tooling-specific copies) are materialized by the `prepare` script in [`package.json`](./package.json), which runs `skills add ./skills-contrib --skill '*' --agent universal claude-code -y`. After `pnpm install`, `.claude/skills/` and `.agents/skills/` are populated automatically — no manual setup. If you add a new skill under `skills-contrib/`, re-run `pnpm install` (or just the prepare hook) to wire it into the tooling locations. `pnpm lint:skills` validates skill frontmatter in CI.
 - **Rules — canonical home:** `.agents/rules/<rule-name>.mdc` (tracked via a whitelist exception in `.gitignore`). The `.cursor/rules/` and `.claude/rules/` paths are presentation symlinks into `.agents/rules/`.
 - **Practical implication for editors and sub-agents:** when amending or authoring a skill or rule, **edit at the canonical path** (`skills-contrib/` for skills, `.agents/rules/` for rules) — not at the symlinked path. An edit through a symlink writes to the canonical file on disk, but `git status` and `git ls-files` report against the canonical path; addressing the canonical path keeps diffs legible and avoids surface churn.
 
@@ -61,7 +61,7 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 - Never use `@ts-expect-error` outside of negative type tests; never use `@ts-nocheck`.
 - Never suppress biome lints.
 - Minimize type casts: prefer explicit types that make casts unnecessary. If unavoidable, narrow the cast as far as possible — never cast a whole object/class when casting one property would suffice.
-- `as unknown as SomeOtherType` is a last resort and must be accompanied by a comment explaining why.
+- No bare `as` in production code. Use `blindCast<T, "Reason">` or `castAs<T>` from `@prisma-next/utils/casts`; see the `no-bare-casts` skill for the decision tree. `as const` and test files are exempt. The `no-bare-cast` plugin + CI ratchet enforce no per-PR cast increases.
 
 ## Common Commands
 

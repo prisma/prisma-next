@@ -82,6 +82,8 @@ export interface MigrationCommandResult {
    * into a single ambiguous list. See {@link AggregatePerSpaceExecutionEntry}.
    */
   readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
+  readonly plannedAdvanceRef?: { readonly name: string; readonly hash: string } | null;
   readonly summary: string;
   readonly timings: {
     readonly total: number;
@@ -208,6 +210,15 @@ export function formatMigrationPlanOutput(
     lines.push(`${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`);
   }
 
+  if (result.plannedAdvanceRef) {
+    lines.push('');
+    lines.push(
+      formatDimText(
+        `Would advance ref "${result.plannedAdvanceRef.name}" → ${result.plannedAdvanceRef.hash}`,
+      ),
+    );
+  }
+
   // Statement preview (any family that implements OperationPreviewCapable)
   const preview = result.plan?.preview;
   if (preview) {
@@ -260,6 +271,7 @@ export interface MigrationApplyCommandOutputResult {
   readonly timings?: {
     readonly total: number;
   };
+  readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
 }
 
 export function formatMigrationApplyCommandOutput(
@@ -282,6 +294,13 @@ export function formatMigrationApplyCommandOutput(
     for (const line of formatPerSpaceBlock(result.perSpace, 'apply', useColor)) {
       lines.push(line);
     }
+  }
+
+  if (result.advancedRef) {
+    lines.push('');
+    lines.push(
+      formatDimText(`Advanced ref "${result.advancedRef.name}" → ${result.advancedRef.hash}`),
+    );
   }
 
   lines.push('');
@@ -469,6 +488,12 @@ export function formatMigrationApplyOutput(
     // Timings in verbose mode
     if (isVerbose(flags, 1)) {
       lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    }
+
+    if (result.advancedRef) {
+      lines.push(
+        formatDimText(`Advanced ref "${result.advancedRef.name}" → ${result.advancedRef.hash}`),
+      );
     }
   }
 

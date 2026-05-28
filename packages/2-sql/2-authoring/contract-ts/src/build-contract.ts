@@ -19,6 +19,7 @@ import {
   type JsonValue,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
+import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
@@ -598,8 +599,24 @@ export function buildSqlContractFromDefinition(
     }
   }
 
-  const capabilities: Record<string, Record<string, boolean>> = definition.capabilities || {};
-  const profileHash = computeProfileHash({ target, targetFamily, capabilities });
+  const extensionPackCapabilitySources = definition.extensionPacks
+    ? Object.values(definition.extensionPacks).map(
+        (pack) => pack.capabilities as CapabilityMatrix | undefined,
+      )
+    : [];
+  const capabilities = mergeCapabilityMatrices(
+    definition.target.capabilities as CapabilityMatrix | undefined,
+    ...extensionPackCapabilitySources,
+  );
+  // Internal `profileHash` computation is unchanged from `origin/main`: it
+  // continues to fingerprint the author-declared capability subset. With
+  // `capabilities` removed from the `defineContract` input that subset is
+  // now always empty, so the hash naturally stabilises at `hash({})`.
+  const profileHash = computeProfileHash({
+    target,
+    targetFamily,
+    capabilities: {},
+  });
 
   const executionWithHash = executionSection
     ? {

@@ -32,7 +32,7 @@ export type StorageHash =
   StorageHashBase<'sha256:3e50138f416ab435ac8933c9d2ddcb725f486464d13054a8100f17f06d97f970'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:4afac8f9fa43b8aa78ee7fb8b1b3e079e92b64ef745e9f115be11e201eb08ef1'>;
+  ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -152,6 +152,7 @@ type ContractBase = ContractType<
   };
   readonly capabilities: {
     readonly postgres: {
+      readonly distinctOn: true;
       readonly jsonAgg: true;
       readonly lateral: true;
       readonly limit: true;
@@ -162,6 +163,7 @@ type ContractBase = ContractType<
     readonly sql: {
       readonly defaultInInsert: true;
       readonly enums: true;
+      readonly lateral: true;
       readonly returning: true;
     };
   };

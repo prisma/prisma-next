@@ -31,10 +31,13 @@
     "@prisma-next/mongo-runtime": "workspace:0.11.0",
     "@prisma-next/target-mongo": "workspace:0.11.0",
     "@prisma-next/utils": "workspace:0.11.0",
-    "mongodb": "catalog:",
     "pathe": "^2.0.3"
   },
+  "peerDependencies": {
+    "mongodb": "^7.0.0"
+  },
   "devDependencies": {
+    "mongodb": "catalog:",
     "@prisma-next/test-utils": "workspace:0.11.0",
     "@prisma-next/tsconfig": "workspace:0.11.0",
     "@prisma-next/tsdown": "workspace:0.11.0",

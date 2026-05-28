@@ -81,7 +81,6 @@ type StorageRelationSpec = {
   readonly field: string;
 };
 
-type ContractCapabilities = Record<string, Record<string, boolean>>;
 type StringListInput = string | readonly string[];
 type Present<T> = Exclude<T, undefined>;
 type EmptyObject = Record<never, never>;
@@ -484,12 +483,6 @@ type DefinitionRoots<Definition> = Definition extends {
   ? NormalizeRoots<Roots>
   : DerivedRootModels<DefinitionModels<Definition>>;
 
-type DefinitionCapabilities<Definition> = Definition extends {
-  readonly capabilities?: infer Capabilities extends ContractCapabilities;
-}
-  ? Capabilities
-  : Record<never, never>;
-
 type DefinitionExtensionPacks<Definition> = Definition extends {
   readonly extensionPacks?: infer ExtensionPacks extends Record<
     string,
@@ -532,7 +525,7 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<
     readonly roots: DefinitionRoots<Definition>;
     readonly models: ContractModelsFromRecord<DefinitionModels<Definition>>;
     readonly storage: DefinitionStorage<Definition>;
-    readonly capabilities: DefinitionCapabilities<Definition>;
+    readonly capabilities: Record<string, never>;
     readonly extensionPacks: DefinitionExtensionPacks<Definition>;
     readonly profileHash: ProfileHashBase<string>;
     readonly meta: Record<string, never>;
@@ -633,13 +626,11 @@ export type ContractScaffold<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<string, string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
-  Capabilities extends ContractCapabilities | undefined = undefined,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
   readonly extensionPacks?: ExtensionPacks;
-  readonly capabilities?: Capabilities;
   readonly roots?: Roots;
 };
 
@@ -649,9 +640,8 @@ export type ContractDefinition<
   Models extends Record<string, AnyModelBuilder> = Record<never, never>,
   ValueObjects extends Record<string, AnyValueObjectBuilder> = Record<never, never>,
   ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
-  Capabilities extends ContractCapabilities | undefined = undefined,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
-> = ContractScaffold<Family, Target, ExtensionPacks, Capabilities, Roots> & {
+> = ContractScaffold<Family, Target, ExtensionPacks, Roots> & {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
 };
@@ -1172,7 +1162,6 @@ function isContractScaffold(
   FamilyPackRef<string>,
   TargetPackRef<string, string>,
   Record<string, ExtensionPackRef<string, string>> | undefined,
-  ContractCapabilities | undefined,
   Record<string, ModelNameInput> | undefined
 > {
   if (typeof value !== 'object' || value === null) {
@@ -1510,7 +1499,6 @@ function buildContractFromDefinition<
     Record<string, AnyModelBuilder>,
     Record<string, AnyValueObjectBuilder>,
     Record<string, ExtensionPackRef<string, string>> | undefined,
-    ContractCapabilities | undefined,
     Record<string, ModelNameInput> | undefined
   >,
 >(definition: Definition): MongoContractResult<Definition> {
@@ -1522,7 +1510,12 @@ function buildContractFromDefinition<
   const roots = definition.roots
     ? normalizeRoots(definition.roots)
     : deriveRoots(definition.models);
-  const capabilities = definition.capabilities ?? {};
+  // The Mongo `defineContract` input no longer accepts a `capabilities`
+  // block. The build-time matrix is empty here; CLI-time `enrichContract`
+  // layers in adapter / driver / extension caps. `profileHash` continues
+  // to fingerprint this (now-always-empty) author subset, so it stabilises
+  // at `hash({})`.
+  const capabilities: Record<string, Record<string, boolean>> = {};
   const collections = buildCollections(definition.models);
   const storageBody = {
     namespaces: {
@@ -1571,7 +1564,6 @@ export function defineContract<
     Record<string, AnyModelBuilder>,
     Record<string, AnyValueObjectBuilder>,
     Record<string, ExtensionPackRef<string, string>> | undefined,
-    ContractCapabilities | undefined,
     Record<string, ModelNameInput> | undefined
   >,
 >(definition: Definition): MongoContractResult<Definition>;
@@ -1580,7 +1572,6 @@ export function defineContract<
     Family,
     Target,
     ExtensionPacks,
-    ContractCapabilities | undefined,
     Record<string, ModelNameInput> | undefined
   >,
   const Built extends {
@@ -1602,7 +1593,6 @@ export function defineContract(
     FamilyPackRef<string>,
     TargetPackRef<string, string>,
     Record<string, ExtensionPackRef<string, string>> | undefined,
-    ContractCapabilities | undefined,
     Record<string, ModelNameInput> | undefined
   >,
   factory?: ContractFactory<

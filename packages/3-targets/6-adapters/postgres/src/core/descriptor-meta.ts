@@ -164,11 +164,13 @@ export const postgresAdapterDescriptorMeta = {
       lateral: true,
       jsonAgg: true,
       returning: true,
+      distinctOn: true,
     },
     sql: {
       enums: true,
       returning: true,
       defaultInInsert: true,
+      lateral: true,
     },
   },
   types: {

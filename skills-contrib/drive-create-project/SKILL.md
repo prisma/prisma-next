@@ -7,7 +7,7 @@ description: >
   specify-project and drive-plan-project. Use at the start of every new project AND
   during promote ceremonies (mid-flight slice→project).
 metadata:
-  version: "2026.5.18"
+  version: "2026.5.27"
 ---
 
 > **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
@@ -31,7 +31,11 @@ It's also useful when a developer wants to:
 
 ## Inputs to collect (minimal)
 
-- `{project}` slug (kebab-case). If the developer provides a name like "Payments Revamp", derive `payments-revamp` and confirm by stating the derived slug (don’t ask them to retype it).
+- `{project}` slug (kebab-case). Derive deterministically — **do not ask permission, do not request confirmation**:
+  - **Linear-branch worktree** (branch name matches `tml-NNNN-<slug>` or similar ticket-prefix pattern): strip the ticket prefix and use the remainder as the slug. Example: branch `tml-2685-forbid-casts` → slug `forbid-casts`.
+  - **Ticket title or project name provided**: kebab-case it. Example: "Payments Revamp" → `payments-revamp`.
+  - **No signal available**: fall back to asking the operator once — but this is the only case where a question is appropriate.
+  - Once derived, announce the slug in a **single declarative sentence in the response stream** and proceed immediately: `"Project slug: forbid-casts (derived from branch)."` — NOT an interrogative ("Does `forbid-casts` work for you?") and NOT a structured `AskQuestion` prompt. The operator can correct the slug in their next message if they wish; the agent must not block on acknowledgement.
 - Whether to create stub files (default: yes)
 - Whether to immediately start shaping the project spec (default: yes)
 
@@ -55,7 +59,7 @@ Notes:
 
 ## Stub files (optional)
 
-If stubs are requested (or defaulted) **and** the developer is **not** immediately starting shaping via `drive-create-spec`:
+If stubs are requested (or defaulted) **and** the developer is **not** immediately starting shaping via `drive-specify-project`:
 
 - `projects/{project}/spec.md` (project spec placeholder)
 - `projects/{project}/plan.md` (project plan placeholder)
@@ -68,7 +72,7 @@ Use these minimal stubs:
 ```markdown
 # Summary
 
-_Drafted via drive-create-spec. Replace this placeholder._
+_Drafted via drive-specify-project. Replace this placeholder._
 
 # Description
 
@@ -98,7 +102,7 @@ _Problem, users, scope. Replace this placeholder._
 
 ## Summary
 
-_Drafted via drive-create-plan. Replace this placeholder._
+_Drafted via drive-plan-project. Replace this placeholder._
 
 **Spec:** `projects/{project}/spec.md`
 
@@ -143,14 +147,27 @@ After DoR passes, check whether the repo has `drive/<category>/README.md` surfac
 
 The bootstrap is non-destructive: existing `drive/<category>/README.md` files are not touched. Only missing categories get scaffolded.
 
+## Authoring discipline
+
+This skill is **orchestrator-direct**: the setup choices it makes (slug derivation, stub-file creation, immediate handoff to shaping) are already declared as defaults in the skill body. The agent must not re-litigate them by asking the operator for permission.
+
+**Do not pause on orchestrator-direct actions.** Concretely:
+- Slug choice: derive and announce (see `## Inputs to collect`); do not ask for approval.
+- Stub-file creation: proceed with the default (yes) unless the operator has already said otherwise.
+- Immediate handoff to `drive-specify-project` / `drive-plan-project`: proceed; do not ask "shall I start shaping now?"
+
+**Operator-confirmation gates are reserved for two cases only:**
+1. Verdicts with explicit operator-authorisation flags — promote and demote ceremonies, per `drive-triage-work`.
+2. DoR gaps that genuinely require operator input (e.g. purpose statement not yet settled, external dependency unknown).
+
+Everything else proceeds without a confirmation round-trip. If the operator disagrees with a choice, they will say so in their next message.
+
 ## Next step (default)
 
 If the developer wants to start shaping now (default), hand off immediately:
 
 - Run `drive-specify-project` targeting `projects/{project}/spec.md`.
 - Then run `drive-plan-project` targeting `projects/{project}/plan.md`.
-
-(For consumers still calling the deprecated `drive-create-spec` / `drive-create-plan`, those skills now point at the split variants — handoff still works but is one indirection level deep.)
 
 ## Promote-ceremony specifics
 

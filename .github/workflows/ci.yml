@@ -55,6 +55,8 @@ jobs:
         run: pnpm lint:examples
       - name: Validate rules
         run: pnpm lint:rules
+      - name: Validate skills
+        run: pnpm lint:skills
       - name: Check rules footprint
         run: pnpm lint:rules:footprint
       - name: Validate package READMEs
@@ -65,6 +67,8 @@ jobs:
         run: pnpm lint:workflows
       - name: Test scripts/
         run: pnpm test:scripts
+      - name: Lint casts
+        run: pnpm lint:casts
       - name: Check upgrade-instruction coverage
         run: pnpm check:upgrade-coverage --mode pr
 

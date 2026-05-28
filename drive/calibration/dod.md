@@ -2,6 +2,8 @@
 
 Canonical DoD (the shape) lives in [`docs/drive/principles/definition-of-done.md`](../../docs/drive/principles/definition-of-done.md). This file holds the **team's overlays + validation gates** — the concrete items the agile orchestrator checks at handoff time, in addition to the canonical items each scope already requires.
 
+> **Inherited by every project spec.** This file is the team's DoD floor; per [`drive-specify-project`](../../skills-contrib/drive-specify-project/SKILL.md), every project's `## Project Definition of Done` section inherits these items and adds project-specific conditions on top — it does not restate them.
+
 Overlays grow by retro accretion (per [`README.md § Maintenance discipline`](./README.md#maintenance-discipline)): a retro reveals a handoff-time gap, the matching scope's overlay grows by one item. Never delete — overlay items become baseline.
 
 ## Dispatch-DoD validation gates
@@ -41,7 +43,7 @@ A brief may add gates specific to the work:
 
 - [ ] Brief's referenced [`failure-modes.md`](./failure-modes.md) entries were checked during execution and noted as "avoided" in the dispatch summary.
 - [ ] No new TODOs left behind by this dispatch.
-- [ ] Per-commit messages reference the source spike artefact / slice spec where appropriate.
+- [ ] Per-commit messages reference the source spike artifact / slice spec where appropriate.
 - [ ] If the dispatch touched test fixtures: `fixtures:check` passes; drift in unrelated fixture files is investigated, not committed.
 
 ## Slice-DoD overlay

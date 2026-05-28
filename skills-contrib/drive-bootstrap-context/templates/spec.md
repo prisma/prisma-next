@@ -1,8 +1,8 @@
 # Drive `spec` context
 
-> Read by `drive-create-spec` and `drive-reverse-spec` before they start. Capture project-specific facts the generic skills can't know. Update when a drive run surfaces something the next run should inherit.
+> Read by `drive-specify-project`, `drive-specify-slice`, and `drive-reverse-spec` before they start. Capture project-specific facts the generic skills can't know. Update when a drive run surfaces something the next run should inherit.
 
-**Skills served:** `drive-create-spec`, `drive-reverse-spec`
+**Skills served:** `drive-specify-project`, `drive-specify-slice`, `drive-reverse-spec`
 
 ## Spec conventions
 

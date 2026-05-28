@@ -82,7 +82,13 @@ withTempDir(({ createTempDir }) => {
         // 4. Retroactive migration plan: user realizes they should have used migrations.
         //    `migration plan` plans from graph leaf (C2) to current contract (C3).
         //    This is the same edge that db update already applied to the DB.
-        const plan2 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-bio', '--json']);
+        const plan2 = await runMigrationPlanAndEmit(ctx, [
+          '--from',
+          c2Hash,
+          '--name',
+          'add-bio',
+          '--json',
+        ]);
         expect(plan2.exitCode, '4: plan C2→C3').toBe(0);
         const plan2Result = parseJsonOutput<{ from: string; to: string }>(plan2);
         expect(plan2Result.from, '4: from is C2 (graph leaf)').toBe(c2Hash);

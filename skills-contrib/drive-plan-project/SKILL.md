@@ -1,204 +1,104 @@
 ---
 name: drive-plan-project
 description: >
-  Compose a project's slices + direct changes into a sequenced project plan with stack
-  (delivery order) and parallel (independent) groupings. Use after drive-specify-project
-  has settled the project spec. Outputs projects/<project>/plan.md listing each slice +
-  direct change with its purpose, scope, dependencies, and target Linear issue. Split
-  from drive-create-plan; the slice variant is drive-plan-slice.
+  Compose a project's slices into a sequenced project plan. Each entry carries
+  outcome + builds-on + hands-to + focus. Parallelisation is surfaced explicitly;
+  the default is parallel, not serial. Use after drive-specify-project has settled
+  the spec. Outputs projects/<project>/plan.md. Hands off to drive-deliver-workflow.
 metadata:
-  version: "2026.5.18"
-  split_from: drive-create-plan
+  version: "2026.5.28"
 ---
 
-> **Execution mode: orchestrator-direct.** This atomic skill is invoked by the Orchestrator directly. Running it does NOT change the Orchestrator's role — the file-path boundary, stop-and-delegate triggers, and escape-hatch criterion from the active workflow skill remain in force. Outputs land in `projects/<current-project>/` (spec / plan / design notes), in Linear (via MCP), or in the conversation surface (verdicts, briefs, summaries).
->
-> Read-only codebase investigation (Grep / Read / Glob / SemanticSearch) is **permitted and expected** — the skill body requires grounding plans in actual codebase state. If the skill's body asks for work that requires running builds/tests or writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See [`drive/roles/README.md`](../../drive/roles/README.md) for the canonical Orchestrator role definition.
+> **Execution mode: orchestrator-direct.** Atomic skill invoked by the Orchestrator
+> directly. Read-only codebase investigation (Grep / Read / Glob / SemanticSearch)
+> is permitted and expected. If the body would require running builds/tests or
+> writing files outside `projects/<current-project>/` — **STOP. Dispatch.** See
+> [`drive/roles/README.md`](../../drive/roles/README.md).
 
 # Drive: Plan Project
 
-Compose a project into its sequence of slices + direct changes. A project plan answers two questions:
+A project is composed of **slices**, never direct changes. The plan answers three questions:
 
-1. **What units of work make up this project?** A list of slices + direct changes, each with a purpose, scope, and Linear issue.
-2. **In what order?** Stack (must-deliver-in-sequence) vs parallel (can-deliver-independently). Plus dependencies between them.
+1. **What slices make up this project?** A list, sized **1–4** (5+ flags for re-boundary; coordination cost scales nonlinearly).
+2. **In what order — and what can run in parallel?** Default to parallel. The most common throughput killer is serializing work the dependency graph would allow to parallelise.
+3. **What does each slice deliver to the next?** Per-entry handoff contracts — the stable state this slice leaves for downstream slices to consume.
 
-The plan does NOT decompose each slice into dispatches — that's `drive-plan-slice`'s job, fired when the slice is picked up.
+The plan does **not** decompose each slice into dispatches — that's `drive-plan-slice`'s job, run when the slice is picked up.
 
-## When to use
-
-- After `drive-specify-project` has produced `projects/<project>/spec.md`.
-- When picking up an existing project whose plan needs re-sequencing (e.g. mid-flight scope shift, slice dependencies discovered late).
-
-**Do not use this skill for:**
-
-- Slice-level dispatch planning — that's `drive-plan-slice`.
-- The project spec — that's `drive-specify-project`.
-- Direct-change planning — direct changes have no plan; intent goes in the PR body.
-
-## Pre-conditions
-
-- `projects/<project>/spec.md` exists, with purpose + scope + project-DoD pinned.
-- The operator (or `drive-discussion`) has converged on a rough decomposition of the project into slice-sized units.
-- Optional: `drive/plan/README.md` exists with team-specific sequencing heuristics + parallelisation patterns.
-
-## Post-conditions
-
-- `projects/<project>/plan.md` exists and lists each slice + direct change with: name, purpose, scope, dependencies, target Linear issue, stack-or-parallel position.
-- Each unit is sized correctly (slice ≤ 1 PR; direct change ≤ 30-second-verifiable diff). Oversized units have been re-triaged (likely outcome: split into smaller slices or promoted to its own project).
-- Stack ordering is acyclic; parallel groups have no inter-group dependencies.
-- Linear Project has corresponding issues for each unit (created via Linear MCP if missing).
-
-## Project context
-
-Load `drive/plan/README.md` + `drive/project/README.md` at workflow step 1 if they exist. These carry team-specific patterns — common sequencing traps, parallelisation heuristics, Linear-sync conventions for slice issues, the team's calibration for stack vs parallel grouping.
+The plan template lives at [`./templates/plan.template.md`](./templates/plan.template.md). Fill it; don't author from scratch.
 
 ## Workflow
 
-### Step 1 — Load project context
+### Step 1 — Load context
 
-Read `drive/plan/README.md` + `drive/project/README.md` (and re-read `projects/<project>/spec.md` if not already loaded in context).
+Read `drive/plan/README.md` and `drive/project/README.md` if they exist; re-read `projects/<project>/spec.md`. The team-specific sequencing patterns, parallelisation heuristics, and Linear-sync conventions live in those READMEs.
 
-### Step 2 — Research codebase the plan will touch
+### Step 2 — Ground in the codebase
 
-Before sequencing slices, look up the packages, IR shapes, test infrastructure, and call sites the plan will touch. Use Grep / Read / Glob / SemanticSearch. Plans depend on accurate cost / blast-radius estimation; estimates ungrounded in the codebase produce slice boundaries that don't survive contact with the code. **"I'm not sure how many call sites this touches" as a planning hole is not acceptable** — search.
+Look up the packages, IR shapes, test infrastructure, and call sites the plan will touch. "I'm not sure how many call sites this touches" as a planning hole is not acceptable — search. Slice boundaries depend on accurate cost / blast-radius estimation; estimates ungrounded in the codebase produce slices that don't survive contact with the code.
 
-### Step 3 — Decompose the project into slices + direct changes
+### Step 3 — Decompose into slices, checking slice-INVEST
 
-Walk the project's functional requirements + acceptance criteria. For each chunk of work:
+Walk the project's cross-cutting requirements + transitional-shape constraints. Name each chunk's outcome — what's true after this slice lands. Apply **slice-INVEST** (full definitions in [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md); this-repo specialisations in [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md)):
 
-- Is it ≤ 30-second-verifiable diff? → **direct change**.
-- Is it ≤ 1 PR worth of work with a coherent purpose? → **slice**.
-- Is it bigger than that? → **needs further decomposition** (split into multiple slices) OR **needs re-triage as its own project** (if the chunk has its own purpose that exceeds this project's).
+- **Independent** — ships as one PR without needing a sibling slice to merge concurrently.
+- **Negotiable** — the outcome can be delivered by several plausible dispatch sequences.
+- **Valuable** — closes a real gap in the project's purpose; not "preparation for slice 3."
+- **Estimable** — slice-DoD conditions are binary and verifiable at PR-merge time.
+- **Small** — **manageable in a single code review.** One reviewer reads the PR in one sitting, holds the coherence, and reaches a verdict without re-orienting mid-review. The test is *coherence*, not LoC.
+- **Testable** — slice-DoD + project-DoD floor compose into a passable bar at PR-open time.
 
-Default to fewer-but-coherent slices over many-but-trivial slices. A typical project has 2-6 slices + a handful of direct changes.
+Failure modes and the fix:
 
-### Step 4 — Identify dependencies + sequencing
+- Fails *Small* or *Estimable* → split into two slices with an explicit hand-off.
+- Fails *Independent* or *Valuable* → re-shape (may be two slices, or may not be a slice at all).
+- Turns out to be a 30-second-verifiable diff with no dependency on other slices → re-route to `drive-triage-work`; it's a direct change that escaped triage.
 
-For each slice / direct change, name the things it depends on:
+**Sweet spot: 1–4 slices.** 5+ usually means two projects in a trenchcoat — stop and consider whether this is one project or two.
 
-- **Inside this project**: which other slices need to land first? (A depends on B if A's implementation needs B's API / behaviour / migration.)
-- **Outside this project**: which other projects, libraries, infra changes, decisions need to land first?
+### Step 4 — Sequence: stack vs parallel
 
-Group units into:
+For each slice, fill **builds on** (direct dependencies only — don't transitively list grandparents) and **hands to** (the named stable state downstream slices consume). Then group:
 
-- **Stack**: ordered list; each item depends on the previous.
-- **Parallel**: groups with no inter-group dependencies; each parallel group can proceed independently.
+- **Stack** — ordered list; each item builds on the previous's hand-off.
+- **Parallel** — groups with no inter-group dependencies. **Default to parallel.** If the dependency graph is permissive, the plan should be permissive too.
 
-A typical project plan has one stack thread + 1-2 parallel groups, OR all-parallel if the slices are independent.
+A typical project plan is one stack thread + 1–2 parallel groups, or all-parallel if the slices are independent.
 
 ### Step 5 — Linear sync
 
-For each slice + direct change, create (or align with existing) Linear issue under the project's Linear Project. Use Linear MCP tools. Record the issue ID in the plan entry for that unit.
+For each slice, create (or align with) a Linear issue under the project's Linear Project via Linear MCP. Record the issue ID in the plan entry. If the project has no Linear Project, surface this and route back to `drive-start-workflow` — Linear-Project creation is part of the promote / new-project ceremony.
 
-If the project has no Linear Project yet: surface this and route back to `drive-start-workflow` to scaffold it (this is part of the promote / new-project ceremony).
+### Step 6 — Fill the template
 
-### Step 6 — Draft the plan
+Open [`./templates/plan.template.md`](./templates/plan.template.md) and fill it from the data assembled in steps 3–5.
 
-Write `projects/<project>/plan.md` using the **Project Plan Template** below.
+### Step 7 — Sanity-check, then hand off
 
-### Step 7 — Sanity checks
+Before handing off:
 
-- Each slice ≤ 1 PR worth? (If any are over: split.)
-- Each direct change ≤ 30-second-verifiable? (If any are over: re-classify as slice.)
-- Stack acyclic? (No A→B→A loops.)
-- Project-DoD's verifiable conditions covered by the slices + direct changes? (If any DoD condition isn't covered by any unit, the plan is incomplete.)
+- Each slice passes slice-INVEST (especially *Small* = manageable in a single code review).
+- Slice count ≤ 4 (over: re-consider project boundary).
+- Stack is acyclic (no A→B→A).
+- Anything sequenced that could be parallel? — un-sequence it.
+- Every project-DoD condition reachable from the slice set.
 
-### Step 8 — Hand off
-
-Hand off to `drive-deliver-workflow` to pilot delivery. Or, for operators running manually: `drive-build-workflow` per slice as they're picked up.
-
-## Project Plan Template
-
-```markdown
-# Project Plan: <project-name>
-
-**Spec:** `projects/<project>/spec.md`
-**Linear Project:** _link_
-**Purpose** _(from spec)_: _restate the 1-3 sentence purpose so the plan is self-anchoring_
-
-## At a glance
-
-_1-2 sentences: what slices + direct changes make up this project, in what shape (stack-heavy vs parallel-heavy)._
-
-## Composition
-
-### Stack (deliver in order)
-
-1. **Slice `<name>`** — _purpose._ Scope: _files/surfaces._ Linear: `<issue>`. Depends on: _none._
-2. **Slice `<name>`** — _purpose._ Scope: _..._ Linear: `<issue>`. Depends on: slice 1 (uses the foo helper introduced there).
-3. ...
-
-### Parallel group A (independent of stack + group B)
-
-- **Slice `<name>`** — _purpose._ Scope: _..._ Linear: `<issue>`.
-- **Direct change `<name>`** — _purpose._ Linear: `<issue>`.
-
-### Parallel group B (independent of stack + group A)
-
-- **Slice `<name>`** — _purpose._ Scope: _..._ Linear: `<issue>`.
-
-## Dependencies (external)
-
-_Other projects, libraries, infra, or decisions this project depends on. Each with current status._
-
-- [ ] _Dependency_ — _status / blocker note._
-
-## Project-DoD coverage map
-
-_For each Project-DoD condition from the spec, name the slice(s) + direct change(s) that deliver it. Reveals plan gaps._
-
-| Project-DoD | Delivered by |
-|---|---|
-| **PDoD1.** _condition_ | Slices 1, 2, parallel A |
-| **PDoD2.** _condition_ | Slice 3 |
-| _..._ | _..._ |
-
-## Risks + open questions
-
-_Plan-level risks (sequencing assumption that might not hold; parallelisation that might collide; external dependency that might slip). Open questions for design discussion if surfaced._
-
-1. _Risk / question._
-
-## Close-out (required)
-
-- [ ] Verify all acceptance criteria in `projects/<project>/spec.md`
-- [ ] Mandatory final retro complete; output landed in canonical / project-context / ADR
-- [ ] Migrate long-lived docs into `docs/`
-- [ ] Strip repo-wide references to `projects/<project>/**` (replace with canonical `docs/` links or remove)
-- [ ] Delete `projects/<project>/`
-- [ ] Linear Project marked Completed
-```
+Hand off to `drive-deliver-workflow`.
 
 ## Pitfalls
 
-1. **Slices that are actually their own projects.** Symptom: a "slice" in the plan would itself need 4+ dispatches with cross-area dependencies. Re-triage as project (promote).
-2. **Direct changes that aren't 30-second-verifiable.** A direct change isn't a synonym for "small slice." If the diff isn't obviously-correct from reading any one chunk, it's a slice, not a direct change.
-3. **Stack ordering that collapses parallelisation opportunities.** Default to parallel unless there's a real dependency. Sequencing serially when work could parallelise is the most common throughput killer.
-4. **Plan that doesn't cover all Project-DoD conditions.** The coverage map is the gate — if a DoD condition has no delivering unit, the plan is incomplete.
-5. **Linear issues missing.** Slices without Linear issues are invisible to the wider team's observability. Sync issues at planning time, not at slice-pickup time.
-6. **Plan written over an unsettled spec.** Symptom: the purpose statement is fuzzy; scope keeps drifting; DoD conditions feel made up. Route back to `drive-specify-project` (which routes back to `drive-discussion`).
-
-## Checklist
-
-- [ ] Loaded `drive/plan/README.md` + `drive/project/README.md` (if exist)
-- [ ] Researched codebase the plan will touch
-- [ ] Decomposed into slices + direct changes
-- [ ] Each unit sized correctly (slice ≤ 1 PR; direct change ≤ 30-sec)
-- [ ] Dependencies identified; stack acyclic; parallel groups independent
-- [ ] Linear issues created / aligned for each unit
-- [ ] Plan drafted using template
-- [ ] DoD coverage map filled (every PDoD covered by some unit)
-- [ ] Sanity checks passed
-
-## Related skills
-
-- `drive-specify-project` — produces the spec this plan composes; runs before
-- `drive-plan-slice` — decomposes each slice into dispatches; runs when the slice is picked up
-- `drive-deliver-workflow` — pilots the project plan to delivery
-- `drive-discussion` — fires when sequencing decisions surface load-bearing design questions
-- `drive-start-workflow` — handles mid-flight scope shifts that require re-planning
+1. **Slices that are actually their own projects.** Symptom: a "slice" fails slice-INVEST's *Small* — one reviewer can't hold its coherence in one sitting — or fails *Independent* by needing concurrent sibling work. Re-triage as project (promote).
+2. **Listing direct changes in the project plan.** A direct change is an alternative to a project (chosen at triage), not a unit inside one. If a chunk would be a 30-second-verifiable diff with no dependency, route it through `drive-triage-work` as its own direct change.
+3. **Sequencing that collapses parallelisation opportunities.** Default to parallel unless there's a real dependency. Plans that sequence everything serially lose throughput their dependency graph would allow.
+4. **Per-slice DoD coverage maps inherited from the old template.** The project-DoD is checked at close-out directly; restating it per slice is noise. Drop it.
+5. **Per-slice "Files in play" or "Predicted size" entries.** That's slice-author work, done at slice-pickup time. Including it here pretends the project plan can predict slice-internals; it can't.
+6. **Linear issues missing.** Slices without Linear issues are invisible to the wider team's observability. Sync issues at planning time, not at slice-pickup time.
+7. **Plan written over an unsettled spec.** Symptom: the purpose statement is fuzzy; non-goals keep shifting; DoD conditions feel made up. Route back to `drive-specify-project` (which routes back to `drive-discussion`).
+8. **5+ slices accepted without questioning project boundary.** The 1–4-slice sweet spot exists because coordination overhead scales nonlinearly with slice count. A 6-slice project is two 3-slice projects in a trenchcoat.
 
 ## References
 
-- [`drive/plan/README.md`](../../drive/plan/README.md) — stack vs parallel heuristics, sizing reference cases, dispatch overlays
-- [`drive/project/README.md`](../../drive/project/README.md) — slice-composition patterns for this repo
+- [`./templates/plan.template.md`](./templates/plan.template.md) — the fillable template.
+- [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md) — slice-INVEST; the "manageable in a single code review" framing.
+- [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) — this repo's slice-shape patterns (clean vs mis-sized).
+- [`docs/drive/model.md`](../../docs/drive/model.md) § Slice — invariants I1 (one PR per slice), I2 (scope discipline).

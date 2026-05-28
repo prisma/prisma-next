@@ -28,17 +28,9 @@ function defineTestContract<
   const Types extends NonNullable<ContractInput['types']> = Record<never, never>,
   const Models extends NonNullable<ContractInput['models']> = Record<never, never>,
   const ExtensionPacks extends NonNullable<ContractInput['extensionPacks']> | undefined = undefined,
-  const Capabilities extends NonNullable<ContractInput['capabilities']> | undefined = undefined,
 >(
   definition: Omit<
-    ContractInput<
-      typeof bareFamilyPack,
-      typeof postgresTargetPack,
-      Types,
-      Models,
-      ExtensionPacks,
-      Capabilities
-    >,
+    ContractInput<typeof bareFamilyPack, typeof postgresTargetPack, Types, Models, ExtensionPacks>,
     'family' | 'target'
   >,
 ) {

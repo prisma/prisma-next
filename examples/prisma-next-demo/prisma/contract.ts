@@ -4,16 +4,6 @@ import { defineContract, rel } from '@prisma-next/postgres/contract-builder';
 export const contract = defineContract(
   {
     extensionPacks: { pgvector },
-    capabilities: {
-      postgres: {
-        lateral: true,
-        jsonAgg: true,
-        returning: true,
-        'pgvector.cosine': true,
-        'defaults.now': true,
-        'defaults.uuidv4': true,
-      },
-    },
   },
   ({ enum: enumEntity, field, model, type }) => {
     const types = {

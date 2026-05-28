@@ -1,206 +1,166 @@
-# Principle: The brief is the dispatch's running spec
+# Principle: a dispatch brief has six sections — and nothing else
 
-## A bad brief and the same brief done well
+A dispatch brief is the document the orchestrator hands to an executor subagent to delegate one unit of work. It contains exactly these six sections, in this order:
 
-A brief that drifts:
+| Section | What it contains |
+|---|---|
+| **Task** | One paragraph naming what this dispatch does. Unambiguous. Names the surface and the change. |
+| **Scope** | Two lists: what's in this dispatch and what's explicitly out. The "out" list pre-empts "while I was in there I also fixed X." |
+| **Completed when** | One to three binary, dispatch-specific conditions. Not slice-wide gates. Not anything CI / reviewer / project-DoD already implies. |
+| **Standing instruction** | The same paragraph in every brief, every time: *"Stay focused on the goal; control scope. Trivial, obviously-related fixes that serve the goal go in the same dispatch with a one-line note in the wrap-up. Anything that pulls you off the goal — even if it looks useful — halts and surfaces."* |
+| **References** | Links to: the slice spec; this dispatch's slice-plan entry; any spike artifact this dispatch consumes; prior dispatch artifacts in this slice. Plus team-context entries that match this dispatch's shape (failure modes the team has hit before, grep patterns from the team's catalogue). |
+| **Operational metadata** | Three things: model tier (with a one-line rationale), time-box (overrun means halt and surface), halt conditions (the specific situations under which the executor stops and asks). |
 
-> Migrate a legacy data shape (the kind that lives across multiple consumers) to its replacement.
+A spike dispatch swaps "Completed when" for an artifact specification — see [`spikes.md`](spikes.md).
 
-That's it. No outcome statement beyond the topic. No scope split. No edge cases. No DoD. No size. No tier. No inputs.
+That's the whole rule. Everything below explains why each section is what it is and how to keep briefs from drifting back into bigger shapes.
 
-A dispatch run from this brief will pick whichever consumers the implementer happens to notice, resolve every edge case privately (legacy fixtures? silently regenerate; intentionally-flat-shape consumers like rejection tests? silently migrate them too, breaking the tests), declare done when the implementer feels finished, and pass validation gates because the gates don't catch unscoped work.
-
-The same brief, well-shaped:
+## A concrete example
 
 ```markdown
-# Brief: Migrate legacy-shape consumers (round 2 of 3)
+# Brief: Migrate legacy-shape test sites (dispatch 2 of 3)
 
-## Outcome
+## Task
 
-Migrate the 8 in-source test sites listed in the spike artefact to the
-new shape. One commit per file. No other consumers touched.
+Migrate the 8 in-source test sites listed in the spike artifact to the new shape.
+One commit per file. No other consumers touched.
 
 ## Scope
 
-In scope:
-- The 8 test sites named in the spike artefact
-- Test fixture regeneration ONLY if a fixture is listed as touched
+**In:** The 8 test sites named in the spike artifact (linked below).
 
-Out of scope:
-- Authoring-layer consumers (round 1 of next slice)
-- Introspector tightening (round 3)
-- Any fixture or consumer NOT in the spike artefact
+**Out:** Authoring-layer consumers (next dispatch); introspector tightening (dispatch 3);
+any fixture or consumer NOT in the spike artifact.
 
-## Edge cases
+## Completed when
 
-| Edge case | Do what |
-|---|---|
-| Site has a legacy-shape literal intentionally (rejection test) | Skip; flag in dispatch summary |
-| Fixture file has drifted since the spike | Defer to a follow-up dispatch; do not regenerate inline |
-| Site mixes legacy + new shape (partial migration from earlier) | Refuse and surface — slice-spec ambiguity, escalate to design discussion |
+- [ ] All 8 sites updated; per-site commits reference the spike artifact.
+- [ ] `rg "old-shape-literal"` returns empty in the migrated files.
+- [ ] Package typecheck clean for the affected packages.
 
-## Done when
+## Standing instruction
 
-- [ ] `<typecheck command>` clean
-- [ ] `<test command>` passing
-- [ ] `<grep-for-legacy-shape command>` returns empty for migrated sites
-- [ ] No new TODOs
-- [ ] Per-site commit messages reference the spike artefact
+Stay focused on the goal; control scope. Trivial, obviously-related fixes that serve the
+goal go in the same dispatch with a one-line note in the wrap-up. Anything that pulls you
+off the goal — even if it looks useful — halts and surfaces.
 
-## Size + time-box
+## References
 
-M; ≤ 30 min wall-clock.
+- Slice spec: `projects/<project>/slices/<slice>/spec.md`
+- Slice-plan entry: `projects/<project>/slices/<slice>/plan.md` § Dispatch 2
+- Spike artifact: `projects/<project>/spikes/<date>-test-sites.md`
+- Team context: `drive/calibration/sizing.md` § Migration-shaped dispatches
 
-## Model tier
+## Operational metadata
 
-Cheap. Mechanical migration with strong DoD;
-the capability premium isn't paying for anything here.
-
-## Inputs
-
-- Slice spec: projects/<project>/slices/round-2/spec.md
-- Spike artefact: projects/<project>/spikes/<date>-test-sites.md
-- Calibration: team's failure-mode catalogue § "<the relevant entry>"
-  + grep patterns from the team's grep library
-
-## Implementer + Reviewer
-
-- Implementer: implementer subagent (cheap)
-- Reviewer: reviewer subagent (orchestrator, for verification rigour)
+- **Model tier:** cheap. Mechanical migration with strong gates.
+- **Time-box:** ≤ 30 min.
+- **Halt conditions:** site has a legacy-shape literal intentionally (rejection test) → skip and flag in wrap-up; site mixes legacy + new shape (partial migration) → halt and surface as slice-spec ambiguity.
 ```
 
-The well-shaped brief is verbose but unsurprising. The dispatch produced from it has nothing to interpret — every edge case is pre-named, every gate is explicit, scope-out is enumerated, the tier matches the shape. WIP-inspection has something sharp to check ("what did the implementer touch that wasn't in scope?"); the reviewer subagent has a sharp checklist; the operator returns to a dispatch whose outcome is predictable.
+There's nothing to interpret. The task is named. The scope is bounded. The completed-when is binary. The halt conditions cover the foreseen edge cases. The reviewer has a sharp focus (was the goal achieved, was scope honoured); the operator gets back a predictable dispatch.
 
-## What every brief needs
+## Briefs get shorter as a slice progresses
 
-Eight sections. None may be omitted; your team's project context may add more.
+The same executor subagent runs every dispatch in a slice — it's resumed across dispatches rather than spawned fresh each time. Because the subagent is resumed, it retains the priming context from earlier dispatches even as its transcript grows. (Different agent harnesses keep that context in different ways — context-window expansion, selective compaction, summarisation — but the rule "same executor, resumed across dispatches" is what makes the briefs thin out, not the specific mechanism.)
 
-| Section | What it says | Why it matters |
-|---|---|---|
-| **Outcome** | One paragraph: what this dispatch produces. | The implementer's compass. Without it, "correct" and "useful" come apart. |
-| **Scope (in / out)** | What's in this dispatch + what's explicitly out (named follow-up or scope-deferred). | Pre-empts "while I was in there I also fixed X" — the dispatch-scope sibling of project scope creep. |
-| **Edge cases + dispositions** | Edge cases the implementer will hit, each with a pre-decided disposition (do X / refuse and surface / defer). | The fix for silent accommodation. The implementer cannot interpret an edge case the brief already covers. |
-| **Done when** | Specific commands + per-dispatch acceptance criteria. | The contract the implementer fulfils and the reviewer verifies. |
-| **Size + time-box** | T-shirt (XS / S / M — never L or XL); wall-clock per size. Overrun means re-scope, not extension. | Refuses oversized work; alarms on runaway dispatches. |
-| **Model tier** | Cheap / mid / orchestrator. | Forces an explicit tier decision; defaulting to the parent agent's tier (the Cursor SDK's `Task` default) is treated as a bug. |
-| **Inputs** | Links to slice spec, project spec, spike artefacts, calibration entries, prior dispatch artefacts in this slice. | What the agent reads — links pull the dependencies into the dispatch's context. |
-| **Implementer + Reviewer** | Named (operator / subagent / specific persona). | Removes ambiguity about who's accountable for what. |
+What this means in practice:
 
-A spike-flavoured brief swaps the "Done when" section for an artefact spec — see [`spikes.md`](spikes.md).
+| Dispatch | Brief shape |
+|---|---|
+| **Dispatch 1** of the slice | Full template at full precision. This brief primes the slice's chosen design, the team's catalogue entries the slice will need, and the slice-DoD context. |
+| **Dispatch 2 onwards** | The References section gets shorter (the subagent already knows where the slice spec lives); team-context entries are only restated if they're new to this dispatch. Task / Scope / Completed-when / halt conditions stay at full precision. |
+
+The default is to keep the same executor across all dispatches of a slice. Switching mid-slice means the new executor has to re-establish what the prior one already knew, which forfeits the priming. Spawn a fresh executor only when there's a deliberate reason — e.g. operator asks for a fresh-eyes pass.
 
 ## Where edge cases come from
 
-Two sources at brief-assembly time:
+Two sources, both at brief-assembly time:
 
-1. **From the slice plan.** The implementer who authored the slice plan walked through this dispatch's work and asked "what's the implementer likely to encounter that's not the happy path?" — those are the candidate edge cases.
-2. **From your team's project context.** The failure-mode catalogue and grep library entries that match this dispatch's shape get pulled into the edge-case table at brief-assembly time. Every failure the team has hit before that matches this shape goes in, with a disposition.
+1. **The team's catalogue.** Failure modes the team has hit before, grep patterns that anchor common rewrites. The brief-assembler picks the entries that match this dispatch's shape and links them in `References`. The ones that warrant halting become entries in `Halt conditions`.
 
-The *first* time an edge case happens, the brief was the wrong place to catch it — you didn't know to name it. That's a retro trigger. The lesson goes into the team's project context; the next brief that matches the shape pulls the entry and pre-names the edge case. Over time the catalogue grows; new dispatches inherit the team's accumulated lessons automatically.
+2. **The slice spec's pre-investigated edge cases**, if any. This list is almost always empty. The slice spec only pre-investigates an edge case when the orchestrator already knew about it from outside the codebase (a user's prior bug, a known footgun). If there's an entry, the brief-assembler pulls it into `Halt conditions`.
 
-## The brief is fresh per dispatch; the slice spec is stable
+Most edge cases are discovered at dispatch time by the executor's grep pre-flight on the named surface. The standing instruction tells the executor what to do with each one it finds (in scope and obvious → handle and note; in scope and ambiguous → halt; out of scope → don't touch).
 
-| Artefact | Scope | Lifespan | Authored by |
-|---|---|---|---|
-| **Slice spec** | One PR | Stable for the slice | Implementer (once) |
-| **Slice plan** | One PR | Stable; the dispatch sequence | Implementer (once) |
-| **Brief** | One dispatch | Re-assembled per dispatch | Agile orchestrator (at delegation time) |
-
-The brief draws from the slice spec and slice plan but adds what the dispatch needs *right now*: which sub-scope of the slice, which edge cases apply here vs the next dispatch, which gates are checkpoint-vs-final, which tier is right for this work.
-
-If a brief looks identical to the slice spec, the slice plan probably has one big dispatch (= the slice). That's a sign the plan needs decomposing.
+When an edge case happens that the catalogue didn't predict, the brief was the wrong place to catch it — the team didn't know to name it. That's a retro trigger: the lesson goes into the team's context catalogue, and the next brief whose shape matches inherits it.
 
 ## Brief template
 
 ```markdown
 # Brief: <one-line-name>
 
-## Outcome
+## Task
 
-<One paragraph: what this dispatch produces. For a spike: what
-the artefact answers, where it lives, what shape it has.>
+<One paragraph: what this dispatch does. Unambiguous. Names the surface and the change.>
 
 ## Scope
 
-**In scope:**
-- <bullets>
+**In:** <bullets — the files / changes / behaviours in this dispatch>
 
-**Out of scope:**
-- <bullets — name the follow-up dispatch / slice / "scope-deferred"
-  each item lives in>
+**Out:** <bullets — what the executor must NOT touch, even if adjacent and tempting>
 
-## Edge cases
+## Completed when
 
-| Edge case | Do what |
-|---|---|
-| <named edge case 1> | <do X / refuse and surface / defer to follow-up> |
-| <named edge case 2> | <…> |
+- [ ] <specific condition — e.g. "the `oldX` function is removed; all call sites use `newX`">
+- [ ] <operational gate — e.g. "package typecheck clean for `<pkg>`">
 
-## Done when
+## Standing instruction
 
-- [ ] <command 1> (e.g. `pnpm typecheck` clean)
-- [ ] <command 2> (e.g. `pnpm test path/to/relevant` passing)
-- [ ] <grep gate>: `rg <pattern> -- '!:foo'` returns empty
-- [ ] <intent-level criterion>: <e.g. "no remaining call sites of
-       legacy symbol X"; "fixtures regenerated without drift";
-       "no TODOs left behind by this dispatch">
+Stay focused on the goal; control scope. Trivial, obviously-related fixes that serve the
+goal go in the same dispatch with a one-line note in the wrap-up. Anything that pulls you
+off the goal — even if it looks useful — halts and surfaces.
 
-## Size + time-box
-
-- T-shirt: <XS | S | M>
-- Wall-clock: <≤ 5 min | ≤ 15 min | ≤ 30 min>
-
-## Model tier
-
-<cheap | mid | orchestrator> — <one-line rationale referencing
-decomposition-and-cost.md>
-
-## Inputs
+## References
 
 - Slice spec: <path>
-- Slice plan: <path>
-- Project spec (if any): <path>
-- Spike artefacts (if any): <path>
-- Calibration entries: <links to failure-mode entries / grep library
-  patterns that apply>
-- Prior dispatch artefacts in this slice: <links>
+- Slice-plan entry: <path> § Dispatch N
+- Team context entries that match this dispatch's shape: <links — only the ones that apply>
+- Prior dispatch artifacts in this slice (if any): <links>
 
-## Implementer + Reviewer
+## Operational metadata
 
-- Implementer: <subagent | operator | named persona>
-- Reviewer: <subagent | operator | named persona>
+- **Model tier:** <cheap | mid | orchestrator> — <one-line rationale>
+- **Time-box:** <≤ 5 min | ≤ 15 min | ≤ 30 min>
+- **Halt conditions:** <conditions under which the executor stops and surfaces>
 ```
 
-For a spike, swap "Done when" for:
+A spike brief swaps "Completed when" for:
 
 ```markdown
-## Artefact + Done when
+## Artifact + Completed when
 
-**Artefact path:** <typically `projects/<x>/spikes/<date>-<q>.md`>
+**Artifact path:** <typically `projects/<x>/spikes/<date>-<q>.md`>
 
-**Artefact shape:** <table | list | per-section structure — be specific>
+**Artifact shape:** <table | list | per-section structure — be specific>
 
-**Done when:**
-- [ ] Artefact exists at the named path with the named shape
-- [ ] Artefact answers the question (not "I started investigating")
-- [ ] Downstream dispatch's brief can be assembled using the artefact
+**Completed when:**
+- [ ] Artifact exists at the named path with the named shape.
+- [ ] Artifact answers the question (not "I started investigating").
+- [ ] The next dispatch's brief can be assembled using the artifact.
 ```
 
-## Anti-patterns
+## Things to avoid
 
-1. **"Do what's needed" briefs.** No outcome, no scope, no edge cases. The implementer interprets. The dispatch silently expands. WIP-inspection finds work that wasn't in any spec.
-2. **Brief without an explicit "Done when."** Implementer declares done by feel. Reviewer has nothing to verify against. Drift passes the gates.
-3. **Brief without explicit "out of scope."** Only "in scope" listed. The implementer who notices an adjacent fix is tempted to include it. Including it is silent scope expansion.
-4. **Brief without edge cases.** Implementer hits the first edge case, makes a private call, drifts. The edge case was knowable at brief-assembly time; not naming it is the structural failure.
-5. **Wishlist "Done when."** Items like "code is clean" or "tests are good" — not checkable; reviewer can't verify; drift slips through. Items must be commands, grep gates, or specific facts.
-6. **Brief without a model tier.** Defaults to the orchestrator's tier (Cursor SDK's `Task` default). Pays the capability premium on dispatches that don't need it. Make the tier explicit.
-7. **Brief that's a re-statement of the slice spec.** The slice is one dispatch's worth of work. Either the slice is too small (no plan needed) or the plan needs decomposing.
-8. **Implementer silently rewrites the brief.** The agile orchestrator owns the brief; implementer-side amendments are forbidden by invariant I12 (every spec/plan amendment requires design discussion or operator authorisation). Symptom: the brief in the dispatch transcript doesn't match the brief the orchestrator wrote.
+1. **"Do what's needed" briefs.** No task, no scope, no completed-when. The executor interprets. The dispatch silently grows. The orchestrator's mid-dispatch check finds work that wasn't in any spec.
+2. **No "Completed when".** The executor declares done by feel; the reviewer has nothing concrete to verify against.
+3. **No "Out of scope".** Only "In scope" listed. The executor who notices an adjacent fix is tempted to include it; including it is silent scope expansion.
+4. **Pre-decomposing every file the executor will touch.** The executor's grep pre-flight finds the call sites at dispatch time. Pre-naming them in the brief pretends the orchestrator knows more than they do, inflates the brief, and creates a false sense of completeness.
+5. **Pre-walking every edge case "to be safe".** Same. Pre-name only what the team's catalogue or outside-codebase knowledge already taught — and put those in `Halt conditions`, not a separate catalogue dump.
+6. **Wishlist "Completed when" entries.** Items like "code is clean" or "tests are good" — not verifiable; the reviewer can't check; drift slips through. Each item must be a command, a grep gate, or a specific fact.
+7. **No model tier.** Defaults to the orchestrator's tier and pays the capability premium on dispatches that don't need it. Make the tier explicit.
+8. **A brief that restates the slice spec.** Either the slice is one dispatch's worth of work (no plan needed) or the plan needs decomposing.
+9. **The executor silently rewriting the brief.** The orchestrator owns the brief; executor-side amendments require operator authorisation. If the brief in the dispatch transcript doesn't match the brief the orchestrator wrote, something went wrong.
+10. **Standing instruction rephrased as "minimize changes".** Minimisation trains timidity — executors refuse obvious, goal-serving fixes. The standing instruction is "stay focused on the goal; control scope" — fix-and-note for the trivial-and-related; halt for drift.
+11. **Brief composed by a subagent.** If the orchestrator has the context to write the brief, they write the brief. Dispatching brief-assembly to a subagent inflates the brief (the subagent loads context defensively to "do a thorough job") and inverts the cost model.
 
 ## Related principles
 
-- **[`protocol-as-memory.md`](protocol-as-memory.md)** — the team's failure-mode catalogue + grep library are what the brief draws from when assembling the edge-case table.
-- **[`decomposition-and-cost.md`](decomposition-and-cost.md)** — the brief's model-tier section is the per-dispatch routing decision.
-- **[`spikes.md`](spikes.md)** — a spike's brief swaps "Done when" for an artefact spec.
-- **[`roles-and-personas.md`](roles-and-personas.md)** — the agile orchestrator assembles the brief; implementer + reviewer assignments live in the brief.
-- **[`definition-of-ready.md`](definition-of-ready.md)** — dispatch DoR is "is the brief assembled per brief discipline?"
-- **[`definition-of-done.md`](definition-of-done.md)** — dispatch DoD is the brief's "Done when" operationalised at handoff, plus intent-validation and (where the slice touches user-observable surface) manual QA.
+- [`sizing.md`](sizing.md) — the dispatch-INVEST checklist this brief embodies. `Task` answers *Valuable* + *Independent*; `Scope` + `Completed when` answer *Estimable* + *Testable*; `References` answer *Small* (does the priming fit?); `Halt conditions` close the loop on *Negotiable* by naming where the executor's discovery must stop.
+- [`protocol-as-memory.md`](protocol-as-memory.md) — the team's failure-mode catalogue and grep library, which the brief draws from for `Halt conditions` and `References`.
+- [`decomposition-and-cost.md`](decomposition-and-cost.md) — the model-tier choice in `Operational metadata`.
+- [`spikes.md`](spikes.md) — how to write a spike brief.
+- [`roles-and-personas.md`](roles-and-personas.md) — who composes the brief, who executes, who reviews.
+- [`definition-of-ready.md`](definition-of-ready.md) — what the orchestrator checks before dispatching.
+- [`definition-of-done.md`](definition-of-done.md) — what the orchestrator checks at handoff.
+- [`../design-decisions/2026-05-28-artifact-cascade-redesign.md`](../design-decisions/2026-05-28-artifact-cascade-redesign.md) — the design discussion that produced the six-section template.

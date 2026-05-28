@@ -134,6 +134,7 @@ type ContractBase = ContractType<
   };
   readonly capabilities: {
     readonly postgres: {
+      readonly distinctOn: true;
       readonly jsonAgg: true;
       readonly lateral: true;
       readonly limit: true;
@@ -143,6 +144,7 @@ type ContractBase = ContractType<
     readonly sql: {
       readonly defaultInInsert: true;
       readonly enums: true;
+      readonly lateral: true;
       readonly returning: true;
     };
   };

@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:29a17a141f69a59f39e6e5ce56adda9719ab0899a8af17bc6e4db2c4e866a182",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "comment": {
       "model": "Comment",
@@ -1102,8 +1102,7 @@
   },
   "capabilities": {
     "postgres": {
-      "defaults.autoincrement": true,
-      "defaults.now": true,
+      "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -1114,6 +1113,7 @@
     "sql": {
       "defaultInInsert": true,
       "enums": true,
+      "lateral": true,
       "returning": true
     }
   },

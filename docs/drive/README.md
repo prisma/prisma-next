@@ -12,6 +12,7 @@ Long-lived methodology for the Drive workflow used in prisma-next: a Kanban-shap
 **Then read** the principles that the workflow embodies:
 
 - [`principles/protocol-as-memory.md`](./principles/protocol-as-memory.md) — why agent teams need rituals.
+- [`principles/sizing.md`](./principles/sizing.md) — size by logical coherence, not logistical footprint; INVEST at three altitudes.
 - [`principles/decomposition-and-cost.md`](./principles/decomposition-and-cost.md) — smaller dispatches enable cheaper tiers and tighter loops.
 - [`principles/gradual-ai-adoption.md`](./principles/gradual-ai-adoption.md) — the spectrum from human-driven to fully delegated.
 - [`principles/roles-and-personas.md`](./principles/roles-and-personas.md) — the human / agent / agile-orchestrator split.
@@ -23,7 +24,7 @@ Long-lived methodology for the Drive workflow used in prisma-next: a Kanban-shap
 
 **Worked example (project context, not long-lived docs):**
 
-prisma-next's own calibration — reference tasks for t-shirt sizing, DoR/DoD overlays, failure-mode catalogue, grep library, model-tier routing, accreted patterns — lives in one centralised home: [`drive/calibration/`](../../drive/calibration/README.md) at the repo root. Each [`drive/<category>/README.md`](../../drive/) links out to the relevant calibration files; calibration is loaded by the matching skill at workflow step 1. The calibration *content* is project-specific by definition; only the conventions that govern it (in `principles/`) are long-lived.
+prisma-next's own calibration — the per-altitude INVEST rubric, DoR/DoD overlays, failure-mode catalogue, grep library, model-tier routing, accreted patterns — lives in one centralised home: [`drive/calibration/`](../../drive/calibration/README.md) at the repo root. Each [`drive/<category>/README.md`](../../drive/) links out to the relevant calibration files; calibration is loaded by the matching skill at workflow step 1. The calibration *content* is project-specific by definition; only the conventions that govern it (in `principles/`) are long-lived.
 
 **Trial period (project context, not long-lived):**
 

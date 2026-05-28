@@ -17,7 +17,7 @@ The `Drive skill(s)` column in the lifecycle table below names the atomic skill 
 
 ## Drive's Agile lineage (one sentence per influence)
 
-- **Kanban (the substrate).** Continuous flow, WIP limits as a structural rule (our size caps are the WIP-shape rule — PR-cap on slices, M-cap on dispatches), pull over push, throughput as the diagnostic.
+- **Kanban (the substrate).** Continuous flow, WIP limits as a structural rule (Drive's INVEST checks at slice and dispatch altitudes are the WIP-shape rule), pull over push, throughput as the diagnostic.
 - **Scrum (selected rituals).** Definition of Ready + Definition of Done as living team artefacts; retros as the team's learning ritual; relative estimation; explicit role taxonomy. **Not adopted:** sprints, story-point velocity-as-commitment, sprint-boundaried rituals.
 - **XP (selected practices).** Pair-style continuous WIP inspection during a dispatch; spikes as a first-class brief-type; tests-first; collective code ownership across the agent team.
 - **Specification by Example / Example Mapping (brief discipline).** Pre-named examples and edge cases in every brief; acceptance criteria as scenarios.
@@ -35,14 +35,14 @@ Phases in rows. The Workflow column maps to the eight workflows in [`model.md`](
 |---|---|---|---|---|---|---|---|
 | Triage | Triage | Backlog refinement + sizing (Kanban) | `drive-triage-work` | Per entry point + mid-flight | Agile orchestrator | One of eight triage verdicts (§ Triage outputs) | — |
 | Design discussion (cross-cutting) | Design discussion | Three Amigos / collaborative refinement (SBE) | `drive-discussion` (mode) | On trigger (pre-spec, mid-spec, mid-flight assumption-falsification, mid-flight obstacle, explicit) | Operator + agile orchestrator (collaboratively) | Spec edit + plan edit + `design-decisions.md` entry | — |
-| Direct change: do | Direct change execution | "Just commit it" (cowboy Kanban — but bounded by triage verdict) | — (no Drive skill; `gh pr create` after edit) | Per direct change | Implementer | One PR; intent in PR body | — |
+| Direct change: do | Direct change execution | "Just commit it" (cowboy Kanban — but bounded by triage verdict) | `drive-dispatch` (one-shot; fresh implementer; no reviewer cycle) → `gh pr create` | Per direct change | Implementer | One PR; intent in PR body | — |
 | Plan: scaffold project | Project initiation | — | `drive-create-project` | Per project | Project owner + agile orchestrator | `projects/<x>/` skeleton | — |
 | Plan: project spec | Project initiation | Story writing + Example Mapping (SBE) | `drive-specify-project` | Per project | Project owner (often with design-discussion participation) | `projects/<x>/spec.md` (purpose, scope boundary, project-DoD) | — |
 | Plan: project plan | Project initiation | Release planning + WIP-cap commitment (Kanban) | `drive-plan-project` | Per project | Project owner | `projects/<x>/plan.md` (slice + direct-change composition; stack/parallel) | — |
 | Plan: slice spec | Slice initiation | Story writing + Example Mapping (SBE) | `drive-specify-slice` | Per slice | Implementer | Slice spec (in-project: `projects/<x>/slices/<s>/spec.md`; orphan: inline in PR description) | — |
-| Plan: slice plan | Slice initiation | Sprint planning + relative estimation (Scrum) | `drive-plan-slice` (with sizing step + DoR-per-dispatch gate) | Per slice | Implementer (often with agile-orchestrator review) | Slice plan: dispatch sequence; every dispatch ≤ M; DoR + DoD declared per dispatch | DoR met for every dispatch; no L/XL dispatch admitted |
+| Plan: slice plan | Slice initiation | Sprint planning + INVEST sizing (Scrum / Bill Wake) | `drive-plan-slice` (with dispatch-INVEST step + DoR-per-dispatch gate) | Per slice | Implementer (often with agile-orchestrator review) | Slice plan: dispatch sequence; every dispatch passes dispatch-INVEST; DoR + DoD declared per dispatch | DoR met for every dispatch; no INVEST-failing dispatch admitted |
 | Spike (brief-type variant) | Slice execution (single-dispatch slice plan) OR Triage spike-first | Spike (XP / Scrum) | `drive-build-workflow` (single dispatch with spike-flavoured brief) | Per planning unknown | Implementer | `projects/<x>/spikes/<date>-<q>.md` artefact (dispatch-scope) OR a doc PR (slice-scope) | Spike-DoR; spike-DoD = artefact is actionable |
-| Execute: brief + dispatch | Slice execution | Story kickoff + pull (XP + Kanban) | `drive-build-workflow` (brief template per `principles/brief-discipline.md`) | Per dispatch | Agile orchestrator delegates → implementer executes | Dispatch brief; commits | DoR pre-flight checklist |
+| Execute: brief + dispatch | Slice execution | Story kickoff + pull (XP + Kanban) | `drive-build-workflow` (loop) calls `drive-dispatch` (brief template + delegation; see `principles/brief-discipline.md`) | Per dispatch | Agile orchestrator delegates → implementer executes | Dispatch brief; commits | DoR pre-flight checklist |
 | Execute: WIP inspection | Slice execution | Pair-programming review (XP) / WIP-flow inspection (Kanban) | `drive-build-workflow` (WIP-inspection step) | ≤ 5 min within each dispatch | Agile orchestrator | Inspection note (light; promoted to a finding on drift) | — |
 | Execute: close dispatch | Slice execution | Acceptance test (XP / SBE) | `drive-build-workflow` (reviewer subagent) | Per dispatch | Reviewer | Reviewer verdict + refreshed review artefacts | DoD post-flight checklist |
 | Project-health rollup | Cross-cutting | Daily scrum + WIP-board review (Scrum + Kanban) | `drive-check-health` | Session-bookended (interactive) + per-slice + unattended triggers (§ Project-health rollup cadence) | Agile orchestrator | Rollup (short, written) | — |
@@ -85,10 +85,10 @@ Per-dispatch is too noisy (polling cadence); per-project alone is too coarse (dr
 | Cadence | Rituals |
 |---|---|
 | Per entry point | `drive-start-workflow` (pilots; calls `drive-triage-work` then verdict setup) |
-| Per direct change | `drive-start-workflow` routes to `drive-pr-description` direct-change framing → edit → `gh pr create` → review → merge |
+| Per direct change | `drive-start-workflow` routes to `drive-pr-description` direct-change framing → `drive-dispatch` (one-shot) → `gh pr create` → review → merge |
 | Per project | `drive-deliver-workflow` (pilots; calls `drive-create-project`, `drive-specify-project`, `drive-plan-project`, `drive-create-deployment-plan` if applicable, `drive-close-project` with mandatory final retro) |
 | Per slice | `drive-specify-slice`, `drive-plan-slice`, `drive-build-workflow` (pilots the dispatch loop, calling `drive-review-code`, `drive-pr-walkthrough`, `drive-pr-description`, `drive-qa-plan`, `drive-qa-run`) |
-| Per dispatch (inside `drive-build-workflow`'s loop) | DoR pre-flight → brief assembly → delegate → WIP inspection (≤ 5 min) → DoD post-flight → reviewer verdict |
+| Per dispatch (inside `drive-build-workflow`'s loop) | DoR pre-flight → `drive-dispatch` (brief assembly + delegate) → WIP inspection (≤ 5 min) → DoD post-flight → reviewer verdict |
 | Session-bookended (interactive) | `drive-check-health` (open + close) |
 | Trigger-fired (any mode) | `drive-discussion`, `drive-run-retro`, mid-flight `drive-triage-work` (for promotion / demotion / surfaced scope) |
 | Mandatory at project close | Final `drive-run-retro` (if it didn't produce a canonical / project-context / ADR update, retro failed) |
@@ -100,12 +100,13 @@ Three workflow skills pilot the multi-step phases; atomic skills do the bounded 
 **Workflow tier:**
 
 - **`drive-start-workflow`** — pilots triage + the verdict's setup chain.
-- **`drive-build-workflow`** — pilots the slice's dispatch loop (per-dispatch DoR / DoD; WIP-inspection step; brief template; L/XL refusal; design-discussion stop-condition).
+- **`drive-build-workflow`** — pilots the slice's dispatch loop (per-dispatch DoR / DoD; WIP-inspection step; dispatch-INVEST refusal at pre-flight; design-discussion stop-condition). Calls `drive-dispatch` per dispatch for brief assembly + implementer delegation.
 - **`drive-deliver-workflow`** — pilots a project's lifecycle (init → slices → health → retros → mandatory close retro).
 
 **Atomic tier:**
 
 - **Triage / health / retro.** `drive-triage-work`, `drive-check-health`, `drive-run-retro`.
+- **Dispatch primitive.** `drive-dispatch` — assembles the brief, delegates to the implementer subagent, owns the heartbeat contract for the duration of the call. Called by `drive-build-workflow` (in the slice loop) and by `drive-start-workflow` (one-shot, for direct change).
 - **Specs (per scope).** `drive-specify-project`, `drive-specify-slice`.
 - **Plans (per scope).** `drive-plan-project`, `drive-plan-slice`.
 - **Project boundary.** `drive-create-project`, `drive-close-project` (with mandatory-final-retro hook).
@@ -116,4 +117,4 @@ Three workflow skills pilot the multi-step phases; atomic skills do the bounded 
 - **Deployment.** `drive-create-deployment-plan` (where applicable).
 - **Spike.** Not a separate skill — a brief-type variant inside `drive-build-workflow`. The brief's DoD is "the artefact is actionable" rather than "code is committed." See [`principles/spikes.md`](principles/spikes.md).
 
-Hard invariants (PR-cap on slices, M-cap on dispatches, WIP-inspection cadence, no-silent-amendments) live in an always-applied rule so the workflow + atomic skills can reference rather than re-state them.
+Hard invariants (slice-INVEST passes before triage admits the unit; dispatch-INVEST passes before slice-plan finalises and again at dispatch DoR; WIP-inspection cadence; no-silent-amendments) live in an always-applied rule so the workflow + atomic skills can reference rather than re-state them.

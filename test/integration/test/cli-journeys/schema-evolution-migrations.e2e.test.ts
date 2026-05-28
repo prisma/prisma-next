@@ -16,7 +16,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { withTempDir } from '../utils/cli-test-helpers';
+import { clearDbRefForGreenfieldPlan, withTempDir } from '../utils/cli-test-helpers';
 import {
   getLatestMigrationDir,
   type JourneyContext,
@@ -179,6 +179,7 @@ withTempDir(({ createTempDir }) => {
         // creates from ∅ → additive. The marker won't match the chain root.
         // Instead, we use db update for this transition (which is how it works in practice).
         // Journey Z tests the realistic "switch to migrations" workflow.
+        clearDbRefForGreenfieldPlan(ctx.testDir);
         const plan = await runMigrationPlan(ctx, ['--name', 'initial-evolution']);
         expect(plan.exitCode, 'Z.02: migration plan').toBe(0);
 

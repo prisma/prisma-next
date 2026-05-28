@@ -32,6 +32,7 @@
     "./array-equal": "./dist/array-equal.mjs",
     "./assertions": "./dist/assertions.mjs",
     "./canonical-stringify": "./dist/canonical-stringify.mjs",
+    "./casts": "./dist/casts.mjs",
     "./defined": "./dist/defined.mjs",
     "./hash-content": "./dist/hash-content.mjs",
     "./json": "./dist/json.mjs",

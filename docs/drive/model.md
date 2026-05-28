@@ -2,7 +2,7 @@
 
 ## At a glance
 
-Drive's domain model has three sized **units of work** (Direct change, Slice, Project), one **delegation unit** (Dispatch), eight **workflows** (seven lifecycle-stage + one cross-cutting), three **aggregate roots** that the workflows mutate, and twelve **invariants** that hold across everything. Two forcing constraints — the PR cap (units of work) and the M-cap (dispatches) — keep work appropriately sized; an anti-corruption layer maps Drive's units to the team's tracker.
+Drive's domain model has three sized **units of work** (Direct change, Slice, Project), one **delegation unit** (Dispatch), eight **workflows** (seven lifecycle-stage + one cross-cutting), three **aggregate roots** that the workflows mutate, and twelve **invariants** that hold across everything. **Sizing is by logical coherence — INVEST applied at each altitude — not by logistical footprint (file count, LoC, time-box).** An anti-corruption layer maps Drive's units to the team's tracker.
 
 ```text
 Sized units (smallest → largest):
@@ -17,9 +17,10 @@ Workflows (eight):
   Project init → Slice init → Slice exec → Slice review → Slice closure → Project closure
   Design discussion (cross-cutting; fires on triggers across the lifecycle)
 
-Forcing constraints:
-  Units of work bounded by PR cap (triage enforces).
-  Dispatches bounded by M cap (slice planning enforces; slice execution refuses L/XL).
+Sizing:
+  Every unit (project / slice / dispatch) is sized by INVEST at its altitude;
+  see docs/drive/principles/sizing.md. Slice-Small = manageable in a single
+  code review. Dispatch-Small = brief + references fit in the executor's context.
 
 Tracker sync:
   Anti-corruption layer maps Drive units → tracker units; promotion + demotion are
@@ -28,25 +29,25 @@ Tracker sync:
 
 This document is the source of truth for the Drive domain model. The workflow map ([`workflow.md`](workflow.md)) is the operational layer that names every skill plug-point.
 
-## Two forcing constraints
+## Sizing — INVEST at each altitude
 
-The model's two structural constraints. Everything downstream — sizing, triage outcomes, dispatch discipline — falls out of these.
+The model's sizing discipline. Everything downstream — triage outcomes, slice planning, dispatch DoR — falls out of this.
 
-### The PR cap (the unit-of-work constraint)
+Sizing is by **logical coherence** (does this unit have one outcome an executor can hold, deliver, and verify?), not by logistical footprint (file count, LoC, time-box). The check at each altitude is **INVEST** (Independent, Negotiable, Valuable, Estimable, Small, Testable), with altitude-specific definitions. Full principle: [`docs/drive/principles/sizing.md`](principles/sizing.md). This-codebase calibration: [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md).
 
-A pull request has a natural size cap. Above the cap, PRs become hard to review, debug, deploy, and roll back. Below the cap (down to one-line fixes), they remain useful. The cap varies by codebase but is real and bounded.
+### Sizing at the slice / direct-change altitude
 
-Drive does not produce PRs directly. It produces specs and plans that *compose into* PRs. The PR cap therefore shows up as the **slice / direct-change cap** — the unit of work that delivers exactly one PR cannot exceed what one PR can absorb. Triage enforces this on admission: any candidate unit that wouldn't fit in one PR is admitted as a Project (which composes multiple PRs) instead.
+A slice delivers exactly one PR. The slice is well-sized when it passes **slice-INVEST** — in particular when **Small** holds: the PR is **manageable in a single code review** (one reviewer holds the coherence in one sitting without losing the thread). Triage enforces this on admission: any candidate unit that fails slice-INVEST is admitted as a Project (composing multiple slices) or split into multiple units.
 
-### The M cap (the dispatch constraint)
+### Sizing at the dispatch altitude
 
 A dispatch is one agent session. Long-running dispatches are hard for the orchestrator to inspect, hard to recover from when drift emerges, and pressure the implementer model into capability that should be reserved for genuine judgment.
 
-Drive does not run dispatches directly either. The slice plan *decomposes into* dispatches. The dispatch cap therefore shows up as **complexity ≤ M** (t-shirt sized) plus a per-size wall-clock time-box. Slice planning enforces the cap; slice execution refuses L/XL even if a plan slipped one through (defense in depth).
+The dispatch is well-sized when it passes **dispatch-INVEST** — in particular when **Small** holds (brief + references fit in the executor's context) and **Estimable** holds (a binary `Completed when` checklist can be written). Slice planning enforces this; slice execution refuses dispatches that fail INVEST (defense in depth) and routes them back for re-decomposition.
 
-### The two caps act independently
+### The two altitudes act independently
 
-The PR cap is about review-ability, rollback-ability, debug-ability. The M cap is about agent-session inspect-ability, orchestrator recover-ability. **Neither subsumes the other** — a slice can fit one PR but require multiple dispatches; a single dispatch can never span multiple PRs. Codified as invariant **I11**.
+Slice-INVEST is about review-ability, rollback-ability, debug-ability. Dispatch-INVEST is about agent-session inspect-ability, orchestrator recover-ability. **Neither subsumes the other** — a slice can pass slice-INVEST but compose into multiple dispatches; a single dispatch can never span multiple slices. Codified as invariant **I11**.
 
 ## Layer 1: ubiquitous language
 
@@ -63,7 +64,7 @@ The terms below are pinned. Every drive-* skill body uses these and only these f
 | **Project spec** | Artefact stating a project's purpose, scope boundary, and project-DoD. |
 | **Slice spec** | Artefact stating a slice's purpose, scope (within the parent project's purpose, if any), and slice-DoD. For orphan slices, may live inline in the PR description. |
 | **Project plan** | Sketch of the slices and direct changes composing a project — known and anticipated. Sequences them, identifies stacking and parallelism. Does not enumerate the dispatches inside any one slice. |
-| **Slice plan** | Sequence of dispatches that will deliver one PR. Each dispatch sized ≤ M, with declared DoR and DoD. Does not enumerate the steps inside any one dispatch. |
+| **Slice plan** | Sequence of dispatches that will deliver one PR. Each dispatch passes dispatch-INVEST, with declared DoR and DoD. Does not enumerate the steps inside any one dispatch. |
 | **Brief** | The artefact passed to a dispatch at delegation time. Carries DoR satisfaction, scope, edge cases pre-named with dispositions (Example Mapping), validation gates, time-box, model tier. The dispatch-level analogue of a slice spec. |
 | **Purpose statement** | The "why" of a project. Declared in the project spec. Immutable after the first slice or direct change starts (I7). |
 | **Scope boundary** | The "what's in" of a project. Declared in the project spec. May sharpen; never expands outside the purpose (I2). |
@@ -220,8 +221,9 @@ Triggered by:  triage outputting "new slice" (orphan or in-project),
                OR project initiation adding a slice, OR mid-flight
                triage adopting surfaced scope.
 Driven by:     implementer.
-Outputs:       slice spec + slice plan (dispatch sequence; sized
-               ≤ M-cap per dispatch; DoR + DoD declared per dispatch).
+Outputs:       slice spec + slice plan (dispatch sequence; every
+               dispatch passes dispatch-INVEST; DoR + DoD declared per
+               dispatch).
                Persistence per context (§ Persistence shape):
                – Orphan slice: inline in PR description.
                – In-project slice: under projects/<project>/slices/<slice>/.
@@ -345,13 +347,14 @@ I9  Every slice has a Definition of Done declared in its slice
     spec OR inherited from its parent project's DoD.
 I10 Every project has a Definition of Done declared in its
     project spec.
-I11 Sizing caps apply at two scopes:
-      - Slice/direct-change: bounded by PR-cap (the unit must fit
-        in one PR). Triage enforces.
-      - Dispatch: bounded by M-cap (complexity ≤ M; wall-clock
-        time-box per t-shirt size). Slice planning enforces;
-        slice execution refuses L/XL even if a plan slipped one
-        through.
+I11 Sizing applies at two altitudes, by logical coherence (INVEST),
+    not by logistical footprint:
+      - Slice/direct-change: must pass slice-INVEST. Small =
+        manageable in a single code review. Triage enforces.
+      - Dispatch: must pass dispatch-INVEST. Small = brief +
+        references fit in the executor's context. Slice planning
+        enforces; slice execution refuses INVEST-failing
+        dispatches even if a plan slipped one through.
 I12 Spec or plan amendments after the first dispatch of a slice
     starts are either (a) the output of a design discussion with
     operator participation, or (b) an explicit operator-authorised
@@ -361,7 +364,7 @@ I12 Spec or plan amendments after the first dispatch of a slice
 
 I7 is the structural ratchet against mission drift: you can refine *how* the project gets done, but you can't change *what* the project is once you've committed work to it.
 
-I11 is the structural ratchet against runaway agent dispatches and unreviewable PRs. The two caps are independent and complementary.
+I11 is the structural ratchet against runaway agent dispatches and unreviewable PRs. The two altitudes are independent and complementary; INVEST is the validity check at each.
 
 I12 is the structural ratchet against assumption-falsification being silently accommodated: when an assumption breaks, the orchestrator must surface to the operator (or, in unattended mode, halt) rather than amend the spec/plan privately.
 
@@ -488,9 +491,9 @@ The distinction matters because it sets human expectations and supports gradual 
 Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/main/skills/README.md), the only hard rule is "consistency with existing skills." Three shapes cover the drive-* family:
 
 - **`drive-<verb>-workflow`** for the workflow tier (e.g. `drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`). The `-workflow` suffix is the visible cue.
-- **`drive-<verb>-<noun>`** for atomic action skills producing an artefact (e.g. `drive-create-spec`, `drive-close-project`, `drive-review-code`, `drive-triage-work`, `drive-check-health`).
+- **`drive-<verb>-<noun>`** for atomic action skills producing an artefact (e.g. `drive-close-project`, `drive-review-code`, `drive-triage-work`, `drive-check-health`).
 - **`drive-<sub-namespace>-<verb>`** for atomic skills under a focused area (e.g. `drive-pr-description` / `drive-pr-walkthrough`; `drive-qa-plan` / `drive-qa-run`; `drive-specify-project` / `drive-specify-slice`; `drive-plan-project` / `drive-plan-slice`; `drive-run-retro`).
-- **`drive-<verb>`** or **`drive-<noun>`** for single-name atomic skills (e.g. `drive-list`, `drive-discussion`).
+- **`drive-<verb>`** or **`drive-<noun>`** for single-name atomic skills (e.g. `drive-dispatch`, `drive-list`, `drive-discussion`).
 
 *Scope units* (project / slice) are not sub-namespaces — they show up as the **noun** in `drive-<verb>-<noun>`, not as a leading namespace token. The verb leads so the skill reads as a command (*"drive specify project"*, *"drive plan slice"*, *"drive check health"*).
 
@@ -499,7 +502,7 @@ Per [`prisma/ignite skills/README.md`](https://github.com/prisma/ignite/blob/mai
 | Skill | Pilots |
 |---|---|
 | `drive-start-workflow` | Triage + the verdict's setup. Routes the work to its right shape and runs the immediate downstream setup (creates the project / scaffolds the slice / opens the direct-change PR). Fires at fresh entry AND mid-flight (promote / demote). |
-| `drive-build-workflow` | A slice's implementation loop: pre-flight DoR → dispatch loop with WIP inspection → post-flight DoD → review → close. Includes intent-validation, L/XL refusal, and the design-discussion stop-condition. |
+| `drive-build-workflow` | A slice's implementation loop: pre-flight DoR → dispatch loop with WIP inspection → post-flight DoD → review → close. Includes intent-validation, dispatch-INVEST refusal at pre-flight, and the design-discussion stop-condition. |
 | `drive-deliver-workflow` | A project's lifecycle: project init → slice-by-slice (each via `drive-build-workflow`) → health checks → retros on triggers → mandatory final retro → close. |
 
 ### Atomic skills
@@ -512,6 +515,7 @@ Specs and plans are per-scope (project / slice) because the inputs, outputs, and
 | `drive-specify-slice` | Slice | Slice spec: scope-within-project + slice-DoD + Example-Mapping edge cases. |
 | `drive-plan-project` | Project | Project plan: slice composition; stack / parallel sequencing. |
 | `drive-plan-slice` | Slice | Slice plan: dispatch sequence; sizing discipline; DoR-per-dispatch. |
+| `drive-dispatch` | Dispatch | Executes one dispatch: assemble brief, delegate implementer, monitor heartbeats, return report. Called by `drive-build-workflow` (in the slice loop) and by `drive-start-workflow` (one-shot, for direct-change verdicts). Owns the dispatch-brief template, implementer delegation prompt, and implementer persona. |
 | `drive-triage-work` | Cross-cutting | Runs the triage decision tree and outputs one of the eight verdicts. Called by `drive-start-workflow`; operators can invoke directly. |
 | `drive-create-project` | Project | Scaffolds `projects/<x>/`; seeds slice template + project-context links. Called by `drive-deliver-workflow` at project init. |
 | `drive-close-project` | Project | Verifies project DoD, prose-audits long-lived candidates, migrates / lifts / softens, deletes the project folder, opens the close-out PR. Mandatory final retro step. Called by `drive-deliver-workflow` at project close. |
@@ -527,16 +531,16 @@ Specs and plans are per-scope (project / slice) because the inputs, outputs, and
 | `drive-discussion` (mode) | Cross-cutting | Operator + agile orchestrator design discussion. Fires on trigger from any workflow skill or operator invocation. |
 | `drive-list` (in `.system/`) | Cross-cutting | Lists / discoverability helper. |
 
-### Direct change has no dedicated skill
+### Direct change shares the dispatch primitive
 
-Triage's "direct change" verdict routes the developer straight to `gh pr create`. No Drive skill is involved in execution; the implementer reads the intent, makes the edit, opens the PR. `drive-start-workflow` orchestrates this path by calling `drive-pr-description` (in its direct-change framing) and then returning; the path is deliberately ceremonial-light.
+Triage's "direct change" verdict reuses `drive-dispatch` for execution — one-shot, fresh implementer, no reviewer cycle. `drive-start-workflow` orchestrates this path by calling `drive-pr-description` (direct-change framing), then `drive-dispatch` (one-off), then `gh pr create`. The slice loop in `drive-build-workflow` calls the same `drive-dispatch` primitive in its dispatch-after-dispatch sequence. Both paths share the brief template, the delegation prompt, the implementer persona, and the heartbeat contract; what differs is the wrapping loop (one-shot vs. iterate-implement-review).
 
 ## What this document does *not* decide
 
 - The bodies of any skills (those live in [`skills-contrib/drive-*/SKILL.md`](../../skills-contrib/) as their canonical source).
 - The exact templates for slice spec / slice plan / brief / DoR / DoD / retro (these live in the principle docs under [`principles/`](principles/)).
 - The migration plan from canonical to the new model (per-consumer adoption is downstream).
-- The reference-task anchors for any specific repo's t-shirt sizing (lives in each repo's project context — for prisma-next, in [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md)).
+- The INVEST rubric specialised to a specific repo's vocabulary and dispatch shapes (lives in each repo's project context — for prisma-next, in [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md)).
 
 All of those are downstream. This document is the input.
 
