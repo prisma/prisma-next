@@ -29,15 +29,19 @@ The skill is the *mode of operation*: the operating rules, the response shape, t
 
 ## When to use
 
+**Discussion is signal-triggered, not mandatory on every entry.** The orchestrator's workflow skills (`drive-start-workflow`, `drive-build-workflow`, `drive-deliver-workflow`) are responsible for detecting signals and routing here; this skill is the destination, not the gatekeeper. See [`docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artefact-cascade-redesign.md) § Cross-cutting principles for the signal definitions.
+
 Five canonical triggers (design discussion at triage / spec / mid-flight boundaries — see `drive/triage/README.md` for team overlays):
 
-1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-specify-project` or `drive-specify-slice`.
+1. **Pre-spec.** The conversation needs to produce a spec, plan, or design before implementation begins. Typically fires before / inside `drive-specify-project` or `drive-specify-slice`. Signal: design ambiguity in the ticket, surface uncertainty (first-grep returns more files than expected), parent-project assumption at risk.
 2. **Mid-spec.** A spec authoring session hits a fork-in-the-road that needs collaborative resolution rather than a unilateral pick by the agent.
 3. **Mid-flight on falsified assumption.** A load-bearing assumption (named in the spec or implicit in the plan) is observed to be false during implementation. Per invariant I12 (no silent agent-side amendments), the orchestrator must halt and route to design discussion rather than amending the spec quietly. Surfacing the falsification as a discussion topic is itself one of the skill's uses — *"the contract-versioning assumption from spec § 3.2 is wrong; entering discussion mode to decide what changes."*
 4. **Mid-flight on obstacle.** An obstacle emerges that the plan doesn't account for (a dependency unexpectedly drops, a tool turns out to be insufficient, a design boundary breaks). Same I12-driven discipline: halt and discuss rather than silently route around.
 5. **Explicit operator request.** *"Let's discuss this."* *"Discussion mode."* *"Pressure-test this."*
 
 Triggers 3 and 4 are typically surfaced by workflow skills (`drive-build-workflow` stop-conditions, `drive-deliver-workflow` health-check escalations). The workflow skill halts and routes here.
+
+**Skip discussion when:** the entry-point is unambiguous, the affected surface is familiar and small, the plan-level assumptions look stable, AND the operator hasn't asked for discussion. Default to drafting directly in those cases.
 
 Do **not** use this skill for:
 
