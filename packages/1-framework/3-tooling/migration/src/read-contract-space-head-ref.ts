@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { ContractSpaceHeadRef } from '@prisma-next/framework-components/control';
 import { join } from 'pathe';
 import { errorInvalidJson, errorInvalidRefFile } from './errors';
-import { assertValidSpaceId } from './space-layout';
+import { assertValidSpaceId, spaceMigrationDirectory, spaceRefsDirectory } from './space-layout';
 
 export type { ContractSpaceHeadRef };
 
@@ -29,7 +29,10 @@ export async function readContractSpaceHeadRef(
 ): Promise<ContractSpaceHeadRef | null> {
   assertValidSpaceId(spaceId);
 
-  const filePath = join(projectMigrationsDir, spaceId, 'refs', 'head.json');
+  const filePath = join(
+    spaceRefsDirectory(spaceMigrationDirectory(projectMigrationsDir, spaceId)),
+    'head.json',
+  );
 
   let raw: string;
   try {

@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import type { ContractSpaceHeadRef } from './read-contract-space-head-ref';
-import { assertValidSpaceId } from './space-layout';
+import { assertValidSpaceId, spaceRefsDirectory } from './space-layout';
 
 /**
  * Inputs for {@link emitContractSpaceArtefacts}.
@@ -56,7 +56,8 @@ export async function emitContractSpaceArtefacts(
   assertValidSpaceId(spaceId);
 
   const dir = join(projectMigrationsDir, spaceId);
-  await mkdir(join(dir, 'refs'), { recursive: true });
+  const refsDir = spaceRefsDirectory(dir);
+  await mkdir(refsDir, { recursive: true });
 
   await writeFile(join(dir, 'contract.json'), `${canonicalizeJson(inputs.contract)}\n`);
   await writeFile(join(dir, 'contract.d.ts'), inputs.contractDts);
@@ -66,5 +67,5 @@ export async function emitContractSpaceArtefacts(
     hash: inputs.headRef.hash,
     invariants: sortedInvariants,
   });
-  await writeFile(join(dir, 'refs', 'head.json'), `${headJson}\n`);
+  await writeFile(join(refsDir, 'head.json'), `${headJson}\n`);
 }

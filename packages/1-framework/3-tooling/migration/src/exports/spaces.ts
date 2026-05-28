@@ -31,7 +31,10 @@ export {
   APP_SPACE_ID,
   assertValidSpaceId,
   isValidSpaceId,
+  RESERVED_SPACE_SUBDIR_NAMES,
+  SPACE_REFS_DIRNAME,
   spaceMigrationDirectory,
+  spaceRefsDirectory,
   type ValidSpaceId,
 } from '../space-layout';
 export {

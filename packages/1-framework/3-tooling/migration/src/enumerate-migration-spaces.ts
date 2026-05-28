@@ -1,13 +1,14 @@
-import { join } from 'pathe';
 import { readMigrationsDir } from './io';
 import type { MigrationListEntry, MigrationSpaceListEntry } from './migration-list-types';
 import { readRefs } from './refs';
-import { APP_SPACE_ID, isValidSpaceId, spaceMigrationDirectory } from './space-layout';
+import {
+  APP_SPACE_ID,
+  isValidSpaceId,
+  RESERVED_SPACE_SUBDIR_NAMES,
+  spaceMigrationDirectory,
+  spaceRefsDirectory,
+} from './space-layout';
 import { listContractSpaceDirectories } from './verify-contract-spaces';
-
-function refsDirectoryFor(spaceMigrationsDir: string): string {
-  return join(spaceMigrationsDir, 'refs');
-}
 
 /**
  * Index `migrations/<space>/refs/*.json` by the contract hash each ref
@@ -82,7 +83,10 @@ function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry)
  *
  * Directory entries that are not valid {@link isValidSpaceId} names are
  * skipped (a stray non-space directory under `migrations/` does not
- * spawn a phantom space entry).
+ * spawn a phantom space entry). Entries whose name appears in
+ * {@link RESERVED_SPACE_SUBDIR_NAMES} are also skipped — the per-space
+ * `refs/` subdirectory name shape would otherwise satisfy
+ * {@link isValidSpaceId} and surface as a phantom contract space.
  *
  * Returns `[]` when `<projectMigrationsDir>` does not exist — a fresh
  * project that has not authored any migration yet.
@@ -92,13 +96,16 @@ export async function enumerateMigrationSpaces(args: {
 }): Promise<readonly MigrationSpaceListEntry[]> {
   const { projectMigrationsDir } = args;
   const candidateDirs = await listContractSpaceDirectories(projectMigrationsDir);
-  const spaceIds = candidateDirs.filter(isValidSpaceId).sort(compareSpaceIds);
+  const spaceIds = candidateDirs
+    .filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name))
+    .filter(isValidSpaceId)
+    .sort(compareSpaceIds);
 
   const spaces: MigrationSpaceListEntry[] = [];
   for (const spaceId of spaceIds) {
     const spaceDir = spaceMigrationDirectory(projectMigrationsDir, spaceId);
     const packages = await readMigrationsDir(spaceDir);
-    const refsByHash = await resolveRefsByContractHash(refsDirectoryFor(spaceDir));
+    const refsByHash = await resolveRefsByContractHash(spaceRefsDirectory(spaceDir));
 
     const migrations: MigrationListEntry[] = packages
       .map((pkg) => ({

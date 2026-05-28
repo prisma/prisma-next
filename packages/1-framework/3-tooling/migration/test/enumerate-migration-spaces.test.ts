@@ -189,6 +189,51 @@ describe('enumerateMigrationSpaces', () => {
     expect(result.map((s) => s.spaceId)).toEqual(['app']);
   });
 
+  it('treats a top-level `refs/` subdirectory as reserved, not a contract space', async () => {
+    // The per-space layout reserves `refs/` as a sub-directory of each
+    // space (`migrations/<space>/refs/*.json`). If a project ends up with
+    // a top-level `migrations/refs/` directory — for example because a
+    // ref file was authored at the wrong layer — the enumerator must not
+    // mistake it for a phantom contract space named `refs`.
+    await writeTestPackage(
+      join(migrationsDir, 'app', '20260101T0000_seed'),
+      { from: null, to: HASH_INITIAL },
+      [ADDITIVE_OP],
+    );
+    await writeRef(join(migrationsDir, 'refs'), 'production', {
+      hash: HASH_BRANCH_A,
+      invariants: [],
+    });
+
+    const result = await enumerateMigrationSpaces({ projectMigrationsDir: migrationsDir });
+
+    expect(result.map((s) => s.spaceId)).toEqual(['app']);
+  });
+
+  it('treats `refs` as a reserved name even when it looks like a populated space directory', async () => {
+    // Edge case: a user could theoretically name a contract space `refs`
+    // and nest a migration package under it
+    // (`migrations/refs/<dir>/migration.json`). The candidate-level filter
+    // still excludes it — `refs` is reserved at the contract-space
+    // candidate level regardless of contents — so the user's migration is
+    // silently filtered out (the recommended remediation is to rename the
+    // space).
+    await writeTestPackage(
+      join(migrationsDir, 'app', '20260101T0000_seed'),
+      { from: null, to: HASH_INITIAL },
+      [ADDITIVE_OP],
+    );
+    await writeTestPackage(
+      join(migrationsDir, 'refs', '20260101T0000_misplaced'),
+      { from: null, to: HASH_BRANCH_A },
+      [ADDITIVE_OP],
+    );
+
+    const result = await enumerateMigrationSpaces({ projectMigrationsDir: migrationsDir });
+
+    expect(result.map((s) => s.spaceId)).toEqual(['app']);
+  });
+
   it('reads the prisma-next-demo fixture into a single app space, latest-first', async () => {
     const fixtureMigrationsDir = resolve(
       __dirname,
