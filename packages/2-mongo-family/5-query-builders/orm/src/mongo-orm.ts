@@ -4,6 +4,7 @@ import type {
   MongoTypeMaps,
   RootModelName,
 } from '@prisma-next/mongo-contract';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { MongoCollection } from './collection';
 import { createMongoCollection } from './collection';
 import type { MongoQueryExecutor } from './executor';
@@ -31,10 +32,10 @@ export function mongoOrm<TContract extends MongoContractWithTypeMaps<MongoContra
   for (const [rootName, rootRef] of Object.entries(contract.roots)) {
     client[rootName] = createMongoCollection(
       contract,
-      rootRef.model as RootModelName<
-        TContract,
-        typeof rootName & keyof TContract['roots'] & string
-      >,
+      blindCast<
+        RootModelName<TContract, typeof rootName & keyof TContract['roots'] & string>,
+        'roots entries are CrossReferences; rootRef.model is a valid RootModelName for this contract'
+      >(rootRef.model),
       executor,
     );
   }

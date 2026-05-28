@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { blindCast } from '@prisma-next/utils/casts';
 import { isSafeTypeExpression } from './type-expression-safety';
 
 export function serializeValue(value: unknown): string {
@@ -105,7 +106,9 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
     const parts: string[] = [];
 
     if (relObj['to'])
-      parts.push(`readonly to: ${serializeCrossReference(relObj['to'] as CrossReference)}`);
+      parts.push(
+        `readonly to: ${serializeCrossReference(blindCast<CrossReference, 'contract JSON schema-validated before serialization; truthy check above confirms presence'>(relObj['to']))}`,
+      );
     if (relObj['cardinality'])
       parts.push(`readonly cardinality: ${serializeValue(relObj['cardinality'])}`);
 

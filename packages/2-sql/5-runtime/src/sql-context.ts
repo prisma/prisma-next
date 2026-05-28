@@ -31,6 +31,7 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 // Framework `Namespace.tables` is widened to `Record<string, object>` so
 // emitted `contract.d.ts` table literals satisfy it structurally. At
@@ -45,9 +46,15 @@ function documentScopedCodecTypes(
 ): Record<string, StorageTypeInstance> | undefined {
   const fromDomain = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'];
   if (fromDomain !== undefined && typeof fromDomain === 'object') {
-    return fromDomain as Record<string, StorageTypeInstance>;
+    return blindCast<
+      Record<string, StorageTypeInstance>,
+      'contract domain types object validated by schema; shape confirmed as StorageTypeInstance map'
+    >(fromDomain);
   }
-  return contract.storage.types as Record<string, StorageTypeInstance> | undefined;
+  return blindCast<
+    Record<string, StorageTypeInstance> | undefined,
+    'SqlStorage.types is typed for generic access; runtime shape is guaranteed by contract schema validation'
+  >(contract.storage.types);
 }
 
 import {

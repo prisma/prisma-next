@@ -7,6 +7,7 @@ import {
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type Type, type } from 'arktype';
 import {
   type ForeignKeyInput,
@@ -134,12 +135,17 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-export const ForeignKeyReferenceSchema = type({
-  '+': 'reject',
-  namespaceId: 'string',
-  tableName: 'string',
-  columns: type.string.array().readonly(),
-}) as Type<ForeignKeyReferenceInput>;
+export const ForeignKeyReferenceSchema = blindCast<
+  Type<ForeignKeyReferenceInput>,
+  "arktype 'string' cannot infer the NamespaceId brand; brand is compile-time-only so runtime shape matches"
+>(
+  type({
+    '+': 'reject',
+    namespaceId: 'string',
+    tableName: 'string',
+    columns: type.string.array().readonly(),
+  }),
+);
 
 export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
