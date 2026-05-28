@@ -925,7 +925,7 @@ describe('capability folding', () => {
       driver,
     });
 
-    expect(JSON.stringify(context.contract.capabilities)).toBe(JSON.stringify(expected));
+    expect(context.contract.capabilities).toEqual(expected);
   });
 
   it('is idempotent when the same extension descriptor appears twice in the stack', () => {

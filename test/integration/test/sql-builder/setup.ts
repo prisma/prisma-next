@@ -14,6 +14,7 @@ import {
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { Client } from 'pg';
 import { afterAll, beforeAll } from 'vitest';
 import { contract } from './fixtures/contract';
@@ -21,7 +22,10 @@ import type { Contract } from './fixtures/generated/contract';
 
 export { timeouts };
 
-const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
+const sqlContract = blindCast<
+  Contract,
+  "SqlContractSerializer.deserializeContract returns the framework's Contract supertype; the test fixture's narrowed Contract type isn't expressible at the deserializer boundary"
+>(new SqlContractSerializer().deserializeContract(contract));
 
 export function setupIntegrationTest() {
   let runtime: Runtime;

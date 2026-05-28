@@ -7,15 +7,17 @@
  * byte-for-byte consistent without one depending on the other.
  */
 
+import { blindCast } from '@prisma-next/utils/casts';
+
 type CapabilityMatrix = Record<string, Record<string, boolean>>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function sortDeep<T>(value: T): T {
+function sortDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map(sortDeep) as unknown as T;
+    return value.map(sortDeep);
   }
   if (!isPlainObject(value)) {
     return value;
@@ -25,7 +27,7 @@ function sortDeep<T>(value: T): T {
   for (const [key, child] of entries) {
     next[key] = sortDeep(child);
   }
-  return next as T;
+  return next;
 }
 
 function extractCapabilityMatrix(value: unknown): CapabilityMatrix {
@@ -81,5 +83,8 @@ export function mergeCapabilityMatrices(
     }
   }
 
-  return sortDeep(merged);
+  return blindCast<
+    CapabilityMatrix,
+    "sortDeep preserves the matrix shape but the recursive generic relationship can't be expressed to TS"
+  >(sortDeep(merged));
 }
