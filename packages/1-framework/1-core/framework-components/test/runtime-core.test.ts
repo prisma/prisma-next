@@ -143,7 +143,7 @@ describe('RuntimeCore', () => {
     ]);
   });
 
-  it('runBeforeCompile defaults to identity (does not transform the plan)', async () => {
+  it('runBeforeCompile defaults to identity (forwards the runtime-wrapped plan)', async () => {
     class IdentityRuntime extends RuntimeCore<MockPlan, MockExec, RuntimeMiddleware<MockExec>> {
       observed: MockPlan | undefined;
       protected override runBeforeCompile(plan: MockPlan): MockPlan {
@@ -166,7 +166,14 @@ describe('RuntimeCore', () => {
 
     await runtime.execute(plan).toArray();
 
-    expect(runtime.observed).toBe(plan);
+    // The runtime wraps the plan with `meta.planExecutionId` before any hook
+    // fires (ADR 220), so `runBeforeCompile` observes the wrapped plan
+    // rather than the caller's reference. The wrapped plan carries every
+    // field of the original plus the runtime-assigned identity.
+    expect(runtime.observed).not.toBe(plan);
+    expect(runtime.observed?.draftId).toBe('d-3');
+    expect(runtime.observed?.meta).toMatchObject(meta);
+    expect(typeof runtime.observed?.meta.planExecutionId).toBe('string');
   });
 
   it('forwards the lowered exec to runDriver and to middleware hooks', async () => {
@@ -210,5 +217,72 @@ describe('RuntimeCore', () => {
     expect(runtime.closeCalls).toBe(0);
     await runtime.close();
     expect(runtime.closeCalls).toBe(1);
+  });
+
+  describe('planExecutionId', () => {
+    interface Observation {
+      readonly hook: 'beforeExecute' | 'afterExecute';
+      readonly planExecutionId: string | undefined;
+    }
+
+    function observer(log: Observation[]): RuntimeMiddleware<MockExec> {
+      return {
+        name: 'observer',
+        async beforeExecute(plan) {
+          log.push({ hook: 'beforeExecute', planExecutionId: plan.meta.planExecutionId });
+        },
+        async afterExecute(plan) {
+          log.push({ hook: 'afterExecute', planExecutionId: plan.meta.planExecutionId });
+        },
+      };
+    }
+
+    it('assigns the same planExecutionId to beforeExecute and afterExecute within one execute call', async () => {
+      const log: Observation[] = [];
+      const runtime = new MockRuntime([observer(log)], ctx, [{ id: 1 }]);
+      const plan: MockPlan = { draftId: 'one-execute', meta };
+
+      await runtime.execute(plan).toArray();
+
+      expect(log).toHaveLength(2);
+      expect(log[0]?.hook).toBe('beforeExecute');
+      expect(log[1]?.hook).toBe('afterExecute');
+      expect(log[0]?.planExecutionId).toBeTypeOf('string');
+      expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+    });
+
+    it('assigns distinct planExecutionIds to two executions of the same plan instance', async () => {
+      const log: Observation[] = [];
+      const runtime = new MockRuntime([observer(log)], ctx, [{ id: 1 }]);
+      const plan: MockPlan = { draftId: 'shared-plan', meta };
+
+      await runtime.execute(plan).toArray();
+      await runtime.execute(plan).toArray();
+
+      expect(log).toHaveLength(4);
+      const firstExecId = log[0]?.planExecutionId;
+      const secondExecId = log[2]?.planExecutionId;
+      expect(firstExecId).toBeTypeOf('string');
+      expect(secondExecId).toBeTypeOf('string');
+      // Within each execute call, beforeExecute and afterExecute see the same ID.
+      expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+      expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
+      // Across execute calls, the IDs differ.
+      expect(firstExecId).not.toBe(secondExecId);
+    });
+
+    it('overrides a caller-supplied planExecutionId on every execute call', async () => {
+      const log: Observation[] = [];
+      const runtime = new MockRuntime([observer(log)], ctx, []);
+      const plan: MockPlan = {
+        draftId: 'preset',
+        meta: { ...meta, planExecutionId: 'caller-supplied' },
+      };
+
+      await runtime.execute(plan).toArray();
+
+      expect(log[0]?.planExecutionId).toBeTypeOf('string');
+      expect(log[0]?.planExecutionId).not.toBe('caller-supplied');
+    });
   });
 });
