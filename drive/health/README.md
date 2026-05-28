@@ -6,11 +6,11 @@ Loaded by `drive-check-health` and (via it) `drive-deliver-workflow`. Holds pris
 
 ## Drift-signal thresholds
 
-Threshold values for the canonical drift signals (calibrate as the team gathers data):
+Threshold values for the canonical drift signals (calibrate as the team gathers data). These are *signals that trigger a recheck*, not validity criteria — the validity test is INVEST at each altitude (see [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md)).
 
-- **Dispatch crossed M-cap unexpectedly**: actual size > 1.5× predicted.
-- **Slice PR scope grew past PR-cap**: > 800 LoC diff OR > 15 files changed.
-- **Slice dispatch count exceeded plan**: actual > 2× planned.
+- **Dispatch failed dispatch-INVEST in flight**: had to be halted or split mid-execution because the outcome turned out fuzzier than the brief named, or scope expanded beyond the brief's `In` list.
+- **Slice coherence broke down in flight**: reviewer flagged that the PR spans concerns they can't hold in one sitting; OR the dispatch sequence drifted across unrelated outcomes.
+- **Slice dispatch count exceeded plan**: actual > 2× planned (likely a slice-INVEST or dispatch-INVEST miscalibration at plan time).
 - **Failed-dispatch rate**: > 30% of dispatches in rolling 7d window required `ANOTHER ROUND NEEDED` or worse.
 - **Long-running in-flight slice**: > 5 calendar days from first dispatch to merge.
 
@@ -18,14 +18,14 @@ Severity defaults:
 
 - 1 signal of any kind: **informational** (surface but no action).
 - 2 signals in the same slice OR 1 signal repeating across slices: **warning** (consider retro at next merge).
-- 3+ signals OR PR-cap blown OR dispatch-count > 3× plan: **scope-shift-candidate** (recommend `drive-start-workflow` mid-flight re-triage).
+- 3+ signals OR a slice-coherence break OR dispatch-count > 3× plan: **scope-shift-candidate** (recommend `drive-start-workflow` mid-flight re-triage).
 
 ## Throughput baselines
 
 Calibrate from operator's historic pace; defaults below are placeholders to be updated.
 
 - **Dispatches/day** (interactive operator, full-time): _~3-5_.
-- **Median dispatch wallclock** (M-sized): _~45 min_.
+- **Median dispatch wallclock**: _~45 min_.
 - **Median rounds-to-satisfied**: _~1.5_ (rare 3+ should fire a retro).
 
 ## Pick-next heuristics (when multiple slices are ready)

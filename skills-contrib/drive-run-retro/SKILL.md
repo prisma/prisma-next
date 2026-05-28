@@ -26,7 +26,7 @@ Per `drive/retro/README.md` team overlays and the retro principle this skill emb
 **Trigger-based (most retros):**
 
 - **Dispatch failure.** A dispatch failed in a way that wasn't pre-named in the slice spec (would have been caught by a known failure-mode pattern), OR failed unexpectedly (the protocol didn't see it coming).
-- **Drift event.** WIP inspection caught the implementer drifting off-brief; OR a dispatch crossed the M-cap unexpectedly; OR a slice's PR diff grew past the PR-cap.
+- **Drift event.** WIP inspection caught the implementer drifting off-brief; OR a dispatch turned out to fail dispatch-INVEST in flight (outcome fuzzier than the brief named, or scope expanded beyond the brief); OR a slice's coherence broke down (one reviewer can no longer hold the PR).
 - **Scope-shift escapee.** A scope shift happened that the protocol should have caught earlier (via DoR / triage / health-check) but didn't.
 - **WIP-inspection finding.** A pattern surfaced repeatedly across WIP inspections that's worth crystallising into the protocol.
 - **Operator-flagged surprise.** Operator notices something unexpected (a failure-mode they hadn't seen before; a reviewer-verdict mis-calibration; an agent doing something wrong without being told).

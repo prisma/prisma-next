@@ -2,16 +2,16 @@
 
 ## The sizing stack — PR, slice, project, dispatch
 
-The natural sizing unit is the **pull request**. PRs have a maximum manageable size (above which review collapses) and a minimum efficient size (below which overhead dominates).
+Drive sizes units by **logical coherence** — does this unit have one outcome a single executor (and reviewer) can hold, deliver, and verify? The check is INVEST, applied at each altitude. The full principle lives at [`sizing.md`](sizing.md); the calibration of what *Independent*, *Small*, *Testable* etc. mean in this codebase lives at [`drive/calibration/sizing.md`](../../../drive/calibration/sizing.md).
 
-From PR derives the stack:
+The stack:
 
-| Unit | Definition | Sizing |
+| Unit | Definition | Sizing test |
 |------|------------|--------|
-| Direct change | Trivial work, no design ceremony | ~30-second verifiable diff |
-| Slice | Vertical slice of value | One PR's envelope |
-| Project | Design home for substantial discovery | Justified by depth, not by implementation size |
-| Dispatch | Sub-slice working unit | M-cap, one implementer handoff |
+| Direct change | Trivial work, no design ceremony | One outcome; ~30-second verifiable diff; spec fits in working memory |
+| Slice | Vertical slice of value | Slice-INVEST. *Small* = manageable in a single code review |
+| Project | Design home for substantial discovery | Project-INVEST. Justified by depth, not by implementation size |
+| Dispatch | Sub-slice working unit | Dispatch-INVEST. *Small* = brief + references fit in the executor's context |
 | Round | Implementer + reviewer iteration on a dispatch | Bounded by "done when" gates |
 
 ### Slice ≡ PR ≡ Linear ticket, 1:1:1
@@ -46,7 +46,7 @@ The orchestrator picks a model tier per dispatch. The rule for picking is shape-
 | Tricky one-line bug whose fix needs reading the spec carefully | "Fix the edge case in `mergeColumns` where two FKs collide on rename" | mid tier |
 | Spike (investigation, output is an artefact) | "Count how many test sites use the legacy shape; output a table by package" | fast tier with short time-box |
 | High blast radius even if conceptually simple | "Drop optionality from a substrate type that affects every consumer in the IR" | thorough tier, or decompose into smaller dispatches |
-| L or XL composite shape | "Do the whole migration end-to-end" | **Refuse — decompose first.** No tier is safe at this shape. |
+| Outsized composite shape (fails dispatch-INVEST's *Small*) | "Do the whole migration end-to-end" | **Refuse — decompose first.** No tier is safe at this shape. |
 
 The rule behind the rule: **decomposition is what makes a cheap tier safe.** Without it, the orchestrator can't drop tier — the verification gates can't catch drift on feature-sized scopes, so the only protection left is the implementer's capability. With decomposition, the gates do enough of the work that the cheap tier becomes safe.
 
@@ -54,7 +54,7 @@ Same shape as the Agile insight that small stories let juniors pick them up. Che
 
 ## Why feature-sized dispatches force the expensive tier
 
-L/XL dispatches (the ones DoR refuses) make the executing agent's job harder in four ways:
+Outsized dispatches — the ones that fail dispatch-INVEST's *Small* and that DoR refuses — make the executing agent's job harder in four ways:
 
 - **More interpretation latitude.** Bigger scope leaves more decisions to the implementer. More decisions means more chances to drift, so the orchestrator needs a model that's less likely to drift.
 - **Higher recovery cost.** Drift in a 5-commit dispatch is N times more expensive to unwind than drift in a 1-commit dispatch. You pay the capability premium to *reduce* drift probability because the cost of the drift is severe.
@@ -65,7 +65,7 @@ Result: feature-sized dispatches are locked to the orchestrator's tier throughou
 
 ## Why small, well-decomposed dispatches free up the tier
 
-When a dispatch is M-sized with a sharp "Done when," the situation inverts:
+When a dispatch passes dispatch-INVEST cleanly — one outcome, sharp `Completed when`, named halt conditions — the situation inverts:
 
 - **Narrow interpretation latitude.** A focused brief with pre-named edge cases gives the implementer few real decisions to make. Closer to "execute this specification" than "design and execute."
 - **Bounded recovery cost.** Drift in a 1-commit dispatch is trivially reversible. The protection against drift is verification + revert, not capability.
@@ -76,21 +76,21 @@ The cheap model is safe now because the protocol around the dispatch (DoR, DoD, 
 
 ## Worked example: a reversal we actually did
 
-The reversal dispatch we ran was effectively L/XL: "drop optionality across the IR substrate + update every caller + retire the conditional envelope + tighten the introspector + delete the helper + regenerate fixtures." We ran the whole thing at thorough tier throughout — the prior dispatch attempts at cheaper tiers had drifted on simpler scopes, so we leaned on capability to avoid drift again.
+The reversal dispatch we ran was a multi-outcome bundle that failed dispatch-INVEST: "drop optionality across the IR substrate + update every caller + retire the conditional envelope + tighten the introspector + delete the helper + regenerate fixtures." We ran the whole thing at thorough tier throughout — the prior dispatch attempts at cheaper tiers had drifted on simpler scopes, so we leaned on capability to avoid drift again.
 
 Properly decomposed, the same work would have been:
 
-| Dispatch | Size | Tier | Why |
+| Dispatch | Shape | Tier | Why |
 |---|---|---|---|
-| Drop `?:` from two adjacent substrate types (typology decision affecting all consumers) | M | thorough | Design judgment — typology decision |
-| TS-builder caller normalisation | M | fast tier | Mechanical, well-bounded |
-| PSL-interpreter caller normalisation | M | fast tier | Mechanical, well-bounded |
-| Verifier inlining + delete `foreignKeyNamespacesMatch` | S | fast tier | Mechanical |
-| Envelope shape simplification (retire conditional, delete probe) | M | thorough | Design judgment — canonical shape contract |
-| Postgres introspector tightening | S | fast tier | Mechanical |
-| F01 regression test | XS | fast tier | Mechanical |
-| Fixture regeneration | XS | fast tier | Pure command execution |
-| Final integration verify | S | thorough | Judgment on whether the pieces compose |
+| Drop `?:` from two adjacent substrate types (typology decision affecting all consumers) | Substrate change + design judgment | thorough | Design judgment — typology decision |
+| TS-builder caller normalisation | Mechanical fan-out | fast tier | Mechanical, well-bounded |
+| PSL-interpreter caller normalisation | Mechanical fan-out | fast tier | Mechanical, well-bounded |
+| Verifier inlining + delete `foreignKeyNamespacesMatch` | Surgical substrate change | fast tier | Mechanical |
+| Envelope shape simplification (retire conditional, delete probe) | Substrate change + design judgment | thorough | Design judgment — canonical shape contract |
+| Postgres introspector tightening | Surgical substrate change | fast tier | Mechanical |
+| F01 regression test | Single-package new test | fast tier | Mechanical |
+| Fixture regeneration | Fixture regen | fast tier | Pure command execution |
+| Final integration verify | Single-file judgment call | thorough | Judgment on whether the pieces compose |
 
 Two thorough-tier dispatches for the genuine design judgment; six cheap dispatches for the mechanical execution; one final thorough-tier dispatch for composition judgment. Total thorough-tier hours would have been ~25-40% of what we actually spent.
 
@@ -100,7 +100,7 @@ The cost reduction fell out of the decomposition. We didn't set out to optimise 
 
 | Agile concept | Drive analogue |
 |---|---|
-| Story sized for sprint | Slice sized for one PR (PR-cap) + dispatch sized for time-box (M-cap) |
+| Story sized for sprint (INVEST) | Slice + dispatch sized for INVEST at their altitude (see [`sizing.md`](sizing.md)) |
 | Acceptance criteria | Definition of Done at dispatch / slice / project scope |
 | Junior developer | Cheaper / faster model tier |
 | Senior developer review | Orchestrator's WIP-inspection cadence (≤ 5 min during every dispatch) |
@@ -158,7 +158,8 @@ This principles doc carries the *why* — context preservation, cost arithmetic,
 
 ## Related principles
 
+- **[`sizing.md`](sizing.md)** — the INVEST-based sizing principle this doc takes as input when deciding which tier to dispatch at.
 - **[`protocol-as-memory.md`](protocol-as-memory.md)** — the gates and catalogues that make cheap-tier dispatch safe are themselves part of the team's memory.
 - **[`spikes.md`](spikes.md)** — spikes are among the cheapest dispatches; using them first clears the way for cheaper implementation dispatches.
 - **[`brief-discipline.md`](brief-discipline.md)** — the brief's "Model tier" section is the per-dispatch routing decision this principle codifies.
-- **[`definition-of-ready.md`](definition-of-ready.md)** — dispatch DoR enforces the size cap that makes cheap-tier safe.
+- **[`definition-of-ready.md`](definition-of-ready.md)** — dispatch DoR runs the dispatch-INVEST checklist that makes cheap-tier safe.

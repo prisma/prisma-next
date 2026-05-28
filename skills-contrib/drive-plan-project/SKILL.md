@@ -39,13 +39,13 @@ A project is composed of slices, never direct changes. Direct changes are an alt
 
 - `projects/<project>/spec.md` exists, with purpose + non-goals + project-DoD pinned.
 - The operator (or `drive-discussion`) has converged on a rough decomposition of the project into slice-sized units.
-- Optional: `drive/plan/README.md` exists with team-specific sequencing heuristics + parallelisation patterns.
+- Optional: `drive/plan/README.md` exists with team-specific sequencing heuristics + parallelisation patterns; `drive/calibration/sizing.md` exists with the team's INVEST rubric and slice-shape reference patterns.
 
 ## Post-conditions
 
 - `projects/<project>/plan.md` exists; lists each slice with outcome, builds-on, hands-to, focus, Linear issue.
 - Parallelisation is explicit — the plan names which slices can proceed independently and which must stack.
-- Each slice is sized correctly (≤ 1 PR worth of work).
+- Each slice passes slice-INVEST (see [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md)) — in particular, *Small* meaning **manageable in a single code review**.
 - Slice count is in the 1–4 sweet spot (5+ flagged for project re-boundary).
 - Linear Project has corresponding issues for each slice (created via Linear MCP if missing).
 
@@ -65,10 +65,16 @@ Before sequencing, look up the packages, IR shapes, test infrastructure, and cal
 
 ### Step 3 — Decompose the project into slices
 
-Walk the project's cross-cutting requirements + transitional-shape constraints. For each chunk of work:
+Walk the project's cross-cutting requirements + transitional-shape constraints. Name each chunk's outcome — what's true after this slice lands. Apply **slice-INVEST** to each candidate (see [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md); per-altitude rubric specialised for this codebase at [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md)):
 
-- Is it ≤ 1 PR worth of work with a coherent purpose? → **slice**.
-- Is it bigger? → **needs further decomposition** (split into multiple slices) OR **needs re-triage as its own project** (if the chunk has its own purpose).
+- **Independent** — ships as one PR without needing a sibling slice to merge concurrently.
+- **Negotiable** — the slice's outcome can be delivered by several plausible dispatch sequences.
+- **Valuable** — closes a real gap in the project's purpose; not "preparation for slice 3."
+- **Estimable** — slice-DoD conditions are binary and verifiable at PR-merge time.
+- **Small** — **manageable in a single code review.** One reviewer reads the PR in one sitting, holds the coherence, and reaches a verdict without re-orienting mid-review. The test is *coherence*, not LoC.
+- **Testable** — slice-DoD + project-DoD floor compose into a passable bar at PR-open time.
+
+If a candidate fails Small or Estimable, split it into two slices with an explicit hand-off. If it fails Independent or Valuable, re-shape it (it may be two slices, or it may not be a slice at all).
 
 If a chunk turns out to be a 30-second-verifiable diff with no dependency on other slices, that's a sign this chunk shouldn't be in the project — re-route to `drive-triage-work`; it's probably a direct change that escaped triage.
 
@@ -100,7 +106,7 @@ Write `projects/<project>/plan.md` using the **Project Plan Template** below.
 
 ### Step 7 — Sanity checks
 
-- Each slice ≤ 1 PR? (If any are over: split.)
+- Each slice passes slice-INVEST (in particular, Small = manageable in a single code review)?
 - Slice count ≤ 4? (If over: probably two projects.)
 - Stack acyclic? (No A→B→A loops.)
 - Parallelisation maximised? (Anything sequenced that could be parallel?)
@@ -167,7 +173,7 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 
 ## Pitfalls
 
-1. **Slices that are actually their own projects.** Symptom: a "slice" in the plan would itself need 5+ dispatches with cross-area dependencies. Re-triage as project (promote).
+1. **Slices that are actually their own projects.** Symptom: a "slice" in the plan fails slice-INVEST's *Small* — one reviewer cannot hold its coherence in one sitting — or fails *Independent* by needing concurrent sibling work. Re-triage as project (promote).
 2. **Listing direct changes in the project plan.** A direct change is an alternative to a project (chosen at triage), not a unit inside one. If a chunk of work would be a 30-second-verifiable diff with no dependency on other slices, it doesn't belong in this plan — route it back through `drive-triage-work` as its own direct change.
 3. **Sequencing that collapses parallelisation opportunities.** Default to parallel unless there's a real dependency. Project plans that sequence everything serially lose the throughput their dependency graph would allow.
 4. **Per-slice DoD coverage maps inherited from the old template.** The project-DoD is checked at close-out directly; restating it per slice is noise. Drop it.
@@ -181,7 +187,7 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 - [ ] Loaded `drive/plan/README.md` + `drive/project/README.md` (if exist)
 - [ ] Researched codebase the plan will touch
 - [ ] Decomposed into slices (no direct changes in the plan)
-- [ ] Each slice sized correctly (≤ 1 PR worth of work)
+- [ ] Each slice passes slice-INVEST (Small = manageable in a single code review)
 - [ ] Slice count ≤ 4 (if over: re-consider project boundary)
 - [ ] Each entry has outcome / builds-on / hands-to / focus
 - [ ] Parallelisation explicit; default-to-parallel applied
@@ -199,6 +205,8 @@ _Where the sequencing isn't obvious from the dependency graph: why is it shaped 
 
 ## References
 
+- [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md) — sizing principle (logical coherence; INVEST at three altitudes; slice-Small = manageable in a single code review)
+- [`drive/calibration/sizing.md`](../../drive/calibration/sizing.md) — this codebase's INVEST rubric and slice-shape reference patterns
 - [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md) — the redesign that introduced outcome / builds-on / hands-to / focus entries, required explicit parallelisation, and pinned the 1–4-slice sweet spot
-- [`drive/plan/README.md`](../../drive/plan/README.md) — stack vs parallel heuristics, sizing reference cases
+- [`drive/plan/README.md`](../../drive/plan/README.md) — stack vs parallel heuristics
 - [`drive/project/README.md`](../../drive/project/README.md) — slice-composition patterns for this repo

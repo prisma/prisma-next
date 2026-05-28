@@ -68,19 +68,20 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 ### F4. Feature-sized dispatch with no inspection cadence
 
-**Symptom.** The umbrella failure mode behind the 2026-05-17 reversal. A dispatch is sized L/XL (multiple commits, many files, multiple disciplines), the orchestrator monitors via file-system proxies (commit cadence, file mod rate) rather than reading diffs, validation gates pass throughout, drift compounds across multiple commits, and the violation is invisible until someone reads a specific diff for an unrelated reason.
+**Symptom.** The umbrella failure mode behind the 2026-05-17 reversal. A dispatch fails dispatch-INVEST — it carries multiple outcomes, spans multiple disciplines, and would need multiple commits — but ships under one brief. The orchestrator monitors via file-system proxies (commit cadence, file mod rate) rather than reading diffs, validation gates pass throughout, drift compounds across multiple commits, and the violation is invisible until someone reads a specific diff for an unrelated reason.
 
 **Detection signal.**
 
-- Dispatch brief lists "4-6 commits" or "~50-100 files" or "multiple disciplines."
+- Dispatch brief implies multiple outcomes ("substrate change + consumer migration + fixture regen + introspector tightening") rather than one.
+- The `Completed when` checklist mixes outcome conditions from unrelated disciplines.
 - Orchestrator's monitoring strategy is "check commit cadence" rather than "read diffs."
 - Implementer is allowed to run unattended for >> 5 min without commit-level inspection.
 
 **Mitigation.**
 
-- Dispatch DoR refuses to dispatch L/XL.
-- All M-or-below dispatches are subject to WIP-inspection cadence (≤ 5 min), including diff reads.
-- Brief pre-names the disciplines so the orchestrator can verify each commit lands the correct discipline.
+- Dispatch DoR refuses dispatches that fail dispatch-INVEST (in particular *Estimable* + *Small* — see [`docs/drive/principles/sizing.md`](../../docs/drive/principles/sizing.md)).
+- All admitted dispatches are subject to WIP-inspection cadence (≤ 5 min), including diff reads.
+- Brief pre-names the dispatch's single outcome so the orchestrator can verify each commit serves it.
 
 ### F5. Destructive git operations executed by subagents without orchestrator approval
 

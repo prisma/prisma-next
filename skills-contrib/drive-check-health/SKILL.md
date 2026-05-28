@@ -22,7 +22,7 @@ Run a project-health rollup. Atomic skill — its primary output is the rollup d
 A rollup answers:
 
 - **Where is the project?** Slices delivered, slices in flight, slices not yet started, direct changes done.
-- **Where is it drifting?** Dispatches that crossed the M-cap unexpectedly; slices whose PR scope grew past the PR-cap; scope-shift candidates (in-flight unit that should triage as promote / demote).
+- **Where is it drifting?** Dispatches that failed dispatch-INVEST in flight (outcome turned out fuzzier than the brief suggested, or scope expanded mid-execution); slices that failed slice-INVEST in flight (one reviewer can no longer hold the coherence); scope-shift candidates (in-flight unit that should triage as promote / demote).
 - **How fast is it going?** Dispatch throughput across the recent window (e.g. dispatches/day; failed-dispatch rate; review-round count distribution).
 - **What's the calibration story?** Slice-size predictions vs actuals; retro-trigger frequency; spike outcomes that re-shaped the plan.
 - **What should we pick next?** Recommended slice / direct change to pick up, given dependencies, parallelisation, and operator availability.
@@ -89,8 +89,8 @@ For each section of the rollup template:
 
 #### Drift signals
 
-- **Dispatches that crossed the M-cap unexpectedly.** Read recent slice retros + code-review.md round entries. If a dispatch's actual size exceeded prediction by > 50%, flag.
-- **Slices whose PR scope grew past the PR-cap.** If a slice's PR diff is > N files / > N LoC (threshold in `drive/health/README.md`), flag — candidate for promote.
+- **Dispatches that failed dispatch-INVEST in flight.** Read recent slice retros + code-review.md round entries. If a dispatch had to be halted or split mid-execution because its outcome turned out fuzzier than the brief suggested, or its scope expanded beyond what the brief named, flag — likely sizing miscalibration or under-specified outcome.
+- **Slices that failed slice-INVEST in flight.** If a slice's coherence broke down (a reviewer flagged that the PR spans concerns they can't hold together; the dispatch sequence drifted across unrelated outcomes), flag — candidate for promote.
 - **Slices whose dispatch count exceeded the plan.** If a slice's actual dispatch count is > 2× the planned count, flag — sizing miscalibration or scope creep.
 - **Failed-dispatch rate.** If > 30% of recent dispatches required ANOTHER ROUND NEEDED (or worse), flag — calibration issue.
 - **Long-running in-flight slice.** If a slice has been in flight for > N days (threshold in `drive/health/README.md`), flag.
@@ -109,7 +109,7 @@ Each drift signal carries a severity:
 
 #### Calibration
 
-- Slice-size predictions vs actuals (S/M predicted; what landed).
+- Slice-INVEST predictions vs actuals (which slices passed cleanly; which surfaced a coherence break in flight).
 - Retro-trigger frequency (1/week ≈ healthy; 0 = check the team's actually firing them; > 3/week = something systemic is off).
 - Spike outcomes that re-shaped the plan.
 

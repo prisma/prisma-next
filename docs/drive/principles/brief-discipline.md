@@ -156,6 +156,7 @@ A spike brief swaps "Completed when" for:
 
 ## Related principles
 
+- [`sizing.md`](sizing.md) — the dispatch-INVEST checklist this brief embodies. `Task` answers *Valuable* + *Independent*; `Scope` + `Completed when` answer *Estimable* + *Testable*; `References` answer *Small* (does the priming fit?); `Halt conditions` close the loop on *Negotiable* by naming where the executor's discovery must stop.
 - [`protocol-as-memory.md`](protocol-as-memory.md) — the team's failure-mode catalogue and grep library, which the brief draws from for `Halt conditions` and `References`.
 - [`decomposition-and-cost.md`](decomposition-and-cost.md) — the model-tier choice in `Operational metadata`.
 - [`spikes.md`](spikes.md) — how to write a spike brief.

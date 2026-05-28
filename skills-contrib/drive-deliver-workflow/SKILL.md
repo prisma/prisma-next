@@ -105,7 +105,7 @@ For each picked slice:
 
 ### Step 4 — Run the slice via `drive-build-workflow`
 
-Invoke `drive-build-workflow` on the picked slice. It pilots the dispatch loop and returns when the slice's DoD is met (slice merged) or the slice's stop-condition fires (design discussion required; assumption falsified; L/XL refusal that needs replanning).
+Invoke `drive-build-workflow` on the picked slice. It pilots the dispatch loop and returns when the slice's DoD is met (slice merged) or the slice's stop-condition fires (design discussion required; assumption falsified; dispatch-INVEST refusal that needs replanning).
 
 If `drive-build-workflow` returns with a stop-condition: escalate to operator via `drive-discussion`; resume on operator-authorised plan amendment.
 

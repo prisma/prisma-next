@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Status:** Accepted; pilot rollout starting immediately
-**Touches:** `drive-specify-project`, `drive-plan-project`, `drive-specify-slice`, `drive-plan-slice`, `drive-build-workflow`, `drive-discussion`, `drive-triage-work`, `drive-start-workflow`, `docs/drive/principles/brief-discipline.md`, `drive/calibration/dod.md`, `drive/calibration/sizing.md`
+**Touches:** `drive-specify-project`, `drive-plan-project`, `drive-specify-slice`, `drive-plan-slice`, `drive-build-workflow`, `drive-discussion`, `drive-triage-work`, `drive-start-workflow`, `docs/drive/principles/brief-discipline.md`, `docs/drive/principles/sizing.md` (new), `docs/drive/principles/decomposition-and-cost.md`, `drive/calibration/dod.md`, `drive/calibration/sizing.md`
 
 ## Decision
 
@@ -124,7 +124,7 @@ Plus a transitional-shape rationale where the sequencing isn't obvious from the 
 
 **Contains:**
 
-An ordered list of M-sized dispatches (target ≤ 10). Each entry uses the same shape as project-plan slice entries: outcome + builds-on + hands-to + focus.
+An ordered list of dispatches (target ≤ ~10; each passes dispatch-INVEST per [`sizing.md`](../principles/sizing.md)). Each entry uses the same shape as project-plan slice entries: outcome + builds-on + hands-to + focus.
 
 The order encodes the migration shape — incremental delivery, keep-tests-green, transitional advantages. The brief-assembler reads each entry to know what context the executor needs for that dispatch.
 
@@ -134,21 +134,31 @@ The order encodes the migration shape — incremental delivery, keep-tests-green
 
 - Per-dispatch DoR / DoD checklists (brief-assembler work).
 - Per-dispatch "Files in play" (executor's discovery work).
-- Per-dispatch sizing rationale (the slice-plan's M-cap means dispatches are M-sized by construction; L or XL refuses, re-decomposes).
+- Per-dispatch t-shirt sizing labels. Dispatch-INVEST is the validity test; failing letters trigger refinement or re-decomposition.
 
 ### Dispatch brief
 
 The full template lives at [`docs/drive/principles/brief-discipline.md`](../principles/brief-discipline.md). In summary: six sections — Task, Scope, Completed when, Standing instruction (verbatim across all briefs), References, Operational metadata. Briefs get shorter as the slice progresses because the same executor subagent runs every dispatch in the slice and retains the priming context from earlier dispatches when it's resumed.
 
-## Sizing anchors
+## Sizing
 
-| Level | Lower | Upper | Why the floor matters |
-|---|---|---|---|
-| Direct change | 1 dispatch | 1 dispatch | If the spec needs writing down, it's a slice. |
-| Slice | 1 dispatch | 5–10 M-dispatches | PR review has real human cost; tiny unrelated PRs are dominated by review overhead. Batch into an adjacent slice. |
-| Project | 1 slice | 1–4 slices | Above 5 slices, stacked-PR and coordination overhead exceeds the project's value; that's probably two projects. |
+Units are sized by **logical coherence**, not by logistical footprint (file count, LoC, time-box). The check at each altitude is **INVEST** (Independent, Negotiable, Valuable, Estimable, Small, Testable), specialised per altitude:
+
+- **Dispatch-Small:** brief + references fit in the executor's context.
+- **Slice-Small:** **manageable in a single code review** — one reviewer holds the slice's coherence without losing the thread.
+- **Project-Small:** the branch stack survives normal rebasing cadence.
+
+Operational caps (soft guides that trigger a recheck, not validity criteria):
+
+| Level | Soft cap | What hitting it means |
+|---|---|---|
+| Direct change | 1 dispatch | If the spec needs writing down, it's a slice. |
+| Slice | ≤ ~10 M-equivalent dispatches | Re-check the slice's *Independent* + *Valuable*; it may be two slices. |
+| Project | 1–4 slices | Above 4, re-check the project's *Independent*; it may be two projects with one shared umbrella. |
 
 Single-slice projects exist when discussion-first reveals one slice that needs design thinking before dispatching.
+
+The full principle lives at [`docs/drive/principles/sizing.md`](../principles/sizing.md); per-altitude INVEST rubrics specialised for this codebase live at [`drive/calibration/sizing.md`](../../../drive/calibration/sizing.md).
 
 ## Why we made this change
 
@@ -185,9 +195,11 @@ The next project IS the pilot. Rather than running the new model against one pro
 
 Measurements at pilot retro: operator interventions per dispatch; cycle time from project-start to project-done; retro-finding count generated during the pilot; artifact line counts (project spec, slice spec, slice plan, dispatch brief); reviewer wallclock per dispatch.
 
-## Held thread
+## Sizing recalibration (resolved in this commit)
 
-The dispatch sizing matrix at `drive/calibration/sizing.md` is too conservative for cheap-tier mechanical-fanout dispatches relative to what subagents have actually delivered across recent slices. Re-calibration is deferred until the pilot accumulates fresh data points. After the pilot, revisit using shipped dispatches as the ground-truth dataset and rewrite the matrix.
+The previous sizing matrix at `drive/calibration/sizing.md` was shaped around T-shirt buckets anchored on file count + time-box (XS/S/M/L/XL with per-bucket file-count thresholds). That shape trained orchestrators to size on logistical footprint, which produced the recurring failure mode where a dispatch passed the size check on file count but failed in the loop because its outcome was underspecified (the S1.C D2 defensive-expansion incident is the canonical case).
+
+Resolution: the T-shirt matrix is dropped. Sizing is now defined by the **logical coherence principle + INVEST rubric** in [`docs/drive/principles/sizing.md`](../principles/sizing.md). The per-altitude INVEST rubrics specialised for this codebase live at [`drive/calibration/sizing.md`](../../../drive/calibration/sizing.md). T-shirts can be reintroduced at any altitude if and when a concrete use case appears.
 
 ## Consequences
 

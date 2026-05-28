@@ -38,14 +38,14 @@ Both surfaces are **human-readable and human-runnable**, not just agent context 
 **In the shared skill body** (which means: not edited in your repo, but proposed upstream to `prisma/ignite`):
 
 - The shape of DoR, DoD, brief, retro, WIP inspection, design discussion.
-- The invariants every team should honour (no L/XL dispatch, ≤ 5-min WIP cadence, intent-validation before slice close, no silent agent-side spec amendments).
+- The invariants every team should honour (every dispatch passes dispatch-INVEST; every slice passes slice-INVEST; ≤ 5-min WIP cadence; intent-validation before slice close; no silent agent-side spec amendments).
 - The workflows themselves (triage decision tree, slice execution loop, etc.).
 
 **In your team's project context** (`drive/`, where your team's accumulated lessons live):
 
 - Failure modes you've hit before. ("Dual-shape support relocated under a new name" — recurring trap in our IR.)
 - Greps to watch for. (`rg "Object\.fromEntries\(" packages/2-sql/src` — programmatic equivalents of legacy shapes.)
-- Reference tasks your team uses to anchor t-shirt sizes. ("An S is roughly a one-package fixture regen, like the per-codec column rename in TML-2103.")
+- Dispatch-shape reference patterns your team recognises (e.g. "single-package fixture regen + replay probe" — see [`sizing.md`](sizing.md) for the principle and your repo's `drive/calibration/sizing.md` for the per-altitude INVEST rubric).
 - DoR / DoD items specific to your team. ("PR title must carry a Linear ticket prefix.")
 - Manual-QA conventions. ("For any slice touching the demo, run `pnpm demo` and check the version banner.")
 - Model-tier routing rules your team has worked out. ("Codemods over `**/test/**` → fast tier. API-design dispatches → thorough tier.")

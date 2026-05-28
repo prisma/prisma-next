@@ -21,7 +21,7 @@ metadata:
 **This skill is deprecated.** Use the scope-specific variants instead:
 
 - **Project plans** (compose slices + direct changes; stack / parallel sequencing) → `drive-plan-project`.
-- **Slice plans** (decompose into M-sized dispatches; per-dispatch DoR; L/XL refusal) → `drive-plan-slice`.
+- **Slice plans** (decompose into dispatches that pass dispatch-INVEST; per-dispatch DoR; dispatches that fail INVEST get re-decomposed) → `drive-plan-slice`.
 
 The split is per [`docs/drive/model.md`](/docs/drive/model.md) § Two skill tiers. The pre-existing "milestone + task" vocabulary is also retired: the two units are now **Slice** (was: milestone) and **Dispatch** (replaces the agent-aggregation sense of "task"). Pre-implementation logical-increment thinking happens inside `drive-plan-slice` as dispatches, not as a separate "step" or "task" layer.
 
