@@ -53,13 +53,14 @@ export function dispatchMutationRows<Row>(
   // With includes the mutation returns identity columns only; the rows
   // are reloaded through the read path so relations resolve via the same
   // single-query builders, decode, and hidden-column stripping the read
-  // path uses — no parallel read-back implementation.
+  // path uses — no parallel read-back implementation. The reload streams;
+  // only the small set of identities is buffered to key it.
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const identityRows = await executeQueryPlan<Record<string, unknown>>(
       runtime,
       compiled,
     ).toArray();
-    const rows = await reloadMutationRowsByIdentities<Row>({
+    yield* reloadMutationRowsByIdentities<Row>({
       contract,
       runtime,
       tableName,
@@ -68,9 +69,6 @@ export function dispatchMutationRows<Row>(
       selectedFields,
       includes,
     });
-    for (const row of rows) {
-      yield row;
-    }
   };
 
   return new AsyncIterableResult(generator());
@@ -111,7 +109,7 @@ export function dispatchSplitMutationRows<Row>(
           ...(await executeQueryPlan<Record<string, unknown>>(runtime, plan).toArray()),
         );
       }
-      const rows = await reloadMutationRowsByIdentities<Row>({
+      yield* reloadMutationRowsByIdentities<Row>({
         contract,
         runtime,
         tableName,
@@ -120,18 +118,14 @@ export function dispatchSplitMutationRows<Row>(
         selectedFields,
         includes,
       });
-      for (const row of rows) {
-        yield row;
-      }
       return;
     }
 
     for (const plan of plans) {
-      const rows = await executeQueryPlan<Record<string, unknown>>(runtime, plan).toArray();
-      for (const rawRow of rows) {
-        const mapped = mapStorageRowToModelFields(contract, tableName, rawRow);
+      for await (const rawRow of executeQueryPlan<Record<string, unknown>>(runtime, plan)) {
+        const mapped = mapStorageRowToModelFields(contract, modelName, rawRow);
         if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(contract, tableName, mapped, hiddenColumns);
+          stripHiddenMappedFields(contract, modelName, mapped, hiddenColumns);
         }
         yield mapRow(mapped);
       }
@@ -189,7 +183,9 @@ export async function executeMutationReturningSingleRow<Row>(
     return null;
   }
 
-  const rows = await reloadMutationRowsByIdentities<Row>({
+  // Pull only the first reloaded row — a single mutated identity reloads
+  // to a single row, so the stream is advanced once rather than drained.
+  for await (const row of reloadMutationRowsByIdentities<Row>({
     contract,
     runtime,
     tableName,
@@ -197,10 +193,8 @@ export async function executeMutationReturningSingleRow<Row>(
     identityRows,
     selectedFields,
     includes,
-  });
-  const result = rows[0];
-  if (!result) {
-    throw new Error(onMissingRowMessage);
+  })) {
+    return row;
   }
-  return result;
+  throw new Error(onMissingRowMessage);
 }

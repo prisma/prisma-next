@@ -16,9 +16,7 @@ export type IncludeStrategy = 'lateral' | 'correlated';
  *
  * Every supported SQL target provides `jsonAgg`; the only axis the
  * selector reads is `lateral`. Targets that declare neither flag are
- * not supported on the read path — there is no multi-query fallback
- * (removed in TML-2657 once every in-tree target became
- * lateral/correlated-capable).
+ * not supported on the read path — there is no multi-query fallback.
  *
  * The `lateral` flag is looked up under the contract's `targetFamily`
  * and `target` namespaces — the two layers the contract emitter
