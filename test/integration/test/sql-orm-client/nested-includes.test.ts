@@ -1,6 +1,6 @@
-// Integration coverage for nested includes (depth >= 2) across the three
-// dispatch strategies the SQL ORM advertises: lateral, correlated, and
-// multi-query. The corpus exists to (a) lock in row-shape correctness for
+// Integration coverage for nested includes (depth >= 2) across both
+// single-query dispatch strategies the SQL ORM advertises: lateral and
+// correlated. The corpus exists to (a) lock in row-shape correctness for
 // the relationship traversal patterns we ship and (b) pin the SQL-execution
 // count per strategy so a future regression flipping the dispatch gate is
 // caught at the contract level, not by downstream benchmark drift.
@@ -36,10 +36,8 @@ import { seedComments, seedPosts, seedProfiles, seedUsers } from './runtime-help
 describe('integration/nested-includes', () => {
   // ===========================================================================
   // Depth-2 traversal: row-shape correctness on the default lateral contract.
-  // These tests document the relationship-traversal shapes we ship. They
-  // pass under the multi-query fallback today (functional correctness is
-  // unaffected by the dispatch bug) and continue to pass under the
-  // single-query lateral path post-fix.
+  // These tests document the relationship-traversal shapes we ship, resolved
+  // through the single-query lateral path.
   // ===========================================================================
 
   describe('depth-2 traversal shapes', () => {

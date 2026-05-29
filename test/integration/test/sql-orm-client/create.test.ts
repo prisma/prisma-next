@@ -124,6 +124,48 @@ describe('integration/create', () => {
   );
 
   it(
+    'createAll() with include() returns inserted rows with their relations via a single read-back',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        runtime.resetExecutions();
+        const created = await users
+          .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
+          .createAll([
+            { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+            { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
+          ]);
+
+        // Freshly inserted users own no posts yet; the read-back still
+        // resolves the relation to an empty array per row.
+        expect(created).toEqual([
+          {
+            id: 10,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [],
+          },
+          {
+            id: 11,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            address: null,
+            posts: [],
+          },
+        ]);
+        // One INSERT ... RETURNING plus one include read-back — no
+        // per-relation N+1.
+        expect(runtime.executions).toHaveLength(2);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'createCount() inserts multiple rows and returns inserted count',
     async () => {
       await withCollectionRuntime(async (runtime) => {

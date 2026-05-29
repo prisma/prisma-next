@@ -15,6 +15,15 @@ import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContract } from './helpers';
 
+// The mutation read-back loads `.include()` relations with a single
+// follow-up SELECT keyed by the mutated rows' identity columns, lowered
+// through the same lateral / correlated builders the read path uses
+// (TML-2657 — no per-relation N+1 stitch). With the default test
+// contract advertising `postgres.lateral` + `postgres.jsonAgg`, that
+// read-back is a single execution returning one JSON-aggregated column
+// per top-level include. So include-mode tests queue two result sets:
+// the mutation `RETURNING` rows, then the include read-back rows.
+
 function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown>> {
   return {
     ast: SelectAst.from(TableSource.named('users')).withProjection([
@@ -65,7 +74,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('insert into users ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: [],
       hiddenColumns: ['email'],
@@ -75,7 +84,7 @@ describe('collection-mutation-dispatch', () => {
     expect(rows).toEqual([{ id: 1, name: 'Alice' }]);
   });
 
-  it('dispatchMutationRows() returns empty when include query returns no rows and releases scope', async () => {
+  it('dispatchMutationRows() returns empty when the mutation returns no rows and releases scope', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
@@ -89,30 +98,33 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime: runtimeWithConnection,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
       mapRow: (mapped) => mapped,
     }).toArray();
 
+    // The empty `RETURNING` short-circuits before the include read-back,
+    // so only the mutation statement runs.
     expect(rows).toEqual([]);
+    expect(runtime.executions).toHaveLength(1);
     expect(released).toBe(true);
   });
 
-  it('dispatchMutationRows() stitches includes and strips hidden fields in include mode', async () => {
+  it('dispatchMutationRows() loads includes via a single read-back and strips hidden fields', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 10 }],
+      [{ id: 1, posts: '[{"id":10,"title":"Post A","user_id":1,"views":10}]' }],
     ]);
 
     const rows = await dispatchMutationRows<Record<string, unknown>>({
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: ['email'],
@@ -126,6 +138,9 @@ describe('collection-mutation-dispatch', () => {
         posts: [{ id: 10, title: 'Post A', userId: 1, views: 10 }],
       },
     ]);
+    // Mutation `RETURNING` + one include read-back — not a per-relation
+    // N+1 stitch.
+    expect(runtime.executions).toHaveLength(2);
   });
 
   it('dispatchMutationRows() keeps mapped fields when include mode has no hidden columns', async () => {
@@ -133,14 +148,14 @@ describe('collection-mutation-dispatch', () => {
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 10 }],
+      [{ id: 1, posts: '[{"id":10,"title":"Post A","user_id":1,"views":10}]' }],
     ]);
 
     const rows = await dispatchMutationRows<Record<string, unknown>>({
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
@@ -157,6 +172,25 @@ describe('collection-mutation-dispatch', () => {
     ]);
   });
 
+  it('dispatchMutationRows() assigns an empty include for a row absent from the read-back', async () => {
+    const contract = getTestContract();
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
+
+    const rows = await dispatchMutationRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      compiled: makeCompiled('update users set ... returning *'),
+      tableName: 'users',
+      modelName: 'User',
+      includes: usersPostsIncludes(contract),
+      hiddenColumns: ['email'],
+      mapRow: (mapped) => mapped,
+    }).toArray();
+
+    expect(rows).toEqual([{ id: 1, name: 'Alice', posts: [] }]);
+  });
+
   it('executeMutationReturningSingleRow() returns null when no rows are returned without includes', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
@@ -166,7 +200,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('delete from users returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: [],
       hiddenColumns: ['email'],
@@ -186,7 +220,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: [],
       hiddenColumns: ['email'],
@@ -197,7 +231,7 @@ describe('collection-mutation-dispatch', () => {
     expect(result).toEqual({ id: 1, name: 'Alice' });
   });
 
-  it('executeMutationReturningSingleRow() returns null when include query has no first row', async () => {
+  it('executeMutationReturningSingleRow() returns null when the mutation returns no first row', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
@@ -206,7 +240,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
@@ -217,12 +251,12 @@ describe('collection-mutation-dispatch', () => {
     expect(result).toBeNull();
   });
 
-  it('executeMutationReturningSingleRow() stitches includes, strips hidden fields, and releases scope', async () => {
+  it('executeMutationReturningSingleRow() loads includes via a single read-back and releases scope', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 10 }],
+      [{ id: 1, posts: '[{"id":10,"title":"Post A","user_id":1,"views":10}]' }],
     ]);
 
     let released = false;
@@ -234,7 +268,7 @@ describe('collection-mutation-dispatch', () => {
       contract,
       runtime: runtimeWithConnection,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: ['email'],
@@ -255,14 +289,14 @@ describe('collection-mutation-dispatch', () => {
     const runtime = createMockRuntime();
     runtime.setNextResults([
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 10 }],
+      [{ id: 1, posts: '[{"id":10,"title":"Post A","user_id":1,"views":10}]' }],
     ]);
 
     const result = await executeMutationReturningSingleRow<Record<string, unknown>>({
       contract,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
-
+      tableName: 'users',
       modelName: 'User',
       includes: usersPostsIncludes(contract),
       hiddenColumns: [],
@@ -341,15 +375,15 @@ describe('collection-mutation-dispatch', () => {
       expect(runtime.executions).toHaveLength(2);
     });
 
-    it('stitches includes from multiple plans, strips hidden fields, and releases scope', async () => {
+    it('loads includes for all plans with a single read-back, strips hidden fields, and releases scope', async () => {
       const contract = getTestContract();
       const runtime = createMockRuntime();
       runtime.setNextResults([
         [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
         [{ id: 2, name: 'Bob', email: 'bob@example.com' }],
         [
-          { id: 10, title: 'Post A', user_id: 1, views: 10 },
-          { id: 11, title: 'Post B', user_id: 2, views: 5 },
+          { id: 1, posts: '[{"id":10,"title":"Post A","user_id":1,"views":10}]' },
+          { id: 2, posts: '[{"id":11,"title":"Post B","user_id":2,"views":5}]' },
         ],
       ]);
 
@@ -372,6 +406,8 @@ describe('collection-mutation-dispatch', () => {
         { id: 1, name: 'Alice', posts: [{ id: 10, title: 'Post A', userId: 1, views: 10 }] },
         { id: 2, name: 'Bob', posts: [{ id: 11, title: 'Post B', userId: 2, views: 5 }] },
       ]);
+      // Two insert batches + one include read-back across both batches.
+      expect(runtime.executions).toHaveLength(3);
       expect(released).toBe(true);
     });
 
@@ -404,7 +440,7 @@ describe('collection-mutation-dispatch', () => {
       const runtime = createMockRuntime();
       runtime.setNextResults([
         [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-        [{ id: 10, title: 'Post A', user_id: 1, views: 10 }],
+        [{ id: 1, posts: '[{"id":10,"title":"Post A","user_id":1,"views":10}]' }],
       ]);
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({

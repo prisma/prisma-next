@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { stitchIncludes } from './collection-dispatch';
+import { loadIncludesForMutationRows } from './collection-dispatch';
 import {
   acquireRuntimeScope,
   createRowEnvelope,
@@ -17,6 +17,7 @@ interface DispatchMutationRowsOptions<Row> {
   readonly contract: Contract<SqlStorage>;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
+  readonly tableName: string;
   readonly modelName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
@@ -26,7 +27,8 @@ interface DispatchMutationRowsOptions<Row> {
 export function dispatchMutationRows<Row>(
   options: DispatchMutationRowsOptions<Row>,
 ): AsyncIterableResult<Row> {
-  const { contract, runtime, compiled, modelName, includes, hiddenColumns, mapRow } = options;
+  const { contract, runtime, compiled, tableName, modelName, includes, hiddenColumns, mapRow } =
+    options;
 
   if (includes.length === 0) {
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
@@ -49,7 +51,14 @@ export function dispatchMutationRows<Row>(
       }
 
       const wrappedRows = rawRows.map((row) => createRowEnvelope(contract, modelName, row));
-      await stitchIncludes(scope, contract, wrappedRows, includes);
+      await loadIncludesForMutationRows({
+        scope,
+        contract,
+        tableName,
+        modelName,
+        parentRows: wrappedRows,
+        includes,
+      });
 
       for (const row of wrappedRows) {
         if (hiddenColumns.length > 0) {
@@ -94,7 +103,14 @@ export function dispatchSplitMutationRows<Row>(
         if (allRawRows.length === 0) return;
 
         const wrappedRows = allRawRows.map((row) => createRowEnvelope(contract, tableName, row));
-        await stitchIncludes(scope, contract, wrappedRows, includes);
+        await loadIncludesForMutationRows({
+          scope,
+          contract,
+          tableName,
+          modelName: tableName,
+          parentRows: wrappedRows,
+          includes,
+        });
 
         for (const row of wrappedRows) {
           if (hiddenColumns.length > 0) {
@@ -126,6 +142,7 @@ interface ExecuteSingleMutationOptions<Row> {
   readonly contract: Contract<SqlStorage>;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
+  readonly tableName: string;
   readonly modelName: string;
   readonly includes: readonly IncludeExpr[];
   readonly hiddenColumns: readonly string[];
@@ -140,6 +157,7 @@ export async function executeMutationReturningSingleRow<Row>(
     contract,
     runtime,
     compiled,
+    tableName,
     modelName,
     includes,
     hiddenColumns,
@@ -170,7 +188,14 @@ export async function executeMutationReturningSingleRow<Row>(
     }
 
     const wrappedRows = [createRowEnvelope(contract, modelName, first)];
-    await stitchIncludes(scope, contract, wrappedRows, includes);
+    await loadIncludesForMutationRows({
+      scope,
+      contract,
+      tableName,
+      modelName,
+      parentRows: wrappedRows,
+      includes,
+    });
 
     const result = wrappedRows[0];
     if (!result) {
