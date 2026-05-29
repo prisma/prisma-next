@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type { StorageTableInput } from '@prisma-next/sql-contract/types';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -91,7 +92,7 @@ function planEnumCalls(options: {
   fromContract?: Contract<SqlStorage> | null;
   schema: SqlSchemaIR;
   issues?: SchemaIssue[];
-  policy?: { allowedOperationClasses: readonly string[] };
+  policy?: MigrationOperationPolicy;
 }) {
   const result = planIssues({
     ...defaultCtx,
@@ -203,11 +204,11 @@ describe('enum namespace collision planning', () => {
         { schemaName: 'audit', nativeType: 'Status', values: ['low', 'high'] },
         { schemaName: 'public', nativeType: 'Status', values: ['draft', 'published'] },
       ]);
-      const policy = {
-        allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'] as const,
+      const policy: MigrationOperationPolicy = {
+        allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'],
       };
 
-      const calls = planEnumCalls({ toContract, schema, policy: { ...policy } });
+      const calls = planEnumCalls({ toContract, schema, policy });
       const alterCalls = calls.filter(
         (c): c is AlterColumnTypeCall => c instanceof AlterColumnTypeCall,
       );
@@ -256,11 +257,11 @@ describe('enum namespace collision planning', () => {
         { schemaName: 'audit', nativeType: 'Status', values: ['only', 'removed'] },
         { schemaName: 'public', nativeType: 'Status', values: ['kept'] },
       ]);
-      const policy = {
-        allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'] as const,
+      const policy: MigrationOperationPolicy = {
+        allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'],
       };
 
-      const calls = planEnumCalls({ toContract, schema, policy: { ...policy } });
+      const calls = planEnumCalls({ toContract, schema, policy });
       const dropCalls = calls.filter((c): c is DropEnumTypeCall => c instanceof DropEnumTypeCall);
 
       expect(dropCalls).toHaveLength(1);
