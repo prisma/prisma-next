@@ -605,3 +605,49 @@ describe('canonicalize with valueObjects', () => {
     expect(result).not.toHaveProperty('valueObjects');
   });
 });
+
+describe('typeParams preservation', () => {
+  it('preserves empty storage.types[].typeParams', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: { storageHash: 'sha256:stub', types: { MyType: { typeParams: {} } } },
+      }),
+    );
+    const myType = drill(result, 'storage', 'types', 'MyType');
+    expect(myType['typeParams']).toEqual({});
+  });
+});
+
+describe('array sort with nullish entries', () => {
+  it('sorts indexes containing nullish entries without throwing', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            indexes: [null, null] as unknown as Record<string, unknown>[],
+          },
+        }),
+      }),
+    );
+    const table = drill(unboundTables(result), 'users');
+    const indexes = table['indexes'] as Array<unknown>;
+    expect(indexes).toHaveLength(2);
+  });
+
+  it('sorts uniques containing nullish entries without throwing', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            uniques: [null, null] as unknown as Record<string, unknown>[],
+          },
+        }),
+      }),
+    );
+    const table = drill(unboundTables(result), 'users');
+    const uniques = table['uniques'] as Array<unknown>;
+    expect(uniques).toHaveLength(2);
+  });
+});
