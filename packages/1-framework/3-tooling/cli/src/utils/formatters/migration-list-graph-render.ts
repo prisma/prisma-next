@@ -211,7 +211,7 @@ export function renderMigrationListGraphWithStyle(
   const layoutMaxLane = layoutMaxLaneIndex(layout);
   const dirNameWidth = computeMigrationDirNameWidth(migrations);
   const gutterMaxLane = layoutMaxLane;
-  const blockDataStart = layoutMaxLane === 0 ? 2 : (layoutMaxLane + 1) * 2 + 2;
+  const blockDataStart = (layoutMaxLane + 1) * 2;
   // Migration and node-line gutters always occupy a fixed, ANSI-free visible
   // width of two columns per lane. Padding is computed from this width rather
   // than the rendered string length so dimmed lanes (which carry zero-width

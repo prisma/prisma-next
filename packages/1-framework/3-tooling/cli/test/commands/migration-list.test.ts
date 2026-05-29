@@ -736,10 +736,10 @@ describe('migration list --graph human output', () => {
 
     const graph = renderGraphListed(result.value, 'unicode');
     expect(graph).toBe(
-      'o     fffffff\n' +
+      'o   fffffff\n' +
         '├─┐\n' +
-        '* │   20260101T0001_right  bbbbbbb → fffffff\n' +
-        '│ *   20260101T0000_left   aaaaaaa → fffffff\n' +
+        '* │ 20260101T0001_right  bbbbbbb → fffffff\n' +
+        '│ * 20260101T0000_left   aaaaaaa → fffffff\n' +
         '\n' +
         '2 migration(s) on disk',
     );
@@ -906,7 +906,7 @@ describe('migration list --graph human output', () => {
     expect(graph).not.toContain('app:');
     expect(graph).not.toContain('20260422T0720_initial');
     expect(graph).toContain('20260101T0000_left');
-    expect(graph).toContain('o     fffffff');
+    expect(graph).toContain('o   fffffff');
   });
 
   it('renders multi-space graph blocks with headings and summary', async () => {
@@ -939,10 +939,10 @@ describe('migration list --graph human output', () => {
         '  * 20260422T0720_initial  ∅       → 4cb4256\n' +
         '\n' +
         'postgis:\n' +
-        '  o     fffffff\n' +
+        '  o   fffffff\n' +
         '  ├─┐\n' +
-        '  * │   20260101T0001_right  bbbbbbb → fffffff\n' +
-        '  │ *   20260101T0000_left   aaaaaaa → fffffff\n' +
+        '  * │ 20260101T0001_right  bbbbbbb → fffffff\n' +
+        '  │ * 20260101T0000_left   aaaaaaa → fffffff\n' +
         '\n' +
         '3 migration(s) across 2 contract space(s)',
     );

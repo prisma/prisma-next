@@ -89,14 +89,14 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      'o     d41a8c3\n' +
+      'o   d41a8c3\n' +
         '├─┐\n' +
-        '* │   20250302_merge_tags   9c4f1e7 → d41a8c3\n' +
-        '│ *   20250301_merge_posts  7e1b9a0 → d41a8c3\n' +
-        '* │   20250210_add_tags     abc1234 → 9c4f1e7\n' +
-        '│ *   20250203_add_posts    abc1234 → 7e1b9a0\n' +
+        '* │ 20250302_merge_tags   9c4f1e7 → d41a8c3\n' +
+        '│ * 20250301_merge_posts  7e1b9a0 → d41a8c3\n' +
+        '* │ 20250210_add_tags     abc1234 → 9c4f1e7\n' +
+        '│ * 20250203_add_posts    abc1234 → 7e1b9a0\n' +
         '├─┘\n' +
-        '*     20250115_add_users    ∅       → abc1234',
+        '*   20250115_add_users    ∅       → abc1234',
     );
   });
 
@@ -111,16 +111,16 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_base', null, HASH.fourcb4),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      'o       d41a8c3\n' +
+      'o     d41a8c3\n' +
         '├─┬─┐\n' +
-        '* │ │   20250310_merge_a   a1b2c3d → d41a8c3\n' +
-        '│ * │   20250309_merge_b   b1c2d3e → d41a8c3\n' +
-        '│ │ *   20250308_merge_c   c1d2e3f → d41a8c3\n' +
-        '* │ │   20250304_branch_a  4cb4256 → a1b2c3d\n' +
-        '│ * │   20250303_branch_b  4cb4256 → b1c2d3e\n' +
-        '│ │ *   20250302_branch_c  4cb4256 → c1d2e3f\n' +
+        '* │ │ 20250310_merge_a   a1b2c3d → d41a8c3\n' +
+        '│ * │ 20250309_merge_b   b1c2d3e → d41a8c3\n' +
+        '│ │ * 20250308_merge_c   c1d2e3f → d41a8c3\n' +
+        '* │ │ 20250304_branch_a  4cb4256 → a1b2c3d\n' +
+        '│ * │ 20250303_branch_b  4cb4256 → b1c2d3e\n' +
+        '│ │ * 20250302_branch_c  4cb4256 → c1d2e3f\n' +
         '└─┴─┘\n' +
-        '*       20250115_add_base  ∅       → 4cb4256',
+        '*     20250115_add_base  ∅       → 4cb4256',
     );
   });
 
@@ -131,12 +131,12 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      'o     def5678\n' +
+      'o   def5678\n' +
         '├─┐\n' +
-        '* │   20250203_add_posts_v2  abc1234 → def5678\n' +
-        '│ *   20250203_add_posts     abc1234 → def5678\n' +
+        '* │ 20250203_add_posts_v2  abc1234 → def5678\n' +
+        '│ * 20250203_add_posts     abc1234 → def5678\n' +
         '├─┘\n' +
-        '*     20250115_add_users     ∅       → abc1234',
+        '*   20250115_add_users     ∅       → abc1234',
     );
   });
 
@@ -151,17 +151,17 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_base', null, HASH.fourcb4),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      '*     20250320_add_x     d41a8c3 → e1f2a3b\n' +
-        '│ *   20250319_add_y     d41a8c3 → c4d5e6f\n' +
+      '*   20250320_add_x     d41a8c3 → e1f2a3b\n' +
+        '│ * 20250319_add_y     d41a8c3 → c4d5e6f\n' +
         '├─┘\n' +
-        'o     d41a8c3\n' +
+        'o   d41a8c3\n' +
         '├─┐\n' +
-        '* │   20250310_merge_a   a1b2c3d → d41a8c3\n' +
-        '│ *   20250309_merge_b   b1c2d3e → d41a8c3\n' +
-        '* │   20250304_branch_a  4cb4256 → a1b2c3d\n' +
-        '│ *   20250303_branch_b  4cb4256 → b1c2d3e\n' +
+        '* │ 20250310_merge_a   a1b2c3d → d41a8c3\n' +
+        '│ * 20250309_merge_b   b1c2d3e → d41a8c3\n' +
+        '* │ 20250304_branch_a  4cb4256 → a1b2c3d\n' +
+        '│ * 20250303_branch_b  4cb4256 → b1c2d3e\n' +
         '├─┘\n' +
-        '*     20250115_add_base  ∅       → 4cb4256',
+        '*   20250115_add_base  ∅       → 4cb4256',
     );
   });
 
@@ -189,12 +189,12 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      '*     20250320_add_likes          def5678 → jkl1234\n' +
-        '│ ↩   20250312_rollback_comments  ghi7890 → def5678\n' +
-        '│ *   20250310_add_comments       def5678 → ghi7890\n' +
+      '*   20250320_add_likes          def5678 → jkl1234\n' +
+        '│ ↩ 20250312_rollback_comments  ghi7890 → def5678\n' +
+        '│ * 20250310_add_comments       def5678 → ghi7890\n' +
         '├─┘\n' +
-        '*     20250203_add_posts          abc1234 → def5678\n' +
-        '*     20250115_add_users          ∅       → abc1234',
+        '*   20250203_add_posts          abc1234 → def5678\n' +
+        '*   20250115_add_users          ∅       → abc1234',
     );
   });
 
@@ -204,7 +204,7 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250301_other', HASH.rootA, HASH.rootB),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      '*     20250302_branch  mid0000 → tip0000\n' + '│ *   20250301_other   root00a → root00b',
+      '*   20250302_branch  mid0000 → tip0000\n' + '│ * 20250301_other   root00a → root00b',
     );
   });
 
@@ -217,12 +217,12 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      '*     20250320_add_likes     def5678 → jkl1234\n' +
-        '│ ⟲   20250315_touch_schema  def5678\n' +
-        '│ *   20250310_add_comments  def5678 → ghi7890\n' +
+      '*   20250320_add_likes     def5678 → jkl1234\n' +
+        '│ ⟲ 20250315_touch_schema  def5678\n' +
+        '│ * 20250310_add_comments  def5678 → ghi7890\n' +
         '├─┘\n' +
-        '*     20250203_add_posts     abc1234 → def5678\n' +
-        '*     20250115_add_users     ∅       → abc1234',
+        '*   20250203_add_posts     abc1234 → def5678\n' +
+        '*   20250115_add_users     ∅       → abc1234',
     );
   });
 
@@ -236,15 +236,15 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
-      'o       d41a8c3\n' +
+      'o     d41a8c3\n' +
         '├─┐  \n' +
-        '* │     20250302_merge_tags   9c4f1e7 → d41a8c3\n' +
-        '│ *     20250301_merge_posts  7e1b9a0 → d41a8c3\n' +
-        '│ │ *   20250220_unrelated    feed000 → dead000\n' +
-        '* │ │   20250210_add_tags     abc1234 → 9c4f1e7\n' +
-        '│ * │   20250203_add_posts    abc1234 → 7e1b9a0\n' +
+        '* │   20250302_merge_tags   9c4f1e7 → d41a8c3\n' +
+        '│ *   20250301_merge_posts  7e1b9a0 → d41a8c3\n' +
+        '│ │ * 20250220_unrelated    feed000 → dead000\n' +
+        '* │ │ 20250210_add_tags     abc1234 → 9c4f1e7\n' +
+        '│ * │ 20250203_add_posts    abc1234 → 7e1b9a0\n' +
         '├─┘ │ \n' +
-        '*   │   20250115_add_users    ∅       → abc1234',
+        '*   │ 20250115_add_users    ∅       → abc1234',
     );
   });
 
@@ -270,14 +270,14 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderAscii(entries)).toBe(
-      'o     d41a8c3\n' +
+      'o   d41a8c3\n' +
         '+-\\\n' +
-        '* |   20250302_merge_tags   9c4f1e7 -> d41a8c3\n' +
-        '| *   20250301_merge_posts  7e1b9a0 -> d41a8c3\n' +
-        '* |   20250210_add_tags     abc1234 -> 9c4f1e7\n' +
-        '| *   20250203_add_posts    abc1234 -> 7e1b9a0\n' +
+        '* | 20250302_merge_tags   9c4f1e7 -> d41a8c3\n' +
+        '| * 20250301_merge_posts  7e1b9a0 -> d41a8c3\n' +
+        '* | 20250210_add_tags     abc1234 -> 9c4f1e7\n' +
+        '| * 20250203_add_posts    abc1234 -> 7e1b9a0\n' +
         '+-/\n' +
-        '*     20250115_add_users    -       -> abc1234',
+        '*   20250115_add_users    -       -> abc1234',
     );
   });
 
@@ -292,16 +292,16 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_base', null, HASH.fourcb4),
     ];
     expect(renderAscii(entries)).toBe(
-      'o       d41a8c3\n' +
+      'o     d41a8c3\n' +
         '+-|-\\\n' +
-        '* | |   20250310_merge_a   a1b2c3d -> d41a8c3\n' +
-        '| * |   20250309_merge_b   b1c2d3e -> d41a8c3\n' +
-        '| | *   20250308_merge_c   c1d2e3f -> d41a8c3\n' +
-        '* | |   20250304_branch_a  4cb4256 -> a1b2c3d\n' +
-        '| * |   20250303_branch_b  4cb4256 -> b1c2d3e\n' +
-        '| | *   20250302_branch_c  4cb4256 -> c1d2e3f\n' +
+        '* | | 20250310_merge_a   a1b2c3d -> d41a8c3\n' +
+        '| * | 20250309_merge_b   b1c2d3e -> d41a8c3\n' +
+        '| | * 20250308_merge_c   c1d2e3f -> d41a8c3\n' +
+        '* | | 20250304_branch_a  4cb4256 -> a1b2c3d\n' +
+        '| * | 20250303_branch_b  4cb4256 -> b1c2d3e\n' +
+        '| | * 20250302_branch_c  4cb4256 -> c1d2e3f\n' +
         '/-+-/\n' +
-        '*       20250115_add_base  -       -> 4cb4256',
+        '*     20250115_add_base  -       -> 4cb4256',
     );
   });
 
@@ -312,12 +312,12 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderAscii(entries)).toBe(
-      'o     def5678\n' +
+      'o   def5678\n' +
         '+-\\\n' +
-        '* |   20250203_add_posts_v2  abc1234 -> def5678\n' +
-        '| *   20250203_add_posts     abc1234 -> def5678\n' +
+        '* | 20250203_add_posts_v2  abc1234 -> def5678\n' +
+        '| * 20250203_add_posts     abc1234 -> def5678\n' +
         '+-/\n' +
-        '*     20250115_add_users     -       -> abc1234',
+        '*   20250115_add_users     -       -> abc1234',
     );
   });
 
@@ -332,17 +332,17 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_base', null, HASH.fourcb4),
     ];
     expect(renderAscii(entries)).toBe(
-      '*     20250320_add_x     d41a8c3 -> e1f2a3b\n' +
-        '| *   20250319_add_y     d41a8c3 -> c4d5e6f\n' +
+      '*   20250320_add_x     d41a8c3 -> e1f2a3b\n' +
+        '| * 20250319_add_y     d41a8c3 -> c4d5e6f\n' +
         '+-/\n' +
-        'o     d41a8c3\n' +
+        'o   d41a8c3\n' +
         '+-\\\n' +
-        '* |   20250310_merge_a   a1b2c3d -> d41a8c3\n' +
-        '| *   20250309_merge_b   b1c2d3e -> d41a8c3\n' +
-        '* |   20250304_branch_a  4cb4256 -> a1b2c3d\n' +
-        '| *   20250303_branch_b  4cb4256 -> b1c2d3e\n' +
+        '* | 20250310_merge_a   a1b2c3d -> d41a8c3\n' +
+        '| * 20250309_merge_b   b1c2d3e -> d41a8c3\n' +
+        '* | 20250304_branch_a  4cb4256 -> a1b2c3d\n' +
+        '| * 20250303_branch_b  4cb4256 -> b1c2d3e\n' +
         '+-/\n' +
-        '*     20250115_add_base  -       -> 4cb4256',
+        '*   20250115_add_base  -       -> 4cb4256',
     );
   });
 
@@ -370,12 +370,12 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderAscii(entries)).toBe(
-      '*     20250320_add_likes          def5678 -> jkl1234\n' +
-        '| <   20250312_rollback_comments  ghi7890 -> def5678\n' +
-        '| *   20250310_add_comments       def5678 -> ghi7890\n' +
+      '*   20250320_add_likes          def5678 -> jkl1234\n' +
+        '| < 20250312_rollback_comments  ghi7890 -> def5678\n' +
+        '| * 20250310_add_comments       def5678 -> ghi7890\n' +
         '+-/\n' +
-        '*     20250203_add_posts          abc1234 -> def5678\n' +
-        '*     20250115_add_users          -       -> abc1234',
+        '*   20250203_add_posts          abc1234 -> def5678\n' +
+        '*   20250115_add_users          -       -> abc1234',
     );
   });
 
@@ -385,7 +385,7 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250301_other', HASH.rootA, HASH.rootB),
     ];
     expect(renderAscii(entries)).toBe(
-      '*     20250302_branch  mid0000 -> tip0000\n' + '| *   20250301_other   root00a -> root00b',
+      '*   20250302_branch  mid0000 -> tip0000\n' + '| * 20250301_other   root00a -> root00b',
     );
   });
 
@@ -398,12 +398,12 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderAscii(entries)).toBe(
-      '*     20250320_add_likes     def5678 -> jkl1234\n' +
-        '| ~   20250315_touch_schema  def5678\n' +
-        '| *   20250310_add_comments  def5678 -> ghi7890\n' +
+      '*   20250320_add_likes     def5678 -> jkl1234\n' +
+        '| ~ 20250315_touch_schema  def5678\n' +
+        '| * 20250310_add_comments  def5678 -> ghi7890\n' +
         '+-/\n' +
-        '*     20250203_add_posts     abc1234 -> def5678\n' +
-        '*     20250115_add_users     -       -> abc1234',
+        '*   20250203_add_posts     abc1234 -> def5678\n' +
+        '*   20250115_add_users     -       -> abc1234',
     );
   });
 
@@ -417,15 +417,15 @@ describe('renderMigrationListGraph', () => {
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderAscii(entries)).toBe(
-      'o       d41a8c3\n' +
+      'o     d41a8c3\n' +
         '+-\\  \n' +
-        '* |     20250302_merge_tags   9c4f1e7 -> d41a8c3\n' +
-        '| *     20250301_merge_posts  7e1b9a0 -> d41a8c3\n' +
-        '| | *   20250220_unrelated    feed000 -> dead000\n' +
-        '* | |   20250210_add_tags     abc1234 -> 9c4f1e7\n' +
-        '| * |   20250203_add_posts    abc1234 -> 7e1b9a0\n' +
+        '* |   20250302_merge_tags   9c4f1e7 -> d41a8c3\n' +
+        '| *   20250301_merge_posts  7e1b9a0 -> d41a8c3\n' +
+        '| | * 20250220_unrelated    feed000 -> dead000\n' +
+        '* | | 20250210_add_tags     abc1234 -> 9c4f1e7\n' +
+        '| * | 20250203_add_posts    abc1234 -> 7e1b9a0\n' +
         '+-/ | \n' +
-        '*   |   20250115_add_users    -       -> abc1234',
+        '*   | 20250115_add_users    -       -> abc1234',
     );
   });
 });
