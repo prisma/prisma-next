@@ -1,16 +1,10 @@
-import { stat } from 'node:fs/promises';
 import { enumerateMigrationSpaces } from '@prisma-next/migration-tools/enumerate-migration-spaces';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type {
   MigrationListResult,
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
-import {
-  APP_SPACE_ID,
-  isValidSpaceId,
-  listContractSpaceDirectories,
-  spaceMigrationDirectory,
-} from '@prisma-next/migration-tools/spaces';
+import { APP_SPACE_ID, isValidSpaceId } from '@prisma-next/migration-tools/spaces';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -80,55 +74,20 @@ function computeSummary(spaces: readonly MigrationSpaceListEntry[]): string {
   return `${totalMigrations} migration(s) across ${spaces.length} contract space(s)`;
 }
 
-function isEnoent(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'ENOENT'
-  );
-}
-
-/**
- * Pre-check that the requested `--space <id>` exists on disk before
- * delegating to the enumerator. The enumerator returns `[]` for a
- * non-existent space directory (because the parent walk returns no
- * candidates), which is structurally identical to the empty-state path
- * — the spec explicitly distinguishes the two and requires a structured
- * CLI error here.
- *
- * Returns `null` on success so the caller can proceed; returns the
- * structured error to forward verbatim when the space is missing.
- * Surfaces only valid contract-space directory names in the suggestion
- * list (skips stray non-space directories), matching the enumerator's
- * own filtering rule.
- */
-async function ensureSpaceExists(
-  migrationsDir: string,
-  spaceId: string,
-): Promise<CliStructuredError | null> {
-  const spaceDir = spaceMigrationDirectory(migrationsDir, spaceId);
-  try {
-    const stats = await stat(spaceDir);
-    if (stats.isDirectory()) {
-      return null;
-    }
-  } catch (error) {
-    if (!isEnoent(error)) {
-      throw error;
-    }
-  }
-  const candidates = await listContractSpaceDirectories(migrationsDir);
-  const validCandidates = candidates.filter(isValidSpaceId).slice().sort();
-  return errorSpaceNotFound(spaceId, validCandidates);
-}
-
 /**
  * The unit-testable core of `migration list`. Given an absolute
  * `migrationsDir` and an optional `spaceFilter`, enumerates every
  * on-disk migration (via {@link enumerateMigrationSpaces}), narrows to
  * the requested space if any, and assembles a {@link MigrationListResult}
  * ready for the renderer or JSON serializer.
+ *
+ * The enumerator is the single source of truth for "what is a contract
+ * space": existence, the `--space` candidate-suggestion list, and
+ * scoping are all derived from one {@link enumerateMigrationSpaces}
+ * traversal. This means the reserved-name exclusion the enumerator
+ * applies (e.g. the per-space `refs/` subdirectory) is honoured here for
+ * free — a `--space refs` request resolves to `SPACE_NOT_FOUND`, not a
+ * synthesized empty-state.
  *
  * Distinct empty-state paths:
  *
@@ -137,8 +96,9 @@ async function ensureSpaceExists(
  *   renderer's empty-state path can name a directory (spec § Empty-state +
  *   the `migrations/` missing edge case).
  * - `--space <id>` on an existing-but-empty space dir → the enumerator
- *   surfaces `{ spaceId, migrations: [] }`; rendered the same way.
- * - `--space <id>` on a non-existent dir → structured
+ *   surfaces `{ spaceId, migrations: [] }`; `<id>` is in the set, so it
+ *   scopes to that entry and renders the empty-state the same way.
+ * - `--space <id>` on a non-existent (or reserved) space → structured
  *   `MIGRATION.SPACE_NOT_FOUND` error (NOT empty-state).
  *
  * Errors caught here:
@@ -156,13 +116,6 @@ export async function runMigrationList(
     return notOk(errorInvalidSpaceId(spaceFilter));
   }
 
-  if (spaceFilter !== undefined) {
-    const spaceError = await ensureSpaceExists(migrationsDir, spaceFilter);
-    if (spaceError !== null) {
-      return notOk(spaceError);
-    }
-  }
-
   let spaces: readonly MigrationSpaceListEntry[];
   try {
     spaces = await enumerateMigrationSpaces({ projectMigrationsDir: migrationsDir });
@@ -173,6 +126,10 @@ export async function runMigrationList(
         why: `Failed to enumerate migrations: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
+  }
+
+  if (spaceFilter !== undefined && !spaces.some((s) => s.spaceId === spaceFilter)) {
+    return notOk(errorSpaceNotFound(spaceFilter, spaces.map((s) => s.spaceId).sort()));
   }
 
   const scopedSpaces =

@@ -522,6 +522,36 @@ describe('runMigrationList — --space flag', () => {
     expect(envelope.meta?.['code']).toBe('MIGRATION.INVALID_SPACE_ID');
     expect(envelope.meta?.['spaceId']).toBe('../escape');
   });
+
+  it('emits MIGRATION.SPACE_NOT_FOUND for --space refs (reserved per-space subdirectory name)', async () => {
+    const { migrationsRoot } = await setupFixture();
+
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    // A stray top-level `migrations/refs/` directory: `refs` is the
+    // reserved per-space ref-store name, never a contract space. The
+    // syntactic name check passes, but enumeration excludes it, so the
+    // request must fail rather than wrongly render the app empty-state.
+    await writeRef(join(migrationsRoot, 'refs'), 'production', {
+      hash: HASH_55bada2,
+      invariants: [],
+    });
+
+    const result = await runMigrationList({
+      migrationsDir: migrationsRoot,
+      spaceFilter: 'refs',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    const envelope = result.failure.toEnvelope();
+    expect(envelope.meta?.['code']).toBe('MIGRATION.SPACE_NOT_FOUND');
+    expect(envelope.meta?.['spaceId']).toBe('refs');
+    expect(envelope.meta?.['availableSpaces']).toEqual(['app']);
+  });
 });
 
 describe('runMigrationList — JSON output shape', () => {
