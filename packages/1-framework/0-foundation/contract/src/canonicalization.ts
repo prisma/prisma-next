@@ -331,6 +331,7 @@ export function canonicalizeContractToObject(
     roots: serialized['roots'],
     models: serialized['models'],
     ...ifDefined('valueObjects', serialized['valueObjects']),
+    ...ifDefined('domain', serialized['domain']),
     storage: serialized['storage'],
     ...ifDefined('execution', serialized['execution']),
     extensionPacks: serialized['extensionPacks'],

@@ -606,6 +606,20 @@ describe('canonicalize with valueObjects', () => {
   });
 });
 
+describe('domain plane', () => {
+  it('preserves domain types and empty typeParams', () => {
+    const result = canonicalizeContractToObject(
+      minimal({ domain: { auth: { types: { Embedding: { typeParams: {} } } } } }),
+    );
+    expect(drill(result, 'domain', 'auth', 'types', 'Embedding')['typeParams']).toEqual({});
+  });
+
+  it('omits domain from output when undefined', () => {
+    const result = canonicalizeContractToObject(minimal());
+    expect(result).not.toHaveProperty('domain');
+  });
+});
+
 describe('typeParams preservation', () => {
   it('preserves empty storage.types[].typeParams', () => {
     const result = canonicalizeContractToObject(
