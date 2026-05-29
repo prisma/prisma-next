@@ -75,12 +75,16 @@ Per the project plan's stack / parallel ordering:
 
 ### Step 3 — Run the slice
 
+> **Emit `slice-started`:** Fields: `slice_slug` (the slug identifying this slice in the project plan), `slice_index` (1-based position of this slice in the project plan's full slice list), `linear_ref` (the Linear ticket reference for this slice, or `null` if none), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `slice-started` for the payload schema and `emission.md` § Append protocol for the file-append mechanics.
+
 Invoke `drive-build-workflow` on the picked slice. It pilots the dispatch loop and returns when one of:
 
 - **Slice DoD met** — the slice loop has auto-pushed and opened the slice PR autonomously (per `drive-build-workflow`'s own behavioural rules). `drive-deliver-workflow` does **not** halt for an extra operator gate between slice-SATISFIED and PR-open.
 - **Stop-condition fired** — design discussion required, assumption falsified, dispatch-INVEST refusal that needs replanning. Escalate to operator via `drive-discussion`; resume on operator-authorised plan amendment.
 
 ### Step 4 — On slice merge: health check + maybe retro
+
+> **Emit `slice-completed`:** Fields: `slice_slug` (matching the `slice-started` for this slice), `result` (`"merged"` when the slice PR merged cleanly; `"abandoned"` when the slice was deferred or cancelled without merging), `pr_ref` (the GitHub PR reference for the merged PR, or `null` if the slice was abandoned), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `slice-completed` for the payload schema and `emission.md` § Append protocol for the file-append mechanics.
 
 - Run `drive-check-health` in **session-bookend mode** after each slice merges. Updates recommended-next-pick + drift signals.
 - If `drive-build-workflow` surfaced a retro trigger (dispatch failure, drift event, scope-shift escapee), invoke `drive-run-retro`. The retro is not done until its output lands in a memory-strong surface (canonical skill update / `drive/<category>/README.md` update / ADR).

@@ -126,6 +126,8 @@ _Drafted via drive-plan-project. Replace this placeholder._
 
 Copy from `./templates/design-notes.template.md`. The template provides the canonical section structure (principles, the model, alternatives considered, open questions, references). Design-notes is a mandatory project-level artifact, on equal footing with `spec.md` and `plan.md`, and is authored directly by the Orchestrator — see [`drive/roles/README.md`](../../drive/roles/README.md) for the orchestrator-direct authoring rule.
 
+> **Emit `project-started`:** Fields: `project_slug` (the kebab-case slug derived above), `origin` (`"new-project"` when creating fresh; `"promote"` when invoked during a promote ceremony), `has_linear_project` (bool — `true` if a Linear Project exists or was just created in the setup step), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `project-started` for the payload schema and `emission.md` § Append protocol for the file-append mechanics.
+
 ## Project DoR check
 
 After scaffolding the directory and (optionally) writing stubs, walk the Project DoR (per `drive/spec/README.md` overlays and § Project DoR below). For each item, either confirm it's met or surface the gap to the operator before handoff:
