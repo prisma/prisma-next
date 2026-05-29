@@ -9,7 +9,9 @@ import {
   assertFromIsGraphNode,
   looksLikeFullHash,
   type ResolveFromForPlanInput,
+  type ResolveToForPlanInput,
   resolveFromForPlan,
+  resolveToForPlan,
 } from '../../src/utils/plan-resolution';
 
 const mocks = vi.hoisted(() => ({
@@ -340,6 +342,103 @@ describe('resolveFromForPlan', () => {
     expect(explicit.ok).toBe(true);
     if (implicit.ok && explicit.ok) {
       expect(implicit.value.kind).toBe(explicit.value.kind);
+    }
+  });
+});
+
+function baseToInput(
+  overrides: Partial<ResolveToForPlanInput> & Pick<ResolveToForPlanInput, 'bundles' | 'graph'>,
+): ResolveToForPlanInput {
+  return {
+    refsDir: '/project/migrations/refs',
+    familyInstance: makeFamilyInstance(),
+    readBundleEndContract: vi.fn().mockResolvedValue({ storage: { storageHash: HASH_A } }),
+    readBundleEndArtifacts: vi.fn().mockResolvedValue({
+      contractJson: { storage: { storageHash: HASH_A } },
+      contractDts: 'export type Contract = unknown;\n',
+    }),
+    optionsFrom: undefined,
+    ...overrides,
+  };
+}
+
+describe('resolveToForPlan', () => {
+  beforeEach(() => {
+    migrationCounter = 0;
+    mocks.readRefs.mockReset();
+    mocks.readRefSnapshot.mockReset();
+    mocks.readRefs.mockResolvedValue({});
+  });
+
+  it('resolves a ref name with a paired snapshot to its materialized contract', async () => {
+    const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
+    const graph = reconstructGraph(bundles);
+    mocks.readRefs.mockResolvedValue({ staging: { hash: HASH_A, invariants: [] } });
+    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_A));
+
+    const result = await resolveToForPlan('staging', baseToInput({ bundles, graph }));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.hash).toBe(HASH_A);
+      expect(result.value.contractDts).toContain('Contract');
+      expect(result.value.contractJson).toMatchObject({ storage: { storageHash: HASH_A } });
+    }
+  });
+
+  it('resolves a full hash that is a graph node via the bundle end-contract artifacts', async () => {
+    const bundles = [makePkg(E, HASH_A, 'm1')];
+    const graph = reconstructGraph(bundles);
+    mocks.readRefs.mockResolvedValue({});
+    const readBundleEndArtifacts = vi.fn().mockResolvedValue({
+      contractJson: { storage: { storageHash: HASH_A } },
+      contractDts: 'export type Contract = unknown;\n',
+    });
+
+    const result = await resolveToForPlan(
+      HASH_A,
+      baseToInput({ bundles, graph, readBundleEndArtifacts }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.hash).toBe(HASH_A);
+      expect(result.value.contractJson).toMatchObject({ storage: { storageHash: HASH_A } });
+    }
+    expect(readBundleEndArtifacts).toHaveBeenCalledWith('/migrations/app/m1');
+  });
+
+  it('resolves <dir>^ to the predecessor (from) contract via the bundle artifacts', async () => {
+    const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
+    const graph = reconstructGraph(bundles);
+    mocks.readRefs.mockResolvedValue({});
+    const readBundleEndArtifacts = vi.fn().mockResolvedValue({
+      contractJson: { storage: { storageHash: HASH_A } },
+      contractDts: 'export type Contract = unknown;\n',
+    });
+
+    const result = await resolveToForPlan(
+      'm2^',
+      baseToInput({ bundles, graph, readBundleEndArtifacts }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.hash).toBe(HASH_A);
+    }
+    expect(readBundleEndArtifacts).toHaveBeenCalledWith('/migrations/app/m1');
+  });
+
+  it('maps a not-found reference to a structured error', async () => {
+    const bundles = [makePkg(E, HASH_A, 'm1')];
+    const graph = reconstructGraph(bundles);
+    mocks.readRefs.mockResolvedValue({});
+
+    const result = await resolveToForPlan('does-not-exist', baseToInput({ bundles, graph }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.meta?.['input']).toBe('does-not-exist');
     }
   });
 });

@@ -128,7 +128,7 @@ function makeBundle(from: string, to: string, dirName: string): OnDiskMigrationP
     metadata: {
       from: from === EMPTY_CONTRACT_HASH ? null : from,
       to,
-      migrationHash: 'sha256:prev-id',
+      migrationHash: `sha256:mig-${dirName}`,
       createdAt: '2026-03-01T09:00:00.000Z',
       providedInvariants: [],
     },
@@ -141,6 +141,20 @@ function graphWithPriorMigration(fromHash: string): {
   graph: ReturnType<typeof reconstructGraph>;
 } {
   const bundles = [makeBundle(EMPTY_CONTRACT_HASH, fromHash, '20260301T0900_prev')];
+  return { bundles, graph: reconstructGraph(bundles) };
+}
+
+function graphWithTwoMigrations(
+  baselineHash: string,
+  tipHash: string,
+): {
+  bundles: OnDiskMigrationPackage[];
+  graph: ReturnType<typeof reconstructGraph>;
+} {
+  const bundles = [
+    makeBundle(EMPTY_CONTRACT_HASH, baselineHash, '20260301T0900_baseline'),
+    makeBundle(baselineHash, tipHash, '20260301T0905_add_model'),
+  ];
   return { bundles, graph: reconstructGraph(bundles) };
 }
 
@@ -631,6 +645,153 @@ describe('migration plan command', () => {
       await executeCommand(command, ['--json']);
 
       expect(mocks.writeMigrationTs).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('--to arbitrary destination', () => {
+    function snapshotByRefName(byName: Record<string, string>): void {
+      mocks.readRefSnapshot.mockImplementation(async (_dir: string, name: string) =>
+        sampleSnapshot(byName[name] ?? OLD_HASH),
+      );
+    }
+
+    it('plans a reverse delta toward the resolved target, flags it destructive, and does not refuse', async () => {
+      // Current emitted contract is the tip (NEW_HASH); --to rolls back to the
+      // baseline (OLD_HASH). The planner returns a DROP op: a clean rollback
+      // plans successfully with a destructive warning rather than refusing.
+      const planMock = vi
+        .fn()
+        .mockReturnValue(
+          defaultPlannerSuccess([
+            { id: 'table.comment', label: 'Drop table "comment"', operationClass: 'destructive' },
+          ]),
+        );
+      setupBaseConfig(planMock);
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      const { bundles, graph } = graphWithTwoMigrations(OLD_HASH, NEW_HASH);
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      mocks.readRefs.mockResolvedValue({
+        db: { hash: NEW_HASH, invariants: [] },
+        staging: { hash: OLD_HASH, invariants: [] },
+      });
+      snapshotByRefName({ db: NEW_HASH, staging: OLD_HASH });
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+      mocks.extractSqlDdl.mockReturnValue([]);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json', '--to', 'staging']);
+
+      expect(exitCode).toBe(0);
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result.from).toBe(NEW_HASH);
+      expect(result.to).toBe(OLD_HASH);
+      expect(result.operations).toEqual([
+        { id: 'table.comment', label: 'Drop table "comment"', operationClass: 'destructive' },
+      ]);
+      // Destination end-contract is written from the resolved target, not
+      // copied from the emitted contract.json.
+      expect(mocks.copyFilesWithRename).not.toHaveBeenCalled();
+    });
+
+    it('renders the destructive-operations warning for a reverse delta', async () => {
+      const planMock = vi
+        .fn()
+        .mockReturnValue(
+          defaultPlannerSuccess([
+            { id: 'table.comment', label: 'Drop table "comment"', operationClass: 'destructive' },
+          ]),
+        );
+      setupBaseConfig(planMock);
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      const { bundles, graph } = graphWithTwoMigrations(OLD_HASH, NEW_HASH);
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      mocks.readRefs.mockResolvedValue({
+        db: { hash: NEW_HASH, invariants: [] },
+        staging: { hash: OLD_HASH, invariants: [] },
+      });
+      snapshotByRefName({ db: NEW_HASH, staging: OLD_HASH });
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+      mocks.extractSqlDdl.mockReturnValue([]);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--to', 'staging']);
+
+      expect(exitCode).toBe(0);
+      const rendered = consoleOutput.join('\n');
+      expect(rendered).toContain('destructive operations that may cause data loss');
+    });
+
+    it('resolves an explicit --from and --to independently', async () => {
+      setupBaseConfig();
+      mocks.readFile.mockImplementation(async (path: string) => {
+        if (typeof path === 'string' && path.endsWith('end-contract.json')) {
+          return makeContractJson(OLD_HASH);
+        }
+        return makeContractJson(NEW_HASH);
+      });
+      const { bundles, graph } = graphWithTwoMigrations(OLD_HASH, NEW_HASH);
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      mocks.readRefs.mockResolvedValue({ staging: { hash: NEW_HASH, invariants: [] } });
+      snapshotByRefName({ staging: NEW_HASH });
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+      mocks.extractSqlDdl.mockReturnValue([]);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, [
+        '--json',
+        '--from',
+        OLD_HASH,
+        '--to',
+        'staging',
+      ]);
+
+      expect(exitCode).toBe(0);
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result.from).toBe(OLD_HASH);
+      expect(result.to).toBe(NEW_HASH);
+      // Explicit graph-node --from still copies start-contract from the bundle;
+      // the destination end-contract comes from the resolved --to instead.
+      const startCopy = mocks.copyFilesWithRename.mock.calls.find(([, files]) =>
+        (files as { destName: string }[]).some((f) => f.destName === 'start-contract.json'),
+      );
+      expect(startCopy).toBeDefined();
+      const endCopy = mocks.copyFilesWithRename.mock.calls.find(([, files]) =>
+        (files as { destName: string }[]).some((f) => f.destName === 'end-contract.json'),
+      );
+      expect(endCopy).toBeUndefined();
+    });
+
+    it('preserves the emitted contract.json as the destination when --to is omitted', async () => {
+      setupBaseConfig();
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      const { bundles, graph } = graphWithPriorMigration(OLD_HASH);
+      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      setupDbRefFromHash(OLD_HASH);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+      mocks.extractSqlDdl.mockReturnValue([]);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json']);
+
+      expect(exitCode).toBe(0);
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result.to).toBe(NEW_HASH);
+      const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
+      expect(destinationFiles).toEqual([
+        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
+        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
+      ]);
     });
   });
 

@@ -49,7 +49,7 @@ import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
-import { resolveFromForPlan } from '../utils/plan-resolution';
+import { resolveFromForPlan, resolveToForPlan } from '../utils/plan-resolution';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -57,6 +57,37 @@ interface MigrationPlanOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly name?: string;
   readonly from?: string;
+  readonly to?: string;
+}
+
+/**
+ * Read a migration package's sibling `end-contract.json` / `end-contract.d.ts`
+ * as raw artifacts (parsed JSON + verbatim `.d.ts` text). Used to materialize a
+ * graph-node `--to` target's destination contract so it can be written as the
+ * planned package's `end-contract.*`. Surfaces a structured file-not-found
+ * error (rather than a raw ENOENT) when either sibling is missing.
+ */
+async function readBundleEndArtifacts(
+  migrationDir: string,
+): Promise<{ contractJson: unknown; contractDts: string }> {
+  const jsonPath = join(migrationDir, 'end-contract.json');
+  const dtsPath = join(migrationDir, 'end-contract.d.ts');
+  try {
+    const [rawJson, contractDts] = await Promise.all([
+      readFile(jsonPath, 'utf-8'),
+      readFile(dtsPath, 'utf-8'),
+    ]);
+    const contractJson: unknown = JSON.parse(rawJson);
+    return { contractJson, contractDts };
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      throw errorFileNotFound(migrationDir, {
+        why: `Target migration is missing its destination contract snapshot under ${migrationDir}`,
+        fix: 'Re-emit the target migration so its sibling `end-contract.json` / `end-contract.d.ts` are restored, then re-run this command.',
+      });
+    }
+    throw error;
+  }
 }
 
 /**
@@ -282,6 +313,9 @@ async function executeMigrationPlanCommand(
     if (options.from) {
       details.push({ label: 'from', value: options.from });
     }
+    if (options.to) {
+      details.push({ label: 'to', value: options.to });
+    }
     if (options.name) {
       details.push({ label: 'name', value: options.name });
     }
@@ -342,9 +376,14 @@ async function executeMigrationPlanCommand(
       }),
     );
   }
-  const toStorageHash = rawStorageHash;
+  let toStorageHash: string = rawStorageHash;
 
   const { refsDir } = resolveMigrationPaths(options.config, config);
+
+  // When `--to <ref>` resolves a non-default destination, these carry its raw
+  // artifacts so the planned package's `end-contract.*` is written from the
+  // resolved target rather than copied from the emitted `contract.json`.
+  let toArtifacts: { contractJson: unknown; contractDts: string } | null = null;
 
   let fromContract: Contract | null = null;
   let fromHash: string | null = null;
@@ -394,6 +433,31 @@ async function executeMigrationPlanCommand(
         };
         isAutoBaseline = true;
         break;
+    }
+
+    // `--to <ref>` swaps the planner destination to an arbitrary resolved
+    // contract (e.g. an ancestor / rollback target). The from-side resolution
+    // above is untouched; only the destination + its emitted `end-contract.*`
+    // change.
+    if (options.to !== undefined) {
+      const toResolution = await resolveToForPlan(options.to, {
+        refsDir,
+        bundles,
+        graph,
+        familyInstance,
+        readBundleEndContract: (migrationDir) =>
+          readPredecessorEndContract(migrationDir, familyInstance),
+        readBundleEndArtifacts,
+      });
+      if (!toResolution.ok) {
+        return notOk(toResolution.failure);
+      }
+      toContract = toResolution.value.contract;
+      toStorageHash = toResolution.value.hash;
+      toArtifacts = {
+        contractJson: toResolution.value.contractJson,
+        contractDts: toResolution.value.contractDts,
+      };
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
@@ -486,6 +550,26 @@ async function executeMigrationPlanCommand(
     config.target.targetId,
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
+
+  // Write the planned package's destination `end-contract.*`. With `--to`, the
+  // resolved target's raw artifacts are written; otherwise the emitted
+  // `contract.json` / `contract.d.ts` are copied verbatim (today's behaviour).
+  async function writeDestinationEndContract(packageDir: string): Promise<void> {
+    if (toArtifacts !== null) {
+      await writeSnapshotContractArtifacts(
+        packageDir,
+        toArtifacts.contractJson,
+        toArtifacts.contractDts,
+        'end-contract',
+      );
+      return;
+    }
+    const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
+    await copyFilesWithRename(packageDir, [
+      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
+      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
+    ]);
+  }
 
   try {
     const planner = migrations.createPlanner(familyInstance);
@@ -591,11 +675,7 @@ async function executeMigrationPlanCommand(
         deltaTimestamp,
         deltaLeg.value,
       );
-      const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
-      await copyFilesWithRename(deltaPackageDir, [
-        { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
-        { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
-      ]);
+      await writeDestinationEndContract(deltaPackageDir);
       await writeSnapshotStartContract(
         deltaPackageDir,
         snapshotStartContract.contractJson,
@@ -668,11 +748,7 @@ async function executeMigrationPlanCommand(
       timestamp,
       deltaLeg.value,
     );
-    const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
-    await copyFilesWithRename(packageDir, [
-      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
-      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
-    ]);
+    await writeDestinationEndContract(packageDir);
     if (fromContractSourceDir !== null) {
       const sourceArtifacts = getEmittedArtifactPaths(
         join(fromContractSourceDir, 'end-contract.json'),
@@ -755,6 +831,7 @@ export function createMigrationPlanCommand(): Command {
   setCommandExamples(command, [
     'prisma-next migration plan',
     'prisma-next migration plan --name add-users-table',
+    'prisma-next migration plan --to <migration-dir>^ --name rollback',
   ]);
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
@@ -762,6 +839,10 @@ export function createMigrationPlanCommand(): Command {
     .option(
       '--from <contract>',
       'Starting contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path)',
+    )
+    .option(
+      '--to <contract>',
+      'Destination contract reference (hash, prefix, ref name, migration dir name, <dir>^, or ./path); defaults to the emitted contract',
     )
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlagsOrExit(options);

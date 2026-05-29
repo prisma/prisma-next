@@ -8,6 +8,7 @@ import {
   isGraphNode,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import type { ContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefSnapshot, readRefs } from '@prisma-next/migration-tools/refs';
@@ -105,34 +106,49 @@ async function deserializeSnapshotContract(
   }
 }
 
+/**
+ * Materialized destination/source contract for an explicitly-parsed
+ * reference. Both `--from` and `--to` resolve through {@link resolveContractRef}
+ * to one of these variants:
+ *
+ *   - `snapshot`: the contract came from a ref's paired snapshot, so the raw
+ *     `contractJson` / `contractDts` are already in hand.
+ *   - `graph-node`: the hash is a migration graph node; `sourceDir` names the
+ *     on-disk package whose `end-contract.*` carries the materialized contract.
+ */
+type RefContractResolution =
+  | {
+      kind: 'snapshot';
+      hash: string;
+      contract: Contract;
+      contractJson: unknown;
+      contractDts: string;
+    }
+  | { kind: 'graph-node'; hash: string; contract: Contract; sourceDir: string };
+
 async function resolveGraphNodeFromBundle(
-  fromHash: string,
+  hash: string,
   bundles: readonly OnDiskMigrationPackage[],
   readBundleEndContract: (migrationDir: string) => Promise<Contract>,
-  explicitFromLabel?: string,
-): Promise<Result<Extract<FromResolution, { kind: 'graph-node' }>, CliStructuredError>> {
-  const matchingBundle = bundles.find((pkg) => pkg.metadata.to === fromHash);
+  explicitLabel?: string,
+): Promise<Result<Extract<RefContractResolution, { kind: 'graph-node' }>, CliStructuredError>> {
+  const matchingBundle = bundles.find((pkg) => pkg.metadata.to === hash);
   if (!matchingBundle) {
     return notOk(
       errorUnexpected(
-        explicitFromLabel
-          ? `No migration bundle found for --from "${explicitFromLabel}" (resolved hash: ${fromHash})`
-          : `No migration bundle found for graph node ${fromHash}`,
+        explicitLabel
+          ? `No migration bundle found for reference "${explicitLabel}" (resolved hash: ${hash})`
+          : `No migration bundle found for graph node ${hash}`,
         {
-          why: `The hash ${fromHash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
+          why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
           fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
         },
       ),
     );
   }
   try {
-    const fromContract = await readBundleEndContract(matchingBundle.dirPath);
-    return ok({
-      kind: 'graph-node',
-      fromHash,
-      fromContract,
-      sourceDir: matchingBundle.dirPath,
-    });
+    const contract = await readBundleEndContract(matchingBundle.dirPath);
+    return ok({ kind: 'graph-node', hash, contract, sourceDir: matchingBundle.dirPath });
   } catch (error) {
     if (CliStructuredError.is(error)) {
       return notOk(error);
@@ -141,74 +157,120 @@ async function resolveGraphNodeFromBundle(
   }
 }
 
-async function resolveFromRefName(
-  refName: string,
-  fromHash: string,
+/**
+ * Shared reference→contract resolution core for `migration plan`. Maps a
+ * successfully-parsed {@link ContractRef} to a materialized
+ * {@link RefContractResolution}, dispatching on provenance:
+ *
+ *   - `ref`: prefer the ref's paired snapshot; fall back to the matching graph
+ *     node's on-disk bundle; otherwise the ref points at no contract source.
+ *   - `hash` / migration directory: resolve the graph node's bundle directly.
+ *
+ * `--from`-specific policy (greenfield default, auto-baseline on an empty
+ * graph, graph-node reachability assertions) is layered on top by
+ * {@link resolveFromPolicy}; `--to` consumes the resolution as-is.
+ */
+async function resolveContractRef(
+  parsed: ContractRef,
   input: ResolveFromForPlanInput,
-  refs: Refs,
-): Promise<Result<FromResolution, CliStructuredError>> {
+  explicitLabel?: string,
+): Promise<Result<RefContractResolution, CliStructuredError>> {
   const { refsDir, bundles, graph, familyInstance, readBundleEndContract } = input;
-  const empty = graphIsEmpty(bundles);
-  const graphTip = findLatestMigration(graph)?.to ?? null;
+  const { hash, provenance } = parsed;
 
-  let snapshot: Awaited<ReturnType<typeof readRefSnapshot>>;
-  try {
-    snapshot = await readRefSnapshot(refsDir, refName);
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    throw error;
-  }
-
-  if (snapshot) {
-    const contractResult = await deserializeSnapshotContract(familyInstance, snapshot.contract);
-    if (!contractResult.ok) {
-      return contractResult;
-    }
-    const fromContract = contractResult.value;
-    const { contractDts, contract: contractJson } = snapshot;
-    if (empty) {
-      return ok({ kind: 'auto-baseline', fromHash, fromContract, contractDts, contractJson });
-    }
+  if (provenance.kind === 'ref') {
+    let snapshot: Awaited<ReturnType<typeof readRefSnapshot>>;
     try {
-      assertFromIsGraphNode(fromHash, graph, refs, graphTip);
+      snapshot = await readRefSnapshot(refsDir, provenance.refName);
     } catch (error) {
-      if (CliStructuredError.is(error)) {
-        return notOk(error);
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
       }
       throw error;
     }
-    return ok({ kind: 'snapshot', fromHash, fromContract, contractDts, contractJson });
+
+    if (snapshot) {
+      const contractResult = await deserializeSnapshotContract(familyInstance, snapshot.contract);
+      if (!contractResult.ok) {
+        return contractResult;
+      }
+      return ok({
+        kind: 'snapshot',
+        hash,
+        contract: contractResult.value,
+        contractJson: snapshot.contract,
+        contractDts: snapshot.contractDts,
+      });
+    }
+
+    if (isGraphNode(hash, graph)) {
+      return resolveGraphNodeFromBundle(hash, bundles, readBundleEndContract, explicitLabel);
+    }
+
+    return notOk(errorSnapshotMissing(provenance.refName));
   }
 
-  if (isGraphNode(fromHash, graph)) {
-    return resolveGraphNodeFromBundle(fromHash, bundles, readBundleEndContract);
-  }
-
-  return notOk(errorSnapshotMissing(refName));
-}
-
-async function resolveFromHashProvenance(
-  fromHash: string,
-  input: ResolveFromForPlanInput,
-  _refs: Refs,
-  explicitFromLabel?: string,
-): Promise<Result<FromResolution, CliStructuredError>> {
-  const { bundles, graph } = input;
-
-  if (isGraphNode(fromHash, graph)) {
-    return resolveGraphNodeFromBundle(
-      fromHash,
-      bundles,
-      input.readBundleEndContract,
-      explicitFromLabel,
-    );
+  if (isGraphNode(hash, graph)) {
+    return resolveGraphNodeFromBundle(hash, bundles, readBundleEndContract, explicitLabel);
   }
 
   throw new Error(
-    `resolveFromHashProvenance: non-graph-node hash ${fromHash} should be refused via looksLikeFullHash before this helper is called`,
+    `resolveContractRef: non-graph-node hash ${hash} should be refused via looksLikeFullHash before this helper is called`,
   );
+}
+
+/**
+ * Apply `--from`-specific policy on top of the shared {@link resolveContractRef}
+ * core: relabel a snapshot resolution as `auto-baseline` on an empty graph,
+ * and otherwise assert the resolved from-hash is reachable in the graph.
+ */
+async function resolveFromPolicy(
+  parsed: ContractRef,
+  input: ResolveFromForPlanInput,
+  refs: Refs,
+  explicitFromLabel?: string,
+): Promise<Result<FromResolution, CliStructuredError>> {
+  const resolution = await resolveContractRef(parsed, input, explicitFromLabel);
+  if (!resolution.ok) {
+    return resolution;
+  }
+
+  if (resolution.value.kind === 'graph-node') {
+    return ok({
+      kind: 'graph-node',
+      fromHash: resolution.value.hash,
+      fromContract: resolution.value.contract,
+      sourceDir: resolution.value.sourceDir,
+    });
+  }
+
+  const { hash, contract, contractJson, contractDts } = resolution.value;
+  if (graphIsEmpty(input.bundles)) {
+    return ok({
+      kind: 'auto-baseline',
+      fromHash: hash,
+      fromContract: contract,
+      contractDts,
+      contractJson,
+    });
+  }
+
+  const graphTip = findLatestMigration(input.graph)?.to ?? null;
+  try {
+    assertFromIsGraphNode(hash, input.graph, refs, graphTip);
+  } catch (error) {
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+    throw error;
+  }
+  return ok({
+    kind: 'snapshot',
+    fromHash: hash,
+    fromContract: contract,
+    contractDts,
+    contractJson,
+  });
 }
 
 export async function resolveFromForPlan(
@@ -231,7 +293,11 @@ export async function resolveFromForPlan(
     if (!dbRef) {
       return ok({ kind: 'greenfield', fromHash: null, fromContract: null });
     }
-    return resolveFromRefName('db', dbRef.hash, input, refs);
+    return resolveFromPolicy(
+      { hash: dbRef.hash, provenance: { kind: 'ref', refName: 'db' } },
+      input,
+      refs,
+    );
   }
 
   const refResult = parseContractRef(optionsFrom, { graph, refs });
@@ -247,11 +313,82 @@ export async function resolveFromForPlan(
     return notOk(mapRefResolutionError(refResult.failure));
   }
 
-  const { hash: fromHash, provenance } = refResult.value;
+  return resolveFromPolicy(refResult.value, input, refs, optionsFrom);
+}
 
-  if (provenance.kind === 'ref') {
-    return resolveFromRefName(provenance.refName, fromHash, input, refs);
+/**
+ * Raw destination contract artifacts read from a migration package's sibling
+ * `end-contract.json` / `end-contract.d.ts`. Injected by the command so the
+ * resolver stays free of direct filesystem access.
+ */
+export interface ResolveToForPlanInput extends ResolveFromForPlanInput {
+  readonly readBundleEndArtifacts: (
+    migrationDir: string,
+  ) => Promise<{ contractJson: unknown; contractDts: string }>;
+}
+
+/**
+ * A fully-materialized contract reference: the resolved hash plus the
+ * destination contract in every shape `migration plan` needs — the hydrated
+ * `Contract` for the planner, and the raw `contractJson` / `contractDts` to
+ * write as the package's `end-contract.*`.
+ */
+export interface ResolvedContractRef {
+  readonly hash: string;
+  readonly contract: Contract;
+  readonly contractJson: unknown;
+  readonly contractDts: string;
+}
+
+/**
+ * Resolve `migration plan --to <ref>` to its destination contract, accepting
+ * the same reference grammar as `--from` (full hash, prefix, ref name,
+ * migration directory name, `<dir>^`). Shares {@link resolveContractRef} with
+ * `--from`; for a graph-node target it reads the matching bundle's
+ * `end-contract.*` via the injected {@link ResolveToForPlanInput.readBundleEndArtifacts}.
+ */
+export async function resolveToForPlan(
+  optionsTo: string,
+  input: ResolveToForPlanInput,
+): Promise<Result<ResolvedContractRef, CliStructuredError>> {
+  const { refsDir, graph, readBundleEndArtifacts } = input;
+
+  let refs: Refs;
+  try {
+    refs = await readRefs(refsDir);
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    throw error;
   }
 
-  return resolveFromHashProvenance(fromHash, input, refs, optionsFrom);
+  const refResult = parseContractRef(optionsTo, { graph, refs });
+  if (!refResult.ok) {
+    return notOk(mapRefResolutionError(refResult.failure));
+  }
+
+  const resolution = await resolveContractRef(refResult.value, input, optionsTo);
+  if (!resolution.ok) {
+    return resolution;
+  }
+
+  if (resolution.value.kind === 'snapshot') {
+    const { hash, contract, contractJson, contractDts } = resolution.value;
+    return ok({ hash, contract, contractJson, contractDts });
+  }
+
+  const { hash, contract, sourceDir } = resolution.value;
+  try {
+    const { contractJson, contractDts } = await readBundleEndArtifacts(sourceDir);
+    return ok({ hash, contract, contractJson, contractDts });
+  } catch (error) {
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    throw error;
+  }
 }
