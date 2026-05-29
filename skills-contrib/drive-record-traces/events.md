@@ -104,21 +104,6 @@ Payload-only fields below; merge with the common envelope at emit time. Spec/pla
 | `open_questions_count` | integer | Count of open questions in the spec at write time. |
 | `dod_items_count` | integer | Count of Definition-of-Done checklist items in the spec at write time. |
 
-#### Arktype
-
-```typescript
-export const SpecAuthoredEvent = type({
-  ...envelopeFields,
-  event_type: '"spec-authored"',
-  spec_path: 'string',
-  spec_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  edge_cases_count: 'number.integer>=0 | null',
-  open_questions_count: 'number.integer>=0',
-  dod_items_count: 'number.integer>=0',
-});
-```
-
 #### JSONL example
 
 ```jsonl
@@ -142,25 +127,6 @@ export const SpecAuthoredEvent = type({
 | `dod_items_count` | integer | Count after amendment. |
 | `reason` | enum | `"falsified-assumption"` \| `"new-edge-case"` \| `"scope-shift"` \| `"operator-correction"` \| `"replan-from-discussion"`. |
 | `sections_changed` | string[] | Headings or section identifiers touched (best-effort orchestrator observation). |
-
-#### Arktype
-
-```typescript
-export const SpecAmendedEvent = type({
-  ...envelopeFields,
-  event_type: '"spec-amended"',
-  spec_path: 'string',
-  spec_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  bytes_delta: 'number.integer',
-  edge_cases_count: 'number.integer>=0 | null',
-  open_questions_count: 'number.integer>=0',
-  dod_items_count: 'number.integer>=0',
-  reason:
-    '"falsified-assumption" | "new-edge-case" | "scope-shift" | "operator-correction" | "replan-from-discussion"',
-  sections_changed: type('string').array(),
-});
-```
 
 #### JSONL example
 
@@ -187,29 +153,6 @@ A same-session re-write of a spec just authored emits `spec-amended` (existence-
 | `slice_count` | integer \| null | Number of slices in a project plan; `null` for slice plans. |
 | `dispatch_size_distribution` | object \| null | Slice plans only: `{"S": n, "M": n, "L": n, "XL": n}` dispatch size counts; `null` for project plans. |
 | `open_items_count` | integer | Count of open / TBD items in the plan at write time. |
-
-#### Arktype
-
-```typescript
-const dispatchSizeDistribution = type({
-  S: 'number.integer>=0',
-  M: 'number.integer>=0',
-  L: 'number.integer>=0',
-  XL: 'number.integer>=0',
-});
-
-export const PlanAuthoredEvent = type({
-  ...envelopeFields,
-  event_type: '"plan-authored"',
-  plan_path: 'string',
-  plan_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  dispatch_count: 'number.integer>=0 | null',
-  slice_count: 'number.integer>=0 | null',
-  dispatch_size_distribution: dispatchSizeDistribution.or('null'),
-  open_items_count: 'number.integer>=0',
-});
-```
 
 #### JSONL example
 
@@ -238,28 +181,6 @@ export const PlanAuthoredEvent = type({
 | `dispatches_removed` | integer \| null | Slice plans only: count of dispatches removed; `null` for project plans. |
 | `dispatches_resized` | integer \| null | Slice plans only: count of dispatches whose size label changed; `null` for project plans. |
 
-#### Arktype
-
-```typescript
-export const PlanAmendedEvent = type({
-  ...envelopeFields,
-  event_type: '"plan-amended"',
-  plan_path: 'string',
-  plan_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  bytes_delta: 'number.integer',
-  dispatch_count: 'number.integer>=0 | null',
-  slice_count: 'number.integer>=0 | null',
-  dispatch_size_distribution: dispatchSizeDistribution.or('null'),
-  open_items_count: 'number.integer>=0',
-  reason:
-    '"falsified-assumption" | "new-edge-case" | "scope-shift" | "operator-correction" | "replan-from-discussion" | "dispatch-resize" | "dispatch-added" | "dispatch-removed"',
-  dispatches_added: 'number.integer>=0 | null',
-  dispatches_removed: 'number.integer>=0 | null',
-  dispatches_resized: 'number.integer>=0 | null',
-});
-```
-
 #### JSONL example
 
 ```jsonl
@@ -277,20 +198,6 @@ export const PlanAmendedEvent = type({
 | `verdict` | enum | `"direct-change"` \| `"orphan-slice"` \| `"in-project-slice"` \| `"new-project"` \| `"promote"` \| `"demote"` \| `"spike-first"` \| `"defer"`. |
 | `input_shape` | enum | `"linear-ticket"` \| `"chat-ask"` \| `"customer-ask"` \| `"bug-report"` \| `"mid-flight-scope-signal"` \| `"i-should-do-x-thought"`. |
 | `input_ref` | string \| null | Linear ticket ID when available (e.g. `TML-2704`); else `null`. |
-
-#### Arktype
-
-```typescript
-export const TriageVerdictEvent = type({
-  ...envelopeFields,
-  event_type: '"triage-verdict"',
-  verdict:
-    '"direct-change" | "orphan-slice" | "in-project-slice" | "new-project" | "promote" | "demote" | "spike-first" | "defer"',
-  input_shape:
-    '"linear-ticket" | "chat-ask" | "customer-ask" | "bug-report" | "mid-flight-scope-signal" | "i-should-do-x-thought"',
-  input_ref: 'string | null',
-});
-```
 
 #### JSONL example
 
@@ -313,19 +220,6 @@ Re-triage (e.g. promote ceremony) emits a second event with the same `input_ref`
 | `artifact_path` | string | Repo-relative path to the spec or plan whose load-bearing assumption was falsified. |
 | `triggered_by` | enum | `"implementer-pushback"` \| `"wip-inspection"` \| `"dispatch-blocked"` \| `"health-check-drift"` \| `"orchestrator-self-detected"` \| `"operator-flagged"`. |
 | `assumption_summary` | string \| null | One-sentence summary of the falsified assumption; `null` when not summarised at emit time. |
-
-#### Arktype
-
-```typescript
-export const FalsifiedAssumptionEvent = type({
-  ...envelopeFields,
-  event_type: '"falsified-assumption"',
-  artifact_path: 'string',
-  triggered_by:
-    '"implementer-pushback" | "wip-inspection" | "dispatch-blocked" | "health-check-drift" | "orchestrator-self-detected" | "operator-flagged"',
-  assumption_summary: 'string | null',
-});
-```
 
 #### JSONL example
 
@@ -353,18 +247,6 @@ Payload-only fields below; merge with the common envelope at emit time.
 | `origin` | enum | `"new-project"` \| `"promote"`. `new-project` = freshly created; `promote` = promoted from an orphan slice. |
 | `has_linear_project` | boolean | Whether a Linear project was linked at creation time. |
 
-#### Arktype
-
-```typescript
-export const ProjectStartedEvent = type({
-  ...envelopeFields,
-  event_type: '"project-started"',
-  project_slug: 'string',
-  origin: '"new-project" | "promote"',
-  has_linear_project: 'boolean',
-});
-```
-
 #### JSONL example
 
 ```jsonl
@@ -385,18 +267,6 @@ export const ProjectStartedEvent = type({
 
 > **Note.** Project wall-clock (total project duration) is **read-side**: compute it as `project-closed.ts − project-started.ts` from the trace file. It is not emitted because the two events routinely span sessions and the orchestrator does not hold `project-started.ts` at close time.
 
-#### Arktype
-
-```typescript
-export const ProjectClosedEvent = type({
-  ...envelopeFields,
-  event_type: '"project-closed"',
-  dod_status: '"all-met" | "some-deferred" | "some-cancelled"',
-  slices_completed: 'number.integer>=0',
-  final_retro_done: 'boolean',
-});
-```
-
 #### JSONL example
 
 ```jsonl
@@ -414,18 +284,6 @@ export const ProjectClosedEvent = type({
 | `slice_slug` | string | The slice's slug identifier (matches the slice directory name). |
 | `slice_index` | integer ≥ 1 | 1-based position of this slice in the project plan. |
 | `linear_ref` | string \| null | Linear issue reference (e.g. `TML-2711`) when the slice was sourced from a Linear ticket; `null` otherwise. |
-
-#### Arktype
-
-```typescript
-export const SliceStartedEvent = type({
-  ...envelopeFields,
-  event_type: '"slice-started"',
-  slice_slug: 'string',
-  slice_index: 'number.integer>=1',
-  linear_ref: 'string | null',
-});
-```
 
 #### JSONL example
 
@@ -445,18 +303,6 @@ export const SliceStartedEvent = type({
 | `result` | enum | `"merged"` \| `"abandoned"`. `merged` = PR landed; `abandoned` = slice dropped without merging. |
 | `pr_ref` | string \| null | PR reference (e.g. `#42`) when a PR was opened; `null` if the slice was abandoned before a PR was created. |
 
-#### Arktype
-
-```typescript
-export const SliceCompletedEvent = type({
-  ...envelopeFields,
-  event_type: '"slice-completed"',
-  slice_slug: 'string',
-  result: '"merged" | "abandoned"',
-  pr_ref: 'string | null',
-});
-```
-
 #### JSONL example
 
 ```jsonl
@@ -475,20 +321,6 @@ export const SliceCompletedEvent = type({
 | `drift_signal_count` | integer ≥ 0 | Count of drift signals detected in this rollup. |
 | `max_drift_severity` | enum | `"none"` \| `"low"` \| `"medium"` \| `"high"`. Highest severity across all drift signals in this rollup; `"none"` when `drift_signal_count = 0`. |
 | `recommended_next` | string \| null | The health check's recommended next action, if any; `null` when no recommendation was generated. |
-
-#### Arktype
-
-```typescript
-export const HealthCheckFiredEvent = type({
-  ...envelopeFields,
-  event_type: '"health-check-fired"',
-  cadence:
-    '"opening-rollup" | "per-slice-merge" | "closing-rollup" | "session-bookend" | "trigger-fired"',
-  drift_signal_count: 'number.integer>=0',
-  max_drift_severity: '"none" | "low" | "medium" | "high"',
-  recommended_next: 'string | null',
-});
-```
 
 #### JSONL example
 
@@ -510,245 +342,15 @@ export const HealthCheckFiredEvent = type({
 
 > **Note.** This event fires only on landing; an un-landed retro (process failure before Step 7) is silent. Slice-3 assertions can infer un-landed retros by finding a health-check retro trigger with no matching `retro-landed`.
 
-#### Arktype
-
-```typescript
-export const RetroLandedEvent = type({
-  ...envelopeFields,
-  event_type: '"retro-landed"',
-  trigger_class:
-    '"dispatch-failure" | "drift-event" | "scope-shift-escapee" | "wip-inspection-finding" | "operator-flagged-surprise" | "mandatory-final"',
-  landing_surfaces: type('"canonical-skill" | "project-context-readme" | "adr"').array(),
-  is_mandatory_final: 'boolean',
-});
-```
-
 #### JSONL example
 
 ```jsonl
 {"event_id":"e5000006-0005-4005-8005-000000000006","event_type":"retro-landed","schema_version":"1","ts":"2026-05-30T15:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"trigger_class":"dispatch-failure","landing_surfaces":["canonical-skill","adr"],"is_mandatory_final":false}
 ```
 
-## Arktype schemas
+## Machine-readable schema
 
-Reference definitions for slice-3 read-time validation. Instrumented skills construct conformant payloads from orchestrator state at emit time; slice 1 does not validate on write.
-
-Conventions match the codebase: `import { type } from 'arktype'`, object schemas via `type({ ... })`, optional keys with `'field?'`, nullable unions with `'string | null'`, string-literal unions inline.
-
-```typescript
-import { type } from 'arktype';
-
-/** UUID v4 string — emit-side assigns a fresh v4; read validator may tighten. */
-const uuidV4 = 'string';
-
-const envelopeFields = {
-  event_id: uuidV4,
-  schema_version: '"1"' as const,
-  ts: 'string', // ISO 8601 UTC
-  project_run_id: 'string',
-  orchestrator_agent_id: 'string | null',
-};
-
-export const DispatchStartEvent = type({
-  ...envelopeFields,
-  event_type: '"dispatch-start"',
-  dispatch_id: uuidV4,
-  dispatch_name: 'string',
-  subagent_type: 'string',
-  model: 'string | null',
-  parent_dispatch_id: 'string | null',
-});
-
-export const DispatchEndEvent = type({
-  ...envelopeFields,
-  event_type: '"dispatch-end"',
-  dispatch_id: uuidV4,
-  result: '"completed" | "failed" | "aborted"',
-  wall_clock_ms: 'number.integer>=0',
-});
-
-export const RoundStartEvent = type({
-  ...envelopeFields,
-  event_type: '"round-start"',
-  dispatch_id: uuidV4,
-  round_id: uuidV4,
-  round_number: 'number.integer>=1',
-});
-
-export const RoundEndEvent = type({
-  ...envelopeFields,
-  event_type: '"round-end"',
-  dispatch_id: uuidV4,
-  round_id: uuidV4,
-  verdict:
-    '"satisfied" | "another-round-needed" | "escalating-to-user" | "stop-condition"',
-  findings_filed: 'number.integer>=0',
-  wall_clock_ms: 'number.integer>=0',
-});
-
-export const BriefIssuedEvent = type({
-  ...envelopeFields,
-  event_type: '"brief-issued"',
-  dispatch_id: uuidV4,
-  round_id: uuidV4,
-  brief_byte_length: 'number.integer>=0',
-  brief_content_hash: 'string',
-  brief_disposition: '"initial" | "reissue" | "amended"',
-});
-
-const dispatchSizeDistribution = type({
-  S: 'number.integer>=0',
-  M: 'number.integer>=0',
-  L: 'number.integer>=0',
-  XL: 'number.integer>=0',
-});
-
-export const SpecAuthoredEvent = type({
-  ...envelopeFields,
-  event_type: '"spec-authored"',
-  spec_path: 'string',
-  spec_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  edge_cases_count: 'number.integer>=0 | null',
-  open_questions_count: 'number.integer>=0',
-  dod_items_count: 'number.integer>=0',
-});
-
-export const SpecAmendedEvent = type({
-  ...envelopeFields,
-  event_type: '"spec-amended"',
-  spec_path: 'string',
-  spec_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  bytes_delta: 'number.integer',
-  edge_cases_count: 'number.integer>=0 | null',
-  open_questions_count: 'number.integer>=0',
-  dod_items_count: 'number.integer>=0',
-  reason:
-    '"falsified-assumption" | "new-edge-case" | "scope-shift" | "operator-correction" | "replan-from-discussion"',
-  sections_changed: type('string').array(),
-});
-
-export const PlanAuthoredEvent = type({
-  ...envelopeFields,
-  event_type: '"plan-authored"',
-  plan_path: 'string',
-  plan_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  dispatch_count: 'number.integer>=0 | null',
-  slice_count: 'number.integer>=0 | null',
-  dispatch_size_distribution: dispatchSizeDistribution.or('null'),
-  open_items_count: 'number.integer>=0',
-});
-
-export const PlanAmendedEvent = type({
-  ...envelopeFields,
-  event_type: '"plan-amended"',
-  plan_path: 'string',
-  plan_kind: '"project" | "slice"',
-  byte_length: 'number.integer>=0',
-  bytes_delta: 'number.integer',
-  dispatch_count: 'number.integer>=0 | null',
-  slice_count: 'number.integer>=0 | null',
-  dispatch_size_distribution: dispatchSizeDistribution.or('null'),
-  open_items_count: 'number.integer>=0',
-  reason:
-    '"falsified-assumption" | "new-edge-case" | "scope-shift" | "operator-correction" | "replan-from-discussion" | "dispatch-resize" | "dispatch-added" | "dispatch-removed"',
-  dispatches_added: 'number.integer>=0 | null',
-  dispatches_removed: 'number.integer>=0 | null',
-  dispatches_resized: 'number.integer>=0 | null',
-});
-
-export const TriageVerdictEvent = type({
-  ...envelopeFields,
-  event_type: '"triage-verdict"',
-  verdict:
-    '"direct-change" | "orphan-slice" | "in-project-slice" | "new-project" | "promote" | "demote" | "spike-first" | "defer"',
-  input_shape:
-    '"linear-ticket" | "chat-ask" | "customer-ask" | "bug-report" | "mid-flight-scope-signal" | "i-should-do-x-thought"',
-  input_ref: 'string | null',
-});
-
-export const FalsifiedAssumptionEvent = type({
-  ...envelopeFields,
-  event_type: '"falsified-assumption"',
-  artifact_path: 'string',
-  triggered_by:
-    '"implementer-pushback" | "wip-inspection" | "dispatch-blocked" | "health-check-drift" | "orchestrator-self-detected" | "operator-flagged"',
-  assumption_summary: 'string | null',
-});
-
-export const ProjectStartedEvent = type({
-  ...envelopeFields,
-  event_type: '"project-started"',
-  project_slug: 'string',
-  origin: '"new-project" | "promote"',
-  has_linear_project: 'boolean',
-});
-
-export const ProjectClosedEvent = type({
-  ...envelopeFields,
-  event_type: '"project-closed"',
-  dod_status: '"all-met" | "some-deferred" | "some-cancelled"',
-  slices_completed: 'number.integer>=0',
-  final_retro_done: 'boolean',
-});
-
-export const SliceStartedEvent = type({
-  ...envelopeFields,
-  event_type: '"slice-started"',
-  slice_slug: 'string',
-  slice_index: 'number.integer>=1',
-  linear_ref: 'string | null',
-});
-
-export const SliceCompletedEvent = type({
-  ...envelopeFields,
-  event_type: '"slice-completed"',
-  slice_slug: 'string',
-  result: '"merged" | "abandoned"',
-  pr_ref: 'string | null',
-});
-
-export const HealthCheckFiredEvent = type({
-  ...envelopeFields,
-  event_type: '"health-check-fired"',
-  cadence:
-    '"opening-rollup" | "per-slice-merge" | "closing-rollup" | "session-bookend" | "trigger-fired"',
-  drift_signal_count: 'number.integer>=0',
-  max_drift_severity: '"none" | "low" | "medium" | "high"',
-  recommended_next: 'string | null',
-});
-
-export const RetroLandedEvent = type({
-  ...envelopeFields,
-  event_type: '"retro-landed"',
-  trigger_class:
-    '"dispatch-failure" | "drift-event" | "scope-shift-escapee" | "wip-inspection-finding" | "operator-flagged-surprise" | "mandatory-final"',
-  landing_surfaces: type('"canonical-skill" | "project-context-readme" | "adr"').array(),
-  is_mandatory_final: 'boolean',
-});
-
-// OQ1 resolved: Slice1TraceEvent extended in place (lower-churn than introducing a separate TraceEvent alias).
-export const Slice1TraceEvent = DispatchStartEvent.or(DispatchEndEvent)
-  .or(RoundStartEvent)
-  .or(RoundEndEvent)
-  .or(BriefIssuedEvent)
-  .or(SpecAuthoredEvent)
-  .or(SpecAmendedEvent)
-  .or(PlanAuthoredEvent)
-  .or(PlanAmendedEvent)
-  .or(TriageVerdictEvent)
-  .or(FalsifiedAssumptionEvent)
-  .or(ProjectStartedEvent)
-  .or(ProjectClosedEvent)
-  .or(SliceStartedEvent)
-  .or(SliceCompletedEvent)
-  .or(HealthCheckFiredEvent)
-  .or(RetroLandedEvent);
-```
-
-Each exported `*Event` schema is the full flat object (envelope + payload). Slice-3 read validators should accept exactly these shapes.
+The TypeScript arktype definitions for all event types live in [`skills-contrib/drive-record-traces/schema.ts`](./schema.ts). That file is the single source of truth; `skills-contrib/drive-diagnose-run/schema.ts` is a vendored copy kept in sync by the `schema-parity` test in `skills-contrib/drive-diagnose-run/test/schema-parity.test.ts`.
 
 ## JSONL examples
 
@@ -776,6 +378,7 @@ One example line per slice-1 event type (build loop, then planning chain). Paylo
 
 ## References
 
+- Machine-readable schema (arktype definitions): [`schema.ts`](./schema.ts).
 - Emission protocol (path resolution, append mechanics): [`emission.md`](./emission.md).
 - This skill's overview + the list of instrumented skills: [`SKILL.md`](./SKILL.md).
 - Brief shape the `brief-issued` event measures: the Drive `brief-discipline` principle doc.
