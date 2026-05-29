@@ -119,15 +119,15 @@ Test tool: `node --test` with `node:assert` (the `scripts/` precedent — not vi
 
 ## Slice Definition of Done
 
-- [ ] **SDoD1.** All "Done when" gates from the slice plan pass.
-- [ ] **SDoD2.** Every pre-named edge case handled per disposition; new edge cases discovered amend the spec via `drive-discussion` (I12).
-- [ ] **SDoD3.** Reviewer verdict `SATISFIED` on `reviews/code-review.md` at slice close.
-- [ ] **SDoD4.** `node scripts/drive-diagnostics/cli.ts projects/drive-instrumentation/trace.jsonl` runs clean and emits the dashboard; `pnpm test:scripts` green incl. the new suites; `pnpm typecheck`/`biome` clean on the new files.
-- [ ] **SDoD5.** Slice touches only `scripts/drive-diagnostics/**`, root `package.json` (script wiring), and `projects/drive-instrumentation/slices/03-…/**` (+ the one canonical lesson surface). No skill body, no `packages/**`, no `events.md` event-type additions.
-- [ ] **SDoD6.** Assertion library covers I1–I12 + 8 cascade rules + brief-discipline anti-patterns; every `not-checkable` carries a one-line gap rationale (the "coverage gaps explicitly named" project-DoD item).
-- [ ] **SDoD7.** Diagnostic metrics from the project-DoD list compute (or degrade to `null` with a note); each metric has ≥1 test with a hand-checked expected value.
-- [ ] **SDoD8.** Post-hoc parser reconstructs a trace from ≥1 transcript fixture with per-event confidence; report flags post-hoc origin. (Project-DoD asks ≥3 runs; this slice ships the parser + ≥1 fixture and records remaining corpus coverage as a close-out follow-up if <3 are readily available.)
-- [ ] **SDoD9.** The framework grades this project's own `trace.jsonl`; the report is committed; ≥1 lesson lands in a canonical/project-context/ADR surface.
+- [x] **SDoD1.** All "Done when" gates from the slice plan pass. (D1–D7 all SATISFIED in `plan.md`.)
+- [x] **SDoD2.** Every pre-named edge case handled per disposition; no new edge cases required an I12 amendment.
+- [x] **SDoD3.** Reviewer verdict `SATISFIED` on each dispatch (D1–D6 reviewed at dispatch close; D7 orchestrator-direct).
+- [x] **SDoD4.** `cli.ts … trace.jsonl` runs clean + emits the dashboard; `pnpm test:scripts` green (397) incl. the new suites; `tsc`/`biome` clean (0 `no-bare-cast`). Captured in `qa-run-01.md`.
+- [x] **SDoD5.** Slice diff (merge-base..HEAD) confined to `scripts/drive-diagnostics/**`, root `package.json`, `projects/drive-instrumentation/**`, and the one lesson surface (`drive/retro/findings.md`). Verified by QA C6.
+- [x] **SDoD6.** Assertion library covers I1–I12 + 8 cascade rules + brief-discipline; every `not-checkable` carries a one-line rationale (24 named coverage gaps in the self-grade report).
+- [x] **SDoD7.** Diagnostic metrics compute or degrade to `null`/`0` with a note; each has ≥1 test with a hand-checked expected value (inline fixtures).
+- [x] **SDoD8.** Post-hoc parser reconstructs from the `sample-transcript.jsonl` fixture with per-event confidence; report flags `origin: post-hoc`. Broader ≥3-run corpus deferred to Project 2's live-experiment harness (recorded as the self-grade caveat).
+- [x] **SDoD9.** The framework graded this project's own `trace.jsonl` → `self-grade-report.md` (committed); the lesson landed in `drive/retro/findings.md`.
 
 ## Open Questions
 

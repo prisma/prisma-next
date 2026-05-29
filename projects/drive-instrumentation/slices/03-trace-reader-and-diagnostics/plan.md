@@ -6,13 +6,13 @@ All code lands under `scripts/drive-diagnostics/`; tests use `node --test` + `no
 
 ## Status
 
-- **D1:** PENDING — schema module + JSONL loader.
-- **D2:** PENDING — diagnostic-metrics module.
-- **D3:** PENDING — assertions A (invariants I1–I12).
-- **D4:** PENDING — assertions B (8 cascade rules + brief-discipline anti-patterns).
-- **D5:** PENDING — report generator + CLI + package.json wiring.
-- **D6:** PENDING — best-effort post-hoc transcript parser.
-- **D7:** PENDING — self-grade run + manual-QA; slice close.
+- **D1:** SATISFIED — `fe4ace2ec`. `schema.ts` (17 arktype event schemas, `TraceEvent` union, `KNOWN_EVENT_TYPES`) + `load.ts` (`loadTrace`/`loadTraceFromString` → `{events, unknown, errors}`, never throws). 7/7 `node --test`; real trace = 32 events, 0 errors. Orchestrator fixups: `as const` on the arktype envelope (`.infer` was collapsing to `never`), `events: TraceEvent[]` kept schema-faithful so origin lives on the load source — cast-free under the ratchet. `.ts` import extensions confirmed correct for `scripts/`.
+- **D2:** SATISFIED — `a438aed91`. `metrics.ts` `computeMetrics(TraceEvent[])` covers the full project-DoD metric set (rework, planning-quality, artefact-churn, lifecycle/cadence, operator-raw); null-with-note on absent signal; never throws on partial traces. 79 `node --test` cases (86 total in the dir); tsc 0, biome 0 casts. Real trace: rounds/dispatch mean 1.0, spec-amended 0, falsified-assumption 0. NOTE for D5: wire `test:scripts` with explicit file paths or a `*.test.ts` glob — a bare `test/` dir path trips Node's directory runner.
+- **D3:** SATISFIED — `a8d9b50e2`. `assertions/invariants.ts` (one checker per I1–I12) + `assertions/types.ts` (shared `AssertionResult`). Observable: I1/I4/I6/I8/I10 (real checks + evidence). Not-checkable with rationale: I2/I3/I5/I7/I9/I11/I12. 77 `node --test`; tsc 0, 0 casts. Also hardened D2's real-trace metric tests (magic-count pins → internally-consistent assertions) so the suite survives continued trace growth.
+- **D4:** SATISFIED — `304ba6d03`. `assertions/cascade.ts` (8 rules) + `brief.ts` (anti-patterns) + `index.ts` `runAssertions` (31 results on the real trace: 7 pass, 0 fail, 24 not-checkable). Cascade-3 + BD-8 (heuristic) observable; rest honestly not-checkable with rationale. 94 `node --test` (246 dir total); tsc 0, 0 casts.
+- **D5:** SATISFIED — `e0e4be74e`. `report.ts` (deterministic markdown dashboard: header + origin/parse-health banners, metrics tables, assertion sections w/ evidence) + `cli.ts` (`drive:diagnose`, import-guarded) + root `package.json` (script + 5 suites in `test:scripts`). `pnpm test:scripts` green (374). Real-trace dashboard renders clean; wall-clock means rounded. `--posthoc` left as a stub for D6.
+- **D6:** SATISFIED — `6660ff6be`. `posthoc.ts` reconstructs dispatch-start / spec-authored / plan-authored + operator-turn count from a Cursor transcript (origin:post-hoc + confidence; no invented timestamps; no-signal note). `cli.ts --posthoc` (origin native/post-hoc/mixed; operator count threaded). 23 posthoc cases + fixture; `pnpm test:scripts` green (397); tsc 0, 0 casts. Limitation: timestamp-less reconstructed events surface via origin + operator count but don't feed metrics.
+- **D7:** SATISFIED — orchestrator-direct. Ran `cli.ts` on the project's own trace → `self-grade-report.md` (59 events, 7 assertions pass / 0 fail, clean rework/planning metrics). `manual-qa.md` (7 checks + pre-flight gate) + `qa-run-01.md` (PASS, no Blockers). Lesson landed in `drive/retro/findings.md` (SDoD9): a self-grade over a hand-emitted trace validates the *reader*, not the *methodology* — plus the live-artefact-test-coupling and arktype-`as const` gotchas. **Slice 3 SATISFIED at close.**
 
 ## Failure modes threaded into briefs
 
