@@ -1,8 +1,9 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { StorageTableInput } from '@prisma-next/sql-contract/types';
+import type { PostgresEnumStorageEntry, StorageTableInput } from '@prisma-next/sql-contract/types';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
@@ -330,11 +331,50 @@ describe('enum namespace collision planning', () => {
       const alterCalls = calls.filter(
         (c): c is AlterColumnTypeCall => c instanceof AlterColumnTypeCall,
       );
+      const createCalls = calls.filter(
+        (c): c is CreateEnumTypeCall => c instanceof CreateEnumTypeCall,
+      );
+      const dropCalls = calls.filter((c): c is DropEnumTypeCall => c instanceof DropEnumTypeCall);
 
       expect(alterCalls).toHaveLength(1);
       expect(alterCalls[0]?.tableName).toBe('user');
-      expect(calls.some((c) => c instanceof CreateEnumTypeCall)).toBe(true);
-      expect(calls.some((c) => c instanceof DropEnumTypeCall)).toBe(true);
+      expect(alterCalls[0]?.schemaName).toBe('public');
+      // Rebuild recipe creates the temp type and drops the old one — both in
+      // the enum's `public` schema, not the column's unbound coordinate.
+      expect(createCalls).toHaveLength(1);
+      expect(createCalls[0]?.schemaName).toBe('public');
+      expect(dropCalls).toHaveLength(1);
+      expect(dropCalls[0]?.schemaName).toBe('public');
+    });
+  });
+
+  describe('verifier — same-name enums across namespaces', () => {
+    // Regression for the verifier collapsing `storageTypes` by bare enum name:
+    // two namespaces declaring the same enum name must each be verified with
+    // their own namespace coordinate, not last-write-wins down to one.
+    it('emits a distinct issue per namespace for a same-name enum', () => {
+      const toContract = makeCollisionContract({
+        audit: { enum: enumEntry(['open', 'closed']) },
+        public: { enum: enumEntry(['draft', 'published']) },
+      });
+
+      // Both enums absent from the (empty) live schema → one type_missing each.
+      const result = verifySqlSchema({
+        contract: toContract,
+        schema: { tables: {} },
+        strict: false,
+        typeMetadataRegistry: new Map(),
+        frameworkComponents: [],
+        resolveExistingEnumValues: (_schema, _enumType: PostgresEnumStorageEntry) => null,
+      });
+
+      const enumIssues = result.schema.issues.filter(
+        (issue) => issue.kind === 'type_missing' && issue.typeName === 'Status',
+      );
+      expect(enumIssues).toHaveLength(2);
+      expect(
+        enumIssues.map((issue) => ('namespaceId' in issue ? issue.namespaceId : undefined)).sort(),
+      ).toEqual(['audit', 'public']);
     });
   });
 });

@@ -14,6 +14,7 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
@@ -130,19 +131,19 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
+  // Column `typeRef` resolution map: keyed by the bare contract type name
+  // (columns carry bare `typeRef`s). Used by `verifySchemaTables` only.
   const allStorageTypesMap: Record<string, PostgresEnumStorageEntry | StorageTypeInstance> = {
     ...((contract.storage.types ?? {}) as Record<
       string,
       PostgresEnumStorageEntry | StorageTypeInstance
     >),
   };
-  const namespaceIdForEnumType = new Map<string, string>();
-  for (const [nsId, ns] of Object.entries(contract.storage.namespaces)) {
+  for (const ns of Object.values(contract.storage.namespaces)) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
         allStorageTypesMap[k] = v;
-        namespaceIdForEnumType.set(k, nsId);
       }
     }
   }
@@ -162,49 +163,84 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
 
-  // Verify storage type instances. PostgresEnumStorageEntry entries are walked
-  // natively (using the bridging adapter `resolveExistingEnumValues`);
-  // remaining codec-typed entries continue to dispatch through the
-  // generic codec-hook `verifyType` path.
-  const storageTypeEntries = Object.entries(storageTypes);
-  if (storageTypeEntries.length > 0) {
-    const typeNodes: SchemaVerificationNode[] = [];
-    for (const [typeName, typeInstance] of storageTypeEntries) {
-      let typeIssues: readonly SchemaIssue[];
-      if (isPostgresEnumStorageEntry(typeInstance)) {
-        typeIssues = verifyEnumType({
+  // Verify storage type instances. Codec-typed `storage.types` entries dispatch
+  // through the generic codec-hook `verifyType` path (keyed by bare name).
+  // `PostgresEnumStorageEntry` enums are walked natively *per namespace* (using
+  // the bridging adapter `resolveExistingEnumValues`) so two namespaces that
+  // declare an enum with the same name are each verified with their own
+  // namespace coordinate — a bare-name aggregation would collapse them
+  // (last-write-wins) and verify only one.
+  const typeNodes: SchemaVerificationNode[] = [];
+  const pushTypeNode = (
+    typeName: string,
+    contractPath: string,
+    typeIssues: readonly SchemaIssue[],
+  ): void => {
+    if (typeIssues.length > 0) {
+      issues.push(...typeIssues);
+    }
+    typeNodes.push({
+      status: typeIssues.length > 0 ? 'fail' : 'pass',
+      kind: 'storageType',
+      name: `type ${typeName}`,
+      contractPath,
+      code: typeIssues.length > 0 ? (typeIssues[0]?.kind ?? '') : '',
+      message:
+        typeIssues.length > 0
+          ? `${typeIssues.length} issue${typeIssues.length === 1 ? '' : 's'}`
+          : '',
+      expected: undefined,
+      actual: undefined,
+      children: [],
+    });
+  };
+
+  // Top-level `storage.types`: codec-typed entries via codec hooks; a
+  // defensive top-level enum is verified under the unbound coordinate.
+  for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
+    if (isPostgresEnumStorageEntry(typeInstance)) {
+      pushTypeNode(
+        typeName,
+        `storage.types.${typeName}`,
+        verifyEnumType({
           typeName,
           typeInstance,
           schema,
           resolveExistingEnumValues,
-          namespaceId: namespaceIdForEnumType.get(typeName) ?? '',
-        });
-      } else if (isStorageTypeInstance(typeInstance)) {
-        const hook = codecHooks.get(typeInstance.codecId);
-        typeIssues = hook?.verifyType ? hook.verifyType({ typeName, typeInstance, schema }) : [];
-      } else {
-        typeIssues = [];
-      }
-      if (typeIssues.length > 0) {
-        issues.push(...typeIssues);
-      }
-      const typeStatus = typeIssues.length > 0 ? 'fail' : 'pass';
-      const typeCode = typeIssues.length > 0 ? (typeIssues[0]?.kind ?? '') : '';
-      typeNodes.push({
-        status: typeStatus,
-        kind: 'storageType',
-        name: `type ${typeName}`,
-        contractPath: `storage.types.${typeName}`,
-        code: typeCode,
-        message:
-          typeIssues.length > 0
-            ? `${typeIssues.length} issue${typeIssues.length === 1 ? '' : 's'}`
-            : '',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
+          namespaceId: UNBOUND_NAMESPACE_ID,
+        }),
+      );
+    } else if (isStorageTypeInstance(typeInstance)) {
+      const hook = codecHooks.get(typeInstance.codecId);
+      pushTypeNode(
+        typeName,
+        `storage.types.${typeName}`,
+        hook?.verifyType ? hook.verifyType({ typeName, typeInstance, schema }) : [],
+      );
     }
+  }
+
+  // Namespace-scoped enums, verified per `(namespaceId, typeName)`.
+  for (const [nsId, ns] of Object.entries(contract.storage.namespaces)) {
+    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    if (!nsEnums) continue;
+    for (const [typeName, entry] of Object.entries(nsEnums)) {
+      if (!isPostgresEnumStorageEntry(entry)) continue;
+      pushTypeNode(
+        typeName,
+        `storage.namespaces.${nsId}.enum.${typeName}`,
+        verifyEnumType({
+          typeName,
+          typeInstance: entry,
+          schema,
+          resolveExistingEnumValues,
+          namespaceId: nsId,
+        }),
+      );
+    }
+  }
+
+  if (typeNodes.length > 0) {
     const typesStatus = typeNodes.some((n) => n.status === 'fail') ? 'fail' : 'pass';
     rootChildren.push({
       status: typesStatus,
