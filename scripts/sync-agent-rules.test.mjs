@@ -33,17 +33,36 @@ function isSymlinkTo(root, dir, name) {
 }
 
 describe('syncAgentRules (sync mode)', () => {
-  it('symlinks every canonical rule into both presentation dirs', () => {
+  it('symlinks every canonical .mdc rule into both presentation dirs', () => {
     const root = makeRoot();
     writeCanonical(root, 'alpha.mdc');
-    writeCanonical(root, 'beta.md');
+    writeCanonical(root, 'beta.mdc');
 
     syncAgentRules({ root });
 
     for (const dir of PRESENTATION_DIRS) {
       ok(isSymlinkTo(root, dir, 'alpha.mdc'), `${dir}/alpha.mdc should be a symlink`);
-      ok(isSymlinkTo(root, dir, 'beta.md'), `${dir}/beta.md should be a symlink`);
+      ok(isSymlinkTo(root, dir, 'beta.mdc'), `${dir}/beta.mdc should be a symlink`);
     }
+  });
+
+  it('mirrors the README.md index but not other .md files', () => {
+    const root = makeRoot();
+    writeCanonical(root, 'alpha.mdc');
+    writeCanonical(root, 'README.md', '# Rules Index\n');
+
+    syncAgentRules({ root });
+
+    for (const dir of PRESENTATION_DIRS) {
+      ok(isSymlinkTo(root, dir, 'README.md'), `${dir}/README.md should be a symlink`);
+    }
+  });
+
+  it('throws on a .md rule because only .mdc is ever loaded', () => {
+    const root = makeRoot();
+    writeCanonical(root, 'dead-rule.md');
+
+    throws(() => syncAgentRules({ root }), /\.mdc/);
   });
 
   it('uses a relative symlink target pointing into the canonical dir', () => {
@@ -116,7 +135,7 @@ describe('syncAgentRules (sync mode)', () => {
     ok(isSymlinkTo(root, PRESENTATION_DIRS[0], 'dupe.mdc'));
   });
 
-  it('ignores non-rule files in canonical (no .md/.mdc extension)', () => {
+  it('ignores non-rule files in canonical (no .mdc extension)', () => {
     const root = makeRoot();
     writeFileSync(join(root, CANONICAL_DIR, 'notes.txt'), 'scratch\n');
     writeCanonical(root, 'alpha.mdc');
@@ -166,5 +185,23 @@ describe('syncAgentRules (check mode)', () => {
     const result = syncAgentRules({ root, check: true });
     strictEqual(result.ok, false);
     ok(result.drift.some((d) => d.includes('ghost.mdc')));
+  });
+
+  it('reports a .md rule as dead drift without throwing', () => {
+    const root = makeRoot();
+    writeCanonical(root, 'dead-rule.md');
+
+    const result = syncAgentRules({ root, check: true });
+    strictEqual(result.ok, false);
+    ok(result.drift.some((d) => /dead-rule\.md/.test(d) && /\.mdc/.test(d)));
+  });
+
+  it('does not flag README.md as a dead rule', () => {
+    const root = makeRoot();
+    writeCanonical(root, 'README.md', '# Rules Index\n');
+    syncAgentRules({ root });
+
+    const result = syncAgentRules({ root, check: true });
+    strictEqual(result.ok, true);
   });
 });

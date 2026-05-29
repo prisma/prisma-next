@@ -2,15 +2,18 @@
 /**
  * Keeps agent rules consistently symlinked.
  *
- * Rules have a single canonical home: `.agents/rules/<name>.{md,mdc}` (the only
+ * Rules have a single canonical home: `.agents/rules/<name>.mdc` (the only
  * git-tracked copy). The harness-specific presentation trees `.cursor/rules`
  * and `.claude/rules` are git-ignored and contain nothing but relative symlinks
  * back into the canonical dir — exactly the model `skills add` uses for skills.
+ * The `README.md` index is mirrored too, but it is the only `.md` allowed: the
+ * harnesses load `.mdc` files only, so a `.md` rule would silently never fire.
  *
  * Default mode consolidates any stray real-file rule found in a presentation
  * tree into the canonical dir, then (re)creates the symlinks and prunes dangling
  * ones. `--check` reports drift without touching the filesystem; it is the lint
- * gate that fails CI when a rule was added only to a presentation tree.
+ * gate that fails CI when a rule was added only to a presentation tree, or
+ * authored with the dead `.md` extension.
  */
 
 import {
@@ -31,10 +34,24 @@ const repoRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 export const CANONICAL_DIR = '.agents/rules';
 export const PRESENTATION_DIRS = ['.cursor/rules', '.claude/rules'];
 
-const RULE_EXTENSIONS = ['.mdc', '.md'];
+// Only `.mdc` files are loaded as rules by the agent harnesses; a `.md` rule is
+// silently dead. `README.md` is the index doc, not a rule, and is exempt.
+const RULE_EXTENSION = '.mdc';
+const INDEX_FILE = 'README.md';
 
 function isRuleFile(name) {
-  return RULE_EXTENSIONS.some((ext) => name.endsWith(ext));
+  return name.endsWith(RULE_EXTENSION);
+}
+
+// Files mirrored into the presentation trees: the `.mdc` rules plus the index.
+function isMirrored(name) {
+  return isRuleFile(name) || name === INDEX_FILE;
+}
+
+// A `.md` file that isn't the index is almost certainly a rule authored with the
+// wrong extension — it would never be loaded, so we refuse to bless it.
+function isDeadRule(name) {
+  return name.endsWith('.md') && name !== INDEX_FILE;
 }
 
 function listEntries(dir) {
@@ -87,11 +104,28 @@ export function syncAgentRules({ root = repoRoot, check = false } = {}) {
 
   const canonicalDir = join(root, CANONICAL_DIR);
 
+  // 0. Reject dead `.md` rules: only `.mdc` is loaded, so a `.md` rule is a
+  //    silent no-op. In sync mode this is a hard stop (we can't safely rename,
+  //    since references would break); in check mode it surfaces as drift.
+  const deadRules = listEntries(canonicalDir).filter(isDeadRule).sort();
+  if (deadRules.length > 0) {
+    if (check) {
+      for (const name of deadRules) {
+        drift.push(
+          `dead rule: ${CANONICAL_DIR}/${name} uses the .md extension, which is never loaded — rename it to .mdc`,
+        );
+      }
+    } else {
+      const list = deadRules.map((name) => `${CANONICAL_DIR}/${name}`).join(', ');
+      throw new Error(`rules must use the .mdc extension (only .mdc is loaded); rename: ${list}`);
+    }
+  }
+
   // 1. Consolidate stray real-file rules from presentation trees into canonical.
   for (const presentationDir of PRESENTATION_DIRS) {
     const dir = join(root, presentationDir);
     for (const name of listEntries(dir)) {
-      if (!isRuleFile(name)) continue;
+      if (!isMirrored(name)) continue;
       const full = join(dir, name);
       if (classify(full) !== 'file') continue;
 
@@ -126,7 +160,7 @@ export function syncAgentRules({ root = repoRoot, check = false } = {}) {
   }
 
   const canonicalRules = listEntries(canonicalDir)
-    .filter((name) => isRuleFile(name) && classify(join(canonicalDir, name)) === 'file')
+    .filter((name) => isMirrored(name) && classify(join(canonicalDir, name)) === 'file')
     .sort();
   const canonicalSet = new Set(canonicalRules);
 
@@ -163,7 +197,7 @@ export function syncAgentRules({ root = repoRoot, check = false } = {}) {
     for (const name of listEntries(dir)) {
       const full = join(dir, name);
       const kind = classify(full);
-      const orphanRule = kind === 'symlink' && isRuleFile(name) && !canonicalSet.has(name);
+      const orphanRule = kind === 'symlink' && isMirrored(name) && !canonicalSet.has(name);
       if (kind !== 'dangling' && !orphanRule) continue;
 
       if (check) {
