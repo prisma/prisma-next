@@ -269,8 +269,11 @@ export class GroupedQueryImpl<
       this.state.scope as AvailableScope,
       this.state.rowFields as RowType,
     );
-    const fns = createAggregateFunctions(this.ctx.queryOperationTypes, this.ctx.rawCodecInferer);
-    const result = expr(createFieldProxy(combined), fns as AggregateFunctions<QC>);
+    const fns = createAggregateFunctions<QC>(
+      this.ctx.queryOperationTypes,
+      this.ctx.rawCodecInferer,
+    );
+    const result = expr(createFieldProxy(combined), fns);
     return new GroupedQueryImpl(cloneState(this.state, { having: result.buildAst() }), this.ctx);
   }
 

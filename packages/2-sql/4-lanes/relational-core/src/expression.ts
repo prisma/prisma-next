@@ -228,24 +228,33 @@ function resolveInterpolation(
 export function createRawSql(adapter: RawCodecInferer): RawSqlTag {
   return (strings, ...values) => {
     const parts: (string | AstExpression | ParamRef)[] = [];
-    for (let i = 0; i < strings.length; i++) {
-      const fragment = strings[i] ?? '';
-      parts.push(fragment);
-      if (i < values.length) {
-        parts.push(resolveInterpolation(adapter, values[i] as RawSqlInterpolation));
-      }
-    }
-    return {
-      returns(spec: string | { readonly codecId: string; readonly nullable?: boolean }) {
-        const codecId = typeof spec === 'string' ? spec : spec.codecId;
-        const nullable = typeof spec === 'string' ? false : (spec.nullable ?? false);
-        const returns: ParamSpec = { codecId, nullable };
-        const node = new RawExpr({ parts, returns });
-        return {
-          returnType: { codecId, nullable },
-          buildAst: () => node,
-        } as Expression<{ codecId: string; nullable: boolean }>;
-      },
-    } as RawSqlBuilder;
+    parts.push(strings[0] ?? '');
+    values.forEach((value, i) => {
+      parts.push(resolveInterpolation(adapter, value));
+      parts.push(strings[i + 1] ?? '');
+    });
+    return new RawSqlBuilderImpl(parts);
   };
+}
+
+class RawSqlBuilderImpl implements RawSqlBuilder {
+  constructor(private readonly parts: readonly (string | AstExpression | ParamRef)[]) {}
+
+  returns<S extends string>(spec: S): Expression<{ codecId: S; nullable: false }>;
+  returns<S extends string, N extends boolean = false>(spec: {
+    readonly codecId: S;
+    readonly nullable?: N;
+  }): Expression<{ codecId: S; nullable: N }>;
+  returns(
+    spec: string | { readonly codecId: string; readonly nullable?: boolean },
+  ): Expression<{ codecId: string; nullable: boolean }> {
+    const codecId = typeof spec === 'string' ? spec : spec.codecId;
+    const nullable = typeof spec === 'string' ? false : (spec.nullable ?? false);
+    const paramSpec: ParamSpec = { codecId, nullable };
+    const node = new RawExpr({ parts: this.parts, returns: paramSpec });
+    return {
+      returnType: { codecId, nullable },
+      buildAst: () => node,
+    };
+  }
 }

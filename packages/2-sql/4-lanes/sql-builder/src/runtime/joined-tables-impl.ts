@@ -10,7 +10,6 @@ import type {
   ExpressionBuilder,
   ExtractScopeFields,
   FieldProxy,
-  Functions,
   WithField,
   WithFields,
 } from '../expression';
@@ -179,7 +178,7 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
       ),
     ) as FieldProxy<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>>;
     const fns = createFunctions<QC>(this.ctx.queryOperationTypes, this.ctx.rawCodecInferer);
-    const onResult = onExpr(fieldProxy, fns as Functions<QC>);
+    const onResult = onExpr(fieldProxy, fns);
     const joinAst = new JoinAst(joinType, other.buildAst(), onResult.buildAst());
 
     return new JoinedTablesImpl(
