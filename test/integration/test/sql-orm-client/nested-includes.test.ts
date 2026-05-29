@@ -1,15 +1,12 @@
-// Integration coverage for nested includes (depth >= 2) across both
-// single-query dispatch strategies the SQL ORM advertises: lateral and
-// correlated. The corpus exists to (a) lock in row-shape correctness for
-// the relationship traversal patterns we ship and (b) pin the SQL-execution
-// count per strategy so a future regression flipping the dispatch gate is
-// caught at the contract level, not by downstream benchmark drift.
-//
-// History: prior to TML-2594, every depth-2+ include unconditionally fell
-// through the `hasNestedIncludes` arm of `dispatchWithIncludeStrategy()`
-// and emitted one IN-batched child query per depth level, regardless of
-// what the contract's capabilities advertised. The single-execution
-// assertions below fail under that behaviour and pass after the fix.
+// Integration coverage for nested includes (depth >= 2) on the default
+// lateral path. Every test uses `createUsersCollection(runtime)`, whose
+// contract advertises the lateral capability with no override, so the
+// dispatch picks the lateral builder. The corpus exists to (a) lock in
+// row-shape correctness for the relationship traversal patterns we ship
+// and (b) pin the SQL-execution count so a future regression flipping the
+// dispatch gate is caught at the contract level, not by downstream
+// benchmark drift. Cross-strategy equivalence (lateral vs correlated over
+// the same data) lives in `nested-includes-strategy.test.ts`.
 //
 // Test data shape (kept small and disjoint between tests so failures point
 // at one relation traversal at a time):
