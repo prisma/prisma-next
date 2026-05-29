@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type } from 'arktype';
+import { dirname } from 'pathe';
 import { Slice1TraceEvent } from './schema.ts';
 
 const ENVELOPE_KEYS = [
