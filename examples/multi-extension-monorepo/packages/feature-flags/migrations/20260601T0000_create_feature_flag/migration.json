@@ -1,13 +1,7 @@
 {
   "from": null,
   "to": "sha256:1a11ef0c4ef2dc0d6ae0663e65bf61113f980fee7f55e3dd828f65fe439a88cb",
-  "labels": [],
   "providedInvariants": ["feature-flags:create-feature_flag-v1"],
   "createdAt": "2026-05-09T04:27:33.360Z",
-  "hints": {
-    "used": [],
-    "applied": [],
-    "plannerVersion": "2.0.0"
-  },
-  "migrationHash": "sha256:c4af94fbf188fb849e2a47a81ac1314ed9f7c0f042fabca603893bef73f8d843"
+  "migrationHash": "sha256:59796a538c6acea2e89459b8a0ab4a2717bf87597e7506bc5faebdd2a36467b9"
 }

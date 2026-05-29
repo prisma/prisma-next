@@ -1,13 +1,7 @@
 {
   "from": "sha256:ef9de2767997cc2d57d1a4b6b0a4907d54b94793afd5309225803b14be0463bc",
   "to": "sha256:a94b7b4182e84e872afd95caf7921f565c22be691e2fc907c4bdbe2aa429282a",
-  "hints": {
-    "used": [],
-    "applied": [],
-    "plannerVersion": "1.0.0"
-  },
-  "labels": ["staging"],
   "providedInvariants": [],
   "createdAt": "2026-03-24T15:13:45.635Z",
-  "migrationHash": "sha256:8662d7c1a773f7808697129c11b239f74e3b035322858f8abeb2fc9fa1eded80"
+  "migrationHash": "sha256:cf5e0e9583b0ca3f7c53e4646562fc35cf04130b6c1e95597101e04188bf0ffd"
 }

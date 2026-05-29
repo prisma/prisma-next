@@ -1,12 +1,6 @@
 {
   "from": null,
   "to": "sha256:7475191ce0d78258ce5586265bcdfd12202f5daf90690b902890e58eb7508373",
-  "hints": {
-    "used": [],
-    "applied": [],
-    "plannerVersion": "2.0.0"
-  },
-  "labels": [],
   "createdAt": "2026-05-12T17:16:17.785Z",
   "providedInvariants": [
     "cipherstash-codec:users.accountid:add-search-config:ore@v1",
@@ -21,5 +15,5 @@
     "cipherstash-codec:users.salary:add-search-config:ore@v1",
     "cipherstash-codec:users.salary:add-search-config:unique@v1"
   ],
-  "migrationHash": "sha256:561847f84062bd9d2a41c73b2dd311c5b74d68d521f096e11b87db6a29eb4616"
+  "migrationHash": "sha256:7da78a718312537a53533a9c19324c0df9e4cdcec39a173344faab2862ad94bd"
 }
