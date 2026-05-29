@@ -8,7 +8,7 @@ import type { MigrationListResult } from '@prisma-next/migration-tools/migration
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
-import { runMigrationList } from '../../src/commands/migration-list';
+import { buildKindByMigrationHash, runMigrationList } from '../../src/commands/migration-list';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
 
 /**
@@ -129,6 +129,10 @@ function expectOk<T>(
   }
 }
 
+function renderListed(listResult: MigrationListResult): string {
+  return renderMigrationList(listResult, buildKindByMigrationHash(listResult.spaces));
+}
+
 describe('runMigrationList — slice-spec worked example', () => {
   it('renders the slice-spec worked example byte-for-byte (single space)', async () => {
     const { migrationsRoot } = await setupFixture();
@@ -182,14 +186,14 @@ describe('runMigrationList — slice-spec worked example', () => {
     expectOk(result);
 
     const expected =
-      '20260601T1200_backfill_emails     55bada2 ⟲          {backfill_emails_v1} (production)\n' +
-      '20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
-      '20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
-      '20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '20260422T0720_initial             ∅       → 4cb4256\n' +
+      '⟲ 20260601T1200_backfill_emails       55bada2  {backfill_emails_v1} (production)\n' +
+      '* 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
+      '* 20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
+      '* 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
+      '* 20260422T0720_initial             ∅       → 4cb4256\n' +
       '\n' +
       '5 migration(s) on disk';
-    expect(renderMigrationList(result.value)).toBe(expected);
+    expect(renderListed(result.value)).toBe(expected);
   });
 
   it('renders every on-disk migration as exactly one row (row-count guarantee)', async () => {
@@ -255,8 +259,8 @@ describe('runMigrationList — slice-spec worked example', () => {
 
     // Human pass — confirm every dirName lands on its own row, no
     // dedup, no silent omission. Count rows directly.
-    const human = renderMigrationList(result.value);
-    const rows = human.split('\n').filter((line) => /^\d{8}T\d{4}_/.test(line));
+    const human = renderListed(result.value);
+    const rows = human.split('\n').filter((line) => /^(\s*)?[*↩⟲] \d{8}T\d{4}_/.test(line));
     expect(rows).toHaveLength(specs.length);
     for (const spec of specs) {
       expect(human).toContain(spec.dirName);
@@ -304,15 +308,15 @@ describe('runMigrationList — slice-spec worked example', () => {
 
     const expected =
       'app:\n' +
-      '  20260518T1701_namespaces_bookend  55bada2 → 804e018  (db)\n' +
-      '  20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '  20260422T0720_initial             ∅       → 4cb4256\n' +
+      '  * 20260518T1701_namespaces_bookend  55bada2 → 804e018  (db)\n' +
+      '  * 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
+      '  * 20260422T0720_initial             ∅       → 4cb4256\n' +
       '\n' +
       'postgis:\n' +
-      '  20260601T0000_install_postgis_extension  ∅       → 9aabbcc  (db)\n' +
+      '  * 20260601T0000_install_postgis_extension  ∅       → 9aabbcc  (db)\n' +
       '\n' +
       '4 migration(s) across 2 contract space(s)';
-    expect(renderMigrationList(result.value)).toBe(expected);
+    expect(renderListed(result.value)).toBe(expected);
     expect(result.value.summary).toBe('4 migration(s) across 2 contract space(s)');
   });
 
@@ -343,7 +347,7 @@ describe('runMigrationList — slice-spec worked example', () => {
       expect(m.to).toBe(HASH_FAN_C);
       expect(m.refs).toEqual(['production']);
     }
-    const human = renderMigrationList(result.value);
+    const human = renderListed(result.value);
     const matches = [...human.matchAll(/\(production\)/g)];
     expect(matches).toHaveLength(2);
   });
@@ -374,8 +378,8 @@ describe('runMigrationList — slice-spec worked example', () => {
     // The `⟲` row has hash-width pad in the destination slot and no
     // decoration block at all. Trailing newline + summary follows.
     const expected =
-      '20260101T0000_useless_self_edge  4cb4256 ⟲        \n' + '\n' + '1 migration(s) on disk';
-    expect(renderMigrationList(result.value)).toBe(expected);
+      '⟲ 20260101T0000_useless_self_edge    4cb4256\n' + '\n' + '1 migration(s) on disk';
+    expect(renderListed(result.value)).toBe(expected);
   });
 
   it('renders self-edge with invariants as `⟲ … {invariant_id}`', async () => {
@@ -395,10 +399,10 @@ describe('runMigrationList — slice-spec worked example', () => {
       'backfill_emails_v1',
     ]);
 
-    const human = renderMigrationList(result.value);
-    // Spec rule: hash column for `to` is blank-padded on a self-edge,
-    // followed by a uniform 2-space decoration prefix before `{...}`.
-    expect(human).toMatch(/55bada2 ⟲ {10}\{backfill_emails_v1\}/);
+    const human = renderListed(result.value);
+    expect(human).toMatch(/^⟲ 20260601T1200_backfill_emails/);
+    expect(human).toMatch(/55bada2 {2}\{backfill_emails_v1\}/);
+    expect(human).not.toContain('→');
   });
 
   it('renders the empty-state line when the migrations directory does not exist', async () => {
@@ -408,9 +412,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     // Empty-state synthesizes the app space so the renderer can name a
     // directory.
     expect(result.value.spaces).toEqual([{ spaceId: 'app', migrations: [] }]);
-    expect(renderMigrationList(result.value)).toBe(
-      'There are no migrations in migrations/app/ yet',
-    );
+    expect(renderListed(result.value)).toBe('There are no migrations in migrations/app/ yet');
   });
 
   it('renders the empty-state line for an existing-but-empty default scope (only stray non-space dirs)', async () => {
@@ -421,9 +423,41 @@ describe('runMigrationList — slice-spec worked example', () => {
     await mkdir(migrationsRoot, { recursive: true });
     const result = await runMigrationList({ migrationsDir: migrationsRoot });
     expectOk(result);
-    expect(renderMigrationList(result.value)).toBe(
-      'There are no migrations in migrations/app/ yet',
-    );
+    expect(renderListed(result.value)).toBe('There are no migrations in migrations/app/ yet');
+  });
+
+  it('threads topology classification so skip-rollback shows a leading ↩ glyph', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_chain_a',
+      from: null,
+      to: HASH_FAN_BASE,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_chain_b',
+      from: HASH_FAN_BASE,
+      to: HASH_FAN_A,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0002_chain_c',
+      from: HASH_FAN_A,
+      to: HASH_FAN_B,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260106T0000_skip_back',
+      from: HASH_FAN_B,
+      to: HASH_FAN_BASE,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+    const human = renderListed(result.value);
+    expect(human).toMatch(/^↩ 20260106T0000_skip_back/m);
+    expect(human).toContain('* 20260101T0002_chain_c');
   });
 });
 
@@ -455,7 +489,7 @@ describe('runMigrationList — --space flag', () => {
       '20260601T0000_install_postgis_extension',
     ]);
 
-    const human = renderMigrationList(result.value);
+    const human = renderListed(result.value);
     // Single-space output → no per-space heading.
     expect(human).not.toContain('app:');
     expect(human).not.toContain('postgis:');
@@ -474,9 +508,7 @@ describe('runMigrationList — --space flag', () => {
     });
     expectOk(result);
     expect(result.value.spaces).toEqual([{ spaceId: 'postgis', migrations: [] }]);
-    expect(renderMigrationList(result.value)).toBe(
-      'There are no migrations in migrations/postgis/ yet',
-    );
+    expect(renderListed(result.value)).toBe('There are no migrations in migrations/postgis/ yet');
   });
 
   it('emits MIGRATION.SPACE_NOT_FOUND when --space names a non-existent contract space', async () => {

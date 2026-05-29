@@ -1,5 +1,9 @@
 import { enumerateMigrationSpaces } from '@prisma-next/migration-tools/enumerate-migration-spaces';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import {
+  classifyMigrationListGraphTopology,
+  type EdgeKind,
+} from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListResult,
   MigrationSpaceListEntry,
@@ -67,6 +71,19 @@ export interface RunMigrationListInputs {
  * — the empty-state line carries enough information on its own — so
  * this function always returns a string even for the empty-state.
  */
+export function buildKindByMigrationHash(
+  spaces: readonly MigrationSpaceListEntry[],
+): ReadonlyMap<string, EdgeKind> {
+  const kindByMigrationHash = new Map<string, EdgeKind>();
+  for (const space of spaces) {
+    const topology = classifyMigrationListGraphTopology(space.migrations);
+    for (const [migrationHash, edgeKind] of topology.kindByMigrationHash) {
+      kindByMigrationHash.set(migrationHash, edgeKind);
+    }
+  }
+  return kindByMigrationHash;
+}
+
 function computeSummary(spaces: readonly MigrationSpaceListEntry[]): string {
   const totalMigrations = spaces.reduce((count, space) => count + space.migrations.length, 0);
   if (spaces.length <= 1) {
@@ -217,7 +234,8 @@ export function createMigrationListCommand(): Command {
           ui.output(JSON.stringify(listResult, null, 2));
         } else if (!flags.quiet) {
           const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
-          ui.output(renderMigrationListWithStyle(listResult, styler));
+          const kindByMigrationHash = buildKindByMigrationHash(listResult.spaces);
+          ui.output(renderMigrationListWithStyle(listResult, styler, kindByMigrationHash));
         }
       });
       process.exit(exitCode);

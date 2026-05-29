@@ -1,7 +1,10 @@
+import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
   MigrationListResult,
 } from '@prisma-next/migration-tools/migration-list-types';
+
+export type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 
 export type {
   MigrationListEntry,
@@ -11,9 +14,14 @@ export type {
 
 const HASH_WIDTH = 7;
 const EMPTY_SOURCE = '∅';
-const SELF_EDGE_GLYPH = '⟲';
 const FORWARD_EDGE_GLYPH = '→';
 const DECORATION_PREFIX = '  ';
+
+const KIND_GLYPH: Record<EdgeKind, string> = {
+  forward: '*',
+  rollback: '↩',
+  self: '⟲',
+};
 
 /**
  * Semantic styler for `migration list` output tokens. Token-typed so
@@ -29,6 +37,7 @@ const DECORATION_PREFIX = '  ';
  * having to re-parse a joined block.
  */
 export interface MigrationListStyler {
+  kind(text: string): string;
   dirName(text: string): string;
   sourceHash(text: string): string;
   destHash(text: string): string;
@@ -41,6 +50,7 @@ export interface MigrationListStyler {
 }
 
 export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
+  kind: (text) => text,
   dirName: (text) => text,
   sourceHash: (text) => text,
   destHash: (text) => text,
@@ -64,15 +74,11 @@ function formatSourceColumn(from: string | null, style: MigrationListStyler): st
   return style.sourceHash(abbreviateContractHash(from));
 }
 
-function formatDestColumn(from: string | null, to: string, style: MigrationListStyler): string {
-  if (from !== null && from === to) {
-    return ' '.repeat(HASH_WIDTH);
-  }
-  return style.destHash(abbreviateContractHash(to));
-}
-
-function formatArrowGlyph(from: string | null, to: string, style: MigrationListStyler): string {
-  return style.glyph(from !== null && from === to ? SELF_EDGE_GLYPH : FORWARD_EDGE_GLYPH);
+function resolveEdgeKind(
+  migrationHash: string,
+  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
+): EdgeKind {
+  return kindByMigrationHash.get(migrationHash) ?? 'forward';
 }
 
 function formatDecorations(
@@ -94,15 +100,24 @@ function formatDecorations(
 function formatMigrationRow(
   migration: MigrationListEntry,
   dirNameWidth: number,
+  edgeKind: EdgeKind,
   style: MigrationListStyler,
 ): string {
+  const kindColumn = `${style.kind(KIND_GLYPH[edgeKind])} `;
   const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - migration.dirName.length));
   const dirName = `${style.dirName(migration.dirName)}${dirNamePadding}`;
-  const source = formatSourceColumn(migration.from, style);
-  const arrow = formatArrowGlyph(migration.from, migration.to, style);
-  const dest = formatDestColumn(migration.from, migration.to, style);
   const decorations = formatDecorations(migration.providedInvariants, migration.refs, style);
-  return `${dirName}${source} ${arrow} ${dest}${decorations}`;
+
+  if (edgeKind === 'self') {
+    const contractHash = migration.from ?? migration.to;
+    const hash = style.sourceHash(abbreviateContractHash(contractHash));
+    return `${kindColumn}${dirName}  ${hash}${decorations}`;
+  }
+
+  const source = formatSourceColumn(migration.from, style);
+  const arrow = style.glyph(FORWARD_EDGE_GLYPH);
+  const dest = style.destHash(abbreviateContractHash(migration.to));
+  return `${kindColumn}${dirName}${source} ${arrow} ${dest}${decorations}`;
 }
 
 function formatEmptyStateLine(spaceId: string, style: MigrationListStyler): string {
@@ -114,6 +129,7 @@ function renderSpaceBlock(
   migrations: readonly MigrationListEntry[],
   multiSpace: boolean,
   style: MigrationListStyler,
+  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatEmptyStateLine(spaceId, style);
@@ -124,7 +140,14 @@ function renderSpaceBlock(
   }
 
   const dirNameWidth = Math.max(...migrations.map((entry) => entry.dirName.length)) + 2;
-  const rows = migrations.map((entry) => formatMigrationRow(entry, dirNameWidth, style));
+  const rows = migrations.map((entry) =>
+    formatMigrationRow(
+      entry,
+      dirNameWidth,
+      resolveEdgeKind(entry.migrationHash, kindByMigrationHash),
+      style,
+    ),
+  );
   if (!multiSpace) {
     return rows;
   }
@@ -142,6 +165,7 @@ function renderSpaceBlock(
 export function renderMigrationListWithStyle(
   result: MigrationListResult,
   style: MigrationListStyler,
+  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
 ): string {
   const multiSpace = result.spaces.length > 1;
   const lines: string[] = [];
@@ -151,7 +175,9 @@ export function renderMigrationListWithStyle(
     if (index > 0) {
       lines.push('');
     }
-    lines.push(...renderSpaceBlock(space.spaceId, space.migrations, multiSpace, style));
+    lines.push(
+      ...renderSpaceBlock(space.spaceId, space.migrations, multiSpace, style, kindByMigrationHash),
+    );
   }
 
   const totalMigrations = result.spaces.reduce(
@@ -166,6 +192,9 @@ export function renderMigrationListWithStyle(
   return lines.join('\n');
 }
 
-export function renderMigrationList(result: MigrationListResult): string {
-  return renderMigrationListWithStyle(result, IDENTITY_MIGRATION_LIST_STYLER);
+export function renderMigrationList(
+  result: MigrationListResult,
+  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
+): string {
+  return renderMigrationListWithStyle(result, IDENTITY_MIGRATION_LIST_STYLER, kindByMigrationHash);
 }

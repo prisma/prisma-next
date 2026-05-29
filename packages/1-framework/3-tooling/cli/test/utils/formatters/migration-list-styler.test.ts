@@ -5,6 +5,7 @@ import type {
 } from '@prisma-next/migration-tools/migration-list-types';
 import { bold, cyan, cyanBright, dim, green, greenBright, yellow } from 'colorette';
 import { describe, expect, it } from 'vitest';
+import { buildKindByMigrationHash } from '../../../src/commands/migration-list';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
   renderMigrationList,
@@ -15,13 +16,15 @@ import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/mig
 const HASH_C = 'sha256:4cb4256c30b7a8123456789012345678901234567890123456';
 const HASH_D = 'sha256:55bada2f123456789012345678901234567890123456789012';
 
+let migrationHashSeq = 0;
+
 function migration(
   overrides: Pick<MigrationListEntry, 'dirName' | 'to'> &
     Partial<Omit<MigrationListEntry, 'dirName' | 'to'>>,
 ): MigrationListEntry {
   return {
     from: null,
-    migrationHash: 'sha256:placeholder0000000000000000000000000000000000000000',
+    migrationHash: overrides.migrationHash ?? `sha256:styler-mig-${migrationHashSeq++}`,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
     refs: [],
@@ -37,6 +40,9 @@ function result(spaces: readonly MigrationSpaceListEntry[], summary: string): Mi
 describe('createAnsiMigrationListStyler', () => {
   it('returns an identity styler when useColor is false (suppresses ANSI for non-TTY / --no-color)', () => {
     const styler = createAnsiMigrationListStyler({ useColor: false });
+    expect(styler.kind('*')).toBe('*');
+    expect(styler.kind('↩')).toBe('↩');
+    expect(styler.kind('⟲')).toBe('⟲');
     expect(styler.dirName('20260422T0720_initial')).toBe('20260422T0720_initial');
     expect(styler.sourceHash('4cb4256')).toBe('4cb4256');
     expect(styler.destHash('55bada2')).toBe('55bada2');
@@ -69,15 +75,20 @@ describe('createAnsiMigrationListStyler', () => {
       ],
       '1 migration(s) on disk',
     );
+    const kinds = buildKindByMigrationHash(r.spaces);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: false }),
+      kinds,
     );
-    expect(styled).toBe(renderMigrationList(r));
+    expect(styled).toBe(renderMigrationList(r, kinds));
   });
 
   it('wraps each token with the expected SGR style when useColor is true', () => {
     const styler = createAnsiMigrationListStyler({ useColor: true });
+    expect(styler.kind('*')).toBe(dim('*'));
+    expect(styler.kind('↩')).toBe(dim('↩'));
+    expect(styler.kind('⟲')).toBe(dim('⟲'));
     expect(styler.dirName('20260422T0720_initial')).toBe(bold('20260422T0720_initial'));
     expect(styler.sourceHash('4cb4256')).toBe(dim(cyan('4cb4256')));
     expect(styler.destHash('55bada2')).toBe(cyanBright('55bada2'));
@@ -124,14 +135,16 @@ describe('renderMigrationListWithStyle', () => {
       ],
       '1 migration(s) on disk',
     );
+    const kinds = buildKindByMigrationHash(r.spaces);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
+      kinds,
     );
     const expectedRow =
-      `${bold('20260601T1200_backfill_emails')}  ` +
-      `${dim(cyan('55bada2'))} ${dim('⟲')}         ` +
-      ` ${yellow('{backfill_emails_v1}')} ` +
+      `${dim('⟲')} ${bold('20260601T1200_backfill_emails')}    ` +
+      `${dim(cyan('55bada2'))}` +
+      `  ${yellow('{backfill_emails_v1}')} ` +
       `${green('(') + [green('production'), bold(greenBright('db'))].join(green(', ')) + green(')')}`;
     const expected = `${expectedRow}\n\n${dim('1 migration(s) on disk')}`;
     expect(styled).toBe(expected);
@@ -157,9 +170,11 @@ describe('renderMigrationListWithStyle', () => {
       ],
       '1 migration(s) across 2 contract space(s)',
     );
+    const kinds = buildKindByMigrationHash(r.spaces);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
+      kinds,
     );
     expect(styled).toContain(bold('app:'));
     expect(styled).toContain(bold('postgis:'));
@@ -191,10 +206,12 @@ describe('renderMigrationListWithStyle', () => {
       ],
       '2 migration(s) on disk',
     );
-    const plain = renderMigrationList(r);
+    const kinds = buildKindByMigrationHash(r.spaces);
+    const plain = renderMigrationList(r, kinds);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
+      kinds,
     );
 
     function stripAnsi(s: string): string {
@@ -225,8 +242,9 @@ describe('IDENTITY_MIGRATION_LIST_STYLER', () => {
       ],
       '1 migration(s) on disk',
     );
-    expect(renderMigrationList(r)).toBe(
-      renderMigrationListWithStyle(r, IDENTITY_MIGRATION_LIST_STYLER),
+    const kinds = buildKindByMigrationHash(r.spaces);
+    expect(renderMigrationList(r, kinds)).toBe(
+      renderMigrationListWithStyle(r, IDENTITY_MIGRATION_LIST_STYLER, kinds),
     );
   });
 });

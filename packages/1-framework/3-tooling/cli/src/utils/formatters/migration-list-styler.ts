@@ -38,6 +38,7 @@ export function createAnsiMigrationListStyler(opts: {
     return IDENTITY_MIGRATION_LIST_STYLER;
   }
   return {
+    kind: (text) => dim(text),
     dirName: (text) => bold(text),
     sourceHash: (text) => dim(cyan(text)),
     destHash: (text) => cyanBright(text),
