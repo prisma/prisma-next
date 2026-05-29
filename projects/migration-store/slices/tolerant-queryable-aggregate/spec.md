@@ -62,19 +62,19 @@ None. The design is settled in the project spec; this slice implements it.
 - **Hands to:** A pure `reconstructGraph`, a tolerant `readMigrationsDir` returning `{ packages, problems }`, and the `IntegrityViolation` value vocabulary.
 - **Focus:** `migration-graph.ts`, `io.ts`, the new violation types. **Out:** the aggregate, `checkIntegrity()`, consumer re-pointing.
 
-### Dispatch 2: tolerant queryable aggregate + `checkIntegrity()`
+### Dispatch 2: tolerant queryable aggregate + `checkIntegrity()` + intra-package engine re-point
 
-- **Outcome:** `loadContractSpaceAggregate` has the disk-only tolerant signature; `ContractSpaceMember` / `ContractSpaceAggregate` carry raw `packages` + `refs` + nullable `headRef` + lazy `graph()` / `contract()` + query methods (`listSpaces` / `hasSpace` / `space` / `spaces`), `app` + `extensions` retained; `checkIntegrity(opts?)` returns the full violation set (no bail), config/contract checks gated by the opts. Unit tests cover construction tolerance, lazy facets, and the integrity query.
+- **Outcome:** `loadContractSpaceAggregate` has the tolerant signature `{ migrationsDir, deserializeContract, appContract }` (the live `appContract` is caller-supplied compiled PSL — always present; the app `headRef` is synthesised from `appContract.storage.storageHash`); `ContractSpaceMember` / `ContractSpaceAggregate` carry raw `packages` + `refs` + nullable `headRef` + lazy `graph()` / `contract()` + query methods (`listSpaces` / `hasSpace` / `space` / `spaces`), `app` + `extensions` retained; `checkIntegrity(opts?)` returns the full violation set (no bail), config/contract checks gated by the opts. The **intra-`@prisma-next/migration-tools` apply/verify engine** (planner / verifier / strategies / `project-schema-to-space` + their tests) is re-pointed onto the new member shape — this is atomic with the member-shape change, so it rides here, not in D3. Both D1 transitional shims removed. Unit tests cover construction tolerance, lazy facets, and the integrity query (incl. a multi-violation no-bail case).
 - **Builds on:** D1's pure primitives + violation vocabulary.
-- **Hands to:** The tolerant queryable model API + `checkIntegrity()` that consumers will gate on.
-- **Focus:** `aggregate/{types,loader}.ts` + integrity surface. **Out:** consumer re-pointing, integration tests.
+- **Hands to:** The tolerant queryable model API + `checkIntegrity()` that consumers gate on; `@prisma-next/migration-tools` green on the new model.
+- **Focus:** `aggregate/{types,loader}.ts` + integrity surface + the intra-package apply/verify engine. **Out:** the **CLI-package** consumers (`check` / `status` / `show` / `db verify` / the CLI aggregate-loader wrapper) → D3; integration tests → D4. CLI package may stay red until D3.
 
-### Dispatch 3: re-point the load-throw consumers onto the model + explicit gate
+### Dispatch 3: re-point the CLI-package consumers onto the model + explicit gate
 
-- **Outcome:** `migration check` (reports ALL violations at once), the apply path (`compute-extension-space-apply-path.ts`), `db verify`, `migration status`, `migration show`, and the CLI aggregate-loader wrapper all construct the tolerant aggregate and gate via `checkIntegrity()`; `5001` / `5002` / `PN-MIG-CHECK-001..006` envelopes + `meta.violations[]` preserved. Workspace typecheck + package tests green.
-- **Builds on:** D2's model API + `checkIntegrity()`.
+- **Outcome:** `migration check` (reports ALL violations at once), `db verify`, `migration status`, `migration show`, and the CLI aggregate-loader wrapper all construct the tolerant aggregate and gate via `checkIntegrity()`; `5001` / `5002` / `PN-MIG-CHECK-001..006` envelopes + `meta.violations[]` preserved. Workspace typecheck + package tests green.
+- **Builds on:** D2's model API + `checkIntegrity()` (and the intra-package engine already on the new shape).
 - **Hands to:** All current aggregate / load-throw consumers on the one model; behaviour preserved modulo self-edge tolerance + check-reports-all.
-- **Focus:** the named CLI commands + apply/verify paths + the CLI wrapper. **Out:** `list` / `graph` / `log` (slice 2).
+- **Focus:** the named CLI commands + the CLI wrapper. **Out:** `list` / `graph` / `log` (slice 2).
 
 ### Dispatch 4: cross-consumer integrity integration tests
 

@@ -14,18 +14,19 @@ This project separates the three fused responsibilities — **build**, **query**
 
 ## Design
 
-### Construction: disk-only, tolerant
+### Construction: tolerant; live contract supplied as always
 
 ```ts
 function loadContractSpaceAggregate(input: {
-  readonly migrationsDir: string;                       // project `migrations/` root
-  readonly deserializeContract: (raw: unknown) => Contract; // family-aware; held, called lazily
-}): Promise<ContractSpaceAggregate>;                    // never rejects on disk *content*
+  readonly migrationsDir: string;                        // project `migrations/` root
+  readonly deserializeContract: (raw: unknown) => Contract; // family-aware; held, called lazily for on-disk contracts
+  readonly appContract: Contract;                        // the project's live app contract (compiled from src/prisma/contract.psl)
+}): Promise<ContractSpaceAggregate>;                     // never rejects on disk *content*
 ```
 
-Construction needs only the directory and a pure `deserializeContract` function. It enumerates spaces from disk (`listContractSpaceDirectories` + reserved-name / `isValidSpaceId` filtering — `app` included, read from `migrations/app/`), and for each space loads its raw packages and its refs. It **does not** require the deserialized app contract or the `extensionPacks` declaration, and it **never throws on disk content** — every integrity problem becomes a represented violation (below), not a load failure. The only rejections are catastrophic I/O (a `migrations/` that exists but is unreadable for reasons other than absence).
+Construction reads migration **state** from disk: it enumerates spaces (`listContractSpaceDirectories` + reserved-name / `isValidSpaceId` filtering — `app` included, packages read from `migrations/app/`), and for each space loads its raw packages and its refs. The app's *live* contract is **not** a disk artifact — in Prisma Next it always comes from the project's central contract (compiled from `src/prisma/contract.psl`), so the caller always has it and passes it as `appContract`, exactly as before. The app's `headRef` is synthesised from `appContract.storage.storageHash` (as the old loader did). App migration *packages* are read from disk like every other space. Construction **never throws on disk content** — every integrity problem becomes a represented violation (below), not a load failure. The only rejections are catastrophic I/O (a `migrations/` that exists but is unreadable for reasons other than absence).
 
-This is the crux of "one model": `list` / `graph` can load it without a deserializable contract or a config reconciliation; `status` / `show` / apply / verify ask for the extra facets.
+This is the crux of "one model": construction needs no config reconciliation (no `extensionPacks` declaration) and deserializes no on-disk contract eagerly — `list` / `graph` / `log` build the aggregate and simply never query `app.contract()` or the lazy facets, while `status` / apply / verify query them. The `appContract` is always in hand; what the read commands avoid paying for is reconciliation and lazy deserialization, not the live contract object itself.
 
 ### The model: value with lazy facets + query methods
 
@@ -142,7 +143,7 @@ type IntegrityViolation =
 
 - [ ] Team-DoD floor items (inherited; see [`drive/calibration/dod.md`](../../drive/calibration/dod.md)).
 - [ ] `reconstructGraph` builds pure structure and no longer throws on a `from === to` self-edge.
-- [ ] `loadContractSpaceAggregate` has the disk-only tolerant signature (`{ migrationsDir, deserializeContract }`), never throws on disk content, and carries per-space raw `packages` + user `refs` + nullable `headRef` + lazy `graph()` / `contract()`.
+- [ ] `loadContractSpaceAggregate` has the tolerant signature (`{ migrationsDir, deserializeContract, appContract }`), never throws on disk content, and carries per-space raw `packages` + user `refs` + nullable `headRef` + lazy `graph()` / `contract()`. The live `appContract` is caller-supplied (compiled PSL) and always present; read commands receive it but don't query the app's lazy facets.
 - [ ] `ContractSpaceAggregate.checkIntegrity()` returns the full `IntegrityViolation[]` (no first-failure bail); `migration check` reports all violations at once; apply / verify refuse on the gating subset; CLI mapping preserves `5001` / `5002` / `PN-MIG-CHECK-*`.
 - [ ] All five read commands (`list`, `graph`, `status`, `show`, `log`) consume the one model via `space()` / `spaces()` / `hasSpace()` / lazy facets; per-command hand-rolled space/ref/graph I/O deleted (net deletion confirmed on the branch diff).
 - [ ] Integration tests pin self-edge / hash-mismatch / orphan-dir behaviour across all consumer classes (tolerate-and-render / report-all / refuse).
