@@ -1828,10 +1828,13 @@ export class Collection<
    *
    * A parent-anchored single-query include read can't observe a row
    * that has already been deleted, so this reads the rows together with
-   * their relations BEFORE issuing the DELETE, then deletes by the same
-   * filter and yields the pre-delete snapshot. Snapshot read and delete
-   * run inside one `withMutationScope` so they are atomic; the returned
-   * relations reflect the row's state at delete time (TML-2657).
+   * their relations BEFORE issuing the DELETE. The snapshot is fully
+   * drained into a plain array with `.toArray()` while the rows still
+   * exist; only then does the DELETE run. The yielded `for..of` walks
+   * that in-memory array, not a live cursor, so nothing reads from the
+   * deleted rows after the fact. Snapshot read and delete share one
+   * `withMutationScope` so they are atomic; the returned relations
+   * reflect the row's state at delete time.
    */
   #executeDeleteReturningWithIncludes(
     annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
