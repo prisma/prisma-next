@@ -114,6 +114,10 @@
       "types": "./dist/exports/aggregate.d.mts",
       "import": "./dist/exports/aggregate.mjs"
     },
+    "./integrity-violation": {
+      "types": "./dist/exports/integrity-violation.d.mts",
+      "import": "./dist/exports/integrity-violation.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {
