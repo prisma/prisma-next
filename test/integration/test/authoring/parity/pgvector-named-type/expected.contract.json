@@ -74,7 +74,17 @@
         }
       }
     },
-    "storageHash": "sha256:30416ae8eaa55bae7bc079f58e917501d9627440f038de67410d8f2d42b27f2a"
+    "storageHash": "sha256:923650d8962586ae327c2224a8d4a589abf94ce9465182179bf7939228ef8cef",
+    "types": {
+      "Embedding1536": {
+        "codecId": "pg/vector@1",
+        "kind": "codec-instance",
+        "nativeType": "vector",
+        "typeParams": {
+          "length": 1536
+        }
+      }
+    }
   },
   "capabilities": {
     "postgres": {

@@ -285,7 +285,15 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:2b4e92df225452e57b079947cd56034202462576c9398302100f6787cc45651a"
+    "storageHash": "sha256:a0eae5e868776b85d3a394fe5d916c1518660c9e7cf7ab5f3ece00a05b27190d",
+    "types": {
+      "Email": {
+        "codecId": "pg/text@1",
+        "kind": "codec-instance",
+        "nativeType": "text",
+        "typeParams": {}
+      }
+    }
   },
   "capabilities": {
     "postgres": {
