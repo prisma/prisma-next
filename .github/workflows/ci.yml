@@ -55,6 +55,8 @@ jobs:
         run: pnpm lint:examples
       - name: Validate rules
         run: pnpm lint:rules
+      - name: Validate rule symlinks
+        run: pnpm lint:rules:symlinks
       - name: Validate skills
         run: pnpm lint:skills
       - name: Check rules footprint
