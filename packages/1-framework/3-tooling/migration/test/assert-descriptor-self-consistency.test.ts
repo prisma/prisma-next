@@ -181,6 +181,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: onDiskStorage,
         headRefHash: namespacedHash,
+        ...SQL_HOOKS,
       }),
     ).not.toThrow();
   });
