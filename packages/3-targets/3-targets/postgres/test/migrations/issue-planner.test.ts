@@ -387,6 +387,7 @@ describe('planIssues', () => {
       const issues: SchemaIssue[] = [
         {
           kind: 'enum_values_changed',
+          namespaceId: UNBOUND_NAMESPACE_ID,
           typeName: 'status',
           addedValues: ['archived'],
           removedValues: [],
@@ -464,6 +465,7 @@ describe('planIssues', () => {
       const issues: SchemaIssue[] = [
         {
           kind: 'enum_values_changed',
+          namespaceId: UNBOUND_NAMESPACE_ID,
           typeName: 'status',
           addedValues: [],
           removedValues: ['inactive'],

@@ -135,11 +135,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       PostgresEnumStorageEntry | StorageTypeInstance
     >),
   };
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  const namespaceIdForEnumType = new Map<string, string>();
+  for (const [nsId, ns] of Object.entries(contract.storage.namespaces)) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
         allStorageTypesMap[k] = v;
+        namespaceIdForEnumType.set(k, nsId);
       }
     }
   }
@@ -174,6 +176,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
           typeInstance,
           schema,
           resolveExistingEnumValues,
+          namespaceId: namespaceIdForEnumType.get(typeName) ?? '',
         });
       } else if (isStorageTypeInstance(typeInstance)) {
         const hook = codecHooks.get(typeInstance.codecId);
@@ -275,11 +278,12 @@ function verifyEnumType(options: {
   readonly typeName: string;
   readonly typeInstance: PostgresEnumStorageEntry;
   readonly schema: SqlSchemaIR;
+  readonly namespaceId: string;
   readonly resolveExistingEnumValues?:
     | ((schema: SqlSchemaIR, enumType: PostgresEnumStorageEntry) => readonly string[] | null)
     | undefined;
 }): readonly SchemaIssue[] {
-  const { typeName, typeInstance, schema, resolveExistingEnumValues } = options;
+  const { typeName, typeInstance, schema, namespaceId, resolveExistingEnumValues } = options;
   const desired = typeInstance.values;
   const existing = resolveExistingEnumValues?.(schema, typeInstance) ?? null;
   if (!existing) {
@@ -287,6 +291,7 @@ function verifyEnumType(options: {
       {
         kind: 'type_missing',
         typeName,
+        namespaceId,
         message: `Type "${typeName}" is missing from database`,
       },
     ];
@@ -305,6 +310,7 @@ function verifyEnumType(options: {
   return [
     {
       kind: 'enum_values_changed' as const,
+      namespaceId,
       typeName,
       addedValues,
       removedValues,
