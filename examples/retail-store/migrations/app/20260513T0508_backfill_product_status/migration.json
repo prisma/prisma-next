@@ -1,15 +1,7 @@
 {
   "from": "sha256:8a15f8e37a3a8731578a87102f9507da65b5f84556f84320ea0ead82645e394d",
   "to": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
-  "labels": [
-    "backfill-product-status"
-  ],
   "providedInvariants": [],
   "createdAt": "2026-05-13T05:08:23.957Z",
-  "hints": {
-    "used": [],
-    "applied": [],
-    "plannerVersion": "1.0.0"
-  },
-  "migrationHash": "sha256:a4ea977332cd9633d214e616bac4c83624ed33c5e0e363640f77b09104be84b1"
+  "migrationHash": "sha256:f3e340978ae26aa08e0324b1223b8a6664c594677aa82da9928338f111ebb946"
 }
