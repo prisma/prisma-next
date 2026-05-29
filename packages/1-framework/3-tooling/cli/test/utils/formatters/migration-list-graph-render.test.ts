@@ -7,7 +7,7 @@ import {
   IDENTITY_MIGRATION_LIST_STYLER,
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
-import { HASH, kindsFor, layoutFor, migrationEntry } from './migration-list-graph-fixtures';
+import { HASH, layoutFor, migrationEntry } from './migration-list-graph-fixtures';
 
 function renderGraph(
   entries: readonly ReturnType<typeof migrationEntry>[],
@@ -60,11 +60,7 @@ describe('renderMigrationListGraph', () => {
       spaces: [{ spaceId: 'app', migrations: entries }],
       summary: '3 migration(s) on disk',
     };
-    const flat = renderMigrationListWithStyle(
-      listResult,
-      IDENTITY_MIGRATION_LIST_STYLER,
-      kindsFor(entries),
-    );
+    const flat = renderMigrationListWithStyle(listResult, IDENTITY_MIGRATION_LIST_STYLER);
     const flatRows = flat.split('\n').slice(0, 3).join('\n');
     expect(renderGraph(entries, 'unicode')).toBe(flatRows);
   });
