@@ -1,3 +1,9 @@
+---
+description: Prefer extracting a testable core over vi.mock / vi.resetModules when unit tests need to reach production logic entangled with config, env, or singletons.
+alwaysApply: false
+globs: ["**/test/**/*.ts", "**/test/**/*.tsx"]
+---
+
 # Prefer direct unit imports over module mocks in tests
 
 When you reach for `vi.mock` / `vi.hoisted` / `vi.resetModules` / `vi.setConfig` to make a piece of production code testable, stop and ask: **can the production code be factored so the test imports the unit it cares about directly?**
