@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-space';
 import type { ContractSpaceMember } from '../../src/aggregate/types';
 
-type MongoStorageLike = StorageBase & { readonly collections: Record<string, unknown> };
+type MongoStorageLike = StorageBase & {
+  readonly namespaces: Record<
+    string,
+    { readonly id: string; readonly kind: string; readonly collections: Record<string, unknown> }
+  >;
+};
 
 /**
  * Unit tests for the duck-typed schema projector used by the aggregate
@@ -70,7 +75,15 @@ describe('projectSchemaToSpace', () => {
       contract: createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              kind: 'mongo-namespace',
+              collections,
+            },
+          },
+        },
       }),
       headRef: { hash: 'sha256:test', invariants: [] },
       migrations: emptyMigrations(),

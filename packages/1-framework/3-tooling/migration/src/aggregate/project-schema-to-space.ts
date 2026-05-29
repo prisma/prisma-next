@@ -1,4 +1,4 @@
-import { extractStorageElementNames } from './extract-storage-element-names';
+import { storageElementNames } from './storage-element-names';
 import type { ContractSpaceMember } from './types';
 
 /**
@@ -92,8 +92,8 @@ export function projectSchemaToSpace(
 
 /**
  * Collect the set of storage element names claimed by other members.
- * Reuses the loader's `extractStorageElementNames` helper so the
- * tables/collections walk lives in exactly one place.
+ * Reuses the loader's `storageElementNames` helper so the
+ * namespace-scoped entity walk lives in exactly one place.
  */
 function collectOwnedNames(
   member: ContractSpaceMember,
@@ -102,7 +102,7 @@ function collectOwnedNames(
   const owned = new Set<string>();
   for (const other of otherMembers) {
     if (other.spaceId === member.spaceId) continue;
-    for (const name of extractStorageElementNames(other.contract)) {
+    for (const name of storageElementNames(other.contract)) {
       owned.add(name);
     }
   }

@@ -9,7 +9,7 @@ import { readContractSpaceContract } from '../read-contract-space-contract';
 import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
 import { APP_SPACE_ID, spaceMigrationDirectory } from '../space-layout';
 import { listContractSpaceDirectories } from '../verify-contract-spaces';
-import { extractStorageElementNames } from './extract-storage-element-names';
+import { storageElementNames } from './storage-element-names';
 import type { ContractSpaceAggregate, ContractSpaceMember, HydratedMigrationGraph } from './types';
 
 function integrityDetail(error: unknown): string {
@@ -349,7 +349,7 @@ export async function loadContractSpaceAggregate(
   // 7. Disjointness: no two members claim the same storage element.
   const elementClaimedBy = new Map<string, string[]>();
   for (const member of [appMember, ...extensionMembers]) {
-    const elements = extractStorageElementNames(member.contract);
+    const elements = storageElementNames(member.contract);
     for (const elementName of elements) {
       const claimers = elementClaimedBy.get(elementName);
       if (claimers) claimers.push(member.spaceId);
