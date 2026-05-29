@@ -6,11 +6,11 @@ Slice spec: [`spec.md`](./spec.md). This slice extends the slice-1 trace contrac
 
 ## Status
 
-- **D1:** PENDING — vocabulary extension (6 new event types + direct-change reuse note + instrumented-skills table).
-- **D2:** PENDING — lifecycle bookends (`drive-create-project`, `drive-close-project`, `drive-deliver-workflow`).
-- **D3:** PENDING — cadence firings (`drive-check-health`, `drive-run-retro`).
-- **D4:** PENDING — direct-change gap (`drive-start-workflow` build-loop spine).
-- **D5:** PENDING — manual-QA expansion + walkthrough covering lifecycle + cadence + direct-change.
+- **D1: SATISFIED** — `27b6bf482`. Six lifecycle/cadence event types added to `events.md` (17 total, `schema_version:"1"`); direct-change reuse note in `emission.md`; instrumented-skills table extended in `SKILL.md`. OQ1 resolved: `Slice1TraceEvent` extended in place.
+- **D2: SATISFIED** — `7fef50b6b`. Four additive Emit blockquotes: `project-started` (`drive-create-project`), `project-closed` (`drive-close-project`), `slice-started` + `slice-completed` (`drive-deliver-workflow`). By-name refs; behaviour preserved; `drive-dispatch` untouched.
+- **D3: SATISFIED** — `3de874359`. `health-check-fired` (`drive-check-health` Step 4) + `retro-landed` (`drive-run-retro` Step 7) Emit blockquotes. Retro fires only on landing; cadence read from invoking context. By-name refs; additive.
+- **D4: SATISFIED** — `36dbb1ff0`. Five Emit blockquotes on `drive-start-workflow` direct-change sub-path (build-loop spine reuse: 3 before the `drive-dispatch` call, 2 after return). No other sub-path touched; `drive-dispatch` clean. OQ3: done→satisfied, blocked→stop-condition.
+- **D5: SATISFIED** — manual-QA + walkthrough. `manual-qa.md` (≥1 check per new event + structural gates), `qa-trace-01.jsonl` (12-event lifecycle+cadence arc, all 6 new types), `qa-trace-direct-01.jsonl` (5-event direct-change spine), `qa-run-01.md` (4 signals hand-computed; behaviour-preservation attested across all 6 instrumented skills). PASS, no Blockers. **Slice 2 SATISFIED at close.**
 
 ## Failure modes threaded into briefs
 
