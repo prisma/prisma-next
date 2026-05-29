@@ -58,13 +58,17 @@ function makeSchemaWithEnum(
   values: readonly string[],
   schemaName = UNBOUND_NAMESPACE_ID,
 ): SqlSchemaIR {
+  // Introspection always keys `storageTypes` by the *live* schema name the
+  // adapter walked — the unbound coordinate resolves to `current_schema()`
+  // (`public` here), never the `__unbound__` DDL-emit sentinel.
+  const liveSchema = schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName;
   return {
     tables: {},
     annotations: {
       pg: {
-        schema: schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName,
+        schema: liveSchema,
         storageTypes: {
-          [enumStorageCompoundKey(schemaName, nativeType)]: {
+          [enumStorageCompoundKey(liveSchema, nativeType)]: {
             kind: 'postgres-enum',
             codecId: 'pg/enum@1',
             nativeType,

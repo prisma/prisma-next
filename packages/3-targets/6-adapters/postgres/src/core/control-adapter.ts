@@ -31,6 +31,7 @@ import {
   readExistingEnumValues,
 } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import {
@@ -87,7 +88,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     enumType: PostgresEnumStorageEntry,
     namespaceId: string,
   ): readonly string[] | null => {
-    const pgSchema = (schema.annotations?.['pg'] as { schema?: string })?.schema ?? 'public';
+    const pgSchema =
+      blindCast<{ schema?: string } | undefined, 'pg annotation envelope index slot'>(
+        schema.annotations?.['pg'],
+      )?.schema ?? 'public';
     const schemaName = namespaceId === UNBOUND_NAMESPACE_ID ? pgSchema : namespaceId;
     return readExistingEnumValues(schema, schemaName, enumType.nativeType);
   };
@@ -340,11 +344,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const mergedStorageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
     for (let i = 0; i < perSchema.length; i++) {
       const ir = perSchema[i];
-      const pg = (
-        ir?.annotations?.['pg'] as {
-          storageTypes?: Record<string, PostgresEnumStorageTypeAnnotation>;
-        }
-      )?.storageTypes;
+      const pg = blindCast<
+        { storageTypes?: Record<string, PostgresEnumStorageTypeAnnotation> } | undefined,
+        'pg annotation envelope index slot'
+      >(ir?.annotations?.['pg'])?.storageTypes;
       if (!pg) continue;
       for (const [key, value] of Object.entries(pg)) {
         mergedStorageTypes[key] = value;
@@ -352,7 +355,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     }
 
     const firstAnnotations = perSchema[0]?.annotations;
-    const firstPg = (firstAnnotations?.['pg'] as Record<string, unknown>) ?? {};
+    const firstPg =
+      blindCast<Record<string, unknown> | undefined, 'pg annotation envelope index slot'>(
+        firstAnnotations?.['pg'],
+      ) ?? {};
     return {
       tables: mergedTables,
       ...ifDefined('annotations', {

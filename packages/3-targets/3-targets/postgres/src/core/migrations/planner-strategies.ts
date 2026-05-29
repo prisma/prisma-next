@@ -37,7 +37,11 @@ import {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
-import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
+import {
+  determineEnumDiff,
+  readExistingEnumValues,
+  resolveDdlSchemaForNamespaceStorage,
+} from './enum-planning';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -482,7 +486,15 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
 
     const desired = enumType.values;
     const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
-    const existing = readExistingEnumValues(ctx.schema, ddlSchema, enumType.nativeType);
+    // The live-schema lookup keys by the *introspected* schema name, which for
+    // the unbound namespace is the resolved `current_schema()` (not the
+    // `__unbound__` DDL-emit sentinel) — see `resolveDdlSchemaForNamespaceStorage`.
+    const readSchema = resolveDdlSchemaForNamespaceStorage(
+      ctx.toContract.storage,
+      enumNamespaceId,
+      ctx.schema,
+    );
+    const existing = readExistingEnumValues(ctx.schema, readSchema, enumType.nativeType);
     if (!existing) {
       calls.push(new CreateEnumTypeCall(ddlSchema, typeName, desired, enumType.nativeType));
       handledKeys.add(key);
