@@ -8,6 +8,7 @@ import {
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { type Type, type } from 'arktype';
+import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
 import {
   type ForeignKeyInput,
   type ForeignKeyReferenceInput,
@@ -442,7 +443,14 @@ export function validateStorage(value: unknown): SqlStorage {
   // structurally. Funnel through the constructor so nested IR fields
   // (`types`) are normalised into class instances and the
   // branded `storageHash` is preserved on the returned `SqlStorage`.
-  return new SqlStorage(result as SqlStorageInput);
+  const validated = result as SqlStorageInput & {
+    readonly namespaces?: SqlStorageInput['namespaces'];
+  };
+  return new SqlStorage({
+    storageHash: validated.storageHash,
+    ...(validated.types !== undefined ? { types: validated.types } : {}),
+    namespaces: buildSqlNamespaceMap(validated.namespaces ?? {}),
+  });
 }
 
 export function validateModel(value: unknown): unknown {

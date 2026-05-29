@@ -3,6 +3,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import {
+  buildSqlNamespace,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageTypeEntry,
@@ -102,27 +103,32 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         : undefined;
 
     const rawNamespaces = validated.storage.namespaces;
-    const hydratedNamespaces =
-      rawNamespaces !== undefined ? this.hydrateSqlNamespaceMap(rawNamespaces) : undefined;
+    if (rawNamespaces === undefined) {
+      throw new ContractValidationError(
+        'Contract storage.namespaces is required after structural validation',
+        'structural',
+      );
+    }
+    const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
 
     return {
       ...validated,
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
         ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
-        ...(hydratedNamespaces !== undefined ? { namespaces: hydratedNamespaces } : {}),
+        namespaces: hydratedNamespaces,
       }),
     };
   }
 
   protected hydrateSqlNamespaceMap(
     namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
-  ): Readonly<Record<string, Namespace | SqlNamespaceTablesInput>> {
+  ): Readonly<Record<string, Namespace>> {
     return Object.fromEntries(
-      Object.entries(namespaces).map(([nsId, raw]) => [
-        nsId,
-        this.hydrateSqlNamespaceEntry(nsId, raw),
-      ]),
+      Object.entries(namespaces).map(([nsId, raw]) => {
+        const hydrated = this.hydrateSqlNamespaceEntry(nsId, raw);
+        return [nsId, hydrated instanceof NamespaceBase ? hydrated : buildSqlNamespace(hydrated)];
+      }),
     );
   }
 

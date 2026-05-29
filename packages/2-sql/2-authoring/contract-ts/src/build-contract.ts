@@ -30,11 +30,11 @@ import {
 } from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
+  buildSqlNamespace,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   SqlStorage,
-  type SqlStorageInput,
   type StorageColumn,
   StorageTable,
   type StorageTableInput,
@@ -544,7 +544,7 @@ export function buildSqlContractFromDefinition(
     namespaceCoordinateIds.add(id);
   }
   const { createNamespace } = definition;
-  const namespaces: Record<string, SqlNamespaceTablesInput | Namespace> = Object.fromEntries(
+  const namespaces: Record<string, Namespace> = Object.fromEntries(
     [...namespaceCoordinateIds].sort().map((id) => {
       const enumTypes = namespaceEnumTypesById[id];
       const nsInput: SqlNamespaceTablesInput = {
@@ -552,7 +552,7 @@ export function buildSqlContractFromDefinition(
         tables: tablesByNamespace[id] ?? {},
         ...ifDefined('enum', enumTypes),
       };
-      return [id, createNamespace ? createNamespace(nsInput) : nsInput];
+      return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
     }),
   );
   const domainUnboundTypes =
@@ -570,7 +570,7 @@ export function buildSqlContractFromDefinition(
         targetFamily,
         storage: storageWithoutHash as Record<string, unknown>,
       });
-  const storage = new SqlStorage({ ...storageWithoutHash, storageHash } as SqlStorageInput); // Builder types are wider than SqlStorageInput until SqlStorage normalises document types.
+  const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
 
   const executionSection =
     executionDefaults.length > 0

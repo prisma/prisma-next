@@ -10,6 +10,8 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  buildSqlNamespace,
+  buildSqlNamespaceMap,
   SqlStorage,
   type SqlStorageInput,
   type StorageTable,
@@ -531,57 +533,70 @@ describe('buildBuiltinIdentityValue (built-in fallback)', () => {
 
 function createTestContract(
   overrides?: Partial<Omit<Contract<SqlStorage>, 'storage'>> & {
-    storage?: Omit<SqlStorageInput, 'storageHash'>;
+    storage?: Partial<Omit<SqlStorageInput, 'storageHash'>>;
   },
 ): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:contract');
-  const storage = overrides?.storage ?? {
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'] }],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                constraint: true,
-                index: true,
-              },
-            ],
-          },
-        },
+  const defaultTables = {
+    user: {
+      columns: {
+        id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
       },
+      primaryKey: { columns: ['id'] },
+      uniques: [{ columns: ['email'] }],
+      indexes: [{ columns: ['email'] }],
+      foreignKeys: [],
+    },
+    post: {
+      columns: {
+        id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      },
+      primaryKey: { columns: ['id'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [
+        {
+          source: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            tableName: 'post',
+            columns: ['userId'],
+          },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+          constraint: true,
+          index: true,
+        },
+      ],
+    },
+  };
+  const storageInput = overrides?.storage ?? {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        tables: defaultTables,
+      }),
     },
   };
   const { storage: _s, ...rest } = overrides ?? {};
+  const namespaces = storageInput.namespaces
+    ? buildSqlNamespaceMap(storageInput.namespaces)
+    : {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables: defaultTables,
+        }),
+      };
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({ ...storage, storageHash: storageHashValue }),
+    storage: new SqlStorage({
+      ...(storageInput.types !== undefined ? { types: storageInput.types } : {}),
+      namespaces,
+      storageHash: storageHashValue,
+    }),
     roots: {},
     models: {},
     capabilities: {},
@@ -677,13 +692,13 @@ function planUserTableOperations(
   const contract = createTestContract({
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             ...(options?.extraContractTables ?? {}),
             user: userTable,
           },
-        },
+        }),
       },
       ...(options?.extraStorageTypes ? { types: options.extraStorageTypes } : {}),
     },

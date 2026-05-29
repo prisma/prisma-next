@@ -6,9 +6,11 @@ import {
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
+import { buildMongoNamespace } from '../src/ir/build-mongo-namespace';
 import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoIndex } from '../src/ir/mongo-index';
 import { MongoStorage } from '../src/ir/mongo-storage';
+import { MongoUnboundNamespace } from '../src/ir/mongo-unbound-namespace';
 
 const hash = coreHash('h_0');
 
@@ -35,18 +37,18 @@ describe('MongoStorage', () => {
     expect(Object.keys(storage)).toEqual(expect.arrayContaining(['storageHash', 'namespaces']));
   });
 
-  it('normalises plain namespace envelopes with collection collections', () => {
+  it('accepts built namespace instances with collections', () => {
     const storage = new MongoStorage({
       storageHash: hash,
       namespaces: {
-        default: {
+        default: buildMongoNamespace({
           id: 'default',
           collections: {
             events: new MongoCollection({
               indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })],
             }),
           },
-        },
+        }),
       },
     });
     expect(storage.namespaces['default']!.collections['events']).toBeInstanceOf(MongoCollection);
@@ -71,8 +73,13 @@ describe('MongoStorage', () => {
     expect(Object.isFrozen(storage)).toBe(true);
   });
 
-  it('defaults to unbound namespace when namespaces omitted', () => {
-    const storage = new MongoStorage({ storageHash: hash });
-    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]).toBeDefined();
+  it('requires a namespaces map at construction', () => {
+    expect(
+      () =>
+        new MongoStorage({
+          storageHash: hash,
+          namespaces: { [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance },
+        }),
+    ).not.toThrow();
   });
 });

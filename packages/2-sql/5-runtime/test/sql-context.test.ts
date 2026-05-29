@@ -1,7 +1,11 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import { mergeCapabilityMatrices } from '@prisma-next/framework-components/components';
 import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  SqlUnboundNamespace,
+} from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -27,7 +31,10 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: new SqlStorage({ storageHash: coreHash('sha256:test') }),
+  storage: new SqlStorage({
+    storageHash: coreHash('sha256:test'),
+    namespaces: { __unbound__: SqlUnboundNamespace.instance },
+  }),
   extensionPacks: {},
   capabilities: {},
   meta: {},
@@ -298,7 +305,7 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: {
+          __unbound__: buildSqlNamespace({
             id: '__unbound__',
             tables: {
               user: {
@@ -310,7 +317,7 @@ describe('contract/stack validation errors', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       execution: {
@@ -346,7 +353,7 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: {
+          __unbound__: buildSqlNamespace({
             id: '__unbound__',
             tables: {
               user: {
@@ -359,7 +366,7 @@ describe('contract/stack validation errors', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       execution: {
@@ -397,7 +404,7 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: {
+          __unbound__: buildSqlNamespace({
             id: '__unbound__',
             tables: {
               user: {
@@ -409,7 +416,7 @@ describe('contract/stack validation errors', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       execution: {
@@ -437,7 +444,7 @@ describe('applyMutationDefaults', () => {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        __unbound__: {
+        __unbound__: buildSqlNamespace({
           id: '__unbound__',
           tables: {
             user: {
@@ -451,7 +458,7 @@ describe('applyMutationDefaults', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
       },
     }),
     execution: {
@@ -554,7 +561,7 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: {
+          __unbound__: buildSqlNamespace({
             id: '__unbound__',
             tables: {
               user: {
@@ -567,7 +574,7 @@ describe('applyMutationDefaults', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       execution: {
@@ -649,7 +656,7 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: {
+          __unbound__: buildSqlNamespace({
             id: '__unbound__',
             tables: {
               event: {
@@ -663,7 +670,7 @@ describe('applyMutationDefaults', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       execution: {
@@ -736,7 +743,7 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         namespaces: {
-          __unbound__: {
+          __unbound__: buildSqlNamespace({
             id: '__unbound__',
             tables: {
               user: {
@@ -748,7 +755,7 @@ describe('applyMutationDefaults', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       execution: {

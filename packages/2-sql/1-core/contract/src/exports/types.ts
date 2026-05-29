@@ -37,6 +37,8 @@ export type {
 } from '../types';
 export {
   applyFkDefaults,
+  buildSqlNamespace,
+  buildSqlNamespaceMap,
   CODEC_INSTANCE_KIND,
   DEFAULT_FK_CONSTRAINT,
   DEFAULT_FK_INDEX,

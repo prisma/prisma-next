@@ -3,7 +3,6 @@ import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type PostgresEnumStorageEntry,
-  type SqlNamespaceTablesInput,
   SqlStorage,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
@@ -12,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
-import { PostgresSchema } from '../../src/core/postgres-schema';
+import { PostgresSchema, postgresCreateNamespace } from '../../src/core/postgres-schema';
 import { PostgresEnumType } from '../../src/exports/types';
 
 function makeContract(
@@ -21,11 +20,11 @@ function makeContract(
     enum?: Record<string, PostgresEnumStorageEntry>;
   } = {},
 ): Contract<SqlStorage> {
-  const unboundNs: SqlNamespaceTablesInput = {
+  const unboundNs = postgresCreateNamespace({
     id: UNBOUND_NAMESPACE_ID,
     tables: overrides.tables ?? {},
     ...(overrides.enum !== undefined ? { enum: overrides.enum } : {}),
-  };
+  });
   return {
     target: 'postgres',
     targetFamily: 'sql',
