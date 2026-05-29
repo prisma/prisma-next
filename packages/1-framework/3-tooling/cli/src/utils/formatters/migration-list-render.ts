@@ -3,6 +3,11 @@ import type {
   MigrationListEntry,
   MigrationListResult,
 } from '@prisma-next/migration-tools/migration-list-types';
+import {
+  computeMigrationDirNameWidth,
+  formatMigrationDataColumn,
+  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+} from './migration-list-data-column';
 
 export type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 
@@ -11,11 +16,6 @@ export type {
   MigrationListResult,
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
-
-const HASH_WIDTH = 7;
-const EMPTY_SOURCE = '∅';
-const FORWARD_EDGE_GLYPH = '→';
-const DECORATION_PREFIX = '  ';
 
 const KIND_GLYPH: Record<EdgeKind, string> = {
   forward: '*',
@@ -62,39 +62,11 @@ export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
   emptyState: (text) => text,
 };
 
-function abbreviateContractHash(hash: string): string {
-  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
-  return stripped.slice(0, HASH_WIDTH);
-}
-
-function formatSourceColumn(from: string | null, style: MigrationListStyler): string {
-  if (from === null) {
-    return style.glyph(EMPTY_SOURCE) + ' '.repeat(HASH_WIDTH - EMPTY_SOURCE.length);
-  }
-  return style.sourceHash(abbreviateContractHash(from));
-}
-
 function resolveEdgeKind(
   migrationHash: string,
   kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
 ): EdgeKind {
   return kindByMigrationHash.get(migrationHash) ?? 'forward';
-}
-
-function formatDecorations(
-  providedInvariants: readonly string[],
-  refs: readonly string[],
-  style: MigrationListStyler,
-): string {
-  const blocks: string[] = [];
-  if (providedInvariants.length > 0) {
-    blocks.push(style.invariants(providedInvariants));
-  }
-  if (refs.length > 0) {
-    blocks.push(style.refs(refs));
-  }
-  if (blocks.length === 0) return '';
-  return `${DECORATION_PREFIX}${blocks.join(' ')}`;
 }
 
 function formatMigrationRow(
@@ -104,20 +76,13 @@ function formatMigrationRow(
   style: MigrationListStyler,
 ): string {
   const kindColumn = `${style.kind(KIND_GLYPH[edgeKind])} `;
-  const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - migration.dirName.length));
-  const dirName = `${style.dirName(migration.dirName)}${dirNamePadding}`;
-  const decorations = formatDecorations(migration.providedInvariants, migration.refs, style);
-
-  if (edgeKind === 'self') {
-    const contractHash = migration.from ?? migration.to;
-    const hash = style.sourceHash(abbreviateContractHash(contractHash));
-    return `${kindColumn}${dirName}${hash}${decorations}`;
-  }
-
-  const source = formatSourceColumn(migration.from, style);
-  const arrow = style.glyph(FORWARD_EDGE_GLYPH);
-  const dest = style.destHash(abbreviateContractHash(migration.to));
-  return `${kindColumn}${dirName}${source} ${arrow} ${dest}${decorations}`;
+  const data = formatMigrationDataColumn(migration, {
+    dirNameWidth,
+    edgeKind,
+    style,
+    forwardArrow: MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+  });
+  return `${kindColumn}${data}`;
 }
 
 function formatEmptyStateLine(spaceId: string, style: MigrationListStyler): string {
@@ -139,7 +104,7 @@ function renderSpaceBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
-  const dirNameWidth = Math.max(...migrations.map((entry) => entry.dirName.length)) + 2;
+  const dirNameWidth = computeMigrationDirNameWidth(migrations);
   const rows = migrations.map((entry) =>
     formatMigrationRow(
       entry,
