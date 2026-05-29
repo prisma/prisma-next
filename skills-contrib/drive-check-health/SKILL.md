@@ -80,6 +80,8 @@ Assign severity per signal:
 
 Interactive: display in chat. Unattended: write to `projects/<project>/rollups/<timestamp>.md` and emit a notification surface for the operator to read on return.
 
+> **Emit `health-check-fired`:** Fields: `cadence` (`"opening-rollup" | "per-slice-merge" | "closing-rollup" | "session-bookend" | "trigger-fired"` — read from the invoking context; whichever cadence point called this health check), `drift_signal_count` (integer ≥ 0 — total drift signals surfaced in this rollup), `max_drift_severity` (`"none" | "low" | "medium" | "high"` — the highest-severity signal in the rollup), `recommended_next` (string describing the recommended next pick, or `null` if none), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `health-check-fired` for the payload schema and `emission.md` § Append protocol for the file-append mechanics.
+
 ### Step 5 — Downstream skill recommendations (policy-gated)
 
 The rollup is complete after Step 4. This step **recommends only** unless unattended policy explicitly allows auto-invoke:

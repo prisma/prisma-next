@@ -93,6 +93,8 @@ A retro can land in multiple surfaces (tighten the canonical body AND add a team
 
 Append to `projects/<project>/retros.md` (create if missing) using [`./templates/retro-entry.template.md`](./templates/retro-entry.template.md).
 
+> **Emit `retro-landed`:** This event fires only when the retro entry has been written — an un-landed retro (triggered but never written to `retros.md`) is silent. Fields: `trigger_class` (`"dispatch-failure" | "drift-event" | "scope-shift-escapee" | "wip-inspection-finding" | "operator-flagged-surprise" | "mandatory-final"` — matches the trigger that invoked this retro), `landing_surfaces` (array of one or more `"canonical-skill" | "project-context-readme" | "adr"` — the surface(s) the retro wrote to in Steps 5–6), `is_mandatory_final` (`true` when invoked as the mandatory project-close retro per invariant I10; `false` otherwise), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `retro-landed` for the payload schema and `emission.md` § Append protocol for the file-append mechanics.
+
 ### Step 8 — Mandatory-final-retro specifics
 
 When invoked as the mandatory final retro at project close:
