@@ -7,7 +7,7 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationListResult } from '@prisma-next/migration-tools/migration-list-types';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildKindByMigrationHash,
   renderMigrationListHumanOutput,
@@ -818,6 +818,62 @@ describe('migration list --graph human output', () => {
     expect(coloredOff).toContain('→');
     expect(coloredOff).not.toContain('->');
     expect(ascii).toContain('->');
+  });
+
+  it('keeps ANSI styling when ASCII glyph mode is on', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const wrapSgr =
+      (open: string, close: string) =>
+      (text: string): string =>
+        `${open}${text}${close}`;
+    vi.doMock('colorette', () => ({
+      bold: wrapSgr('\u001b[1m', '\u001b[22m'),
+      dim: wrapSgr('\u001b[2m', '\u001b[22m'),
+      cyan: wrapSgr('\u001b[36m', '\u001b[39m'),
+      cyanBright: wrapSgr('\u001b[96m', '\u001b[39m'),
+      yellow: wrapSgr('\u001b[33m', '\u001b[39m'),
+      green: wrapSgr('\u001b[32m', '\u001b[39m'),
+      greenBright: wrapSgr('\u001b[92m', '\u001b[39m'),
+    }));
+    vi.resetModules();
+    try {
+      const { parseGlobalFlags: parseFlags } = await import('../../src/utils/global-flags');
+      const { createTerminalUI: createUi } = await import('../../src/utils/terminal-ui');
+      const { renderMigrationListHumanOutput: renderHuman } = await import(
+        '../../src/commands/migration-list'
+      );
+      const ui = createUi(parseFlags({}), {
+        isTTY: true,
+        env: { LANG: 'en_US.UTF-8' },
+      });
+      const graph = renderHuman(result.value, {
+        graph: true,
+        glyphMode: ui.resolveGlyphMode(true),
+        useColor: true,
+      });
+      expect(graph).toContain('\u001b[');
+      expect(graph).toContain('->');
+      expect(graph).not.toContain('→');
+    } finally {
+      vi.doUnmock('colorette');
+      vi.resetModules();
+    }
   });
 
   it('scopes graph output with --space', async () => {
