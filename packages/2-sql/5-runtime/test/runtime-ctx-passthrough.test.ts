@@ -21,7 +21,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { createTestFamilyDescriptor, descriptorsFromCodecs } from './utils';
 
 /**
  * Pins that the SQL runtime's middleware ctx exposes a working `now()` clock and `contentHash()` plan hasher even when no `log` was supplied to `createRuntime` (default noop log path).
@@ -117,7 +117,12 @@ describe('SQL middleware context surface', () => {
         ) as SqlRuntimeAdapterInstance<'postgres'>;
       },
     };
-    const stack = createSqlExecutionStack({ target, adapter: adapterDesc, extensionPacks: [] });
+    const stack = createSqlExecutionStack({
+      family: createTestFamilyDescriptor(),
+      target,
+      adapter: adapterDesc,
+      extensionPacks: [],
+    });
     type SqlTestStackInstance = ExecutionStackInstance<
       'sql',
       'postgres',
@@ -128,7 +133,12 @@ describe('SQL middleware context surface', () => {
     const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
     const context = createExecutionContext({
       contract: testContract,
-      stack: { target, adapter: adapterDesc, extensionPacks: [] },
+      stack: {
+        family: createTestFamilyDescriptor(),
+        target,
+        adapter: adapterDesc,
+        extensionPacks: [],
+      },
     });
 
     let observedNow: number | undefined;

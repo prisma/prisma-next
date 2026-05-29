@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
@@ -66,6 +67,7 @@ export async function createPgIntegrationRuntime(
       const contract = getTestContract();
 
       const stack = createSqlExecutionStack({
+        family: sqlRuntimeFamilyDescriptor,
         target: postgresTarget,
         adapter: postgresAdapter,
         driver: postgresDriver,

@@ -26,7 +26,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { createTestFamilyDescriptor, descriptorsFromCodecs } from './utils';
 
 /**
  * Pins the per-result-kind branches of `verifyMarker` in `sql-runtime.ts`: absent marker
@@ -184,6 +184,7 @@ function buildRuntime({
   const target = createTargetDescriptor();
   const adapterDesc = createAdapterDescriptor(adapter);
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target,
     adapter: adapterDesc,
     extensionPacks: [],
@@ -191,7 +192,12 @@ function buildRuntime({
   const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target, adapter: adapterDesc, extensionPacks: [] },
+    stack: {
+      family: createTestFamilyDescriptor(),
+      target,
+      adapter: adapterDesc,
+      extensionPacks: [],
+    },
   });
   return createRuntime({
     stackInstance,

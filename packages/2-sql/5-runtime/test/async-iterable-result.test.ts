@@ -9,6 +9,7 @@ import {
   createTestAdapterDescriptor,
   createTestContext,
   createTestContract,
+  createTestFamilyDescriptor,
   createTestTargetDescriptor,
   stubAst,
   unboundNamespaceWithTables,
@@ -81,6 +82,7 @@ const fixtureContract = createTestContract({
 function createTestRuntime(mockDriver: MockDriver): Runtime {
   const adapter = createStubAdapter();
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: [],

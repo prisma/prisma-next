@@ -26,7 +26,6 @@
  * carries no runtime code.
  */
 
-import type { Subquery } from '@prisma-next/sql-builder/types';
 import type {
   QueryOperationTypeEntry,
   SqlQueryOperationTypes,
@@ -36,6 +35,7 @@ import type {
   CodecTypesBase,
   Expression,
   ScopeField,
+  Subquery,
 } from '@prisma-next/sql-relational-core/expression';
 
 /**

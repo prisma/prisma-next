@@ -6,6 +6,7 @@ import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -183,6 +184,7 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
   rawCodecInferer: RawCodecInferer;
 }> {
   const stack = createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,

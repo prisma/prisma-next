@@ -5,7 +5,11 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
 import { DerivedTableSource, type SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { toExpr } from '@prisma-next/sql-relational-core/expression';
+import {
+  // biome-ignore lint/correctness/noUnusedImports: used in `declare` property
+  type SubqueryMarker,
+  toExpr,
+} from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   AggregateFunctions,
@@ -28,8 +32,6 @@ import type {
   QueryContext,
   Scope,
   ScopeField,
-  // biome-ignore lint/correctness/noUnusedImports: used in `declare` property
-  SubqueryMarker,
 } from '../scope';
 import type { GroupedQuery } from '../types/grouped-query';
 import type { SelectQuery } from '../types/select-query';

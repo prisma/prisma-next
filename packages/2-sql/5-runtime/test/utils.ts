@@ -54,6 +54,7 @@ import type {
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
+  SqlRuntimeFamilyDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { defineTestCodec } from './test-codec';
@@ -263,6 +264,28 @@ export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgr
 }
 
 /**
+ * Minimal stub family descriptor for tests. Real callers pass
+ * `sqlRuntimeFamilyDescriptor` from `@prisma-next/family-sql/runtime`;
+ * sql-runtime's own tests cannot import family-sql (workspace cycle) so
+ * they pass this stub instead. The stub registers no codecs and no
+ * query operations — sufficient for tests that exercise stack /
+ * context / runtime plumbing without invoking real SQL operations.
+ */
+export function createTestFamilyDescriptor(): SqlRuntimeFamilyDescriptor {
+  return {
+    kind: 'family' as const,
+    id: 'sql',
+    familyId: 'sql' as const,
+    version: '0.0.1',
+    codecs: () => [],
+    queryOperations: () => ({}),
+    create() {
+      return { familyId: 'sql' as const };
+    },
+  };
+}
+
+/**
  * Creates an ExecutionContext for testing. This helper DRYs up the common pattern of context creation in tests.
  *
  * Accepts a raw adapter and optional extension descriptors, wrapping the adapter in a descriptor internally for descriptor-first context creation.
@@ -277,6 +300,7 @@ export function createTestContext<TContract extends Contract<SqlStorage>>(
   return createExecutionContext({
     contract,
     stack: {
+      family: createTestFamilyDescriptor(),
       target: createTestTargetDescriptor(),
       adapter: createTestAdapterDescriptor(adapter),
       extensionPacks: options?.extensionPacks ?? [],
@@ -294,6 +318,7 @@ export function createTestStackInstance(options?: {
   >;
 }) {
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
     driver: options?.driver,

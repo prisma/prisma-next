@@ -75,6 +75,7 @@ function patchBackfillMigrationTs(
 
   const dbSetupBlock = [
     `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,
+    `import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';`,
     `import { sql } from '@prisma-next/sql-builder/runtime';`,
     `import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';`,
     `import postgresTarget from '@prisma-next/target-postgres/runtime';`,
@@ -82,7 +83,7 @@ function patchBackfillMigrationTs(
     'const db = sql({',
     '  context: createExecutionContext({',
     '    contract: endContract,',
-    '    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),',
+    '    stack: createSqlExecutionStack({ family: sqlRuntimeFamilyDescriptor, target: postgresTarget, adapter: postgresAdapter }),',
     '  }),',
     '});',
     '',
@@ -600,6 +601,7 @@ withTempDir(({ createTempDir }) => {
         expect(draftManifest.to).toBe(c1Hash);
 
         const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -609,7 +611,7 @@ import endContract from './end-contract.json' with { type: 'json' };
 const db = sql({
   context: createExecutionContext({
     contract: endContract,
-    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
+    stack: createSqlExecutionStack({ family: sqlRuntimeFamilyDescriptor, target: postgresTarget, adapter: postgresAdapter }),
   }),
 });
 
@@ -749,6 +751,7 @@ MigrationCLI.run(import.meta.url, M);
         );
 
         const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -758,7 +761,7 @@ import endContract from './end-contract.json' with { type: 'json' };
 const db = sql({
   context: createExecutionContext({
     contract: endContract,
-    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
+    stack: createSqlExecutionStack({ family: sqlRuntimeFamilyDescriptor, target: postgresTarget, adapter: postgresAdapter }),
   }),
 });
 

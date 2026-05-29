@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { contractModels, type Contract as FrameworkContract } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
@@ -138,6 +139,7 @@ const pgVectorCodecStubExtension: SqlRuntimeExtensionDescriptor<'postgres'> = ((
 const testContext: ExecutionContext<TestContract> = createExecutionContext({
   contract: baseTestContract,
   stack: createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: postgresTarget,
     adapter: postgresAdapter,
     extensionPacks: [pgVectorCodecStubExtension],

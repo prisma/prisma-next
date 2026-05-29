@@ -2,6 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import { orm } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
@@ -11,6 +12,7 @@ import { contract } from '../../prisma/contract';
 import { PostCollection, UserCollection } from '../orm-client/collections';
 
 export const stack = createSqlExecutionStack({
+  family: sqlRuntimeFamilyDescriptor,
   target: postgresTarget,
   adapter: postgresAdapter,
   driver: postgresDriver,

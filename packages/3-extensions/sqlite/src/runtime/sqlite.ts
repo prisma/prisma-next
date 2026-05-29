@@ -3,6 +3,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -102,6 +103,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   const contract = resolveContract(options);
   let binding = resolveOptionalSqliteBinding(options);
   const stack = createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,

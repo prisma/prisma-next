@@ -24,6 +24,7 @@ import {
   createTestAdapterDescriptor,
   createTestContext,
   createTestContract,
+  createTestFamilyDescriptor,
   createTestTargetDescriptor,
 } from './utils';
 
@@ -78,6 +79,7 @@ function createSetup(options?: {
   const targetDescriptor = createTestTargetDescriptor();
   const adapterDescriptor = createTestAdapterDescriptor(adapter);
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensionPacks: [],

@@ -25,7 +25,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs, stubAst } from './utils';
+import { createTestFamilyDescriptor, descriptorsFromCodecs, stubAst } from './utils';
 
 /**
  * Verifies the SQL runtime populates `RuntimeMiddlewareContext.scope`
@@ -167,6 +167,7 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
   const adapterDescriptor = createTestAdapterDescriptor(adapter);
 
   const stack = createSqlExecutionStack({
+    family: createTestFamilyDescriptor(),
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensionPacks: [],
@@ -182,7 +183,12 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
 
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    stack: {
+      family: createTestFamilyDescriptor(),
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    },
   });
 
   const runtime = createRuntime({

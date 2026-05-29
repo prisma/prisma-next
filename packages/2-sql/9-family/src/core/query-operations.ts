@@ -22,8 +22,6 @@
  * regression.
  */
 
-import { ExpressionImpl } from '@prisma-next/sql-builder/runtime';
-import type { Subquery } from '@prisma-next/sql-builder/types';
 import {
   AndExpr,
   type AnyExpression as AstExpression,
@@ -43,6 +41,7 @@ import {
   codecOf,
   type Expression,
   type ScopeField,
+  type Subquery,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
 import type { QueryOperationTypes } from '../types/operation-types';
@@ -55,9 +54,15 @@ const BOOL_FIELD = { codecId: 'pg/bool@1' as const, nullable: false as const };
  * Wrap a relational-core AST node as an `Expression<PgBoolReturn>` —
  * the canonical `pg/bool@1` return wrapping used by every predicate
  * factory below.
+ *
+ * Uses a plain object literal rather than `sql-builder`'s `ExpressionImpl`
+ * to keep `family-sql` free of a workspace edge to `sql-builder` (the
+ * cycle-breaking constraint). Downstream consumers only read
+ * `returnType` / `buildAst()` from the wrapper — no `instanceof` checks
+ * — so the structural shape is sufficient.
  */
 function boolExpr(ast: AstExpression): PgBoolReturn {
-  return new ExpressionImpl(ast, BOOL_FIELD);
+  return { returnType: BOOL_FIELD, buildAst: () => ast };
 }
 
 /**

@@ -2,6 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Log } from '@prisma-next/sql-runtime';
@@ -62,6 +63,7 @@ describe('runtime verify-marker: missing marker table', {
     const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } satisfies Log;
 
     const stack = createSqlExecutionStack({
+      family: sqlRuntimeFamilyDescriptor,
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: postgresDriver,

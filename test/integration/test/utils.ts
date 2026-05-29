@@ -5,6 +5,7 @@ import type {
   PostgresDriverCreateOptions,
 } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -46,6 +47,7 @@ export async function createTestRuntime(
   options?: CreateTestRuntimeOptions,
 ): Promise<Runtime> {
   const stack = createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: postgresTarget,
     adapter: postgresAdapter,
     driver:

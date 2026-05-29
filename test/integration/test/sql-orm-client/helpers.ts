@@ -2,10 +2,10 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { contractModels, type Contract as FrameworkContract } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import sqlRuntimeFamilyDescriptor from '@prisma-next/family-sql/runtime';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 
 const POSTGRES_DEFAULT_NAMESPACE_ID = 'public' as const;
-
-import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
@@ -90,6 +90,7 @@ function unboundDomainModels(raw: {
 const testContext: ExecutionContext<TestContract> = createExecutionContext({
   contract: baseTestContract,
   stack: createSqlExecutionStack({
+    family: sqlRuntimeFamilyDescriptor,
     target: postgresTarget,
     adapter: postgresAdapter,
     extensionPacks: [pgvectorRuntime],
