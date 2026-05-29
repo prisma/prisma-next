@@ -1,5 +1,6 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type ForeignKey,
   type Index,
@@ -51,6 +52,26 @@ export type NativeTypeExpander = (input: {
  * `contractToSchemaIR`, keeping the family layer target-agnostic.
  */
 export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
+
+/**
+ * Target-supplied callback that computes the schema-qualified annotation-map
+ * key for a namespace-scoped enum storage type.
+ *
+ * Enum lookups (`readExistingEnumValues`) are namespace/schema-qualified so two
+ * namespaces holding an enum with the same TypeScript name (and even the same
+ * native type) resolve to distinct live-database types. The *format* of that
+ * key — and the namespace → DDL-schema resolution it depends on — is a
+ * target-specific concern (Postgres schemas; SQLite/MySQL differ), so the
+ * target injects it here as data rather than the family layer importing a
+ * concrete `ddlSchemaName`/key implementation. This keeps the family layer
+ * target-agnostic (no `@prisma-next/target-*` dependency) while the projection
+ * still emits keys that match the target's read side exactly.
+ */
+export type EnumStorageKeyResolver = (
+  storage: SqlStorage,
+  namespaceId: string,
+  nativeType: string,
+) => string;
 
 function convertColumn(
   name: string,
@@ -265,6 +286,14 @@ export interface ContractToSchemaIROptions {
   readonly annotationNamespace: string;
   readonly expandNativeType?: NativeTypeExpander;
   readonly renderDefault?: DefaultRenderer;
+  /**
+   * Target-supplied resolver for namespace/schema-qualified enum annotation
+   * keys. When provided (Postgres), every namespace-scoped enum is keyed by the
+   * resolver's output so the projected `storageTypes` map matches the target's
+   * `readExistingEnumValues` lookup. Targets without namespace-qualified enum
+   * storage (SQLite) omit it; enums are absent there.
+   */
+  readonly resolveEnumStorageKey?: EnumStorageKeyResolver;
 }
 
 /**
@@ -330,7 +359,11 @@ export function contractToSchemaIR(
     }
   }
 
-  const annotations = deriveAnnotations(storage, options.annotationNamespace);
+  const annotations = deriveAnnotations(
+    storage,
+    options.annotationNamespace,
+    options.resolveEnumStorageKey,
+  );
 
   return {
     tables,
@@ -338,47 +371,61 @@ export function contractToSchemaIR(
   };
 }
 
+/**
+ * Normalises a native enum storage entry to the codec-typed annotation shape
+ * `{codecId, nativeType, typeParams}` the introspector writes and
+ * `readExistingEnumValues` reads (`existing.codecId` + `existing.typeParams.values`).
+ * Without this the projector would emit the raw `PostgresEnumStorageEntry`
+ * shape (top-level `values`, no `typeParams`) and the enum would read as new.
+ */
+function normalizeEnumAnnotation(entry: PostgresEnumStorageEntry): StorageTypeInstance {
+  return toStorageTypeInstance({
+    codecId: entry.codecId,
+    nativeType: entry.nativeType,
+    typeParams: { values: entry.values },
+  });
+}
+
 function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
+  resolveEnumStorageKey: EnumStorageKeyResolver | undefined,
 ): SqlAnnotations | undefined {
-  const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
-    ...((storage.types ?? {}) as ResolvedStorageTypes),
-  };
-  for (const ns of Object.values(storage.namespaces)) {
-    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
-    if (nsEnums) {
-      for (const [k, v] of Object.entries(nsEnums)) {
-        allTypes[k] = v;
-      }
-    }
-  }
-  const types = allTypes as ResolvedStorageTypes;
-  if (Object.keys(types).length === 0) return undefined;
-  // Re-key by nativeType, normalising every variant to the codec-typed
-  // annotation shape `{codecId, nativeType, typeParams}` produced by the
-  // adapter introspector (`introspectPostgresEnumTypes` writes that shape;
-  // see also `enum-planning.ts § readExistingEnumValues`, which reads
-  // `existing.codecId` + `existing.typeParams.values`). Without this
-  // normalisation, the projector would emit the raw
-  // `PostgresEnumStorageEntry` shape (top-level `values`, no `typeParams`)
-  // and downstream Schema IR consumers that walk the codec-typed shape
-  // would see enum entries as new (e.g. the planner emits a fresh
-  // `CreateEnumTypeCall` instead of the rebuild recipe). Unknown future
-  // kinds without `nativeType` are skipped rather than crashing.
-  const byNativeType: Record<string, StorageTypeInstance> = {};
-  for (const typeInstance of Object.values(types)) {
+  const storageTypes: Record<string, StorageTypeInstance> = {};
+
+  // Top-level `storage.types`: codec-typed entries (vector, decimal, …) keyed
+  // by bare `nativeType` (unchanged). Post-S1.B enums live in
+  // `namespaces[*].enum`, not here; a defensive top-level enum is still
+  // namespace/schema-qualified via the resolver under the unbound coordinate
+  // so it never collides on a bare name.
+  for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
     if (isPostgresEnumStorageEntry(typeInstance)) {
-      byNativeType[typeInstance.nativeType] = toStorageTypeInstance({
-        codecId: typeInstance.codecId,
-        nativeType: typeInstance.nativeType,
-        typeParams: { values: typeInstance.values },
-      });
+      const key = resolveEnumStorageKey
+        ? resolveEnumStorageKey(storage, UNBOUND_NAMESPACE_ID, typeInstance.nativeType)
+        : typeInstance.nativeType;
+      storageTypes[key] = normalizeEnumAnnotation(typeInstance);
       continue;
     }
     if (isStorageTypeInstance(typeInstance)) {
-      byNativeType[typeInstance.nativeType] = typeInstance;
+      storageTypes[typeInstance.nativeType] = typeInstance;
     }
   }
-  return { [annotationNamespace]: { storageTypes: byNativeType } };
+
+  // Namespace-scoped enums: schema-qualified compound key matching the target's
+  // `readExistingEnumValues` read side, so two namespaces sharing an enum name
+  // (or native type) resolve to distinct live-database types.
+  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+    if (!nsEnums) continue;
+    for (const entry of Object.values(nsEnums)) {
+      if (!isPostgresEnumStorageEntry(entry)) continue;
+      const key = resolveEnumStorageKey
+        ? resolveEnumStorageKey(storage, namespaceId, entry.nativeType)
+        : entry.nativeType;
+      storageTypes[key] = normalizeEnumAnnotation(entry);
+    }
+  }
+
+  if (Object.keys(storageTypes).length === 0) return undefined;
+  return { [annotationNamespace]: { storageTypes } };
 }
