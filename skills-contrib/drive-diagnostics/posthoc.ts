@@ -257,6 +257,16 @@ export function parseTranscriptFromString(text: string, sourceLabel = '(string)'
 }
 
 export function parseTranscript(path: string): PostHocResult {
-  const text = readFileSync(path, 'utf-8');
-  return parseTranscriptFromString(text, path);
+  try {
+    const text = readFileSync(path, 'utf-8');
+    return parseTranscriptFromString(text, path);
+  } catch (err) {
+    return {
+      events: [],
+      operatorTurnCount: 0,
+      notes: [
+        `${path}: failed to read transcript (${err instanceof Error ? err.message : String(err)})`,
+      ],
+    };
+  }
 }

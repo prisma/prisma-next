@@ -62,10 +62,15 @@ function mkDispatchStart(
   };
 }
 
-function mkBriefIssued(dispatch_id: string, project_run_id = ENV.project_run_id): TraceEvent {
+function mkBriefIssued(
+  dispatch_id: string,
+  project_run_id = ENV.project_run_id,
+  ts = ENV.ts,
+): TraceEvent {
   return {
     ...ENV,
     event_id: uid(),
+    ts,
     project_run_id,
     event_type: 'brief-issued' as const,
     dispatch_id,
@@ -95,6 +100,29 @@ function mkSpecAuthored(
     edge_cases_count: 3,
     open_questions_count: 2,
     dod_items_count,
+  };
+}
+
+function mkSpecAmended(
+  spec_path: string,
+  spec_kind: 'project' | 'slice' = 'project',
+  dod_items_count = 5,
+  project_run_id = ENV.project_run_id,
+): TraceEvent {
+  return {
+    ...ENV,
+    event_id: uid(),
+    project_run_id,
+    event_type: 'spec-amended' as const,
+    spec_path,
+    spec_kind,
+    byte_length: 4000,
+    bytes_delta: -1000,
+    edge_cases_count: 3,
+    open_questions_count: 1,
+    dod_items_count,
+    reason: 'operator-correction' as const,
+    sections_changed: [],
   };
 }
 
@@ -217,6 +245,39 @@ describe('I1 — fail: same slug completed twice', () => {
     const r = results.find((x) => x.id === 'I1');
     assert.ok(r !== undefined);
     assert.ok(r.evidence[0]?.note?.includes('slice-a'));
+  });
+
+  it('note reports 1 duplicated slug', () => {
+    const r = results.find((x) => x.id === 'I1');
+    assert.ok(r !== undefined);
+    assert.ok(r.note.startsWith('1 slice(s)'));
+  });
+});
+
+describe('I1 — fail: same slug completed three times counts as one duplicated slug', () => {
+  const events: TraceEvent[] = [
+    mkSliceCompleted('slice-a', '2026-01-01T00:00:00.000Z'),
+    mkSliceCompleted('slice-a', '2026-01-01T00:01:00.000Z'),
+    mkSliceCompleted('slice-a', '2026-01-01T00:02:00.000Z'),
+  ];
+  const results = checkInvariants(events);
+
+  it('status is fail', () => {
+    const r = results.find((x) => x.id === 'I1');
+    assert.ok(r !== undefined);
+    assert.equal(r.status, 'fail');
+  });
+
+  it('evidence contains all three events', () => {
+    const r = results.find((x) => x.id === 'I1');
+    assert.ok(r !== undefined);
+    assert.equal(r.evidence.length, 3);
+  });
+
+  it('note correctly reports 1 duplicated slug (not 1 from Math.floor(3/2))', () => {
+    const r = results.find((x) => x.id === 'I1');
+    assert.ok(r !== undefined);
+    assert.ok(r.note.startsWith('1 slice(s)'));
   });
 });
 
@@ -459,6 +520,51 @@ describe('I8 — fail: dispatch-start without matching brief-issued', () => {
   });
 });
 
+describe('I8 — fail: brief-issued from different run does not satisfy the dispatch-start', () => {
+  const BRIEF_TS = '2026-01-01T00:00:00.000Z';
+  const DISPATCH_TS = '2026-01-01T01:00:00.000Z';
+  const events: TraceEvent[] = [
+    mkDispatchStart('d-001', 'run-A', DISPATCH_TS),
+    mkBriefIssued('d-001', 'run-B', BRIEF_TS),
+  ];
+  const results = checkInvariants(events);
+
+  it('status is fail (cross-run brief does not match)', () => {
+    const r = results.find((x) => x.id === 'I8');
+    assert.ok(r !== undefined);
+    assert.equal(r.status, 'fail');
+  });
+
+  it('evidence references the orphan dispatch-start', () => {
+    const r = results.find((x) => x.id === 'I8');
+    assert.ok(r !== undefined);
+    assert.equal(r.evidence.length, 1);
+    assert.equal(r.evidence[0]?.event_type, 'dispatch-start');
+  });
+});
+
+describe('I8 — fail: brief-issued arrives after dispatch-start', () => {
+  const DISPATCH_TS = '2026-01-01T00:00:00.000Z';
+  const BRIEF_TS = '2026-01-01T01:00:00.000Z';
+  const events: TraceEvent[] = [
+    mkDispatchStart('d-late', 'test-run', DISPATCH_TS),
+    mkBriefIssued('d-late', 'test-run', BRIEF_TS),
+  ];
+  const results = checkInvariants(events);
+
+  it('status is fail (brief arrived after dispatch-start)', () => {
+    const r = results.find((x) => x.id === 'I8');
+    assert.ok(r !== undefined);
+    assert.equal(r.status, 'fail');
+  });
+
+  it('evidence note mentions brief occurs after dispatch-start', () => {
+    const r = results.find((x) => x.id === 'I8');
+    assert.ok(r !== undefined);
+    assert.ok(r.evidence[0]?.note?.includes('after'));
+  });
+});
+
 // ---------------------------------------------------------------------------
 // I10 — every project has a DoD in its project spec
 // ---------------------------------------------------------------------------
@@ -504,6 +610,24 @@ describe('I10 — fail: project spec with dod_items_count = 0', () => {
     const r = results.find((x) => x.id === 'I10');
     assert.ok(r !== undefined);
     assert.ok(r.evidence[0]?.note?.includes('dod_items_count'));
+  });
+});
+
+describe('I10 — fail: no spec-authored but spec-amended zeroes out dod_items (early-return bug fix)', () => {
+  const events: TraceEvent[] = [mkSpecAmended('spec.md', 'project', 0)];
+  const results = checkInvariants(events);
+
+  it('status is fail (spec-amended with dod=0 must be caught even without spec-authored)', () => {
+    const r = results.find((x) => x.id === 'I10');
+    assert.ok(r !== undefined);
+    assert.equal(r.status, 'fail');
+  });
+
+  it('evidence references the spec-amended event', () => {
+    const r = results.find((x) => x.id === 'I10');
+    assert.ok(r !== undefined);
+    assert.equal(r.evidence.length, 1);
+    assert.equal(r.evidence[0]?.event_type, 'spec-amended');
   });
 });
 

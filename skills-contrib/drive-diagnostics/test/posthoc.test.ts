@@ -202,3 +202,35 @@ describe('parseTranscript — reads from file path', () => {
     assert.equal(result.operatorTurnCount, fromString.operatorTurnCount);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseTranscript — unreadable file returns structured empty result
+// ---------------------------------------------------------------------------
+
+describe('parseTranscript — unreadable file returns empty result with note', () => {
+  const result = parseTranscript('/nonexistent/path/that/does/not/exist.jsonl');
+
+  it('does not throw', () => {
+    assert.ok(result !== undefined);
+  });
+
+  it('returns empty events', () => {
+    assert.equal(result.events.length, 0);
+  });
+
+  it('returns operatorTurnCount of 0', () => {
+    assert.equal(result.operatorTurnCount, 0);
+  });
+
+  it('includes a note describing the failure', () => {
+    const hasFailNote = result.notes.some((n) => n.includes('failed to read transcript'));
+    assert.ok(hasFailNote, 'notes must mention failed to read transcript');
+  });
+
+  it('includes the path in the failure note', () => {
+    const hasPath = result.notes.some((n) =>
+      n.includes('/nonexistent/path/that/does/not/exist.jsonl'),
+    );
+    assert.ok(hasPath, 'notes must include the file path');
+  });
+});

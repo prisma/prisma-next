@@ -44,8 +44,10 @@ function checkI1(events: TraceEvent[]): AssertionResult {
   }
 
   const duplicates: TraceRef[] = [];
+  let duplicatedSlugCount = 0;
   for (const [slug, slugEvents] of bySlug) {
     if (slugEvents.length > 1) {
+      duplicatedSlugCount += 1;
       for (const e of slugEvents) {
         duplicates.push(ref(e, `duplicate slice-completed for slug "${slug}"`));
       }
@@ -58,7 +60,7 @@ function checkI1(events: TraceEvent[]): AssertionResult {
       title: 'A slice or direct change delivers exactly one PR.',
       status: 'fail',
       evidence: duplicates,
-      note: `${Math.floor(duplicates.length / 2)} slice(s) have more than one slice-completed event`,
+      note: `${duplicatedSlugCount} slice(s) have more than one slice-completed event`,
     };
   }
 
@@ -257,16 +259,29 @@ function checkI8(events: TraceEvent[]): AssertionResult {
   }
 
   const briefIssueds = eventsOfType(events, 'brief-issued');
-  const briefDispatchIds = new Set(briefIssueds.map((e) => e.dispatch_id));
+  const earliestBriefTsByKey = new Map<string, string>();
+  for (const b of briefIssueds) {
+    const key = `${b.project_run_id}::${b.dispatch_id}`;
+    const prev = earliestBriefTsByKey.get(key);
+    if (prev === undefined || b.ts < prev) {
+      earliestBriefTsByKey.set(key, b.ts);
+    }
+  }
 
   const orphans: TraceRef[] = [];
   const matched: TraceRef[] = [];
 
   for (const ds of dispatchStarts) {
-    if (briefDispatchIds.has(ds.dispatch_id)) {
+    const key = `${ds.project_run_id}::${ds.dispatch_id}`;
+    const briefTs = earliestBriefTsByKey.get(key);
+    if (briefTs !== undefined && briefTs <= ds.ts) {
       matched.push(ref(ds));
     } else {
-      orphans.push(ref(ds, `no brief-issued for dispatch_id "${ds.dispatch_id}"`));
+      const note =
+        briefTs === undefined
+          ? `no matching brief-issued for dispatch_id "${ds.dispatch_id}" in run "${ds.project_run_id}"`
+          : `brief-issued for dispatch_id "${ds.dispatch_id}" occurs after dispatch-start`;
+      orphans.push(ref(ds, note));
     }
   }
 
@@ -305,14 +320,17 @@ function checkI10(events: TraceEvent[]): AssertionResult {
   const projectSpecs = eventsOfType(events, 'spec-authored').filter(
     (e) => e.spec_kind === 'project',
   );
+  const projectSpecAmended = eventsOfType(events, 'spec-amended').filter(
+    (e) => e.spec_kind === 'project',
+  );
 
-  if (projectSpecs.length === 0) {
+  if (projectSpecs.length === 0 && projectSpecAmended.length === 0) {
     return {
       id: 'I10',
       title: 'Every project has a DoD declared in its project spec.',
       status: 'pass',
       evidence: [],
-      note: 'No project spec-authored events; invariant does not apply.',
+      note: 'No project spec-authored or spec-amended events; invariant does not apply.',
     };
   }
 
@@ -327,10 +345,6 @@ function checkI10(events: TraceEvent[]): AssertionResult {
     }
   }
 
-  // Also check spec-amended for project kind: if a project spec was amended down to 0 dod_items.
-  const projectSpecAmended = eventsOfType(events, 'spec-amended').filter(
-    (e) => e.spec_kind === 'project',
-  );
   for (const e of projectSpecAmended) {
     if (e.dod_items_count === 0) {
       failing.push(ref(e, `project spec at "${e.spec_path}" amended to dod_items_count = 0`));

@@ -1,4 +1,4 @@
-import type { AssertionResult } from './assertions/index.ts';
+import type { AssertionResult } from './assertions/types.ts';
 import type { LoadError, UnknownEvent } from './load.ts';
 import type { Metrics } from './metrics.ts';
 
@@ -40,12 +40,16 @@ function naCell(note: string | undefined): string {
 // Markdown table
 // ---------------------------------------------------------------------------
 
+function escapeMdCell(value: string): string {
+  return value.replaceAll('|', '\\|').replaceAll('\n', '<br/>');
+}
+
 function mdTable(header: string[], rows: string[][]): string {
   const sep = header.map(() => '---');
   const allRows = [
-    `| ${header.join(' | ')} |`,
+    `| ${header.map(escapeMdCell).join(' | ')} |`,
     `| ${sep.join(' | ')} |`,
-    ...rows.map((r) => `| ${r.join(' | ')} |`),
+    ...rows.map((r) => `| ${r.map(escapeMdCell).join(' | ')} |`),
   ];
   return allRows.join('\n');
 }

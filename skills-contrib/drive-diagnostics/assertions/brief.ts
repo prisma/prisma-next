@@ -136,7 +136,7 @@ function checkBD8(events: TraceEvent[]): AssertionResult {
     };
   }
 
-  const specAuthored = eventsOfType(events, 'spec-authored');
+  const specAuthored = eventsOfType(events, 'spec-authored').filter((e) => e.spec_kind === 'slice');
   const minSpecByteLength = new Map<string, number>();
   for (const e of specAuthored) {
     const current = minSpecByteLength.get(e.project_run_id);

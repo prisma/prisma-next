@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { AssertionResult } from '../assertions/index.ts';
+import type { AssertionResult } from '../assertions/types.ts';
 import type { LoadError, UnknownEvent } from '../load.ts';
 import type { Metrics } from '../metrics.ts';
 import { renderReport } from '../report.ts';
@@ -226,6 +226,39 @@ describe('renderReport — assertion sections', () => {
     assert.ok(report.includes('I1'));
     assert.ok(report.includes('I2'));
     assert.ok(report.includes('I6'));
+  });
+});
+
+describe('renderReport — mdTable cell escaping', () => {
+  const assertions: AssertionResult[] = [
+    {
+      id: 'NC1',
+      title: 'Check with pipe | character',
+      status: 'not-checkable',
+      evidence: [],
+      note: 'rationale with | pipe and\nnewline in note',
+    },
+  ];
+  const report = renderReport({
+    metrics: EMPTY_METRICS,
+    assertions,
+    loadErrors: [],
+    unknown: [],
+    runMeta: RUN_META,
+  });
+
+  it('escapes pipe characters in table cells', () => {
+    assert.ok(report.includes('\\|'), 'pipe in title/note must be escaped as \\|');
+  });
+
+  it('replaces newline in table cells with <br/>', () => {
+    assert.ok(report.includes('<br/>'), 'newline in note must become <br/>');
+  });
+
+  it('the note text appears on a single unbroken table row', () => {
+    const lineWithNote = report.split('\n').find((l) => l.includes('rationale with'));
+    assert.ok(lineWithNote !== undefined, 'note text must appear on exactly one line');
+    assert.ok(lineWithNote.startsWith('|'), 'that line must be a table row');
   });
 });
 

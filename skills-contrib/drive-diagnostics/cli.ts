@@ -16,6 +16,17 @@ function getProjectRunIds(events: TraceEvent[]): string[] {
 }
 
 function main(): void {
+  try {
+    run();
+  } catch (err) {
+    process.stderr.write(
+      `drive:diagnose failed: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exit(1);
+  }
+}
+
+function run(): void {
   const args = process.argv.slice(2);
 
   let tracePath: string | undefined;
@@ -24,12 +35,15 @@ function main(): void {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--out' && i + 1 < args.length) {
+    if (arg === '--out' || arg === '--posthoc') {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith('--')) {
+        process.stderr.write(`Missing value for ${arg}\n`);
+        process.exit(1);
+      }
       i++;
-      outPath = args[i];
-    } else if (arg === '--posthoc' && i + 1 < args.length) {
-      i++;
-      posthocPath = args[i];
+      if (arg === '--out') outPath = next;
+      else posthocPath = next;
     } else if (!arg.startsWith('--')) {
       tracePath = arg;
     }

@@ -70,6 +70,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.6
         version: 4.1.6(vitest@4.1.6)
+      arktype:
+        specifier: 'catalog:'
+        version: 2.2.0
       dependency-cruiser:
         specifier: ^17.4.0
         version: 17.4.0
