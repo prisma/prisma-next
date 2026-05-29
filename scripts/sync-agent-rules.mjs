@@ -54,7 +54,7 @@ function classify(fullPath) {
   }
   if (stat.isSymbolicLink()) {
     try {
-      // statSync follows the link; throws if the target is missing.
+      // readFileSync follows the link; throws if the target is missing or unreadable.
       readFileSync(fullPath);
       return 'symlink';
     } catch {

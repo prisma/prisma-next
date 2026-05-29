@@ -7,7 +7,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 - [Docs Index](docs/README.md) — How the docs are organized and what to read next
 - [Architecture Overview](docs/Architecture%20Overview.md) — High-level design principles
 - [Testing Guide](docs/Testing%20Guide.md) — Philosophy, patterns, and commands
-- [Rules Index](.cursor/rules/README.md) — All Cursor rules organized by topic
+- [Rules Index](.agents/rules/README.md) — All agent rules organized by topic
 - [ADRs](docs/architecture%20docs/adrs/) — Architecture Decision Records
 
 ### Modular Onboarding
@@ -51,9 +51,9 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 - Don't add backwards-compat exports unless asked.
 - Always write tests before creating or modifying implementation.
 - Don't reexport from one file in another, except in `exports/` folders.
-- Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`.
-- Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`.
-- Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`.
+- Don't branch on target; use adapters: `.agents/rules/no-target-branches.mdc`.
+- Keep tests concise; omit "should": `.agents/rules/omit-should-in-tests.mdc`.
+- Keep docs current (READMEs, rules, links): `.agents/rules/doc-maintenance.mdc`.
 - Prefer links to canonical docs over long comments.
 
 ## Typesafety rules
