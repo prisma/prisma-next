@@ -5,7 +5,6 @@ import {
   errorDuplicateMigrationHash,
   errorNoInitialMigration,
   errorNoTarget,
-  errorSameSourceAndTarget,
 } from './errors';
 import type { MigrationEdge, MigrationGraph } from './graph';
 import { bfs } from './graph-ops';
@@ -49,13 +48,6 @@ export function reconstructGraph(packages: readonly OnDiskMigrationPackage[]): M
     // keyed.
     const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
     const { to } = pkg.metadata;
-
-    if (from === to) {
-      const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
-      if (!hasDataOp) {
-        throw errorSameSourceAndTarget(pkg.dirPath, from);
-      }
-    }
 
     nodes.add(from);
     nodes.add(to);
