@@ -14,6 +14,7 @@ import {
   errorMigrationHashMismatch,
   errorMissingFile,
   errorProvidedInvariantsMismatch,
+  MigrationToolsError,
 } from './errors';
 import { verifyMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
@@ -247,6 +248,60 @@ export async function readMigrationPackage(dir: string): Promise<OnDiskMigration
   return pkg;
 }
 
+/**
+ * Reads a migration package's manifest and ops without running hash or
+ * invariants verification. Returns `null` when the files cannot be read or
+ * parsed (i.e. when the package is genuinely unloadable).
+ *
+ * Used by {@link readMigrationsDir} to retain a package whose hash or
+ * invariants diverge from what is stored on disk — the raw content is still
+ * useful for display / querying; only integrity is in question.
+ */
+async function readMigrationPackageRaw(dir: string): Promise<OnDiskMigrationPackage | null> {
+  const absoluteDir = resolve(dir);
+  const manifestPath = join(absoluteDir, MANIFEST_FILE);
+  const opsPath = join(absoluteDir, OPS_FILE);
+
+  let manifestRaw: string;
+  try {
+    manifestRaw = await readFile(manifestPath, 'utf-8');
+  } catch {
+    return null;
+  }
+  let opsRaw: string;
+  try {
+    opsRaw = await readFile(opsPath, 'utf-8');
+  } catch {
+    return null;
+  }
+
+  let metadata: MigrationMetadata;
+  try {
+    metadata = JSON.parse(manifestRaw);
+  } catch {
+    return null;
+  }
+  let ops: MigrationOps;
+  try {
+    ops = JSON.parse(opsRaw);
+  } catch {
+    return null;
+  }
+
+  const result = MigrationMetadataSchema(metadata);
+  if (result instanceof type.errors) return null;
+
+  const opsResult = MigrationOpsSchema(ops);
+  if (opsResult instanceof type.errors) return null;
+
+  return {
+    dirName: basename(absoluteDir),
+    dirPath: absoluteDir,
+    metadata,
+    ops,
+  };
+}
+
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -272,20 +327,64 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
   }
 }
 
-export async function readMigrationsDir(
-  migrationsRoot: string,
-): Promise<readonly OnDiskMigrationPackage[]> {
+/**
+ * A per-package load-time problem returned by {@link readMigrationsDir}.
+ *
+ * Three variants, matching the relocated throws from the load path:
+ *
+ * - `hashMismatch` — stored `migrationHash` differs from the recomputed value.
+ *   The package is **retained** in the returned `packages` array.
+ * - `providedInvariantsMismatch` — `migration.json` declares different
+ *   `providedInvariants` than `ops.json` implies.  The package is **retained**.
+ * - `packageUnloadable` — the manifest is missing, unparseable, or schema-
+ *   invalid.  The package is **omitted** from `packages`.
+ *
+ * Callers that need the `spaceId` context (e.g. the aggregate loader) attach
+ * it when converting to {@link import('./integrity-violation').IntegrityViolation}.
+ */
+export type PackageLoadProblem =
+  | {
+      readonly kind: 'hashMismatch';
+      readonly dirName: string;
+      readonly stored: string;
+      readonly computed: string;
+    }
+  | { readonly kind: 'providedInvariantsMismatch'; readonly dirName: string }
+  | { readonly kind: 'packageUnloadable'; readonly dirName: string; readonly detail: string };
+
+/**
+ * Result returned by {@link readMigrationsDir}.
+ *
+ * - `packages` — every package that could be read; hash-mismatched and
+ *   invariants-mismatched packages are included here (the problem is
+ *   represented rather than fatal).
+ * - `problems` — one entry per package that had a load-time issue.
+ *   `packageUnloadable` entries are **not** in `packages`.
+ */
+export interface ReadMigrationsDirResult {
+  readonly packages: readonly OnDiskMigrationPackage[];
+  readonly problems: readonly PackageLoadProblem[];
+}
+
+function packageLoadProblemDetailFromError(error: unknown): string {
+  if (MigrationToolsError.is(error)) return error.why;
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+export async function readMigrationsDir(migrationsRoot: string): Promise<ReadMigrationsDirResult> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
   } catch (error) {
     if (hasErrnoCode(error, 'ENOENT')) {
-      return [];
+      return { packages: [], problems: [] };
     }
     throw error;
   }
 
   const packages: OnDiskMigrationPackage[] = [];
+  const problems: PackageLoadProblem[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);
@@ -299,10 +398,44 @@ export async function readMigrationsDir(
       continue; // skip non-migration directories
     }
 
-    packages.push(await readMigrationPackage(entryPath));
+    let pkg: OnDiskMigrationPackage;
+    try {
+      pkg = await readMigrationPackage(entryPath);
+    } catch (error) {
+      const dirName = entry;
+      if (MigrationToolsError.is(error)) {
+        if (error.code === 'MIGRATION.HASH_MISMATCH') {
+          const details = error.details as { storedHash: string; computedHash: string } | undefined;
+          const rawPkg = await readMigrationPackageRaw(entryPath);
+          if (rawPkg !== null) packages.push(rawPkg);
+          problems.push({
+            kind: 'hashMismatch',
+            dirName,
+            stored: details?.storedHash ?? '',
+            computed: details?.computedHash ?? '',
+          });
+          continue;
+        }
+        if (error.code === 'MIGRATION.PROVIDED_INVARIANTS_MISMATCH') {
+          const rawPkg = await readMigrationPackageRaw(entryPath);
+          if (rawPkg !== null) packages.push(rawPkg);
+          problems.push({ kind: 'providedInvariantsMismatch', dirName });
+          continue;
+        }
+      }
+      // Any other error (missing file, invalid JSON, invalid manifest schema) →
+      // package unloadable; omit from packages.
+      problems.push({
+        kind: 'packageUnloadable',
+        dirName,
+        detail: packageLoadProblemDetailFromError(error),
+      });
+      continue;
+    }
+    packages.push(pkg);
   }
 
-  return packages;
+  return { packages, problems };
 }
 
 export function formatMigrationDirName(timestamp: Date, slug: string): string {

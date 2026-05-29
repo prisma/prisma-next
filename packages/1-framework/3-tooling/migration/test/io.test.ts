@@ -218,7 +218,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeTestPackage(baselineDir);
     await writeTestPackage(followupDir);
 
-    const packages = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir);
     expect(packages.map((p) => p.dirName).sort()).toEqual(['20260225T1430_a', '20260225T1500_b']);
   });
 
@@ -573,7 +573,7 @@ describe('readMigrationsDir', () => {
       createdAt: '2026-02-25T15:00:00.000Z',
     });
 
-    const packages = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(2);
     expect(packages[0]!.dirName).toBe('20260225T1400_first');
     expect(packages[1]!.dirName).toBe('20260225T1500_second');
@@ -584,14 +584,15 @@ describe('readMigrationsDir', () => {
     await mkdir(join(tmpDir, 'README'), { recursive: true });
     await writeFile(join(tmpDir, 'README', 'content.md'), '# readme');
 
-    const packages = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(1);
     expect(packages[0]!.dirName).toBe('20260225T1400_valid');
   });
 
-  it('returns empty array for empty directory', async () => {
-    const packages = await readMigrationsDir(tmpDir);
+  it('returns empty packages and problems arrays for an empty directory (pre-ENOENT path)', async () => {
+    const { packages, problems } = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(0);
+    expect(problems).toHaveLength(0);
   });
 
   it('rethrows non-ENOENT errors while reading migrations root', async () => {
@@ -605,11 +606,11 @@ describe('readMigrationsDir', () => {
 
   it('skips files (not directories) in root', async () => {
     await writeFile(join(tmpDir, '.gitkeep'), '');
-    const packages = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(0);
   });
 
-  it('propagates MIGRATION.HASH_MISMATCH from any tampered child package', async () => {
+  it('returns a hashMismatch problem and retains the package when a child package is tampered', async () => {
     const intactDir = join(tmpDir, '20260225T1400_intact');
     const tamperedDir = join(tmpDir, '20260225T1500_tampered');
 
@@ -617,11 +618,118 @@ describe('readMigrationsDir', () => {
     await writeTestPackage(tamperedDir);
     await writeFile(join(tamperedDir, 'ops.json'), JSON.stringify([], null, 2));
 
-    await expect(readMigrationsDir(tmpDir)).rejects.toSatisfy((e) => {
-      expectMigrationError(e, 'MIGRATION.HASH_MISMATCH');
-      expect((e as MigrationToolsError).details).toMatchObject({ dir: tamperedDir });
-      return true;
-    });
+    const { packages, problems } = await readMigrationsDir(tmpDir);
+    // Both packages are retained (hashMismatch is recoverable)
+    expect(packages).toHaveLength(2);
+    expect(packages.map((p) => p.dirName).sort()).toEqual([
+      '20260225T1400_intact',
+      '20260225T1500_tampered',
+    ]);
+    // One problem: hashMismatch on the tampered package
+    expect(problems).toHaveLength(1);
+    const problem = problems[0]!;
+    expect(problem.kind).toBe('hashMismatch');
+    if (problem.kind !== 'hashMismatch') return;
+    expect(problem.dirName).toBe('20260225T1500_tampered');
+    expect(typeof problem.stored).toBe('string');
+    expect(typeof problem.computed).toBe('string');
+    expect(problem.stored).not.toBe(problem.computed);
+  });
+
+  it('returns a providedInvariantsMismatch problem and retains the package when manifest disagrees with ops', async () => {
+    const dir = join(tmpDir, '20260225T1400_invariants_mismatch');
+    const ops = [
+      ...createTestOps(),
+      {
+        id: 'data.alpha',
+        label: 'Data: alpha',
+        operationClass: 'data' as const,
+        name: 'alpha',
+        invariantId: 'alpha',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    await writeTestPackage(dir, { providedInvariants: ['alpha'] }, ops);
+
+    // Tamper: add a phantom invariant with a re-computed hash so hashMismatch
+    // does not fire first (the check fires if stored and derived sets differ).
+    const manifestPath = join(dir, 'migration.json');
+    const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
+    content.providedInvariants = ['alpha', 'phantom'];
+    const { computeMigrationHash } = await import('../src/hash');
+    content.migrationHash = computeMigrationHash(content, ops);
+    await writeFile(manifestPath, JSON.stringify(content, null, 2));
+
+    const { packages, problems } = await readMigrationsDir(tmpDir);
+    // Package is retained despite the mismatch
+    expect(packages).toHaveLength(1);
+    expect(packages[0]!.dirName).toBe('20260225T1400_invariants_mismatch');
+    // Problem reported
+    expect(problems).toHaveLength(1);
+    const problem = problems[0]!;
+    expect(problem.kind).toBe('providedInvariantsMismatch');
+    if (problem.kind !== 'providedInvariantsMismatch') return;
+    expect(problem.dirName).toBe('20260225T1400_invariants_mismatch');
+  });
+
+  it('returns a packageUnloadable problem and omits the package when migration.json is missing', async () => {
+    const validDir = join(tmpDir, '20260225T1400_valid');
+    const brokenDir = join(tmpDir, '20260225T1500_broken');
+
+    await writeTestPackage(validDir);
+    // Create a directory that looks like a migration package (has migration.json
+    // when stat'd), then remove the file to simulate missing manifest.
+    await mkdir(brokenDir, { recursive: true });
+    // We need a migration.json to pass the stat() probe, then corrupt it.
+    await writeFile(join(brokenDir, 'migration.json'), 'not json at all');
+    await writeFile(join(brokenDir, 'ops.json'), '[]');
+
+    const { packages, problems } = await readMigrationsDir(tmpDir);
+    // Only the valid package is in packages
+    expect(packages).toHaveLength(1);
+    expect(packages[0]!.dirName).toBe('20260225T1400_valid');
+    // The broken package is reported as unloadable
+    expect(problems).toHaveLength(1);
+    const problem = problems[0]!;
+    expect(problem.kind).toBe('packageUnloadable');
+    if (problem.kind !== 'packageUnloadable') return;
+    expect(problem.dirName).toBe('20260225T1500_broken');
+    expect(typeof problem.detail).toBe('string');
+    expect(problem.detail.length).toBeGreaterThan(0);
+  });
+
+  it('returns a packageUnloadable problem and omits the package when migration.json is schema-invalid', async () => {
+    const dir = join(tmpDir, '20260225T1400_invalid_schema');
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify({ from: 'x' }));
+    await writeFile(join(dir, 'ops.json'), '[]');
+
+    const { packages, problems } = await readMigrationsDir(tmpDir);
+    expect(packages).toHaveLength(0);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]!.kind).toBe('packageUnloadable');
+  });
+
+  it('collects problems from multiple packages without stopping at the first', async () => {
+    const dir1 = join(tmpDir, '20260225T1400_tampered');
+    const dir2 = join(tmpDir, '20260225T1500_missing_manifest');
+
+    await writeTestPackage(dir1);
+    await writeFile(join(dir1, 'ops.json'), JSON.stringify([], null, 2));
+
+    await mkdir(dir2, { recursive: true });
+    await writeFile(join(dir2, 'migration.json'), 'not json');
+    await writeFile(join(dir2, 'ops.json'), '[]');
+
+    const { packages, problems } = await readMigrationsDir(tmpDir);
+    // tampered package is retained (hashMismatch), broken one is omitted (packageUnloadable)
+    expect(packages).toHaveLength(1);
+    expect(packages[0]!.dirName).toBe('20260225T1400_tampered');
+    expect(problems).toHaveLength(2);
+    const kinds = problems.map((p) => p.kind).sort();
+    expect(kinds).toEqual(['hashMismatch', 'packageUnloadable']);
   });
 });
 
@@ -704,7 +812,7 @@ describe('copyFilesWithRename', () => {
 
     await copyFilesWithRename(destDir, []);
 
-    const entries = await readMigrationsDir(join(tmpDir, 'migrations'));
+    const { packages: entries } = await readMigrationsDir(join(tmpDir, 'migrations'));
     expect(entries).toHaveLength(0);
   });
 });

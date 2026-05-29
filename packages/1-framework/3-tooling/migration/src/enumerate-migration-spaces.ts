@@ -104,7 +104,7 @@ export async function enumerateMigrationSpaces(args: {
   const spaces: MigrationSpaceListEntry[] = [];
   for (const spaceId of spaceIds) {
     const spaceDir = spaceMigrationDirectory(projectMigrationsDir, spaceId);
-    const packages = await readMigrationsDir(spaceDir);
+    const { packages } = await readMigrationsDir(spaceDir);
     const refsByHash = await resolveRefsByContractHash(spaceRefsDirectory(spaceDir));
 
     const migrations: MigrationListEntry[] = packages
