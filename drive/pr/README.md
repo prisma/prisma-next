@@ -59,7 +59,7 @@ For PRs routed as **direct change** by `drive-start-workflow`:
 
 ## Reviewer pre-merge check — Signed-off-by on every commit
 
-DCO is a required check; commits without `Signed-off-by` block merge. The reviewer verifies sign-off as a pre-merge gate, regardless of CI status (CI catches it but failures land late and are expensive to fix after threads are anchored to SHAs).
+DCO is a required check; commits without `Signed-off-by` block the merge. The reviewer verifies sign-off as a pre-merge gate, regardless of CI status (CI catches it but failures land late and are expensive to fix after threads are anchored to SHAs).
 
 Reviewer command (run from the branch root):
 
