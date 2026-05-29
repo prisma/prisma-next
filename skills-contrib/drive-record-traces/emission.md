@@ -14,7 +14,7 @@ Resolve the trace file path once per orchestrator session from current project c
 
 | Context | Trace file path | `project_run_id` (envelope) |
 |---|---|---|
-| In-project slice or project work | `projects/<project-slug>/trace.jsonl` | `<project-slug>` (e.g. `drive-instrumentation`) |
+| In-project slice or project work | `projects/<project-slug>/trace.jsonl` | `<project-slug>` (e.g. `sample-project`) |
 | Orphan slice (no parent project) | `wip/drive-trace/orphan-<slice-slug>.jsonl` | `orphan-<slice-slug>` |
 | Direct change | `wip/drive-trace/direct-<ISO-timestamp>.jsonl` | `direct-<ISO-timestamp>` |
 
@@ -64,7 +64,7 @@ mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FI
 Concrete example for in-project work:
 
 ```bash
-TRACE_FILE="projects/drive-instrumentation/trace.jsonl"
+TRACE_FILE="projects/sample-project/trace.jsonl"
 EVENT_JSON='{"event_id":"…","event_type":"dispatch-start",…}'
 mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FILE"
 ```
@@ -99,7 +99,7 @@ This is not a separate trace event — it selects which of two documented event 
 **Shell sketch** (adapt paths and payload construction to the skill's write step):
 
 ```bash
-SPEC_PATH="projects/drive-instrumentation/spec.md"
+SPEC_PATH="projects/sample-project/spec.md"
 if [ -f "$SPEC_PATH" ]; then
   EVENT_TYPE="spec-amended"
 else

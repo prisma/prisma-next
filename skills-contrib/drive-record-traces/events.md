@@ -22,7 +22,7 @@ Every event carries these fields:
 | `event_type` | string | One of the documented event-type names. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. Lifecycle / cadence: `project-started`, `project-closed`, `slice-started`, `slice-completed`, `health-check-fired`, `retro-landed`. |
 | `schema_version` | string | Vocabulary version. Slice 1 ships `"1"`. |
 | `ts` | ISO 8601 UTC string | Wall-clock at emit time. |
-| `project_run_id` | string | Stable identifier for the ProjectRun this event belongs to. Format: project slug for in-project work (e.g. `drive-instrumentation`); `orphan-<slice-slug>` for orphan slices; `direct-<ISO-ts>` for direct changes. Slice 1 hard-codes this per emission site from orchestrator context; automated detection is a later-slice concern. |
+| `project_run_id` | string | Stable identifier for the ProjectRun this event belongs to. Format: project slug for in-project work (e.g. `sample-project`); `orphan-<slice-slug>` for orphan slices; `direct-<ISO-ts>` for direct changes. Slice 1 hard-codes this per emission site from orchestrator context; automated detection is a later-slice concern. |
 | `orchestrator_agent_id` | string \| null | Cursor session UUID when knowable from environment / SDK. Slice 1 emits `null` when not reachable from inside the skill body. |
 
 ## Event types (build loop)
@@ -122,7 +122,7 @@ export const SpecAuthoredEvent = type({
 #### JSONL example
 
 ```jsonl
-{"event_id":"p1000001-0001-4001-8001-000000000001","event_type":"spec-authored","schema_version":"1","ts":"2026-05-28T10:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"spec_path":"projects/drive-instrumentation/spec.md","spec_kind":"project","byte_length":8192,"edge_cases_count":null,"open_questions_count":5,"dod_items_count":8}
+{"event_id":"p1000001-0001-4001-8001-000000000001","event_type":"spec-authored","schema_version":"1","ts":"2026-05-28T10:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"spec_path":"projects/sample-project/spec.md","spec_kind":"project","byte_length":8192,"edge_cases_count":null,"open_questions_count":5,"dod_items_count":8}
 ```
 
 ### `spec-amended`
@@ -165,7 +165,7 @@ export const SpecAmendedEvent = type({
 #### JSONL example
 
 ```jsonl
-{"event_id":"p1000002-0001-4001-8001-000000000002","event_type":"spec-amended","schema_version":"1","ts":"2026-05-28T11:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"spec_path":"projects/drive-instrumentation/spec.md","spec_kind":"project","byte_length":9216,"bytes_delta":1024,"edge_cases_count":null,"open_questions_count":4,"dod_items_count":8,"reason":"falsified-assumption","sections_changed":["Approach","Edge cases"]}
+{"event_id":"p1000002-0001-4001-8001-000000000002","event_type":"spec-amended","schema_version":"1","ts":"2026-05-28T11:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"spec_path":"projects/sample-project/spec.md","spec_kind":"project","byte_length":9216,"bytes_delta":1024,"edge_cases_count":null,"open_questions_count":4,"dod_items_count":8,"reason":"falsified-assumption","sections_changed":["Approach","Edge cases"]}
 ```
 
 #### Notes
@@ -214,7 +214,7 @@ export const PlanAuthoredEvent = type({
 #### JSONL example
 
 ```jsonl
-{"event_id":"p2000001-0002-4002-8002-000000000001","event_type":"plan-authored","schema_version":"1","ts":"2026-05-28T10:30:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"plan_path":"projects/drive-instrumentation/slices/01-trace-vocab-and-build-instrumentation/plan.md","plan_kind":"slice","byte_length":4096,"dispatch_count":6,"slice_count":null,"dispatch_size_distribution":{"S":0,"M":6,"L":0,"XL":0},"open_items_count":2}
+{"event_id":"p2000001-0002-4002-8002-000000000001","event_type":"plan-authored","schema_version":"1","ts":"2026-05-28T10:30:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"plan_path":"projects/sample-project/slices/01-trace-vocab-and-build-instrumentation/plan.md","plan_kind":"slice","byte_length":4096,"dispatch_count":6,"slice_count":null,"dispatch_size_distribution":{"S":0,"M":6,"L":0,"XL":0},"open_items_count":2}
 ```
 
 ### `plan-amended`
@@ -263,7 +263,7 @@ export const PlanAmendedEvent = type({
 #### JSONL example
 
 ```jsonl
-{"event_id":"p2000002-0002-4002-8002-000000000002","event_type":"plan-amended","schema_version":"1","ts":"2026-05-28T12:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"plan_path":"projects/drive-instrumentation/slices/01-trace-vocab-and-build-instrumentation/plan.md","plan_kind":"slice","byte_length":5120,"bytes_delta":1024,"dispatch_count":7,"slice_count":null,"dispatch_size_distribution":{"S":0,"M":7,"L":0,"XL":0},"open_items_count":1,"reason":"dispatch-added","dispatches_added":1,"dispatches_removed":0,"dispatches_resized":0}
+{"event_id":"p2000002-0002-4002-8002-000000000002","event_type":"plan-amended","schema_version":"1","ts":"2026-05-28T12:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"plan_path":"projects/sample-project/slices/01-trace-vocab-and-build-instrumentation/plan.md","plan_kind":"slice","byte_length":5120,"bytes_delta":1024,"dispatch_count":7,"slice_count":null,"dispatch_size_distribution":{"S":0,"M":7,"L":0,"XL":0},"open_items_count":1,"reason":"dispatch-added","dispatches_added":1,"dispatches_removed":0,"dispatches_resized":0}
 ```
 
 ### `triage-verdict`
@@ -295,7 +295,7 @@ export const TriageVerdictEvent = type({
 #### JSONL example
 
 ```jsonl
-{"event_id":"p3000001-0003-4003-8003-000000000001","event_type":"triage-verdict","schema_version":"1","ts":"2026-05-28T09:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"verdict":"in-project-slice","input_shape":"linear-ticket","input_ref":"TML-2704"}
+{"event_id":"p3000001-0003-4003-8003-000000000001","event_type":"triage-verdict","schema_version":"1","ts":"2026-05-28T09:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"verdict":"in-project-slice","input_shape":"linear-ticket","input_ref":"TML-2704"}
 ```
 
 #### Notes
@@ -330,7 +330,7 @@ export const FalsifiedAssumptionEvent = type({
 #### JSONL example
 
 ```jsonl
-{"event_id":"p4000001-0004-4004-8004-000000000001","event_type":"falsified-assumption","schema_version":"1","ts":"2026-05-28T11:30:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"artifact_path":"projects/drive-instrumentation/spec.md","triggered_by":"implementer-pushback","assumption_summary":"Canonical skill path was .agents/skills/ not skills-contrib/"}
+{"event_id":"p4000001-0004-4004-8004-000000000001","event_type":"falsified-assumption","schema_version":"1","ts":"2026-05-28T11:30:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"artifact_path":"projects/sample-project/spec.md","triggered_by":"implementer-pushback","assumption_summary":"Canonical skill path was .agents/skills/ not skills-contrib/"}
 ```
 
 #### Notes
@@ -755,17 +755,17 @@ Each exported `*Event` schema is the full flat object (envelope + payload). Slic
 One example line per slice-1 event type (build loop, then planning chain). Payload values are illustrative.
 
 ```jsonl
-{"event_id":"a1b2c3d4-e5f6-4789-a012-3456789abcde","event_type":"dispatch-start","schema_version":"1","ts":"2026-05-28T14:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","dispatch_name":"implementer D1 R1","subagent_type":"generalPurpose","model":"composer-2.5-fast","parent_dispatch_id":null}
-{"event_id":"c3d4e5f6-a7b8-4901-c234-56789abcdef0","event_type":"round-start","schema_version":"1","ts":"2026-05-28T14:00:01.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","round_id":"d4e5f6a7-b8c9-4012-d345-6789abcdef01","round_number":1}
-{"event_id":"e5f6a7b8-c9d0-4123-e456-789abcdef012","event_type":"brief-issued","schema_version":"1","ts":"2026-05-28T14:00:02.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","round_id":"d4e5f6a7-b8c9-4012-d345-6789abcdef01","brief_byte_length":4096,"brief_content_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","brief_disposition":"initial"}
-{"event_id":"f6a7b8c9-d0e1-4234-f567-89abcdef0123","event_type":"round-end","schema_version":"1","ts":"2026-05-28T15:30:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","round_id":"d4e5f6a7-b8c9-4012-d345-6789abcdef01","verdict":"satisfied","findings_filed":0,"wall_clock_ms":5399000}
-{"event_id":"a7b8c9d0-e1f2-4345-a678-9abcdef01234","event_type":"dispatch-end","schema_version":"1","ts":"2026-05-28T15:30:01.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","result":"completed","wall_clock_ms":5401000}
-{"event_id":"p1000001-0001-4001-8001-000000000001","event_type":"spec-authored","schema_version":"1","ts":"2026-05-28T10:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"spec_path":"projects/drive-instrumentation/spec.md","spec_kind":"project","byte_length":8192,"edge_cases_count":null,"open_questions_count":5,"dod_items_count":8}
-{"event_id":"p1000002-0001-4001-8001-000000000002","event_type":"spec-amended","schema_version":"1","ts":"2026-05-28T11:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"spec_path":"projects/drive-instrumentation/spec.md","spec_kind":"project","byte_length":9216,"bytes_delta":1024,"edge_cases_count":null,"open_questions_count":4,"dod_items_count":8,"reason":"falsified-assumption","sections_changed":["Approach","Edge cases"]}
-{"event_id":"p2000001-0002-4002-8002-000000000001","event_type":"plan-authored","schema_version":"1","ts":"2026-05-28T10:30:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"plan_path":"projects/drive-instrumentation/plan.md","plan_kind":"project","byte_length":6144,"dispatch_count":null,"slice_count":3,"dispatch_size_distribution":null,"open_items_count":1}
-{"event_id":"p2000002-0002-4002-8002-000000000002","event_type":"plan-amended","schema_version":"1","ts":"2026-05-28T12:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"plan_path":"projects/drive-instrumentation/slices/01-trace-vocab-and-build-instrumentation/plan.md","plan_kind":"slice","byte_length":5120,"bytes_delta":1024,"dispatch_count":7,"slice_count":null,"dispatch_size_distribution":{"S":0,"M":7,"L":0,"XL":0},"open_items_count":1,"reason":"dispatch-added","dispatches_added":1,"dispatches_removed":0,"dispatches_resized":0}
-{"event_id":"p3000001-0003-4003-8003-000000000001","event_type":"triage-verdict","schema_version":"1","ts":"2026-05-28T09:00:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"verdict":"in-project-slice","input_shape":"linear-ticket","input_ref":"TML-2704"}
-{"event_id":"p4000001-0004-4004-8004-000000000001","event_type":"falsified-assumption","schema_version":"1","ts":"2026-05-28T11:30:00.000Z","project_run_id":"drive-instrumentation","orchestrator_agent_id":null,"artifact_path":"projects/drive-instrumentation/spec.md","triggered_by":"implementer-pushback","assumption_summary":"Canonical skill path was .agents/skills/ not skills-contrib/"}
+{"event_id":"a1b2c3d4-e5f6-4789-a012-3456789abcde","event_type":"dispatch-start","schema_version":"1","ts":"2026-05-28T14:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","dispatch_name":"implementer D1 R1","subagent_type":"generalPurpose","model":"composer-2.5-fast","parent_dispatch_id":null}
+{"event_id":"c3d4e5f6-a7b8-4901-c234-56789abcdef0","event_type":"round-start","schema_version":"1","ts":"2026-05-28T14:00:01.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","round_id":"d4e5f6a7-b8c9-4012-d345-6789abcdef01","round_number":1}
+{"event_id":"e5f6a7b8-c9d0-4123-e456-789abcdef012","event_type":"brief-issued","schema_version":"1","ts":"2026-05-28T14:00:02.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","round_id":"d4e5f6a7-b8c9-4012-d345-6789abcdef01","brief_byte_length":4096,"brief_content_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","brief_disposition":"initial"}
+{"event_id":"f6a7b8c9-d0e1-4234-f567-89abcdef0123","event_type":"round-end","schema_version":"1","ts":"2026-05-28T15:30:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","round_id":"d4e5f6a7-b8c9-4012-d345-6789abcdef01","verdict":"satisfied","findings_filed":0,"wall_clock_ms":5399000}
+{"event_id":"a7b8c9d0-e1f2-4345-a678-9abcdef01234","event_type":"dispatch-end","schema_version":"1","ts":"2026-05-28T15:30:01.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"dispatch_id":"b2c3d4e5-f6a7-4890-b123-456789abcdef","result":"completed","wall_clock_ms":5401000}
+{"event_id":"p1000001-0001-4001-8001-000000000001","event_type":"spec-authored","schema_version":"1","ts":"2026-05-28T10:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"spec_path":"projects/sample-project/spec.md","spec_kind":"project","byte_length":8192,"edge_cases_count":null,"open_questions_count":5,"dod_items_count":8}
+{"event_id":"p1000002-0001-4001-8001-000000000002","event_type":"spec-amended","schema_version":"1","ts":"2026-05-28T11:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"spec_path":"projects/sample-project/spec.md","spec_kind":"project","byte_length":9216,"bytes_delta":1024,"edge_cases_count":null,"open_questions_count":4,"dod_items_count":8,"reason":"falsified-assumption","sections_changed":["Approach","Edge cases"]}
+{"event_id":"p2000001-0002-4002-8002-000000000001","event_type":"plan-authored","schema_version":"1","ts":"2026-05-28T10:30:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"plan_path":"projects/sample-project/plan.md","plan_kind":"project","byte_length":6144,"dispatch_count":null,"slice_count":3,"dispatch_size_distribution":null,"open_items_count":1}
+{"event_id":"p2000002-0002-4002-8002-000000000002","event_type":"plan-amended","schema_version":"1","ts":"2026-05-28T12:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"plan_path":"projects/sample-project/slices/01-trace-vocab-and-build-instrumentation/plan.md","plan_kind":"slice","byte_length":5120,"bytes_delta":1024,"dispatch_count":7,"slice_count":null,"dispatch_size_distribution":{"S":0,"M":7,"L":0,"XL":0},"open_items_count":1,"reason":"dispatch-added","dispatches_added":1,"dispatches_removed":0,"dispatches_resized":0}
+{"event_id":"p3000001-0003-4003-8003-000000000001","event_type":"triage-verdict","schema_version":"1","ts":"2026-05-28T09:00:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"verdict":"in-project-slice","input_shape":"linear-ticket","input_ref":"TML-2704"}
+{"event_id":"p4000001-0004-4004-8004-000000000001","event_type":"falsified-assumption","schema_version":"1","ts":"2026-05-28T11:30:00.000Z","project_run_id":"sample-project","orchestrator_agent_id":null,"artifact_path":"projects/sample-project/spec.md","triggered_by":"implementer-pushback","assumption_summary":"Canonical skill path was .agents/skills/ not skills-contrib/"}
 {"event_id":"e5000001-0005-4005-8005-000000000001","event_type":"project-started","schema_version":"1","ts":"2026-05-29T08:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"project_slug":"my-new-project","origin":"new-project","has_linear_project":true}
 {"event_id":"e5000002-0005-4005-8005-000000000002","event_type":"project-closed","schema_version":"1","ts":"2026-06-15T16:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"dod_status":"all-met","slices_completed":3,"final_retro_done":true}
 {"event_id":"e5000003-0005-4005-8005-000000000003","event_type":"slice-started","schema_version":"1","ts":"2026-05-29T09:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"slice_slug":"01-initial-scaffolding","slice_index":1,"linear_ref":"TML-2711"}
