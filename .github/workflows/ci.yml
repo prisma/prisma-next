@@ -8,20 +8,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Type Check
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Check working tree is clean
+        run: pnpm check:clean-tree
+
+  typecheck:
+    name: Type Check
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         run: pnpm --filter prisma-orm-demo prisma:generate
-      - name: Build packages
+      - name: Build packages (restored from Turbo cache)
         run: pnpm build
       - name: Type check packages
         run: pnpm typecheck:packages
@@ -30,6 +41,11 @@ jobs:
 
   lint:
     name: Lint
+    # Depends on build only for cache coherence: build is the single writer of
+    # the shared Turbo/pnpm caches, so every other job restores an exact-key
+    # hit and skips saving. Without this, lint (which does no build) could win
+    # the cache-save race and persist a build-less cache.
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -39,10 +55,7 @@ jobs:
           fetch-depth: 0
       - name: Fetch base branch (origin/main)
         run: git fetch --no-tags origin main:refs/remotes/origin/main
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint dependencies
@@ -74,37 +87,19 @@ jobs:
 
   fixtures:
     name: Fixtures
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Build (restored from Turbo cache)
         run: pnpm build
       - name: Link built binaries
         run: pnpm install --frozen-lockfile
       - name: Check fixtures are up to date
         run: pnpm fixtures:check
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        run: pnpm build
-      - name: Check working tree is clean
-        run: pnpm check:clean-tree
 
   test:
     name: Test
@@ -134,13 +129,10 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
       - name: Install dependencies (skip bin linking)
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Build packages (needed for bin linking)
+      - name: Build packages (restored from Turbo cache; needed for bin linking)
         run: pnpm build
       - name: Link bins
         run: pnpm install --frozen-lockfile
@@ -175,13 +167,10 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Build (restored from Turbo cache)
         run: pnpm build
       - name: Run E2E tests
         run: pnpm test:e2e
@@ -210,13 +199,10 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Build (restored from Turbo cache)
         run: pnpm build
       - name: Run Integration tests
         run: pnpm test:integration
@@ -245,13 +231,10 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          cache: true
-      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Build (restored from Turbo cache)
         run: pnpm build
       - name: Generate coverage and report
         run: node scripts/coverage-report.mjs
