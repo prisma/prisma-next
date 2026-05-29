@@ -665,7 +665,17 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:71967f6c42e19a8241e9b392bc1fe94508230c162e6a3a5c74b1399767ee316e"
+    "storageHash": "sha256:e75bed0cca186c56a9b3b0e93e70c90e3fec8900f565c602c229e44979e4d83d",
+    "types": {
+      "Embedding1536": {
+        "codecId": "pg/vector@1",
+        "kind": "codec-instance",
+        "nativeType": "vector",
+        "typeParams": {
+          "length": 1536
+        }
+      }
+    }
   },
   "execution": {
     "executionHash": "sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e",

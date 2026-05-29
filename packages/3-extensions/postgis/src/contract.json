@@ -13,7 +13,15 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:59877923532fc526703f572f1d54bdd6050502ef30ede3333ee1393ea93b9716"
+    "storageHash": "sha256:9f708ee91f4d72f868ef5e93ce6dd13ccf48bab53c8015241a6e808c6f853584",
+    "types": {
+      "geometry": {
+        "codecId": "pg/geometry@1",
+        "kind": "codec-instance",
+        "nativeType": "geometry",
+        "typeParams": {}
+      }
+    }
   },
   "capabilities": {
     "postgres": {

@@ -560,6 +560,7 @@ export function buildSqlContractFromDefinition(
   const domain =
     domainUnboundTypes !== undefined ? { [UNBOUND_NAMESPACE_ID]: domainUnboundTypes } : undefined;
   const storageWithoutHash = {
+    ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
     namespaces,
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
