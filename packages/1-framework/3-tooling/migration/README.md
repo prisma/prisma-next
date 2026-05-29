@@ -60,7 +60,7 @@ graph TD
     CLI["CLI commands<br/>(migration new, plan, apply, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> HASH["hash.ts<br/>Migration hashing"]
     CLI --> GRAPH["migration-graph.ts<br/>Graph operations"]
-    IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
+    IO --> META["metadata.ts<br/>MigrationMetadata"]
     IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
     HASH --> IO
     HASH --> CAN["@prisma-next/framework-components/utils<br/>canonicalizeJson"]
@@ -88,7 +88,7 @@ graph TD
 
 | Subpath | Contents |
 |---|---|
-| `./metadata` | `MigrationMetadata`, `MigrationHints` |
+| `./metadata` | `MigrationMetadata` |
 | `./package` | `MigrationPackage`, `MigrationOps` |
 | `./graph` | `MigrationGraph`, `MigrationEdge` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
