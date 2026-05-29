@@ -27,14 +27,14 @@ const EMPTY_METRICS: Metrics = {
     round_wallclock_ms_note: 'no round-end events',
   },
   planning_quality: {
-    spec_stability: { count: 0, per_path: {}, reason_distribution: {} },
-    plan_accuracy: {
+    spec_amendments: { count: 0, per_path: {}, reason_distribution: {} },
+    plan_amendments: {
       count: 0,
       per_path: {},
       reason_distribution: {},
-      dispatch_size_distributions: [],
     },
-    i12_halt_rate: { count: 0, triggered_by_distribution: {} },
+    dispatch_sizes: [],
+    i12_halts: { count: 0, triggered_by_distribution: {} },
     triage_stability: null,
     triage_stability_note: 'no triage-verdict events',
   },
@@ -239,5 +239,35 @@ describe('renderReport — determinism', () => {
       runMeta: RUN_META,
     };
     assert.equal(renderReport(input), renderReport(input));
+  });
+});
+
+describe('renderReport — verdict + coverage + provenance', () => {
+  const report = renderReport({
+    metrics: EMPTY_METRICS,
+    assertions: FIXTURE_ASSERTIONS,
+    loadErrors: [],
+    unknown: [],
+    runMeta: RUN_META,
+  });
+
+  it('includes Run verdict heading', () => {
+    assert.ok(report.includes('Run verdict'));
+  });
+
+  it('includes Not computable text', () => {
+    assert.ok(report.includes('Not computable'));
+  });
+
+  it('includes Assertion coverage line', () => {
+    assert.ok(report.includes('Assertion coverage'));
+  });
+
+  it('includes Provenance blockquote', () => {
+    assert.ok(report.includes('Provenance'));
+  });
+
+  it('includes token usage row with not instrumented', () => {
+    assert.ok(report.includes('not instrumented'));
   });
 });

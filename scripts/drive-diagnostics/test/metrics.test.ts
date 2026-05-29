@@ -300,20 +300,25 @@ describe('computeMetrics — empty event array', () => {
     assert.ok(typeof m.rework.round_wallclock_ms_note === 'string');
   });
 
-  it('spec_stability.count is 0 (honest zero)', () => {
-    assert.equal(m.planning_quality.spec_stability.count, 0);
-    assert.deepEqual(m.planning_quality.spec_stability.per_path, {});
-    assert.deepEqual(m.planning_quality.spec_stability.reason_distribution, {});
+  it('spec_amendments.count is 0 (honest zero)', () => {
+    assert.equal(m.planning_quality.spec_amendments.count, 0);
+    assert.deepEqual(m.planning_quality.spec_amendments.per_path, {});
+    assert.deepEqual(m.planning_quality.spec_amendments.reason_distribution, {});
   });
 
-  it('plan_accuracy.count is 0 (honest zero)', () => {
-    assert.equal(m.planning_quality.plan_accuracy.count, 0);
-    assert.deepEqual(m.planning_quality.plan_accuracy.dispatch_size_distributions, []);
+  it('plan_amendments.count is 0 (honest zero)', () => {
+    assert.equal(m.planning_quality.plan_amendments.count, 0);
+    assert.deepEqual(m.planning_quality.plan_amendments.per_path, {});
+    assert.deepEqual(m.planning_quality.plan_amendments.reason_distribution, {});
   });
 
-  it('i12_halt_rate.count is 0 (honest zero)', () => {
-    assert.equal(m.planning_quality.i12_halt_rate.count, 0);
-    assert.deepEqual(m.planning_quality.i12_halt_rate.triggered_by_distribution, {});
+  it('dispatch_sizes is empty (no plan-authored events)', () => {
+    assert.deepEqual(m.planning_quality.dispatch_sizes, []);
+  });
+
+  it('i12_halts.count is 0 (honest zero)', () => {
+    assert.equal(m.planning_quality.i12_halts.count, 0);
+    assert.deepEqual(m.planning_quality.i12_halts.triggered_by_distribution, {});
   });
 
   it('triage_stability is null with a note', () => {
@@ -515,19 +520,19 @@ describe('computeMetrics — planning quality: spec-amended events', () => {
   ];
   const m = computeMetrics(events);
 
-  it('spec_stability.count equals total spec-amended events', () => {
-    assert.equal(m.planning_quality.spec_stability.count, 3);
+  it('spec_amendments.count equals total spec-amended events', () => {
+    assert.equal(m.planning_quality.spec_amendments.count, 3);
   });
 
-  it('spec_stability.per_path tracks counts per file', () => {
-    assert.equal(m.planning_quality.spec_stability.per_path['spec.md'], 2);
-    assert.equal(m.planning_quality.spec_stability.per_path['other.md'], 1);
+  it('spec_amendments.per_path tracks counts per file', () => {
+    assert.equal(m.planning_quality.spec_amendments.per_path['spec.md'], 2);
+    assert.equal(m.planning_quality.spec_amendments.per_path['other.md'], 1);
   });
 
-  it('spec_stability.reason_distribution tallies reasons', () => {
-    assert.equal(m.planning_quality.spec_stability.reason_distribution['falsified-assumption'], 1);
-    assert.equal(m.planning_quality.spec_stability.reason_distribution['operator-correction'], 1);
-    assert.equal(m.planning_quality.spec_stability.reason_distribution['scope-shift'], 1);
+  it('spec_amendments.reason_distribution tallies reasons', () => {
+    assert.equal(m.planning_quality.spec_amendments.reason_distribution['falsified-assumption'], 1);
+    assert.equal(m.planning_quality.spec_amendments.reason_distribution['operator-correction'], 1);
+    assert.equal(m.planning_quality.spec_amendments.reason_distribution['scope-shift'], 1);
   });
 });
 
@@ -539,13 +544,11 @@ describe('computeMetrics — planning quality: plan-authored with dispatch_size_
   ];
   const m = computeMetrics(events);
 
-  it('plan_accuracy.dispatch_size_distributions excludes nulls', () => {
-    assert.equal(m.planning_quality.plan_accuracy.dispatch_size_distributions.length, 2);
-    assert.deepEqual(m.planning_quality.plan_accuracy.dispatch_size_distributions[0], {
-      S: 0,
-      M: 5,
-      L: 0,
-      XL: 0,
+  it('dispatch_sizes excludes nulls and includes plan_path + distribution', () => {
+    assert.equal(m.planning_quality.dispatch_sizes.length, 2);
+    assert.deepEqual(m.planning_quality.dispatch_sizes[0], {
+      plan_path: 'plan1.md',
+      distribution: { S: 0, M: 5, L: 0, XL: 0 },
     });
   });
 });
@@ -558,16 +561,13 @@ describe('computeMetrics — planning quality: i12_halt_rate', () => {
   ];
   const m = computeMetrics(events);
 
-  it('i12_halt_rate.count is 3', () => {
-    assert.equal(m.planning_quality.i12_halt_rate.count, 3);
+  it('i12_halts.count is 3', () => {
+    assert.equal(m.planning_quality.i12_halts.count, 3);
   });
 
   it('triggered_by_distribution tallies correctly', () => {
-    assert.equal(
-      m.planning_quality.i12_halt_rate.triggered_by_distribution['implementer-pushback'],
-      2,
-    );
-    assert.equal(m.planning_quality.i12_halt_rate.triggered_by_distribution['wip-inspection'], 1);
+    assert.equal(m.planning_quality.i12_halts.triggered_by_distribution['implementer-pushback'], 2);
+    assert.equal(m.planning_quality.i12_halts.triggered_by_distribution['wip-inspection'], 1);
   });
 });
 
@@ -735,10 +735,10 @@ describe('computeMetrics — real trace (projects/drive-instrumentation/trace.js
     assert.equal(m.rework.rounds_per_dispatch.mean, rounds / dispatches);
   });
 
-  it('spec_stability + i12_halt_rate counts match the raw event counts', () => {
+  it('spec_amendments + i12_halts counts match the raw event counts', () => {
     const m = computeMetrics(events);
-    assert.equal(m.planning_quality.spec_stability.count, countOf('spec-amended'));
-    assert.equal(m.planning_quality.i12_halt_rate.count, countOf('falsified-assumption'));
+    assert.equal(m.planning_quality.spec_amendments.count, countOf('spec-amended'));
+    assert.equal(m.planning_quality.i12_halts.count, countOf('falsified-assumption'));
   });
 
   it('brief_stability dispositions sum to the brief-issued count', () => {
@@ -766,12 +766,9 @@ describe('computeMetrics — real trace (projects/drive-instrumentation/trace.js
     assert.equal(Object.keys(m.rework.round_wallclock_ms).length, countOf('round-end'));
   });
 
-  it('plan_accuracy.dispatch_size_distributions has one entry per plan-authored', () => {
+  it('dispatch_sizes has one entry per plan-authored with non-null distribution', () => {
     const m = computeMetrics(events);
-    assert.equal(
-      m.planning_quality.plan_accuracy.dispatch_size_distributions.length,
-      countOf('plan-authored'),
-    );
+    assert.equal(m.planning_quality.dispatch_sizes.length, countOf('plan-authored'));
   });
 
   it('write_amplification per-path count equals distinct authored artefact paths', () => {

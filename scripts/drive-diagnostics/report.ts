@@ -73,15 +73,18 @@ function renderRework(m: Metrics['rework']): string {
   }
 
   if (m.backtrack_ratio === null) {
-    rows.push(['backtrack ratio', naCell(m.backtrack_ratio_note)]);
+    rows.push(['backtrack ratio (non-satisfied ÷ satisfied)', naCell(m.backtrack_ratio_note)]);
   } else {
-    rows.push(['backtrack ratio', m.backtrack_ratio.toFixed(3)]);
+    rows.push(['backtrack ratio (non-satisfied ÷ satisfied)', m.backtrack_ratio.toFixed(3)]);
   }
 
   if (m.brief_stability === null) {
-    rows.push(['brief stability (overall)', naCell(m.brief_stability_note)]);
+    rows.push(['brief reissues', naCell(m.brief_stability_note)]);
   } else {
-    rows.push(['brief stability (overall)', fmtDist(m.brief_stability.overall)]);
+    const o = m.brief_stability.overall;
+    const total = Object.values(o).reduce((a, b) => a + b, 0);
+    const reissues = (o.reissue ?? 0) + (o.amended ?? 0);
+    rows.push(['brief reissues', `${String(reissues)} of ${String(total)} (${fmtDist(o)})`]);
   }
 
   if (m.tier_mix === null) {
@@ -113,25 +116,28 @@ function renderRework(m: Metrics['rework']): string {
 function renderPlanningQuality(m: Metrics['planning_quality']): string {
   const rows: string[][] = [];
 
-  rows.push(['spec stability (count)', String(m.spec_stability.count)]);
-  rows.push(['spec stability (reasons)', fmtDist(m.spec_stability.reason_distribution)]);
+  rows.push(['spec amendments (count)', String(m.spec_amendments.count)]);
+  rows.push(['spec amendment reasons', fmtDist(m.spec_amendments.reason_distribution)]);
 
-  rows.push(['plan accuracy (count)', String(m.plan_accuracy.count)]);
-  rows.push(['plan accuracy (reasons)', fmtDist(m.plan_accuracy.reason_distribution)]);
+  rows.push(['plan amendments (count)', String(m.plan_amendments.count)]);
+  rows.push(['plan amendment reasons', fmtDist(m.plan_amendments.reason_distribution)]);
 
   const sizeDists =
-    m.plan_accuracy.dispatch_size_distributions.length === 0
+    m.dispatch_sizes.length === 0
       ? '(none)'
-      : m.plan_accuracy.dispatch_size_distributions
-          .map((d) => `S:${d.S} M:${d.M} L:${d.L} XL:${d.XL}`)
+      : m.dispatch_sizes
+          .map(
+            ({ plan_path, distribution: d }) =>
+              `${plan_path} → S:${d.S} M:${d.M} L:${d.L} XL:${d.XL}`,
+          )
           .join('; ');
-  rows.push(['dispatch size distributions', sizeDists]);
+  rows.push(['planned dispatch sizes (per plan)', sizeDists]);
 
-  rows.push(['I12 halt rate (count)', String(m.i12_halt_rate.count)]);
-  rows.push(['I12 triggered by', fmtDist(m.i12_halt_rate.triggered_by_distribution)]);
+  rows.push(['I12 halts (count)', String(m.i12_halts.count)]);
+  rows.push(['I12 halts triggered by', fmtDist(m.i12_halts.triggered_by_distribution)]);
 
   if (m.triage_stability === null) {
-    rows.push(['triage stability', naCell(m.triage_stability_note)]);
+    rows.push(['triage re-verdicts', naCell(m.triage_stability_note)]);
   } else {
     const entries = Object.entries(m.triage_stability).sort(([a], [b]) => a.localeCompare(b));
     const val =
@@ -143,10 +149,12 @@ function renderPlanningQuality(m: Metrics['planning_quality']): string {
                 `${ref}: ${info.count} verdict(s), ${info.distinct_verdict_count} distinct`,
             )
             .join('; ');
-    rows.push(['triage stability', val]);
+    rows.push(['triage re-verdicts', val]);
   }
 
-  return `### Planning Quality\n\n${mdTable(['Metric', 'Value'], rows)}`;
+  const note =
+    '_Counts of instability events: lower is better; 0 means the artefact held (no amendments / halts)._';
+  return `### Planning Quality\n\n${note}\n\n${mdTable(['Metric', 'Value'], rows)}`;
 }
 
 function renderArtefactChurn(m: Metrics['artefact_churn']): string {
@@ -173,10 +181,14 @@ function renderArtefactChurn(m: Metrics['artefact_churn']): string {
   const stabilityVal =
     stabilityEntries.length === 0
       ? '(none)'
-      : stabilityEntries.map(([p, ms]) => `${p}: ${fmtMs(ms)}`).join(', ');
+      : stabilityEntries
+          .map(([p, ms]) => `${p}: ${ms === 0 ? '0 ms (no re-amendment)' : fmtMs(ms)}`)
+          .join(', ');
   rows.push(['time to stability', stabilityVal]);
 
-  return `### Artefact Churn\n\n${mdTable(['Metric', 'Value'], rows)}`;
+  const note =
+    '_Write amplification = writes per artefact (authored + amended); 1.00 = authored once, never rewritten (the floor, and the best case)._';
+  return `### Artefact Churn\n\n${note}\n\n${mdTable(['Metric', 'Value'], rows)}`;
 }
 
 function renderLifecycle(m: Metrics['lifecycle']): string {
@@ -224,8 +236,49 @@ function renderLifecycle(m: Metrics['lifecycle']): string {
 function renderOperator(m: Metrics['operator'], turnCountOverride?: number | null): string {
   const value =
     turnCountOverride != null ? String(turnCountOverride) : naCell(m.operator_turn_count_note);
-  const rows: string[][] = [['operator turn count', value]];
+  const rows: string[][] = [
+    ['operator turn count', value],
+    ['token usage', 'n/a — not instrumented (no token-usage event in the trace vocabulary)'],
+  ];
   return `### Operator\n\n${mdTable(['Metric', 'Value'], rows)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Header helpers
+// ---------------------------------------------------------------------------
+
+function renderAssertionCoverage(assertions: AssertionResult[]): string {
+  const total = assertions.length;
+  if (total === 0) return '**Assertion coverage:** n/a (no assertions)';
+  const checkable = assertions.filter((a) => a.status === 'pass' || a.status === 'fail').length;
+  const notObservable = total - checkable;
+  return `**Assertion coverage:** ${String(checkable)}/${String(total)} checkable (${String(notObservable)} not observable from the trace)`;
+}
+
+function renderProvenance(origin: RunMeta['origin']): string {
+  const captions: Record<RunMeta['origin'], string> = {
+    native:
+      '> Provenance: events were appended through the trace path; their values are author-asserted (e.g. round verdicts are written by the emitter, not verified by an external gate). Read the metrics below as *what was recorded*, not *what was independently measured*.',
+    'post-hoc':
+      '> Provenance: events were reconstructed post-hoc from a transcript — timestamps are absent and counts are best-effort.',
+    mixed:
+      '> Provenance: mixed native + post-hoc events; post-hoc events are best-effort and timestamp-less. Native values are author-asserted, not independently verified.',
+  };
+  return captions[origin];
+}
+
+function renderVerdict(): string {
+  return [
+    '## Run verdict',
+    '',
+    '**Not computable** from this trace alone — this report describes *what happened*, not *how good the run was*:',
+    '',
+    '- **Correctness** (the primary axis): no external correctness signal in the trace; round-end verdicts are emitter-asserted, not CI / merge / judge results.',
+    '- **Tokens** (top efficiency target): not instrumented — no token-usage event exists in the trace vocabulary.',
+    '- **Baseline**: single-run report; "how good vs. the alternative" requires cross-run comparison.',
+    '',
+    'Treat all-green metrics below as "no recorded problems", not "verified good".',
+  ].join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +332,7 @@ export function renderReport(input: ReportInput): string {
     runMeta.projectRunIds.length === 0 ? '(none)' : runMeta.projectRunIds.slice().sort().join(', ');
   lines.push(`**Run IDs:** ${runIds}`);
   lines.push(`**Origin:** ${runMeta.origin}`);
+  lines.push(renderAssertionCoverage(assertions));
 
   if (loadErrors.length > 0 || unknown.length > 0) {
     lines.push('');
@@ -287,6 +341,12 @@ export function renderReport(input: ReportInput): string {
     );
   }
 
+  lines.push('');
+  lines.push(renderProvenance(runMeta.origin));
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push(renderVerdict());
   lines.push('');
   lines.push('---');
   lines.push('');

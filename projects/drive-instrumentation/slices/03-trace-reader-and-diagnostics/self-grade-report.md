@@ -4,6 +4,21 @@
 **Events:** 59
 **Run IDs:** drive-instrumentation
 **Origin:** native
+**Assertion coverage:** 7/31 checkable (24 not observable from the trace)
+
+> Provenance: events were appended through the trace path; their values are author-asserted (e.g. round verdicts are written by the emitter, not verified by an external gate). Read the metrics below as *what was recorded*, not *what was independently measured*.
+
+---
+
+## Run verdict
+
+**Not computable** from this trace alone — this report describes *what happened*, not *how good the run was*:
+
+- **Correctness** (the primary axis): no external correctness signal in the trace; round-end verdicts are emitter-asserted, not CI / merge / judge results.
+- **Tokens** (top efficiency target): not instrumented — no token-usage event exists in the trace vocabulary.
+- **Baseline**: single-run report; "how good vs. the alternative" requires cross-run comparison.
+
+Treat all-green metrics below as "no recorded problems", not "verified good".
 
 ---
 
@@ -15,8 +30,8 @@
 | --- | --- |
 | rounds per dispatch (mean) | 1.00 |
 | first-pass acceptance rate | 100.0% |
-| backtrack ratio | 0.000 |
-| brief stability (overall) | initial: 11 |
+| backtrack ratio (non-satisfied ÷ satisfied) | 0.000 |
+| brief reissues | 0 of 11 (initial: 11) |
 | tier mix | claude-4.6-sonnet-high-thinking: 11 |
 | dispatch wallclock (mean) | 616909 ms |
 | dispatch wallclock (total) | 6786000 ms |
@@ -25,24 +40,28 @@
 
 ### Planning Quality
 
+_Counts of instability events: lower is better; 0 means the artefact held (no amendments / halts)._
+
 | Metric | Value |
 | --- | --- |
-| spec stability (count) | 0 |
-| spec stability (reasons) | (none) |
-| plan accuracy (count) | 0 |
-| plan accuracy (reasons) | (none) |
-| dispatch size distributions | S:0 M:5 L:0 XL:0; S:0 M:7 L:0 XL:0 |
-| I12 halt rate (count) | 0 |
-| I12 triggered by | (none) |
-| triage stability | n/a (no signal) — no triage-verdict events |
+| spec amendments (count) | 0 |
+| spec amendment reasons | (none) |
+| plan amendments (count) | 0 |
+| plan amendment reasons | (none) |
+| planned dispatch sizes (per plan) | projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/plan.md → S:0 M:5 L:0 XL:0; projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/plan.md → S:0 M:7 L:0 XL:0 |
+| I12 halts (count) | 0 |
+| I12 halts triggered by | (none) |
+| triage re-verdicts | n/a (no signal) — no triage-verdict events |
 
 ### Artefact Churn
+
+_Write amplification = writes per artefact (authored + amended); 1.00 = authored once, never rewritten (the floor, and the best case)._
 
 | Metric | Value |
 | --- | --- |
 | write amplification (mean) | 1.00 |
 | write amplification (paths) | projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/plan.md: 1, projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/spec.md: 1, projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/plan.md: 1, projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/spec.md: 1 |
-| time to stability | projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/plan.md: 0 ms, projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/spec.md: 0 ms, projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/plan.md: 0 ms, projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/spec.md: 0 ms |
+| time to stability | projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/plan.md: 0 ms (no re-amendment), projects/drive-instrumentation/slices/02-lifecycle-cadence-and-direct-change/spec.md: 0 ms (no re-amendment), projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/plan.md: 0 ms (no re-amendment), projects/drive-instrumentation/slices/03-trace-reader-and-diagnostics/spec.md: 0 ms (no re-amendment) |
 
 ### Lifecycle
 
@@ -62,6 +81,7 @@
 | Metric | Value |
 | --- | --- |
 | operator turn count | n/a (no signal) — post-hoc only — no native operator-turn event exists in slice 1 |
+| token usage | n/a — not instrumented (no token-usage event in the trace vocabulary) |
 
 ---
 

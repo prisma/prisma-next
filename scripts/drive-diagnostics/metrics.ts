@@ -63,21 +63,22 @@ export type Metrics = {
     round_wallclock_ms_note?: string;
   };
   planning_quality: {
-    /** Count of spec-amended events + per-path breakdown + reason distribution. */
-    spec_stability: {
+    /** Count of spec-amended events + per-path breakdown + reason distribution. Counts instability; lower is better, 0 = the spec never changed after authoring. */
+    spec_amendments: {
       count: number;
       per_path: Record<string, number>;
       reason_distribution: Record<string, number>;
     };
-    /** Count of plan-amended events + distribution; dispatch_size_distribution from plan-authored events. */
-    plan_accuracy: {
+    /** Count of plan-amended events + per-path + reason distribution. Counts plan churn; lower is better, 0 = the plan held. */
+    plan_amendments: {
       count: number;
       per_path: Record<string, number>;
       reason_distribution: Record<string, number>;
-      dispatch_size_distributions: DispatchSizeDistribution[];
     };
-    /** Count of falsified-assumption events + triggered_by distribution. */
-    i12_halt_rate: {
+    /** Planned dispatch-size distribution per plan-authored event, labelled by plan path. */
+    dispatch_sizes: { plan_path: string; distribution: DispatchSizeDistribution }[];
+    /** Count of falsified-assumption events + triggered_by distribution. Counts mid-flight halts; lower is better, 0 = no assumption was falsified. */
+    i12_halts: {
       count: number;
       triggered_by_distribution: Record<string, number>;
     };
@@ -327,28 +328,27 @@ function computePlanningQuality(events: TraceEvent[]): Metrics['planning_quality
   const falsified = eventsOfType(events, 'falsified-assumption');
   const triageVerdicts = eventsOfType(events, 'triage-verdict');
 
-  const spec_stability = {
+  const spec_amendments = {
     count: specAmended.length,
     per_path: countByKey(specAmended, (e) => e.spec_path),
     reason_distribution: countByKey(specAmended, (e) => e.reason),
   };
 
-  const dispatch_size_distributions: DispatchSizeDistribution[] = [];
+  const dispatch_sizes: { plan_path: string; distribution: DispatchSizeDistribution }[] = [];
   for (const e of planAuthored) {
     const dist = e.dispatch_size_distribution;
     if (dist !== null) {
-      dispatch_size_distributions.push(dist);
+      dispatch_sizes.push({ plan_path: e.plan_path, distribution: dist });
     }
   }
 
-  const plan_accuracy = {
+  const plan_amendments = {
     count: planAmended.length,
     per_path: countByKey(planAmended, (e) => e.plan_path),
     reason_distribution: countByKey(planAmended, (e) => e.reason),
-    dispatch_size_distributions,
   };
 
-  const i12_halt_rate = {
+  const i12_halts = {
     count: falsified.length,
     triggered_by_distribution: countByKey(falsified, (e) => e.triggered_by),
   };
@@ -384,9 +384,10 @@ function computePlanningQuality(events: TraceEvent[]): Metrics['planning_quality
   }
 
   return {
-    spec_stability,
-    plan_accuracy,
-    i12_halt_rate,
+    spec_amendments,
+    plan_amendments,
+    dispatch_sizes,
+    i12_halts,
     triage_stability,
     triage_stability_note,
   };

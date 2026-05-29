@@ -6,7 +6,7 @@ Executed [`manual-qa.md`](./manual-qa.md) from repo root on the slice-3 branch (
 
 | Gate | Result |
 |---|---|
-| `pnpm test:scripts` | PASS — 397 tests, 397 pass, 0 fail (incl. the 5 `scripts/drive-diagnostics/test/*.test.ts` suites: load, metrics, invariants, cascade-brief, report, posthoc). |
+| `pnpm test:scripts` | PASS — 407 tests, 407 pass, 0 fail (incl. the 5 `scripts/drive-diagnostics/test/*.test.ts` suites: load, metrics, invariants, cascade-brief, report, posthoc). |
 | `tsc --noEmit --strict` over the dir | PASS — exit 0. |
 | `biome check scripts/drive-diagnostics` | PASS — no fixes, 0 errors, 0 `no-bare-cast` diagnostics. |
 
@@ -27,7 +27,7 @@ Executed [`manual-qa.md`](./manual-qa.md) from repo root on the slice-3 branch (
 From `self-grade-report.md` over the live trace (59 events, all native, run id `drive-instrumentation`):
 
 - **Rework: clean.** `rounds_per_dispatch.mean = 1.00`, `first_pass_acceptance_rate = 100%`, `backtrack_ratio = 0` — every dispatch landed in one round, no reissued briefs, all `brief_disposition = initial`.
-- **Planning: stable.** `spec_stability = 0` amendments, `plan_accuracy = 0` amendments, `i12_halt_rate = 0` falsified assumptions, no re-triage.
+- **Planning: stable.** `spec_amendments = 0`, `plan_amendments = 0`, `i12_halts = 0` falsified assumptions, no re-triage.
 - **Assertions: 7 pass / 0 fail / 24 not-checkable.** The not-checkable set is the honest coverage-gap list (scope/purpose immutability, sizing-by-INVEST, brief content sections, reviewer/skill-body facts) — invariants the current trace vocabulary cannot observe.
 
 ## Honest caveat (recorded in the landed finding)
