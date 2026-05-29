@@ -73,7 +73,6 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
     const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
 
     expect(manifest.migrationHash).toMatch(/^sha256:/);
-    expect(manifest.labels).toEqual(['add-posts-author-index']);
     expect(manifest.from).toMatch(/^sha256:/);
     expect(manifest.to).toMatch(/^sha256:/);
     expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);

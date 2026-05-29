@@ -88,8 +88,10 @@ function sortKeys(value: unknown): unknown {
     return value.map(sortKeys);
   }
   const sorted: Record<string, unknown> = Object.create(null);
-  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-    sorted[key] = sortKeys((value as Record<string, unknown>)[key]);
+  for (const [key, entry] of Object.entries(value).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )) {
+    sorted[key] = sortKeys(entry);
   }
   return sorted;
 }
@@ -234,6 +236,11 @@ async function findMigrationManifests(root: string): Promise<string[]> {
 
 // --- Per-file transform ---------------------------------------------------
 
+/** Narrows an arbitrary JSON-parsed value to a plain object (manifest shape). */
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 type Status = 'already-clean' | 'needs-fix' | 'fixed' | 'skipped-no-ops';
 
 interface Result {
@@ -244,18 +251,18 @@ interface Result {
 async function processFile(path: string): Promise<Result> {
   const raw = await readFile(path, 'utf-8');
 
-  let metadata: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return { path, status: 'already-clean' }; // not a manifest object
-    }
-    metadata = parsed as Record<string, unknown>;
+    parsed = JSON.parse(raw);
   } catch (error) {
     throw new Error(
       `${path}: not valid JSON (${error instanceof Error ? error.message : String(error)})`,
     );
   }
+  if (!isJsonObject(parsed)) {
+    return { path, status: 'already-clean' }; // not a manifest object
+  }
+  const metadata = parsed;
 
   // A complete on-disk migration package pairs `migration.json` with a sibling
   // `ops.json` (the operations the hash is computed over); without it we cannot
