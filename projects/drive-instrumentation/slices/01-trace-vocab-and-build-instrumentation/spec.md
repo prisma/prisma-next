@@ -95,7 +95,7 @@ See commit `42feffeb4`.
 
 ### Planning-chain instrumentation (D5a + D5b)
 
-Six skill bodies gain emit-sites. Each emit-site is the same shape as build-workflow's: a 1–3-line "Emit" blockquote citing both `skills-contrib/drive-record-traces/events.md` (payload schema) and `skills-contrib/drive-record-traces/emission.md` (file-append mechanics). Anchor-discovery is the implementer's first task in D5a / D5b; the natural anchors are listed below as guidance, not verbatim section names (the canonical skill bodies have their own structure that the implementer reads on the dispatch).
+Six skill bodies gain emit-sites. Each emit-site is the same shape as build-workflow's: a 1–3-line "Emit" blockquote referencing the `drive-record-traces` skill **by name** (its `events.md` for the payload schema, its `emission.md` for file-append mechanics) — no relative path. Anchor-discovery is the implementer's first task in D5a / D5b; the natural anchors are listed below as guidance, not verbatim section names (the canonical skill bodies have their own structure that the implementer reads on the dispatch).
 
 **D5a — spec + plan lifecycle (4 skills):**
 
@@ -166,7 +166,7 @@ New edge cases introduced by the planning-chain expansion (D4–D6):
 - [ ] **SDoD3.** Reviewer verdict `SATISFIED` on `reviews/code-review.md` at slice close.
 - [ ] **SDoD4.** Manual-QA covers all eleven event types. `manual-qa.md` (D3 + D6) re-runnable; ≥ 2 QA runs committed (`qa-run-01.md` from D3; `qa-run-02.md` from D6); no unresolved 🛑 Blocker findings.
 - [ ] **SDoD5.** Slice doesn't touch surfaces listed as out-of-scope (no instrumentation of lifecycle skills, `drive-dispatch`, or QA-side skills; no assertion / metric code; no judge / harness code; no edits to `.agents/skills/` — only `skills-contrib/` and `docs/drive/`).
-- [ ] **SDoD6.** `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md` exist, are versioned (`schema_version: "1"`), and are linked from every instrumented skill body's emit-sites.
+- [ ] **SDoD6.** `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md` exist, are versioned (`schema_version: "1"`), and are referenced by name (not by relative path) from every instrumented skill body's emit-sites.
 - [ ] **SDoD7.** Every instrumented skill verified non-regressing against an uninstrumented baseline (behaviour-preservation read-through covers all seven instrumented skill bodies — verified per-skill in their respective dispatch's done-when checks).
 - [ ] **SDoD8.** Trace.jsonl evidence committed: `qa-trace-01.jsonl` (D3 — five-event-spine coverage) + `qa-trace-02.jsonl` (D6 — all-eleven-event coverage).
 

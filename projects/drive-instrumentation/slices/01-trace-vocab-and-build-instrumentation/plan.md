@@ -79,7 +79,7 @@ NOT in play: any skill body; the QA artefacts; any new file outside the two docs
 - `skills-contrib/drive-plan-project/SKILL.md` — emits `plan-authored` OR `plan-amended` at the plan-write step.
 - `skills-contrib/drive-plan-slice/SKILL.md` — same shape for slice plans.
 
-Each emit-site is the same shape as D2's: a 1–3-line Emit blockquote citing `skills-contrib/drive-record-traces/events.md` (payload schema) and `skills-contrib/drive-record-traces/emission.md` (file-append mechanics + the existence-check addendum). Anchor-discovery is the implementer's first task — find the "write the spec/plan" step in each skill body and place the emit-site immediately after the write, before the skill returns control to its caller.
+Each emit-site is the same shape as D2's: a 1–3-line Emit blockquote referencing the `drive-record-traces` skill by name (its `events.md` payload schema + its `emission.md` file-append mechanics + the existence-check addendum) — no relative path. Anchor-discovery is the implementer's first task — find the "write the spec/plan" step in each skill body and place the emit-site immediately after the write, before the skill returns control to its caller.
 
 **Files in play.**
 
@@ -93,7 +93,7 @@ NOT in play: any other skill body; docs; QA artefacts.
 **"Done when":**
 
 - [ ] One Emit blockquote per skill body at the post-write anchor. Four files modified, ~5–10 lines each, ~30 lines total.
-- [ ] Each emit-site cites both `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md`.
+- [ ] Each emit-site references the `drive-record-traces` skill by name (its `events.md` + `emission.md`), with no relative path.
 - [ ] The existence-check pattern is correctly applied in each emit-site (the Emit instruction itself names the check: "if the target file exists at write time, emit `*-amended`; else emit `*-authored`").
 - [ ] No other section of any skill body is materially changed; additive-only.
 - [ ] Behaviour-preservation read-through: each skill body's "write the spec/plan" workflow step is unchanged in semantics; quote one before/after fragment in the return report.
@@ -127,7 +127,7 @@ NOT in play: any other skill body; docs; QA artefacts.
 - [ ] Two Emit blockquotes (one per skill body) at the named anchors.
 - [ ] `drive-discussion`'s emit-site explicitly documents the I12-trigger gating — the emit fires only when discussion was entered to address a mid-flight falsified assumption; other entry triggers (pre-spec design, mid-spec fork, operator-requested, unplanned obstacle) do NOT emit. The gating logic lives inside the Emit instruction itself.
 - [ ] `drive-triage-work`'s emit-site fires on every triage verdict (no gating; multiple triage calls per ticket → multiple events).
-- [ ] Each emit-site cites both `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md`.
+- [ ] Each emit-site references the `drive-record-traces` skill by name (its `events.md` + `emission.md`), with no relative path.
 - [ ] No other section of either skill body is materially changed; additive-only.
 - [ ] Behaviour-preservation read-through per skill.
 - [ ] Intent-validation: `git diff --stat <prior-head>..HEAD` lists exactly two files.

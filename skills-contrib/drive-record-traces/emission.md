@@ -79,9 +79,9 @@ Slice 1 assumes a single orchestrator writer per trace file (`drive-build-workfl
 
 ## Canonical Emit snippet (for skill bodies)
 
-Instrumented skills grow by ~one line per transition point. Each emit step names the event type, lists payload fields the orchestrator must compute (see [`events.md`](./events.md)), and delegates append mechanics here:
+Instrumented skills grow by ~one line per transition point. Each emit step names the event type, lists payload fields the orchestrator must compute, refers to this skill **by name** (no path — the runtime resolves `drive-record-traces`), and delegates append mechanics here:
 
-> **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see [`events.md`](./events.md) § `{event_type}`). Append one JSON line per [`emission.md`](./emission.md) § Append protocol (`Shell` + `mkdir -p` + `printf … >> trace file`).
+> **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see the `drive-record-traces` skill — `events.md` § `{event_type}`). Append one JSON line per the same skill's `emission.md` § Append protocol (`Shell` + `mkdir -p` + `printf … >> trace file`).
 
 Replace `{event_type}` with the event name for the transition point. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. For spec/plan writes, apply § Existence-check pattern before choosing `*-authored` vs `*-amended`. Resolve `TRACE_FILE` from § Trace file path resolution before the first emit in the session.
 
@@ -127,5 +127,5 @@ The check uses the orchestrator's filesystem view at write time. A same-session 
 ## References
 
 - Event vocabulary (envelope, payloads, arktype, examples): [`events.md`](./events.md).
-- Drive domain model (dispatch, round, ProjectRun): [`model.md`](../../docs/drive/model.md).
-- Brief discipline (feeds `brief-issued`): [`brief-discipline.md`](../../docs/drive/principles/brief-discipline.md).
+- Drive domain model (dispatch, round, ProjectRun): the Drive `model` doc.
+- Brief discipline (feeds `brief-issued`): the Drive `brief-discipline` principle doc.

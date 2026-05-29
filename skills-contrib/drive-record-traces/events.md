@@ -522,5 +522,5 @@ One example line per slice-1 event type (build loop, then planning chain). Paylo
 
 - Emission protocol (path resolution, append mechanics): [`emission.md`](./emission.md).
 - This skill's overview + the list of instrumented skills: [`SKILL.md`](./SKILL.md).
-- Brief shape the `brief-issued` event measures: [`brief-discipline.md`](../../docs/drive/principles/brief-discipline.md).
-- Build-loop emitter: [`drive-build-workflow`](../drive-build-workflow/SKILL.md).
+- Brief shape the `brief-issued` event measures: the Drive `brief-discipline` principle doc.
+- Build-loop emitter: the `drive-build-workflow` skill.
