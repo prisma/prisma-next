@@ -12,6 +12,7 @@ import {
   requireHeadRef,
   verifyAggregate,
 } from '@prisma-next/migration-tools/aggregate';
+import { castAs } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -174,7 +175,7 @@ function createPerMemberVerifier<TFamilyId extends string, TTargetId extends str
   return (projectedSchema, member, verifyMode) => {
     if (skipSchema) return buildSkippedSchemaResult(member);
     return familyInstance.verifySchema({
-      contract: member.contract,
+      contract: member.contract(),
       // The family's `TSchemaIR` is opaque to migration-tools; the
       // aggregate verifier passes through whatever we hand it. The
       // family expects its own IR shape on the way back.
@@ -250,7 +251,7 @@ function finaliseVerifyResult(args: {
 function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSchemaResult {
   const contract = member.contract();
   const headRef = requireHeadRef(member);
-  const profileHash = (contract as { profileHash?: string }).profileHash;
+  const profileHash = castAs<{ profileHash?: string }>(contract).profileHash;
   return {
     ok: true,
     summary: 'Schema verification skipped',
