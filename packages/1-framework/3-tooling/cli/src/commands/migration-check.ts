@@ -286,10 +286,11 @@ async function loadAggregateIntegrityViolations(
     const familyInstance = config.family.create(createControlStack(config));
     const declaredExtensions = toDeclaredExtensionsFromRaw(config.extensionPacks ?? []);
 
+    const parsedAppContract: unknown = JSON.parse(contractJsonContent);
     const aggregate = await loadContractSpaceAggregate({
       migrationsDir,
       deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
-      appContract: familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown),
+      appContract: familyInstance.deserializeContract(parsedAppContract),
     });
     return aggregate.checkIntegrity({ declaredExtensions, requireContracts: true });
   } catch {

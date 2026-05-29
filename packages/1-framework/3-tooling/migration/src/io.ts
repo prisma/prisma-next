@@ -405,14 +405,14 @@ export async function readMigrationsDir(migrationsRoot: string): Promise<ReadMig
       const dirName = entry;
       if (MigrationToolsError.is(error)) {
         if (error.code === 'MIGRATION.HASH_MISMATCH') {
-          const details = error.details as { storedHash: string; computedHash: string } | undefined;
+          const details = error.details;
           const rawPkg = await readMigrationPackageRaw(entryPath);
           if (rawPkg !== null) packages.push(rawPkg);
           problems.push({
             kind: 'hashMismatch',
             dirName,
-            stored: details?.storedHash ?? '',
-            computed: details?.computedHash ?? '',
+            stored: typeof details?.['storedHash'] === 'string' ? details['storedHash'] : '',
+            computed: typeof details?.['computedHash'] === 'string' ? details['computedHash'] : '',
           });
           continue;
         }

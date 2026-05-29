@@ -102,7 +102,8 @@ async function executeMigrationNewCommand(
 
   let toContract: Contract;
   try {
-    toContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
+    const parsedContract: unknown = JSON.parse(contractJsonContent);
+    toContract = familyInstance.deserializeContract(parsedContract);
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {
