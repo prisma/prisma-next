@@ -43,6 +43,7 @@ import {
   setCommandExamples,
   targetSupportsMigrations,
 } from '../utils/command-helpers';
+import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -227,6 +228,24 @@ async function executeMigrateCommand(
     throw error;
   }
 
+  // Gate the contract-space aggregate before opening a DB connection.
+  // `checkIntegrity` is a pure offline check (on-disk migration state +
+  // the live app contract — no driver), and the transitional constraint
+  // forbids any window where a broken set touches a database. Refusing
+  // here preserves the original "refuse before connecting" safety
+  // property: a tampered/inconsistent set fails with the `5002` integrity
+  // envelope before the driver is ever created.
+  const gate = await buildContractSpaceAggregate({
+    targetId: config.target.targetId,
+    migrationsDir,
+    appContract: contractRaw,
+    extensionPacks: config.extensionPacks ?? [],
+    deserializeContract: (json) => familyInstance.deserializeContract(json),
+  });
+  if (!gate.ok) {
+    return notOk(gate.failure);
+  }
+
   const client = createControlClient({
     family: config.family,
     target: config.target,
@@ -277,7 +296,6 @@ async function executeMigrateCommand(
     const applyResult = await client.migrationApply({
       contract: contractRaw,
       migrationsDir,
-      appMigrationPackages: appPackages.bundles,
       ...ifDefined('refHash', refEntry?.hash),
       ...(refEntry?.invariants ? { refInvariants: refEntry.invariants } : {}),
       ...(refEntry !== undefined ? ifDefined('refName', toArg) : {}),

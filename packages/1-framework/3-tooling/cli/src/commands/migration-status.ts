@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import {
   createControlStack,
   type MigrationPlanOperation,
@@ -5,6 +6,8 @@ import {
 import {
   type ContractMarkerRecordLike,
   graphWalkStrategy,
+  loadContractSpaceAggregate,
+  requireHeadRef,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
@@ -52,6 +55,7 @@ import {
 import {
   type BuildAggregateInputs,
   buildContractSpaceAggregate,
+  mapIntegrityViolations,
 } from '../utils/contract-space-aggregate-loader';
 import {
   type EdgeStatus,
@@ -432,6 +436,47 @@ function resolveDisplayChain(
  * version reports per-space marker + pending state alongside the
  * cross-space totals.
  */
+/**
+ * Reader-subset integrity gate for `migration status`. The tolerant
+ * loader retains a hash-/invariants-mismatched package and omits an
+ * unloadable one instead of throwing, so a genuinely corrupt on-disk
+ * package would otherwise surface downstream as a misleading
+ * "cannot reconstruct migration history". This refuses early with the
+ * structured `5002` integrity envelope on exactly the package
+ * corruptions the prior throwing loader rejected
+ * (`hashMismatch` / `providedInvariantsMismatch` / `packageUnloadable`)
+ * — behaviour-preservation. Self-edges, head-ref, layout, and contract
+ * drift stay tolerated: `status` is a reader, not a gating command.
+ *
+ * Returns the structured failure to refuse on, or `null` to proceed.
+ * Any error building the model is swallowed — the existing pipeline's
+ * contract / load diagnostics own those paths.
+ */
+async function detectPackageCorruption(args: {
+  readonly migrationsDir: string;
+  readonly contractRaw: unknown;
+  readonly deserializeContract: (json: unknown) => Contract;
+}): Promise<CliStructuredError | null> {
+  try {
+    const aggregate = await loadContractSpaceAggregate({
+      migrationsDir: args.migrationsDir,
+      deserializeContract: args.deserializeContract,
+      appContract: args.deserializeContract(args.contractRaw),
+    });
+    const corruption = aggregate
+      .checkIntegrity()
+      .filter(
+        (v) =>
+          v.kind === 'hashMismatch' ||
+          v.kind === 'providedInvariantsMismatch' ||
+          v.kind === 'packageUnloadable',
+      );
+    return mapIntegrityViolations(corruption);
+  } catch {
+    return null;
+  }
+}
+
 export async function loadAggregateStatusSpaces(args: {
   readonly targetId: string;
   readonly migrationsDir: string;
@@ -463,16 +508,19 @@ export async function loadAggregateStatusSpaces(args: {
   for (const member of orderedMembers) {
     const liveMarker = args.markersBySpace?.get(member.spaceId) ?? null;
     const isApp = member.spaceId === aggregate.app.spaceId;
+    // The aggregate passed the integrity gate above, so every member has
+    // a resolved head ref (a missing one would have refused the load).
+    const headRef = requireHeadRef(member);
 
-    if (member.migrations.graph.nodes.size === 0) {
+    if (member.graph().nodes.size === 0) {
       rows.push({
         spaceId: member.spaceId,
         kind: isApp ? 'app' : 'extension',
-        headHash: member.headRef.hash,
+        headHash: headRef.hash,
         ...(args.markersBySpace !== null
           ? {
               markerHash: liveMarker?.storageHash ?? null,
-              status: member.headRef.hash === EMPTY_CONTRACT_HASH ? 'up-to-date' : 'never-planned',
+              status: headRef.hash === EMPTY_CONTRACT_HASH ? 'up-to-date' : 'never-planned',
               pendingCount: 0,
             }
           : {}),
@@ -484,7 +532,7 @@ export async function loadAggregateStatusSpaces(args: {
       rows.push({
         spaceId: member.spaceId,
         kind: isApp ? 'app' : 'extension',
-        headHash: member.headRef.hash,
+        headHash: headRef.hash,
       });
       continue;
     }
@@ -513,7 +561,7 @@ export async function loadAggregateStatusSpaces(args: {
     rows.push({
       spaceId: member.spaceId,
       kind: isApp ? 'app' : 'extension',
-      headHash: member.headRef.hash,
+      headHash: headRef.hash,
       markerHash: liveMarker?.storageHash ?? null,
       pendingCount,
       ...(status ? { status } : {}),
@@ -822,6 +870,16 @@ async function executeMigrationStatusCommand(
     // during construction (e.g. codec lookups) get a consistent view.
     const stack = createControlStack(config);
     const familyInstance = config.family.create(stack);
+
+    const corruptionFailure = await detectPackageCorruption({
+      migrationsDir,
+      contractRaw: contractRawForAggregate,
+      deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
+    });
+    if (corruptionFailure) {
+      return notOk(corruptionFailure);
+    }
+
     try {
       aggregateSpaces = await loadAggregateStatusSpaces({
         targetId: config.target.targetId,

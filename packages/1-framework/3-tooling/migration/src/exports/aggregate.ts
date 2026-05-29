@@ -1,6 +1,7 @@
 export {
   createContractSpaceAggregate,
   createContractSpaceMember,
+  requireHeadRef,
 } from '../aggregate/aggregate';
 export {
   computeIntegrityViolations,

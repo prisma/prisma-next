@@ -10,6 +10,7 @@ import type {
   ContractSpaceAggregate,
   ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
+import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -21,30 +22,31 @@ import type { ControlProgressEvent } from '../../src/control-api/types';
 const APP_HASH = `sha256:${'a'.repeat(64)}`;
 
 function makeAppMember(): ContractSpaceMember {
+  const contract = {
+    storage: { storageHash: APP_HASH, tables: {} },
+  } as unknown as ReturnType<ContractSpaceMember['contract']>;
   return {
     spaceId: 'app',
-    contract: {
-      storage: { storageHash: APP_HASH, tables: {} },
-    } as unknown as ContractSpaceMember['contract'],
+    packages: [],
+    refs: {},
     headRef: { hash: APP_HASH, invariants: [] },
-    migrations: {
-      graph: {
-        nodes: new Set<string>([APP_HASH]),
-        forwardChain: new Map(),
-        reverseChain: new Map(),
-        migrationByHash: new Map(),
-      },
-      packagesByMigrationHash: new Map(),
-    },
+    graph: () => ({
+      nodes: new Set<string>([APP_HASH]),
+      forwardChain: new Map(),
+      reverseChain: new Map(),
+      migrationByHash: new Map(),
+    }),
+    contract: () => contract,
   };
 }
 
 function makeAggregate(): ContractSpaceAggregate {
-  return {
+  return createContractSpaceAggregate({
     targetId: 'postgres',
     app: makeAppMember(),
     extensions: [],
-  };
+    checkIntegrity: () => [],
+  });
 }
 
 function makePerSpacePlan(): AggregatePerSpacePlan {

@@ -46,6 +46,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -71,7 +72,10 @@ async function executeMigrationNewCommand(
   options: MigrationNewOptions,
 ): Promise<Result<MigrationNewResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
+  const { migrationsDir, appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
 
   // Construct the family instance up-front so the on-disk contract read
   // below crosses the serializer seam (`familyInstance.deserializeContract`)
@@ -118,11 +122,29 @@ async function executeMigrationNewCommand(
     );
   }
 
+  // Gate the contract-space aggregate before scaffolding. `migration new`
+  // is a mutating command; the now-tolerant load no longer throws on a
+  // tampered/inconsistent on-disk set, so without this gate a corrupt
+  // package would be silently skipped and the `from` computed off a
+  // partial graph (a misleading "no initial migration" diagnostic).
+  // Refusing here on the gating subset (the `5002` integrity envelope)
+  // preserves the prior refuse-on-tamper behaviour, matching apply/verify.
+  const gate = await buildContractSpaceAggregate({
+    targetId: config.target.targetId,
+    migrationsDir,
+    appContract: toContract,
+    extensionPacks: config.extensionPacks ?? [],
+    deserializeContract: (json) => familyInstance.deserializeContract(json),
+  });
+  if (!gate.ok) {
+    return notOk(gate.failure);
+  }
+
   let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
 
   try {
-    const packages = await readMigrationsDir(appMigrationsDir);
+    const { packages } = await readMigrationsDir(appMigrationsDir);
 
     if (packages.length > 0) {
       const graph = reconstructGraph(packages);

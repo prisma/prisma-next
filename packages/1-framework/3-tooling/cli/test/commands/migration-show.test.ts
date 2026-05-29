@@ -103,7 +103,7 @@ describe('resolveByHashPrefix', () => {
       [createOp('table.user', 'Create table "user"', 'additive')],
     );
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const pkg = packages[0]!;
     const migrationHash = pkg.metadata.migrationHash;
 
@@ -126,7 +126,7 @@ describe('resolveByHashPrefix', () => {
       [createOp('table.user', 'Create table "user"', 'additive')],
     );
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const migrationHash = packages[0]!.metadata.migrationHash;
     const prefix = migrationHash.slice(0, 12);
 
