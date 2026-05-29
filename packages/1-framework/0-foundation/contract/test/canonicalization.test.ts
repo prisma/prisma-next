@@ -90,6 +90,47 @@ describe('canonicalizeContractToObject', () => {
     ]);
   });
 
+  it('preserves additionalProperties:false in a storage validator schema', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        targetFamily: 'mongo',
+        target: 'mongo',
+        storage: {
+          storageHash: 'sha256:stub',
+          namespaces: {
+            [UNBOUND]: {
+              id: UNBOUND,
+              collections: {
+                users: {
+                  validator: {
+                    jsonSchema: {
+                      bsonType: 'object',
+                      properties: { _id: { bsonType: 'objectId' } },
+                      additionalProperties: false,
+                    },
+                    validationLevel: 'strict',
+                    validationAction: 'error',
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    );
+    const jsonSchema = drill(
+      result,
+      'storage',
+      'namespaces',
+      UNBOUND,
+      'collections',
+      'users',
+      'validator',
+      'jsonSchema',
+    );
+    expect(jsonSchema['additionalProperties']).toBe(false);
+  });
+
   it('includes schemaVersion when provided', () => {
     const result = canonicalizeContractToObject(minimal(), { schemaVersion: '1.0' });
     expect(result['schemaVersion']).toBe('1.0');

@@ -5,6 +5,7 @@ import {
 } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ControlFamilyInstance,
   MigrationPlan,
@@ -56,6 +57,36 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['Float', 'mongo/double@1'],
 ]);
 
+const mongoTargetTypes: Record<string, readonly string[]> = {
+  'mongo/string@1': ['string'],
+  'mongo/int32@1': ['int'],
+  'mongo/bool@1': ['bool'],
+  'mongo/date@1': ['date'],
+  'mongo/objectId@1': ['objectId'],
+  'mongo/double@1': ['double'],
+};
+
+// Without a codec lookup the emitter cannot resolve field BSON types, so the
+// derived validator carries empty `properties`. Closed-by-default schemas then
+// reject every real field, so the validator must be derived with the lookup
+// the production emission path also supplies.
+const mongoCodecLookup: CodecLookup = {
+  get(id: string) {
+    const targetTypes = mongoTargetTypes[id];
+    if (!targetTypes) return undefined;
+    return {
+      id,
+      encode: async (v: unknown) => v,
+      decode: async (w: unknown) => w,
+      encodeJson: (v: unknown) => v,
+      decodeJson: (j: unknown) => j,
+    } as ReturnType<CodecLookup['get']>;
+  },
+  targetTypesFor: (id: string) => mongoTargetTypes[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+};
+
 const polymorphicSchema = `
   model Task {
     id    ObjectId @id @map("_id")
@@ -89,6 +120,7 @@ function makeContractFromPsl(): MongoContract {
   const result = interpretPslDocumentToMongoContract({
     document,
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {
     throw new Error(

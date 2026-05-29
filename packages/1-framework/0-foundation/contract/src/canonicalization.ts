@@ -148,6 +148,11 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
 
       const isNullableField = key === 'nullable';
 
+      // `additionalProperties: false` is the closed-schema marker on a Mongo
+      // `$jsonSchema` validator. It is a meaningful constraint, not an omittable
+      // default, so it must survive canonicalization at any nesting depth.
+      const isAdditionalPropertiesField = key === 'additionalProperties';
+
       if (
         !isRequiredModels &&
         !isRequiredNamespaces &&
@@ -167,6 +172,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isNamespaceTableForeignKeys &&
         !isFkBooleanField &&
         !isNullableField &&
+        !isAdditionalPropertiesField &&
         !isStorageTypeTypeParams &&
         !isDomainUnboundTypeParams
       ) {

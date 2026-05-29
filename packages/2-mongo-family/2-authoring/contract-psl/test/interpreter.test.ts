@@ -823,6 +823,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                         email: { bsonType: 'string' },
                         bio: { bsonType: ['null', 'string'] },
                       },
+                      additionalProperties: false,
                     },
                     validationLevel: 'strict',
                     validationAction: 'error',
@@ -840,6 +841,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                         authorId: { bsonType: 'objectId' },
                         createdAt: { bsonType: 'date' },
                       },
+                      additionalProperties: false,
                     },
                     validationLevel: 'strict',
                     validationAction: 'error',
@@ -1639,6 +1641,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           street: { bsonType: 'string' },
           city: { bsonType: 'string' },
         },
+        additionalProperties: false,
       });
     });
 
@@ -1667,6 +1670,7 @@ describe('interpretPslDocumentToMongoContract', () => {
               street: { bsonType: 'string' },
               city: { bsonType: 'string' },
             },
+            additionalProperties: false,
           },
         ],
       });

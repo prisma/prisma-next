@@ -66,6 +66,9 @@ function deriveObjectSchema(
   const result: Record<string, unknown> = {
     bsonType: 'object',
     properties,
+    // Closed by default: documents carrying fields not declared in `properties`
+    // are rejected at every level (top-level collections and nested value objects).
+    additionalProperties: false,
   };
   if (required.length > 0) {
     result['required'] = required.sort();
@@ -73,13 +76,34 @@ function deriveObjectSchema(
   return result;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A closed top-level collection schema that omits `_id` would reject every
+ * document, because MongoDB stamps an `_id` onto every document. The normal
+ * authoring path maps the `@id` field to `_id`, but a model whose `@id` field is
+ * not mapped to `_id` would otherwise produce a top-level schema lacking it.
+ * Only top-level collection schemas get this guarantee — nested value objects
+ * never carry an `_id`.
+ */
+function ensureTopLevelIdProperty(schema: Record<string, unknown>): void {
+  const properties = schema['properties'];
+  if (isRecord(properties) && !('_id' in properties)) {
+    properties['_id'] = {};
+  }
+}
+
 export function deriveJsonSchema(
   fields: Record<string, ContractField>,
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
 ): MongoValidator {
+  const jsonSchema = deriveObjectSchema(fields, valueObjects, codecLookup);
+  ensureTopLevelIdProperty(jsonSchema);
   return new MongoValidator({
-    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup),
+    jsonSchema,
     validationLevel: 'strict',
     validationAction: 'error',
   });
@@ -98,6 +122,8 @@ export function derivePolymorphicJsonSchema(
   codecLookup?: CodecLookup,
 ): MongoValidator {
   const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup);
+  ensureTopLevelIdProperty(baseSchema);
+  const baseProperties = isRecord(baseSchema['properties']) ? baseSchema['properties'] : {};
 
   const oneOf: Record<string, unknown>[] = [];
   for (const variant of variants) {
@@ -107,12 +133,6 @@ export function derivePolymorphicJsonSchema(
         variantOnlyFields[name] = field;
       }
     }
-
-    const entry: Record<string, unknown> = {
-      properties: {
-        [discriminatorField]: { enum: [variant.discriminatorValue] },
-      },
-    };
 
     const variantProperties: Record<string, unknown> = {};
     const variantRequired: string[] = [discriminatorField];
@@ -126,18 +146,29 @@ export function derivePolymorphicJsonSchema(
       }
     }
 
-    if (Object.keys(variantProperties).length > 0) {
-      (entry['properties'] as Record<string, unknown>) = {
-        ...(entry['properties'] as Record<string, unknown>),
+    // `additionalProperties: false` only sees the `properties` of the schema
+    // object it sits on — it does not look into sibling `oneOf` branches. Each
+    // branch is validated independently, so a closed branch must list the base
+    // properties too; otherwise it would reject the base fields. The
+    // discriminator is constrained to this variant's value.
+    const entry: Record<string, unknown> = {
+      properties: {
+        ...baseProperties,
+        [discriminatorField]: { enum: [variant.discriminatorValue] },
         ...variantProperties,
-      };
-    }
-    entry['required'] = variantRequired.sort();
+      },
+      required: variantRequired.sort(),
+      additionalProperties: false,
+    };
 
     oneOf.push(entry);
   }
 
+  // The top-level schema stays open: closure is enforced by the closed branches.
+  // Keeping `additionalProperties: false` here would reject every variant-only
+  // field, since the top-level `properties` only lists base fields.
   const jsonSchema = { ...baseSchema };
+  delete jsonSchema['additionalProperties'];
   if (oneOf.length > 0) {
     jsonSchema['oneOf'] = oneOf;
   }

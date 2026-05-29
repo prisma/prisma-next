@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:2ee73b7cea5db2a81d60ae425b9af74456292ede4a408008cc2278d2c455ca90'>;
+  StorageHashBase<'sha256:91e5141e1b79b8c0b5e8a9de8b9e0e4dfaaa987c52f06fda7506edb6a9710afd'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -279,14 +279,17 @@ type ContractBase = Omit<
                               readonly amount: { readonly bsonType: 'double' };
                               readonly currency: { readonly bsonType: 'string' };
                             };
+                            readonly additionalProperties: false;
                             readonly required: readonly ['amount', 'currency'];
                           };
                           readonly image: {
                             readonly bsonType: 'object';
                             readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                            readonly additionalProperties: false;
                             readonly required: readonly ['url'];
                           };
                         };
+                        readonly additionalProperties: false;
                         readonly required: readonly [
                           'amount',
                           'brand',
@@ -298,6 +301,7 @@ type ContractBase = Omit<
                       };
                     };
                   };
+                  readonly additionalProperties: false;
                   readonly required: readonly ['_id', 'items', 'userId'];
                 };
                 readonly validationLevel: 'strict';
@@ -335,28 +339,43 @@ type ContractBase = Omit<
                   readonly oneOf: readonly [
                     {
                       readonly properties: {
+                        readonly _id: { readonly bsonType: 'objectId' };
+                        readonly userId: { readonly bsonType: 'string' };
+                        readonly sessionId: { readonly bsonType: 'string' };
                         readonly type: { readonly enum: readonly ['view-product'] };
+                        readonly timestamp: { readonly bsonType: 'date' };
                         readonly productId: { readonly bsonType: 'string' };
                         readonly subCategory: { readonly bsonType: 'string' };
                         readonly brand: { readonly bsonType: 'string' };
                         readonly exitMethod: { readonly bsonType: readonly ['null', 'string'] };
                       };
                       readonly required: readonly ['brand', 'productId', 'subCategory', 'type'];
+                      readonly additionalProperties: false;
                     },
                     {
                       readonly properties: {
+                        readonly _id: { readonly bsonType: 'objectId' };
+                        readonly userId: { readonly bsonType: 'string' };
+                        readonly sessionId: { readonly bsonType: 'string' };
                         readonly type: { readonly enum: readonly ['search'] };
+                        readonly timestamp: { readonly bsonType: 'date' };
                         readonly query: { readonly bsonType: 'string' };
                       };
                       readonly required: readonly ['query', 'type'];
+                      readonly additionalProperties: false;
                     },
                     {
                       readonly properties: {
+                        readonly _id: { readonly bsonType: 'objectId' };
+                        readonly userId: { readonly bsonType: 'string' };
+                        readonly sessionId: { readonly bsonType: 'string' };
                         readonly type: { readonly enum: readonly ['add-to-cart'] };
+                        readonly timestamp: { readonly bsonType: 'date' };
                         readonly productId: { readonly bsonType: 'string' };
                         readonly brand: { readonly bsonType: 'string' };
                       };
                       readonly required: readonly ['brand', 'productId', 'type'];
+                      readonly additionalProperties: false;
                     },
                   ];
                 };
@@ -394,6 +413,7 @@ type ContractBase = Omit<
                           readonly unitPrice: { readonly bsonType: 'double' };
                           readonly lineTotal: { readonly bsonType: 'double' };
                         };
+                        readonly additionalProperties: false;
                         readonly required: readonly ['amount', 'lineTotal', 'name', 'unitPrice'];
                       };
                     };
@@ -402,6 +422,7 @@ type ContractBase = Omit<
                     readonly total: { readonly bsonType: 'double' };
                     readonly issuedAt: { readonly bsonType: 'date' };
                   };
+                  readonly additionalProperties: false;
                   readonly required: readonly [
                     '_id',
                     'issuedAt',
@@ -440,6 +461,7 @@ type ContractBase = Omit<
                     readonly postalCode: { readonly bsonType: 'string' };
                     readonly country: { readonly bsonType: 'string' };
                   };
+                  readonly additionalProperties: false;
                   readonly required: readonly [
                     '_id',
                     'city',
@@ -483,14 +505,17 @@ type ContractBase = Omit<
                               readonly amount: { readonly bsonType: 'double' };
                               readonly currency: { readonly bsonType: 'string' };
                             };
+                            readonly additionalProperties: false;
                             readonly required: readonly ['amount', 'currency'];
                           };
                           readonly image: {
                             readonly bsonType: 'object';
                             readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                            readonly additionalProperties: false;
                             readonly required: readonly ['url'];
                           };
                         };
+                        readonly additionalProperties: false;
                         readonly required: readonly [
                           'amount',
                           'brand',
@@ -511,10 +536,12 @@ type ContractBase = Omit<
                           readonly status: { readonly bsonType: 'string' };
                           readonly timestamp: { readonly bsonType: 'date' };
                         };
+                        readonly additionalProperties: false;
                         readonly required: readonly ['status', 'timestamp'];
                       };
                     };
                   };
+                  readonly additionalProperties: false;
                   readonly required: readonly [
                     '_id',
                     'items',
@@ -579,11 +606,13 @@ type ContractBase = Omit<
                         readonly amount: { readonly bsonType: 'double' };
                         readonly currency: { readonly bsonType: 'string' };
                       };
+                      readonly additionalProperties: false;
                       readonly required: readonly ['amount', 'currency'];
                     };
                     readonly image: {
                       readonly bsonType: 'object';
                       readonly properties: { readonly url: { readonly bsonType: 'string' } };
+                      readonly additionalProperties: false;
                       readonly required: readonly ['url'];
                     };
                     readonly embedding: {
@@ -592,6 +621,7 @@ type ContractBase = Omit<
                     };
                     readonly status: { readonly bsonType: 'string' };
                   };
+                  readonly additionalProperties: false;
                   readonly required: readonly [
                     '_id',
                     'articleType',
@@ -638,6 +668,7 @@ type ContractBase = Omit<
                             readonly postalCode: { readonly bsonType: 'string' };
                             readonly country: { readonly bsonType: 'string' };
                           };
+                          readonly additionalProperties: false;
                           readonly required: readonly [
                             'city',
                             'country',
@@ -648,6 +679,7 @@ type ContractBase = Omit<
                       ];
                     };
                   };
+                  readonly additionalProperties: false;
                   readonly required: readonly ['_id', 'email', 'name'];
                 };
                 readonly validationLevel: 'strict';
