@@ -120,7 +120,7 @@ When `--from` is provided, graph reconstruction and target resolution are skippe
 
 - **Lossy conversion**: `contractToSchemaIR` drops codec metadata. If the planner ever needs codec-level information, the converter must be extended.
 - **Manual branch resolution**: Two developers planning concurrently must resolve the branch manually (delete one migration, re-plan, or use `--from`). Future `migration rebase` tooling can automate this.
-- **No `db update` to migrations transition path**: Databases managed with `db update` have a marker but no migration history. Switching to migrations requires a baseline migration. A future `migration baseline` command would bridge this.
+- **No `db update` to migrations transition path**: Databases managed with `db update` have a marker but no migration history. Switching to migrations requires a baseline migration. Closed by ADR 218: `migration plan` auto-emits a baseline bundle on an empty graph when the `db` ref is non-null.
 
 ## Alternatives considered
 

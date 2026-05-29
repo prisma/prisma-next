@@ -174,6 +174,25 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-27, same slice as F8. Slice plan's structural-coherence check #3 used `rg '"mongodb":' "$pkg/package.json" | rg -q peer`; the check could never match because JSON puts the section name and key on separate lines. Resolved via amendment to the slice plan rewriting the check in `jq`.
 
+### F10. Parallel slices collide on a shared non-source artefact; reviewer trusts the scope claim over `git show --stat`
+
+**Symptom.** Two slices are dispatched in parallel on the rationale that they "don't share surface" — but the rationale only considered *source* surface (different commands, different `.ts` files). One slice's commit also edits a **shared non-source artefact** that is another slice's deliverable (a shared ADR, a subsystem doc, a shared fixture, a glossary). The reviewer of the contaminating slice reads the implementer's prose scope claim ("diff is confined to `ref.ts`, `cli-errors.ts`, and the test files") and signs off without cross-checking the actual commit's file list, so the cross-slice touch ships invisibly inside an unrelated commit.
+
+**Detection signal.**
+
+- A slice's parallel-safety rationale names only source files / commands ("different package surface", "no shared `.ts`").
+- A reviewer verdict asserts the diff is "confined to" a file list that came from the implementer's report rather than from `git show --stat <commit>`.
+- A single commit's `--stat` shows a large touch (here +253 lines) to a file owned by a *different* slice (an ADR / subsystem doc / shared fixture).
+- The contaminated artefact is one that two slices both have legitimate reason to edit (e.g. an ADR that one slice authors and another slice's behaviour informs).
+
+**Mitigation.**
+
+- **Parallel-safety must clear non-source surface too.** When declaring slices parallel-safe, enumerate shared *artefact* surface (ADRs, subsystem docs, shared fixtures, glossary, error-code tables), not just source files. Two slices that touch the same ADR are not parallel-safe on that file even if their `.ts` surfaces are disjoint.
+- **Reviewer diff-inspection is grounded in `git show --stat`, never in the implementer's prose.** The scope claim is a hypothesis; the commit's file list is the evidence. A verdict that says "confined to X" must have run `git show --stat <commit>` (or `git diff --stat <base>..<head>`) and reconciled it against X.
+- **Sequence slices that co-own an artefact.** If two slices both legitimately edit the same ADR/doc, sequence them (the doc slice lands last and absorbs the other's edits) rather than running them in parallel and reconciling after the fact.
+
+**Reference incident.** 2026-05-29 retro, project `dev-to-ship-migration-handoff`. The `ref-cmds-snapshot-integration` slice (declared parallel-safe against the `docs-and-adr` slice on "different command surface") had its single commit `70dfb715e` also rewrite ADR 218 (+253 lines) — a `docs-and-adr` deliverable. The Parallel A reviewer's verdict claimed the diff was "confined to `ref.ts`, `cli-errors.ts`, the two test files, and the four scoped test artefacts"; `git show --stat` showed the ADR. The rewrite was editorial (added code references, tightened Context, condensed prose), not a factual divergence, so it was accepted as-is — but the miss was a reviewer-discipline failure, not a benign coincidence, and a factual divergence on the same path would have shipped just as silently.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.
