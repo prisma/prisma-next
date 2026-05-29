@@ -8,9 +8,32 @@ import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { PG_ENUM_CODEC_ID } from '../codec-ids';
 import type { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
+
+/**
+ * Codec-typed enum entry shape stored under
+ * `schema.annotations.pg.storageTypes[(schemaName, nativeType)]`.
+ */
+interface PgStorageTypeEntry {
+  readonly codecId?: string;
+  readonly typeParams?: { readonly values?: unknown };
+}
+
+/** Reads the Postgres annotation envelope (`schema.annotations.pg`). */
+function readPgAnnotations(schema: SqlSchemaIR): {
+  readonly schema?: string;
+  readonly storageTypes?: Record<string, PgStorageTypeEntry>;
+} {
+  return (
+    blindCast<
+      { schema?: string; storageTypes?: Record<string, PgStorageTypeEntry> } | undefined,
+      'pg annotation envelope is an untyped index-signature slot'
+    >(schema.annotations?.['pg']) ?? {}
+  );
+}
 
 /**
  * Separator for `(schemaName, nativeType)` keys in introspected
@@ -25,21 +48,26 @@ export function enumStorageCompoundKey(schemaName: string, nativeType: string): 
 }
 
 /**
- * Resolves the DDL schema name for a namespace coordinate without a full
- * strategy context — used when bridging verifier/planner enum lookups.
+ * Resolves the live-schema name a namespace's enums are introspected under,
+ * for keying `readExistingEnumValues` lookups. The unbound namespace's
+ * `ddlSchemaName` is a planner-emit sentinel (`__unbound__`) that never names a
+ * real schema, so for the unbound coordinate we read the *introspected* schema
+ * recorded on `annotations.pg.schema` (the live `current_schema()` the adapter
+ * walked) — that is the schema the enum's `storageTypes` entry is keyed under.
+ * Named namespaces resolve to their own DDL schema, which matches the
+ * per-schema introspection key directly.
  */
 export function resolveDdlSchemaForNamespaceStorage(
   storage: SqlStorage,
   namespaceId: string,
   schemaIr?: SqlSchemaIR,
 ): string {
+  if (namespaceId === UNBOUND_NAMESPACE_ID) {
+    return (schemaIr ? readPgAnnotations(schemaIr).schema : undefined) ?? 'public';
+  }
   const namespace = storage.namespaces[namespaceId];
   if (namespace && isPostgresSchema(namespace)) {
     return namespace.ddlSchemaName(storage);
-  }
-  if (namespaceId === UNBOUND_NAMESPACE_ID) {
-    const pg = schemaIr?.annotations?.['pg'] as { schema?: string } | undefined;
-    return pg?.schema ?? 'public';
   }
   return namespaceId;
 }
@@ -87,17 +115,7 @@ export function readExistingEnumValues(
   schemaName: string,
   nativeType: string,
 ): readonly string[] | null {
-  const storageTypes = (schema.annotations?.['pg'] as Record<string, unknown> | undefined)?.[
-    'storageTypes'
-  ] as
-    | Record<
-        string,
-        {
-          codecId?: string;
-          typeParams?: { values?: unknown };
-        }
-      >
-    | undefined;
+  const storageTypes = readPgAnnotations(schema).storageTypes;
   const existing = storageTypes?.[enumStorageCompoundKey(schemaName, nativeType)];
   if (!existing || existing.codecId !== PG_ENUM_CODEC_ID) {
     return null;
@@ -106,7 +124,7 @@ export function readExistingEnumValues(
   if (!Array.isArray(enumValues) || !enumValues.every((v) => typeof v === 'string')) {
     return null;
   }
-  return enumValues as readonly string[];
+  return enumValues;
 }
 
 /**
