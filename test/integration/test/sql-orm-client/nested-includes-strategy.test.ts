@@ -5,11 +5,11 @@
 // `./nested-includes-helpers.ts` (per-file test-count threshold of the
 // prisma/dev PGlite infrastructure).
 //
-// These tests are the heart of the TML-2594 acceptance: they pin the
-// SQL-execution count per strategy, so a future regression flipping
-// the dispatch gate is caught at the contract level, not by downstream
-// benchmark drift. The cross-strategy equivalence tests then assert
-// that the three strategies produce byte-identical result trees over
+// These tests pin the SQL-execution count per strategy, so a future
+// regression flipping the dispatch gate is caught at the contract
+// level, not by downstream benchmark drift. The cross-strategy
+// equivalence tests then assert that both single-query strategies —
+// lateral and correlated — produce byte-identical result trees over
 // the same data.
 
 import { describe, expect, it } from 'vitest';
