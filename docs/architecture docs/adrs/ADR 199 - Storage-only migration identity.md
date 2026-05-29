@@ -2,6 +2,7 @@
 
 **Revised:** 2026-04-30 — `kind` removed; `from` is now nullable (TML-2270).
 **Revised:** 2026-05-14 — vestigial `authorship` and `signature` fields removed from `MigrationMetadata` (TML-2458); `strippedMeta` description and example updated to match.
+**Revised:** 2026-05-29 — vestigial `labels` and `hints` fields removed from `MigrationMetadata` entirely (TML-2701); `strippedMeta` description, destructure example, "What stays on disk", and "Why `hints` is excluded" sections updated to match.
 
 **Amends:** [ADR 169 §3 — Content-addressed migration identity](ADR%20169%20-%20On-disk%20migration%20persistence.md)
 
@@ -15,7 +16,7 @@ This is wrong. The migration doesn't care about operation names. It cares about 
 
 ## Decision
 
-`migrationId` is computed from `(strippedManifest, ops)` only. The full `fromContract`, `toContract`, and `hints` objects are excluded from the hash.
+`migrationId` is computed from `(strippedManifest, ops)` only. The full `fromContract` and `toContract` objects are excluded from the hash.
 
 ```ts
 export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOps): string {
@@ -23,7 +24,6 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
     migrationId: _migrationId,
     fromContract: _fromContract,
     toContract: _toContract,
-    hints: _hints,
     ...strippedMeta
   } = manifest;
 
@@ -37,15 +37,11 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
 }
 ```
 
-`strippedMeta` contains `from`, `to`, `labels`, `providedInvariants`, `createdAt`. The `from` field is `string | null`: when it is a string, it is the prior-state storage hash — the same storage-projection commitment that ADR 004 defines; `null` denotes a baseline with no prior state. The `to` field is the destination storage hash. They pin the migration to its bookends: which physical schema it expects (if any), and which physical schema it produces. `providedInvariants` participates in identity because it captures which routing-visible data transforms the migration declares; changing the set changes which refs the migration satisfies, so it is *not* metadata-about. Together with `ops`, the strippedMeta fields fully describe what the migration does to the database. Everything else (the discarded `fromContract`, `toContract`, `hints`, plus the trivially-derived `migrationHash` itself) is metadata *about* the migration, not part of its physical identity.
+`strippedMeta` contains `from`, `to`, `providedInvariants`, `createdAt`. The `from` field is `string | null`: when it is a string, it is the prior-state storage hash — the same storage-projection commitment that ADR 004 defines; `null` denotes a baseline with no prior state. The `to` field is the destination storage hash. They pin the migration to its bookends: which physical schema it expects (if any), and which physical schema it produces. `providedInvariants` participates in identity because it captures which routing-visible data transforms the migration declares; changing the set changes which refs the migration satisfies, so it is *not* metadata-about. Together with `ops`, the strippedMeta fields fully describe what the migration does to the database. Everything else (the discarded `fromContract`, `toContract`, plus the trivially-derived `migrationHash` itself) is metadata *about* the migration, not part of its physical identity.
 
 ### What stays on disk
 
-`fromContract`, `toContract`, and `hints` remain in `migration.json`. They are consumed by `migration plan` (to reconstruct the "from" schema for the next diff), `migrate` (for display and verification), and the transitional `migration emit` command (to regenerate ops; see [ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)). They're context for tooling, not inputs to identity.
-
-### Why `hints` is excluded
-
-`hints` carries `used`, `applied`, `plannerVersion`, and `planningStrategy` — metadata about how the migration was planned, not what it does. Stripping `hints` from the hash means a future cleanup or reshaping of these fields (they are currently written as empty arrays in some cases and read by nothing) doesn't invalidate existing `migrationId` values.
+`fromContract` and `toContract` remain in `migration.json`. They are consumed by `migration plan` (to reconstruct the "from" schema for the next diff), `migrate` (for display and verification), and the transitional `migration emit` command (to regenerate ops; see [ADR 193](ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)). They're context for tooling, not inputs to identity.
 
 ## Consequence
 

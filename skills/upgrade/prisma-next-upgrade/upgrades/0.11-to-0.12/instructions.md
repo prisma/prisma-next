@@ -20,6 +20,16 @@ changes:
         - "defineContract"
         - "capabilities:"
       anyMatch: false
+  - id: strip-migration-labels-hints
+    summary: |
+      The 0.12 migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`; any on-disk `migration.json` still holding either key fails to load with `INVALID_MANIFEST` naming the offending key. Both fields are also dropped from the content-addressed migration identity, so `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json`. Run the colocated codemod to strip both keys from every `migration.json` and recompute its `migrationHash` over the slimmed envelope.
+    detection:
+      glob: "**/migration.json"
+      contains:
+        - '"labels"'
+        - '"hints"'
+      anyMatch: true
+    script: ./strip-migration-labels-hints.ts
 ---
 
 # 0.11 → 0.12 — User upgrade instructions
@@ -174,3 +184,29 @@ You should see capability keys appear in the regenerated `contract.json` — for
 ### Validation
 
 After applying the rule above, run `pnpm typecheck && pnpm test` (or your application's equivalent). The change is mechanical and TypeScript pinpoints every affected call site; the regenerated `contract.json` diff confirms the capabilities flowed through unchanged.
+
+## `strip-migration-labels-hints`
+
+Starting at the 0.12 release, the migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`. Any on-disk `migration.json` that still holds either key fails to load: the loader rejects the manifest with `INVALID_MANIFEST`, naming the first offending key (`labels` or `hints`). The two fields are also removed from the content-addressed migration identity — `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json` — so every migrated manifest additionally needs its hash recomputed over the slimmed envelope, or it fails hash verification on the next load.
+
+Run the colocated codemod from your project root:
+
+```bash
+pnpm exec tsx ./strip-migration-labels-hints.ts
+```
+
+It walks every `migration.json` that has a sibling `ops.json` (a complete on-disk migration package), removes the `labels` and `hints` keys, and recomputes `migrationHash` over the slimmed metadata plus the operations. The edit is format-preserving — only the two key lines are removed and the hash value is swapped in place, so the rest of each manifest (key order, indentation, inline-vs-expanded arrays) is left untouched and the diff stays minimal. The codemod is idempotent: re-running it over already-migrated manifests makes no further changes.
+
+### Confirm every manifest is migrated
+
+Run the codemod in dry-run mode to confirm no manifest still carries the removed keys or a stale hash:
+
+```bash
+pnpm exec tsx ./strip-migration-labels-hints.ts --check
+```
+
+`--check` lists every manifest that still needs fixing and exits non-zero if any remain, so wire it into a pre-commit hook or CI step to keep stale manifests out of the tree. A fully migrated tree reports `0 needing fix` and exits `0`.
+
+### Validation
+
+After running the codemod, exercise any command that loads your migrations (your deploy or migration-status step). The loader recomputes and verifies each manifest's `migrationHash` on read: a manifest that still carried `labels`/`hints` would have thrown `INVALID_MANIFEST`, and a manifest with a stale hash would fail verification. Once the codemod has run, every manifest loads cleanly and its recomputed hash verifies against the slimmed envelope.

@@ -4,7 +4,6 @@ import type {
   OpFactoryCall,
 } from '@prisma-next/framework-components/control';
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 import { renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
@@ -64,7 +63,6 @@ export class TypeScriptRenderableSqliteMigration
     return renderCallsToTypeScript(this.#calls, {
       from: this.#meta.from,
       to: this.#meta.to,
-      ...ifDefined('labels', this.#meta.labels),
     });
   }
 }

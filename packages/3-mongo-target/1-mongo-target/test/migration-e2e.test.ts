@@ -280,7 +280,6 @@ describe('migration file E2E', () => {
       const tsSource = renderCallsToTypeScript(calls, {
         from: 'sha256:aaa',
         to: 'sha256:bbb',
-        labels: ['cleanup'],
       });
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
@@ -300,7 +299,6 @@ describe('migration file E2E', () => {
       const manifest = JSON.parse(manifestJson);
       expect(manifest.from).toBe('sha256:aaa');
       expect(manifest.to).toBe('sha256:bbb');
-      expect(manifest.labels).toEqual(['cleanup']);
     });
   });
 

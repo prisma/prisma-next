@@ -206,12 +206,6 @@ async function writePlannedMigrationPackage(
   const metadataWithInvariants: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toHash,
-    hints: {
-      used: [],
-      applied: [],
-      plannerVersion: '2.0.0',
-    },
-    labels: [],
     providedInvariants: deriveProvidedInvariants(opsForWrite),
     createdAt: createdAt.toISOString(),
   };

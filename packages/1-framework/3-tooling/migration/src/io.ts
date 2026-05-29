@@ -28,19 +28,11 @@ function hasErrnoCode(error: unknown, code: string): boolean {
   return error instanceof Error && (error as { code?: string }).code === code;
 }
 
-const MigrationHintsSchema = type({
-  used: 'string[]',
-  applied: 'string[]',
-  plannerVersion: 'string',
-});
-
 const MigrationMetadataSchema = type({
   '+': 'reject',
   from: 'string > 0 | null',
   to: 'string',
   migrationHash: 'string',
-  hints: MigrationHintsSchema,
-  labels: 'string[]',
   providedInvariants: 'string[]',
   createdAt: 'string',
 });

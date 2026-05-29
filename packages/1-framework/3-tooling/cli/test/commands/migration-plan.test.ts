@@ -81,12 +81,6 @@ describe('migration plan — core flow', () => {
       {
         from: null,
         to: 'sha256:test-hash',
-        hints: {
-          used: [],
-          applied: ['additive_only'],
-          plannerVersion: '1.0.0',
-        },
-        labels: [],
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -114,12 +108,6 @@ describe('migration plan — core flow', () => {
       {
         from: null,
         to: 'sha256:same-hash',
-        hints: {
-          used: [],
-          applied: ['additive_only'],
-          plannerVersion: '1.0.0',
-        },
-        labels: [],
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -154,12 +142,6 @@ describe('migration plan — core flow', () => {
         {
           from: null,
           to: 'sha256:hash-a',
-          hints: {
-            used: [],
-            applied: ['additive_only'],
-            plannerVersion: '1.0.0',
-          },
-          labels: [],
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -175,12 +157,6 @@ describe('migration plan — core flow', () => {
         {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
-          hints: {
-            used: [],
-            applied: ['additive_only'],
-            plannerVersion: '1.0.0',
-          },
-          labels: [],
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -231,8 +207,6 @@ describe('--from hash lookup', () => {
       {
         from: null,
         to: 'sha256:known-hash',
-        hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-        labels: [],
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -256,8 +230,6 @@ describe('--from hash lookup', () => {
       {
         from: null,
         to: 'sha256:abcdef1234567890',
-        hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-        labels: [],
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -284,8 +256,6 @@ describe('--from hash lookup', () => {
       {
         from: null,
         to: 'sha256:abcdef1234567890',
-        hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-        labels: [],
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -314,8 +284,6 @@ describe('--from hash lookup', () => {
         {
           from: null,
           to: 'sha256:abc111',
-          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-          labels: [],
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -328,8 +296,6 @@ describe('--from hash lookup', () => {
         {
           from: 'sha256:abc111',
           to: 'sha256:abc222',
-          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-          labels: [],
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },

@@ -9,14 +9,13 @@ import { type } from 'arktype';
 import { errorInvalidOperationEntry } from './errors';
 import { computeMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
-import type { MigrationHints, MigrationMetadata } from './metadata';
+import type { MigrationMetadata } from './metadata';
 import { MigrationOpSchema } from './op-schema';
 import type { MigrationOps } from './package';
 
 export interface MigrationMeta {
   readonly from: string | null;
   readonly to: string;
-  readonly labels?: readonly string[];
 }
 
 // `from` rejects empty strings to mirror `MigrationMetadataSchema` in
@@ -27,7 +26,6 @@ export interface MigrationMeta {
 const MigrationMetaSchema = type({
   from: 'string > 0 | null',
   to: 'string',
-  'labels?': type('string').array(),
 });
 
 /**
@@ -127,12 +125,11 @@ export interface MigrationArtifacts {
  * operations list, and the previously-scaffolded metadata (if any).
  *
  * When a `migration.json` already exists for this package (the common
- * case: it was scaffolded by `migration plan`), preserve the contract
- * bookends, hints, labels, and `createdAt` set there — those fields are
- * owned by the CLI scaffolder, not the authored class. Only the
- * `describe()`-derived fields (`from`, `to`) and the operations
- * change as the author iterates. When no metadata exists yet (a bare
- * `migration.ts` run from scratch), synthesize a minimal but
+ * case: it was scaffolded by `migration plan`), preserve `createdAt`
+ * set there — that field is owned by the CLI scaffolder, not the authored
+ * class. Only the `describe()`-derived fields (`from`, `to`) and the
+ * operations change as the author iterates. When no metadata exists yet
+ * (a bare `migration.ts` run from scratch), synthesize a minimal but
  * schema-conformant record so the resulting package can still be read,
  * verified, and applied.
  *
@@ -147,10 +144,8 @@ function buildAttestedMetadata(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: meta.from,
     to: meta.to,
-    labels: meta.labels ?? existing?.labels ?? [],
     providedInvariants: deriveProvidedInvariants(ops),
     createdAt: existing?.createdAt ?? new Date().toISOString(),
-    hints: normalizeHints(existing?.hints),
   };
 
   const migrationHash = computeMigrationHash(baseMetadata, ops);
@@ -158,28 +153,13 @@ function buildAttestedMetadata(
 }
 
 /**
- * Project `existing.hints` down to the known `MigrationHints` shape, dropping
- * any legacy keys that may linger in metadata scaffolded by older CLI
- * versions (e.g. `planningStrategy`). Picking fields explicitly instead of
- * spreading keeps refreshed `migration.json` files schema-clean regardless
- * of what was on disk before.
- */
-function normalizeHints(existing: MigrationHints | undefined): MigrationHints {
-  return {
-    used: existing?.used ?? [],
-    applied: existing?.applied ?? [],
-    plannerVersion: existing?.plannerVersion ?? '2.0.0',
-  };
-}
-
-/**
  * Pure conversion from a `Migration` instance (plus the previously
  * scaffolded metadata, when one exists on disk) to the in-memory
  * artifacts that downstream tooling persists. Owns metadata validation,
- * metadata synthesis/preservation, hint normalization, and the
- * content-addressed `migrationHash` computation, but performs no file I/O
- * — callers handle reads (to source `existing`) and writes (to persist
- * `opsJson` / `metadataJson`).
+ * metadata synthesis/preservation, and the content-addressed
+ * `migrationHash` computation, but performs no file I/O — callers handle
+ * reads (to source `existing`) and writes (to persist `opsJson` /
+ * `metadataJson`).
  */
 export function buildMigrationArtifacts(
   instance: Migration,

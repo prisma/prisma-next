@@ -46,6 +46,16 @@ changes:
         - "baseDefineContract"
         - "Capabilities"
       anyMatch: false
+  - id: strip-migration-labels-hints
+    summary: |
+      The 0.12 migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`; any on-disk `migration.json` your extension ships (e.g. an install-extension migration under `migrations/`) still holding either key fails to load with `INVALID_MANIFEST` naming the offending key. Both fields are also dropped from the content-addressed migration identity, so `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json`. Run the colocated codemod to strip both keys from every `migration.json` and recompute its `migrationHash` over the slimmed envelope.
+    detection:
+      glob: "**/migration.json"
+      contains:
+        - '"labels"'
+        - '"hints"'
+      anyMatch: true
+    script: ./strip-migration-labels-hints.ts
 ---
 
 # 0.11 → 0.12 — Extension-author upgrade instructions
@@ -508,9 +518,35 @@ No fixture-shape changes other than capability additions; if your re-emit produc
 
 After applying the edits, run `pnpm typecheck` and the matching test suite for your extension package. For facade-style extensions, the typecheck pinpoints every remaining occurrence of the `Capabilities` generic at compile time. For fixture-only extensions, the regenerated `contract.json` / `contract.d.ts` diff is the signal — review it to confirm the new capability keys landed where you expect.
 
+## `strip-migration-labels-hints`
+
+Starting at the 0.12 release, the migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`. If your extension ships on-disk migration packages — for example an install-extension migration (`migrations/<timestamp>_install_…/migration.json`) that provisions your extension's database objects — any manifest that still holds either key fails to load: the loader rejects it with `INVALID_MANIFEST`, naming the first offending key (`labels` or `hints`). The two fields are also removed from the content-addressed migration identity — `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json` — so every migrated manifest additionally needs its hash recomputed over the slimmed envelope, or it fails hash verification on the next load.
+
+Run the colocated codemod from your extension's package root:
+
+```bash
+pnpm exec tsx ./strip-migration-labels-hints.ts
+```
+
+It walks every `migration.json` that has a sibling `ops.json` (a complete on-disk migration package), removes the `labels` and `hints` keys, and recomputes `migrationHash` over the slimmed metadata plus the operations. The edit is format-preserving — only the two key lines are removed and the hash value is swapped in place, so the rest of each manifest (key order, indentation, inline-vs-expanded arrays) is left untouched and the diff stays minimal. The codemod is idempotent: re-running it over already-migrated manifests makes no further changes.
+
+### Confirm every manifest is migrated
+
+Run the codemod in dry-run mode to confirm no committed manifest still carries the removed keys or a stale hash:
+
+```bash
+pnpm exec tsx ./strip-migration-labels-hints.ts --check
+```
+
+`--check` lists every manifest that still needs fixing and exits non-zero if any remain, so wire it into your extension's CI alongside `prisma-next-check-pins`. A fully migrated tree reports `0 needing fix` and exits `0`.
+
+### Validation
+
+After running the codemod, run your extension's migration-loading tests (the integration suite that applies your install migration, or whatever exercises the on-disk packages). The loader recomputes and verifies each manifest's `migrationHash` on read: a manifest that still carried `labels`/`hints` would have thrown `INVALID_MANIFEST`, and a manifest with a stale hash would fail verification. Once the codemod has run, every manifest loads cleanly and its recomputed hash verifies against the slimmed envelope.
+
 ## Validation by execution
 
-These entries are prose-only (no codemod scripts). The substrate diffs inside `packages/3-extensions/` in this transition are the same code translations downstream extension authors will replicate by hand:
+Apart from `strip-migration-labels-hints` (which ships the colocated codemod described above, validated against the migration manifests under `packages/3-extensions/`), these entries are prose-only (no codemod scripts). The substrate diffs inside `packages/3-extensions/` in this transition are the same code translations downstream extension authors will replicate by hand:
 
 - The `windowFunc` method literally added to `bindWhereExprNode`'s `ExprVisitor` literal in `where-binding.ts`.
 - The `windowFunc: rejectHavingExpr` literally added to `validateGroupedHavingExpr`'s `ExprVisitor` literal in `query-plan-aggregate.ts`.

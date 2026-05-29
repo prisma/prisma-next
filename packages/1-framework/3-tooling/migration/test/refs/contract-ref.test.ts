@@ -25,8 +25,6 @@ function pkg(
       from,
       to,
       migrationHash,
-      hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-      labels: [],
       providedInvariants: [],
       createdAt: '2026-01-01T00:00:00Z',
     },

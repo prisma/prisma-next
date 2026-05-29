@@ -13,8 +13,6 @@ const baselineMetadata = {
   migrationHash: 'synthetic-mongo-test-contract-space-baseline-hash-v1',
   from: null,
   to: MONGO_TEST_HEAD_HASH,
-  hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-  labels: [],
   providedInvariants: [MONGO_TEST_BASELINE_INVARIANT_ID],
   createdAt: '2026-01-01T00:00:00.000Z',
 } as const satisfies MigrationPackage['metadata'];

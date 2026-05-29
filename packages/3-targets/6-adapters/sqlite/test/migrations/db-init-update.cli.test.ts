@@ -186,8 +186,6 @@ async function writeExtensionContractSpaceArtefacts(args: {
   const baseMeta = {
     from: args.fromHash,
     to: args.toHash,
-    hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-    labels: [],
     providedInvariants: [...args.providedInvariants],
     createdAt: '2026-01-01T00:00:00.000Z',
   };
@@ -352,8 +350,6 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       const baseMeta = {
         from: extContractV1.storage.storageHash,
         to: extContractV2.storage.storageHash,
-        hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-        labels: [],
         providedInvariants: [],
         createdAt: '2026-02-01T00:00:00.000Z',
       };
@@ -626,8 +622,6 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       const baseMeta = {
         from: extContractV1.storage.storageHash,
         to: extContractV2.storage.storageHash,
-        hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-        labels: [],
         providedInvariants: [],
         createdAt: '2026-02-01T00:00:00.000Z',
       };

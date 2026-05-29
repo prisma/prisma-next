@@ -74,8 +74,6 @@ async function writePackage(migrationsRoot: string, spec: PackageSpec): Promise<
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: spec.from,
     to: spec.to,
-    hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
-    labels: [],
     providedInvariants:
       spec.providedInvariants ??
       ops

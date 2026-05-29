@@ -20,21 +20,6 @@ import type { ControlDriverInstance, ControlFamilyInstance } from './control-ins
 // ============================================================================
 
 /**
- * Planner provenance recorded inside {@link MigrationMetadata}.
- *
- * `used` / `applied` track which migration hints the planner consulted
- * vs. which it actually applied during emission; `plannerVersion`
- * pins the planner build that produced the migration so future
- * verification passes can recognise plans authored against an older
- * planner.
- */
-export interface MigrationHints {
-  readonly used: readonly string[];
-  readonly applied: readonly string[];
-  readonly plannerVersion: string;
-}
-
-/**
  * In-memory migration metadata envelope. Every migration is
  * content-addressed: the `migrationHash` is a hash over the metadata
  * envelope plus the operations list, computed at write time. There is no
@@ -63,8 +48,6 @@ export interface MigrationMetadata {
   readonly migrationHash: string;
   readonly from: string | null;
   readonly to: string;
-  readonly hints: MigrationHints;
-  readonly labels: readonly string[];
   /**
    * Sorted, deduplicated list of `invariantId`s declared by the
    * migration's data-transform ops. Always present; an empty array

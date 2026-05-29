@@ -17,7 +17,7 @@ On-disk migration persistence, hash verification, and history reconstruction for
 
 `computeMigrationHash` in `hash.ts` uses explicit framing:
 
-1. Strip non-identity fields (`migrationHash`, `hints`) from
+1. Strip the non-identity field (`migrationHash`) from
    the metadata envelope, then canonicalize the stripped envelope and the
    ops array.
 2. SHA-256 each canonical part independently.
@@ -27,7 +27,7 @@ This avoids delimiter-ambiguity and pins `migrationHash` to a 2-tuple over
 the on-disk storage shape. Per [ADR 199 — Storage-only migration identity],
 contracts are anchored by the storage-hash bookends (`from`, `to`) inside
 the metadata envelope — the full contract IRs themselves are not part of
-the manifest. Planner hints are advisory and must not affect identity.
+the manifest.
 
 [ADR 199 — Storage-only migration identity]: ../../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md
 
@@ -60,7 +60,7 @@ graph TD
     CLI["CLI commands<br/>(migration new, plan, apply, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> HASH["hash.ts<br/>Migration hashing"]
     CLI --> GRAPH["migration-graph.ts<br/>Graph operations"]
-    IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
+    IO --> META["metadata.ts<br/>MigrationMetadata"]
     IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
     HASH --> IO
     HASH --> CAN["@prisma-next/framework-components/utils<br/>canonicalizeJson"]
@@ -88,7 +88,7 @@ graph TD
 
 | Subpath | Contents |
 |---|---|
-| `./metadata` | `MigrationMetadata`, `MigrationHints` |
+| `./metadata` | `MigrationMetadata` |
 | `./package` | `MigrationPackage`, `MigrationOps` |
 | `./graph` | `MigrationGraph`, `MigrationEdge` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |

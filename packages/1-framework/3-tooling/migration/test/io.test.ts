@@ -256,19 +256,6 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when "hints" is missing', async () => {
-    const dir = join(tmpDir, '20260225T1430_no_hints');
-    const { hints: _, ...metadataWithout } = createTestMetadata();
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
-    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
-
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
-      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
-      return true;
-    });
-  });
-
   it('errors when ops is not an array', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_ops');
     await mkdir(dir, { recursive: true });
@@ -372,7 +359,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
     const manifestPath = join(dir, 'migration.json');
     const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
-    content.labels = ['tampered'];
+    content.createdAt = '2024-01-01T00:00:00.000Z';
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {

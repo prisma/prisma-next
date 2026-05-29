@@ -117,8 +117,6 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
     {
       from: FROM_HASH,
       to: TO_HASH,
-      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
-      labels: [],
       providedInvariants: [],
       createdAt: '2026-02-25T14:00:00.000Z',
     },
@@ -132,8 +130,6 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
     {
       from: FROM_HASH,
       to: REF_HASH,
-      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
-      labels: [],
       providedInvariants: [],
       createdAt: '2026-02-25T14:01:00.000Z',
     },
@@ -175,8 +171,6 @@ async function setupFixture(opts: {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
-      labels: [],
       providedInvariants: edgeInvariants,
       createdAt: CREATED_AT,
     },

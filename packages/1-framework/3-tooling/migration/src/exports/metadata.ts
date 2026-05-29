@@ -1,1 +1,1 @@
-export type { MigrationHints, MigrationMetadata } from '../metadata';
+export type { MigrationMetadata } from '../metadata';

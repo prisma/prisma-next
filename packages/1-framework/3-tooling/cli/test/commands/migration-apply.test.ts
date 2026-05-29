@@ -46,12 +46,6 @@ async function writeAttestedMigration(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
-    hints: {
-      used: [],
-      applied: ['additive_only'],
-      plannerVersion: '1.0.0',
-    },
-    labels: [],
     providedInvariants: [],
     createdAt: opts.timestamp.toISOString(),
   };
@@ -230,8 +224,6 @@ describe('migrate — pending migration resolution', {
     const baseMetadata = {
       from: 'sha256:hash-a',
       to: EMPTY_CONTRACT_HASH,
-      hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-      labels: [],
       providedInvariants: [],
       createdAt: new Date().toISOString(),
     };

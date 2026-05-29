@@ -461,8 +461,8 @@ function writeStructuredError(stream: MigrationCliWritable, err: CliStructuredEr
  * `null` when the file is missing and throwing `MIGRATION.INVALID_JSON`
  * when the file is present but cannot be parsed as JSON. The CLI feeds
  * this into `buildMigrationArtifacts` so the pure builder can preserve
- * fields owned by `migration plan` (contract bookends, hints, labels,
- * `createdAt`) across re-emits.
+ * fields owned by `migration plan` (contract bookends, `createdAt`) across
+ * re-emits.
  *
  * Author-time path: this loader still does not verify the manifest hash
  * or schema — that is the apply-time loader's job. Hash mismatch is the
@@ -472,8 +472,8 @@ function writeStructuredError(stream: MigrationCliWritable, err: CliStructuredEr
  * however, is now surfaced rather than swallowed: a malformed
  * `migration.json` indicates either a hand-edit gone wrong or partial
  * write, and silently rebuilding from `describe()` would discard the
- * user's on-disk content (preserved bookends, hints, labels,
- * `createdAt`) without any indication something was wrong on disk.
+ * user's on-disk content (preserved bookends, `createdAt`) without any
+ * indication something was wrong on disk.
  * Apply-time consumers always route through the verifying
  * `readMigrationPackage` in `@prisma-next/migration-tools/io` instead.
  */

@@ -11,12 +11,11 @@
 
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
-import { type ImportRequirement, jsonToTsSource, renderImports } from '@prisma-next/ts-render';
+import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
 
 export interface RenderMigrationMeta {
   readonly from: string | null;
   readonly to: string;
-  readonly labels?: readonly string[];
 }
 
 /**
@@ -83,9 +82,6 @@ function buildDescribeMethod(meta: RenderMigrationMeta): string {
   lines.push('    return {');
   lines.push(`      from: ${JSON.stringify(meta.from)},`);
   lines.push(`      to: ${JSON.stringify(meta.to)},`);
-  if (meta.labels && meta.labels.length > 0) {
-    lines.push(`      labels: ${jsonToTsSource(meta.labels)},`);
-  }
   lines.push('    };');
   lines.push('  }');
   lines.push('');
