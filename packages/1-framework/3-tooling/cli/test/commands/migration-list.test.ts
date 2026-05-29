@@ -8,8 +8,15 @@ import type { MigrationListResult } from '@prisma-next/migration-tools/migration
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildKindByMigrationHash, runMigrationList } from '../../src/commands/migration-list';
+import {
+  buildKindByMigrationHash,
+  renderMigrationListHumanOutput,
+  runMigrationList,
+} from '../../src/commands/migration-list';
+import { detectGlyphMode } from '../../src/utils/formatters/migration-list-graph-render';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
+import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { createTerminalUI } from '../../src/utils/terminal-ui';
 
 /**
  * Verifies the `migration list` command's data-and-policy core:
@@ -131,6 +138,18 @@ function expectOk<T>(
 
 function renderListed(listResult: MigrationListResult): string {
   return renderMigrationList(listResult, buildKindByMigrationHash(listResult.spaces));
+}
+
+function renderGraphListed(
+  listResult: MigrationListResult,
+  glyphMode: 'unicode' | 'ascii',
+  useColor = false,
+): string {
+  return renderMigrationListHumanOutput(listResult, {
+    graph: true,
+    glyphMode,
+    useColor,
+  });
 }
 
 describe('runMigrationList — slice-spec worked example', () => {
@@ -664,5 +683,231 @@ describe('runMigrationList — JSON output shape', () => {
     expectOk(result);
     expect(result.value.spaces.map((s) => s.spaceId)).toEqual(['app', 'postgis']);
     expect(result.value.summary).toBe('2 migration(s) across 2 contract space(s)');
+  });
+});
+
+describe('migration list --graph human output', () => {
+  it('renders linear history byte-identical to the flat list', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_chain_a',
+      from: null,
+      to: HASH_FAN_BASE,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_chain_b',
+      from: HASH_FAN_BASE,
+      to: HASH_FAN_A,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0002_chain_c',
+      from: HASH_FAN_A,
+      to: HASH_FAN_B,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const flat = renderListed(result.value);
+    const graph = renderGraphListed(result.value, 'unicode');
+    const flatRows = flat.split('\n').slice(0, 3).join('\n');
+    expect(graph.split('\n').slice(0, 3).join('\n')).toBe(flatRows);
+  });
+
+  it('renders a branched convergence tree with node-line and lane gutters', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'unicode');
+    expect(graph).toBe(
+      'o     fffffff\n' +
+        '├─┐\n' +
+        '* │   20260101T0001_right  bbbbbbb → fffffff\n' +
+        '│ *   20260101T0000_left   aaaaaaa → fffffff\n' +
+        '\n' +
+        '2 migration(s) on disk',
+    );
+  });
+
+  it('forces ASCII glyphs when glyph mode is ascii', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'ascii');
+    expect(graph).toContain('+-\\');
+    expect(graph).toContain('->');
+    expect(graph).not.toContain('→');
+  });
+
+  it('picks ASCII for non-TTY stdout via injected runtime', () => {
+    const ui = createTerminalUI(parseGlobalFlags({}), {
+      isTTY: false,
+      env: { LANG: 'en_US.UTF-8' },
+    });
+    expect(ui.resolveGlyphMode(false)).toBe('ascii');
+    expect(detectGlyphMode(ui.glyphModeInput())).toBe('ascii');
+  });
+
+  it('picks Unicode on a UTF-8 TTY via injected runtime', () => {
+    const ui = createTerminalUI(parseGlobalFlags({}), {
+      isTTY: true,
+      env: { LANG: 'en_US.UTF-8' },
+    });
+    expect(ui.resolveGlyphMode(false)).toBe('unicode');
+  });
+
+  it('lets --ascii override a UTF-8 TTY', () => {
+    const ui = createTerminalUI(parseGlobalFlags({}), {
+      isTTY: true,
+      env: { LANG: 'en_US.UTF-8' },
+    });
+    expect(ui.resolveGlyphMode(true)).toBe('ascii');
+  });
+
+  it('keeps Unicode glyphs when color is disabled', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const coloredOff = renderGraphListed(result.value, 'unicode', false);
+    const ascii = renderGraphListed(result.value, 'ascii', false);
+    expect(coloredOff).toContain('→');
+    expect(coloredOff).not.toContain('->');
+    expect(ascii).toContain('->');
+  });
+
+  it('scopes graph output with --space', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({
+      migrationsDir: migrationsRoot,
+      spaceFilter: 'postgis',
+    });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'unicode');
+    expect(graph).not.toContain('app:');
+    expect(graph).not.toContain('20260422T0720_initial');
+    expect(graph).toContain('20260101T0000_left');
+    expect(graph).toContain('o     fffffff');
+  });
+
+  it('renders multi-space graph blocks with headings and summary', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'unicode');
+    expect(graph).toBe(
+      'app:\n' +
+        '  * 20260422T0720_initial  ∅       → 4cb4256\n' +
+        '\n' +
+        'postgis:\n' +
+        '  o     fffffff\n' +
+        '  ├─┐\n' +
+        '  * │   20260101T0001_right  bbbbbbb → fffffff\n' +
+        '  │ *   20260101T0000_left   aaaaaaa → fffffff\n' +
+        '\n' +
+        '3 migration(s) across 2 contract space(s)',
+    );
+  });
+
+  it('leaves JSON serialization unchanged by graph rendering options', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const json = JSON.stringify(result.value, null, 2);
+    expect(json).toContain('20260101T0000_left');
+    expect(json).not.toContain('├─┐');
+    expect(JSON.parse(json)).toEqual(result.value);
   });
 });

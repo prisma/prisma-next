@@ -27,6 +27,10 @@ import {
   setCommandExamples,
   setCommandSeeAlso,
 } from '../utils/command-helpers';
+import {
+  type GlyphMode,
+  renderMigrationListGraphResult,
+} from '../utils/formatters/migration-list-graph-render';
 import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -38,6 +42,26 @@ import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 interface MigrationListOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly space?: string;
+  readonly graph?: boolean;
+  readonly ascii?: boolean;
+}
+
+export interface MigrationListHumanRenderOptions {
+  readonly graph: boolean;
+  readonly glyphMode: GlyphMode;
+  readonly useColor: boolean;
+}
+
+export function renderMigrationListHumanOutput(
+  result: MigrationListResult,
+  options: MigrationListHumanRenderOptions,
+): string {
+  const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
+  if (options.graph) {
+    return renderMigrationListGraphResult(result, styler, options.glyphMode);
+  }
+  const kindByMigrationHash = buildKindByMigrationHash(result.spaces);
+  return renderMigrationListWithStyle(result, styler, kindByMigrationHash);
 }
 
 /**
@@ -206,14 +230,18 @@ export function createMigrationListCommand(): Command {
     'List on-disk migrations, latest first, per contract space',
     'Enumerates every on-disk migration under migrations/<space>/ for every\n' +
       'contract space found on disk, latest first. Offline — does not consult\n' +
-      'the database. Each row shows source → destination contract hashes\n' +
-      '(7-char git-style), the self-edge marker (⟲), any provided invariants\n' +
-      '({...}), and refs landing on the destination ((production, db)). Pass\n' +
-      '--space <id> to narrow to a single contract space.',
+      'the database. Each row leads with a kind glyph (* forward, ↩ rollback,\n' +
+      '⟲ self), then dirName, then source → destination contract hashes\n' +
+      '(7-char git-style). Self-edges show a single hash. Invariants render as\n' +
+      '{...}; refs on the destination as (production, db). Pass --space <id>\n' +
+      'to narrow to one contract space. --graph draws the forward spine with\n' +
+      'lane gutters; --ascii forces ASCII glyphs (orthogonal to --no-color).',
   );
   setCommandExamples(command, [
     'prisma-next migration list',
+    'prisma-next migration list --graph',
     'prisma-next migration list --space app',
+    'prisma-next migration list --graph --ascii',
     'prisma-next migration list --json',
   ]);
   setCommandSeeAlso(command, [
@@ -225,6 +253,8 @@ export function createMigrationListCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--space <id>', 'Narrow output to a single contract space')
+    .option('--graph', 'Draw migration relationships as an annotated tree')
+    .option('--ascii', 'Use ASCII glyphs for --graph (pipe-friendly)')
     .action(async (options: MigrationListOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
@@ -233,9 +263,13 @@ export function createMigrationListCommand(): Command {
         if (flags.json) {
           ui.output(JSON.stringify(listResult, null, 2));
         } else if (!flags.quiet) {
-          const styler = createAnsiMigrationListStyler({ useColor: ui.useColor });
-          const kindByMigrationHash = buildKindByMigrationHash(listResult.spaces);
-          ui.output(renderMigrationListWithStyle(listResult, styler, kindByMigrationHash));
+          ui.output(
+            renderMigrationListHumanOutput(listResult, {
+              graph: options.graph === true,
+              glyphMode: ui.resolveGlyphMode(options.ascii === true),
+              useColor: ui.useColor,
+            }),
+          );
         }
       });
       process.exit(exitCode);

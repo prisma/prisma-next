@@ -5,7 +5,12 @@ import type {
   MigrationListGraphLayout,
   NodeLineLayoutRow,
 } from '@prisma-next/migration-tools/migration-list-graph-layout';
+import { computeMigrationListGraphLayout } from '@prisma-next/migration-tools/migration-list-graph-layout';
 import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+} from '@prisma-next/migration-tools/migration-list-types';
 import {
   abbreviateContractHash,
   computeMigrationDirNameWidth,
@@ -245,4 +250,62 @@ export function renderMigrationListGraph(
 
 export function formatGraphNodeLineHash(contractHash: string, style: MigrationListStyler): string {
   return style.sourceHash(abbreviateContractHash(contractHash));
+}
+
+function formatGraphEmptyStateLine(spaceId: string, style: MigrationListStyler): string {
+  return style.emptyState(`There are no migrations in migrations/${spaceId}/ yet`);
+}
+
+function renderGraphSpaceBlock(
+  spaceId: string,
+  migrations: readonly MigrationListEntry[],
+  multiSpace: boolean,
+  style: MigrationListStyler,
+  glyphMode: GlyphMode,
+): readonly string[] {
+  if (migrations.length === 0) {
+    const emptyLine = formatGraphEmptyStateLine(spaceId, style);
+    if (!multiSpace) {
+      return [emptyLine];
+    }
+    return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
+  }
+
+  const layout = computeMigrationListGraphLayout(migrations);
+  const graphBody = renderMigrationListGraphWithStyle(layout, style, glyphMode);
+  const rows = graphBody.split('\n');
+  if (!multiSpace) {
+    return rows;
+  }
+  return [style.spaceHeading(`${spaceId}:`), ...rows.map((row) => `  ${row}`)];
+}
+
+export function renderMigrationListGraphResult(
+  result: MigrationListResult,
+  style: MigrationListStyler,
+  glyphMode: GlyphMode,
+): string {
+  const multiSpace = result.spaces.length > 1;
+  const lines: string[] = [];
+
+  for (let index = 0; index < result.spaces.length; index++) {
+    const space = result.spaces[index]!;
+    if (index > 0) {
+      lines.push('');
+    }
+    lines.push(
+      ...renderGraphSpaceBlock(space.spaceId, space.migrations, multiSpace, style, glyphMode),
+    );
+  }
+
+  const totalMigrations = result.spaces.reduce(
+    (count, space) => count + space.migrations.length,
+    0,
+  );
+  if (totalMigrations > 0) {
+    lines.push('');
+    lines.push(style.summary(result.summary));
+  }
+
+  return lines.join('\n');
 }
