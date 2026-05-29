@@ -1,4 +1,4 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
@@ -8,7 +8,7 @@ import {
   type ControlDriverInstance,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
+import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -25,11 +25,18 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
-import { readExistingEnumValues } from '@prisma-next/target-postgres/enum-planning';
+import {
+  createResolveExistingEnumValues,
+  enumStorageCompoundKey,
+  readExistingEnumValues,
+} from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
-import { introspectPostgresEnumTypes } from './enum-control-hooks';
+import {
+  introspectPostgresEnumTypes,
+  type PostgresEnumStorageTypeAnnotation,
+} from './enum-control-hooks';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
@@ -78,7 +85,15 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly resolveExistingEnumValues = (
     schema: SqlSchemaIR,
     enumType: PostgresEnumStorageEntry,
-  ): readonly string[] | null => readExistingEnumValues(schema, enumType.nativeType);
+    namespaceId: string,
+  ): readonly string[] | null => {
+    const pgSchema = (schema.annotations?.['pg'] as { schema?: string })?.schema ?? 'public';
+    const schemaName = namespaceId === UNBOUND_NAMESPACE_ID ? pgSchema : namespaceId;
+    return readExistingEnumValues(schema, schemaName, enumType.nativeType);
+  };
+
+  readonly resolveExistingEnumValuesForContract = (contract: Contract<SqlStorage>) =>
+    createResolveExistingEnumValues(contract.storage);
 
   /**
    * Lower a SQL query AST into a Postgres-flavored `{ sql, params }` payload.
@@ -322,14 +337,34 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
     }
 
-    // Annotations carry the first schema's metadata (Postgres version,
-    // enum storage types). Multi-namespace storage types are introspected
-    // per schema; merging them is deferred until a contract actually
-    // declares enum types on more than one namespace.
+    const mergedStorageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
+    for (let i = 0; i < perSchema.length; i++) {
+      const ir = perSchema[i];
+      const pg = (
+        ir?.annotations?.['pg'] as {
+          storageTypes?: Record<string, PostgresEnumStorageTypeAnnotation>;
+        }
+      )?.storageTypes;
+      if (!pg) continue;
+      for (const [key, value] of Object.entries(pg)) {
+        mergedStorageTypes[key] = value;
+      }
+    }
+
     const firstAnnotations = perSchema[0]?.annotations;
+    const firstPg = (firstAnnotations?.['pg'] as Record<string, unknown>) ?? {};
     return {
       tables: mergedTables,
-      ...ifDefined('annotations', firstAnnotations),
+      ...ifDefined('annotations', {
+        ...firstAnnotations,
+        pg: {
+          ...firstPg,
+          ...ifDefined(
+            'storageTypes',
+            Object.keys(mergedStorageTypes).length > 0 ? mergedStorageTypes : undefined,
+          ),
+        },
+      }),
     };
   }
 
@@ -726,7 +761,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const storageTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
+    const rawStorageTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
+    const storageTypes: Record<string, PostgresEnumStorageTypeAnnotation> = {};
+    for (const [typeName, annotation] of Object.entries(rawStorageTypes)) {
+      storageTypes[enumStorageCompoundKey(schema, typeName)] = annotation;
+    }
 
     const annotations = {
       pg: {

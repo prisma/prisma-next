@@ -98,6 +98,7 @@ export interface VerifySqlSchemaOptions {
   readonly resolveExistingEnumValues?: (
     schema: SqlSchemaIR,
     enumType: PostgresEnumStorageEntry,
+    namespaceId: string,
   ) => readonly string[] | null;
 }
 
@@ -280,12 +281,16 @@ function verifyEnumType(options: {
   readonly schema: SqlSchemaIR;
   readonly namespaceId: string;
   readonly resolveExistingEnumValues?:
-    | ((schema: SqlSchemaIR, enumType: PostgresEnumStorageEntry) => readonly string[] | null)
+    | ((
+        schema: SqlSchemaIR,
+        enumType: PostgresEnumStorageEntry,
+        namespaceId: string,
+      ) => readonly string[] | null)
     | undefined;
 }): readonly SchemaIssue[] {
   const { typeName, typeInstance, schema, namespaceId, resolveExistingEnumValues } = options;
   const desired = typeInstance.values;
-  const existing = resolveExistingEnumValues?.(schema, typeInstance) ?? null;
+  const existing = resolveExistingEnumValues?.(schema, typeInstance, namespaceId) ?? null;
   if (!existing) {
     return [
       {

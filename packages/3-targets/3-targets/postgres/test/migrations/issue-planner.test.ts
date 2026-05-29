@@ -9,6 +9,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
@@ -52,13 +53,18 @@ const defaultCtx = {
   storageTypes: {},
 };
 
-function makeSchemaWithEnum(nativeType: string, values: readonly string[]): SqlSchemaIR {
+function makeSchemaWithEnum(
+  nativeType: string,
+  values: readonly string[],
+  schemaName = UNBOUND_NAMESPACE_ID,
+): SqlSchemaIR {
   return {
     tables: {},
     annotations: {
       pg: {
+        schema: schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName,
         storageTypes: {
-          [nativeType]: {
+          [enumStorageCompoundKey(schemaName, nativeType)]: {
             kind: 'postgres-enum',
             codecId: 'pg/enum@1',
             nativeType,
