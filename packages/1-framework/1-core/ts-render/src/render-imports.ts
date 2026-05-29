@@ -8,11 +8,15 @@ import type { ImportRequirement } from './ts-expression';
  * The emitter invariants:
  *
  * - **One line per module specifier.** Named imports are aggregated and
- *   emitted sorted alphabetically; a single default symbol is combined
- *   onto the same line when attributes agree (`import def, { a, b } from "m";`).
- *   Aliased symbols render `symbol as alias`. When every symbol for a module is
- *   `typeOnly`, the statement collapses to `import type { … }`; a module mixing
- *   value and type symbols prefixes the type-only ones (`import { type T, v }`).
+ *   emitted sorted; a single default symbol is combined onto the same line
+ *   when attributes agree (`import def, { a, b } from "m";`). Aliased symbols
+ *   render `symbol as alias`. When every symbol for a module is `typeOnly`,
+ *   the statement collapses to `import type { … }`; a module mixing value
+ *   and type symbols prefixes the type-only ones (`import { type T, v }`).
+ *   Exception: a fully type-only statement that has both a default and one or
+ *   more named bindings splits to two lines (`import type D from "m";` then
+ *   `import type { N } from "m";`) because TypeScript rejects
+ *   `import type D, { N } from "m"` (TS1363).
  * - **At most one default symbol per module.** Two conflicting default
  *   symbols on the same specifier throw — the user's renderer can't
  *   guess which one they meant.
@@ -20,8 +24,17 @@ import type { ImportRequirement } from './ts-expression';
  *   module specifier must carry the same (or no) `attributes` map.
  *   Divergent attribute maps throw — they can't collapse to one line
  *   and there's no user-resolvable recovery at this layer.
+ * - **Distinct (symbol, alias) pairs are distinct bindings.** TypeScript
+ *   permits importing the same export under multiple local names, so
+ *   `{ A }` + `{ A as B }` renders as `import { A, A as B } from "m"` and
+ *   `{ A as B }` + `{ A as C }` renders as `import { A as B, A as C } from "m"`.
+ *   Truly identical `(symbol, alias)` pairs still collapse to one binding,
+ *   merging `typeOnly` by AND.
  * - **Deterministic ordering.** Modules are emitted sorted by specifier;
- *   within a module, named symbols are emitted sorted alphabetically.
+ *   within a module, named bindings are emitted sorted by `(symbol, alias)`
+ *   using JavaScript code-unit comparison, with the un-aliased form (no
+ *   alias) treated as alias `""` so it sorts before any aliased form of the
+ *   same symbol.
  *
  * Returns a string containing one import line per module, joined by `\n`
  * (no trailing newline). An empty requirement list returns `""`.
@@ -35,6 +48,7 @@ export function renderImports(requirements: readonly ImportRequirement[]): strin
 }
 
 interface NamedBinding {
+  symbol: string;
   alias: string | null;
   typeOnly: boolean;
 }
@@ -82,12 +96,12 @@ function mergeRequirementIntoGroup(req: ImportRequirement, group: ModuleImportGr
     group.defaultTypeOnly = group.defaultTypeOnly && typeOnly;
   } else {
     const alias = req.alias && req.alias !== req.symbol ? req.alias : null;
-    const existing = group.named.get(req.symbol);
+    const key = namedBindingKey(req.symbol, alias);
+    const existing = group.named.get(key);
     if (existing) {
       existing.typeOnly = existing.typeOnly && typeOnly;
-      if (existing.alias === null) existing.alias = alias;
     } else {
-      group.named.set(req.symbol, { alias, typeOnly });
+      group.named.set(key, { symbol: req.symbol, alias, typeOnly });
     }
   }
   mergeAttributes(req, group);
@@ -134,9 +148,18 @@ function stringifyAttributes(attrs: Readonly<Record<string, string>> | null): st
 }
 
 function renderModuleImport(moduleSpecifier: string, group: ModuleImportGroup): string {
-  const keyword = isStatementTypeOnly(group) ? 'import type' : 'import';
-  const clause = buildImportClause(group, keyword === 'import type');
+  const typeOnlyStatement = isStatementTypeOnly(group);
   const attrs = buildAttributesClause(group.attributes);
+  const hasDefault = group.defaultSymbol !== null;
+  const hasNamed = group.named.size > 0;
+  if (typeOnlyStatement && hasDefault && hasNamed) {
+    const defaultLine = `import type ${group.defaultSymbol} from '${moduleSpecifier}'${attrs};`;
+    const namedClause = renderNamedBindingsList(group, true);
+    const namedLine = `import type { ${namedClause} } from '${moduleSpecifier}'${attrs};`;
+    return `${defaultLine}\n${namedLine}`;
+  }
+  const keyword = typeOnlyStatement ? 'import type' : 'import';
+  const clause = buildImportClause(group, typeOnlyStatement);
   return `${keyword} ${clause} from '${moduleSpecifier}'${attrs};`;
 }
 
@@ -152,12 +175,9 @@ function isStatementTypeOnly(group: ModuleImportGroup): boolean {
 }
 
 function buildImportClause(group: ModuleImportGroup, statementTypeOnly: boolean): string {
-  const named = [...group.named.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  const hasNamed = named.length > 0;
+  const hasNamed = group.named.size > 0;
   const hasDefault = group.defaultSymbol !== null;
-  const namedClause = named
-    .map(([symbol, binding]) => renderNamedBinding(symbol, binding, statementTypeOnly))
-    .join(', ');
+  const namedClause = hasNamed ? renderNamedBindingsList(group, statementTypeOnly) : '';
   if (hasDefault && hasNamed) {
     return `${group.defaultSymbol}, { ${namedClause} }`;
   }
@@ -167,14 +187,29 @@ function buildImportClause(group: ModuleImportGroup, statementTypeOnly: boolean)
   return `{ ${namedClause} }`;
 }
 
-function renderNamedBinding(
-  symbol: string,
-  binding: NamedBinding,
-  statementTypeOnly: boolean,
-): string {
+function renderNamedBindingsList(group: ModuleImportGroup, statementTypeOnly: boolean): string {
+  return [...group.named.values()]
+    .sort(compareNamedBindings)
+    .map((binding) => renderNamedBinding(binding, statementTypeOnly))
+    .join(', ');
+}
+
+function compareNamedBindings(a: NamedBinding, b: NamedBinding): number {
+  if (a.symbol !== b.symbol) return a.symbol < b.symbol ? -1 : 1;
+  const aAlias = a.alias ?? '';
+  const bAlias = b.alias ?? '';
+  if (aAlias === bAlias) return 0;
+  return aAlias < bAlias ? -1 : 1;
+}
+
+function namedBindingKey(symbol: string, alias: string | null): string {
+  return `${symbol}\x00${alias ?? ''}`;
+}
+
+function renderNamedBinding(binding: NamedBinding, statementTypeOnly: boolean): string {
   const prefix = !statementTypeOnly && binding.typeOnly ? 'type ' : '';
   const aliasClause = binding.alias !== null ? ` as ${binding.alias}` : '';
-  return `${prefix}${symbol}${aliasClause}`;
+  return `${prefix}${binding.symbol}${aliasClause}`;
 }
 
 function buildAttributesClause(attrs: Readonly<Record<string, string>> | null): string {

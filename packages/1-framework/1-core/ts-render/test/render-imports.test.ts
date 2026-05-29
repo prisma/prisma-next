@@ -183,6 +183,73 @@ describe('renderImports', () => {
     expect(out).toBe("import { type T, val } from 'm';");
   });
 
+  it('keeps both bare and aliased imports of the same symbol', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'A' },
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'B' },
+    ]);
+    expect(out).toBe("import { A, A as B } from 'm';");
+  });
+
+  it('keeps two distinct aliases of the same symbol', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'B' },
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'C' },
+    ]);
+    expect(out).toBe("import { A as B, A as C } from 'm';");
+  });
+
+  it('deduplicates identical (symbol, alias) pairs', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'B' },
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'B' },
+    ]);
+    expect(out).toBe("import { A as B } from 'm';");
+  });
+
+  it('merges typeOnly by AND for identical (symbol, alias) pairs', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'B', typeOnly: true },
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'B' },
+    ]);
+    expect(out).toBe("import { A as B } from 'm';");
+  });
+
+  it('orders bare and aliased forms of the same symbol with the bare form first', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'Z' },
+      { moduleSpecifier: 'm', symbol: 'A', alias: 'A2' },
+      { moduleSpecifier: 'm', symbol: 'A' },
+    ]);
+    expect(out).toBe("import { A, A as A2, A as Z } from 'm';");
+  });
+
+  it('splits a type-only statement with default and named into two import lines', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'D', kind: 'default', typeOnly: true },
+      { moduleSpecifier: 'm', symbol: 'N', typeOnly: true },
+    ]);
+    expect(out).toBe(["import type D from 'm';", "import type { N } from 'm';"].join('\n'));
+  });
+
+  it('splits a type-only statement with default and multiple named imports', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'D', kind: 'default', typeOnly: true },
+      { moduleSpecifier: 'm', symbol: 'A', typeOnly: true },
+      { moduleSpecifier: 'm', symbol: 'B', typeOnly: true, alias: 'C' },
+    ]);
+    expect(out).toBe(["import type D from 'm';", "import type { A, B as C } from 'm';"].join('\n'));
+  });
+
+  it('keeps the non-type-only mixed default+named form on a single line', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'D', kind: 'default' },
+      { moduleSpecifier: 'm', symbol: 'T', typeOnly: true },
+      { moduleSpecifier: 'm', symbol: 'v' },
+    ]);
+    expect(out).toBe("import D, { type T, v } from 'm';");
+  });
+
   it('stringifies multi-key attribute maps in sorted order in the conflict message', () => {
     try {
       renderImports([
