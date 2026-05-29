@@ -222,7 +222,7 @@ async function captureDiagnostic(
   }
   const envelope = JSON.parse(jsonLine) as CliErrorEnvelope;
 
-  // --- Human pass: rendered diagnostic (used for the uniformity assertion in T3.5).
+  // --- Human pass: rendered diagnostic returned for the caller's assertions.
   consoleOutput.length = 0;
   consoleErrors.length = 0;
   await runAndCaptureExit(invokeHuman);
