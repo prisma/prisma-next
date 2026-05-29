@@ -1,11 +1,9 @@
-import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
   MigrationListResult,
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
 import { describe, expect, it } from 'vitest';
-import { buildKindByMigrationHash } from '../../../src/commands/migration-list';
 import { renderMigrationList } from '../../../src/utils/formatters/migration-list-render';
 
 const HASH_A = 'sha256:abcdef0123456789abcdef0123456789abcdef0123456789ab';
@@ -37,7 +35,7 @@ function result(spaces: readonly MigrationSpaceListEntry[], summary: string): Mi
 }
 
 function renderListed(listResult: MigrationListResult): string {
-  return renderMigrationList(listResult, buildKindByMigrationHash(listResult.spaces));
+  return renderMigrationList(listResult);
 }
 
 describe('renderMigrationList', () => {
@@ -61,19 +59,28 @@ describe('renderMigrationList', () => {
   });
 
   it('leads rollback row with plain arrow and both hashes', () => {
-    const row = migration({
+    const eUsers = migration({ dirName: '20250115_add_users', from: null, to: HASH_A });
+    const ePosts = migration({ dirName: '20250203_add_posts', from: HASH_A, to: HASH_B });
+    const eComments = migration({ dirName: '20250310_add_comments', from: HASH_B, to: HASH_C });
+    const eRollback = migration({
       dirName: '20250312_full_rollback',
-      from: HASH_E,
+      from: HASH_C,
       to: HASH_A,
       migrationHash: 'sha256:rollback-edge',
     });
-    const kinds = new Map<string, EdgeKind>([[row.migrationHash, 'rollback']]);
-    const output = renderMigrationList(
-      result([{ spaceId: 'app', migrations: [row] }], '1 migration(s) on disk'),
-      kinds,
+    const output = renderListed(
+      result(
+        [
+          {
+            spaceId: 'app',
+            migrations: [eRollback, eComments, ePosts, eUsers],
+          },
+        ],
+        '1 migration(s) on disk',
+      ),
     );
     expect(output).toMatch(/^↩ 20250312_full_rollback/);
-    expect(output).toContain('2f45cc7 → abcdef0');
+    expect(output).toContain('4cb4256 → abcdef0');
     expect(output).not.toMatch(/↩.*↩/);
   });
 
@@ -135,9 +142,8 @@ describe('renderMigrationList', () => {
 
   it('defaults missing migration hash to forward kind glyph', () => {
     const row = migration({ dirName: '20260422T0742_migration', from: HASH_A, to: HASH_B });
-    const output = renderMigrationList(
+    const output = renderListed(
       result([{ spaceId: 'app', migrations: [row] }], '1 migration(s) on disk'),
-      new Map(),
     );
     expect(output).toMatch(/^\* 20260422T0742_migration/);
   });

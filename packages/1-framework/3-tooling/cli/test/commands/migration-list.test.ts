@@ -9,7 +9,6 @@ import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildKindByMigrationHash,
   renderMigrationListHumanOutput,
   runMigrationList,
 } from '../../src/commands/migration-list';
@@ -137,7 +136,7 @@ function expectOk<T>(
 }
 
 function renderListed(listResult: MigrationListResult): string {
-  return renderMigrationList(listResult, buildKindByMigrationHash(listResult.spaces));
+  return renderMigrationList(listResult);
 }
 
 function renderGraphListed(

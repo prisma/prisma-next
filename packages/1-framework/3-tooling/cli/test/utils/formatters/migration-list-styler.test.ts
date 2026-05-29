@@ -5,7 +5,6 @@ import type {
 } from '@prisma-next/migration-tools/migration-list-types';
 import { bold, cyan, cyanBright, dim, green, greenBright, yellow } from 'colorette';
 import { describe, expect, it } from 'vitest';
-import { buildKindByMigrationHash } from '../../../src/commands/migration-list';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
   renderMigrationList,
@@ -75,13 +74,11 @@ describe('createAnsiMigrationListStyler', () => {
       ],
       '1 migration(s) on disk',
     );
-    const kinds = buildKindByMigrationHash(r.spaces);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: false }),
-      kinds,
     );
-    expect(styled).toBe(renderMigrationList(r, kinds));
+    expect(styled).toBe(renderMigrationList(r));
   });
 
   it('wraps each token with the expected SGR style when useColor is true', () => {
@@ -135,11 +132,9 @@ describe('renderMigrationListWithStyle', () => {
       ],
       '1 migration(s) on disk',
     );
-    const kinds = buildKindByMigrationHash(r.spaces);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
-      kinds,
     );
     const expectedRow =
       `${dim('⟲')} ${bold('20260601T1200_backfill_emails')}  ` +
@@ -170,11 +165,9 @@ describe('renderMigrationListWithStyle', () => {
       ],
       '1 migration(s) across 2 contract space(s)',
     );
-    const kinds = buildKindByMigrationHash(r.spaces);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
-      kinds,
     );
     expect(styled).toContain(bold('app:'));
     expect(styled).toContain(bold('postgis:'));
@@ -206,12 +199,10 @@ describe('renderMigrationListWithStyle', () => {
       ],
       '2 migration(s) on disk',
     );
-    const kinds = buildKindByMigrationHash(r.spaces);
-    const plain = renderMigrationList(r, kinds);
+    const plain = renderMigrationList(r);
     const styled = renderMigrationListWithStyle(
       r,
       createAnsiMigrationListStyler({ useColor: true }),
-      kinds,
     );
 
     function stripAnsi(s: string): string {
@@ -242,9 +233,8 @@ describe('IDENTITY_MIGRATION_LIST_STYLER', () => {
       ],
       '1 migration(s) on disk',
     );
-    const kinds = buildKindByMigrationHash(r.spaces);
-    expect(renderMigrationList(r, kinds)).toBe(
-      renderMigrationListWithStyle(r, IDENTITY_MIGRATION_LIST_STYLER, kinds),
+    expect(renderMigrationList(r)).toBe(
+      renderMigrationListWithStyle(r, IDENTITY_MIGRATION_LIST_STYLER),
     );
   });
 });
