@@ -101,9 +101,21 @@ In interactive mode: present the verdict + setup chain; wait for confirmation. I
 1. `drive-pr-description` (direct-change framing): intent statement, Linear ticket link, scope statement, brief verification note (*"reviewer can verify in ~30 sec by reading the diff"*).
 2. **Sanity-check the verdict** at PR-description time — if the diff is sprawling, the 30-second-verifiable claim was wrong; escalate back to `drive-triage-work` for re-routing. Direct change is a scope claim; the diff is the test.
 3. Branch from `main`. Assemble a dispatch brief (use the *direct-change* shape of [`drive-dispatch/templates/dispatch-brief.template.md`](../drive-dispatch/templates/dispatch-brief.template.md) — references point at the PR description draft and Linear ticket, not at a slice spec).
+
+> **Emit `dispatch-start`:** Trace path for this unit: `wip/drive-trace/direct-<ISO-ts>.jsonl`; `project_run_id = "direct-<ISO-ts>"` (resolve once per the `drive-record-traces` skill — `emission.md` § Trace file path resolution). Fields: `dispatch_id` (fresh UUID v4 — reuse through this dispatch's `dispatch-end`), `dispatch_name = "direct-change <ticket>"` (ticket slug; short descriptor if no Linear ticket), `subagent_type` and `model` from the planned `drive-dispatch` / `Task` call, `parent_dispatch_id = null`, plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `dispatch-start` and `emission.md` § Append protocol.
+
+> **Emit `round-start`:** Fields: `dispatch_id` (from the `dispatch-start` above), `round_id` (fresh UUID v4 — record for the matching `brief-issued` and `round-end`), `round_number = 1` (one-shot; direct changes do not loop by default), plus envelope fields. See the `drive-record-traces` skill — `events.md` § `round-start` and `emission.md` § Append protocol.
+
+> **Emit `brief-issued`:** Fire immediately before the `drive-dispatch` call. Fields: `dispatch_id` and `round_id` from above, `brief_byte_length` (UTF-8 byte length of the assembled brief), `brief_content_hash` (sha256 hex of the same text), `brief_disposition = "initial"` (first and only brief for this dispatch), plus envelope fields. See the `drive-record-traces` skill — `events.md` § `brief-issued` and `emission.md` § Append protocol.
+
 4. Call [`drive-dispatch`](../drive-dispatch/SKILL.md) with: the brief; **`null` implementer ID** (one-shot — no continuity to preserve); `foreground` multitasking policy (nothing to prep in parallel for a single dispatch); no carry-over.
 5. On `done` return: run `gh pr create` with the PR description body. Return the PR URL.
 6. On `blocked` return (deferral or pushback): triage as a stop-condition; route via `drive-discussion` or escalate to the operator. Do not silently re-dispatch.
+
+> **Emit `round-end`:** Fields: `dispatch_id` and `round_id` from the round, `verdict` (map the `drive-dispatch` return: `done` → `"satisfied"`; `blocked` / stop-condition → `"stop-condition"`), `findings_filed = 0` (direct changes have no `code-review.md`; best-effort), `wall_clock_ms` (`now − round-start.ts`), plus envelope fields. See the `drive-record-traces` skill — `events.md` § `round-end` and `emission.md` § Append protocol.
+
+> **Emit `dispatch-end`:** Fields: `dispatch_id` from the `dispatch-start` above, `result` (`"completed"` on `done` return; `"failed"` on `blocked` / stop-condition), `wall_clock_ms` (`now − dispatch-start.ts`), plus envelope fields. See the `drive-record-traces` skill — `events.md` § `dispatch-end` and `emission.md` § Append protocol.
+
 7. On `stale` return: surface the heartbeat snapshot to the operator.
 
 #### Slice (orphan or in-project)
