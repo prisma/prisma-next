@@ -62,6 +62,23 @@ export type IntegrityViolation =
     };
 
 /**
+ * One declared extension entry, drawn from `Config.extensionPacks`.
+ *
+ * The integrity layer needs only:
+ *
+ * - `id` — the space id (also the directory name under `migrations/`),
+ *   used for the layout-drift checks (`orphanSpaceDir` /
+ *   `declaredButUnmigrated`).
+ * - `targetId` — the target the declaring extension was configured for.
+ *
+ * Typed structurally so the migration-tools layer stays framework-neutral.
+ */
+export interface DeclaredExtensionEntry {
+  readonly id: string;
+  readonly targetId: string;
+}
+
+/**
  * Options controlling which config/contract-dependent violation checks
  * `checkIntegrity()` runs.
  *
@@ -76,7 +93,7 @@ export interface IntegrityQueryOptions {
    * (a directory exists on disk for an extension not in the list) and
    * `declaredButUnmigrated` (an extension in the list has no on-disk dir).
    */
-  readonly declaredExtensions?: readonly { readonly id: string }[];
+  readonly declaredExtensions?: readonly DeclaredExtensionEntry[];
   /**
    * When true, enables contract/disjointness/target checks:
    * `contractUnreadable`, `targetMismatch`, `disjointness`.

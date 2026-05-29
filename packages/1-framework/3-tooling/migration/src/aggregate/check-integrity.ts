@@ -1,0 +1,190 @@
+import { EMPTY_CONTRACT_HASH } from '../constants';
+import { MigrationToolsError } from '../errors';
+import type {
+  DeclaredExtensionEntry,
+  IntegrityQueryOptions,
+  IntegrityViolation,
+} from '../integrity-violation';
+import type { PackageLoadProblem } from '../io';
+import { extractStorageElementNames } from './extract-storage-element-names';
+import type { ContractSpaceMember } from './types';
+
+/**
+ * One space's load-time facts that `checkIntegrity` judges: the loaded
+ * member, the load-time problems `readMigrationsDir` surfaced for it, and
+ * whether it is the app space (the app head ref is synthesised, so the
+ * head-ref checks are skipped for it).
+ */
+export interface IntegritySpaceState {
+  readonly member: ContractSpaceMember;
+  readonly problems: readonly PackageLoadProblem[];
+  readonly isApp: boolean;
+}
+
+export interface IntegrityComputationInput {
+  readonly targetId: string;
+  readonly spaces: readonly IntegritySpaceState[];
+}
+
+/**
+ * Walk the loaded model and return **every** integrity violation — never
+ * bailing at the first. Structurally-derivable violations (load-time
+ * problems, self-edges, missing / unreachable head refs) are always
+ * produced; layout-drift checks require `declaredExtensions`, and
+ * contract / target / disjointness checks require `requireContracts`.
+ */
+export function computeIntegrityViolations(
+  input: IntegrityComputationInput,
+  opts?: IntegrityQueryOptions,
+): readonly IntegrityViolation[] {
+  const violations: IntegrityViolation[] = [];
+
+  for (const { member, problems, isApp } of input.spaces) {
+    const { spaceId } = member;
+
+    for (const problem of problems) {
+      violations.push(loadProblemToViolation(spaceId, problem));
+    }
+
+    for (const pkg of member.packages) {
+      const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
+      const isSelfEdge = from === pkg.metadata.to;
+      const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
+      if (isSelfEdge && !hasDataOp) {
+        violations.push({ kind: 'sameSourceAndTarget', spaceId, dirName: pkg.dirName, hash: from });
+      }
+    }
+
+    // The app head ref is synthesised from the live contract, so it is
+    // always present and reachable; only extension spaces read their head
+    // ref from disk and can be missing or point outside the graph.
+    if (!isApp) {
+      if (member.headRef === null) {
+        violations.push({ kind: 'headRefMissing', spaceId });
+      } else if (!headRefPresentInGraph(member, member.headRef.hash)) {
+        violations.push({ kind: 'headRefNotInGraph', spaceId, hash: member.headRef.hash });
+      }
+    }
+  }
+
+  if (opts?.declaredExtensions !== undefined) {
+    violations.push(...layoutViolations(input.spaces, opts.declaredExtensions));
+  }
+
+  if (opts?.requireContracts === true) {
+    violations.push(...contractViolations(input));
+  }
+
+  return violations;
+}
+
+function loadProblemToViolation(spaceId: string, problem: PackageLoadProblem): IntegrityViolation {
+  switch (problem.kind) {
+    case 'hashMismatch':
+      return {
+        kind: 'hashMismatch',
+        spaceId,
+        dirName: problem.dirName,
+        stored: problem.stored,
+        computed: problem.computed,
+      };
+    case 'providedInvariantsMismatch':
+      return { kind: 'providedInvariantsMismatch', spaceId, dirName: problem.dirName };
+    case 'packageUnloadable':
+      return {
+        kind: 'packageUnloadable',
+        spaceId,
+        dirName: problem.dirName,
+        detail: problem.detail,
+      };
+  }
+}
+
+/**
+ * Whether a space's head-ref hash is present in its reconstructed graph.
+ * An empty graph is reachable only by the empty-contract sentinel. A
+ * graph that cannot be reconstructed (e.g. a duplicate migration hash) is
+ * treated as "present" so this check does not invent a spurious
+ * `headRefNotInGraph` on top of a deeper structural corruption.
+ */
+function headRefPresentInGraph(member: ContractSpaceMember, headHash: string): boolean {
+  let graph: ReturnType<ContractSpaceMember['graph']>;
+  try {
+    graph = member.graph();
+  } catch {
+    return true;
+  }
+  if (graph.nodes.size === 0) {
+    return headHash === EMPTY_CONTRACT_HASH;
+  }
+  return graph.nodes.has(headHash);
+}
+
+function layoutViolations(
+  spaces: readonly IntegritySpaceState[],
+  declaredExtensions: readonly DeclaredExtensionEntry[],
+): readonly IntegrityViolation[] {
+  const out: IntegrityViolation[] = [];
+  const extensionSpaceIds = new Set(spaces.filter((s) => !s.isApp).map((s) => s.member.spaceId));
+  const declaredIds = new Set(declaredExtensions.map((d) => d.id));
+
+  for (const id of [...extensionSpaceIds].sort()) {
+    if (!declaredIds.has(id)) {
+      out.push({ kind: 'orphanSpaceDir', spaceId: id });
+    }
+  }
+  for (const id of [...declaredIds].sort()) {
+    if (!extensionSpaceIds.has(id)) {
+      out.push({ kind: 'declaredButUnmigrated', spaceId: id });
+    }
+  }
+  return out;
+}
+
+function contractViolations(input: IntegrityComputationInput): readonly IntegrityViolation[] {
+  const out: IntegrityViolation[] = [];
+  const elementClaimedBy = new Map<string, string[]>();
+
+  for (const { member } of input.spaces) {
+    let contract: ReturnType<ContractSpaceMember['contract']>;
+    try {
+      contract = member.contract();
+    } catch (error) {
+      out.push({ kind: 'contractUnreadable', spaceId: member.spaceId, detail: detailOf(error) });
+      continue;
+    }
+
+    if (contract.target !== input.targetId) {
+      out.push({
+        kind: 'targetMismatch',
+        spaceId: member.spaceId,
+        expected: input.targetId,
+        actual: contract.target,
+      });
+    }
+
+    for (const elementName of extractStorageElementNames(contract)) {
+      const claimers = elementClaimedBy.get(elementName);
+      if (claimers) claimers.push(member.spaceId);
+      else elementClaimedBy.set(elementName, [member.spaceId]);
+    }
+  }
+
+  const disjointness: IntegrityViolation[] = [];
+  for (const [element, claimedBy] of elementClaimedBy) {
+    if (claimedBy.length > 1) {
+      disjointness.push({ kind: 'disjointness', element, claimedBy: [...claimedBy].sort() });
+    }
+  }
+  disjointness.sort((a, b) =>
+    a.kind === 'disjointness' && b.kind === 'disjointness' ? a.element.localeCompare(b.element) : 0,
+  );
+  out.push(...disjointness);
+  return out;
+}
+
+function detailOf(error: unknown): string {
+  if (MigrationToolsError.is(error)) return error.why;
+  if (error instanceof Error) return error.message;
+  return String(error);
+}

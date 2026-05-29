@@ -3,32 +3,20 @@ import { describe, expect, it } from 'vitest';
 import { graphWalkStrategy } from '../../../src/aggregate/strategies/graph-walk';
 import type { ContractSpaceMember } from '../../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../../src/constants';
-import { reconstructGraph } from '../../../src/migration-graph';
 import type { OnDiskMigrationPackage } from '../../../src/package';
-import { createAttestedPackage } from '../../fixtures';
+import { createAttestedPackage, makeContractSpaceMember } from '../../fixtures';
 
 function makeMember(
   packages: readonly OnDiskMigrationPackage[],
   headHash: string,
+  invariants: readonly string[] = [],
 ): ContractSpaceMember {
-  const graph =
-    packages.length === 0
-      ? {
-          nodes: new Set<string>(),
-          forwardChain: new Map(),
-          reverseChain: new Map(),
-          migrationByHash: new Map(),
-        }
-      : reconstructGraph(packages);
-  return {
+  return makeContractSpaceMember({
     spaceId: 'cipherstash',
     contract: createSqlContract({ target: 'postgres' }),
-    headRef: { hash: headHash, invariants: [] },
-    migrations: {
-      graph,
-      packagesByMigrationHash: new Map(packages.map((p) => [p.metadata.migrationHash, p])),
-    },
-  };
+    headRef: { hash: headHash, invariants },
+    packages,
+  });
 }
 
 describe('graphWalkStrategy', () => {
@@ -72,16 +60,7 @@ describe('graphWalkStrategy', () => {
     // A package walking baseline → headHash but providing zero invariants.
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
-    const graph = reconstructGraph([pkg]);
-    const member: ContractSpaceMember = {
-      spaceId: 'cipherstash',
-      contract: createSqlContract({ target: 'postgres' }),
-      headRef: { hash: headHash, invariants: ['cipher:create-v1'] },
-      migrations: {
-        graph,
-        packagesByMigrationHash: new Map([[pkg.metadata.migrationHash, pkg]]),
-      },
-    };
+    const member = makeMember([pkg], headHash, ['cipher:create-v1']);
 
     const outcome = graphWalkStrategy({
       aggregateTargetId: 'postgres',
@@ -139,30 +118,6 @@ describe('graphWalkStrategy', () => {
     if (outcome.kind !== 'ok') return;
     expect(outcome.result.plan.operations).toEqual([]);
     expect(outcome.result.plan.origin).toEqual({ storageHash: headHash });
-  });
-
-  it('throws an internal error when the graph references a package not in packagesByMigrationHash', () => {
-    const headHash = 'sha256:cipher-head';
-    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
-    const graph = reconstructGraph([pkg]);
-    const member: ContractSpaceMember = {
-      spaceId: 'cipherstash',
-      contract: createSqlContract({ target: 'postgres' }),
-      headRef: { hash: headHash, invariants: [] },
-      migrations: {
-        graph,
-        // Empty map — out of sync with graph.
-        packagesByMigrationHash: new Map(),
-      },
-    };
-
-    expect(() =>
-      graphWalkStrategy({
-        aggregateTargetId: 'postgres',
-        member,
-        currentMarker: null,
-      }),
-    ).toThrow(/out of sync/);
   });
 
   it('handles the empty-graph + EMPTY_CONTRACT_HASH head ref + no invariants happy path', () => {

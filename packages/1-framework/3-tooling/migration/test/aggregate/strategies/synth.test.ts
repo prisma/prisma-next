@@ -10,7 +10,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { synthStrategy } from '../../../src/aggregate/strategies/synth';
 import type { ContractSpaceMember } from '../../../src/aggregate/types';
-import { EMPTY_CONTRACT_HASH } from '../../../src/constants';
+import { makeContractSpaceMember } from '../../fixtures';
 
 const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
@@ -21,20 +21,8 @@ const STUB_FAMILY: ControlFamilyInstance<'sql', unknown> = {} as unknown as Cont
   unknown
 >;
 
-function emptyMigrations(): ContractSpaceMember['migrations'] {
-  return {
-    graph: {
-      nodes: new Set<string>(),
-      forwardChain: new Map(),
-      reverseChain: new Map(),
-      migrationByHash: new Map(),
-    },
-    packagesByMigrationHash: new Map(),
-  };
-}
-
 function makeMember(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
-  return {
+  return makeContractSpaceMember({
     spaceId,
     contract: createSqlContract({
       target: 'postgres',
@@ -44,9 +32,7 @@ function makeMember(spaceId: string, tables: Record<string, unknown>): ContractS
         },
       },
     }),
-    headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
-    migrations: emptyMigrations(),
-  };
+  });
 }
 
 function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {

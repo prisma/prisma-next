@@ -1,65 +1,36 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { createContract, createSqlContract } from '@prisma-next/contract/testing';
-import type { Contract, StorageBase } from '@prisma-next/contract/types';
+import { createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-
-type MongoStorageLike = StorageBase & {
-  readonly namespaces: Record<
-    string,
-    { readonly id: string; readonly kind: string; readonly tables: Record<string, unknown> }
-  >;
-};
-
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  type DeclaredExtensionEntry,
-  type LoadAggregateInput,
-  loadContractSpaceAggregate,
-} from '../../src/aggregate/loader';
-import { EMPTY_CONTRACT_HASH } from '../../src/constants';
-import { emitContractSpaceArtefacts } from '../../src/emit-contract-space-artefacts';
-import { spaceMigrationDirectory } from '../../src/space-layout';
+import { loadContractSpaceAggregate } from '../../src/aggregate/loader';
+import type { ContractSpaceAggregate } from '../../src/aggregate/types';
+import type { IntegrityViolation } from '../../src/integrity-violation';
 import { writeTestPackage } from '../fixtures';
 
 /**
- * Identity validator: returns the JSON value as a `Contract` (typed,
- * not validated). The loader's contract is that the validator either
- * returns a Contract or throws — both branches are exercised below.
- *
- * For the success path we hand back a typed `Contract` produced by
- * `createSqlContract` so downstream invariant checks
- * (`spaceContract.target`, table extraction) succeed.
+ * Build a SQL/postgres contract that claims the given storage element
+ * names as tables. The storage hash is computed by `createSqlContract`.
  */
-function makeIdentityValidator(byJson: ReadonlyMap<string, Contract>) {
-  return (json: unknown): Contract => {
-    const key = JSON.stringify(json);
-    const contract = byJson.get(key);
-    if (!contract) {
-      throw new Error(`unexpected validator input: ${key.slice(0, 80)}`);
-    }
-    return contract;
-  };
+function sqlContractWithTables(args: { target?: string; tables: readonly string[] }): Contract {
+  const tables = Object.fromEntries(args.tables.map((name) => [name, { columns: { id: {} } }]));
+  return createSqlContract({
+    target: args.target ?? 'postgres',
+    storage: {
+      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+    },
+  });
 }
 
-/**
- * Build a `LoadAggregateInput` with sensible defaults plus the supplied
- * overrides. Tests assemble the on-disk state separately and then point
- * the loader at the resulting `migrationsDir`.
- */
-function buildInput(overrides: Partial<LoadAggregateInput>): LoadAggregateInput {
-  const appContract = overrides.appContract ?? createSqlContract({ target: 'postgres' });
-  return {
-    targetId: 'postgres',
-    migrationsDir: '',
-    appContract,
-    declaredExtensions: [],
-    deserializeContract: makeIdentityValidator(new Map()),
-    appMigrationPackages: [],
-    ...overrides,
-  };
-}
+const APP_CONTRACT = sqlContractWithTables({ tables: ['user'] });
+
+// Identity deserializer: the loader reads the raw on-disk contract.json
+// and hands the parsed value here; tests stand it up as a typed contract
+// without separate validation. The cast is test-only (production wires a
+// family-aware validator). `as` is permitted in test files.
+const identityDeserialize = (json: unknown): Contract => json as Contract;
 
 describe('loadContractSpaceAggregate', () => {
   let migrationsDir: string;
@@ -72,454 +43,238 @@ describe('loadContractSpaceAggregate', () => {
     await rm(migrationsDir, { recursive: true, force: true });
   });
 
-  describe('targetMismatch', () => {
-    it('reports targetMismatch when the app contract target differs from input.targetId', async () => {
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          targetId: 'postgres',
-          appContract: createSqlContract({ target: 'sqlite' }),
-        }),
-      );
-      expect(result.ok).toBe(false);
-      expect(result.assertNotOk()).toEqual({
-        kind: 'targetMismatch',
-        spaceId: 'app',
-        expected: 'postgres',
-        actual: 'sqlite',
-      });
+  function load(appContract: Contract = APP_CONTRACT): Promise<ContractSpaceAggregate> {
+    return loadContractSpaceAggregate({
+      migrationsDir,
+      deserializeContract: identityDeserialize,
+      appContract,
+    });
+  }
+
+  /** Write a migration package under `migrations/<spaceId>/<dirName>`. */
+  function writePackage(
+    spaceId: string,
+    dirName: string,
+    meta: Parameters<typeof writeTestPackage>[1] = {},
+    ops?: Parameters<typeof writeTestPackage>[2],
+  ): Promise<unknown> {
+    return writeTestPackage(join(migrationsDir, spaceId, dirName), meta, ops);
+  }
+
+  /** Write `migrations/<spaceId>/refs/head.json`. */
+  async function writeHeadRef(
+    spaceId: string,
+    headRef: { hash: string; invariants: readonly string[] },
+  ): Promise<void> {
+    const refsDir = join(migrationsDir, spaceId, 'refs');
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(join(refsDir, 'head.json'), JSON.stringify(headRef, null, 2));
+  }
+
+  /** Write `migrations/<spaceId>/contract.json` verbatim. */
+  async function writeContractJson(spaceId: string, contract: unknown): Promise<void> {
+    await mkdir(join(migrationsDir, spaceId), { recursive: true });
+    await writeFile(join(migrationsDir, spaceId, 'contract.json'), JSON.stringify(contract));
+  }
+
+  function violationsOfKind<K extends IntegrityViolation['kind']>(
+    violations: readonly IntegrityViolation[],
+    kind: K,
+  ): readonly Extract<IntegrityViolation, { kind: K }>[] {
+    return violations.filter((v): v is Extract<IntegrityViolation, { kind: K }> => v.kind === kind);
+  }
+
+  describe('tolerant construction', () => {
+    it('resolves with an empty extension set when migrations/ is absent', async () => {
+      const aggregate = await load();
+      expect(aggregate.app.spaceId).toBe('app');
+      expect(aggregate.extensions).toEqual([]);
     });
 
-    it('reports targetMismatch when a declared extension targets a different database', async () => {
-      const declaredExtension: DeclaredExtensionEntry = {
-        id: 'cipherstash',
-        targetId: 'sqlite',
-      };
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          targetId: 'postgres',
-          declaredExtensions: [declaredExtension],
-        }),
-      );
-      expect(result.ok).toBe(false);
-      expect(result.assertNotOk()).toEqual({
-        kind: 'targetMismatch',
-        spaceId: 'cipherstash',
-        expected: 'postgres',
-        actual: 'sqlite',
+    it('never throws on a hash-mismatched, unparseable, or self-edge package', async () => {
+      // app: a self-edge package (from === to, no data op).
+      await writePackage('app', '20260101T0000_self', {
+        from: 'sha256:app-head',
+        to: 'sha256:app-head',
       });
+      // alpha: a hash-mismatched package (retained) and no head ref.
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writeFile(join(migrationsDir, 'alpha', '20260101T0000_init', 'ops.json'), '[]');
+      // beta: an unparseable package (omitted) and a head ref.
+      await mkdir(join(migrationsDir, 'beta', '20260101T0000_broken'), { recursive: true });
+      await writeFile(
+        join(migrationsDir, 'beta', '20260101T0000_broken', 'migration.json'),
+        'not json',
+      );
+      await writeFile(join(migrationsDir, 'beta', '20260101T0000_broken', 'ops.json'), '[]');
+      await writeHeadRef('beta', { hash: 'sha256:b1', invariants: [] });
+
+      const aggregate = await load();
+      expect(aggregate.listSpaces()).toEqual(['app', 'alpha', 'beta']);
+      // Recoverable packages are retained; the unparseable one is omitted.
+      expect(aggregate.space('alpha')?.packages).toHaveLength(1);
+      expect(aggregate.space('beta')?.packages).toHaveLength(0);
     });
   });
 
-  describe('layoutViolation', () => {
-    it('bundles every layout offence in a single layoutViolation', async () => {
-      // Pin a directory for an extension the user did NOT declare in
-      // extensionPacks — that's an orphanSpaceDir.
-      await emitContractSpaceArtefacts(migrationsDir, 'orphan_ext', {
-        contract: { id: 'orphan' },
-        contractDts: '\n',
-        headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
+  describe('app member', () => {
+    it('synthesises the app head ref from the live contract storage hash', async () => {
+      const aggregate = await load();
+      expect(aggregate.app.headRef).toEqual({
+        hash: APP_CONTRACT.storage.storageHash,
+        invariants: [],
       });
+    });
 
-      // Declare an extension with a contract space that has NO on-disk
-      // directory on disk — that's a declaredButUnmigrated.
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          declaredExtensions: [
-            {
-              id: 'unmigrated_ext',
-              targetId: 'postgres',
-            },
-          ],
-        }),
+    it('app.contract() returns the supplied live contract by reference', async () => {
+      const aggregate = await load();
+      expect(aggregate.app.contract()).toBe(APP_CONTRACT);
+    });
+
+    it('reads app migration packages from disk', async () => {
+      await writePackage('app', '20260101T0000_init', { from: null, to: 'sha256:app-head' });
+      const aggregate = await load();
+      expect(aggregate.app.packages).toHaveLength(1);
+      expect(aggregate.app.packages[0]?.dirName).toBe('20260101T0000_init');
+    });
+  });
+
+  describe('lazy memoised facets', () => {
+    it('graph() returns the same instance across calls', async () => {
+      const aggregate = await load();
+      expect(aggregate.app.graph()).toBe(aggregate.app.graph());
+    });
+
+    it('extension contract() deserializes the on-disk contract.json and memoises it', async () => {
+      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
+      await writePackage('cipherstash', '20260101T0000_init', { from: null, to: 'sha256:c1' });
+      await writeHeadRef('cipherstash', { hash: 'sha256:c1', invariants: [] });
+      await writeContractJson('cipherstash', extContract);
+
+      const aggregate = await load();
+      const member = aggregate.space('cipherstash');
+      const first = member?.contract();
+      expect(first).toBe(member?.contract());
+      expect(first?.target).toBe('postgres');
+    });
+  });
+
+  describe('query methods', () => {
+    it('lists app first, then extension ids lex-ascending', async () => {
+      await writePackage('zeta', '20260101T0000_init', { from: null, to: 'sha256:z1' });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      const aggregate = await load();
+      expect(aggregate.listSpaces()).toEqual(['app', 'alpha', 'zeta']);
+      expect(aggregate.spaces().map((m) => m.spaceId)).toEqual(['app', 'alpha', 'zeta']);
+    });
+
+    it('hasSpace / space resolve by id', async () => {
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      const aggregate = await load();
+      expect(aggregate.hasSpace('app')).toBe(true);
+      expect(aggregate.hasSpace('alpha')).toBe(true);
+      expect(aggregate.hasSpace('missing')).toBe(false);
+      expect(aggregate.space('alpha')?.spaceId).toBe('alpha');
+      expect(aggregate.space('missing')).toBeUndefined();
+    });
+  });
+
+  describe('checkIntegrity', () => {
+    it('returns the full structural violation set without bailing at the first', async () => {
+      await writePackage('app', '20260101T0000_self', {
+        from: 'sha256:app-head',
+        to: 'sha256:app-head',
+      });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writeFile(join(migrationsDir, 'alpha', '20260101T0000_init', 'ops.json'), '[]');
+      await mkdir(join(migrationsDir, 'beta', '20260101T0000_broken'), { recursive: true });
+      await writeFile(
+        join(migrationsDir, 'beta', '20260101T0000_broken', 'migration.json'),
+        'not json',
       );
+      await writeFile(join(migrationsDir, 'beta', '20260101T0000_broken', 'ops.json'), '[]');
+      await writeHeadRef('beta', { hash: 'sha256:b1', invariants: [] });
 
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('layoutViolation');
-      if (failure.kind !== 'layoutViolation') return;
-      // Both offences are surfaced in one error so the operator can
-      // resolve them together rather than discovering one at a time.
-      expect([...failure.violations].sort((a, b) => a.spaceId.localeCompare(b.spaceId))).toEqual([
-        { kind: 'orphanSpaceDir', spaceId: 'orphan_ext' },
-        { kind: 'declaredButUnmigrated', spaceId: 'unmigrated_ext' },
+      const violations = (await load()).checkIntegrity();
+
+      expect(violationsOfKind(violations, 'sameSourceAndTarget').map((v) => v.spaceId)).toContain(
+        'app',
+      );
+      expect(violationsOfKind(violations, 'hashMismatch').map((v) => v.spaceId)).toContain('alpha');
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).toContain(
+        'alpha',
+      );
+      expect(violationsOfKind(violations, 'packageUnloadable').map((v) => v.spaceId)).toContain(
+        'beta',
+      );
+      expect(violationsOfKind(violations, 'headRefNotInGraph').map((v) => v.spaceId)).toContain(
+        'beta',
+      );
+      // No bail: violations span more than one space.
+      expect(
+        new Set(violations.map((v) => ('spaceId' in v ? v.spaceId : '*'))).size,
+      ).toBeGreaterThan(1);
+    });
+
+    it('omits config/contract checks unless the matching opt is set', async () => {
+      await writePackage('orphan', '20260101T0000_init', { from: null, to: 'sha256:o1' });
+      await writeHeadRef('orphan', { hash: 'sha256:o1', invariants: [] });
+      const aggregate = await load();
+
+      const bare = aggregate.checkIntegrity();
+      expect(violationsOfKind(bare, 'orphanSpaceDir')).toHaveLength(0);
+      expect(violationsOfKind(bare, 'targetMismatch')).toHaveLength(0);
+    });
+
+    it('gates layout-drift checks behind declaredExtensions', async () => {
+      await writePackage('present', '20260101T0000_init', { from: null, to: 'sha256:p1' });
+      await writeHeadRef('present', { hash: 'sha256:p1', invariants: [] });
+      const aggregate = await load();
+
+      const violations = aggregate.checkIntegrity({
+        declaredExtensions: [{ id: 'declared-but-absent', targetId: 'postgres' }],
+      });
+      // `present` exists on disk but is not declared → orphanSpaceDir.
+      expect(violationsOfKind(violations, 'orphanSpaceDir').map((v) => v.spaceId)).toEqual([
+        'present',
+      ]);
+      // `declared-but-absent` is declared but has no on-disk dir.
+      expect(violationsOfKind(violations, 'declaredButUnmigrated').map((v) => v.spaceId)).toEqual([
+        'declared-but-absent',
       ]);
     });
-  });
 
-  describe('integrityFailure', () => {
-    it('reports integrityFailure when refs/head.json is missing for a declared extension', async () => {
-      // Create the contract-space dir minus the head.json — `readContractSpaceHeadRef`
-      // returns null and the loader treats this as integrity (the layout
-      // precheck only sees the directory exists).
-      const dir = join(migrationsDir, 'cipherstash');
-      // Layout precheck looks for the directory, but readContractSpaceHeadRef
-      // returns null when refs/head.json doesn't exist; the loader then
-      // surfaces it as integrityFailure (not layoutViolation).
-      const { mkdir, writeFile } = await import('node:fs/promises');
-      await mkdir(dir, { recursive: true });
-      // Write contract.json so readContractSpaceContract doesn't fire first;
-      // and write a placeholder so listContractSpaceDirectories sees it.
-      await writeFile(join(dir, 'contract.json'), '{}');
-
-      const declaredExtension: DeclaredExtensionEntry = {
-        id: 'cipherstash',
-        targetId: 'postgres',
-      };
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          declaredExtensions: [declaredExtension],
-        }),
+    it('gates target / disjointness / contract checks behind requireContracts', async () => {
+      // wrongtarget: a deserializable contract whose target differs.
+      await writePackage('wrongtarget', '20260101T0000_init', { from: null, to: 'sha256:w1' });
+      await writeHeadRef('wrongtarget', { hash: 'sha256:w1', invariants: [] });
+      await writeContractJson(
+        'wrongtarget',
+        sqlContractWithTables({ target: 'sqlite', tables: ['wt'] }),
       );
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('integrityFailure');
-      if (failure.kind !== 'integrityFailure') return;
-      expect(failure.spaceId).toBe('cipherstash');
-      expect(failure.detail).toContain('refs/head.json');
-    });
+      // sharer: claims the same `user` table as the app → disjointness.
+      await writePackage('sharer', '20260101T0000_init', { from: null, to: 'sha256:s1' });
+      await writeHeadRef('sharer', { hash: 'sha256:s1', invariants: [] });
+      await writeContractJson('sharer', sqlContractWithTables({ tables: ['user'] }));
+      // broken: no contract.json → contract() throws → contractUnreadable.
+      await writePackage('broken', '20260101T0000_init', { from: null, to: 'sha256:k1' });
+      await writeHeadRef('broken', { hash: 'sha256:k1', invariants: [] });
 
-    it('reports integrityFailure when the on-disk head ref is not in the on-disk migration graph', async () => {
-      // Pin a head ref to a hash that no migration package walks to.
-      const cipherContract = { id: 'cipher' };
-      const priorHeadHash = 'sha256:cipher-pinned-head';
-      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: cipherContract,
-        contractDts: '\n',
-        headRef: {
-          hash: priorHeadHash,
-          invariants: [],
-        },
-      });
-      // Write a single migration package whose `to` is something else;
-      // this leaves the graph non-empty but missing the on-disk head hash.
-      await writeTestPackage(
-        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: 'sha256:cipher-real-head' },
+      const aggregate = await load();
+
+      const bare = aggregate.checkIntegrity();
+      expect(violationsOfKind(bare, 'targetMismatch')).toHaveLength(0);
+      expect(violationsOfKind(bare, 'disjointness')).toHaveLength(0);
+      expect(violationsOfKind(bare, 'contractUnreadable')).toHaveLength(0);
+
+      const gated = aggregate.checkIntegrity({ requireContracts: true });
+      expect(violationsOfKind(gated, 'targetMismatch').map((v) => v.spaceId)).toContain(
+        'wrongtarget',
       );
-
-      const validator = makeIdentityValidator(
-        new Map([[JSON.stringify(cipherContract), createSqlContract({ target: 'postgres' })]]),
+      expect(violationsOfKind(gated, 'disjointness').map((v) => v.element)).toContain('user');
+      expect(violationsOfKind(gated, 'contractUnreadable').map((v) => v.spaceId)).toContain(
+        'broken',
       );
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          deserializeContract: validator,
-          declaredExtensions: [
-            {
-              id: 'cipherstash',
-              targetId: 'postgres',
-            },
-          ],
-        }),
-      );
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('integrityFailure');
-      if (failure.kind !== 'integrityFailure') return;
-      expect(failure.spaceId).toBe('cipherstash');
-      expect(failure.detail).toContain('not present in the on-disk migration graph');
-    });
-  });
-
-  describe('validationFailure', () => {
-    it('reports validationFailure when the on-disk contract.json fails validation', async () => {
-      const cipherContract = { id: 'cipher' };
-      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: cipherContract,
-        contractDts: '\n',
-        headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
-      });
-
-      // Validator throws for the on-disk contract — simulates ArkType
-      // surfacing a structural failure for a corrupt contract.json.
-      const failingValidator = (_json: unknown): Contract => {
-        throw new Error('storage.namespaces.__unbound__.tables.users is missing');
-      };
-
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          deserializeContract: failingValidator,
-          declaredExtensions: [
-            {
-              id: 'cipherstash',
-              targetId: 'postgres',
-            },
-          ],
-        }),
-      );
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('validationFailure');
-      if (failure.kind !== 'validationFailure') return;
-      expect(failure.spaceId).toBe('cipherstash');
-      expect(failure.detail).toContain('storage.namespaces.__unbound__.tables.users is missing');
-    });
-  });
-
-  describe('descriptor independence', () => {
-    it('does not read the descriptor at load time (load succeeds with on-disk pinned hash regardless of descriptor value)', async () => {
-      // The loader's contract is that the descriptor's `contractJson` is
-      // never consulted at load time — only the on-disk pinned head and
-      // the on-disk `contract.json` mirror are. As a regression guard,
-      // assemble on-disk state with one pinned hash and prove the load
-      // succeeds without any descriptor input beyond `id` / `targetId`.
-      const cipherJson = { id: 'cipher' };
-      const cipherHeadHash = 'sha256:cipher-pinned';
-      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: cipherJson,
-        contractDts: '\n',
-        headRef: { hash: cipherHeadHash, invariants: [] },
-      });
-      await writeTestPackage(
-        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: cipherHeadHash },
-      );
-      const validator = makeIdentityValidator(
-        new Map([[JSON.stringify(cipherJson), createSqlContract({ target: 'postgres' })]]),
-      );
-
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          deserializeContract: validator,
-          declaredExtensions: [{ id: 'cipherstash', targetId: 'postgres' }],
-        }),
-      );
-      expect(result.ok).toBe(true);
-    });
-  });
-
-  describe('disjointnessViolation', () => {
-    it('reports disjointnessViolation when two members claim the same storage element', async () => {
-      // App claims `users`; extension claims `users` as well.
-      const appContract = createSqlContract({
-        target: 'postgres',
-        storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { users: {} } },
-          },
-        },
-      });
-      const extContract = createSqlContract({
-        target: 'postgres',
-        storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { users: {} } },
-          },
-        },
-      });
-
-      const cipherJson = { id: 'cipher-collides' };
-      const cipherHeadHash = 'sha256:cipher-collides-head';
-      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: cipherJson,
-        contractDts: '\n',
-        headRef: { hash: cipherHeadHash, invariants: [] },
-      });
-      // Migration so the graph contains the on-disk head ref node.
-      await writeTestPackage(
-        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: cipherHeadHash },
-      );
-
-      const validator = makeIdentityValidator(new Map([[JSON.stringify(cipherJson), extContract]]));
-
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          appContract,
-          deserializeContract: validator,
-          declaredExtensions: [
-            {
-              id: 'cipherstash',
-              targetId: 'postgres',
-            },
-          ],
-        }),
-      );
-
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('disjointnessViolation');
-      if (failure.kind !== 'disjointnessViolation') return;
-      expect(failure.element).toBe('users');
-      expect([...failure.claimedBy].sort()).toEqual(['app', 'cipherstash']);
-    });
-
-    it('reports disjointnessViolation for Mongo-shaped contracts where two members claim the same collection', async () => {
-      // Storage extractor must also handle Mongo's `collections` record:
-      // an aggregate of two Mongo members both claiming a collection
-      // named `users` should be rejected at the disjointness phase, not
-      // silently allowed (which is what would happen if the extractor
-      // only knew about `tables`).
-      const appContract = createContract<MongoStorageLike>({
-        target: 'mongo',
-        targetFamily: 'mongo',
-        storage: {
-          namespaces: {
-            __unbound__: { id: '__unbound__', kind: 'mongo-namespace', tables: { users: {} } },
-          },
-        },
-      });
-      const extContract = createContract<MongoStorageLike>({
-        target: 'mongo',
-        targetFamily: 'mongo',
-        storage: {
-          namespaces: {
-            __unbound__: { id: '__unbound__', kind: 'mongo-namespace', tables: { users: {} } },
-          },
-        },
-      });
-
-      const cipherJson = { id: 'cipher-mongo-collides' };
-      const cipherHeadHash = 'sha256:cipher-mongo-collides-head';
-      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: cipherJson,
-        contractDts: '\n',
-        headRef: { hash: cipherHeadHash, invariants: [] },
-      });
-      await writeTestPackage(
-        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: cipherHeadHash },
-      );
-
-      const validator = makeIdentityValidator(new Map([[JSON.stringify(cipherJson), extContract]]));
-
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          targetId: 'mongo',
-          appContract,
-          deserializeContract: validator,
-          declaredExtensions: [{ id: 'cipherstash', targetId: 'mongo' }],
-        }),
-      );
-
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('disjointnessViolation');
-      if (failure.kind !== 'disjointnessViolation') return;
-      expect(failure.element).toBe('users');
-      expect([...failure.claimedBy].sort()).toEqual(['app', 'cipherstash']);
-    });
-  });
-
-  describe('success path', () => {
-    it('returns a fully hydrated aggregate with extensions sorted alphabetically by spaceId', async () => {
-      // Two extensions, declared in non-alphabetical order. The
-      // resulting `aggregate.extensions` must be sorted alphabetically
-      // because downstream `applyOrder` invariants (and the existing
-      // `concatenateSpaceApplyInputs` ordering) rely on it.
-      const cipherJson = { id: 'cipher' };
-      const pgvectorJson = { id: 'pgvector' };
-      const cipherHeadHash = 'sha256:cipher-head';
-      const pgvectorHeadHash = 'sha256:pgvector-head';
-      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: cipherJson,
-        contractDts: '\n',
-        headRef: {
-          hash: cipherHeadHash,
-          invariants: ['cipher:create-v1', 'a-cipher-inv'],
-        },
-      });
-      await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
-        contract: pgvectorJson,
-        contractDts: '\n',
-        headRef: {
-          hash: pgvectorHeadHash,
-          invariants: [],
-        },
-      });
-      // Migrations so each space's graph contains the on-disk head ref.
-      await writeTestPackage(
-        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: cipherHeadHash },
-      );
-      await writeTestPackage(
-        join(spaceMigrationDirectory(migrationsDir, 'pgvector'), '20260101T0000_init'),
-        { from: null, to: pgvectorHeadHash },
-      );
-
-      const cipherContract = createSqlContract({
-        target: 'postgres',
-        storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { cipher_state: {} } },
-          },
-        },
-      });
-      const pgvectorContract = createSqlContract({
-        target: 'postgres',
-        storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { pgvector_state: {} } },
-          },
-        },
-      });
-      const validator = makeIdentityValidator(
-        new Map([
-          [JSON.stringify(cipherJson), cipherContract],
-          [JSON.stringify(pgvectorJson), pgvectorContract],
-        ]),
-      );
-
-      const result = await loadContractSpaceAggregate(
-        buildInput({
-          migrationsDir,
-          targetId: 'postgres',
-          appContract: createSqlContract({
-            target: 'postgres',
-            storage: {
-              namespaces: {
-                [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { app_user: {} } },
-              },
-            },
-          }),
-          deserializeContract: validator,
-          declaredExtensions: [
-            // Declaration order does NOT determine apply order.
-            {
-              id: 'pgvector',
-              targetId: 'postgres',
-            },
-            {
-              id: 'cipherstash',
-              targetId: 'postgres',
-            },
-          ],
-        }),
-      );
-
-      expect(result.ok).toBe(true);
-      const { aggregate } = result.assertOk();
-
-      expect(aggregate.targetId).toBe('postgres');
-      expect(aggregate.app.spaceId).toBe('app');
-      // Extensions are alphabetical; matches `concatenateSpaceApplyInputs`.
-      expect(aggregate.extensions.map((e) => e.spaceId)).toEqual(['cipherstash', 'pgvector']);
-
-      const cipherMember = aggregate.extensions[0];
-      // headRef.invariants must be sorted (defensive) and member-shape
-      // complete.
-      expect(cipherMember?.headRef.invariants).toEqual(['a-cipher-inv', 'cipher:create-v1']);
-      expect(cipherMember?.contract).toBe(cipherContract);
-      expect(cipherMember?.headRef.hash).toBe(cipherHeadHash);
-      // Graph is hydrated from the on-disk packages: one migration
-      // package implies two nodes (EMPTY_CONTRACT_HASH source plus the
-      // head ref target).
-      expect(cipherMember?.migrations.graph.nodes.has(cipherHeadHash)).toBe(true);
-      expect(cipherMember?.migrations.graph.nodes.has(EMPTY_CONTRACT_HASH)).toBe(true);
-      expect(cipherMember?.migrations.packagesByMigrationHash.size).toBe(1);
-
-      // App member is hydrated from the caller-supplied packages (none
-      // here = empty graph).
-      expect(aggregate.app.migrations.graph.nodes.size).toBe(0);
-      expect(aggregate.app.migrations.packagesByMigrationHash.size).toBe(0);
     });
   });
 });
