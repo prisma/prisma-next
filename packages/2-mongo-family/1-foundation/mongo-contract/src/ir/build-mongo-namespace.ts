@@ -4,6 +4,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { MongoCollection } from './mongo-collection';
 import type { MongoNamespace, MongoNamespaceCollectionsInput } from './mongo-storage';
 import { MongoUnboundNamespace } from './mongo-unbound-namespace';
@@ -38,9 +39,9 @@ class MongoNamespaceFromCollectionsInput extends NamespaceBase {
 export function buildMongoNamespace(input: MongoNamespaceCollectionsInput): MongoNamespace {
   const collectionCount = Object.keys(input.collections ?? {}).length;
   if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
-    return MongoUnboundNamespace.instance as MongoNamespace;
+    return castAs<MongoNamespace>(MongoUnboundNamespace.instance);
   }
-  return new MongoNamespaceFromCollectionsInput(input) as MongoNamespace;
+  return castAs<MongoNamespace>(new MongoNamespaceFromCollectionsInput(input));
 }
 
 export function buildMongoNamespaceMap(
@@ -49,7 +50,12 @@ export function buildMongoNamespaceMap(
   return Object.fromEntries(
     Object.entries(namespaces).map(([nsKey, ns]) => [
       nsKey,
-      ns instanceof NamespaceBase ? (ns as MongoNamespace) : buildMongoNamespace(ns),
+      ns instanceof NamespaceBase
+        ? blindCast<
+            MongoNamespace,
+            'an already-built NamespaceBase in a Mongo-family namespace map is a MongoNamespace'
+          >(ns)
+        : buildMongoNamespace(ns),
     ]),
   );
 }
