@@ -445,8 +445,8 @@ describe('renderMigrationListGraph line dimming', () => {
   ];
 
   function stripAnsi(value: string): string {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI SGR sequences
-    return value.replace(/\u001b\[[0-9;]*m/g, '');
+    const esc = String.fromCharCode(0x1b);
+    return value.replace(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
   }
 
   it('routes lane verticals and the fan/join connectors through the lane styler', () => {
