@@ -203,6 +203,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered; the framework parameter type is the cross-family base.
       contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
       scope: 'runtime',
+      // Placeholder satisfying the required field on the cross-family base. The
+      // stored ctx is a runtime-level template; the per-execute ctxs constructed
+      // in `executeAgainstQueryable` / `executePreparedAgainstQueryable` spread
+      // this template and override `planExecutionId` with a fresh UUID. ADR 220.
+      planExecutionId: '',
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });

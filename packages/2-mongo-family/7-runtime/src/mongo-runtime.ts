@@ -93,6 +93,11 @@ class MongoRuntimeImpl
       // derive a scope-narrowed ctx per call (mirror
       // SqlRuntimeImpl#executeAgainstQueryable in `sql-runtime.ts`).
       scope: 'runtime',
+      // Placeholder satisfying the required field on the cross-family base. The
+      // stored ctx is a runtime-level template; the per-execute ctx constructed
+      // in `execute()` spreads this template and overrides `planExecutionId`
+      // with a fresh UUID. ADR 220.
+      planExecutionId: '',
     };
 
     super({ middleware, ctx });

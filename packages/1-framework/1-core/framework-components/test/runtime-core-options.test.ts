@@ -51,6 +51,7 @@ const ctxValue: RuntimeMiddlewareContext = {
   log: { info: () => {}, warn: () => {}, error: () => {} },
   contentHash: async () => 'mock-hash',
   scope: 'runtime',
+  planExecutionId: 'test-fixture-plan-execution-id',
 };
 
 const plan: MockPlan = { draftId: 'd', meta };

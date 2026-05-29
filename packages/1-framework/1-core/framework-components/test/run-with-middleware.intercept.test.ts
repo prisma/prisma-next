@@ -235,6 +235,7 @@ describe('runWithMiddleware — intercept', () => {
         log: { info: () => {}, warn: () => {}, error: () => {} },
         contentHash: async () => 'mock-hash',
         scope: 'runtime',
+        planExecutionId: 'test-fixture-plan-execution-id',
       };
 
       const interceptor: RuntimeMiddleware<MockExec> = {
