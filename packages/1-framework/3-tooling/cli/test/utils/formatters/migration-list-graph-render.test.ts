@@ -259,7 +259,7 @@ describe('renderMigrationListGraph', () => {
     expect(renderAscii(entries)).toBe(
       '* 20250310_add_comments  7e1b9a0 -> f03da82\n' +
         '* 20250203_add_posts     abc1234 -> 7e1b9a0\n' +
-        '* 20250115_add_users     ∅       -> abc1234',
+        '* 20250115_add_users     -       -> abc1234',
     );
   });
 
@@ -279,7 +279,7 @@ describe('renderMigrationListGraph', () => {
         '* |   20250210_add_tags     abc1234 -> 9c4f1e7\n' +
         '| *   20250203_add_posts    abc1234 -> 7e1b9a0\n' +
         '+-/\n' +
-        '*     20250115_add_users    ∅       -> abc1234',
+        '*     20250115_add_users    -       -> abc1234',
     );
   });
 
@@ -303,7 +303,7 @@ describe('renderMigrationListGraph', () => {
         '| * |   20250303_branch_b  4cb4256 -> b1c2d3e\n' +
         '| | *   20250302_branch_c  4cb4256 -> c1d2e3f\n' +
         '/-+-/\n' +
-        '*       20250115_add_base  ∅       -> 4cb4256',
+        '*       20250115_add_base  -       -> 4cb4256',
     );
   });
 
@@ -319,7 +319,7 @@ describe('renderMigrationListGraph', () => {
         '* |   20250203_add_posts_v2  abc1234 -> def5678\n' +
         '| *   20250203_add_posts     abc1234 -> def5678\n' +
         '+-/\n' +
-        '*     20250115_add_users     ∅       -> abc1234',
+        '*     20250115_add_users     -       -> abc1234',
     );
   });
 
@@ -344,7 +344,7 @@ describe('renderMigrationListGraph', () => {
         '* |   20250304_branch_a  4cb4256 -> a1b2c3d\n' +
         '| *   20250303_branch_b  4cb4256 -> b1c2d3e\n' +
         '+-/\n' +
-        '*     20250115_add_base  ∅       -> 4cb4256',
+        '*     20250115_add_base  -       -> 4cb4256',
     );
   });
 
@@ -359,7 +359,7 @@ describe('renderMigrationListGraph', () => {
       '< 20250312_full_rollback  ghi7890 -> abc1234\n' +
         '* 20250310_add_comments   def5678 -> ghi7890\n' +
         '* 20250203_add_posts      abc1234 -> def5678\n' +
-        '* 20250115_add_users      ∅       -> abc1234',
+        '* 20250115_add_users      -       -> abc1234',
     );
   });
 
@@ -377,7 +377,7 @@ describe('renderMigrationListGraph', () => {
         '| *   20250310_add_comments       def5678 -> ghi7890\n' +
         '+-/\n' +
         '*     20250203_add_posts          abc1234 -> def5678\n' +
-        '*     20250115_add_users          ∅       -> abc1234',
+        '*     20250115_add_users          -       -> abc1234',
     );
   });
 
@@ -405,7 +405,7 @@ describe('renderMigrationListGraph', () => {
         '| *   20250310_add_comments  def5678 -> ghi7890\n' +
         '+-/\n' +
         '*     20250203_add_posts     abc1234 -> def5678\n' +
-        '*     20250115_add_users     ∅       -> abc1234',
+        '*     20250115_add_users     -       -> abc1234',
     );
   });
 
@@ -427,7 +427,7 @@ describe('renderMigrationListGraph', () => {
         '* | |   20250210_add_tags     abc1234 -> 9c4f1e7\n' +
         '| * |   20250203_add_posts    abc1234 -> 7e1b9a0\n' +
         '+-/ | \n' +
-        '*   |   20250115_add_users    ∅       -> abc1234',
+        '*   |   20250115_add_users    -       -> abc1234',
     );
   });
 });

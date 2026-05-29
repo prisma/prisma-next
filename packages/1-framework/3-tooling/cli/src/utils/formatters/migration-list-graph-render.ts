@@ -52,7 +52,7 @@ const ASCII_PALETTE: GlyphPalette = {
   lane: '|',
   node: 'o',
   forwardArrow: '->',
-  emptySource: MIGRATION_LIST_EMPTY_SOURCE,
+  emptySource: '-',
   kind: { forward: '*', rollback: '<', self: '~' },
   fanBelow: (branchCount) => (branchCount === 2 ? '+-\\' : '+-|-\\'),
   joinBelow: (branchCount) => (branchCount === 2 ? '+-/' : '/-+-/'),

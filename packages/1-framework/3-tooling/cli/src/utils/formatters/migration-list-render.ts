@@ -1,4 +1,7 @@
-import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
+import {
+  classifyMigrationListGraphTopology,
+  type EdgeKind,
+} from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
   MigrationListResult,
@@ -94,7 +97,6 @@ function renderSpaceBlock(
   migrations: readonly MigrationListEntry[],
   multiSpace: boolean,
   style: MigrationListStyler,
-  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatEmptyStateLine(spaceId, style);
@@ -104,6 +106,7 @@ function renderSpaceBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
+  const kindByMigrationHash = classifyMigrationListGraphTopology(migrations).kindByMigrationHash;
   const dirNameWidth = computeMigrationDirNameWidth(migrations);
   const rows = migrations.map((entry) =>
     formatMigrationRow(
@@ -130,7 +133,6 @@ function renderSpaceBlock(
 export function renderMigrationListWithStyle(
   result: MigrationListResult,
   style: MigrationListStyler,
-  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
 ): string {
   const multiSpace = result.spaces.length > 1;
   const lines: string[] = [];
@@ -140,9 +142,7 @@ export function renderMigrationListWithStyle(
     if (index > 0) {
       lines.push('');
     }
-    lines.push(
-      ...renderSpaceBlock(space.spaceId, space.migrations, multiSpace, style, kindByMigrationHash),
-    );
+    lines.push(...renderSpaceBlock(space.spaceId, space.migrations, multiSpace, style));
   }
 
   const totalMigrations = result.spaces.reduce(
@@ -157,9 +157,6 @@ export function renderMigrationListWithStyle(
   return lines.join('\n');
 }
 
-export function renderMigrationList(
-  result: MigrationListResult,
-  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
-): string {
-  return renderMigrationListWithStyle(result, IDENTITY_MIGRATION_LIST_STYLER, kindByMigrationHash);
+export function renderMigrationList(result: MigrationListResult): string {
+  return renderMigrationListWithStyle(result, IDENTITY_MIGRATION_LIST_STYLER);
 }

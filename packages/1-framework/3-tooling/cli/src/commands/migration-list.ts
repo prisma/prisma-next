@@ -1,9 +1,5 @@
 import { enumerateMigrationSpaces } from '@prisma-next/migration-tools/enumerate-migration-spaces';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import {
-  classifyMigrationListGraphTopology,
-  type EdgeKind,
-} from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListResult,
   MigrationSpaceListEntry,
@@ -60,8 +56,7 @@ export function renderMigrationListHumanOutput(
   if (options.graph) {
     return renderMigrationListGraphResult(result, styler, options.glyphMode);
   }
-  const kindByMigrationHash = buildKindByMigrationHash(result.spaces);
-  return renderMigrationListWithStyle(result, styler, kindByMigrationHash);
+  return renderMigrationListWithStyle(result, styler);
 }
 
 /**
@@ -83,29 +78,6 @@ export interface RunMigrationListInputs {
    * on-disk space contributes.
    */
   readonly spaceFilter?: string;
-}
-
-/**
- * Compute the trailing one-line summary appended below the migration
- * rows. Wording follows the existing CLI's pluralization style ("N
- * migration(s) on disk" for the common single-space path; multi-space
- * adds "across K contract space(s)" so consumers can see the spread).
- *
- * The renderer suppresses the summary line when `totalMigrations === 0`
- * — the empty-state line carries enough information on its own — so
- * this function always returns a string even for the empty-state.
- */
-export function buildKindByMigrationHash(
-  spaces: readonly MigrationSpaceListEntry[],
-): ReadonlyMap<string, EdgeKind> {
-  const kindByMigrationHash = new Map<string, EdgeKind>();
-  for (const space of spaces) {
-    const topology = classifyMigrationListGraphTopology(space.migrations);
-    for (const [migrationHash, edgeKind] of topology.kindByMigrationHash) {
-      kindByMigrationHash.set(migrationHash, edgeKind);
-    }
-  }
-  return kindByMigrationHash;
 }
 
 function computeSummary(spaces: readonly MigrationSpaceListEntry[]): string {
