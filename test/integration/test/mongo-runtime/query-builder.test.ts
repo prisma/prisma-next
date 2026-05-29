@@ -3,6 +3,8 @@
 // mongoQuery<typeof contract> chains (PlanRow row shapes collapse to _id: never / count: never).
 // Tracked at https://linear.app/prisma-company/issue/TML-2633 — migrate to the facade form
 // once TML-2633 lands.
+
+import { crossRef, type NamespaceId } from '@prisma-next/contract/types';
 import mongoFamilyPack from '@prisma-next/family-mongo/pack';
 import type {
   MongoContract,
@@ -41,7 +43,10 @@ type TestContract = MongoContract & {
       readonly storage: { readonly collection: 'users' };
     };
   };
-  readonly roots: { readonly orders: 'Order'; readonly users: 'User' };
+  readonly roots: {
+    readonly orders: { readonly namespace: NamespaceId; readonly model: 'Order' };
+    readonly users: { readonly namespace: NamespaceId; readonly model: 'User' };
+  };
 };
 
 type TContract = MongoContractWithTypeMaps<TestContract, MongoTypeMaps>;
@@ -50,7 +55,7 @@ type PlanRow<TPlan> = TPlan extends MongoQueryPlan<infer Row> ? Row : never;
 const contractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
-  roots: { orders: 'Order', users: 'User' },
+  roots: { orders: crossRef('Order'), users: crossRef('User') },
   models: {
     Order: {
       fields: {

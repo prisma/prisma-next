@@ -1,3 +1,4 @@
+import { crossRef, type NamespaceId } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -55,7 +56,10 @@ type PipelineContract = MongoContract & {
       readonly storage: { readonly collection: 'orders' };
     };
   };
-  readonly roots: { readonly products: 'Product'; readonly orders: 'Order' };
+  readonly roots: {
+    readonly products: { readonly namespace: NamespaceId; readonly model: 'Product' };
+    readonly orders: { readonly namespace: NamespaceId; readonly model: 'Order' };
+  };
 };
 
 type TestCodecTypes = {
@@ -78,7 +82,7 @@ const scalarField = <TCodecId extends string>(codecId: TCodecId) => ({
 const contractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
-  roots: { products: 'Product', orders: 'Order' },
+  roots: { products: crossRef('Product'), orders: crossRef('Order') },
   models: {
     Product: {
       fields: {

@@ -2,6 +2,7 @@ import type {
   ColumnDefault,
   Contract,
   ContractRelation,
+  NamespaceId,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -533,12 +534,12 @@ type BuiltStorageTables<Definition> = {
     readonly indexes: ReadonlyArray<Index>;
     readonly foreignKeys: ReadonlyArray<{
       readonly source: {
-        readonly namespaceId: string;
+        readonly namespaceId: NamespaceId;
         readonly tableName: string;
         readonly columns: readonly string[];
       };
       readonly target: {
-        readonly namespaceId: string;
+        readonly namespaceId: NamespaceId;
         readonly tableName: string;
         readonly columns: readonly string[];
       };

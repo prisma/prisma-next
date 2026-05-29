@@ -1,7 +1,7 @@
 import type { CodecTypes as MongoCodecTypes } from '@prisma-next/adapter-mongo/codec-types';
 
 import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
-import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
+import type { NamespaceId, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 
 export type StorageHash =
   StorageHashBase<'sha256:vo-test-storage-hash'>;
@@ -24,7 +24,7 @@ type ContractBase = {
   readonly capabilities: {};
   readonly extensionPacks: {};
   readonly meta: {};
-  readonly roots: { readonly shop: 'Shop' };
+  readonly roots: { readonly shop: { readonly model: 'Shop'; readonly namespace: NamespaceId } };
   readonly models: {
     readonly Shop: {
       readonly fields: {

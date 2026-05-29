@@ -2,7 +2,7 @@ import mongoAdapterDescriptor, {
   createMongoControlDriver,
   initMarker,
 } from '@prisma-next/adapter-mongo/control';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
@@ -18,7 +18,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const baseContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
-  roots: { users: 'User' },
+  roots: { users: crossRef('User') },
   models: {
     User: {
       fields: {
