@@ -12,7 +12,9 @@ import sql from '@prisma-next/family-sql/control';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { type MongoTargetContract, mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
@@ -130,11 +132,15 @@ describe('side-by-side contract examples', () => {
     expect(fixtureCases.map((fixtureCase) => fixtureCase.name)).toEqual(['postgres', 'mongo']);
   });
 
-  it('loads the side-by-side fixture files from disk', async () => {
-    const fixtures = await Promise.all(fixtureCases.map(loadFixture));
+  it(
+    'loads the side-by-side fixture files from disk',
+    async () => {
+      const fixtures = await Promise.all(fixtureCases.map(loadFixture));
 
-    expect(fixtures).toHaveLength(2);
-  });
+      expect(fixtures).toHaveLength(2);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'validates and emits the Postgres side-by-side contract from TS and PSL',
@@ -176,9 +182,11 @@ describe('side-by-side contract examples', () => {
         );
       const emittedTs = await emit(normalizedTs, sqlStack, sql.emission, {
         serializeContract: sqlSerializeContract,
+        ...sqlContractCanonicalizationHooks,
       });
       const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission, {
         serializeContract: sqlSerializeContract,
+        ...sqlContractCanonicalizationHooks,
       });
 
       expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
@@ -263,9 +271,11 @@ describe('side-by-side contract examples', () => {
         mongoTargetDescriptor.contractSerializer.serializeContract(contract as MongoTargetContract);
       const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission, {
         serializeContract: mongoSerializeContract,
+        ...mongoContractCanonicalizationHooks,
       });
       const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission, {
         serializeContract: mongoSerializeContract,
+        ...mongoContractCanonicalizationHooks,
       });
 
       const stripForComparison = (json: string) => {

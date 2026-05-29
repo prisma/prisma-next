@@ -46,6 +46,7 @@ import {
   type MongoStorageShape,
   type MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 
 // `canonicalStringify` rejects non-plain objects so a `Map` or class
@@ -1532,6 +1533,7 @@ function buildContractFromDefinition<
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,
     storage: storageBody,
+    ...mongoContractCanonicalizationHooks,
   });
 
   const storage = new MongoStorage({

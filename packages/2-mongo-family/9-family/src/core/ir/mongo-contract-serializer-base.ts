@@ -8,6 +8,7 @@ import {
   MongoContractSchema,
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type as arktypeType, type Type } from 'arktype';
 
@@ -58,6 +59,14 @@ export abstract class MongoContractSerializerBase<TContract>
     // out override this method.
     return contract as unknown as JsonObject;
   }
+
+  /**
+   * Preserve empty `collections` maps and per-collection payloads. Mongo
+   * collections legitimately serialize empty (a declared collection with no
+   * schema is valid); SQL tables never do — that asymmetry lives here rather
+   * than in the family-agnostic canonicalizer.
+   */
+  shouldPreserveEmpty = mongoContractCanonicalizationHooks.shouldPreserveEmpty;
 
   /**
    * Family-shared structural validation: parse against the Mongo

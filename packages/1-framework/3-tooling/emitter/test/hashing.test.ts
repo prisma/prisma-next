@@ -1,3 +1,4 @@
+import type { PreserveEmptyPredicate } from '@prisma-next/contract/hashing';
 import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/hashing';
 import { describe, expect, it } from 'vitest';
 
@@ -7,12 +8,22 @@ const emptyNamespacedStorage = () => ({
   },
 });
 
+const sqlPreserveEmpty: PreserveEmptyPredicate = (path) => {
+  const len = path.length;
+  if (len < 2 || path[0] !== 'storage') return false;
+  if (path[1] === 'namespaces' && len === 4 && path[3] === 'tables') return true;
+  return false;
+};
+
+const SQL_HOOKS = { shouldPreserveEmpty: sqlPreserveEmpty };
+
 describe('hashing', () => {
   it('computes storage hash', () => {
     const hash = computeStorageHash({
       targetFamily: 'sql',
       target: 'postgres',
       storage: emptyNamespacedStorage(),
+      ...SQL_HOOKS,
     });
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
@@ -31,6 +42,7 @@ describe('hashing', () => {
       targetFamily: 'sql',
       target: 'postgres',
       storage: emptyNamespacedStorage(),
+      ...SQL_HOOKS,
     };
 
     const hash1 = computeStorageHash(args);

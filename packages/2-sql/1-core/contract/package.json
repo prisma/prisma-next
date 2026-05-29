@@ -33,6 +33,7 @@
     "src"
   ],
   "exports": {
+    "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",

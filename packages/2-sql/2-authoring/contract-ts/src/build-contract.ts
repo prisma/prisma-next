@@ -22,6 +22,7 @@ import {
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -569,6 +570,7 @@ export function buildSqlContractFromDefinition(
         target,
         targetFamily,
         storage: storageWithoutHash as Record<string, unknown>,
+        ...sqlContractCanonicalizationHooks,
       });
   const storage = new SqlStorage({ ...storageWithoutHash, storageHash } as SqlStorageInput); // Builder types are wider than SqlStorageInput until SqlStorage normalises document types.
 

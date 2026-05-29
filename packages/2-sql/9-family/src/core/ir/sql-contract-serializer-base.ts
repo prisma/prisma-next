@@ -2,6 +2,7 @@ import { ContractValidationError } from '@prisma-next/contract/contract-validati
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import {
   type SqlNamespaceTablesInput,
   SqlStorage,
@@ -81,6 +82,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   serializeContract(contract: TContract): JsonObject {
     return contract as unknown as JsonObject;
   }
+
+  shouldPreserveEmpty = sqlContractCanonicalizationHooks.shouldPreserveEmpty;
+
+  sortStorage = sqlContractCanonicalizationHooks.sortStorage;
 
   protected parseSqlContractStructure(json: unknown): Contract<SqlStorage> {
     return validateSqlContractFully<Contract<SqlStorage>>(

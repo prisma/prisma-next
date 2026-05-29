@@ -28,6 +28,8 @@ export async function emit(
   const canonicalized = canonicalizeContractToObject(contract, {
     schemaVersion: SCHEMA_VERSION,
     serializeContract: options.serializeContract,
+    ...ifDefined('shouldPreserveEmpty', options.shouldPreserveEmpty),
+    ...ifDefined('sortStorage', options.sortStorage),
   });
   const contractJsonString = JSON.stringify(
     {

@@ -1,6 +1,7 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
 import { emit as emitImpl } from '../src/exports';
@@ -11,6 +12,8 @@ const identitySerialize = (c: Contract): JsonObject => c as unknown as JsonObjec
  * Tests author JSON-clean contracts directly, so the canonicalisation
  * hook trivially passes through. Production callers thread the target
  * descriptor's `contractSerializer.serializeContract` instead.
+ * SQL-shaped test contracts also thread the SQL family's canonicalization
+ * hooks so emitted bytes match production emit.
  */
 export function emit(
   contract: Contract,
@@ -19,6 +22,7 @@ export function emit(
   options?: Omit<EmitOptions, 'serializeContract'>,
 ): Promise<EmitResult> {
   return emitImpl(contract, stack, family, {
+    ...sqlContractCanonicalizationHooks,
     ...options,
     serializeContract: identitySerialize,
   });

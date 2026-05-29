@@ -20,6 +20,7 @@ import {
   type MongoIndexKeyDirection,
   MongoStorage,
 } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type {
   ParsePslDocumentResult,
   PslField,
@@ -1134,7 +1135,12 @@ export function interpretPslDocumentToMongoContract(
       },
     },
   };
-  const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
+  const storageHash = computeStorageHash({
+    target,
+    targetFamily,
+    storage: storageWithoutHash,
+    ...mongoContractCanonicalizationHooks,
+  });
   const storage = new MongoStorage({
     storageHash,
     ...storageWithoutHash,

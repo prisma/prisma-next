@@ -1,4 +1,7 @@
-import { canonicalizeContract as canonicalizeContractRaw } from '@prisma-next/contract/hashing';
+import {
+  type CanonicalizeContractOptions,
+  canonicalizeContract as canonicalizeContractRaw,
+} from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { JsonObject } from '@prisma-next/utils/json';
@@ -19,10 +22,76 @@ function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<st
   return unbound['tables'] as Record<string, unknown>;
 }
 
-const canonicalizeContract = (c: Contract): string =>
-  canonicalizeContractRaw(c, {
-    serializeContract: (input) => input as unknown as JsonObject,
-  });
+const identitySerialize = (input: Contract): JsonObject => input as unknown as JsonObject;
+
+const canonicalizeContract = (
+  c: Contract,
+  opts?: Omit<CanonicalizeContractOptions, 'serializeContract'>,
+): string => canonicalizeContractRaw(c, { serializeContract: identitySerialize, ...opts });
+
+function sqlPreserveEmpty(path: readonly string[]): boolean {
+  const len = path.length;
+  if (len < 2 || path[0] !== 'storage') return false;
+  if (path[1] === 'namespaces') {
+    if (len === 4 && path[3] === 'tables') return true;
+    if (len === 5 && path[3] === 'tables') return true;
+    if (
+      len === 6 &&
+      path[3] === 'tables' &&
+      (path[5] === 'uniques' || path[5] === 'indexes' || path[5] === 'foreignKeys')
+    )
+      return true;
+  }
+  if (path[1] === 'types' && len === 4 && path[3] === 'typeParams') return true;
+  return false;
+}
+
+function sqlSortStorage(storage: unknown): unknown {
+  if (!storage || typeof storage !== 'object' || Array.isArray(storage)) return storage;
+  const s = storage as Record<string, unknown>;
+  const namespaces = s['namespaces'];
+  if (!namespaces || typeof namespaces !== 'object' || Array.isArray(namespaces)) return storage;
+  const ns = namespaces as Record<string, unknown>;
+  const sortedNs: Record<string, unknown> = {};
+  for (const nsId of Object.keys(ns)) {
+    const nsEntry = ns[nsId];
+    if (!nsEntry || typeof nsEntry !== 'object' || Array.isArray(nsEntry)) {
+      sortedNs[nsId] = nsEntry;
+      continue;
+    }
+    const tables = (nsEntry as Record<string, unknown>)['tables'];
+    if (!tables || typeof tables !== 'object' || Array.isArray(tables)) {
+      sortedNs[nsId] = nsEntry;
+      continue;
+    }
+    const sortedTables: Record<string, unknown> = {};
+    for (const tname of Object.keys(tables as Record<string, unknown>)) {
+      const t = (tables as Record<string, unknown>)[tname];
+      if (!t || typeof t !== 'object' || Array.isArray(t)) {
+        sortedTables[tname] = t;
+        continue;
+      }
+      const tableObj = t as Record<string, unknown>;
+      const sorted: Record<string, unknown> = { ...tableObj };
+      const byName = (a: unknown, b: unknown): number => {
+        const na =
+          a && typeof a === 'object' && 'name' in a && typeof a.name === 'string' ? a.name : '';
+        const nb =
+          b && typeof b === 'object' && 'name' in b && typeof b.name === 'string' ? b.name : '';
+        return na.localeCompare(nb);
+      };
+      if (Array.isArray(tableObj['indexes'])) {
+        sorted['indexes'] = [...tableObj['indexes']].sort(byName);
+      }
+      if (Array.isArray(tableObj['uniques'])) {
+        sorted['uniques'] = [...tableObj['uniques']].sort(byName);
+      }
+      sortedTables[tname] = sorted;
+    }
+    sortedNs[nsId] = { ...(nsEntry as Record<string, unknown>), tables: sortedTables };
+  }
+  return { ...s, namespaces: sortedNs };
+}
 
 describe('canonicalization', () => {
   it('orders top-level sections correctly', () => {
@@ -155,7 +224,7 @@ describe('canonicalization', () => {
     expect(parsed).not.toHaveProperty('relations');
   });
 
-  it('preserves an empty per-namespace tables slot as a required structural key', () => {
+  it('preserves an empty per-namespace tables slot when SQL shouldPreserveEmpty hook is provided', () => {
     const ir = createTestContract({
       storage: {
         namespaces: {
@@ -164,7 +233,7 @@ describe('canonicalization', () => {
       },
     });
 
-    const result = canonicalizeContract(ir);
+    const result = canonicalizeContract(ir, { shouldPreserveEmpty: sqlPreserveEmpty });
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
     const namespaces = storage['namespaces'] as Record<string, unknown>;
@@ -208,7 +277,7 @@ describe('canonicalization', () => {
     expect(result1).not.toBe(result2);
   });
 
-  it('sorts indexes by canonical name', () => {
+  it('sorts indexes by canonical name when SQL sortStorage hook is provided', () => {
     const ir = createTestContract({
       storage: unboundNamespaceTables({
         user: {
@@ -223,7 +292,7 @@ describe('canonicalization', () => {
       }),
     });
 
-    const result = canonicalizeContract(ir);
+    const result = canonicalizeContract(ir, { sortStorage: sqlSortStorage });
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
     const tables = tablesFromCanonicalStorage(storage);
@@ -233,7 +302,7 @@ describe('canonicalization', () => {
     expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
   });
 
-  it('sorts uniques by canonical name', () => {
+  it('sorts uniques by canonical name when SQL sortStorage hook is provided', () => {
     const ir = createTestContract({
       storage: unboundNamespaceTables({
         user: {
@@ -250,7 +319,7 @@ describe('canonicalization', () => {
       }),
     });
 
-    const result = canonicalizeContract(ir);
+    const result = canonicalizeContract(ir, { sortStorage: sqlSortStorage });
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
     const tables = tablesFromCanonicalStorage(storage);
@@ -306,11 +375,9 @@ describe('canonicalization', () => {
     expect(columnKeys).toEqual(['a_field', 'm_field', 'z_field']);
   });
 
-  describe('Mongo namespaced storage preservation', () => {
-    it('preserves namespace tables container with empty payloads', () => {
+  describe('namespace table slot preservation (SQL hook required)', () => {
+    it('preserves empty namespace table entries when SQL shouldPreserveEmpty hook is provided', () => {
       const ir = createTestContract({
-        targetFamily: 'mongo',
-        target: 'mongo',
         storage: {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
@@ -321,17 +388,15 @@ describe('canonicalization', () => {
         },
       });
 
-      const result = canonicalizeContract(ir);
+      const result = canonicalizeContract(ir, { shouldPreserveEmpty: sqlPreserveEmpty });
       const parsed = JSON.parse(result) as Record<string, unknown>;
       const tables = tablesFromCanonicalStorage(parsed['storage'] as Record<string, unknown>);
       expect(tables['users']).toEqual({});
       expect(tables['posts']).toEqual({});
     });
 
-    it('sorts collection names lexicographically within a namespace', () => {
+    it('sorts table names lexicographically within a namespace', () => {
       const ir = createTestContract({
-        targetFamily: 'mongo',
-        target: 'mongo',
         storage: {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
@@ -342,7 +407,7 @@ describe('canonicalization', () => {
         },
       });
 
-      const result = canonicalizeContract(ir);
+      const result = canonicalizeContract(ir, { shouldPreserveEmpty: sqlPreserveEmpty });
       const parsed = JSON.parse(result) as Record<string, unknown>;
       const tables = tablesFromCanonicalStorage(parsed['storage'] as Record<string, unknown>);
       expect(Object.keys(tables)).toEqual(['apples', 'mangoes', 'zebras']);
@@ -350,8 +415,6 @@ describe('canonicalization', () => {
 
     it('produces different hashes when namespace tables differ', () => {
       const ir1 = createTestContract({
-        targetFamily: 'mongo',
-        target: 'mongo',
         storage: {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
@@ -362,8 +425,6 @@ describe('canonicalization', () => {
         },
       });
       const ir2 = createTestContract({
-        targetFamily: 'mongo',
-        target: 'mongo',
         storage: {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
@@ -374,8 +435,8 @@ describe('canonicalization', () => {
         },
       });
 
-      const result1 = canonicalizeContract(ir1);
-      const result2 = canonicalizeContract(ir2);
+      const result1 = canonicalizeContract(ir1, { shouldPreserveEmpty: sqlPreserveEmpty });
+      const result2 = canonicalizeContract(ir2, { shouldPreserveEmpty: sqlPreserveEmpty });
       expect(result1).not.toBe(result2);
     });
   });
@@ -415,5 +476,33 @@ describe('canonicalization', () => {
     const columns = user['columns'] as Record<string, unknown>;
     const id = columns['id'] as Record<string, unknown>;
     expect(id['generated']).toBeUndefined();
+  });
+});
+
+describe('framework canonicalizer has no SQL/Mongo storage path knowledge', () => {
+  it('canonicalization.ts does not hardcode tables, indexes, uniques, or foreignKeys path guards', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const sourcePath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../0-foundation/contract/src/canonicalization.ts',
+    );
+    const source = await readFile(sourcePath, 'utf8');
+    const forbidden = [
+      "'tables'",
+      "'indexes'",
+      "'uniques'",
+      "'foreignKeys'",
+      'sortIndexesAndUniques',
+      'sortTableArrays',
+      'isNamespaceTable',
+      'isRequiredNamespaceTables',
+      'isStorageTypeTypeParams',
+      'isFkBooleanField',
+    ];
+    for (const token of forbidden) {
+      expect(source, `framework canonicalizer must not reference ${token}`).not.toContain(token);
+    }
   });
 });

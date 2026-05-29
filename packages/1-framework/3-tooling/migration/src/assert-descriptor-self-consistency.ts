@@ -1,4 +1,6 @@
+import type { PreserveEmptyPredicate, StorageSort } from '@prisma-next/contract/hashing';
 import { computeStorageHash } from '@prisma-next/contract/hashing';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { errorDescriptorHeadHashMismatch } from './errors';
 
 function stripNamespaceKinds(storage: Record<string, unknown>): Record<string, unknown> {
@@ -35,6 +37,8 @@ export interface DescriptorSelfConsistencyInputs {
    */
   readonly storage: unknown;
   readonly headRefHash: string;
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+  readonly sortStorage?: StorageSort;
 }
 
 /**
@@ -82,6 +86,8 @@ export function assertDescriptorSelfConsistency(inputs: DescriptorSelfConsistenc
     target: inputs.target,
     targetFamily: inputs.targetFamily,
     storage: normalizedStorage,
+    ...ifDefined('shouldPreserveEmpty', inputs.shouldPreserveEmpty),
+    ...ifDefined('sortStorage', inputs.sortStorage),
   });
   if (recomputed !== inputs.headRefHash) {
     throw errorDescriptorHeadHashMismatch({
