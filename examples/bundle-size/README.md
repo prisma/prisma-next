@@ -82,3 +82,18 @@ Mongo tests boot `mongodb-memory-server` (downloads a `mongod` binary on first
 run). On unsupported host distros (e.g. NixOS) the Mongo tests will fail
 because the binary downloader has no matching artefact — this is an upstream
 limitation, not a regression in the example.
+
+## CI reporting
+
+[`.github/workflows/bundle-size.yml`](../../.github/workflows/bundle-size.yml)
+runs [`andresz1/size-limit-action`](https://github.com/andresz1/size-limit-action)
+on every PR. It executes `pnpm size:build` (workspace `turbo build` + the
+esbuild `bundle` script above) for both the head and the base ref, runs
+`size-limit --json` against the four `dist/*.bundle.min.mjs` outputs, and
+posts a PR comment with the gzipped sizes side by side. The configuration
+lives in [`.size-limit.json`](./.size-limit.json) and uses `@size-limit/file`,
+so the reported number is the size of the artefact this `bundle` script
+already produces — size-limit does not re-bundle.
+
+See [`docs/oss/ci-pipeline.md`](../../docs/oss/ci-pipeline.md#adjacent-workflows)
+for why this workflow is intentionally not a required check.
