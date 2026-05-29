@@ -7,7 +7,7 @@ import type {
 
 test('InferModelRow resolves Task fields', () => {
   type TaskRow = InferModelRow<Contract, 'Task', Contract['models']['Task']['fields'], CodecTypes>;
-  expectTypeOf({} as TaskRow).toMatchTypeOf<{
+  expectTypeOf({} as TaskRow).toExtend<{
     _id: string;
     title: string;
     type: string;
@@ -17,7 +17,7 @@ test('InferModelRow resolves Task fields', () => {
 
 test('InferModelRow resolves User fields', () => {
   type UserRow = InferModelRow<Contract, 'User', Contract['models']['User']['fields'], CodecTypes>;
-  expectTypeOf({} as UserRow).toMatchTypeOf<{
+  expectTypeOf({} as UserRow).toExtend<{
     _id: string;
     name: string;
     email: string;
@@ -34,7 +34,7 @@ test('InferModelRow resolves embedded model fields', () => {
     Contract['models']['Address']['fields'],
     CodecTypes
   >;
-  expectTypeOf({} as AddressRow).toMatchTypeOf<{
+  expectTypeOf({} as AddressRow).toExtend<{
     street: string;
     city: string;
     zip: string;
@@ -49,8 +49,8 @@ test('InferModelRow resolves variant model fields', () => {
     Contract['models']['Feature']['fields'],
     CodecTypes
   >;
-  expectTypeOf({} as BugRow).toMatchTypeOf<{ severity: string }>();
-  expectTypeOf({} as FeatureRow).toMatchTypeOf<{
+  expectTypeOf({} as BugRow).toExtend<{ severity: string }>();
+  expectTypeOf({} as FeatureRow).toExtend<{
     priority: string;
     targetRelease: string;
   }>();
@@ -63,7 +63,7 @@ test('InferModelRow resolves Comment with date field', () => {
     Contract['models']['Comment']['fields'],
     CodecTypes
   >;
-  expectTypeOf({} as CommentRow).toMatchTypeOf<{
+  expectTypeOf({} as CommentRow).toExtend<{
     _id: string;
     text: string;
     createdAt: Date;
