@@ -1,4 +1,3 @@
-import { castAs } from '@prisma-next/utils/casts';
 import type { CodecCallContext } from '../shared/codec-types';
 import { AsyncIterableResult } from './async-iterable-result';
 import { runBeforeExecuteChain } from './before-execute-chain';
@@ -120,35 +119,35 @@ export abstract class RuntimeCore<
     // satisfy `signal?: AbortSignal`).
     const codecCtx: CodecCallContext = signal === undefined ? {} : { signal };
 
-    // Per-execute identity stamped onto the plan before any hook fires, so
-    // every hook in this `execute()` call observes the same
-    // `meta.planExecutionId`, and two executions of the same plan instance
-    // observe distinct values. Per ADR 220. The runtime overrides any
-    // caller-supplied value — every execute is a fresh identity by contract.
-    const planExecutionId = crypto.randomUUID();
-    const wrappedPlan = castAs<TPlan>({
-      ...plan,
-      meta: { ...plan.meta, planExecutionId },
-    });
+    // Per-execute middleware context. Spread the stored runtime-level
+    // template and mint a fresh `planExecutionId` so every hook in this
+    // call observes the same value, and two executions of the same plan
+    // observe distinct values. ADR 220. The same reference is threaded
+    // through `runBeforeExecuteChain` and `runWithMiddleware`; the plan
+    // itself flows through unchanged.
+    const execCtx: RuntimeMiddlewareContext = {
+      ...self.ctx,
+      planExecutionId: crypto.randomUUID(),
+    };
 
     async function* generator(): AsyncGenerator<Row, void, unknown> {
       // Pre-check the signal at entry so an already-aborted caller observes
       // RUNTIME.ABORTED on the first `next()` without any work being done.
       checkAborted(codecCtx, 'stream');
 
-      const compiled = await self.runBeforeCompile(wrappedPlan);
+      const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
       // Fire the framework-level `beforeExecute` chain on the lowered
       // plan before opening the row source. Families that need
       // pre-encode mutator visibility (SQL) override `execute` to
       // inject the same chain at the equivalent point.
-      await runBeforeExecuteChain<TExec>(exec, self.middleware, self.ctx);
+      await runBeforeExecuteChain<TExec>(exec, self.middleware, execCtx);
       // The driver yields raw `Record<string, unknown>`; we cast to `Row` here.
       // The Row contract is enforced by the caller via `plan._row`.
       yield* runWithMiddleware<TExec, Row>(
         exec,
         self.middleware,
-        self.ctx,
+        execCtx,
         () => self.runDriver(exec) as AsyncIterable<Row>,
       );
     }
