@@ -35,19 +35,18 @@ Prisma ORM historically generates a large JavaScript client from PSL. In Prisma 
 
 ```typescript
 import contractJson from './contract.json' assert { type: 'json' }
-import { makeT, sql } from '@prisma/sql'
+import { sql } from '@prisma/sql'
 import { createRuntime } from '@prisma/runtime'
 
-const t = makeT(contractJson)           // builds typed table/column objects at runtime
-const db = createRuntime({ ir: contractJson, verify: 'onFirstUse' })
+const runtime = createRuntime({ ir: contractJson, verify: 'onFirstUse' })
+const db = sql({ context })
 
-const plan = sql()
-  .from('user')
-  .where(t.user.active.eq(true))
-  .select({ id: t.user.id, email: t.user.email })
+const plan = db.user
+  .select('id', 'email')
+  .where((f, fns) => fns.eq(f.active, true))
   .build()
 
-const rows = await db.execute(plan)
+const rows = await runtime.execute(plan)
 ```
 
 #### makeT

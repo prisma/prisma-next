@@ -354,6 +354,68 @@ describe('MongoRuntime middleware lifecycle', () => {
   });
 });
 
+describe('MongoRuntime planExecutionId (ADR 220)', () => {
+  interface Observation {
+    readonly hook: 'beforeExecute' | 'afterExecute';
+    readonly planExecutionId: string;
+  }
+
+  function observerMiddleware(log: Observation[]): MongoMiddleware {
+    return {
+      name: 'observer',
+      async beforeExecute(_plan, ctx) {
+        log.push({ hook: 'beforeExecute', planExecutionId: ctx.planExecutionId });
+      },
+      async afterExecute(_plan, _result, ctx) {
+        log.push({ hook: 'afterExecute', planExecutionId: ctx.planExecutionId });
+      },
+    };
+  }
+
+  it('assigns the same planExecutionId to beforeExecute and afterExecute within one execute call', async () => {
+    const log: Observation[] = [];
+    const adapter = createMockAdapter();
+    const runtime = createMongoRuntime({
+      context: makeContext(adapter),
+      driver: createMockDriver([{ _id: '1' }]),
+      middleware: [observerMiddleware(log)],
+    });
+
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+
+    expect(log).toHaveLength(2);
+    expect(log[0]?.hook).toBe('beforeExecute');
+    expect(log[1]?.hook).toBe('afterExecute');
+    expect(log[0]?.planExecutionId).toBeTypeOf('string');
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+  });
+
+  it('assigns distinct planExecutionIds to two executions of the same plan instance', async () => {
+    const log: Observation[] = [];
+    const adapter = createMockAdapter();
+    const runtime = createMongoRuntime({
+      context: makeContext(adapter),
+      driver: createMockDriver([{ _id: '1' }]),
+      middleware: [observerMiddleware(log)],
+    });
+
+    const plan = createPlan();
+    for await (const _row of runtime.execute(plan)) {
+      void _row;
+    }
+    for await (const _row of runtime.execute(plan)) {
+      void _row;
+    }
+
+    expect(log).toHaveLength(4);
+    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+    expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
+    expect(log[0]?.planExecutionId).not.toBe(log[2]?.planExecutionId);
+  });
+});
+
 describe('MongoRuntime middleware compatibility validation', () => {
   it('accepts a generic middleware (no familyId)', () => {
     const middleware: MongoMiddleware = { name: 'generic' };

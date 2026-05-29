@@ -43,9 +43,8 @@ type ExecuteResult<T> = AsyncIterable<T> & {
 Type inference remains unchanged. The result is always wrapped in `AsyncIterable`:
 
 ```typescript
-const plan = sql()
-  .from(t.user)
-  .select({ id: t.user.id, email: t.user.email })
+const plan = db.user
+  .select('id', 'email')
   .build()
 
 // TypeScript infers AsyncIterable<{ id: number; email: string }>
@@ -121,19 +120,18 @@ const rt = createRuntime({
 
 ## Lane Examples
 
-All lanes produce the same result type and behavior:
+All lanes produce the same result type and behavior. The SQL builder's
+`.build()` returns a `SqlQueryPlan` that is iterated through
+`runtime.execute(plan)`; the builder itself surfaces eager helpers
+(`.all()`, `.first()`, `.firstOrThrow()`) rather than being iterated
+directly.
 
 ```typescript
 // DSL
-for await (const user of sql().from(t.user).select({ id: t.user.id }).build()) { }
+for await (const user of runtime.execute(db.user.select('id').build())) { }
 
 // ORM with includes
-for await (const user of orm(contract)
-  .from(t.user)
-  .include(orm.user.posts)
-  .select({ id: t.user.id })
-  .build()
-) { }
+for await (const user of orm.User.include('posts').all()) { }
 
 // Raw SQL
 for await (const row of raw({ sql: '...', params: [...], annotations: { ... } })) { }

@@ -2,11 +2,12 @@ import type { QueryOperationTypesBase } from '@prisma-next/sql-contract/types';
 import type {
   CodecExpression,
   Expression,
+  RawSqlTag,
   TraitExpression,
 } from '@prisma-next/sql-relational-core/expression';
 import type { Expand, QueryContext, Scope, ScopeField, ScopeTable, Subquery } from './scope';
 
-export type { CodecExpression, Expression, TraitExpression };
+export type { CodecExpression, Expression, RawSqlTag, TraitExpression };
 
 export type BooleanCodecType = { codecId: 'pg/bool@1'; nullable: boolean };
 
@@ -111,6 +112,8 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
       values: Array<CodecExpression<CodecId, boolean, CT>>,
     ): Expression<BooleanCodecType>;
   };
+
+  readonly raw: RawSqlTag;
 };
 
 export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &

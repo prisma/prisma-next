@@ -171,7 +171,7 @@ export type Mappings = Contract.Mappings;
 ```
 
 This structure enables:
-- **DSL type safety**: `t.user.id` → `Tables.user.id` (via Mappings)
+- **DSL type safety**: `db.user` (field-proxy `f.id`) → `Tables.user.id` (via Mappings)
 - **ORM includes**: `User & { posts: Post[] }` (via Models + Relations)
 - **Query results**: Proper typing for joins and projections
 - **Extension support**: Branded types for domain-specific values
@@ -221,7 +221,7 @@ Mappings provide the essential connections between models and storage. See the c
 - `FieldToColumn` maps model field names to storage column names per model
 - `ColumnToField` maps storage column names to model field names per table
 - All mappings are bidirectional and type-safe
-- Used by DSL for `t.user.id` → `Tables.user.id` type inference
+- Used by DSL for `db.user` field-proxy access (`f.id`) → `Tables.user.id` type inference
 
 ## Cardinality typing rules
 
@@ -330,11 +330,15 @@ Result types from queries with joins follow ADR 020 nullability propagation:
 
 ```typescript
 // INNER JOIN: relation is non-null if FK is non-null
-sql().from(t.post).join(t.user, ...).select({ ... })
+db.post
+  .innerJoin(db.user, (f, fns) => fns.eq(f.post.user_id, f.user.id))
+  .select((f) => ({ /* ... */ }))
 // Result: { ..., user: User }
 
 // LEFT JOIN: relation becomes nullable regardless of FK
-sql().from(t.post).leftJoin(t.user, ...).select({ ... })
+db.post
+  .outerLeftJoin(db.user, (f, fns) => fns.eq(f.post.user_id, f.user.id))
+  .select((f) => ({ /* ... */ }))
 // Result: { ..., user: User | null }
 ```
 
@@ -342,19 +346,23 @@ The DSL layer applies these rules at query construction time, not at model defin
 
 ## DSL integration
 
-### Column access via `t`
+### Column access via the field proxy
 
-The runtime constructs `t` via `makeT(contractJson)` using the Mappings namespace and metadata dictionary:
+The runtime exposes tables through the `Db<C>` proxy returned by
+`sql({ context })`. Columns are referenced via the field-proxy `f` argument
+passed to `.select(...)`, `.where(...)`, `.orderBy(...)`, etc., which is
+scoped to the current builder and typed via the Mappings namespace:
 
 ```typescript
-// DSL uses table names for access
-t.user.id        // ColumnRef<number> - maps to Tables.user.id
-t.user.email     // ColumnRef<string> - maps to Tables.user.email
-t.user.posts     // RelationRef<Post[]> - error: cannot select relation directly
+db.user.select((f) => ({
+  id: f.id,          // ColumnRef<number> - maps to Tables.user.id
+  email: f.email,    // ColumnRef<string> - maps to Tables.user.email
+}));
+// Selecting a relation field directly is a type error; use ORM include.
 
 // Type inference works through mappings and metadata:
-// t.user → Tables.user (via TableToModel mapping)
-// t.user.id → Tables.user.id (via ColumnToField mapping)
+// db.user → Tables.user (via TableToModel mapping)
+// f.id within db.user.select(...) → Tables.user.id (via ColumnToField mapping)
 
 // Runtime access for dynamic queries using metadata
 const user: Contract.Models.User = {
@@ -375,10 +383,10 @@ const modelName = userMetadata.name; // 'User'
 ```
 
 **Rules:**
-- Scalar fields return `ColumnRef<T>` for use in SELECT, WHERE, ORDER BY
-- Relation fields return `RelationRef<T>` which can only be used in ORM-level includes
+- Scalar fields on the `f` proxy carry `ColumnRef<T>` for use in SELECT, WHERE, ORDER BY
+- Relation fields are not exposed on `f`; relation navigation lives at the ORM-include layer
 - Attempting to select a relation directly is a type error
-- Type inference uses Mappings namespace to connect `t.tableName` to `Tables.tableName`
+- Type inference uses Mappings namespace to connect `db.tableName` to `Tables.tableName`
 - Metadata dictionary provides extensible runtime access for dynamic query building
 
 ### Utility types for DSL implementation
@@ -410,10 +418,13 @@ type UserModel = ModelForTable<'user'>  // 'User'
 type UserIdColumn = ColumnForField<'user', 'id'>  // number
 
 // Runtime usage for dynamic queries with metadata
-function buildDynamicQuery<M extends ModelDef<string>>(model: M) {
+function buildDynamicQuery<M extends ModelDef<string>>(
+  db: Db<Contract>,
+  model: M,
+) {
   const modelName = model[META].name  // Runtime access to metadata
   const tableName = Mappings.ModelToTable[modelName]  // Type-safe lookup
-  return sql().from(tableName)
+  return db[tableName]  // Table proxy keyed by table name on Db<C>
 }
 
 // Future: Access extended metadata
@@ -545,13 +556,18 @@ vec1 = vec2  // error: incompatible branded types
 
 ```typescript
 // Query result types infer correctly
-const result = await sql()
-  .from(t.user)
-  .leftJoin(t.post, ...)
-  .select({ uid: t.user.id, post: t.post })
+const result = await db.user
+  .outerLeftJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.user_id))
+  .select((f) => ({ uid: f.user.id, postId: f.post.id, postTitle: f.post.title }))
+  .all();
 
-// result: Array<{ uid: number, post: Tables.post | null }>
+// result: Array<{ uid: number, postId: number | null, postTitle: string | null }>
 ```
+
+The SQL builder currently projects individual columns rather than whole
+relation proxies, so the aspirational `post: Tables.post` projection is
+expressed as the LEFT-JOIN-nullable scalar columns the join exposes; nesting
+a full related row stays at the ORM-include layer.
 
 ## Consequences
 

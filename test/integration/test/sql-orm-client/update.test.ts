@@ -104,6 +104,53 @@ describe('integration/update', () => {
   );
 
   it(
+    'updateAll() with include() returns each updated row keyed to its own relations',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Draft', email: 'a@example.com' },
+          { id: 2, name: 'Draft', email: 'b@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 2, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+
+        const updated = await users
+          .where({ name: 'Draft' })
+          .select('name')
+          .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
+          .updateAll({ name: 'Ready' });
+
+        // The single read-back keyed by the returned identities buckets
+        // each parent's relations back to the right row. Sort by the
+        // first post id for a deterministic order, then assert the exact
+        // shape: only the selected scalar and the included relations may
+        // appear, so a read-back identity column leaking into the public
+        // payload would fail here.
+        const sorted = [...updated].sort((a, b) => a.posts[0]!.id - b.posts[0]!.id);
+        expect(sorted).toEqual([
+          {
+            name: 'Ready',
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
+          },
+          {
+            name: 'Ready',
+            posts: [
+              { id: 11, title: 'Post B', userId: 2, views: 200, embedding: null },
+              { id: 12, title: 'Post C', userId: 2, views: 300, embedding: null },
+            ],
+          },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'update() with include() and select() keeps selected scalars and relation rows',
     async () => {
       await withCollectionRuntime(async (runtime) => {

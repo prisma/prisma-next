@@ -135,6 +135,7 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
   const codecRegistry = adapter.__codecs;
   const adapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres'> = {
     kind: 'adapter',
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,

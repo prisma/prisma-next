@@ -35,6 +35,7 @@ function makeCtx(overrides?: Partial<RuntimeMiddlewareContext>): RuntimeMiddlewa
     log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
     contentHash: async (exec) => `key:${(exec as MockExec).statement}`,
     scope: 'runtime',
+    planExecutionId: 'test-fixture-plan-execution-id',
     ...overrides,
   };
 }

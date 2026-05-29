@@ -139,7 +139,10 @@ describe('side-by-side contract examples', () => {
 
       expect(fixtures).toHaveLength(2);
     },
-    timeouts.typeScriptCompilation,
+    // Reading + parsing the fixture files is local I/O; the 100ms package
+    // default flakes on cold CI workers. vitestPackageDefault is the
+    // documented baseline for exactly this case.
+    timeouts.vitestPackageDefault,
   );
 
   it(

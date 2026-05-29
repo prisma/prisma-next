@@ -189,6 +189,7 @@ const sqlCtx: RuntimeMiddlewareContext = {
   log: { info: () => {}, warn: () => {}, error: () => {} },
   contentHash: async () => 'mock-hash',
   scope: 'runtime',
+  planExecutionId: 'test-fixture-plan-execution-id',
 };
 
 describe('cross-family middleware proof', () => {

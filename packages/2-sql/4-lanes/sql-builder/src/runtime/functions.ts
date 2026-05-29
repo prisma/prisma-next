@@ -13,7 +13,8 @@ import {
   OrExpr,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { codecOf, toExpr } from '@prisma-next/sql-relational-core/expression';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
+import { codecOf, createRawSql, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type {
   AggregateFunctions,
   AggregateOnlyFunctions,
@@ -134,7 +135,7 @@ function numericAgg(
   });
 }
 
-function createBuiltinFunctions() {
+function createBuiltinFunctions(rawCodecInferer: RawCodecInferer) {
   return {
     eq: (a: ExprOrVal, b: ExprOrVal) => eq(a, b),
     ne: (a: ExprOrVal, b: ExprOrVal) => ne(a, b),
@@ -158,6 +159,7 @@ function createBuiltinFunctions() {
       expr: Expression<ScopeField>,
       valuesOrSubquery: Subquery<Record<string, ScopeField>> | ExprOrVal[],
     ) => inOrNotIn(expr, valuesOrSubquery, 'notIn'),
+    raw: createRawSql(rawCodecInferer),
   } satisfies BuiltinFunctions<CodecTypes>;
 }
 
@@ -179,13 +181,15 @@ function createAggregateOnlyFunctions() {
 
 export function createFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawCodecInferer: RawCodecInferer,
 ): Functions<QC> {
-  const builtins = createBuiltinFunctions();
+  const builtins = createBuiltinFunctions(rawCodecInferer);
 
   return new Proxy({} as Functions<QC>, {
     get(_target, prop: string) {
-      const builtin = (builtins as Record<string, unknown>)[prop];
-      if (builtin) return builtin;
+      if (Object.hasOwn(builtins, prop)) {
+        return (builtins as Record<string, unknown>)[prop];
+      }
 
       const op = operations[prop];
       if (op) return op.impl;
@@ -196,8 +200,9 @@ export function createFunctions<QC extends QueryContext>(
 
 export function createAggregateFunctions<QC extends QueryContext>(
   operations: Readonly<Record<string, SqlOperationEntry>>,
+  rawCodecInferer: RawCodecInferer,
 ): AggregateFunctions<QC> {
-  const baseFns = createFunctions<QC>(operations);
+  const baseFns = createFunctions<QC>(operations, rawCodecInferer);
   const aggregates = createAggregateOnlyFunctions();
 
   return new Proxy({} as AggregateFunctions<QC>, {

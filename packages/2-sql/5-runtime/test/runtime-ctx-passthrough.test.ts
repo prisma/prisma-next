@@ -100,6 +100,7 @@ describe('SQL middleware context surface', () => {
     };
     const adapterDesc: SqlRuntimeAdapterDescriptor<'postgres'> = {
       kind: 'adapter',
+      rawCodecInferer: { inferCodec: () => 'pg/text' },
       id: 'test-adapter',
       version: '0.0.1',
       familyId: 'sql' as const,

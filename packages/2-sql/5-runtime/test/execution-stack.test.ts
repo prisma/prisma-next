@@ -23,6 +23,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
 
   return {
     kind: 'adapter',
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
@@ -30,7 +31,10 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
     codecs: () => descriptorsFromCodecs(registry),
     create() {
       return Object.assign(
-        { familyId: 'sql' as const, targetId: 'postgres' as const },
+        {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        },
         {
           profile: {
             id: 'test-profile',

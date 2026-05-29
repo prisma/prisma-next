@@ -133,20 +133,23 @@ interface Renderer {
 
 ## Lane DSL integration
 
-Add `fn()` and `op()` helpers that bind to registry entries with full type inference:
+Extension functions and operators surface through the `fns` proxy passed to
+builder callbacks. The proxy is populated from the `QueryOperationRegistry`,
+so pack-contributed entries like pgvector's `cosineDistance` appear alongside
+the built-ins with full type inference:
 
 ```typescript
-const dist = fn('pgvector.fn.distance') // typed factory
-const sim = op('pgvector.op.<->')
-
-sql().from(t.item)
-  .where(dist(t.item.embedding, param.vector('v')).lt(0.8))
-  .orderBy(sim(t.item.embedding, param.vector('q')))
+db.item
+  .where((f, fns) => fns.lt(fns.cosineDistance(f.embedding, vector), 0.8))
+  .orderBy((f, fns) => fns.cosineDistance(f.embedding, target))
 ```
 
 - Overload resolution uses registry signatures with explicit, deterministic coercion rules supplied by packs
 - Result types and nullability are inferred from the chosen signature
 - Plans add structured function/operator refs to `meta.refs` for policy and hashing
+- Parameter binding for prepared statements is driven by the codec
+  registry — see ADR 210 for the `runtime.prepare(declaration, callback)`
+  form that replaces the older `param.vector('v')` helper.
 
 ## Verification and capabilities
 

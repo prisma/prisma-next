@@ -30,7 +30,7 @@
 
 **Order of precedence:**
 1. Projection alias types when explicitly annotated in the builder API or via codecs
-2. Column types from the data contract for `t.table.column` references
+2. Column types from the data contract for fields accessed via the `(f, fns) => ...` callback proxy
 3. Expression typing rules defined below
 4. Adapter refinements where the adapter declares more precise behaviors via capabilities
 
@@ -38,9 +38,9 @@ If multiple sources disagree, the more specific one wins and the less specific i
 
 ## Projection rules
 
-- `select({ alias: t.user.id })` yields `{ alias: number }` based on contract column type
-- `select({ alias: sql.fn.countStar() })` yields `{ alias: number }`
-- `select({ alias: exprA.add(exprB) })` yields the arithmetic result type per numeric promotion rules
+- `db.user.select('alias', (f) => f.id)` yields `{ alias: number }` based on contract column type
+- `db.user.select('alias', (_f, fns) => fns.count())` yields `{ alias: number }`
+- `db.order.select('alias', (f, fns) => fns.sum(f.amount))` yields the aggregate result type per the aggregate rules below
 - Duplicate aliases are a compile-time error in strict mode and produce a warning in permissive mode
 - `SELECT *` is allowed by the core but strongly discouraged and typically linted as error
   - When used, the result is the intersection of all visible table fields with join-based nullability applied, breaking ties by last-projected table in deterministic order
@@ -140,12 +140,16 @@ Adapters can narrow types only when they guarantee a specific lowering behavior:
 ### Left join nullability
 
 ```typescript
-// FROM user INNER JOIN post
-select({ uid: t.user.id, pid: t.post.id })
+// user INNER JOIN post
+db.user
+  .innerJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.user_id))
+  .select((f) => ({ uid: f.user.id, pid: f.post.id }))
 // { uid: number, pid: number }
 
-// FROM user LEFT JOIN post
-select({ uid: t.user.id, pid: t.post.id })
+// user LEFT JOIN post
+db.user
+  .outerLeftJoin(db.post, (f, fns) => fns.eq(f.user.id, f.post.user_id))
+  .select((f) => ({ uid: f.user.id, pid: f.post.id }))
 // { uid: number, pid: number | null }
 ```
 
@@ -153,11 +157,11 @@ select({ uid: t.user.id, pid: t.post.id })
 
 ```typescript
 // Count is never null
-select({ c: fn.countStar() })
+db.order.select('c', (_f, fns) => fns.count())
 // { c: number }
 
 // Sum may be null when no rows
-select({ s: fn.sum(t.order.amount) })
+db.order.select('s', (f, fns) => fns.sum(f.amount))
 // { s: number | null }
 ```
 

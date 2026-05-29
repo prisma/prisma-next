@@ -302,7 +302,7 @@ const rt = createRuntime({
   }
 })
 
-const plan = sql().from(bigTable).select(...).build()
+const plan = db.bigTable.select(/* ... */).build()
 
 const it = rt.execute(plan)
 console.log(it.info.executionMode) // 'stream' (EXPLAIN said 50k rows)
@@ -317,7 +317,7 @@ const rt = createRuntime({
   }
 })
 
-const plan = sql().from(someTable).select(...).build()
+const plan = db.someTable.select(/* ... */).build()
 
 const it = rt.execute(plan)
 // Adapter probes first 256 rows, estimates 320 total → buffer

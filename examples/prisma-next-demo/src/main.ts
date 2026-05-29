@@ -41,6 +41,8 @@
  *                              Vector similarity search via ORM client
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
+ * - raw-sql-demo [limit]         `fns.raw` in projection + filter + typed-expression
+ *                              interpolation, in one query
  * - cross-author-similarity [limit]
  *                              SQL DSL escape-hatch: closest post pairs across different
  *                              authors via a self-join on a non-relation predicate, with
@@ -88,6 +90,7 @@ import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
 import { getUsersCached } from './queries/get-users-cached';
+import { rawSqlDemo } from './queries/raw-sql-demo';
 import { similaritySearch } from './queries/similarity-search';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
@@ -353,6 +356,12 @@ async function main() {
       const results = await similaritySearch(queryVector, limit);
 
       console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'raw-sql-demo') {
+      const [limitStr] = args;
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const results = await rawSqlDemo(limit);
+
+      console.log(JSON.stringify(results, null, 2));
     } else if (cmd === 'cross-author-similarity') {
       const [limitStr] = args;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
@@ -472,7 +481,7 @@ async function main() {
           'repo-upsert-user <id> <email> <kind> | repo-create-user-address <id> <email> <kind> | ' +
           'repo-similar-posts <postId> [limit] | repo-search-posts <embedding> <maxDistance> [limit] | ' +
           'users-paginate [cursor] [limit] | users-paginate-back <cursor> [limit] | ' +
-          'similarity-search <vec> [limit] | cross-author-similarity [limit] | ' +
+          'similarity-search <vec> [limit] | cross-author-similarity [limit] | raw-sql-demo [limit] | ' +
           'cache-demo-user <userId> | cache-demo-users [limit] | cache-demo-sql [limit] | ' +
           'budget-violation | guardrail-delete]',
       );

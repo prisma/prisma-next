@@ -81,7 +81,7 @@ test('ResultType inference works identically to fixture contract', () => {
   const adapter = createStubAdapter();
   const context = createTestContext(validatedBuilderContract, adapter);
 
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
   const _plan = db.user.select('id', 'email', 'createdAt').build();
 
   type BuilderRow = ResultType<typeof _plan>;
@@ -90,7 +90,10 @@ test('ResultType inference works identically to fixture contract', () => {
     contractJson,
   ) as Contract;
   const fixtureContext = createTestContext(_fixtureContract, adapter);
-  const fixtureDb = sql({ context: fixtureContext });
+  const fixtureDb = sql({
+    context: fixtureContext,
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
+  });
   const _fixturePlan = fixtureDb['user']!.select('id', 'email', 'createdAt').build();
 
   type FixtureRow = ResultType<typeof _fixturePlan>;
@@ -385,7 +388,7 @@ test('codec type inference via type option', () => {
   const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   const context = createTestContext(validated, createStubAdapter());
 
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
   const _plan = db.user.select('id', 'email', 'createdAt').build();
 
   type Row = ResultType<typeof _plan>;
@@ -454,7 +457,7 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
     extensionPacks: [arktypeJsonRuntime],
   });
 
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
   const _plan = db.event.select('payload', 'meta').build();
 
   type Row = ResultType<typeof _plan>;

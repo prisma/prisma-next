@@ -12,7 +12,7 @@ Two of those costs are amortizable. Lowering depends only on the AST, so the res
 
 The SQL DSL exposes one primitive that opts into both kinds of reuse: a *prepared statement*. The user calls `db.prepare(declaration, callback)` once and gets back a `PreparedStatement<Params, Row>` object. The runtime invokes the callback to obtain a plan, runs the `beforeCompile` middleware chain on it, lowers the result once, and freezes the lowered SQL onto the object. On first `.execute()` against a connection, the driver allocates whatever per-target handle it needs — a name, a statement reference, an integer, anything — and stores it back on the `PreparedStatement` through a slot wrapper. Subsequent executes reuse the lowered SQL and the handle until the connection ends.
 
-The primitive lives on the runtime: the underlying call is `runtime.prepare(declaration, callback)`. It lives there because the `beforeCompile` middleware chain is owned and invoked by the runtime, and `prepare` has to run that chain so AST rewrites are baked into the lowered SQL. Each DB-specific facade (the Postgres client, the SQLite client, etc.) re-exposes `prepare(declaration, callback)` as a top-level convenience method that delegates to the runtime. The `db.sql` proxy itself is unchanged — it still maps top-level keys to user-defined tables and exposes nothing else.
+The primitive lives on the runtime: the underlying call is `runtime.prepare(declaration, callback)`. It lives there because the `beforeCompile` middleware chain is owned and invoked by the runtime, and `prepare` has to run that chain so AST rewrites are baked into the lowered SQL. Each DB-specific facade (the Postgres client, the SQLite client, etc.) re-exposes `prepare(declaration, callback)` as a top-level convenience method that delegates to the runtime. The `db` proxy returned by `sql({ context })` itself is unchanged — it still maps top-level keys to user-defined tables and exposes nothing else.
 
 There is no global cache. The lowered SQL lives on the user's `PreparedStatement` reference; the per-connection server-side state lives on the connection. When either ends, that state ends with it.
 
@@ -21,34 +21,33 @@ This ADR is family-level: it pins the author surface, the driver SPI shape, the 
 ## Grounding example
 
 ```ts
-const ps = await db.prepare(
+const ps = await runtime.prepare(
   { userId: 'pg/int4@1', email: 'pg/text@1' },
-  (sql, params) =>
-    sql.user
+  (params) =>
+    db.user
       .update({ email: params.email })
       .where((f, fns) => fns.eq(f.id, params.userId))
       .build(),
 );
 
-const runtime = db.runtime();
 await ps.execute(runtime, { userId: 124, email: 'carl@example.com' });
 await ps.execute(runtime, { userId: 125, email: 'dee@example.com'  });
 
-await db.transaction(async (tx) => {
+await withTransaction(runtime, async (tx) => {
   await ps.execute(tx, { userId: 126, email: 'eve@example.com' });
 });
 ```
 
 A few things to notice:
 
-- **`db.prepare(...)` is a top-level method on the DB facade.** It delegates to `db.runtime().prepare(...)`, the underlying primitive. The two surfaces have identical signatures and return the same object; the facade method exists so that simple call sites don't have to reach for the runtime explicitly.
+- **`runtime.prepare(...)` is the underlying primitive.** Each DB-specific facade re-exposes it as a top-level convenience (`db.prepare(...)` on facades that surface one). The two surfaces have identical signatures and return the same object; the facade method exists so that simple call sites don't have to reach for the runtime explicitly.
 - **The first argument declares the parameter shape.** Names mapped to codec ids drawn from the codec registry. The editor autocompletes the codec id strings; the type system rejects unknown ones.
-- **The callback receives a `params` object whose values are bind-site references.** `params.userId` flowing into `eq(f.id, …)` slots in like any other expression — the type at that position is the same arm of `CodecExpression` that the DSL accepts wherever a literal would normally go (`eq`, `update`, `where` predicates, and so on). Slot reuse is implicit by reference equality: referring to `params.userId` twice is one slot used twice.
+- **The callback receives a `params` object whose values are bind-site references.** It is the *only* callback argument; the DSL root (`db`) is captured from the enclosing scope. `params.userId` flowing into `fns.eq(f.id, …)` slots in like any other expression — the type at that position is the same arm of `CodecExpression` that the DSL accepts wherever a literal would normally go (`eq`, `update`, `where` predicates, and so on). Slot reuse is implicit by reference equality: referring to `params.userId` twice is one slot used twice.
 - **`.execute(target, params)` is typed end to end.** `Params` comes from the declaration via each codec's `TInput` mapping; `Row` comes from the plan returned by the callback.
 - **The execution scope is always explicit.** The first argument is a `RuntimeQueryable` — the top-level runtime, an explicit connection, or an active transaction (or its `TransactionContext`). The same `PreparedStatement` redirects between them without re-preparation; there is no implicit binding back to the runtime that produced it.
 - **The first execute allocates a server-side handle; the second reuses it.** Subsequent executes against the same connection skip both lowering and parsing.
 
-Without `prepare`, ad-hoc `db.sql.from(…).execute()` runs as before: lowered every time, parsed by the server every time, and the framework keeps no state about it.
+Without `prepare`, an ad-hoc `db.user.select(...).where(...).all()` (or `.build()` + `runtime.execute(plan)`) runs as before: lowered every time, parsed by the server every time, and the framework keeps no state about it.
 
 ## Design principles
 
@@ -70,7 +69,7 @@ The primitive is `runtime.prepare(declaration, callback)`. It lives on the runti
 
 Each DB-specific facade re-exposes `prepare(declaration, callback)` as a top-level method that delegates to `this.runtime().prepare(...)`. The two surfaces have identical signatures and return the same object; the facade method exists so that everyday call sites can write `db.prepare(...)` without reaching for the runtime explicitly.
 
-The `db.sql` proxy is unchanged. It still maps top-level keys to user-defined tables and exposes nothing else; there is no `db.sql.prepare`. Anchoring `prepare` to the facade rather than the proxy keeps the proxy's namespace pristine for user-defined names.
+The `db` proxy returned by `sql({ context })` is unchanged. It still maps top-level keys to user-defined tables and exposes nothing else; there is no `db.prepare` on the proxy itself. Anchoring `prepare` to the facade rather than the proxy keeps the proxy's namespace pristine for user-defined names.
 
 ### `prepare(declaration, callback)`
 
@@ -78,7 +77,7 @@ The `db.sql` proxy is unchanged. It still maps top-level keys to user-defined ta
 
 `Params` for `.execute(target, params)` is derived by looking each declared entry's codec up in the registry and using its `TInput` mapping, threading nullability through.
 
-The callback receives `(sql, params)`. `sql` is the same DSL root that the rest of the system uses. Each `params.<name>` is a bind-site reference whose static type is `Expression<{ codecId; nullable }>` — the same arm of `CodecExpression` that the DSL accepts wherever a literal would go. Slot reuse is implicit by reference equality: if the callback refers to `params.userId` twice, that's one slot used twice. Literals not threaded through `params` get baked into the lowered SQL at lower time.
+The callback receives `(params)` — a single argument. The DSL root (`db`) is captured from the enclosing scope rather than passed in, so the callback's only obligation is to turn declared params into a plan. Each `params.<name>` is a bind-site reference whose static type is `Expression<{ codecId; nullable }>` — the same arm of `CodecExpression` that the DSL accepts wherever a literal would go. Slot reuse is implicit by reference equality: if the callback refers to `params.userId` twice, that's one slot used twice. Literals not threaded through `params` get baked into the lowered SQL at lower time.
 
 The callback MUST end with `.build()`, returning a plan. `Row` is derived from that plan's row type.
 

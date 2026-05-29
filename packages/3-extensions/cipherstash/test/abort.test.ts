@@ -118,6 +118,7 @@ function makeMiddlewareCtx(signal: AbortSignal | undefined): SqlMiddlewareContex
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     contentHash: async () => 'mock-hash',
     scope: 'runtime',
+    planExecutionId: 'test-fixture-plan-execution-id',
     ...(signal === undefined ? {} : { signal }),
   };
 }

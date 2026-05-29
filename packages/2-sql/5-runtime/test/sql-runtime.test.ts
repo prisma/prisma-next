@@ -175,6 +175,7 @@ function createTestAdapterDescriptor(
   const codecRegistry = adapter.__codecs;
   return {
     kind: 'adapter',
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
