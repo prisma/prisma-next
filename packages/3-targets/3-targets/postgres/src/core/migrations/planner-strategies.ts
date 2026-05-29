@@ -451,6 +451,18 @@ function enumRebuildCallRecipe(
  * into the `dep` bucket — i.e. `CREATE TYPE` runs before any
  * `CreateTableCall` that references the new enum.
  */
+/**
+ * Separator character for compound enum map keys (`namespaceId\u0000typeName`).
+ * NUL (`\u0000`) is invalid in both Postgres identifiers and TypeScript symbol
+ * names so it cannot appear in either component — unambiguous separator.
+ */
+const COMPOUND_KEY_SEP = '\u0000';
+
+/** Builds the compound map key for a namespace-qualified enum entry. */
+function enumCompoundKey(namespaceId: string, typeName: string): string {
+  return `${namespaceId}${COMPOUND_KEY_SEP}${typeName}`;
+}
+
 export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage);
   if (enumTypes.size === 0) return { kind: 'no_match' };
@@ -458,40 +470,34 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
 
   const calls: PostgresOpFactoryCall[] = [];
-  const handledTypeNames = new Set<string>();
-  const introducedTypeNames = new Set<string>();
-  const rebuiltTypeNames = new Set<string>();
+  const handledKeys = new Set<string>();
+  const introducedKeys = new Set<string>();
+  const rebuiltKeys = new Set<string>();
   let emittedRebuildRecipe = false;
 
-  for (const [typeName, enumType] of enumTypes) {
-    // Partial D2: extract namespaceId for this typeName from the contract storage.
-    // D3 will thread this directly once collectPostgresEnumTypes returns compound-keyed entries.
-    let enumNamespaceId = ctx.schemaName;
-    for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
-      if ('enum' in ns && (ns.enum as Record<string, unknown>)?.[typeName] !== undefined) {
-        enumNamespaceId = nsId;
-        break;
-      }
-    }
+  for (const [key, enumType] of enumTypes) {
+    const sepIdx = key.indexOf(COMPOUND_KEY_SEP);
+    const enumNamespaceId = key.slice(0, sepIdx);
+    const typeName = key.slice(sepIdx + 1);
 
     const desired = enumType.values;
-    const existing = readExistingEnumValues(ctx.schema, enumType.nativeType);
+    const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
+    const existing = readExistingEnumValues(ctx.schema, ddlSchema, enumType.nativeType);
     if (!existing) {
-      const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
       calls.push(new CreateEnumTypeCall(ddlSchema, typeName, desired, enumType.nativeType));
-      handledTypeNames.add(typeName);
-      introducedTypeNames.add(typeName);
+      handledKeys.add(key);
+      introducedKeys.add(key);
       continue;
     }
     const diff = determineEnumDiff(existing, desired);
     if (diff.kind === 'unchanged') {
-      handledTypeNames.add(typeName);
+      handledKeys.add(key);
       continue;
     }
     if (diff.kind === 'add_values') {
       const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
       calls.push(new AddEnumValuesCall(ddlSchema, typeName, enumType.nativeType, diff.values));
-      handledTypeNames.add(typeName);
+      handledKeys.add(key);
       continue;
     }
     if (dataAllowed && diff.removedValues.length > 0) {
@@ -505,8 +511,8 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
     }
     calls.push(...enumRebuildCallRecipe(enumNamespaceId, typeName, ctx));
     emittedRebuildRecipe = true;
-    handledTypeNames.add(typeName);
-    rebuiltTypeNames.add(typeName);
+    handledKeys.add(key);
+    rebuiltKeys.add(key);
   }
 
   // The strategy emits a single `recipe` flag for the entire pass,
@@ -518,9 +524,17 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   // enum would fail at runtime with a confusing `type "X" does not
   // exist` error. Surface the unrepresentable case here as a
   // planner-time error so the failure mode is loud, not silent.
-  if (introducedTypeNames.size > 0 && rebuiltTypeNames.size > 0) {
+  if (introducedKeys.size > 0 && rebuiltKeys.size > 0) {
+    const introducedDisplay = [...introducedKeys]
+      .sort()
+      .map((k) => k.replace(COMPOUND_KEY_SEP, '.'))
+      .join(', ');
+    const rebuiltDisplay = [...rebuiltKeys]
+      .sort()
+      .map((k) => k.replace(COMPOUND_KEY_SEP, '.'))
+      .join(', ');
     throw new Error(
-      `nativeEnumPlanCallStrategy: cannot emit both a brand-new enum and a rebuild on a different enum in the same plan; the single recipe flag cannot route them to different buckets. Introduced: [${[...introducedTypeNames].sort().join(', ')}]; rebuilt: [${[...rebuiltTypeNames].sort().join(', ')}]. Split the strategy or grow the \`match\` return type before this case lands.`,
+      `nativeEnumPlanCallStrategy: cannot emit both a brand-new enum and a rebuild on a different enum in the same plan; the single recipe flag cannot route them to different buckets. Introduced: [${introducedDisplay}]; rebuilt: [${rebuiltDisplay}]. Split the strategy or grow the \`match\` return type before this case lands.`,
     );
   }
 
@@ -529,7 +543,7 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
       !(
         (issue.kind === 'type_missing' || issue.kind === 'enum_values_changed') &&
         issue.typeName &&
-        handledTypeNames.has(issue.typeName)
+        handledKeys.has(enumCompoundKey(resolveNamespaceIdForIssue(issue), issue.typeName))
       ),
   );
 
@@ -551,14 +565,22 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   return { kind: 'match', issues: remaining, calls, recipe: emittedRebuildRecipe };
 };
 
+/**
+ * Collects every `PostgresEnumType` instance across all declared namespaces,
+ * returning a compound-keyed map (`${namespaceId}\u0000${typeName}`). Two
+ * namespaces that declare an enum with the same name produce two distinct
+ * entries — no name collision, no last-write-wins.
+ *
+ * Entries within each namespace are sorted by name for deterministic ordering.
+ */
 function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
     if (!('enum' in ns) || ns.enum == null) continue;
     const nsEnums = ns.enum as Record<string, unknown>;
     for (const [name, instance] of Object.entries(nsEnums).sort(([a], [b]) => a.localeCompare(b))) {
       if (instance instanceof PostgresEnumType) {
-        result.set(name, instance);
+        result.set(enumCompoundKey(nsId, name), instance);
       }
     }
   }
