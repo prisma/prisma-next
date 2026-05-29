@@ -147,6 +147,18 @@
       }
     }
   },
+  "domain": {
+    "__unbound__": {
+      "types": {
+        "Email": {
+          "codecId": "pg/text@1",
+          "kind": "codec-instance",
+          "nativeType": "text",
+          "typeParams": {}
+        }
+      }
+    }
+  },
   "storage": {
     "namespaces": {
       "__unbound__": {
