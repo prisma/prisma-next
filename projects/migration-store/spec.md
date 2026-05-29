@@ -69,6 +69,7 @@ type IntegrityViolation =
   | { readonly kind: 'providedInvariantsMismatch'; readonly spaceId: string; readonly dirName: string }
   | { readonly kind: 'headRefMissing'; readonly spaceId: string }
   | { readonly kind: 'headRefNotInGraph'; readonly spaceId: string; readonly hash: string }
+  | { readonly kind: 'refUnreadable'; readonly spaceId: string; readonly refName: string; readonly detail: string } // corrupt/unparseable ref json (named ref or head.json); ref omitted, not fatal
   // config/contract-dependent — produced only when the matching opt is set
   | { readonly kind: 'orphanSpaceDir'; readonly spaceId: string }              // needs declaredExtensions
   | { readonly kind: 'declaredButUnmigrated'; readonly spaceId: string }       // needs declaredExtensions
@@ -87,6 +88,7 @@ type IntegrityViolation =
 | `errorMigrationHashMismatch` (`readMigrationsDir`) | `hashMismatch` violation; package retained |
 | `errorProvidedInvariantsMismatch` (`readMigrationsDir`) | `providedInvariantsMismatch` violation; package retained |
 | `errorInvalidJson` / `errorInvalidManifest` / `errorMissingFile` (`readMigrationsDir`) | `packageUnloadable` violation; package omitted (per-package, not whole-aggregate fatal) |
+| corrupt / unparseable ref json (`readRefs` / `readContractSpaceHeadRef`) | `refUnreadable` violation; that ref omitted (per-ref, not fatal). A genuinely *absent* head ref stays `headRefMissing`. |
 | loader layout / disjointness / target / head-ref / contract-validation failures | matching violations, produced under the relevant `IntegrityQueryOptions` |
 
 ### Per-command consumption
