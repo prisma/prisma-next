@@ -4,7 +4,11 @@
 import type { CodecTypes as MongoCodecTypes } from '@prisma-next/adapter-mongo/codec-types';
 import type { Vector } from '@prisma-next/adapter-mongo/codec-types';
 
-import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
+import type {
+  MongoCollection,
+  MongoContractWithTypeMaps,
+  MongoTypeMaps,
+} from '@prisma-next/mongo-contract';
 import type {
   Contract as ContractType,
   ExecutionHashBase,
