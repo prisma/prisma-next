@@ -5,7 +5,7 @@ import type {
 import { ppgServerlessDriverDescriptorMeta } from '../core/descriptor-meta';
 
 const NOT_IMPLEMENTED_MESSAGE =
-  'driver-ppg-serverless: runtime not implemented; landing in Slice 2';
+  'driver-ppg-serverless: runtime not yet implemented; this is a placeholder descriptor with no transport bound';
 
 class PpgServerlessUnboundDriver implements RuntimeDriverInstance<'sql', 'postgres'> {
   readonly familyId = 'sql' as const;

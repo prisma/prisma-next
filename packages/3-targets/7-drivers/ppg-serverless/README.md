@@ -16,7 +16,7 @@ In Prisma Next, "driver" refers to the Prisma Next interface (not the underlying
 
 This package reuses the existing `postgres` target and `postgres` adapter (same `familyId: 'sql'`, same `targetId: 'postgres'` as `@prisma-next/driver-postgres`), exposing only a runtime entry point. The migration / control plane continues to be served by `@prisma-next/driver-postgres/control`.
 
-> **Slice 1 placeholder:** the current `./runtime` export ships a descriptor whose `SqlDriver` methods throw `"driver-ppg-serverless: runtime not implemented; landing in Slice 2"`. The real `@prisma/ppg` transport, the `PpgBinding` discriminated union, and the connection lifecycle wiring land in subsequent slices.
+> **Placeholder driver.** The current `./runtime` export ships a descriptor whose `SqlDriver` methods throw `"driver-ppg-serverless: runtime not yet implemented; this is a placeholder descriptor with no transport bound"`. The descriptor's `familyId`, `targetId`, and `id` are correctly populated so the layering wiring is exercised, but the `@prisma/ppg` WebSocket transport, the `PpgBinding` discriminated union, and the connection lifecycle are not bound yet.
 
 ## Purpose
 
@@ -38,7 +38,7 @@ Provide a WebSocket-based PPG transport for Prisma Next that runs in edge and se
 
 ## Architecture
 
-<!-- TODO: Slice 2 -->
+<!-- TODO: add diagram when transport layer lands -->
 
 ## Components
 
@@ -47,7 +47,7 @@ Provide a WebSocket-based PPG transport for Prisma Next that runs in edge and se
 
 ### Runtime descriptor (`src/exports/runtime.ts`)
 - Default export: the `RuntimeDriverDescriptor` consumers register with the runtime.
-- Slice 1 placeholder; real implementation lands in Slice 2.
+- Placeholder descriptor; real WebSocket-backed transport pending.
 
 ## Dependencies
 
@@ -68,9 +68,9 @@ Provide a WebSocket-based PPG transport for Prisma Next that runs in edge and se
 
 ## Usage
 
-<!-- TODO: Slice 2 -->
+<!-- TODO: add usage example when transport binding is implemented -->
 
 ## Exports
 
 - `./runtime`: Runtime entry point for the PPG serverless driver
-  - Default: `ppgServerlessRuntimeDriverDescriptor` — use `create()` for an unbound driver, then `connect(binding)` (Slice 2).
+  - Default: `ppgServerlessRuntimeDriverDescriptor` — use `create()` for an unbound driver, then `connect(binding)` once transport is bound.
