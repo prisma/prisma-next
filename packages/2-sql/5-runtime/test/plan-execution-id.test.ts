@@ -161,7 +161,6 @@ describe('SqlRuntime.execute planExecutionId (ADR 220)', () => {
     // Across two executes: distinct IDs.
     expect(firstExecId).not.toBe(secondExecId);
   });
-
 });
 
 describe('SqlRuntime.executePrepared planExecutionId (ADR 220)', () => {
