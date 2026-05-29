@@ -3,7 +3,7 @@
 **Date:** 2026-05-28  
 **Runner:** implementer subagent (D3 R1 walkthrough)  
 **Mode:** Walkthrough — synthetic scenario simulating orchestrator emit decisions at each anchor in `skills-contrib/drive-build-workflow/SKILL.md § The per-dispatch loop`. No live agent dispatch.  
-**Trace evidence:** [`qa-trace-01.jsonl`](./qa-trace-01.jsonl) (committed copy; canonical in-project runtime path would be `projects/drive-instrumentation/trace.jsonl` per [`docs/drive/trace-emission.md`](../../../../docs/drive/trace-emission.md)).
+**Trace evidence:** [`qa-trace-01.jsonl`](./qa-trace-01.jsonl) (committed copy; canonical in-project runtime path would be `projects/drive-instrumentation/trace.jsonl` per [`skills-contrib/drive-record-traces/emission.md`](../../../../skills-contrib/drive-record-traces/emission.md)).
 
 ## Scenario
 
@@ -29,7 +29,7 @@ Walkthrough followed emit anchors in order: § 1 `dispatch-start` (round 1 only)
 | 1 | Trace file at resolved path | **Pass** | Evidence file `qa-trace-01.jsonl` exists in slice folder; in-project canonical path documented as `projects/drive-instrumentation/trace.jsonl`. |
 | 2 | All five event types present | **Pass** | One or more of each: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. |
 | 3 | Every line valid JSON | **Pass** | `jq -c . qa-trace-01.jsonl > /dev/null` exit 0. |
-| 4 | Payload shape matches vocabulary | **Pass** | All 13 events: flat objects with envelope + event-specific fields only; `schema_version: "1"`; enums and integer types match `docs/drive/trace-events.md`. |
+| 4 | Payload shape matches vocabulary | **Pass** | All 13 events: flat objects with envelope + event-specific fields only; `schema_version: "1"`; enums and integer types match `skills-contrib/drive-record-traces/events.md`. |
 | 5 | Per-dispatch temporal ordering | **Pass** | D1: `dispatch-start → (round-start → brief-issued → round-end)×2 → dispatch-end`. D2: `dispatch-start → round-start → brief-issued → round-end → dispatch-end`. |
 | 6 | `rounds_per_dispatch` computable | **Pass** | See hand-computation below. |
 | 7 | Brief-churn narrow metric computable | **Pass** | See hand-computation below. |

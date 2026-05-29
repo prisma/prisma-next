@@ -6,10 +6,10 @@ Slice spec: [`spec.md`](./spec.md). Spec re-specified 2026-05-28 to expand scope
 
 ## Status
 
-- **D1: SATISFIED** — `5bdc19013`. Build-loop event vocabulary (`docs/drive/trace-events.md`) and shared emission protocol (`docs/drive/trace-emission.md`).
+- **D1: SATISFIED** — `5bdc19013`. Build-loop event vocabulary (`skills-contrib/drive-record-traces/events.md`) and shared emission protocol (`skills-contrib/drive-record-traces/emission.md`).
 - **D2: SATISFIED** — `42feffeb4`. Five emit-sites in `skills-contrib/drive-build-workflow/SKILL.md` at canonical anchors.
 - **D3: SATISFIED** — `849f10598`. `manual-qa.md` + `qa-run-01.md` + `qa-trace-01.jsonl` (build-loop event coverage; 13 events across a synthetic 2-dispatch / 3-round scenario).
-- **D4: SATISFIED** — `4156a84c8` + orchestrator fixup `7a8b3e6fe`. Six planning-chain event types added to `docs/drive/trace-events.md`; existence-check subsection added to `docs/drive/trace-emission.md`. F2 + F3 (low/process JSONL + anchor nits) closed in fixup commit.
+- **D4: SATISFIED** — `4156a84c8` + orchestrator fixup `7a8b3e6fe`. Six planning-chain event types added to `skills-contrib/drive-record-traces/events.md`; existence-check subsection added to `skills-contrib/drive-record-traces/emission.md`. F2 + F3 (low/process JSONL + anchor nits) closed in fixup commit.
 - **D5a: SATISFIED** — `21dc8c0d0`. Four spec+plan lifecycle skills instrumented with existence-check-gated Emit blockquotes (+2 lines each, +8 total). `drive-specify-slice` correctly gates emission on in-project mode; `drive-plan-slice` correctly handles both inline-in-spec and separate-plan.md write modes with mode-specific `plan_path` resolution. Two non-blocking findings (F4 ⚠️ Concern, F5 💡 Suggestion) about abbreviated payload listings — consistent with D2's blockquote-density pattern, doc cites cover the full schema; orchestrator accepts as-is.
 - **D5b: SATISFIED** — `00165a337` + orchestrator fixup (F6 closed). `drive-triage-work` and `drive-discussion` instrumented with one Emit blockquote each. F6 (Blocker) was a brief-was-wrong issue: D5b brief incorrectly said T3+T4 both fire `falsified-assumption`; vocab + plan contract is T3-only. Fix-orchestrator-direct: drive-discussion emit blockquote corrected to T3-only with explicit T4-silent note.
 - **D6: SATISFIED** — `05b4e171e`. `manual-qa.md` extended with 13 new checks (8–20) covering the six planning-chain event types plus 7 structural gates (existence-check, I12-T3-only, re-triage, verdict mapping, orphan silence, plan-slice dual-mode). `qa-trace-02.jsonl` (23 events, all 11 types). `qa-run-02.md` (20/20 checks pass; all 6 quality metrics hand-computed; behaviour-preservation attested across all seven instrumented skills). **Slice 1 SATISFIED at close.**
@@ -46,22 +46,22 @@ Commit `849f10598`. `manual-qa.md` (149 lines, 7-check re-runnable script); `qa-
 
 ### Dispatch 4: Vocabulary expansion for planning-chain events
 
-**Intent.** Extend `docs/drive/trace-events.md` with the six planning-chain event types (`spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`) and the corresponding arktype schemas. Extend `docs/drive/trace-emission.md` with a short addendum on the existence-check pattern (file-exists → emit `*-amended`; else → emit `*-authored`). Payload schemas per the sketches in `spec.md § Approach § Vocabulary shape § Planning-chain payload sketches` — D4 finalises them.
+**Intent.** Extend `skills-contrib/drive-record-traces/events.md` with the six planning-chain event types (`spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`) and the corresponding arktype schemas. Extend `skills-contrib/drive-record-traces/emission.md` with a short addendum on the existence-check pattern (file-exists → emit `*-amended`; else → emit `*-authored`). Payload schemas per the sketches in `spec.md § Approach § Vocabulary shape § Planning-chain payload sketches` — D4 finalises them.
 
 **Files in play.**
 
-- `docs/drive/trace-events.md` (edit, additive).
-- `docs/drive/trace-emission.md` (edit, additive — the addendum).
+- `skills-contrib/drive-record-traces/events.md` (edit, additive).
+- `skills-contrib/drive-record-traces/emission.md` (edit, additive — the addendum).
 
 NOT in play: any skill body; the QA artefacts; any new file outside the two docs.
 
 **"Done when":**
 
-- [ ] Six new event types documented in `docs/drive/trace-events.md` with payload schemas + arktype types + JSONL examples. The doc's existing structure (one section per event type, following the pattern D1 established for the five build-loop events) is preserved; new sections are additive.
+- [ ] Six new event types documented in `skills-contrib/drive-record-traces/events.md` with payload schemas + arktype types + JSONL examples. The doc's existing structure (one section per event type, following the pattern D1 established for the five build-loop events) is preserved; new sections are additive.
 - [ ] Each new event type's section names the emitting skill(s) and the trigger condition, consistent with the table in `spec.md § Approach § Vocabulary shape`.
 - [ ] `trace-emission.md` gains a short subsection on the existence-check pattern (≤ 20 lines, sample bash check, link back to the `*-authored` / `*-amended` event types in `trace-events.md`).
 - [ ] The vocabulary-version field stays at `schema_version: "1"` (no major-version bump — additive).
-- [ ] Intent-validation: `git diff --stat 849f10598..HEAD` lists exactly two files: `docs/drive/trace-events.md` and `docs/drive/trace-emission.md`.
+- [ ] Intent-validation: `git diff --stat 849f10598..HEAD` lists exactly two files: `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md`.
 - [ ] Markdown well-formed; cross-references resolve.
 
 **Size.** M (~2h). 6 event types × ~30 lines each in trace-events.md plus the trace-emission.md addendum.
@@ -79,7 +79,7 @@ NOT in play: any skill body; the QA artefacts; any new file outside the two docs
 - `skills-contrib/drive-plan-project/SKILL.md` — emits `plan-authored` OR `plan-amended` at the plan-write step.
 - `skills-contrib/drive-plan-slice/SKILL.md` — same shape for slice plans.
 
-Each emit-site is the same shape as D2's: a 1–3-line Emit blockquote citing `docs/drive/trace-events.md` (payload schema) and `docs/drive/trace-emission.md` (file-append mechanics + the existence-check addendum). Anchor-discovery is the implementer's first task — find the "write the spec/plan" step in each skill body and place the emit-site immediately after the write, before the skill returns control to its caller.
+Each emit-site is the same shape as D2's: a 1–3-line Emit blockquote citing `skills-contrib/drive-record-traces/events.md` (payload schema) and `skills-contrib/drive-record-traces/emission.md` (file-append mechanics + the existence-check addendum). Anchor-discovery is the implementer's first task — find the "write the spec/plan" step in each skill body and place the emit-site immediately after the write, before the skill returns control to its caller.
 
 **Files in play.**
 
@@ -93,7 +93,7 @@ NOT in play: any other skill body; docs; QA artefacts.
 **"Done when":**
 
 - [ ] One Emit blockquote per skill body at the post-write anchor. Four files modified, ~5–10 lines each, ~30 lines total.
-- [ ] Each emit-site cites both `docs/drive/trace-events.md` and `docs/drive/trace-emission.md`.
+- [ ] Each emit-site cites both `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md`.
 - [ ] The existence-check pattern is correctly applied in each emit-site (the Emit instruction itself names the check: "if the target file exists at write time, emit `*-amended`; else emit `*-authored`").
 - [ ] No other section of any skill body is materially changed; additive-only.
 - [ ] Behaviour-preservation read-through: each skill body's "write the spec/plan" workflow step is unchanged in semantics; quote one before/after fragment in the return report.
@@ -127,7 +127,7 @@ NOT in play: any other skill body; docs; QA artefacts.
 - [ ] Two Emit blockquotes (one per skill body) at the named anchors.
 - [ ] `drive-discussion`'s emit-site explicitly documents the I12-trigger gating — the emit fires only when discussion was entered to address a mid-flight falsified assumption; other entry triggers (pre-spec design, mid-spec fork, operator-requested, unplanned obstacle) do NOT emit. The gating logic lives inside the Emit instruction itself.
 - [ ] `drive-triage-work`'s emit-site fires on every triage verdict (no gating; multiple triage calls per ticket → multiple events).
-- [ ] Each emit-site cites both `docs/drive/trace-events.md` and `docs/drive/trace-emission.md`.
+- [ ] Each emit-site cites both `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md`.
 - [ ] No other section of either skill body is materially changed; additive-only.
 - [ ] Behaviour-preservation read-through per skill.
 - [ ] Intent-validation: `git diff --stat <prior-head>..HEAD` lists exactly two files.

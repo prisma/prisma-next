@@ -2,7 +2,7 @@
 
 ## At a glance
 
-Versioned event vocabulary for Drive orchestrator instrumentation. Every instrumented skill emits structured events to a project-scoped `trace.jsonl` file (see [`trace-emission.md`](./trace-emission.md) for path resolution and append protocol). Slice 1 ships eleven event types: five on the build-loop dispatch/round spine and six on the planning chain (spec/plan authoring, triage, I12 halts). Later slices extend the vocabulary without breaking readers that honour `schema_version`.
+Versioned event vocabulary for Drive orchestrator instrumentation. Every instrumented skill emits structured events to a project-scoped `trace.jsonl` file (see [`emission.md`](./emission.md) for path resolution and append protocol). Slice 1 ships eleven event types: five on the build-loop dispatch/round spine and six on the planning chain (spec/plan authoring, triage, I12 halts). Later slices extend the vocabulary without breaking readers that honour `schema_version`.
 
 **Vocabulary version:** `schema_version: "1"`.
 
@@ -87,7 +87,7 @@ Fires once per round when the implementer brief is finalised, immediately before
 
 ## Event types (planning chain)
 
-Payload-only fields below; merge with the common envelope at emit time. Spec/plan write events use the existence-check pattern in [`trace-emission.md`](./trace-emission.md) § Existence-check pattern.
+Payload-only fields below; merge with the common envelope at emit time. Spec/plan write events use the existence-check pattern in [`emission.md`](./emission.md) § Existence-check pattern.
 
 ### `spec-authored`
 
@@ -520,7 +520,7 @@ One example line per slice-1 event type (build loop, then planning chain). Paylo
 
 ## References
 
-- Emission protocol (path resolution, append mechanics): [`trace-emission.md`](./trace-emission.md).
-- Parent instrumentation project: transient artefact under `projects/drive-instrumentation/` (methodology surfaces migrate to `docs/` on project close-out).
-- Brief shape the `brief-issued` event measures: [`principles/brief-discipline.md`](./principles/brief-discipline.md).
-- Instrumented skill (slice 1): [`skills-contrib/drive-build-workflow/SKILL.md`](../../skills-contrib/drive-build-workflow/SKILL.md).
+- Emission protocol (path resolution, append mechanics): [`emission.md`](./emission.md).
+- This skill's overview + the list of instrumented skills: [`SKILL.md`](./SKILL.md).
+- Brief shape the `brief-issued` event measures: [`brief-discipline.md`](../../docs/drive/principles/brief-discipline.md).
+- Build-loop emitter: [`drive-build-workflow`](../drive-build-workflow/SKILL.md).

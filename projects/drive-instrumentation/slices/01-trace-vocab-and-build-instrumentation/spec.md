@@ -23,8 +23,8 @@ Ships the trace-event contract (vocabulary + emission protocol) plus the first t
 
 ### In scope
 
-- **`docs/drive/trace-events.md`** — versioned event-vocabulary spec. Defines the common envelope, the eleven slice-1 event types (five build-loop events from D1 + six planning-chain events added in D4), payload schemas, ordering and timestamp rules, the vocabulary-version field. Cited from every instrumented skill. D1 shipped the build-loop spine (`5bdc19013`); D4 extends the doc with the six planning-chain event types.
-- **`docs/drive/trace-emission.md`** — shared emission-protocol doc. Defines trace-file path resolution (in-project / orphan-slice / direct-change), append-only JSONL conventions, canonical "Emit" snippet, file-write tool. Cited from every instrumented skill. D1 shipped; D4 adds a short addendum on the existence-check pattern that distinguishes `*-authored` vs `*-amended` events.
+- **`skills-contrib/drive-record-traces/events.md`** — versioned event-vocabulary spec. Defines the common envelope, the eleven slice-1 event types (five build-loop events from D1 + six planning-chain events added in D4), payload schemas, ordering and timestamp rules, the vocabulary-version field. Cited from every instrumented skill. D1 shipped the build-loop spine (`5bdc19013`); D4 extends the doc with the six planning-chain event types.
+- **`skills-contrib/drive-record-traces/emission.md`** — shared emission-protocol doc. Defines trace-file path resolution (in-project / orphan-slice / direct-change), append-only JSONL conventions, canonical "Emit" snippet, file-write tool. Cited from every instrumented skill. D1 shipped; D4 adds a short addendum on the existence-check pattern that distinguishes `*-authored` vs `*-amended` events.
 - **`skills-contrib/drive-build-workflow/SKILL.md`** — five Emit blockquotes at the canonical per-dispatch-loop anchors (D2 shipped `42feffeb4`).
 - **`skills-contrib/drive-specify-project/SKILL.md`** — one Emit blockquote at the spec-write step, gated on existence-check (`spec-authored` if first write, `spec-amended` otherwise). Added in D5a.
 - **`skills-contrib/drive-specify-slice/SKILL.md`** — same shape for slice specs. Added in D5a.
@@ -66,7 +66,7 @@ Eleven event types total in slice 1. The five build-loop events were shipped by 
 | `triage-verdict` | once per triage call | `drive-triage-work` |
 | `falsified-assumption` | once per drive-discussion entry, conditional on I12-trigger | `drive-discussion` |
 
-For payload schemas, common envelope, JSONL examples, and arktype types, see [`docs/drive/trace-events.md`](/docs/drive/trace-events.md).
+For payload schemas, common envelope, JSONL examples, and arktype types, see [`skills-contrib/drive-record-traces/events.md`](/skills-contrib/drive-record-traces/events.md).
 
 #### Planning-chain payload sketches (precise schemas authored in D4)
 
@@ -77,7 +77,7 @@ For payload schemas, common envelope, JSONL examples, and arktype types, see [`d
 
 ### Emission protocol
 
-Unchanged from D1 — see [`docs/drive/trace-emission.md`](/docs/drive/trace-emission.md) for path resolution, append-only JSONL conventions, the canonical Emit snippet, the Shell `>>` file-write mechanic. D4 adds a short subsection documenting the **existence-check pattern** for the `*-authored` vs `*-amended` decision: the emitting skill checks for the target file's existence before write; if absent → emit `*-authored`, else → emit `*-amended`. (The check is part of the emit-site instructions, not a separate event.)
+Unchanged from D1 — see [`skills-contrib/drive-record-traces/emission.md`](/skills-contrib/drive-record-traces/emission.md) for path resolution, append-only JSONL conventions, the canonical Emit snippet, the Shell `>>` file-write mechanic. D4 adds a short subsection documenting the **existence-check pattern** for the `*-authored` vs `*-amended` decision: the emitting skill checks for the target file's existence before write; if absent → emit `*-authored`, else → emit `*-amended`. (The check is part of the emit-site instructions, not a separate event.)
 
 ### `drive-build-workflow` instrumentation
 
@@ -95,7 +95,7 @@ See commit `42feffeb4`.
 
 ### Planning-chain instrumentation (D5a + D5b)
 
-Six skill bodies gain emit-sites. Each emit-site is the same shape as build-workflow's: a 1–3-line "Emit" blockquote citing both `docs/drive/trace-events.md` (payload schema) and `docs/drive/trace-emission.md` (file-append mechanics). Anchor-discovery is the implementer's first task in D5a / D5b; the natural anchors are listed below as guidance, not verbatim section names (the canonical skill bodies have their own structure that the implementer reads on the dispatch).
+Six skill bodies gain emit-sites. Each emit-site is the same shape as build-workflow's: a 1–3-line "Emit" blockquote citing both `skills-contrib/drive-record-traces/events.md` (payload schema) and `skills-contrib/drive-record-traces/emission.md` (file-append mechanics). Anchor-discovery is the implementer's first task in D5a / D5b; the natural anchors are listed below as guidance, not verbatim section names (the canonical skill bodies have their own structure that the implementer reads on the dispatch).
 
 **D5a — spec + plan lifecycle (4 skills):**
 
@@ -166,7 +166,7 @@ New edge cases introduced by the planning-chain expansion (D4–D6):
 - [ ] **SDoD3.** Reviewer verdict `SATISFIED` on `reviews/code-review.md` at slice close.
 - [ ] **SDoD4.** Manual-QA covers all eleven event types. `manual-qa.md` (D3 + D6) re-runnable; ≥ 2 QA runs committed (`qa-run-01.md` from D3; `qa-run-02.md` from D6); no unresolved 🛑 Blocker findings.
 - [ ] **SDoD5.** Slice doesn't touch surfaces listed as out-of-scope (no instrumentation of lifecycle skills, `drive-dispatch`, or QA-side skills; no assertion / metric code; no judge / harness code; no edits to `.agents/skills/` — only `skills-contrib/` and `docs/drive/`).
-- [ ] **SDoD6.** `docs/drive/trace-events.md` and `docs/drive/trace-emission.md` exist, are versioned (`schema_version: "1"`), and are linked from every instrumented skill body's emit-sites.
+- [ ] **SDoD6.** `skills-contrib/drive-record-traces/events.md` and `skills-contrib/drive-record-traces/emission.md` exist, are versioned (`schema_version: "1"`), and are linked from every instrumented skill body's emit-sites.
 - [ ] **SDoD7.** Every instrumented skill verified non-regressing against an uninstrumented baseline (behaviour-preservation read-through covers all seven instrumented skill bodies — verified per-skill in their respective dispatch's done-when checks).
 - [ ] **SDoD8.** Trace.jsonl evidence committed: `qa-trace-01.jsonl` (D3 — five-event-spine coverage) + `qa-trace-02.jsonl` (D6 — all-eleven-event coverage).
 
@@ -175,7 +175,7 @@ New edge cases introduced by the planning-chain expansion (D4–D6):
 1. **Synthetic-vs-real demo** — D3 and D6 both ship walkthroughs, not full real-agent runs. Working position: walkthroughs are sufficient for slice-1 QA per spec § Approach § Demo + manual QA. A real-agent run is implicit once any subsequent project uses the instrumented skills (this very project's slice 2 onwards will produce real traces).
 2. **`orchestrator_agent_id` extraction.** Working position: emit `null` for slice 1. If Cursor's SDK / IDE / env exposes the agent UUID via a standard read, populate; else defer to Project 2.
 3. **`brief-issued` for reviewer brief.** Working position: slice 1 only fires `brief-issued` for the implementer brief; reviewer-brief tracking added in slice 2 if signal demands.
-4. **Vocab-doc location.** Settled at `docs/drive/trace-events.md` + `docs/drive/trace-emission.md`.
+4. **Vocab-doc location.** Settled at `skills-contrib/drive-record-traces/events.md` + `skills-contrib/drive-record-traces/emission.md`.
 5. **ADR for the trace-emission protocol.** Working position: commit to writing an ADR at project close-out.
 6. **Direct-change brief tracking.** Deferred to slice 2 — `drive-start-workflow → drive-dispatch` path emits no `brief-issued` under slice 1.
 7. **(New)** **Pre-spec design discussion tracking.** `drive-discussion` is entered for many reasons (pre-spec design, mid-spec fork, mid-flight I12, unplanned obstacle, operator-requested). Slice 1's `falsified-assumption` event fires only on I12 entries. Tracking of other discussion-entry reasons is deferred — if the operator's iteration loop needs to attribute time spent in pre-spec discussion mode, that's a slice-2 event type (`discussion-entered` with a richer trigger enum).

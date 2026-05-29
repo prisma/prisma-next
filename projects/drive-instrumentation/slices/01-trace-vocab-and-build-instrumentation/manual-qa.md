@@ -2,7 +2,7 @@
 
 Re-runnable checklist for verifying that a `trace.jsonl` produced by (or simulating) the instrumented `drive-build-workflow` loop matches the slice-1 vocabulary and supports hand-computation of the two diagnostic metrics.
 
-**References:** [`docs/drive/trace-events.md`](../../../../docs/drive/trace-events.md) (payload shapes), [`docs/drive/trace-emission.md`](../../../../docs/drive/trace-emission.md) (path resolution), [`skills-contrib/drive-build-workflow/SKILL.md`](../../../../skills-contrib/drive-build-workflow/SKILL.md) (emit-site anchors).
+**References:** [`skills-contrib/drive-record-traces/events.md`](../../../../skills-contrib/drive-record-traces/events.md) (payload shapes), [`skills-contrib/drive-record-traces/emission.md`](../../../../skills-contrib/drive-record-traces/emission.md) (path resolution), [`skills-contrib/drive-build-workflow/SKILL.md`](../../../../skills-contrib/drive-build-workflow/SKILL.md) (emit-site anchors).
 
 **Execution modes:**
 
@@ -71,7 +71,7 @@ jq -c . "$TRACE_FILE" > /dev/null && echo "all lines parse"
 
 ### Check 4 — Payload shape matches vocabulary
 
-**Pass when:** every event is a flat object with exactly the envelope fields plus the event-type-specific fields documented in `docs/drive/trace-events.md`, with no extra top-level keys and no missing required fields.
+**Pass when:** every event is a flat object with exactly the envelope fields plus the event-type-specific fields documented in `skills-contrib/drive-record-traces/events.md`, with no extra top-level keys and no missing required fields.
 
 **Envelope (all events):** `event_id`, `event_type`, `schema_version` (`"1"`), `ts`, `project_run_id`, `orchestrator_agent_id`.
 
@@ -137,7 +137,7 @@ brief-churn = 5120 / 3072 ≈ 1.667
 
 ### Check 8 — `spec-authored` present and schema-valid
 
-**Pass when:** the trace contains at least one `spec-authored` event whose payload matches `docs/drive/trace-events.md` § `spec-authored`: `spec_path`, `spec_kind` (`"project"` \| `"slice"`), `byte_length`, `edge_cases_count` (`null` for project specs), `open_questions_count`, `dod_items_count`.
+**Pass when:** the trace contains at least one `spec-authored` event whose payload matches `skills-contrib/drive-record-traces/events.md` § `spec-authored`: `spec_path`, `spec_kind` (`"project"` \| `"slice"`), `byte_length`, `edge_cases_count` (`null` for project specs), `open_questions_count`, `dod_items_count`.
 
 **Command:**
 

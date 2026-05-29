@@ -2,7 +2,7 @@
 
 ## At a glance
 
-Shared protocol for appending Drive trace events to JSONL files. Instrumented `drive-*` skill bodies cite this doc for file-path resolution and append mechanics; event field definitions live in [`trace-events.md`](./trace-events.md).
+Shared protocol for appending Drive trace events to JSONL files. Instrumented `drive-*` skill bodies cite this doc for file-path resolution and append mechanics; event field definitions live in [`events.md`](./events.md).
 
 The orchestrator is the sole writer per trace file (sub-agents do not emit). Slice 1 does not add file locks; the orchestrator's sequential tool calls already serialise writes.
 
@@ -32,14 +32,14 @@ Partial traces are acceptable: a `dispatch-start` without a matching `dispatch-e
 
 - **One event per line.** Each line is exactly one JSON object; no pretty-printing across lines.
 - **Append only.** Never rewrite or truncate the file mid-run; readers assume monotonic append.
-- **Flat objects.** No nested arrays at the top level; envelope and payload fields merge into one object (see [`trace-events.md`](./trace-events.md)).
+- **Flat objects.** No nested arrays at the top level; envelope and payload fields merge into one object (see [`events.md`](./events.md)).
 - **UTF-8 strict.** Serialize with UTF-8 encoding; `brief_byte_length` and hashes assume UTF-8 byte counts of the brief text.
 - **Compact JSON.** Prefer `JSON.stringify` without extra whitespace so line length stays predictable.
 - **No extra fields.** Slice 1 emits exactly the documented vocabulary; forward-compat via undeclared fields is out of scope.
 
 ## Schema validation
 
-Slice 1 does not validate payloads at emit time. The orchestrator constructs events from known state; conformant shape is the implementer's responsibility against [`trace-events.md`](./trace-events.md). Read-time validation against the documented arktype schemas is a slice-3 deliverable.
+Slice 1 does not validate payloads at emit time. The orchestrator constructs events from known state; conformant shape is the implementer's responsibility against [`events.md`](./events.md). Read-time validation against the documented arktype schemas is a slice-3 deliverable.
 
 ## Append protocol
 
@@ -79,15 +79,15 @@ Slice 1 assumes a single orchestrator writer per trace file (`drive-build-workfl
 
 ## Canonical Emit snippet (for skill bodies)
 
-Instrumented skills grow by ~one line per transition point. Each emit step names the event type, lists payload fields the orchestrator must compute (see [`trace-events.md`](./trace-events.md)), and delegates append mechanics here:
+Instrumented skills grow by ~one line per transition point. Each emit step names the event type, lists payload fields the orchestrator must compute (see [`events.md`](./events.md)), and delegates append mechanics here:
 
-> **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see [`trace-events.md`](./trace-events.md) § `{event_type}`). Append one JSON line per [`trace-emission.md`](./trace-emission.md) § Append protocol (`Shell` + `mkdir -p` + `printf … >> trace file`).
+> **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see [`events.md`](./events.md) § `{event_type}`). Append one JSON line per [`emission.md`](./emission.md) § Append protocol (`Shell` + `mkdir -p` + `printf … >> trace file`).
 
 Replace `{event_type}` with the event name for the transition point. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. For spec/plan writes, apply § Existence-check pattern before choosing `*-authored` vs `*-amended`. Resolve `TRACE_FILE` from § Trace file path resolution before the first emit in the session.
 
 ## Existence-check pattern for `*-authored` vs `*-amended` events
 
-Four planning-chain write events — [`spec-authored`](./trace-events.md#spec-authored), [`spec-amended`](./trace-events.md#spec-amended), [`plan-authored`](./trace-events.md#plan-authored), [`plan-amended`](./trace-events.md#plan-amended) — share a gating decision at emit time: did the target artefact file already exist on disk immediately before this write?
+Four planning-chain write events — [`spec-authored`](./events.md#spec-authored), [`spec-amended`](./events.md#spec-amended), [`plan-authored`](./events.md#plan-authored), [`plan-amended`](./events.md#plan-amended) — share a gating decision at emit time: did the target artefact file already exist on disk immediately before this write?
 
 The emitting skill (`drive-specify-project`, `drive-specify-slice`, `drive-plan-project`, `drive-plan-slice`) checks file existence **before** committing the write, then emits exactly one event:
 
@@ -105,7 +105,7 @@ if [ -f "$SPEC_PATH" ]; then
 else
   EVENT_TYPE="spec-authored"
 fi
-# Build EVENT_JSON for $EVENT_TYPE per docs/drive/trace-events.md, then:
+# Build EVENT_JSON for $EVENT_TYPE per ./events.md, then:
 mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FILE"
 ```
 
@@ -126,6 +126,6 @@ The check uses the orchestrator's filesystem view at write time. A same-session 
 
 ## References
 
-- Event vocabulary (envelope, payloads, arktype, examples): [`trace-events.md`](./trace-events.md).
-- Drive domain model (dispatch, round, ProjectRun): [`model.md`](./model.md).
-- Brief discipline (feeds `brief-issued`): [`principles/brief-discipline.md`](./principles/brief-discipline.md).
+- Event vocabulary (envelope, payloads, arktype, examples): [`events.md`](./events.md).
+- Drive domain model (dispatch, round, ProjectRun): [`model.md`](../../docs/drive/model.md).
+- Brief discipline (feeds `brief-issued`): [`brief-discipline.md`](../../docs/drive/principles/brief-discipline.md).
