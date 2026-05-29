@@ -7,9 +7,7 @@ import { runAssertions } from '../assertions/index.ts';
 import { loadTrace } from '../load.ts';
 import type { TraceEvent } from '../schema.ts';
 
-const TRACE_PATH = fileURLToPath(
-  new URL('../../../projects/drive-instrumentation/trace.jsonl', import.meta.url),
-);
+const TRACE_PATH = fileURLToPath(new URL('./fixtures/sample-trace.jsonl', import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -532,7 +530,7 @@ describe('runAssertions — structural: empty trace returns 31 results', () => {
 // runAssertions — real trace
 // ---------------------------------------------------------------------------
 
-describe('runAssertions — real trace (projects/drive-instrumentation/trace.jsonl)', () => {
+describe('runAssertions — real trace (test/fixtures/sample-trace.jsonl)', () => {
   const { events, errors } = loadTrace(TRACE_PATH);
   const results = runAssertions(events);
 

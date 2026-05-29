@@ -112,7 +112,7 @@ const FIXTURE_UNKNOWN_EVENT: UnknownEvent = {
 };
 
 const RUN_META = {
-  tracePath: 'projects/drive-instrumentation/trace.jsonl',
+  tracePath: 'projects/sample-project/trace.jsonl',
   eventCount: 42,
   projectRunIds: ['run-abc', 'run-def'],
   origin: 'native' as const,
@@ -132,7 +132,7 @@ describe('renderReport — header', () => {
   });
 
   it('contains the trace path', () => {
-    assert.ok(report.includes('projects/drive-instrumentation/trace.jsonl'));
+    assert.ok(report.includes('projects/sample-project/trace.jsonl'));
   });
 
   it('contains the event count', () => {

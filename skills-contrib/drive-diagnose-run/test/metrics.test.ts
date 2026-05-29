@@ -5,9 +5,7 @@ import { loadTrace } from '../load.ts';
 import { computeMetrics } from '../metrics.ts';
 import type { TraceEvent } from '../schema.ts';
 
-const TRACE_PATH = fileURLToPath(
-  new URL('../../../projects/drive-instrumentation/trace.jsonl', import.meta.url),
-);
+const TRACE_PATH = fileURLToPath(new URL('./fixtures/sample-trace.jsonl', import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -711,7 +709,7 @@ describe('computeMetrics — lifecycle: retro_distribution', () => {
 // instrumentation, so these assertions are internally consistent (derived from
 // the loaded events) rather than pinned to magic counts. Exact-value coverage
 // lives in the inline-fixture suites above.
-describe('computeMetrics — real trace (projects/drive-instrumentation/trace.jsonl)', () => {
+describe('computeMetrics — real trace (test/fixtures/sample-trace.jsonl)', () => {
   const { events, errors } = loadTrace(TRACE_PATH);
 
   const countOf = (t: string): number => events.filter((e) => e.event_type === t).length;

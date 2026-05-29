@@ -5,9 +5,7 @@ import { checkInvariants } from '../assertions/invariants.ts';
 import { loadTrace } from '../load.ts';
 import type { TraceEvent } from '../schema.ts';
 
-const TRACE_PATH = fileURLToPath(
-  new URL('../../../projects/drive-instrumentation/trace.jsonl', import.meta.url),
-);
+const TRACE_PATH = fileURLToPath(new URL('./fixtures/sample-trace.jsonl', import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -726,7 +724,7 @@ describe('checkInvariants — structural guarantees', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Real trace — projects/drive-instrumentation/trace.jsonl
+// Real trace — test/fixtures/sample-trace.jsonl
 // ---------------------------------------------------------------------------
 
 describe('checkInvariants — real trace', () => {
