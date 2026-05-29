@@ -142,7 +142,7 @@ describe('renderMigrationListWithStyle', () => {
       kinds,
     );
     const expectedRow =
-      `${dim('⟲')} ${bold('20260601T1200_backfill_emails')}    ` +
+      `${dim('⟲')} ${bold('20260601T1200_backfill_emails')}  ` +
       `${dim(cyan('55bada2'))}` +
       `  ${yellow('{backfill_emails_v1}')} ` +
       `${green('(') + [green('production'), bold(greenBright('db'))].join(green(', ')) + green(')')}`;

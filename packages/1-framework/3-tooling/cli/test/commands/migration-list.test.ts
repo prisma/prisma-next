@@ -186,7 +186,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     expectOk(result);
 
     const expected =
-      '⟲ 20260601T1200_backfill_emails       55bada2  {backfill_emails_v1} (production)\n' +
+      '⟲ 20260601T1200_backfill_emails     55bada2  {backfill_emails_v1} (production)\n' +
       '* 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
       '* 20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
       '* 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
@@ -378,7 +378,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     // The `⟲` row has hash-width pad in the destination slot and no
     // decoration block at all. Trailing newline + summary follows.
     const expected =
-      '⟲ 20260101T0000_useless_self_edge    4cb4256\n' + '\n' + '1 migration(s) on disk';
+      '⟲ 20260101T0000_useless_self_edge  4cb4256\n' + '\n' + '1 migration(s) on disk';
     expect(renderListed(result.value)).toBe(expected);
   });
 

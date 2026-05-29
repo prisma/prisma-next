@@ -111,7 +111,7 @@ function formatMigrationRow(
   if (edgeKind === 'self') {
     const contractHash = migration.from ?? migration.to;
     const hash = style.sourceHash(abbreviateContractHash(contractHash));
-    return `${kindColumn}${dirName}  ${hash}${decorations}`;
+    return `${kindColumn}${dirName}${hash}${decorations}`;
   }
 
   const source = formatSourceColumn(migration.from, style);

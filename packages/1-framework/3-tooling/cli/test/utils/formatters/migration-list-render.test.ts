@@ -77,6 +77,40 @@ describe('renderMigrationList', () => {
     expect(output).not.toMatch(/↩.*↩/);
   });
 
+  it('aligns self-edge hash with forward-row source-hash column', () => {
+    const listResult = result(
+      [
+        {
+          spaceId: 'app',
+          migrations: [
+            migration({
+              dirName: '20260601T1200_latest',
+              from: HASH_E,
+              to: HASH_F,
+            }),
+            migration({
+              dirName: '20260601T1200_backfill_emails',
+              from: HASH_D,
+              to: HASH_D,
+            }),
+          ],
+        },
+      ],
+      '2 migration(s) on disk',
+    );
+    const lines = renderListed(listResult)
+      .split('\n')
+      .filter((line) => line.startsWith('*') || line.startsWith('⟲'));
+    const forwardLine = lines.find((line) => line.startsWith('*'));
+    const selfLine = lines.find((line) => line.startsWith('⟲'));
+    expect(forwardLine).toBeDefined();
+    expect(selfLine).toBeDefined();
+    const forwardHashIndex = forwardLine!.indexOf('2f45cc7');
+    const selfHashIndex = selfLine!.indexOf('55bada2');
+    expect(forwardHashIndex).toBeGreaterThanOrEqual(0);
+    expect(selfHashIndex).toBe(forwardHashIndex);
+  });
+
   it('renders self-edge as kind glyph dirName and single hash', () => {
     const listResult = result(
       [
@@ -180,7 +214,7 @@ describe('renderMigrationList', () => {
       ),
     );
     expect(output).toMatchInlineSnapshot(`
-      "⟲ 20260601T1200_backfill_emails    55bada2  {backfill_emails_v1} (production)
+      "⟲ 20260601T1200_backfill_emails  55bada2  {backfill_emails_v1} (production)
 
       1 migration(s) on disk"
     `);
@@ -333,7 +367,7 @@ describe('renderMigrationList', () => {
       ),
     );
     expect(output).toMatchInlineSnapshot(`
-      "⟲ 20260601T1200_backfill    55bada2  {a, b}
+      "⟲ 20260601T1200_backfill  55bada2  {a, b}
 
       1 migration(s) on disk"
     `);
@@ -462,7 +496,7 @@ describe('renderMigrationList', () => {
       ),
     );
     const expected =
-      '⟲ 20260601T1200_backfill_emails       55bada2  {backfill_emails_v1} (production)\n' +
+      '⟲ 20260601T1200_backfill_emails     55bada2  {backfill_emails_v1} (production)\n' +
       '* 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
       '* 20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
       '* 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
