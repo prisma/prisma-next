@@ -131,7 +131,7 @@ The `migrationStrategy(migrations, targetId)` function probes the target's `Targ
 - **`migration emit`** — descriptor flow calls `evaluateMigrationTs` + `resolveDescriptors`; class flow delegates to `migrations.emit(...)`.
 - **`migration new`** — already unified via `planner.emptyMigration(context)`, no strategy branching.
 
-The manifest records `planningStrategy: 'descriptors' | 'class-based'` in the `hints` field so the provenance is visible, but the runner never inspects it — `ops.json` is format-agnostic.
+The planning strategy is not persisted in the manifest (it was previously carried in the now-removed `hints` field); `ops.json` is format-agnostic and the runner never needs to inspect it.
 
 When Postgres adopts class-flow, `migrationStrategy` becomes a constant, the descriptor-flow branches are dead code, and the entire catalog above can be deleted in a single pass.
 
