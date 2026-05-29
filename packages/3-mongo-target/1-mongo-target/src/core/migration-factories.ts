@@ -24,6 +24,8 @@ import {
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import type { MongoValue } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CollModMeta } from './op-factory-call';
 
@@ -295,6 +297,22 @@ export function collMod(
                 : []),
               ...(options.validationAction
                 ? [MongoFieldFilter.eq('options.validationAction', options.validationAction)]
+                : []),
+              // Include the $jsonSchema body so the idempotency probe only skips when the
+              // live validator body genuinely already equals the target — not merely when
+              // level/action happen to be unchanged (which was the silent-skip bug for widen ops).
+              // The cast is safe: CollModOptions.validator is Record<string,unknown>, and its
+              // $jsonSchema value is always a plain BSON object (MongoDocument at runtime).
+              ...(options.validator?.['$jsonSchema'] !== undefined
+                ? [
+                    MongoFieldFilter.eq(
+                      'options.validator.$jsonSchema',
+                      blindCast<
+                        MongoValue,
+                        'options.validator.$jsonSchema is a plain BSON object — the factory only populates this from a MongoSchemaValidator.jsonSchema record, which is a MongoDocument at runtime'
+                      >(options.validator?.['$jsonSchema']),
+                    ),
+                  ]
                 : []),
             ]),
             expect: 'exists' as const,

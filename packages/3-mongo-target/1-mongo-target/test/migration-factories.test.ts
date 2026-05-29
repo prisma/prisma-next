@@ -440,6 +440,29 @@ describe('collMod', () => {
     expect(op.postcheck[0]!.expect).toBe('exists');
   });
 
+  it('includes $jsonSchema body in postcheck filter to prevent spurious idempotency skip', () => {
+    const schema = {
+      bsonType: 'object',
+      required: ['email'],
+      properties: { email: { bsonType: 'string' } },
+    };
+    const op = collMod('users', {
+      validator: { $jsonSchema: schema },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    expect(op.postcheck).toHaveLength(1);
+    const postcheckFilter = op.postcheck[0]!.filter as MongoAndExpr;
+    expect(postcheckFilter).toBeInstanceOf(MongoAndExpr);
+    // Must contain: name + validationLevel + validationAction + $jsonSchema body
+    expect(postcheckFilter.exprs).toHaveLength(4);
+    const schemaFilter = postcheckFilter.exprs[3] as MongoFieldFilter;
+    expect(schemaFilter).toBeInstanceOf(MongoFieldFilter);
+    expect(schemaFilter.field).toBe('options.validator.$jsonSchema');
+    expect(schemaFilter.value).toEqual(schema);
+  });
+
   it('has no postcheck when validator is empty (removal)', () => {
     const op = collMod('users', {
       validator: {},
