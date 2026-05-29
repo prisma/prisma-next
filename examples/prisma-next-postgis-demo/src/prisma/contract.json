@@ -148,6 +148,20 @@
       }
     }
   },
+  "domain": {
+    "__unbound__": {
+      "types": {
+        "WgsGeometry": {
+          "codecId": "pg/geometry@1",
+          "kind": "codec-instance",
+          "nativeType": "geometry",
+          "typeParams": {
+            "srid": 4326
+          }
+        }
+      }
+    }
+  },
   "storage": {
     "namespaces": {
       "__unbound__": {

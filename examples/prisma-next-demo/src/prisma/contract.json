@@ -414,6 +414,20 @@
       }
     }
   },
+  "domain": {
+    "__unbound__": {
+      "types": {
+        "Embedding1536": {
+          "codecId": "pg/vector@1",
+          "kind": "codec-instance",
+          "nativeType": "vector",
+          "typeParams": {
+            "length": 1536
+          }
+        }
+      }
+    }
+  },
   "storage": {
     "namespaces": {
       "__unbound__": {
