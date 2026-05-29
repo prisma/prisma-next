@@ -27,9 +27,11 @@ if (!target) {
 const source = readFileSync(target, 'utf8');
 
 const importBlock = [
-  "import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';",
-  "import type { Vector } from '@prisma-next/extension-pgvector/codec-types';",
   "import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';",
+  'import type {',
+  '  CodecTypes as PgVectorTypes,',
+  '  Vector,',
+  "} from '@prisma-next/extension-pgvector/codec-types';",
   "import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';",
 ].join('\n');
 

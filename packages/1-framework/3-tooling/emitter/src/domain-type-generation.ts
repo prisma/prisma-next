@@ -5,6 +5,7 @@ import type {
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
 import { isSafeTypeExpression } from './type-expression-safety';
 
 export function serializeValue(value: unknown): string {
@@ -176,10 +177,14 @@ export function deduplicateImports(imports: TypesImportSpec[]): TypesImportSpec[
 }
 
 export function generateImportLines(imports: TypesImportSpec[]): string[] {
-  return imports.map((imp) => {
-    const importClause = imp.named === imp.alias ? imp.named : `${imp.named} as ${imp.alias}`;
-    return `import type { ${importClause} } from '${imp.package}';`;
-  });
+  const requirements: ImportRequirement[] = imports.map((imp) => ({
+    moduleSpecifier: imp.package,
+    symbol: imp.named,
+    alias: imp.alias,
+    typeOnly: true,
+  }));
+  const rendered = renderImports(requirements);
+  return rendered === '' ? [] : rendered.split('\n');
 }
 
 export function generateCodecTypeIntersection(

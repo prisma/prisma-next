@@ -10,6 +10,9 @@ import type { ImportRequirement } from './ts-expression';
  * - **One line per module specifier.** Named imports are aggregated and
  *   emitted sorted alphabetically; a single default symbol is combined
  *   onto the same line when attributes agree (`import def, { a, b } from "m";`).
+ *   Aliased symbols render `symbol as alias`. When every symbol for a module is
+ *   `typeOnly`, the statement collapses to `import type { … }`; a module mixing
+ *   value and type symbols prefixes the type-only ones (`import { type T, v }`).
  * - **At most one default symbol per module.** Two conflicting default
  *   symbols on the same specifier throw — the user's renderer can't
  *   guess which one they meant.
@@ -31,9 +34,15 @@ export function renderImports(requirements: readonly ImportRequirement[]): strin
     .join('\n');
 }
 
+interface NamedBinding {
+  alias: string | null;
+  typeOnly: boolean;
+}
+
 interface ModuleImportGroup {
-  readonly named: Set<string>;
+  readonly named: Map<string, NamedBinding>;
   defaultSymbol: string | null;
+  defaultTypeOnly: boolean;
   attributes: Readonly<Record<string, string>> | null;
   attributesSet: boolean;
 }
@@ -45,7 +54,13 @@ function aggregateByModule(
   for (const req of requirements) {
     let group = byModule.get(req.moduleSpecifier);
     if (!group) {
-      group = { named: new Set(), defaultSymbol: null, attributes: null, attributesSet: false };
+      group = {
+        named: new Map(),
+        defaultSymbol: null,
+        defaultTypeOnly: true,
+        attributes: null,
+        attributesSet: false,
+      };
       byModule.set(req.moduleSpecifier, group);
     }
     mergeRequirementIntoGroup(req, group);
@@ -55,6 +70,7 @@ function aggregateByModule(
 
 function mergeRequirementIntoGroup(req: ImportRequirement, group: ModuleImportGroup): void {
   const kind = req.kind ?? 'named';
+  const typeOnly = req.typeOnly === true;
   if (kind === 'default') {
     if (group.defaultSymbol !== null && group.defaultSymbol !== req.symbol) {
       throw new Error(
@@ -63,8 +79,16 @@ function mergeRequirementIntoGroup(req: ImportRequirement, group: ModuleImportGr
       );
     }
     group.defaultSymbol = req.symbol;
+    group.defaultTypeOnly = group.defaultTypeOnly && typeOnly;
   } else {
-    group.named.add(req.symbol);
+    const alias = req.alias && req.alias !== req.symbol ? req.alias : null;
+    const existing = group.named.get(req.symbol);
+    if (existing) {
+      existing.typeOnly = existing.typeOnly && typeOnly;
+      if (existing.alias === null) existing.alias = alias;
+    } else {
+      group.named.set(req.symbol, { alias, typeOnly });
+    }
   }
   mergeAttributes(req, group);
 }
@@ -110,22 +134,47 @@ function stringifyAttributes(attrs: Readonly<Record<string, string>> | null): st
 }
 
 function renderModuleImport(moduleSpecifier: string, group: ModuleImportGroup): string {
-  const clause = buildImportClause(group);
+  const keyword = isStatementTypeOnly(group) ? 'import type' : 'import';
+  const clause = buildImportClause(group, keyword === 'import type');
   const attrs = buildAttributesClause(group.attributes);
-  return `import ${clause} from '${moduleSpecifier}'${attrs};`;
+  return `${keyword} ${clause} from '${moduleSpecifier}'${attrs};`;
 }
 
-function buildImportClause(group: ModuleImportGroup): string {
-  const named = [...group.named].sort();
+function isStatementTypeOnly(group: ModuleImportGroup): boolean {
+  const hasDefault = group.defaultSymbol !== null;
+  const hasNamed = group.named.size > 0;
+  if (!hasDefault && !hasNamed) return false;
+  if (hasDefault && !group.defaultTypeOnly) return false;
+  for (const binding of group.named.values()) {
+    if (!binding.typeOnly) return false;
+  }
+  return true;
+}
+
+function buildImportClause(group: ModuleImportGroup, statementTypeOnly: boolean): string {
+  const named = [...group.named.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const hasNamed = named.length > 0;
   const hasDefault = group.defaultSymbol !== null;
+  const namedClause = named
+    .map(([symbol, binding]) => renderNamedBinding(symbol, binding, statementTypeOnly))
+    .join(', ');
   if (hasDefault && hasNamed) {
-    return `${group.defaultSymbol}, { ${named.join(', ')} }`;
+    return `${group.defaultSymbol}, { ${namedClause} }`;
   }
   if (hasDefault) {
     return group.defaultSymbol as string;
   }
-  return `{ ${named.join(', ')} }`;
+  return `{ ${namedClause} }`;
+}
+
+function renderNamedBinding(
+  symbol: string,
+  binding: NamedBinding,
+  statementTypeOnly: boolean,
+): string {
+  const prefix = !statementTypeOnly && binding.typeOnly ? 'type ' : '';
+  const aliasClause = binding.alias !== null ? ` as ${binding.alias}` : '';
+  return `${prefix}${symbol}${aliasClause}`;
 }
 
 function buildAttributesClause(attrs: Readonly<Record<string, string>> | null): string {

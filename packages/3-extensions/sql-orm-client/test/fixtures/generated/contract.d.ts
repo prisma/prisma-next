@@ -6,23 +6,25 @@
 // in this package-level copy to avoid a circular Turbo build dependency.
 // (@prisma-next/extension-pgvector → @prisma-next/postgres → @prisma-next/sql-orm-client)
 // The integration tests that exercise pgvector-specific operations live in test/integration/.
-import type { CodecTypes as PgTypes } from '@prisma-next/target-postgres/codec-types';
-import type { JsonValue } from '@prisma-next/target-postgres/codec-types';
-import type { Char } from '@prisma-next/target-postgres/codec-types';
-import type { Varchar } from '@prisma-next/target-postgres/codec-types';
-import type { Numeric } from '@prisma-next/target-postgres/codec-types';
-import type { Bit } from '@prisma-next/target-postgres/codec-types';
-import type { VarBit } from '@prisma-next/target-postgres/codec-types';
-import type { Timestamp } from '@prisma-next/target-postgres/codec-types';
-import type { Timestamptz } from '@prisma-next/target-postgres/codec-types';
-import type { Time } from '@prisma-next/target-postgres/codec-types';
-import type { Timetz } from '@prisma-next/target-postgres/codec-types';
-import type { Interval } from '@prisma-next/target-postgres/codec-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 // pgvector types replaced with local aliases (see note above)
 type PgVectorTypes = object;
 type Vector<_N extends number> = number[];
 type PgVectorQueryOperationTypes<_C> = object;
+import type {
+  Bit,
+  Char,
+  CodecTypes as PgTypes,
+  Interval,
+  JsonValue,
+  Numeric,
+  Time,
+  Timestamp,
+  Timestamptz,
+  Timetz,
+  VarBit,
+  Varchar,
+} from '@prisma-next/target-postgres/codec-types';
 
 import type {
   ContractWithTypeMaps,
