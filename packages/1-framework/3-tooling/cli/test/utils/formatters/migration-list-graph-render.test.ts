@@ -213,14 +213,14 @@ describe('renderMigrationListGraph', () => {
   it('renders self-edge nested in branch in unicode', () => {
     const entries = [
       migrationEntry('20250320_add_likes', HASH.def5678, HASH.jkl1234),
-      migrationEntry('20250305_touch_schema', HASH.def5678, HASH.def5678),
+      migrationEntry('20250315_touch_schema', HASH.def5678, HASH.def5678),
       migrationEntry('20250310_add_comments', HASH.def5678, HASH.ghi7890),
       migrationEntry('20250203_add_posts', HASH.abc1234, HASH.def5678),
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
       '*     20250320_add_likes     def5678 → jkl1234\n' +
-        '│ ⟲   20250305_touch_schema  def5678\n' +
+        '│ ⟲   20250315_touch_schema  def5678\n' +
         '│ *   20250310_add_comments  def5678 → ghi7890\n' +
         '├─┘\n' +
         '*     20250203_add_posts     abc1234 → def5678\n' +
@@ -394,14 +394,14 @@ describe('renderMigrationListGraph', () => {
   it('renders self-edge nested in branch in ascii', () => {
     const entries = [
       migrationEntry('20250320_add_likes', HASH.def5678, HASH.jkl1234),
-      migrationEntry('20250305_touch_schema', HASH.def5678, HASH.def5678),
+      migrationEntry('20250315_touch_schema', HASH.def5678, HASH.def5678),
       migrationEntry('20250310_add_comments', HASH.def5678, HASH.ghi7890),
       migrationEntry('20250203_add_posts', HASH.abc1234, HASH.def5678),
       migrationEntry('20250115_add_users', null, HASH.abc1234),
     ];
     expect(renderAscii(entries)).toBe(
       '*     20250320_add_likes     def5678 -> jkl1234\n' +
-        '| ~   20250305_touch_schema  def5678\n' +
+        '| ~   20250315_touch_schema  def5678\n' +
         '| *   20250310_add_comments  def5678 -> ghi7890\n' +
         '+-/\n' +
         '*     20250203_add_posts     abc1234 -> def5678\n' +
