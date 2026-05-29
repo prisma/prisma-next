@@ -1,21 +1,21 @@
 # Manual QA — slice 03 (trace reader + diagnostics)
 
-Re-runnable script exercising the `skills-contrib/drive-diagnostics/` tool end-to-end against real + synthetic inputs. Run from the repo root. Each check states its command and the PASS condition. A run report lives in [`qa-run-01.md`](./qa-run-01.md).
+Re-runnable script exercising the `skills-contrib/drive-diagnose-run/` tool end-to-end against real + synthetic inputs. Run from the repo root. Each check states its command and the PASS condition. A run report lives in [`qa-run-01.md`](./qa-run-01.md).
 
 ## Pre-flight gate
 
 ```bash
 pnpm test:scripts
 ```
-**PASS:** exits 0; the five `skills-contrib/drive-diagnostics/test/*.test.ts` suites are listed and all tests pass.
+**PASS:** exits 0; the five `skills-contrib/drive-diagnose-run/test/*.test.ts` suites are listed and all tests pass.
 
 ```bash
-./node_modules/.bin/tsc --noEmit --strict --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --target es2022 --skipLibCheck skills-contrib/drive-diagnostics/*.ts skills-contrib/drive-diagnostics/assertions/*.ts skills-contrib/drive-diagnostics/test/*.ts
+./node_modules/.bin/tsc --noEmit --strict --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --target es2022 --skipLibCheck skills-contrib/drive-diagnose-run/*.ts skills-contrib/drive-diagnose-run/assertions/*.ts skills-contrib/drive-diagnose-run/test/*.ts
 ```
 **PASS:** exits 0 (no type errors).
 
 ```bash
-./node_modules/.bin/biome check --config-path biome.jsonc skills-contrib/drive-diagnostics
+./node_modules/.bin/biome check --config-path biome.jsonc skills-contrib/drive-diagnose-run
 ```
 **PASS:** "No fixes applied", 0 errors, 0 `no-bare-cast` diagnostics.
 
@@ -45,7 +45,7 @@ pnpm drive:diagnose /tmp/drive-empty-trace.jsonl
 ## C4 — post-hoc transcript reconstruction
 
 ```bash
-pnpm drive:diagnose --posthoc skills-contrib/drive-diagnostics/test/fixtures/sample-transcript.jsonl
+pnpm drive:diagnose --posthoc skills-contrib/drive-diagnose-run/test/fixtures/sample-transcript.jsonl
 ```
 **PASS:** exit 0; report header shows `**Origin:** post-hoc`; the Operator section shows a non-zero `operator turn count`. No fabricated native metrics.
 
@@ -59,9 +59,9 @@ pnpm drive:diagnose projects/drive-instrumentation/trace.jsonl | rg '^\| (I[0-9]
 ## C6 — directory boundary (grep gate)
 
 ```bash
-git diff --name-only "$(git merge-base origin/main HEAD)"..HEAD -- ':!skills-contrib/drive-diagnostics' ':!package.json' ':!projects/drive-instrumentation' ':!drive/retro/findings.md'
+git diff --name-only "$(git merge-base origin/main HEAD)"..HEAD -- ':!skills-contrib/drive-diagnose-run' ':!package.json' ':!projects/drive-instrumentation' ':!drive/retro/findings.md'
 ```
-**PASS:** empty output — the slice touched only `skills-contrib/drive-diagnostics/**`, root `package.json`, `projects/drive-instrumentation/**`, and the single self-grade lesson in `drive/retro/findings.md`. (Diff against the **merge-base**, not `origin/main` directly, so an out-of-date branch doesn't show upstream churn as false positives.)
+**PASS:** empty output — the slice touched only `skills-contrib/drive-diagnose-run/**`, root `package.json`, `projects/drive-instrumentation/**`, and the single self-grade lesson in `drive/retro/findings.md`. (Diff against the **merge-base**, not `origin/main` directly, so an out-of-date branch doesn't show upstream churn as false positives.)
 
 ## C7 — self-grade report committed
 

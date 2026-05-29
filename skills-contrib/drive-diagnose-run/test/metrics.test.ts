@@ -768,7 +768,10 @@ describe('computeMetrics — real trace (projects/drive-instrumentation/trace.js
 
   it('dispatch_sizes has one entry per plan-authored with non-null distribution', () => {
     const m = computeMetrics(events);
-    assert.equal(m.planning_quality.dispatch_sizes.length, countOf('plan-authored'));
+    const withDist = events.filter(
+      (e) => e.event_type === 'plan-authored' && e.dispatch_size_distribution !== null,
+    ).length;
+    assert.equal(m.planning_quality.dispatch_sizes.length, withDist);
   });
 
   it('write_amplification per-path count equals distinct authored artefact paths', () => {

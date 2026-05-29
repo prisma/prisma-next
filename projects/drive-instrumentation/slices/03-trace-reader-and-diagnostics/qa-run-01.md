@@ -6,7 +6,7 @@ Executed [`manual-qa.md`](./manual-qa.md) from repo root on the slice-3 branch (
 
 | Gate | Result |
 |---|---|
-| `pnpm test:scripts` | PASS — 407 tests, 407 pass, 0 fail (incl. the 5 `skills-contrib/drive-diagnostics/test/*.test.ts` suites: load, metrics, invariants, cascade-brief, report, posthoc). |
+| `pnpm test:scripts` | PASS — 407 tests, 407 pass, 0 fail (incl. the 5 `skills-contrib/drive-diagnose-run/test/*.test.ts` suites: load, metrics, invariants, cascade-brief, report, posthoc). |
 | `tsc --noEmit --strict` over the dir | PASS — exit 0. |
 | `biome check skills-contrib/drive-diagnostics` | PASS — no fixes, 0 errors, 0 `no-bare-cast` diagnostics. |
 
@@ -19,7 +19,7 @@ Executed [`manual-qa.md`](./manual-qa.md) from repo root on the slice-3 branch (
 | **C3** empty trace | PASS | exit 0; `**Events:** 0`; metrics render as `n/a (no signal)`. |
 | **C4** post-hoc transcript | PASS | exit 0; `**Origin:** post-hoc`; `operator turn count = 4`; no fabricated native metrics. |
 | **C5** assertion families + gaps | PASS | 33 assertion rows: I1–I12, Cascade-1…8, BD-* present; Pass 7 / Fail 0 / Not-checkable 24, each not-checkable row carrying a one-line rationale. |
-| **C6** directory boundary (merge-base) | PASS | empty out-of-scope diff; slice confined to `skills-contrib/drive-diagnostics/**`, `package.json`, `projects/drive-instrumentation/**`, `drive/retro/findings.md`. |
+| **C6** directory boundary (merge-base) | PASS | empty out-of-scope diff; slice confined to `skills-contrib/drive-diagnose-run/**`, `package.json`, `projects/drive-instrumentation/**`, `drive/retro/findings.md`. |
 | **C7** self-grade report committed | PASS | `self-grade-report.md` present (the framework grading this project's own ProjectRun). |
 
 ## Self-grade read-out (what the framework says about this project's own run)

@@ -51,7 +51,7 @@ function run(): void {
 
   if (tracePath === undefined && posthocPath === undefined) {
     process.stderr.write(
-      'Usage: node skills-contrib/drive-diagnostics/cli.ts <trace.jsonl> [--posthoc <transcript.jsonl>] [--out <path>]\n',
+      'Usage: node skills-contrib/drive-diagnose-run/cli.ts <trace.jsonl> [--posthoc <transcript.jsonl>] [--out <path>]\n',
     );
     process.exit(1);
   }

@@ -1,12 +1,12 @@
 ---
-name: drive-diagnostics
+name: drive-diagnose-run
 description: >
   Reads a Drive trace.jsonl and renders a deterministic diagnostics report.
   Use when you want to measure a Drive run, read a trace, or produce a
   diagnostics report over an emitted Drive trace.
 ---
 
-# Drive: Diagnostics
+# Drive: Diagnose Run
 
 A **deterministic, LLM-free tool** that reads an emitted Drive `trace.jsonl` and renders a structured markdown diagnostics report. It is the read-side counterpart to the **`drive-record-traces`** skill, which owns the trace vocabulary and emission protocol.
 
@@ -23,7 +23,7 @@ A **deterministic, LLM-free tool** that reads an emitted Drive `trace.jsonl` and
 ## Usage
 
 ```
-node skills-contrib/drive-diagnostics/cli.ts <trace.jsonl> [--posthoc <transcript>] [--out <output.md>]
+node skills-contrib/drive-diagnose-run/cli.ts <trace.jsonl> [--posthoc <transcript>] [--out <output.md>]
 ```
 
 In this repo, the `pnpm drive:diagnose` shortcut is available:
@@ -42,7 +42,7 @@ The report leads with three important caveats:
 
 ## Prerequisite (portability)
 
-Requires Node with native TypeScript execution (Node 22+) and the `arktype` package.
+Requires Node with native TypeScript execution (Node 24+) and the `arktype` package.
 
 In this repo `arktype` is already available via the workspace root `node_modules` — no extra install needed.
 
