@@ -9,11 +9,11 @@ Linear: [TML-2717](https://linear.app/prisma-company/issue/TML-2717).
 Slices 1–2 made the drive-* skills **emit** a `trace.jsonl`. Nothing yet **reads** it — the arktype schemas in `skills-contrib/drive-record-traces/events.md` are markdown, not executable, and every metric in the project plan is still computed by hand. This slice ships the reader:
 
 ```bash
-$ node scripts/drive-diagnostics/cli.ts projects/drive-instrumentation/trace.jsonl
+$ node skills-contrib/drive-diagnostics/cli.ts projects/drive-instrumentation/trace.jsonl
 # → markdown dashboard: metrics table + assertion pass/fail with evidence pointers
 ```
 
-The deliverable is a small TypeScript tool under **`scripts/drive-diagnostics/`** that:
+The deliverable is a small TypeScript tool under **`skills-contrib/drive-diagnostics/`** that:
 
 1. **Validates** each trace line against the real arktype schemas (transcribed from the vocabulary doc).
 2. **Computes** the diagnostic metrics the project plan names (rework rate, spec/plan stability, I12 halt rate, triage stability, rounds-per-dispatch, write amplification, time-to-stability, brief stability, …).
@@ -25,12 +25,15 @@ It closes by **grading itself**: running the framework on this project's own `tr
 
 ## Chosen design
 
-### Code home — `scripts/drive-diagnostics/` (not a `packages/` package)
+### Code home — `skills-contrib/drive-diagnostics/` (not a `packages/` package, not `scripts/`)
 
-This tool is meta-tooling about the **development methodology**, not the prisma-next data-layer product. The `packages/` layering taxonomy (`architecture.config.json`) has only product domains (framework / sql / mongo / targets / extensions); a diagnostics package would have no home there, would be swept into `pnpm-workspace.yaml`'s `packages/**` glob as a publishable `@prisma-next/*` package, and would need a fabricated domain. `scripts/` is the established home for non-product TypeScript (`bump-minor.ts`, `determine-version.ts`), runs under Node's native TS stripping, and is tested via `node --test` in the root `test:scripts` script. So:
+This tool is meta-tooling about the **development methodology**, not the prisma-next data-layer product. The `packages/` layering taxonomy (`architecture.config.json`) has only product domains (framework / sql / mongo / targets / extensions); a diagnostics package would have no home there, would be swept into `pnpm-workspace.yaml`'s `packages/**` glob as a publishable `@prisma-next/*` package, and would need a fabricated domain. That axis still holds.
+
+The deciding axis, however, is **portability**: the entire Drive methodology lives in `skills-contrib/` as portable skills designed to travel to other repos (symlinked into `.agents/skills/` and `.claude/skills/` by the `pnpm install` prepare hook). The diagnostics tool is the read-side of the Drive instrumentation; the emit-side contract lives in `skills-contrib/drive-record-traces/`. Placing the tool in `scripts/` would strand it in this repo while the rest of the cluster travels. Shipping it as a sibling skill keeps the cluster coherent.
 
 ```
-scripts/drive-diagnostics/
+skills-contrib/drive-diagnostics/
+  SKILL.md         # frontmatter + usage docs
   schema.ts        # arktype event schemas (transcribed from events.md) + TraceEvent union
   load.ts          # JSONL loader: parse + validate each line, collect errors with line numbers
   metrics.ts       # diagnostic-metrics computation over a validated event array
@@ -41,11 +44,11 @@ scripts/drive-diagnostics/
     index.ts       # runAssertions(events) → AssertionResult[]
   report.ts        # markdown dashboard renderer
   posthoc.ts       # best-effort transcript → trace reconstruction
-  cli.ts           # entry: node scripts/drive-diagnostics/cli.ts <trace.jsonl> [--posthoc <transcript>]
+  cli.ts           # entry: node skills-contrib/drive-diagnostics/cli.ts <trace.jsonl> [--posthoc <transcript>]
   test/*.test.ts   # node --test suites
 ```
 
-Root `package.json` gains a `drive:diagnose` script and the `test/*.test.ts` files are added to `test:scripts`.
+**Portability prerequisite:** requires `arktype`. In this repo it resolves via the workspace root `node_modules`; in another repo, install `arktype` before running. Root `package.json` has a `drive:diagnose` script and the `test/*.test.ts` files in `test:scripts`.
 
 ### The schema is the source of truth
 
@@ -69,13 +72,13 @@ The final dispatch runs the tool on `projects/drive-instrumentation/trace.jsonl`
 
 ## Coherence rationale
 
-One PR, because it is one idea — "make the emitted trace readable" — across one new isolated directory (`scripts/drive-diagnostics/`) with a single internal contract (`schema.ts` → everything else reads `TraceEvent[]`). Splitting parser / metrics / assertions / report into separate PRs would fragment one tightly-coupled module behind four review cycles of the same files, against the project plan's explicit "slice 3 = the close-out slice" framing. The slice touches no product code and no skill bodies (slices 1–2 own those), so its blast radius is contained to a new directory + two root-`package.json` script lines.
+One PR, because it is one idea — "make the emitted trace readable" — across one new isolated directory (`skills-contrib/drive-diagnostics/`) with a single internal contract (`schema.ts` → everything else reads `TraceEvent[]`). Splitting parser / metrics / assertions / report into separate PRs would fragment one tightly-coupled module behind four review cycles of the same files, against the project plan's explicit "slice 3 = the close-out slice" framing. The slice touches no product code and no skill bodies (slices 1–2 own those), so its blast radius is contained to a new directory + two root-`package.json` script lines.
 
 ## Scope
 
 **In:**
 
-- `scripts/drive-diagnostics/**` — the tool (schema, loader, metrics, assertions, report, post-hoc parser, CLI, tests).
+- `skills-contrib/drive-diagnostics/**` — the tool (schema, loader, metrics, assertions, report, post-hoc parser, CLI, tests, SKILL.md).
 - `package.json` (root) — a `drive:diagnose` script + the new test files added to `test:scripts`.
 - `projects/drive-instrumentation/slices/03-…/` — spec, plan, manual-qa, qa-run, and the committed self-grade report.
 - ≥1 canonical/project-context/ADR update surfaced by the self-grading retro.
@@ -100,7 +103,7 @@ Seven strictly-sequential M-sized dispatches (detailed in [`plan.md`](./plan.md)
 6. **Post-hoc transcript parser** — best-effort reconstruction + confidence; tests over a transcript fixture.
 7. **Self-grade + QA** — run on this project's own trace; commit the report; land ≥1 lesson; manual-qa + run.
 
-Test tool: `node --test` with `node:assert` (the `scripts/` precedent — not vitest). arktype is a catalog dep. No new third-party deps without surfacing.
+Test tool: `node --test` with `node:assert` (the `scripts/` precedent, carried forward — not vitest). arktype is a catalog dep. No new third-party deps without surfacing.
 
 ## Pre-investigated edge cases
 
@@ -123,7 +126,7 @@ Test tool: `node --test` with `node:assert` (the `scripts/` precedent — not vi
 - [x] **SDoD2.** Every pre-named edge case handled per disposition; no new edge cases required an I12 amendment.
 - [x] **SDoD3.** Reviewer verdict `SATISFIED` on each dispatch (D1–D6 reviewed at dispatch close; D7 orchestrator-direct).
 - [x] **SDoD4.** `cli.ts … trace.jsonl` runs clean + emits the dashboard; `pnpm test:scripts` green (407) incl. the new suites; `tsc`/`biome` clean (0 `no-bare-cast`). Captured in `qa-run-01.md`.
-- [x] **SDoD5.** Slice diff (merge-base..HEAD) confined to `scripts/drive-diagnostics/**`, root `package.json`, `projects/drive-instrumentation/**`, and the one lesson surface (`drive/retro/findings.md`). Verified by QA C6.
+- [x] **SDoD5.** Slice diff (merge-base..HEAD) confined to `skills-contrib/drive-diagnostics/**`, root `package.json`, `projects/drive-instrumentation/**`, and the one lesson surface (`drive/retro/findings.md`). Verified by QA C6.
 - [x] **SDoD6.** Assertion library covers I1–I12 + 8 cascade rules + brief-discipline; every `not-checkable` carries a one-line rationale (24 named coverage gaps in the self-grade report).
 - [x] **SDoD7.** Diagnostic metrics compute or degrade to `null`/`0` with a note; each has ≥1 test with a hand-checked expected value (inline fixtures).
 - [x] **SDoD8.** Post-hoc parser reconstructs from the `sample-transcript.jsonl` fixture with per-event confidence; report flags `origin: post-hoc`. Broader ≥3-run corpus deferred to Project 2's live-experiment harness (recorded as the self-grade caveat).
@@ -144,4 +147,4 @@ Test tool: `node --test` with `node:assert` (the `scripts/` precedent — not vi
 - Cascade-redesign rules: [`docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`](../../../../docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md).
 - Brief-discipline anti-patterns: [`docs/drive/principles/brief-discipline.md`](../../../../docs/drive/principles/brief-discipline.md).
 - Live dogfood trace (the self-grade target): [`projects/drive-instrumentation/trace.jsonl`](../../trace.jsonl).
-- `scripts/` TS precedent: `scripts/bump-minor.ts`, `scripts/determine-version-utils.ts` (run via `node`, tested via `node --test`).
+- `scripts/` TS precedent (carried forward for test tooling): `scripts/bump-minor.ts`, `scripts/determine-version-utils.ts` (run via `node`, tested via `node --test`).

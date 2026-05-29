@@ -2,7 +2,7 @@
 
 Seven dispatches, strictly sequential. Each M-sized; none L/XL. Slice spec: [`spec.md`](./spec.md).
 
-All code lands under `scripts/drive-diagnostics/`; tests use `node --test` + `node:assert` (the `scripts/` precedent, not vitest). `arktype` is an existing catalog dep. The internal contract is `schema.ts` (the `TraceEvent` union + loader output) — every later module consumes a validated `TraceEvent[]`.
+All code lands under `skills-contrib/drive-diagnostics/`; tests use `node --test` + `node:assert` (the `scripts/` precedent, not vitest). `arktype` is an existing catalog dep. The internal contract is `schema.ts` (the `TraceEvent` union + loader output) — every later module consumes a validated `TraceEvent[]`.
 
 ## Status
 
@@ -19,28 +19,28 @@ All code lands under `scripts/drive-diagnostics/`; tests use `node --test` + `no
 From [`drive/calibration/failure-modes.md`](../../../../drive/calibration/failure-modes.md):
 
 - **F5 (destructive git ops by subagents)** — non-negotiable, every brief.
-- **F4 (feature-sized dispatch, no inspection cadence)** — D3/D4 (assertion fan-out) and D6 (fuzzy parser) are most at risk; WIP-inspection at the midpoint + "halt and surface if the diff escapes `scripts/drive-diagnostics/`".
+- **F4 (feature-sized dispatch, no inspection cadence)** — D3/D4 (assertion fan-out) and D6 (fuzzy parser) are most at risk; WIP-inspection at the midpoint + "halt and surface if the diff escapes `skills-contrib/drive-diagnostics/`".
 - **F3 (discovery via test suite vs grep)** — every dispatch writes tests first (the repo rule: tests before implementation) and verifies via `node --test`, not by eyeballing.
 
 Scope trap most likely here: "while I'm here, add a native `operator-turn` event / fix a skill emit-site / add a metric not on the list." All out — this slice only *reads*. The grep gate below enforces the directory boundary.
 
 ## Grep gate
 
-After each code dispatch: `git diff --stat origin/main..HEAD` lists only files under `scripts/drive-diagnostics/`, root `package.json`, and `projects/drive-instrumentation/slices/03-…/`. Nothing under `packages/`, `skills-contrib/`, or `docs/drive/` (except the single D7 canonical lesson).
+After each code dispatch: `git diff --stat origin/main..HEAD` lists only files under `skills-contrib/drive-diagnostics/`, root `package.json`, and `projects/drive-instrumentation/slices/03-…/`. Nothing under `packages/`, `skills-contrib/`, or `docs/drive/` (except the single D7 canonical lesson).
 
 ## Dispatches
 
 ### Dispatch 1: Schema module + JSONL loader
 
-**Intent.** Transcribe the 17 arktype event schemas from `skills-contrib/drive-record-traces/events.md` into `scripts/drive-diagnostics/schema.ts` verbatim (envelope spread, `dispatchSizeDistribution` helper, the `Slice1TraceEvent` union — re-export it as `TraceEvent`). Write `load.ts`: `loadTrace(path): { events: ValidatedEvent[], errors: LoadError[] }` — read the file, split lines, `JSON.parse` each, validate against the union, collect failures (line number + arktype problem string + raw line) instead of throwing. Unknown `event_type` → kept as an `unknown-type` record. `ValidatedEvent` carries `origin: "native"` (post-hoc set in D6).
+**Intent.** Transcribe the 17 arktype event schemas from `skills-contrib/drive-record-traces/events.md` into `skills-contrib/drive-diagnostics/schema.ts` verbatim (envelope spread, `dispatchSizeDistribution` helper, the `Slice1TraceEvent` union — re-export it as `TraceEvent`). Write `load.ts`: `loadTrace(path): { events: ValidatedEvent[], errors: LoadError[] }` — read the file, split lines, `JSON.parse` each, validate against the union, collect failures (line number + arktype problem string + raw line) instead of throwing. Unknown `event_type` → kept as an `unknown-type` record. `ValidatedEvent` carries `origin: "native"` (post-hoc set in D6).
 
-**Files in play.** `scripts/drive-diagnostics/schema.ts`, `scripts/drive-diagnostics/load.ts`, `scripts/drive-diagnostics/test/load.test.ts`.
+**Files in play.** `skills-contrib/drive-diagnostics/schema.ts`, `skills-contrib/drive-diagnostics/load.ts`, `skills-contrib/drive-diagnostics/test/load.test.ts`.
 
 **"Done when":**
 - [ ] All 17 event types present in `schema.ts`; `TraceEvent` union exported; arktype imports resolve; `pnpm typecheck` clean on the file (or `tsc --noEmit` on it).
 - [ ] `loadTrace` returns `{events, errors}`; never throws on malformed input.
 - [ ] Tests cover: the real `projects/drive-instrumentation/trace.jsonl` fixture parses with 0 errors and the expected event count; a malformed line is captured in `errors` with its line number; an unknown `event_type` is retained as `unknown-type`; an empty file returns `{events:[], errors:[]}`.
-- [ ] `node --test scripts/drive-diagnostics/test/load.test.ts` green.
+- [ ] `node --test skills-contrib/drive-diagnostics/test/load.test.ts` green.
 - [ ] Diff confined to the three files.
 
 **Size.** M. Schemas are copy-from-doc; the loader + error handling is the real work.
@@ -51,15 +51,15 @@ After each code dispatch: `git diff --stat origin/main..HEAD` lists only files u
 
 ### Dispatch 2: Diagnostic-metrics module
 
-**Intent.** `scripts/drive-diagnostics/metrics.ts`: `computeMetrics(events: TraceEvent[]): Metrics`. Implement the project-DoD metric list as pure functions, each degrading to `null`/`0` with a note when the needed event type is absent: rework rate (`rounds_per_dispatch` = round-starts per dispatch), brief stability (`brief-issued.brief_disposition` distribution), spec stability (`spec-amended` count + reason distribution), plan accuracy (`plan-amended` count + dispatch-size distribution from `plan-authored`), I12 halt rate (`falsified-assumption` count), triage stability (`triage-verdict` count per `input_ref`), write amplification (authored+amended counts per artefact), time-to-stability (first-author `ts` → last-amend `ts` per artefact), per-dispatch + per-round wall-clock (from `*_ms` fields), first-pass acceptance (round-1 `round-end.verdict === "satisfied"` rate), backtrack ratio (another-round-needed vs satisfied), tier mix (`dispatch-start.model` distribution), project/slice wall-clock (bookend `ts` deltas), operator-turn count (native = null; post-hoc only, per spec OQ3).
+**Intent.** `skills-contrib/drive-diagnostics/metrics.ts`: `computeMetrics(events: TraceEvent[]): Metrics`. Implement the project-DoD metric list as pure functions, each degrading to `null`/`0` with a note when the needed event type is absent: rework rate (`rounds_per_dispatch` = round-starts per dispatch), brief stability (`brief-issued.brief_disposition` distribution), spec stability (`spec-amended` count + reason distribution), plan accuracy (`plan-amended` count + dispatch-size distribution from `plan-authored`), I12 halt rate (`falsified-assumption` count), triage stability (`triage-verdict` count per `input_ref`), write amplification (authored+amended counts per artefact), time-to-stability (first-author `ts` → last-amend `ts` per artefact), per-dispatch + per-round wall-clock (from `*_ms` fields), first-pass acceptance (round-1 `round-end.verdict === "satisfied"` rate), backtrack ratio (another-round-needed vs satisfied), tier mix (`dispatch-start.model` distribution), project/slice wall-clock (bookend `ts` deltas), operator-turn count (native = null; post-hoc only, per spec OQ3).
 
-**Files in play.** `scripts/drive-diagnostics/metrics.ts`, `scripts/drive-diagnostics/test/metrics.test.ts`.
+**Files in play.** `skills-contrib/drive-diagnostics/metrics.ts`, `skills-contrib/drive-diagnostics/test/metrics.test.ts`.
 
 **"Done when":**
 - [ ] Each metric on the project-DoD list implemented or explicitly `null`-with-note.
 - [ ] Each metric has ≥1 `node --test` case with a hand-checked expected value (use a small inline fixture + the real trace).
 - [ ] No metric throws on a partial trace (dispatch-start without dispatch-end; missing event types).
-- [ ] `node --test scripts/drive-diagnostics/test/metrics.test.ts` green; diff confined to the two files.
+- [ ] `node --test skills-contrib/drive-diagnostics/test/metrics.test.ts` green; diff confined to the two files.
 
 **Size.** M. ~14 small pure functions + tests.
 
@@ -69,9 +69,9 @@ After each code dispatch: `git diff --stat origin/main..HEAD` lists only files u
 
 ### Dispatch 3: Assertions A — invariants I1–I12
 
-**Intent.** `scripts/drive-diagnostics/assertions/invariants.ts`: one checker per invariant from `docs/drive/model.md` § Layer 5, each returning `{ id, title, status: "pass"|"fail"|"not-checkable", evidence: TraceRef[], note }`. Implement the observable subset (e.g. I1 one PR per slice → >1 `slice-completed` for a slug = fail; I6 spec+plan before impl → `dispatch-start` with no preceding `spec-authored`/`plan-authored` in the run; I8 DoR/DoD per dispatch → best-effort from brief presence; I12 → silent amendment detection is `not-checkable`, but `falsified-assumption` presence is evidence). Mark genuinely unobservable invariants (I2, I7, I11) `not-checkable` with a one-line reason.
+**Intent.** `skills-contrib/drive-diagnostics/assertions/invariants.ts`: one checker per invariant from `docs/drive/model.md` § Layer 5, each returning `{ id, title, status: "pass"|"fail"|"not-checkable", evidence: TraceRef[], note }`. Implement the observable subset (e.g. I1 one PR per slice → >1 `slice-completed` for a slug = fail; I6 spec+plan before impl → `dispatch-start` with no preceding `spec-authored`/`plan-authored` in the run; I8 DoR/DoD per dispatch → best-effort from brief presence; I12 → silent amendment detection is `not-checkable`, but `falsified-assumption` presence is evidence). Mark genuinely unobservable invariants (I2, I7, I11) `not-checkable` with a one-line reason.
 
-**Files in play.** `scripts/drive-diagnostics/assertions/invariants.ts`, `scripts/drive-diagnostics/assertions/types.ts` (shared `AssertionResult`/`TraceRef`), `scripts/drive-diagnostics/test/invariants.test.ts`.
+**Files in play.** `skills-contrib/drive-diagnostics/assertions/invariants.ts`, `skills-contrib/drive-diagnostics/assertions/types.ts` (shared `AssertionResult`/`TraceRef`), `skills-contrib/drive-diagnostics/test/invariants.test.ts`.
 
 **"Done when":**
 - [ ] All 12 invariants represented; each returns a result; `not-checkable` ones carry a rationale string.
@@ -87,9 +87,9 @@ After each code dispatch: `git diff --stat origin/main..HEAD` lists only files u
 
 ### Dispatch 4: Assertions B — cascade rules + brief-discipline
 
-**Intent.** `scripts/drive-diagnostics/assertions/cascade.ts` (the 8 rules from `docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`) and `scripts/drive-diagnostics/assertions/brief.ts` (the brief-discipline anti-patterns from `docs/drive/principles/brief-discipline.md`), reusing the D3 `AssertionResult` shape. Observable examples: brief anti-pattern "brief restates the slice spec" → `brief-issued.brief_byte_length` above a threshold relative to spec size (`not-checkable` if spec size absent; flag as heuristic); cascade Rule 4 "discussion is signal-triggered" → `falsified-assumption`/discussion events present without a triage churn = informational. Mark unobservable rules `not-checkable` with rationale. `assertions/index.ts`: `runAssertions(events) → AssertionResult[]` aggregating invariants + cascade + brief.
+**Intent.** `skills-contrib/drive-diagnostics/assertions/cascade.ts` (the 8 rules from `docs/drive/design-decisions/2026-05-28-artifact-cascade-redesign.md`) and `skills-contrib/drive-diagnostics/assertions/brief.ts` (the brief-discipline anti-patterns from `docs/drive/principles/brief-discipline.md`), reusing the D3 `AssertionResult` shape. Observable examples: brief anti-pattern "brief restates the slice spec" → `brief-issued.brief_byte_length` above a threshold relative to spec size (`not-checkable` if spec size absent; flag as heuristic); cascade Rule 4 "discussion is signal-triggered" → `falsified-assumption`/discussion events present without a triage churn = informational. Mark unobservable rules `not-checkable` with rationale. `assertions/index.ts`: `runAssertions(events) → AssertionResult[]` aggregating invariants + cascade + brief.
 
-**Files in play.** `scripts/drive-diagnostics/assertions/cascade.ts`, `scripts/drive-diagnostics/assertions/brief.ts`, `scripts/drive-diagnostics/assertions/index.ts`, `scripts/drive-diagnostics/test/cascade-brief.test.ts`.
+**Files in play.** `skills-contrib/drive-diagnostics/assertions/cascade.ts`, `skills-contrib/drive-diagnostics/assertions/brief.ts`, `skills-contrib/drive-diagnostics/assertions/index.ts`, `skills-contrib/drive-diagnostics/test/cascade-brief.test.ts`.
 
 **"Done when":**
 - [ ] All 8 cascade rules + the brief-discipline anti-patterns represented; `not-checkable` ones carry rationale.
@@ -105,12 +105,12 @@ After each code dispatch: `git diff --stat origin/main..HEAD` lists only files u
 
 ### Dispatch 5: Report generator + CLI + package.json wiring
 
-**Intent.** `scripts/drive-diagnostics/report.ts`: `renderReport({metrics, assertions, loadErrors, runMeta}): string` → a markdown dashboard (run header incl. `project_run_id` + `detection_method` + native/post-hoc/mixed origin banner; metrics table; assertion pass/fail/not-checkable sections with evidence pointers; an "N unparseable lines" banner if any). `scripts/drive-diagnostics/cli.ts`: parse argv (`<trace.jsonl> [--posthoc <transcript>] [--out <path>]`), load → compute → assert → render → print (or write). Wire root `package.json`: add `"drive:diagnose": "node scripts/drive-diagnostics/cli.ts"` and append the new test files to `test:scripts`.
+**Intent.** `skills-contrib/drive-diagnostics/report.ts`: `renderReport({metrics, assertions, loadErrors, runMeta}): string` → a markdown dashboard (run header incl. `project_run_id` + `detection_method` + native/post-hoc/mixed origin banner; metrics table; assertion pass/fail/not-checkable sections with evidence pointers; an "N unparseable lines" banner if any). `skills-contrib/drive-diagnostics/cli.ts`: parse argv (`<trace.jsonl> [--posthoc <transcript>] [--out <path>]`), load → compute → assert → render → print (or write). Wire root `package.json`: add `"drive:diagnose": "node skills-contrib/drive-diagnostics/cli.ts"` and append the new test files to `test:scripts`.
 
-**Files in play.** `scripts/drive-diagnostics/report.ts`, `scripts/drive-diagnostics/cli.ts`, `scripts/drive-diagnostics/test/report.test.ts`, `package.json` (root).
+**Files in play.** `skills-contrib/drive-diagnostics/report.ts`, `skills-contrib/drive-diagnostics/cli.ts`, `skills-contrib/drive-diagnostics/test/report.test.ts`, `package.json` (root).
 
 **"Done when":**
-- [ ] `node scripts/drive-diagnostics/cli.ts projects/drive-instrumentation/trace.jsonl` prints a well-formed markdown dashboard, exit 0.
+- [ ] `node skills-contrib/drive-diagnostics/cli.ts projects/drive-instrumentation/trace.jsonl` prints a well-formed markdown dashboard, exit 0.
 - [ ] `report.ts` renders metrics + all three assertion families + origin/error banners; tested with a fixture producing deterministic markdown.
 - [ ] Root `package.json` has `drive:diagnose`; `test:scripts` includes the new suites; `pnpm test:scripts` green.
 - [ ] Diff confined to the three tool files + `package.json`.
@@ -123,9 +123,9 @@ After each code dispatch: `git diff --stat origin/main..HEAD` lists only files u
 
 ### Dispatch 6: Best-effort post-hoc transcript parser
 
-**Intent.** `scripts/drive-diagnostics/posthoc.ts`: `parseTranscript(path): { events: ValidatedEvent[], notes: string[] }`. Read the Cursor transcript JSONL (`{role, message:{content:[{type,...}]}}`, only `text`+`tool_use`). Map observable signals → trace events with `origin:"post-hoc"` + `confidence`: a `Task` tool_use → `dispatch-start` (+ `dispatch-end` if a later turn shows return); a spec/plan `Write`/`StrReplace` to a `spec.md`/`plan.md` path → `spec-authored`/`plan-authored`; `user`-role turns → operator-turn count (spec OQ3). No detectable structure → empty list + "no Drive signal" note; never fabricate. Wire `--posthoc` in the CLI to merge post-hoc events and set the report's mixed/post-hoc origin flag.
+**Intent.** `skills-contrib/drive-diagnostics/posthoc.ts`: `parseTranscript(path): { events: ValidatedEvent[], notes: string[] }`. Read the Cursor transcript JSONL (`{role, message:{content:[{type,...}]}}`, only `text`+`tool_use`). Map observable signals → trace events with `origin:"post-hoc"` + `confidence`: a `Task` tool_use → `dispatch-start` (+ `dispatch-end` if a later turn shows return); a spec/plan `Write`/`StrReplace` to a `spec.md`/`plan.md` path → `spec-authored`/`plan-authored`; `user`-role turns → operator-turn count (spec OQ3). No detectable structure → empty list + "no Drive signal" note; never fabricate. Wire `--posthoc` in the CLI to merge post-hoc events and set the report's mixed/post-hoc origin flag.
 
-**Files in play.** `scripts/drive-diagnostics/posthoc.ts`, `scripts/drive-diagnostics/cli.ts` (wire `--posthoc`), `scripts/drive-diagnostics/test/posthoc.test.ts`, a small committed transcript fixture under `scripts/drive-diagnostics/test/fixtures/`.
+**Files in play.** `skills-contrib/drive-diagnostics/posthoc.ts`, `skills-contrib/drive-diagnostics/cli.ts` (wire `--posthoc`), `skills-contrib/drive-diagnostics/test/posthoc.test.ts`, a small committed transcript fixture under `skills-contrib/drive-diagnostics/test/fixtures/`.
 
 **"Done when":**
 - [ ] `parseTranscript` reconstructs ≥ the dispatch + spec/plan + operator-turn signals from a transcript fixture, each event stamped `origin:"post-hoc"` + `confidence`.
