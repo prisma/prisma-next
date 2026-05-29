@@ -14,12 +14,17 @@ description: >
 
 # Drive: Record Traces
 
-A **library skill** — it is not invoked to *do* work; it is read by other skills that emit trace events, and by tooling that reads them. It carries two reference documents and the rules that bind them.
+A **library skill** — it is not invoked to *do* work; it is read by other skills that emit trace events, and by tooling that reads them. It carries two reference documents, an executable emitter, and the rules that bind them.
 
 ## What this skill owns
 
-- [`events.md`](./events.md) — the versioned **trace-event vocabulary**: the common envelope, every event type, its trigger condition, its emitting skill(s), its payload schema (with arktype types), and JSONL examples. This is the source of truth for *what an event is*.
-- [`emission.md`](./emission.md) — the shared **emission protocol**: trace-file path resolution (in-project / orphan-slice / direct-change), append-only JSONL conventions, the canonical `Shell` + `printf … >>` append mechanic, and the existence-check pattern that selects `*-authored` vs `*-amended` events.
+- [`events.md`](./events.md) — the versioned **trace-event vocabulary**: the common envelope, every event type, its trigger condition, its emitting skill(s), its payload schema, and JSONL examples. This is the source of truth for *what an event is*. The machine-readable arktype schema lives in [`schema.ts`](./schema.ts).
+- [`emission.md`](./emission.md) — the shared **emission protocol**: trace-file path resolution (in-project / orphan-slice / direct-change), append-only JSONL conventions, the deterministic `emit.ts` invocation that appends events, and the existence-check pattern that selects `*-authored` vs `*-amended` events.
+- [`emit.ts`](./emit.ts) — the **deterministic emitter CLI** that enforces the vocabulary and protocol. It owns the envelope (`event_id`, `schema_version`, `ts`), validates each fully-merged event against `schema.ts` fail-closed (a malformed event exits non-zero and writes nothing), and appends exactly one compact JSON line. Instrumented skills invoke it instead of hand-appending. In this repo, `pnpm drive:emit` is the shortcut.
+
+## Prerequisites (for the emitter)
+
+`emit.ts` requires Node with native TypeScript execution (Node 24+) and the `arktype` package. In this repo `arktype` is already available via the workspace root `node_modules` — no extra install needed. In another repo, install it before emitting (`npm install arktype`).
 
 ## Why a library skill (not project-local docs)
 
@@ -29,7 +34,7 @@ Instrumentation is a property of the **skills**, not of any one project. When th
 
 An instrumented skill carries a one-to-three-line **Emit** blockquote at each workflow transition point. The blockquote names the event type, lists the payload fields the orchestrator must compute, and refers to this skill **by name** (the runtime resolves and loads it) for the schema + mechanics — no relative path:
 
-> **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see the `drive-record-traces` skill — `events.md` § `{event_type}`). Append one JSON line per the same skill's `emission.md` § Append protocol.
+> **Emit `{event_type}`:** Compute this event's payload fields (see the `drive-record-traces` skill — `events.md` § `{event_type}`), then invoke that skill's emitter per its `emission.md` § Append protocol: `--event {event_type} --payload '<payload-only fields>'` with `--trace-file` and `--project-run-id` from session context. The emitter owns the envelope and validates before appending.
 
 For spec/plan writes that pick between `*-authored` and `*-amended`, the Emit step also applies the existence-check pattern in [`emission.md`](./emission.md) § Existence-check pattern.
 
