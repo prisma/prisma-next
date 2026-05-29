@@ -26,7 +26,6 @@ import {
   LiteralExpr,
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import {
   isToOneCardinality,
   resolvePolymorphismInfo,
@@ -154,35 +153,36 @@ function dispatchWithIncludes<Row>(options: {
 }
 
 /**
- * Attach `.include()` payloads to rows produced by a mutation's
- * `RETURNING` clause (create / createAll / update / updateAll / upsert).
+ * Reload the rows a mutation just wrote (create / createAll / update /
+ * updateAll / upsert) through the read-path dispatch, so `.include()`
+ * relations resolve via the exact same lateral / correlated builders,
+ * decode, hidden-column stripping, and polymorphism mapping a read
+ * query uses — there is no parallel mutation read-back implementation.
  *
- * The mutated parent rows already carry their scalar columns from
- * `RETURNING`; this loads their relations with a single follow-up
- * SELECT keyed by `identity IN (...)`, lowered through the same
- * lateral / correlated builders the read path uses, then decodes the
- * JSON-aggregated include columns and assigns them onto each parent's
- * mapped row. One round-trip regardless of row count or include depth —
- * there is no per-relation N+1 stitch.
+ * The mutation returns only its identity columns (PK / unique); this
+ * re-selects those rows with the caller's projection + includes, keyed
+ * by `identity IN (...)`. One round-trip regardless of row count or
+ * include depth. The read-back observes the just-written rows because
+ * it runs on the same runtime — and therefore the same transaction —
+ * the mutation ran on.
  *
  * Delete read-back does NOT come through here: a parent-anchored
  * include query can't observe an already-deleted row, so delete reads
  * its snapshot before issuing the DELETE (see `collection.ts`).
- *
- * Runs on the caller's already-acquired scope so the read-back observes
- * the just-written rows within the same connection / transaction.
  */
-export async function loadIncludesForMutationRows(options: {
-  scope: RuntimeScope;
+export async function reloadMutationRowsByIdentities<Row>(options: {
   contract: Contract<SqlStorage>;
+  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   tableName: string;
   modelName: string;
-  parentRows: readonly RowEnvelope[];
+  identityRows: readonly Record<string, unknown>[];
+  selectedFields: readonly string[] | undefined;
   includes: readonly IncludeExpr[];
-}): Promise<void> {
-  const { scope, contract, tableName, modelName, parentRows, includes } = options;
-  if (parentRows.length === 0 || includes.length === 0) {
-    return;
+}): Promise<Row[]> {
+  const { contract, runtime, tableName, modelName, identityRows, selectedFields, includes } =
+    options;
+  if (identityRows.length === 0) {
+    return [];
   }
 
   const identityColumns = resolveRowIdentityColumns(contract, tableName);
@@ -192,61 +192,35 @@ export async function loadIncludesForMutationRows(options: {
     );
   }
 
-  const identityFilter = buildIdentityInFilter(contract, tableName, identityColumns, parentRows);
+  const identityFilter = buildIdentityInFilter(contract, tableName, identityColumns, identityRows);
   if (!identityFilter) {
-    for (const parent of parentRows) {
-      assignEmptyMutationIncludes(parent, includes);
-    }
-    return;
+    return [];
   }
 
-  const includeJoinColumns = includes.map((include) => include.localColumn);
-  const { selectedForQuery } = augmentSelectionForJoinColumns(identityColumns, includeJoinColumns);
-  const compiled = compileSelectWithIncludeStrategy(
+  return dispatchCollectionRows<Row>({
     contract,
-    tableName,
-    {
+    runtime,
+    state: {
       ...emptyState(),
       filters: [identityFilter],
-      selectedFields: selectedForQuery,
+      selectedFields,
       includes,
     },
-    selectIncludeStrategy(contract),
+    tableName,
     modelName,
-  );
-
-  const readbackRows = await executeQueryPlan<Record<string, unknown>>(scope, compiled).toArray();
-  const readbackByIdentity = new Map<string, Record<string, unknown>>();
-  for (const row of readbackRows) {
-    readbackByIdentity.set(identityKey(row, identityColumns), row);
-  }
-
-  for (const parent of parentRows) {
-    const readback = readbackByIdentity.get(identityKey(parent.raw, identityColumns));
-    if (!readback) {
-      assignEmptyMutationIncludes(parent, includes);
-      continue;
-    }
-    for (const include of includes) {
-      parent.mapped[include.relationName] = decodeIncludePayload(
-        contract,
-        include,
-        readback[include.relationName],
-      );
-    }
-  }
+  }).toArray();
 }
 
 function buildIdentityInFilter(
   contract: Contract<SqlStorage>,
   tableName: string,
   identityColumns: readonly string[],
-  parentRows: readonly RowEnvelope[],
+  identityRows: readonly Record<string, unknown>[],
 ): AnyExpression | undefined {
   if (identityColumns.length === 1) {
     const column = identityColumns[0]!;
     const values = uniqueByKey(
-      parentRows.map((parent) => parent.raw[column]).filter((value) => value !== undefined),
+      identityRows.map((row) => row[column]).filter((value) => value !== undefined),
       (value) => identityValueKey(value),
     );
     if (values.length === 0) {
@@ -260,8 +234,8 @@ function buildIdentityInFilter(
 
   const tuples: AnyExpression[] = [];
   const seen = new Set<string>();
-  for (const parent of parentRows) {
-    const key = identityKey(parent.raw, identityColumns);
+  for (const row of identityRows) {
+    const key = identityKey(row, identityColumns);
     if (seen.has(key)) {
       continue;
     }
@@ -269,7 +243,7 @@ function buildIdentityInFilter(
     tuples.push(
       AndExpr.of(
         identityColumns.map((column) =>
-          BinaryExpr.eq(ColumnRef.of(tableName, column), LiteralExpr.of(parent.raw[column])),
+          BinaryExpr.eq(ColumnRef.of(tableName, column), LiteralExpr.of(row[column])),
         ),
       ),
     );
@@ -300,29 +274,6 @@ function identityKey(row: Record<string, unknown>, identityColumns: readonly str
 
 function identityValueKey(value: unknown): string {
   return typeof value === 'bigint' ? `bigint:${value.toString()}` : JSON.stringify(value ?? null);
-}
-
-function assignEmptyMutationIncludes(parent: RowEnvelope, includes: readonly IncludeExpr[]): void {
-  for (const include of includes) {
-    parent.mapped[include.relationName] = emptyIncludeValue(include);
-  }
-}
-
-function emptyIncludeValue(include: IncludeExpr): unknown {
-  if (include.scalar) {
-    return emptyScalarResult(include.scalar.fn);
-  }
-  if (include.combine) {
-    const combined: Record<string, unknown> = {};
-    for (const [branchName, branch] of Object.entries(include.combine)) {
-      combined[branchName] =
-        branch.kind === 'rows'
-          ? coerceSingleQueryIncludeResult([], include.cardinality)
-          : emptyScalarResult(branch.selector.fn);
-    }
-    return combined;
-  }
-  return coerceSingleQueryIncludeResult([], include.cardinality);
 }
 
 /**
