@@ -67,85 +67,88 @@ export type TypeMaps = TypeMapsType<
   FieldInputTypes
 >;
 
-type ContractBase = ContractType<
-  {
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly item: {
-            columns: {
-              readonly id: {
-                readonly nativeType: 'int4';
-                readonly codecId: 'pg/int4@1';
-                readonly nullable: false;
+type ContractBase = Omit<
+  ContractType<
+    {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly id: '__unbound__';
+          readonly kind: 'sql-namespace';
+          readonly tables: {
+            readonly item: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly description: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly category: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly rating: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
               };
-              readonly description: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly category: {
-                readonly nativeType: 'text';
-                readonly codecId: 'pg/text@1';
-                readonly nullable: false;
-              };
-              readonly rating: {
-                readonly nativeType: 'int4';
-                readonly codecId: 'pg/int4@1';
-                readonly nullable: false;
-              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['id', 'description', 'category', 'rating'];
+                  readonly name: 'item_bm25_idx';
+                  readonly type: 'bm25';
+                  readonly options: { readonly key_field: 'id' };
+                },
+              ];
+              foreignKeys: readonly [];
             };
-            primaryKey: { readonly columns: readonly ['id'] };
-            uniques: readonly [];
-            indexes: readonly [
-              {
-                readonly columns: readonly ['id', 'description', 'category', 'rating'];
-                readonly name: 'item_bm25_idx';
-                readonly type: 'bm25';
-                readonly options: { readonly key_field: 'id' };
-              },
-            ];
-            foreignKeys: readonly [];
           };
         };
       };
-    };
-    readonly storageHash: StorageHash;
-  },
-  {
-    readonly Item: {
-      readonly fields: {
-        readonly id: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-        };
-        readonly description: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly category: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-        };
-        readonly rating: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-        };
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: {
-        readonly table: 'item';
+      readonly storageHash: StorageHash;
+    },
+    {
+      readonly Item: {
         readonly fields: {
-          readonly id: { readonly column: 'id' };
-          readonly description: { readonly column: 'description' };
-          readonly category: { readonly column: 'category' };
-          readonly rating: { readonly column: 'rating' };
+          readonly id: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+          readonly description: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly category: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+          };
+          readonly rating: {
+            readonly nullable: false;
+            readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+          };
+        };
+        readonly relations: Record<string, never>;
+        readonly storage: {
+          readonly table: 'item';
+          readonly fields: {
+            readonly id: { readonly column: 'id' };
+            readonly description: { readonly column: 'description' };
+            readonly category: { readonly column: 'category' };
+            readonly rating: { readonly column: 'rating' };
+          };
         };
       };
-    };
-  }
+    }
+  >,
+  'roots'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
