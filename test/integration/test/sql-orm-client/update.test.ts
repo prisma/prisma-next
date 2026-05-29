@@ -126,23 +126,25 @@ describe('integration/update', () => {
           .updateAll({ name: 'Ready' });
 
         // The single read-back keyed by the returned identities buckets
-        // each parent's relations back to the right row.
-        expect(updated).toEqual(
-          expect.arrayContaining([
-            {
-              name: 'Ready',
-              posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
-            },
-            {
-              name: 'Ready',
-              posts: [
-                { id: 11, title: 'Post B', userId: 2, views: 200, embedding: null },
-                { id: 12, title: 'Post C', userId: 2, views: 300, embedding: null },
-              ],
-            },
-          ]),
-        );
-        expect(updated).toHaveLength(2);
+        // each parent's relations back to the right row. Sort by the
+        // first post id for a deterministic order, then assert the exact
+        // shape: only the selected scalar and the included relations may
+        // appear, so a read-back identity column leaking into the public
+        // payload would fail here.
+        const sorted = [...updated].sort((a, b) => a.posts[0]!.id - b.posts[0]!.id);
+        expect(sorted).toEqual([
+          {
+            name: 'Ready',
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
+          },
+          {
+            name: 'Ready',
+            posts: [
+              { id: 11, title: 'Post B', userId: 2, views: 200, embedding: null },
+              { id: 12, title: 'Post C', userId: 2, views: 300, embedding: null },
+            ],
+          },
+        ]);
       });
     },
     timeouts.spinUpPpgDev,
