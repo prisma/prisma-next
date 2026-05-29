@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { EMPTY_CONTRACT_HASH } from '../constants';
-import { MigrationToolsError } from '../errors';
+import { errorSameSourceAndTarget, MigrationToolsError } from '../errors';
 import { readMigrationsDir } from '../io';
 import { reconstructGraph } from '../migration-graph';
 import type { OnDiskMigrationPackage } from '../package';
@@ -20,6 +20,17 @@ function integrityDetail(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function loadProblemDetail(problem: import('../io').PackageLoadProblem): string {
+  switch (problem.kind) {
+    case 'hashMismatch':
+      return `Migration "${problem.dirName}" stored hash "${problem.stored}" does not match computed hash "${problem.computed}".`;
+    case 'providedInvariantsMismatch':
+      return `Migration "${problem.dirName}" providedInvariants in migration.json disagrees with ops.json.`;
+    case 'packageUnloadable':
+      return `Migration "${problem.dirName}" could not be loaded: ${problem.detail}`;
+  }
 }
 
 /**
@@ -249,18 +260,42 @@ export async function loadContractSpaceAggregate(
       });
     }
 
-    // Read + integrity-check the migration packages. `readMigrationsDir`
-    // re-derives `providedInvariants` and verifies migrationHash for
-    // every package.
+    // Read the migration packages. readMigrationsDir no longer throws on
+    // content-level errors; problems are returned alongside retained packages.
+    // Transitional shim: convert any load-time problem back to integrityFailure
+    // until checkIntegrity() subsumes this check (removed in the aggregate
+    // refactor dispatch).
     let packages: readonly OnDiskMigrationPackage[];
-    try {
-      packages = await readMigrationsDir(spaceMigrationDirectory(input.migrationsDir, entry.id));
-    } catch (error) {
-      return notOk({
-        kind: 'integrityFailure',
-        spaceId: entry.id,
-        detail: integrityDetail(error),
-      });
+    {
+      const result = await readMigrationsDir(
+        spaceMigrationDirectory(input.migrationsDir, entry.id),
+      );
+      if (result.problems.length > 0) {
+        const first = result.problems[0]!;
+        return notOk({
+          kind: 'integrityFailure',
+          spaceId: entry.id,
+          detail: loadProblemDetail(first),
+        });
+      }
+      packages = result.packages;
+    }
+
+    // Transitional shim: re-acquire the no-data-op self-edge check that
+    // reconstructGraph no longer throws on. Removed when checkIntegrity()
+    // subsumes it.
+    for (const pkg of packages) {
+      const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
+      if (from === pkg.metadata.to) {
+        const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
+        if (!hasDataOp) {
+          return notOk({
+            kind: 'integrityFailure',
+            spaceId: entry.id,
+            detail: integrityDetail(errorSameSourceAndTarget(pkg.dirPath, from)),
+          });
+        }
+      }
     }
 
     let graph: ReturnType<typeof reconstructGraph>;
@@ -309,6 +344,23 @@ export async function loadContractSpaceAggregate(
   }
 
   // 6. Build app member with hydrated graph from caller-supplied packages.
+  //
+  // Transitional shim: re-acquire the no-data-op self-edge check for the
+  // app packages too. Removed when checkIntegrity() subsumes it.
+  for (const pkg of input.appMigrationPackages) {
+    const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
+    if (from === pkg.metadata.to) {
+      const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
+      if (!hasDataOp) {
+        return notOk({
+          kind: 'integrityFailure',
+          spaceId: APP_SPACE_ID,
+          detail: integrityDetail(errorSameSourceAndTarget(pkg.dirPath, from)),
+        });
+      }
+    }
+  }
+
   let appGraph: ReturnType<typeof reconstructGraph>;
   try {
     appGraph = reconstructGraph(input.appMigrationPackages);
