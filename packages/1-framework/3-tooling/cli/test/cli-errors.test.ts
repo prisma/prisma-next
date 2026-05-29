@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildPathNotFoundFailure } from '../src/control-api/operations/migration-apply';
 import type { MigrationApplyFailure } from '../src/control-api/types';
 import {
   errorDriverRequired,
@@ -40,7 +41,7 @@ describe('errorPathUnreachable', () => {
   const targetHash = `sha256:${'a'.repeat(64)}`;
   const fromHash = `sha256:${'b'.repeat(64)}`;
 
-  it('emits a fully-qualified --from --to fix line for the pathUnreachable runner kind', () => {
+  it('emits a fully-qualified --from --to --name plan step plus a migrate apply step for the pathUnreachable runner kind', () => {
     const failure: MigrationApplyFailure = {
       code: 'MIGRATION_PATH_NOT_FOUND',
       summary: 'Current contract has no planned migration path',
@@ -50,10 +51,13 @@ describe('errorPathUnreachable', () => {
     const envelope = errorPathUnreachable(failure).toEnvelope();
     expect(envelope.meta?.['code']).toBe('MIGRATION.PATH_UNREACHABLE');
     expect(envelope.fix).toContain(
-      `prisma-next migration plan --from ${fromHash} --to ${targetHash}`,
+      `prisma-next migration plan --from ${fromHash} --to ${targetHash} --name <slug>`,
     );
+    expect(envelope.fix).toContain(`prisma-next migrate --to ${targetHash}`);
     expect(envelope.fix).toContain('prisma-next migration list');
     expect(envelope.fix).toContain('prisma-next migration show');
+    expect((envelope.fix ?? '').toLowerCase()).toContain('destructive');
+    expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });
 
   it('omits the --from clause when the runner kind is neverPlanned (no fromHash in meta)', () => {
@@ -64,7 +68,7 @@ describe('errorPathUnreachable', () => {
       meta: { spaceId: 'app', kind: 'neverPlanned', target: targetHash },
     };
     const envelope = errorPathUnreachable(failure).toEnvelope();
-    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash}`);
+    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
     expect(envelope.fix).not.toContain('--from');
     expect(envelope.fix).not.toContain('<unknown>');
   });
@@ -77,12 +81,37 @@ describe('errorPathUnreachable', () => {
       meta: { spaceId: 'app' },
     };
     const envelope = errorPathUnreachable(failure).toEnvelope();
-    expect(envelope.fix).toContain(
-      'Run `prisma-next migration plan` to introduce the missing path.',
-    );
+    expect(envelope.fix).toContain('prisma-next migration plan');
     expect(envelope.fix).not.toContain('--from');
     expect(envelope.fix).not.toContain('--to');
     expect(envelope.fix).not.toContain('<unknown>');
+  });
+
+  it('composes buildPathNotFoundFailure why with the fix into one plan-then-apply sequence', () => {
+    // Drive the real failure producer so the `why` text is the one users see,
+    // not a stub — then assert it composes with the fix without both
+    // independently telling the user to run `migration plan`.
+    const failure = buildPathNotFoundFailure(
+      'app',
+      { storageHash: fromHash, invariants: [] },
+      targetHash,
+    );
+    const envelope = errorPathUnreachable(failure).toEnvelope();
+
+    // why: names both endpoints + the absence of an edge; does NOT itself
+    // prescribe running the planner (that is the fix's job).
+    expect(envelope.why).toContain(fromHash);
+    expect(envelope.why).toContain(targetHash);
+    expect(envelope.why?.toLowerCase()).toContain('no migration edge');
+    expect(envelope.why).not.toContain('migration plan');
+
+    // fix: the plan-then-apply sequence pointing at the now-working command.
+    expect(envelope.fix).toContain(
+      `prisma-next migration plan --from ${fromHash} --to ${targetHash} --name <slug>`,
+    );
+    expect(envelope.fix).toContain(`prisma-next migrate --to ${targetHash}`);
+    expect((envelope.fix ?? '').toLowerCase()).toContain('destructive');
+    expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });
 });
 

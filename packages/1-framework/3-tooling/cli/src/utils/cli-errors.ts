@@ -264,26 +264,34 @@ export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructu
     Array.isArray(deadEnds) && deadEnds.length > 0
       ? ` Dead-ends: ${deadEnds.map(String).join(', ')}.`
       : '';
-  const planFix = (() => {
+  // Plan-then-apply recovery. The planner destination is the missing edge's
+  // target; `migration plan --to` (built for arbitrary targets) makes this a
+  // real command, so the diagnostic that sends you here is now honest.
+  const planCommand = (() => {
     if (fromHash !== null && targetHash !== null) {
-      return `Run \`prisma-next migration plan --from ${fromHash} --to ${targetHash}\` to introduce the missing path.`;
+      return `prisma-next migration plan --from ${fromHash} --to ${targetHash} --name <slug>`;
     }
     if (targetHash !== null) {
-      return `Run \`prisma-next migration plan --to ${targetHash}\` to introduce the missing path.`;
+      return `prisma-next migration plan --to ${targetHash} --name <slug>`;
     }
     if (fromHash !== null) {
-      return `Run \`prisma-next migration plan --from ${fromHash}\` to introduce the missing path.`;
+      return `prisma-next migration plan --from ${fromHash} --name <slug>`;
     }
-    return 'Run `prisma-next migration plan` to introduce the missing path.';
+    return 'prisma-next migration plan';
   })();
+  const applyCommand =
+    targetHash !== null ? `prisma-next migrate --to ${targetHash}` : 'prisma-next migrate';
   return errorRuntime(failure.summary, {
     why:
       failure.why ??
       `Cannot reach target "${targetHash ?? '<unknown>'}" from current marker "${fromHash ?? '<unknown>'}".${deadEndsSuffix}`,
     fix: [
-      'Run `prisma-next migration list` to see the on-disk graph.',
-      planFix,
-      'Run `prisma-next migration show <bundle>` for any bundle in the path you expected.',
+      'Plan the missing edge, then apply it:',
+      `  1. ${planCommand}`,
+      `  2. ${applyCommand}`,
+      'A rollback (reverse) plan is expected to contain destructive (DROP) operations — review them before applying.',
+      'Narrower cases (rename inference, re-adding a NOT NULL column without a safe default, or a type change that needs data) may additionally need a hint in the planned migration.',
+      'Inspect the on-disk graph with `prisma-next migration list`, or `prisma-next migration show <bundle>` for any bundle in the path you expected.',
     ].join('\n'),
     meta: {
       ...meta,
