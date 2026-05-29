@@ -306,7 +306,7 @@ model Post {
           Post: expect.objectContaining({
             relations: expect.objectContaining({
               author: expect.objectContaining({
-                to: 'User',
+                to: { namespace: '__unbound__', model: 'User' },
                 cardinality: 'N:1',
               }),
             }),
@@ -394,7 +394,7 @@ model Post {
             },
           }),
           Bug: expect.objectContaining({
-            base: 'Task',
+            base: { namespace: '__unbound__', model: 'Task' },
           }),
           Comment: expect.objectContaining({
             owner: 'Task',
@@ -404,7 +404,7 @@ model Post {
 
       const contractDts = readFileSync(contractDtsPath, 'utf-8');
       expect(contractDts).toContain("readonly owner: 'Task'");
-      expect(contractDts).toContain("readonly base: 'Task'");
+      expect(contractDts).toContain('readonly base: { readonly namespace:');
       expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
       expect(contractDts).toContain('readonly users: {');
       expect(contractDts).toContain('readonly indexes:');

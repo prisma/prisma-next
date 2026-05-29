@@ -4,8 +4,14 @@
   "target": "mongo",
   "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
   "roots": {
-    "posts": "Post",
-    "users": "User"
+    "posts": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Post": {
@@ -50,7 +56,10 @@
               "_id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -99,7 +108,10 @@
               "authorId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

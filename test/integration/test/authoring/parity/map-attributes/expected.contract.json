@@ -4,8 +4,14 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "org_team": "Team",
-    "team_member": "Member"
+    "org_team": {
+      "model": "Team",
+      "namespace": "__unbound__"
+    },
+    "team_member": {
+      "model": "Member",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Member": {
@@ -32,7 +38,10 @@
             "localFields": ["teamId"],
             "targetFields": ["id"]
           },
-          "to": "Team"
+          "to": {
+            "model": "Team",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

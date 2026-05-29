@@ -4,8 +4,14 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "post": "Post",
-    "user": "User"
+    "post": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "user": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Post": {
@@ -46,7 +52,10 @@
             "localFields": ["userId"],
             "targetFields": ["id"]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -284,17 +293,7 @@
         }
       }
     },
-    "storageHash": "sha256:8fa256466ba485fa9d52edc98e76680a9afd7042e65db1fcbb35b8518cf9fd28",
-    "types": {
-      "Embedding": {
-        "codecId": "pg/vector@1",
-        "kind": "codec-instance",
-        "nativeType": "vector",
-        "typeParams": {
-          "length": 1536
-        }
-      }
-    }
+    "storageHash": "sha256:a3e03934c9b1ffead43c5205a8ed737ee0cf0a8f8ed0ede26ce30aabcaff6adf"
   },
   "capabilities": {
     "postgres": {

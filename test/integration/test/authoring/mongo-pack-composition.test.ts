@@ -19,7 +19,7 @@ describe('Mongo pack composition', () => {
       targetFamily: 'mongo',
       target: 'mongo',
       roots: {
-        users: 'User',
+        users: { namespace: '__unbound__', model: 'User' },
       },
       storage: {
         namespaces: {

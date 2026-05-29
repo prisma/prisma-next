@@ -4,8 +4,14 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "post": "Post",
-    "user": "User"
+    "post": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "user": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Post": {
@@ -46,7 +52,10 @@
             "localFields": ["userId"],
             "targetFields": ["id"]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -276,15 +285,7 @@
         "tables": {}
       }
     },
-    "storageHash": "sha256:a0eae5e868776b85d3a394fe5d916c1518660c9e7cf7ab5f3ece00a05b27190d",
-    "types": {
-      "Email": {
-        "codecId": "pg/text@1",
-        "kind": "codec-instance",
-        "nativeType": "text",
-        "typeParams": {}
-      }
-    }
+    "storageHash": "sha256:2b4e92df225452e57b079947cd56034202462576c9398302100f6787cc45651a"
   },
   "capabilities": {
     "postgres": {

@@ -4,8 +4,14 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "posts": "Post",
-    "users": "User"
+    "posts": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Post": {
@@ -50,7 +56,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -113,7 +122,10 @@
               "authorId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
