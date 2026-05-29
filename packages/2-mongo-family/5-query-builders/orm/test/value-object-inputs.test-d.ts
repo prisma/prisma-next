@@ -1,4 +1,4 @@
-import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
+import type { CrossReference, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 import type {
   MongoCollection,
   MongoContractWithTypeMaps,
@@ -12,6 +12,8 @@ import type {
   InferFullRow,
   VariantCreateInput,
 } from '../src/types';
+
+type CrossRefFor<M extends string> = CrossReference & { readonly model: M };
 
 type TestCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
@@ -28,7 +30,7 @@ type VOContract = MongoContractWithTypeMaps<
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
-    readonly roots: { readonly users: 'User' };
+    readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
     readonly models: {
       readonly User: {
         readonly fields: {
@@ -167,7 +169,7 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
-    readonly roots: { readonly users: 'User' };
+    readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
     readonly models: {
       readonly User: {
         readonly fields: {
@@ -284,7 +286,10 @@ type ExtContract = MongoContractWithTypeMaps<
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
-    readonly roots: { readonly tasks: 'Task'; readonly users: 'User' };
+    readonly roots: {
+      readonly tasks: CrossReference & { readonly model: 'Task' };
+      readonly users: CrossReference & { readonly model: 'User' };
+    };
     readonly models: {
       readonly Task: {
         readonly fields: {
@@ -307,14 +312,17 @@ type ExtContract = MongoContractWithTypeMaps<
         };
         readonly relations: {
           readonly assignee: {
-            readonly to: 'User';
+            readonly to: CrossRefFor<'User'>;
             readonly cardinality: 'N:1';
             readonly on: {
               readonly localFields: readonly ['assigneeId'];
               readonly targetFields: readonly ['_id'];
             };
           };
-          readonly comments: { readonly to: 'Comment'; readonly cardinality: '1:N' };
+          readonly comments: {
+            readonly to: CrossRefFor<'Comment'>;
+            readonly cardinality: '1:N';
+          };
         };
         readonly storage: {
           readonly collection: 'tasks';
@@ -335,7 +343,7 @@ type ExtContract = MongoContractWithTypeMaps<
         };
         readonly relations: Record<string, never>;
         readonly storage: { readonly collection: 'tasks' };
-        readonly base: 'Task';
+        readonly base: CrossRefFor<'Task'>;
       };
       readonly Feature: {
         readonly fields: {
@@ -346,7 +354,7 @@ type ExtContract = MongoContractWithTypeMaps<
         };
         readonly relations: Record<string, never>;
         readonly storage: { readonly collection: 'tasks' };
-        readonly base: 'Task';
+        readonly base: CrossRefFor<'Task'>;
       };
       readonly User: {
         readonly fields: {

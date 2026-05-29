@@ -25,7 +25,7 @@ describe('mongoRaw', () => {
     it('throws when root maps to a missing model', () => {
       const badContract = {
         ...ormContractJson,
-        roots: { ghost: 'NoSuchModel' },
+        roots: { ghost: { namespace: '__unbound__', model: 'NoSuchModel' } },
       } as unknown as MongoContract;
       const badRaw = mongoRaw({ contract: badContract });
       expect(() => badRaw.collection('ghost')).toThrow(

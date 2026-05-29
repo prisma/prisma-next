@@ -28,9 +28,11 @@ Per `drive-run-retro` § Step 8, the project-close retro covers the project as a
 1. **What went well?** Patterns worth keeping; calibrations that proved out; protocol points that earned their cost.
 2. **What surprised us?** Things the protocol didn't predict; assumptions that turned out to be wrong; sizing that drifted.
 3. **What lessons land where?** For each lesson: pick canonical / project-context / ADR per the preferences above.
-4. **What deferred work surfaced?** Items in `projects/<project>/deferred.md` that should become Linear tickets vs items that should just be discarded.
+4. **What deferred work surfaced?** Genuinely-deferred *scope* — slices/features pushed out of the project (typically tracked in `projects/<project>/deferred.md`) that should become Linear tickets vs items that should just be discarded.
 5. **What's the ADR-worthy decision (if any)?** Not every project has one; many do.
 6. **What's the one-sentence summary for the team channel?** A retro that doesn't get communicated to the wider team is half-landed.
+
+**A retro collects *process* findings, not code-review findings.** The retro is about how the work was *delivered* — protocol failures, calibration drift, surprises, reviewer/dispatch discipline. Code-review NITs (deferrable lint-level findings, "add a real-rollback test", "handle ENOENT more cleanly", redundant fields) are **not retro material**: they belong in the slice's `code-review.md`, the PR thread, or a follow-up Linear ticket, and they're dispositioned there. Do not enumerate them in the retro or treat "what deferred work surfaced?" (prompt 4) as a place to relist them — that prompt is for deferred *scope*, not for review nits.
 
 ## Retro-trigger frequency baselines
 

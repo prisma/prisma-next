@@ -73,7 +73,7 @@ What stays the same: `BaseSchemaIssue` shape (already carries optional `namespac
 
 **Intent.** Rewrite the two name-only-keyed namespace-type lookup helpers to take `(namespaceId, typeName)` and read the named namespace's `enum` slot directly. Thread the namespace coordinate through their three callsites: `planner-strategies.ts:375` (`enumRebuildCallRecipe`), `planner-strategies.ts:454` (top of `nativeEnumPlanCallStrategy` loop — partial; `collectPostgresEnumTypes` change is D3), `issue-planner.ts:603`. Caller-side: each callsite has `issue.namespaceId` or the outer loop's namespace coordinate already in scope (D1 substrate guarantees the issue field).
 
-Address spec open question #2 at brief assembly: if column→enum reference resolution is already namespace-qualified (object-pair `typeRef`), the column-ref walk in `enumRebuildCallRecipe` works unchanged; if not, narrow `column.typeRef === typeName` by namespace as part of this dispatch.
+**Column→enum reference resolution (spec OQ#2, resolved 2026-05-27 by the S1.C pre-audit).** D2 also narrows the column→enum reference filter at `planner-strategies.ts:384–394` (`enumRebuildCallRecipe`) by namespace; identified by the S1.C pre-audit (see [S1.E spec OQ#2](../spec.md#open-questions)). The walk's `column.typeRef === typeName` bare-string match becomes `column.typeRef === typeName && nsId === sourceNamespaceId`. `column.typeRef` stays a bare string — S1.C does not change column-level type-reference encoding — so the narrowing happens inside the helper using the source enum's namespace coordinate threaded by `locateNamespaceType` / the outer recipe call (`enumRebuildCallRecipe` takes `(namespaceId, typeName, ctx)` after this dispatch, see D3 fold).
 
 What stays the same: `collectPostgresEnumTypes` shape (D3). The `nativeEnumPlanCallStrategy` outer loop iteration variable (D3). All non-enum planner strategies. `readExistingEnumValues` (D3 fold).
 
@@ -83,7 +83,7 @@ What stays the same: `collectPostgresEnumTypes` shape (D3). The `nativeEnumPlanC
 |---|---|
 | Helper rewrites | [`packages/3-targets/3-targets/postgres/src/core/migrations/planner-strategies.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/planner-strategies.ts) (`locateNamespaceType` lines 131–141), [`issue-planner.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/issue-planner.ts) (`locateNamespaceTypeInStorage` lines 66+) |
 | Callsites | `planner-strategies.ts:375` (`enumRebuildCallRecipe`), `issue-planner.ts:603` (grep at brief time for exact call signature) |
-| Column-ref resolution (conditional) | `planner-strategies.ts` `enumRebuildCallRecipe` column-ref walk (lines 384–394) — narrow `column.typeRef === typeName` by namespace if column typeRef encoding is bare-name (spec § Open Questions #2) |
+| Column-ref resolution (confirmed in-scope by S1.C pre-audit) | [`planner-strategies.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/planner-strategies.ts) `enumRebuildCallRecipe` column-ref walk (lines 384–394) — narrow `column.typeRef === typeName` by namespace using the source enum's namespace coordinate (S1.C does not change column.typeRef encoding; spec OQ#2 resolved) |
 | Tests | [`packages/3-targets/3-targets/postgres/test/migrations/issue-planner.test.ts`](../../../../packages/3-targets/3-targets/postgres/test/migrations/issue-planner.test.ts), planner-strategy tests in the same folder |
 
 **Done when.**
@@ -92,7 +92,7 @@ What stays the same: `collectPostgresEnumTypes` shape (D3). The `nativeEnumPlanC
 - [ ] `locateNamespaceType` signature is `(storage, namespaceId, typeName)`; body reads `storage.namespaces[namespaceId]?.enum?.[typeName]` directly — no `Object.values(storage.namespaces)` loop
 - [ ] `locateNamespaceTypeInStorage` signature mirrors the change
 - [ ] Each of the three callsites passes `namespaceId` from the caller's in-scope coordinate (`issue.namespaceId` after D1; outer loop variable in `nativeEnumPlanCallStrategy`'s partial update)
-- [ ] Column-ref walk in `enumRebuildCallRecipe`: either confirmed namespace-aware via column `typeRef` encoding (no change needed) or narrowed by namespace explicitly (open question #2 settled in brief)
+- [ ] Column-ref walk in `enumRebuildCallRecipe` (lines 384–394): narrowed by namespace explicitly — `column.typeRef === typeName && nsId === sourceNamespaceId` (spec OQ#2 resolved by S1.C pre-audit; `column.typeRef` stays a bare string)
 - [ ] `pnpm --filter @prisma-next/target-postgres build`
 - [ ] `pnpm typecheck` clean
 - [ ] `pnpm test:packages` green (postgres target tests)
@@ -101,13 +101,13 @@ What stays the same: `collectPostgresEnumTypes` shape (D3). The `nativeEnumPlanC
 - [ ] Intent-validation: `rg 'for \(const ns of Object\.values\(storage\.namespaces\)\)' packages/3-targets/3-targets/postgres/src/core/migrations/` — no matches in the enum-lookup helpers (`collectPostgresEnumTypes` may still have one until D3)
 - [ ] Edge cases covered: single-namespace contract still resolves correctly (regression test); issue with `namespaceId === undefined` (shouldn't happen post-D1 for enum-related kinds; defensive behaviour — assert at helper boundary if cheap)
 
-**Size.** M. ~3–5 files; one design judgment (column-ref encoding — open question #2). **Re-decomposition trigger:** if open question #2's resolution requires touching the column typeRef encoding shape across authoring + emitter + IR (S1.C territory), halt — that's an S1.C-shaped refactor, not S1.E scope.
+**Size.** M. ~3–5 files; spec OQ#2 settled by the S1.C pre-audit — column-ref narrowing absorbed as one filter clause in `enumRebuildCallRecipe` (no sizing change; the file count and LoC delta are well under the M-cap). **Re-decomposition trigger:** if the column-ref narrowing surfaces an unexpected schema-IR cascade (the outer-loop coordinate isn't actually in scope at the recipe entry), halt and split D2a (helper signatures) + D2b (column-ref narrowing).
 
-**Model tier.** Composer-2.5 (`composer-2.5-fast`). Mechanical signature change + callsite threading. **Escalate to Opus** if open question #2 surfaces structural ambiguity (e.g., column typeRef encoding is bare-name but the namespace context isn't available at the callsite either).
+**Model tier.** Composer-2.5 (`composer-2.5-fast`). Mechanical signature change + callsite threading + bare column-ref filter narrowing. **Escalate to Opus** if the column-ref narrowing surfaces unexpected schema-IR cascade or if `nsId` isn't actually in scope at `enumRebuildCallRecipe` entry (would require deeper recipe restructure than the spec OQ#2 resolution assumes).
 
 **Pre-dispatch DoR.**
 
-- [x] Intent clear (signature change + callsite threading; column-ref question scoped to in-helper narrowing only)
+- [x] Intent clear (signature change + callsite threading + column-ref narrowing — spec OQ#2 resolved 2026-05-27 by the S1.C pre-audit, in-helper narrowing only)
 - [x] Files in play named
 - [x] "Done when" gates explicit
 - [x] Predicted size M
@@ -118,7 +118,7 @@ What stays the same: `collectPostgresEnumTypes` shape (D3). The `nativeEnumPlanC
 **Refusal triggers:**
 
 - Implementer adds a name→namespace lookup helper to "find which namespace the type belongs to" instead of taking the coordinate from caller scope (F6)
-- Open question #2 resolution implicates column typeRef encoding shape across authoring/emitter (S1.C territory) — halt, route to discussion mode, do not expand slice
+- Column-ref narrowing surfaces a missing namespace coordinate at `enumRebuildCallRecipe` entry (recipe takes `(typeName, ctx)` today; S1.E D2 + D3 thread `namespaceId` — if `nsId` still isn't in scope at the column-ref walk after the helper rewrites, halt and re-plan the threading)
 - `pnpm test:integration` regresses on single-namespace Postgres enum hydration — halt; the regression test is the bar
 - Implementer introduces a `types?.[typeName] ?? enum?.[typeName]` coalescing pattern (F1 dual-shape under new name)
 
@@ -127,7 +127,7 @@ What stays the same: `collectPostgresEnumTypes` shape (D3). The `nativeEnumPlanC
 - MUST forbid destructive git operations per F5
 - MUST run grep pre-flight for callsite inventory
 - MUST forbid F1 patterns: cross-namespace fallback, dual-lookup coalescing
-- MUST resolve open question #2 explicitly in the brief — either "column typeRef carries namespace, no narrowing needed" with a code-evidence link, or "narrow within helper" with the planned filter shape
+- MUST name spec OQ#2 as **resolved 2026-05-27 by the S1.C pre-audit** (link [spec OQ#2](./spec.md#open-questions)); the brief carries the planned filter shape (`column.typeRef === typeName && nsId === sourceNamespaceId`) and confirms `nsId` is in scope at the recipe entry (it will be, post-D2 / D3 helper rewrites threading `namespaceId`)
 - MUST name downstream `pnpm build` order (target-postgres only)
 
 ---
@@ -221,6 +221,7 @@ What stays the same: no production source edits unless test surfaces a real bug 
   - [ ] Each call's `schemaName` corresponds to its source namespace's DDL schema
   - [ ] Same-`nativeType` collision resolves distinctly via `readExistingEnumValues` (D3 fold coverage)
   - [ ] Drop scenario: enum removed from one namespace, retained in other → `DropEnumTypeCall` scoped to correct schema
+  - [ ] **Cross-namespace column→enum binding** (spec OQ#2 resolved coverage): fixture carries `audit.log_entry.priority.typeRef = 'Status'` alongside `public.post.status.typeRef = 'Status'` where `audit.Status` and `public.Status` are distinct enums with different values; rebuild on `audit.Status` migrates only the `audit.log_entry.priority` column, leaves `public.post.status` untouched (assert `AlterColumnTypeCall` count + per-call `schemaName`)
 - [ ] Pre-fix regression test: described in test-name as the collision scenario; assertion targets compound-key membership or `CreateEnumTypeCall` count (not opaque snapshot blob — SDoD8 verifiability constraint)
 - [ ] Issue-payload goldens regenerated (if any); diff is shape-only (`+ namespaceId`), not content-shift
 - [ ] `pnpm typecheck` clean
@@ -307,7 +308,7 @@ What stays the same: no production source edits unless test surfaces a real bug 
   - Two namespaces same name, different/same values → D3 + D4
   - Same `nativeType` collision → D3 + D4
   - Single-namespace regression → D1 + D2 + D3 (existing tests stay green)
-  - Cross-namespace column reference → D2 (open question #2)
+  - Cross-namespace column reference → D2 (column-ref narrowing — spec OQ#2 resolved 2026-05-27 by S1.C pre-audit) + D4 (cross-namespace column→enum binding fixture assertion)
   - Drop scenario → D3 + D4
   - `enum_values_changed` under collision → D1 (issue carries namespaceId) + D3 (matching filter)
   - Issue serialization goldens → D4 (conditional)
@@ -340,8 +341,8 @@ D1 (Issue substrate) ──► commit ──► WIP inspection (≤ 5 min)
    ▼
 D2 (helpers + callsites) ──► commit ──► WIP inspection
    │
-   ├─ Open question #2 (column typeRef encoding) settled in brief
-   ├─ If resolution implicates S1.C-shaped refactor: halt → discussion mode
+   ├─ Spec OQ#2 column-ref narrowing absorbed (`column.typeRef === typeName && nsId === sourceNamespaceId`) — resolved 2026-05-27 by S1.C pre-audit
+   ├─ If `nsId` not in scope at column-ref walk after helper rewrites: halt → re-plan threading
    └─ If implementer adds name→namespace lookup helper: halt (F6)
    ▼
 D3 (collection + readExistingEnumValues fold) ──► commit ──► WIP inspection

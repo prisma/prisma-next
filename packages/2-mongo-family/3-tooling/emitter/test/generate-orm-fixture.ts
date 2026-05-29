@@ -38,10 +38,6 @@ const targets = [
     import.meta.dirname,
     '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.d.ts',
   ),
-  resolve(
-    import.meta.dirname,
-    '../../../../../test/integration/test/mongo/fixtures/generated/contract.d.ts',
-  ),
 ];
 
 for (const target of targets) {

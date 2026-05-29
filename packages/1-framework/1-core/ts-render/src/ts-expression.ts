@@ -8,12 +8,20 @@
  * `"default"` emits `import a from "m"`. `attributes`, if provided, emits an
  * import attributes clause (`with { type: "json" }`) verbatim — required for
  * JSON module imports in the rendered scaffolds.
+ *
+ * `alias`, when present and different from `symbol`, renders `symbol as alias`.
+ * `typeOnly` marks the symbol as a type import: when every symbol contributed
+ * for a module is `typeOnly`, the whole statement collapses to
+ * `import type { … } from "m"`; when a module mixes value and type symbols, the
+ * type-only ones carry a per-specifier `type` prefix (`import { type T, val }`).
  */
 export interface ImportRequirement {
   readonly moduleSpecifier: string;
   readonly symbol: string;
   readonly kind?: 'named' | 'default';
   readonly attributes?: Readonly<Record<string, string>>;
+  readonly alias?: string;
+  readonly typeOnly?: boolean;
 }
 
 /**

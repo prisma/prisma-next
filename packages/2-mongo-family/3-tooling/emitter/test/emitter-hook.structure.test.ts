@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import {
@@ -140,7 +141,9 @@ describe('mongoEmission.validateStructure', () => {
           fields: {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
-          relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+          relations: {
+            addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+          },
           storage: {
             collection: 'users',
             relations: { addresses: { field: 'addresses' } },
@@ -179,7 +182,7 @@ describe('mongoEmission.validateStructure', () => {
           },
           relations: {},
           storage: { collection: 'tasks' },
-          base: 'Task',
+          base: crossRef('Task'),
         },
       },
       storage: namespacedMongoStorageFromCollections({ tasks: {} }),
@@ -206,7 +209,7 @@ describe('mongoEmission.validateStructure', () => {
           },
           relations: {},
           storage: { collection: 'bugs' },
-          base: 'Task',
+          base: crossRef('Task'),
         },
       },
       storage: namespacedMongoStorageFromCollections({ tasks: {}, bugs: {} }),
@@ -242,7 +245,7 @@ describe('mongoEmission.validateStructure', () => {
           },
           relations: {},
           storage: { collection: 'tasks' },
-          base: 'NonExistent',
+          base: crossRef('NonExistent'),
         },
       },
       storage: namespacedMongoStorageFromCollections({ tasks: {} }),
@@ -259,7 +262,9 @@ describe('mongoEmission.validateStructure', () => {
           fields: {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
-          relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+          relations: {
+            addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+          },
           storage: { collection: 'users' },
         },
         Address: {

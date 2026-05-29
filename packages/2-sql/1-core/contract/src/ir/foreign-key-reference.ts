@@ -1,3 +1,4 @@
+import { asNamespaceId, type NamespaceId } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 
@@ -15,13 +16,13 @@ export interface ForeignKeyReferenceInput {
  * as the sentinel `namespaceId` for single-namespace (unbound) references.
  */
 export class ForeignKeyReference extends SqlNode {
-  readonly namespaceId: string;
+  readonly namespaceId: NamespaceId;
   readonly tableName: string;
   readonly columns: readonly string[];
 
   constructor(input: ForeignKeyReferenceInput) {
     super();
-    this.namespaceId = input.namespaceId;
+    this.namespaceId = asNamespaceId(input.namespaceId);
     this.tableName = input.tableName;
     this.columns = input.columns;
     freezeNode(this);

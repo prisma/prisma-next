@@ -91,6 +91,7 @@ ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
   ExecutionHashBase,
+  NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -104,9 +105,12 @@ export type FieldOutputTypes = ${fieldTypesMaps.output};
 export type FieldInputTypes = ${fieldTypesMaps.input};
 export type TypeMaps = ${typeMapsExpr};
 
-type ContractBase = ContractType<
+type ContractBase = Omit<
+  ContractType<
 ${storageType},
 ${modelsType}
+  >,
+  'roots'
 > & {
   readonly target: ${serializeValue(contract.target)};
   readonly targetFamily: ${serializeValue(contract.targetFamily)};

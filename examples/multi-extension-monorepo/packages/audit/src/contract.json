@@ -4,7 +4,10 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "audit_event": "AuditEvent"
+    "audit_event": {
+      "model": "AuditEvent",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "AuditEvent": {

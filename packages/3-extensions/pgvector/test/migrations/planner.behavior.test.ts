@@ -1,4 +1,5 @@
 import {
+  asNamespaceId,
   type ColumnDefaultLiteralInputValue,
   type Contract,
   coreHash,
@@ -397,8 +398,16 @@ describe('NOT NULL column without default uses temporary default', () => {
         indexes: [],
         foreignKeys: [
           {
-            source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['orgId'] },
-            target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'org', columns: ['id'] },
+            source: {
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+              tableName: 'user',
+              columns: ['orgId'],
+            },
+            target: {
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+              tableName: 'org',
+              columns: ['id'],
+            },
             constraint: true,
             index: true,
           },

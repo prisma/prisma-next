@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, rel } from '../src/contract-builder';
+import { documentScopedTypes } from './cross-ref-helpers';
 import { unboundTables } from './unbound-tables';
 
 type PortableSqlCodecTypes = {
@@ -295,8 +296,9 @@ describe('contract DSL helper vocabulary', () => {
       },
     ]);
     expect(
-      (contract.models.AuditEntry as unknown as { storage: { fields: Record<string, unknown> } })
-        .storage.fields['actorId'],
+      (contract.models as Record<string, { storage: { fields: Record<string, unknown> } }>)[
+        'AuditEntry'
+      ]!.storage.fields['actorId'],
     ).toEqual({ column: 'actor_id' });
   });
 
@@ -574,7 +576,7 @@ describe('contract DSL helper vocabulary', () => {
       },
     );
 
-    expect(contract.storage.types?.Role).toEqual({
+    expect(documentScopedTypes(contract)?.['Role']).toEqual({
       kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'role',
@@ -662,7 +664,7 @@ describe('contract DSL helper vocabulary', () => {
       },
     );
 
-    expect(contract.storage.types?.Embedding1536).toEqual({
+    expect(documentScopedTypes(contract)?.['Embedding1536']).toEqual({
       kind: 'codec-instance',
       codecId: 'pg/vector@1',
       nativeType: 'vector',

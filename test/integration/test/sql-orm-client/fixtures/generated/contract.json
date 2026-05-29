@@ -4,12 +4,30 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "articles": "Article",
-    "comments": "Comment",
-    "posts": "Post",
-    "profiles": "Profile",
-    "tags": "Tag",
-    "users": "User"
+    "articles": {
+      "model": "Article",
+      "namespace": "__unbound__"
+    },
+    "comments": {
+      "model": "Comment",
+      "namespace": "__unbound__"
+    },
+    "posts": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "profiles": {
+      "model": "Profile",
+      "namespace": "__unbound__"
+    },
+    "tags": {
+      "model": "Tag",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Article": {
@@ -47,7 +65,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -157,7 +178,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "comments": {
           "cardinality": "1:N",
@@ -169,7 +193,10 @@
               "postId"
             ]
           },
-          "to": "Comment"
+          "to": {
+            "model": "Comment",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -228,7 +255,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -328,7 +358,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "invitedUsers": {
           "cardinality": "1:N",
@@ -340,7 +373,10 @@
               "invitedById"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "posts": {
           "cardinality": "1:N",
@@ -352,7 +388,10 @@
               "userId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         },
         "profile": {
           "cardinality": "1:1",
@@ -364,7 +403,10 @@
               "userId"
             ]
           },
-          "to": "Profile"
+          "to": {
+            "model": "Profile",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

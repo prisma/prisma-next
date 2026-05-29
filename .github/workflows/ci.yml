@@ -14,6 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Classifies the PR diff as "inert" (touches only files that cannot affect
+  # build/test/fixture results) so heavy jobs can skip their expensive steps.
+  # Fail-safe: a diff is inert only if *every* changed file matches the
+  # allow-list below; any unrecognized path forces a full run. Required jobs
+  # still launch and report (Pattern 1), so the branch ruleset stays satisfied
+  # on docs-only PRs while the Postgres-backed work is skipped.
+  changes:
+    name: Detect inert diff
+    runs-on: ubuntu-latest
+    outputs:
+      inert: ${{ steps.detect.outputs.inert }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: detect
+        uses: ./.github/actions/detect-inert-diff
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -100,7 +119,7 @@ jobs:
 
   fixtures:
     name: Fixtures
-    needs: build
+    needs: [build, changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -108,17 +127,21 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Install dependencies
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile
       - name: Build (restored from Turbo cache)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm build
       - name: Link built binaries
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile
       - name: Check fixtures are up to date
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm fixtures:check
 
   test:
     name: Test
-    needs: build
+    needs: [build, changes]
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
@@ -148,23 +171,30 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Install dependencies (skip bin linking)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build packages (restored from Turbo cache; needed for bin linking)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm build
       - name: Link bins
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile
       - name: Start cloudflare-worker Postgres (5433, pg_stat_statements)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm --filter prisma-next-cloudflare-worker db:up
       - name: Test packages
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm test:packages
       - name: Test examples
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm test:examples
       - name: Check working tree is clean
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm check:clean-tree
 
   test-e2e:
     name: E2E Tests
-    needs: build
+    needs: [build, changes]
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
@@ -188,17 +218,21 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Install dependencies
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile
       - name: Build (restored from Turbo cache)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm build
       - name: Run E2E tests
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm test:e2e
       - name: Check working tree is clean
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm check:clean-tree
 
   test-integration:
     name: Integration Tests
-    needs: build
+    needs: [build, changes]
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
@@ -222,17 +256,21 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Install dependencies
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile
       - name: Build (restored from Turbo cache)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm build
       - name: Run Integration tests
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm test:integration
       - name: Check working tree is clean
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm check:clean-tree
 
   coverage:
     name: Coverage
-    needs: build
+    needs: [build, changes]
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
@@ -256,10 +294,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Install dependencies
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm install --frozen-lockfile
       - name: Build (restored from Turbo cache)
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm build
       - name: Generate coverage and report
+        if: needs.changes.outputs.inert != 'true'
         run: node scripts/coverage-report.mjs
       - name: Check working tree is clean
+        if: needs.changes.outputs.inert != 'true'
         run: pnpm check:clean-tree

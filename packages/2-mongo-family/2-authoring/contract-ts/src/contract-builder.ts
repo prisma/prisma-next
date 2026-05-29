@@ -5,9 +5,11 @@ import type {
   ContractFieldType,
   ContractReferenceRelation,
   ContractValueObject,
+  CrossReference,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import {
   createEntityHelpersFromNamespace,
   type EntityHelpersFromNamespace,
@@ -388,12 +390,12 @@ type ContractRelationFromBuilder<TBuilder> =
   >
     ? On extends RelationOn
       ? {
-          readonly to: To;
+          readonly to: CrossRefFor<To>;
           readonly cardinality: Cardinality;
           readonly on: On;
         }
       : {
-          readonly to: To;
+          readonly to: CrossRefFor<To>;
           readonly cardinality: Cardinality;
         }
     : never;
@@ -411,7 +413,9 @@ type ContractModelStorageFromBuilder<TBuilder> = ModelStorageSection<TBuilder> &
 type MaybeOwner<Owner> = [Owner] extends [undefined]
   ? EmptyObject
   : { readonly owner: Owner & string };
-type MaybeBase<Base> = [Base] extends [undefined] ? EmptyObject : { readonly base: Base & string };
+type MaybeBase<Base> = [Base] extends [undefined]
+  ? EmptyObject
+  : { readonly base: CrossRefFor<Base & string> };
 type MaybeDiscriminator<Discriminator> = [Discriminator] extends [undefined]
   ? EmptyObject
   : { readonly discriminator: Discriminator & { readonly field: string } };
@@ -447,8 +451,12 @@ type ContractModelsFromRecord<Models extends Record<string, AnyModelBuilder>> = 
   readonly [K in keyof Models as ExtractModelName<Models[K]>]: ContractModelFromBuilder<Models[K]>;
 }>;
 
+type CrossRefFor<M extends string> = CrossReference & { readonly model: M };
+
 type DerivedRootModels<Models extends Record<string, AnyModelBuilder>> = Simplify<{
-  readonly [K in keyof Models as RootModelCollection<Models[K]>]: RootModelName<Models[K]>;
+  readonly [K in keyof Models as RootModelCollection<Models[K]>]: CrossRefFor<
+    RootModelName<Models[K]>
+  >;
 }>;
 
 type StorageCollectionsFromModels<Models extends Record<string, AnyModelBuilder>> = Simplify<{
@@ -456,7 +464,7 @@ type StorageCollectionsFromModels<Models extends Record<string, AnyModelBuilder>
 }>;
 
 type NormalizeRoots<Roots extends Record<string, ModelNameInput>> = Simplify<{
-  readonly [K in keyof Roots]: NormalizeModelName<Roots[K]>;
+  readonly [K in keyof Roots]: CrossRefFor<NormalizeModelName<Roots[K]>>;
 }>;
 
 type DefinitionModels<Definition> = Definition extends {
@@ -1191,14 +1199,15 @@ function buildFields(fields: Record<string, AnyFieldBuilder>): Record<string, Co
 function buildRelation(
   relationBuilder: AnyRelationBuilder,
 ): ContractEmbedRelation | ContractReferenceRelation {
+  const to = crossRef(relationBuilder.__to, UNBOUND_NAMESPACE_ID);
   return relationBuilder.__on
     ? {
-        to: relationBuilder.__to,
+        to,
         cardinality: relationBuilder.__cardinality,
         on: relationBuilder.__on,
       }
     : {
-        to: relationBuilder.__to,
+        to,
         cardinality: relationBuilder.__cardinality,
       };
 }
@@ -1255,7 +1264,7 @@ function buildModels(
       relations: buildRelations(modelBuilder.__relations),
       storage,
       ...(modelBuilder.__owner ? { owner: modelBuilder.__owner } : {}),
-      ...(modelBuilder.__base ? { base: modelBuilder.__base } : {}),
+      ...(modelBuilder.__base ? { base: crossRef(modelBuilder.__base, UNBOUND_NAMESPACE_ID) } : {}),
       ...(modelBuilder.__discriminator ? { discriminator: modelBuilder.__discriminator } : {}),
       ...(modelBuilder.__variants ? { variants: modelBuilder.__variants } : {}),
     };
@@ -1264,25 +1273,29 @@ function buildModels(
   return builtModels;
 }
 
-function deriveRoots(models: Record<string, AnyModelBuilder> | undefined): Record<string, string> {
-  const roots: Record<string, string> = {};
+function deriveRoots(
+  models: Record<string, AnyModelBuilder> | undefined,
+): Record<string, CrossReference> {
+  const roots: Record<string, CrossReference> = {};
 
   for (const modelBuilder of Object.values(models ?? {})) {
     if (!modelBuilder.__collection || modelBuilder.__owner || modelBuilder.__base) {
       continue;
     }
 
-    roots[modelBuilder.__collection] = modelBuilder.__name;
+    roots[modelBuilder.__collection] = crossRef(modelBuilder.__name, UNBOUND_NAMESPACE_ID);
   }
 
   return roots;
 }
 
-function normalizeRoots(roots: Record<string, ModelNameInput> | undefined): Record<string, string> {
-  const normalizedRoots: Record<string, string> = {};
+function normalizeRoots(
+  roots: Record<string, ModelNameInput> | undefined,
+): Record<string, CrossReference> {
+  const normalizedRoots: Record<string, CrossReference> = {};
 
   for (const [rootName, rootValue] of Object.entries(roots ?? {})) {
-    normalizedRoots[rootName] = resolveModelName(rootValue);
+    normalizedRoots[rootName] = crossRef(resolveModelName(rootValue), UNBOUND_NAMESPACE_ID);
   }
 
   return normalizedRoots;

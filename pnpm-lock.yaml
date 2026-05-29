@@ -1626,6 +1626,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:0.11.0
         version: link:../../1-core/operations
+      '@prisma-next/ts-render':
+        specifier: workspace:0.11.0
+        version: link:../../1-core/ts-render
       '@prisma-next/utils':
         specifier: workspace:0.11.0
         version: link:../../0-foundation/utils

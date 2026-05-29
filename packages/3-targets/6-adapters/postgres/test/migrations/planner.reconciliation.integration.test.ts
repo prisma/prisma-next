@@ -1,4 +1,4 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
@@ -388,11 +388,15 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: {
-                namespaceId: UNBOUND_NAMESPACE_ID,
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                 tableName: 'child',
                 columns: ['parent_id'],
               },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'parent', columns: ['id'] },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'parent',
+                columns: ['id'],
+              },
               name: 'child_parent_id_fkey',
               constraint: true,
               index: true,
@@ -718,11 +722,15 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: {
-                namespaceId: UNBOUND_NAMESPACE_ID,
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                 tableName: 'child',
                 columns: ['parent_id'],
               },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'parent', columns: ['id'] },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'parent',
+                columns: ['id'],
+              },
               name: 'child_parent_id_fkey',
               constraint: true,
               index: true,
@@ -1334,11 +1342,15 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: {
-                namespaceId: UNBOUND_NAMESPACE_ID,
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                 tableName: 'child1',
                 columns: ['parent_id'],
               },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'parent', columns: ['id'] },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'parent',
+                columns: ['id'],
+              },
               name: 'fk_parent',
               constraint: true,
               index: true,
@@ -1356,11 +1368,15 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: {
-                namespaceId: UNBOUND_NAMESPACE_ID,
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                 tableName: 'child2',
                 columns: ['parent_id'],
               },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'parent', columns: ['id'] },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'parent',
+                columns: ['id'],
+              },
               name: 'fk_parent',
               constraint: true,
               index: true,
@@ -1393,11 +1409,15 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: {
-                namespaceId: UNBOUND_NAMESPACE_ID,
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
                 tableName: 'child2',
                 columns: ['parent_id'],
               },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'parent', columns: ['id'] },
+              target: {
+                namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                tableName: 'parent',
+                columns: ['id'],
+              },
               name: 'fk_parent',
               constraint: true,
               index: true,

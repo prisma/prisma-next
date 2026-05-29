@@ -1,5 +1,11 @@
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
+import { asNamespaceId } from '../src/namespace-id';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
+
 import {
   type CanonicalizeContractOptions,
   canonicalizeContract as canonicalizeContractRaw,
@@ -91,8 +97,8 @@ describe('canonicalizeContractToObject', () => {
   });
 
   it('includes roots when provided', () => {
-    const result = canonicalizeContractToObject(minimal({ roots: { users: 'User' } }));
-    expect(result['roots']).toEqual({ users: 'User' });
+    const result = canonicalizeContractToObject(minimal({ roots: { users: crossRef('User') } }));
+    expect(result['roots']).toEqual({ users: crossRef('User') });
   });
 
   it('includes execution when provided', () => {
@@ -597,5 +603,65 @@ describe('canonicalize with valueObjects', () => {
     const contract = minimal();
     const result = canonicalizeContractToObject(contract);
     expect(result).not.toHaveProperty('valueObjects');
+  });
+});
+
+describe('domain plane', () => {
+  it('preserves domain types and empty typeParams', () => {
+    const result = canonicalizeContractToObject(
+      minimal({ domain: { auth: { types: { Embedding: { typeParams: {} } } } } }),
+    );
+    expect(drill(result, 'domain', 'auth', 'types', 'Embedding')['typeParams']).toEqual({});
+  });
+
+  it('omits domain from output when undefined', () => {
+    const result = canonicalizeContractToObject(minimal());
+    expect(result).not.toHaveProperty('domain');
+  });
+});
+
+describe('typeParams preservation', () => {
+  it('preserves empty storage.types[].typeParams', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: { storageHash: 'sha256:stub', types: { MyType: { typeParams: {} } } },
+      }),
+    );
+    const myType = drill(result, 'storage', 'types', 'MyType');
+    expect(myType['typeParams']).toEqual({});
+  });
+});
+
+describe('array sort with nullish entries', () => {
+  it('sorts indexes containing nullish entries without throwing', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            indexes: [null, null] as unknown as Record<string, unknown>[],
+          },
+        }),
+      }),
+    );
+    const table = drill(unboundTables(result), 'users');
+    const indexes = table['indexes'] as Array<unknown>;
+    expect(indexes).toHaveLength(2);
+  });
+
+  it('sorts uniques containing nullish entries without throwing', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {},
+            uniques: [null, null] as unknown as Record<string, unknown>[],
+          },
+        }),
+      }),
+    );
+    const table = drill(unboundTables(result), 'users');
+    const uniques = table['uniques'] as Array<unknown>;
+    expect(uniques).toHaveLength(2);
   });
 });

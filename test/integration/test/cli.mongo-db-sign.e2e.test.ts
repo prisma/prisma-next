@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readMarker } from '@prisma-next/adapter-mongo/control';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
@@ -20,7 +20,7 @@ import {
 const testContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
-  roots: { users: 'User' },
+  roots: { users: crossRef('User') },
   models: {
     User: {
       fields: {

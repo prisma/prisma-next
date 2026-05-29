@@ -4,6 +4,7 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
+  RootModelName,
 } from '@prisma-next/mongo-contract';
 import type {
   DeleteResult,
@@ -632,9 +633,9 @@ export function createCollectionHandle<
 >(
   contract: TContract,
   rootName: RootName,
-): CollectionHandle<TContract, TContract['roots'][RootName] & string & keyof TContract['models']> {
+): CollectionHandle<TContract, RootModelName<TContract, RootName>> {
   const c = asMongoContract(contract);
-  const modelName = c.roots[rootName];
+  const modelName = c.roots[rootName]?.model;
   if (!modelName) {
     const validRoots = Object.keys(c.roots).join(', ');
     throw new Error(`Unknown root: "${rootName}". Valid roots: ${validRoots}`);
@@ -655,6 +656,6 @@ export function createCollectionHandle<
       collection: collectionName,
       storageHash: String(c.storage.storageHash),
     },
-    modelName as TContract['roots'][RootName] & string & keyof TContract['models'],
+    modelName as RootModelName<TContract, RootName>,
   );
 }

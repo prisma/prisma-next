@@ -1,4 +1,6 @@
 export type { Contract, ContractExecutionSection } from '../contract-types';
+export type { CrossReference } from '../cross-reference';
+export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,
@@ -18,6 +20,8 @@ export type {
   UnionFieldType,
   ValueObjectFieldType,
 } from '../domain-types';
+export type { NamespaceId } from '../namespace-id';
+export { asNamespaceId } from '../namespace-id';
 export type {
   $,
   Brand,

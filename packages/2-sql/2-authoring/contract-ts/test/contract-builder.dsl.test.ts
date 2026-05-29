@@ -2,6 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
+import { crossRef } from './cross-ref-helpers';
 
 import { columnDescriptor } from './helpers/column-descriptor';
 import { unboundTables } from './unbound-tables';
@@ -207,7 +208,7 @@ describe('contract DSL authoring surface', () => {
     expect(contractModels['Post']?.storage.fields['userId']).toEqual({ column: 'user_id' });
     expect(contractModels['User']?.relations).toMatchObject({
       posts: {
-        to: 'Post',
+        to: crossRef('Post'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -217,7 +218,7 @@ describe('contract DSL authoring surface', () => {
     });
     expect(contractModels['Post']?.relations).toMatchObject({
       user: {
-        to: 'User',
+        to: crossRef('User'),
         cardinality: 'N:1',
         on: {
           localFields: ['userId'],
@@ -384,13 +385,13 @@ describe('contract DSL authoring surface', () => {
     >;
     expect(contractModels['Post']?.relations).toMatchObject({
       tags: {
-        to: 'Tag',
+        to: crossRef('Tag'),
         cardinality: 'N:M',
       },
     });
     expect(contractModels['Tag']?.relations).toMatchObject({
       posts: {
-        to: 'Post',
+        to: crossRef('Post'),
         cardinality: 'N:M',
       },
     });
@@ -541,7 +542,7 @@ describe('contract DSL authoring surface', () => {
     >;
     expect(contractModels['User']?.relations).toMatchObject({
       [relationName]: {
-        to: targetModelName,
+        to: crossRef(targetModelName),
         cardinality: expectedCardinality,
         on: {
           localFields: ['id'],
@@ -551,7 +552,7 @@ describe('contract DSL authoring surface', () => {
     });
     expect(contractModels[targetModelName]?.relations).toMatchObject({
       user: {
-        to: 'User',
+        to: crossRef('User'),
         cardinality: 'N:1',
         on: {
           localFields: ['userId'],
@@ -893,7 +894,7 @@ describe('self-referential and circular relations', () => {
     )['Category'];
     expect(categoryModel?.relations).toMatchObject({
       parent: {
-        to: 'Category',
+        to: crossRef('Category'),
         cardinality: 'N:1',
         on: {
           localFields: ['parentId'],
@@ -901,7 +902,7 @@ describe('self-referential and circular relations', () => {
         },
       },
       children: {
-        to: 'Category',
+        to: crossRef('Category'),
         cardinality: '1:N',
         on: {
           localFields: ['id'],
@@ -945,7 +946,7 @@ describe('self-referential and circular relations', () => {
     >;
     expect(contractModels['Employee']?.relations).toMatchObject({
       department: {
-        to: 'Department',
+        to: crossRef('Department'),
         cardinality: 'N:1',
         on: {
           localFields: ['departmentId'],
@@ -955,7 +956,7 @@ describe('self-referential and circular relations', () => {
     });
     expect(contractModels['Department']?.relations).toMatchObject({
       head: {
-        to: 'Employee',
+        to: crossRef('Employee'),
         cardinality: 'N:1',
         on: {
           localFields: ['headId'],

@@ -1,5 +1,10 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
-import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  type ContractField,
+  type ContractModel,
+  CrossReferenceSchema,
+} from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { type Type, type } from 'arktype';
@@ -129,11 +134,12 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-export const ForeignKeyReferenceSchema = type.declare<ForeignKeyReferenceInput>().type({
+export const ForeignKeyReferenceSchema = type({
+  '+': 'reject',
   namespaceId: 'string',
   tableName: 'string',
   columns: type.string.array().readonly(),
-});
+}) satisfies Type<ForeignKeyReferenceInput>;
 
 export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
@@ -351,13 +357,32 @@ const ModelStorageSchema = type({
   fields: type({ '[string]': ModelStorageFieldSchema }),
 });
 
+const ContractReferenceRelationSchema = type({
+  '+': 'reject',
+  to: CrossReferenceSchema,
+  cardinality: "'1:1' | '1:N' | 'N:1'",
+  on: type({
+    '+': 'reject',
+    localFields: type.string.array().readonly(),
+    targetFields: type.string.array().readonly(),
+  }),
+});
+
+const ContractEmbedRelationSchema = type({
+  '+': 'reject',
+  to: CrossReferenceSchema,
+  cardinality: "'1:1' | '1:N'",
+});
+
+const ContractRelationSchema = ContractReferenceRelationSchema.or(ContractEmbedRelationSchema);
+
 const ModelSchema = type({
   storage: ModelStorageSchema,
   'fields?': type({ '[string]': ModelFieldSchema }),
-  'relations?': type({ '[string]': 'unknown' }),
+  'relations?': type({ '[string]': ContractRelationSchema }),
   'discriminator?': 'unknown',
   'variants?': 'unknown',
-  'base?': 'string',
+  'base?': CrossReferenceSchema,
   'owner?': 'string',
 });
 
@@ -383,7 +408,7 @@ export function createSqlContractSchema(
     'capabilities?': 'Record<string, Record<string, boolean>>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
-    'roots?': 'Record<string, string>',
+    'roots?': type({ '[string]': CrossReferenceSchema }),
     models: type({ '[string]': ModelSchema }),
     'valueObjects?': 'Record<string, unknown>',
     'domain?': 'unknown',

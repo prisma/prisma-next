@@ -4,13 +4,34 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "comment": "Comment",
-    "embedding": "Embedding",
-    "event": "Event",
-    "literal_defaults": "LiteralDefaults",
-    "param_types": "ParamTypes",
-    "post": "Post",
-    "user": "User"
+    "comment": {
+      "model": "Comment",
+      "namespace": "__unbound__"
+    },
+    "embedding": {
+      "model": "Embedding",
+      "namespace": "__unbound__"
+    },
+    "event": {
+      "model": "Event",
+      "namespace": "__unbound__"
+    },
+    "literal_defaults": {
+      "model": "LiteralDefaults",
+      "namespace": "__unbound__"
+    },
+    "param_types": {
+      "model": "ParamTypes",
+      "namespace": "__unbound__"
+    },
+    "post": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "user": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Comment": {
@@ -62,7 +83,10 @@
               "id"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -489,7 +513,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "comments": {
           "cardinality": "1:N",
@@ -501,7 +528,10 @@
               "postId"
             ]
           },
-          "to": "Comment"
+          "to": {
+            "model": "Comment",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -583,7 +613,10 @@
               "userId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

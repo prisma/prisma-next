@@ -25,6 +25,7 @@ export type {
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
   MongoWildcardProjection,
+  RootModelName,
 } from '../contract-types';
 export type { MongoChangeStreamPreAndPostImagesOptionsInput } from '../ir/mongo-change-stream-pre-and-post-images-options';
 export { MongoChangeStreamPreAndPostImagesOptions } from '../ir/mongo-change-stream-pre-and-post-images-options';

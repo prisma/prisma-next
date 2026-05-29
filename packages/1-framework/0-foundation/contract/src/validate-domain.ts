@@ -1,16 +1,17 @@
 import { ContractValidationError } from './contract-validation-error';
+import type { CrossReference } from './cross-reference';
 
 export interface DomainModelShape {
   readonly fields: Record<string, unknown>;
-  readonly relations?: Record<string, { readonly to: string }>;
+  readonly relations?: Record<string, { readonly to: CrossReference }>;
   readonly discriminator?: { readonly field: string };
   readonly variants?: Record<string, unknown>;
-  readonly base?: string;
+  readonly base?: CrossReference;
   readonly owner?: string;
 }
 
 export interface DomainContractShape {
-  readonly roots: Record<string, string>;
+  readonly roots: Record<string, CrossReference>;
   readonly models: Record<string, DomainModelShape>;
   readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
 }
@@ -41,11 +42,13 @@ function validateRoots(
   errors: string[],
 ): void {
   const seenValues = new Set<string>();
-  for (const [rootKey, modelName] of Object.entries(contract.roots)) {
-    if (seenValues.has(modelName)) {
+  for (const [rootKey, crossRef] of Object.entries(contract.roots)) {
+    const modelName = crossRef.model;
+    const dedupeKey = `${crossRef.namespace}:${modelName}`;
+    if (seenValues.has(dedupeKey)) {
       errors.push(`Duplicate root value: "${modelName}" is mapped by multiple root keys`);
     }
-    seenValues.add(modelName);
+    seenValues.add(dedupeKey);
 
     if (!modelNames.has(modelName)) {
       errors.push(
@@ -73,24 +76,27 @@ function validateVariantsAndBases(
         }
         const variantModel = models.get(variantName);
         if (!variantModel) continue;
-        if (variantModel.base !== modelName) {
+        if (variantModel.base?.model !== modelName) {
           errors.push(
-            `Variant "${variantName}" has base "${variantModel.base ?? '(none)'}" but expected "${modelName}"`,
+            `Variant "${variantName}" has base "${variantModel.base?.model ?? '(none)'}" but expected "${modelName}"`,
           );
         }
       }
     }
 
     if (model.base) {
-      if (!modelNames.has(model.base)) {
-        errors.push(`Model "${modelName}" has base "${model.base}" which does not exist in models`);
+      const baseModelName = model.base.model;
+      if (!modelNames.has(baseModelName)) {
+        errors.push(
+          `Model "${modelName}" has base "${baseModelName}" which does not exist in models`,
+        );
         continue;
       }
-      const baseModel = models.get(model.base);
+      const baseModel = models.get(baseModelName);
       if (!baseModel) continue;
       if (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName)) {
         errors.push(
-          `Model "${modelName}" has base "${model.base}" which does not list it as a variant`,
+          `Model "${modelName}" has base "${baseModelName}" which does not list it as a variant`,
         );
       }
     }
@@ -104,9 +110,10 @@ function validateRelationTargets(
 ): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
     for (const [relName, relation] of Object.entries(model.relations ?? {})) {
-      if (!modelNames.has(relation.to)) {
+      const targetModelName = relation.to.model;
+      if (!modelNames.has(targetModelName)) {
         errors.push(
-          `Relation "${relName}" on model "${modelName}" targets "${relation.to}" which does not exist in models`,
+          `Relation "${relName}" on model "${modelName}" targets "${targetModelName}" which does not exist in models`,
         );
       }
     }
@@ -157,8 +164,8 @@ function validateOwnership(
       errors.push(`Model "${modelName}" has owner "${model.owner}" which does not exist in models`);
     }
 
-    for (const [rootKey, rootModel] of Object.entries(contract.roots)) {
-      if (rootModel === modelName) {
+    for (const [rootKey, rootRef] of Object.entries(contract.roots)) {
+      if (rootRef.model === modelName) {
         errors.push(
           `Owned model "${modelName}" must not appear in roots (found as root "${rootKey}")`,
         );

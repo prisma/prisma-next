@@ -187,16 +187,16 @@ describe('side-by-side contract examples', () => {
       const validatedContract = validateEmittedSqlContract(emittedContractJson);
 
       expect(validatedContract.roots).toEqual({
-        posts: 'Post',
-        users: 'User',
+        posts: { namespace: '__unbound__', model: 'Post' },
+        users: { namespace: '__unbound__', model: 'User' },
       });
       expect(validatedContract.models['User']?.relations['posts']).toMatchObject({
         cardinality: '1:N',
-        to: 'Post',
+        to: { namespace: '__unbound__', model: 'Post' },
       });
       expect(validatedContract.models['Post']?.relations['author']).toMatchObject({
         cardinality: 'N:1',
-        to: 'User',
+        to: { namespace: '__unbound__', model: 'User' },
         on: {
           localFields: ['authorId'],
           targetFields: ['id'],
@@ -293,12 +293,12 @@ describe('side-by-side contract examples', () => {
       const validatedContract = validateEmittedMongoContract(emittedContractJson);
 
       expect(validatedContract.contract.roots).toEqual({
-        posts: 'Post',
-        users: 'User',
+        posts: { namespace: '__unbound__', model: 'Post' },
+        users: { namespace: '__unbound__', model: 'User' },
       });
       expect(validatedContract.contract.models['User']?.relations['posts']).toMatchObject({
         cardinality: '1:N',
-        to: 'Post',
+        to: { namespace: '__unbound__', model: 'Post' },
         on: {
           localFields: ['_id'],
           targetFields: ['authorId'],
@@ -306,7 +306,7 @@ describe('side-by-side contract examples', () => {
       });
       expect(validatedContract.contract.models['Post']?.relations['author']).toMatchObject({
         cardinality: 'N:1',
-        to: 'User',
+        to: { namespace: '__unbound__', model: 'User' },
         on: {
           localFields: ['authorId'],
           targetFields: ['_id'],
@@ -341,16 +341,16 @@ describe('side-by-side contract examples', () => {
     const mongoModels = mongoContractJson['models'] as Record<string, Record<string, unknown>>;
 
     expect(postgresModels['User']?.['relations']).toMatchObject({
-      posts: { cardinality: '1:N', to: 'Post' },
+      posts: { cardinality: '1:N', to: { namespace: '__unbound__', model: 'Post' } },
     });
     expect(mongoModels['User']?.['relations']).toMatchObject({
-      posts: { cardinality: '1:N', to: 'Post' },
+      posts: { cardinality: '1:N', to: { namespace: '__unbound__', model: 'Post' } },
     });
     expect(postgresModels['Post']?.['relations']).toMatchObject({
-      author: { cardinality: 'N:1', to: 'User' },
+      author: { cardinality: 'N:1', to: { namespace: '__unbound__', model: 'User' } },
     });
     expect(mongoModels['Post']?.['relations']).toMatchObject({
-      author: { cardinality: 'N:1', to: 'User' },
+      author: { cardinality: 'N:1', to: { namespace: '__unbound__', model: 'User' } },
     });
   });
 });

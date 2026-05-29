@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +8,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -38,13 +40,9 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const storage = result.value.storage as {
-      readonly types?: Record<string, { readonly codecId: string; readonly nativeType: string }>;
-    };
-
     expect(result.value.roots).toEqual({});
     expect(result.value.models).toEqual({});
-    expect(storage.types).toMatchObject({
+    expect(documentScopedTypes(result.value)).toMatchObject({
       Email: {
         codecId: 'pg/text@1',
         nativeType: 'text',
@@ -112,7 +110,7 @@ model Bug {
       if (!result.ok) return;
 
       expect(result.value.models['Bug']).toMatchObject({
-        base: 'Task',
+        base: crossRef('Task'),
       });
     });
 
@@ -247,8 +245,8 @@ model Feature {
           Feature: { value: 'feature' },
         },
       });
-      expect(result.value.models['Bug']).toMatchObject({ base: 'Task' });
-      expect(result.value.models['Feature']).toMatchObject({ base: 'Task' });
+      expect(result.value.models['Bug']).toMatchObject({ base: crossRef('Task') });
+      expect(result.value.models['Feature']).toMatchObject({ base: crossRef('Task') });
     });
 
     it('variants are not included in roots', () => {
@@ -277,8 +275,8 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.roots).toHaveProperty('task', 'Task');
-      expect(Object.values(result.value.roots)).not.toContain('Bug');
+      expect(result.value.roots).toHaveProperty('task', crossRef('Task'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug'));
     });
   });
 
@@ -559,13 +557,13 @@ model Feature {
           Feature: { value: 'feature' },
         },
       });
-      expect(result.value.models['Bug']).toMatchObject({ base: 'Task' });
-      expect(result.value.models['Feature']).toMatchObject({ base: 'Task' });
+      expect(result.value.models['Bug']).toMatchObject({ base: crossRef('Task') });
+      expect(result.value.models['Feature']).toMatchObject({ base: crossRef('Task') });
       expect(result.value.models['Bug']?.storage).toMatchObject({ table: 'tasks' });
       expect(result.value.models['Feature']?.storage).toMatchObject({ table: 'features' });
-      expect(Object.values(result.value.roots)).not.toContain('Bug');
-      expect(Object.values(result.value.roots)).not.toContain('Feature');
-      expect(Object.values(result.value.roots)).toContain('Task');
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Feature'));
+      expect(result.value.roots).toHaveProperty('tasks', crossRef('Task'));
     });
   });
 });

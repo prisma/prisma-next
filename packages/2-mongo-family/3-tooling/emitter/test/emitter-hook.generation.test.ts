@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';
@@ -87,11 +88,15 @@ describe('mongoEmission.generateContractTypes', () => {
 
   it('generates roots type', () => {
     const contract = createMongoContract({
-      roots: { users: 'User', posts: 'Post' },
+      roots: { users: crossRef('User'), posts: crossRef('Post') },
     });
     const types = generateContractDts(contract, mongoEmission, [], testHashes);
-    expect(types).toContain("readonly users: 'User'");
-    expect(types).toContain("readonly posts: 'Post'");
+    expect(types).toContain(
+      "readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' }",
+    );
+    expect(types).toContain(
+      "readonly posts: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
+    );
   });
 
   describe('model generation', () => {
@@ -131,7 +136,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {
               posts: {
-                to: 'Post',
+                to: { model: 'Post', namespace: '__unbound__' },
                 cardinality: '1:N',
                 on: { localFields: ['_id'], targetFields: ['authorId'] },
               },
@@ -145,7 +150,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {
               author: {
-                to: 'User',
+                to: { model: 'User', namespace: '__unbound__' },
                 cardinality: 'N:1',
                 on: { localFields: ['authorId'], targetFields: ['_id'] },
               },
@@ -156,7 +161,9 @@ describe('mongoEmission.generateContractTypes', () => {
         storage: namespacedMongoStorageFromCollections({ users: {}, posts: {} }),
       });
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
-      expect(types).toContain("readonly to: 'Post'");
+      expect(types).toContain(
+        "readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }",
+      );
       expect(types).toContain("readonly cardinality: '1:N'");
       expect(types).toContain("readonly localFields: readonly ['_id']");
       expect(types).toContain("readonly targetFields: readonly ['authorId']");
@@ -187,7 +194,9 @@ describe('mongoEmission.generateContractTypes', () => {
             fields: {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
-            relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+            relations: {
+              addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+            },
             storage: {
               collection: 'users',
               relations: { addresses: { field: 'addresses' } },
@@ -216,7 +225,9 @@ describe('mongoEmission.generateContractTypes', () => {
             fields: {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
-            relations: { comments: { to: 'Comment', cardinality: '1:N' } },
+            relations: {
+              comments: { to: { model: 'Comment', namespace: '__unbound__' }, cardinality: '1:N' },
+            },
             storage: { collection: 'posts' },
           },
           Comment: {
@@ -253,7 +264,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {},
             storage: { collection: 'tasks' },
-            base: 'Task',
+            base: crossRef('Task'),
           },
           Feature: {
             fields: {
@@ -261,7 +272,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {},
             storage: { collection: 'tasks' },
-            base: 'Task',
+            base: crossRef('Task'),
           },
         },
         storage: namespacedMongoStorageFromCollections({ tasks: {} }),
@@ -270,7 +281,9 @@ describe('mongoEmission.generateContractTypes', () => {
       expect(types).toContain("discriminator: { readonly field: 'type' }");
       expect(types).toContain("readonly Bug: { readonly value: 'bug' }");
       expect(types).toContain("readonly Feature: { readonly value: 'feature' }");
-      expect(types).toContain("base: 'Task'");
+      expect(types).toContain(
+        "base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' }",
+      );
     });
 
     it('generates storage.relations on parent model', () => {
@@ -280,7 +293,9 @@ describe('mongoEmission.generateContractTypes', () => {
             fields: {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
-            relations: { addresses: { to: 'Address', cardinality: '1:N' } },
+            relations: {
+              addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+            },
             storage: {
               collection: 'users',
               relations: { addresses: { field: 'addresses' } },
@@ -312,8 +327,8 @@ describe('mongoEmission.generateContractTypes', () => {
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly namespaces:');
       expect(types).toContain('readonly collections:');
-      expect(types).toContain('readonly users: Record<string, never>');
-      expect(types).toContain('readonly posts: Record<string, never>');
+      expect(types).toContain('readonly users: MongoCollection');
+      expect(types).toContain('readonly posts: MongoCollection');
     });
 
     it('generates collection metadata for indexes and options', () => {

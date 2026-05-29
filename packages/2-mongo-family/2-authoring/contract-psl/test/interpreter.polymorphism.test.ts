@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -106,7 +107,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.models['Bug']).toMatchObject({ base: 'Task' });
+      expect(ir.models['Bug']).toMatchObject({ base: crossRef('Task') });
     });
 
     it('variant inherits base collection (single-collection)', () => {
@@ -163,8 +164,8 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
           Feature: { value: 'feature' },
         },
       });
-      expect(ir.models['Bug']).toMatchObject({ base: 'Task' });
-      expect(ir.models['Feature']).toMatchObject({ base: 'Task' });
+      expect(ir.models['Bug']).toMatchObject({ base: crossRef('Task') });
+      expect(ir.models['Feature']).toMatchObject({ base: crossRef('Task') });
     });
 
     it('variants are not included in roots', () => {
@@ -186,8 +187,8 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.roots).toHaveProperty('tasks', 'Task');
-      expect(Object.values(ir.roots)).not.toContain('Bug');
+      expect(ir.roots).toHaveProperty('tasks', crossRef('Task'));
+      expect(Object.values(ir.roots)).not.toContainEqual(crossRef('Bug'));
     });
 
     it('restores base as root when variant explicitly @@map()s to same collection', () => {
@@ -210,8 +211,8 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(ir.roots).toHaveProperty('tasks', 'Task');
-      expect(Object.values(ir.roots)).not.toContain('Bug');
+      expect(ir.roots).toHaveProperty('tasks', crossRef('Task'));
+      expect(Object.values(ir.roots)).not.toContainEqual(crossRef('Bug'));
     });
   });
 

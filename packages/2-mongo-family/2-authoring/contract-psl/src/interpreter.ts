@@ -8,7 +8,9 @@ import type {
   ContractField,
   ContractReferenceRelation,
   ContractValueObject,
+  CrossReference,
 } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -114,7 +116,7 @@ interface MongoModelEntry {
   readonly storage: { readonly collection: string };
   readonly discriminator?: { readonly field: string };
   readonly variants?: Record<string, { readonly value: string }>;
-  readonly base?: string;
+  readonly base?: CrossReference;
 }
 
 type DiscriminatorDeclaration = { readonly fieldName: string; readonly span: PslModel['span'] };
@@ -124,6 +126,10 @@ type BaseDeclaration = {
   readonly collectionName: string;
   readonly span: PslModel['span'];
 };
+
+function mongoCrossRef(modelName: string): CrossReference {
+  return crossRef(modelName, UNBOUND_NAMESPACE_ID);
+}
 
 function collectPolymorphismDeclarations(
   document: ParsePslDocumentResult,
@@ -195,7 +201,7 @@ function collectPolymorphismDeclarations(
 
 function resolvePolymorphism(input: {
   models: Record<string, MongoModelEntry>;
-  roots: Record<string, string>;
+  roots: Record<string, CrossReference>;
   collections: Record<string, Record<string, unknown>>;
   document: ParsePslDocumentResult;
   discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
@@ -206,7 +212,7 @@ function resolvePolymorphism(input: {
   sourceId: string;
 }): {
   models: Record<string, MongoModelEntry>;
-  roots: Record<string, string>;
+  roots: Record<string, CrossReference>;
   collections: Record<string, Record<string, unknown>>;
   diagnostics: ContractSourceDiagnostic[];
 } {
@@ -323,16 +329,16 @@ function resolvePolymorphism(input: {
         ...patched,
         [variantName]: {
           ...variantModel,
-          base: baseDecl.baseName,
+          base: mongoCrossRef(baseDecl.baseName),
           storage: { collection: baseCollection },
         },
       };
     }
 
     const variantCollectionName = resolveCollectionName(variantPslModel);
-    if (roots[variantCollectionName] === variantName) {
+    if (roots[variantCollectionName]?.model === variantName) {
       if (variantCollectionName === baseCollection && baseModel) {
-        roots = { ...roots, [variantCollectionName]: baseDecl.baseName };
+        roots = { ...roots, [variantCollectionName]: mongoCrossRef(baseDecl.baseName) };
       } else {
         roots = Object.fromEntries(
           Object.entries(roots).filter(([key]) => key !== variantCollectionName),
@@ -858,7 +864,7 @@ export function interpretPslDocumentToMongoContract(
 
   const models: Record<string, MongoModelEntry> = {};
   const collections: Record<string, Record<string, unknown>> = {};
-  const roots: Record<string, string> = {};
+  const roots: Record<string, CrossReference> = {};
   const allFkRelations: FkRelation[] = [];
   const indexSpans = new Map<MongoIndex, PslSpan>();
   const modelIndexesByName = new Map<string, readonly MongoIndex[]>();
@@ -908,7 +914,7 @@ export function interpretPslDocumentToMongoContract(
           );
 
           relations[field.name] = {
-            to: field.typeName,
+            to: mongoCrossRef(field.typeName),
             cardinality: 'N:1' as const,
             on: {
               localFields: localMapped,
@@ -969,7 +975,7 @@ export function interpretPslDocumentToMongoContract(
     } else if (!existingColl) {
       collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};
     }
-    roots[collectionName] = pslModel.name;
+    roots[collectionName] = mongoCrossRef(pslModel.name);
   }
 
   const valueObjects: Record<string, ContractValueObject> = {};
@@ -1032,7 +1038,7 @@ export function interpretPslDocumentToMongoContract(
     const modelEntry = models[candidate.modelName];
     if (!modelEntry) continue;
     modelEntry.relations[candidate.fieldName] = {
-      to: candidate.targetModelName,
+      to: mongoCrossRef(candidate.targetModelName),
       cardinality: candidate.cardinality,
       on: {
         localFields: fk.targetFields,

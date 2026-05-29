@@ -25,6 +25,7 @@ import {
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
@@ -33,6 +34,7 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 // Framework `Namespace.tables` is widened to `Record<string, object>` so
 // emitted `contract.d.ts` table literals satisfy it structurally. At
@@ -41,6 +43,22 @@ import {
 // cast (not `as unknown as`) keeps Pattern C walks readable without
 // weakening the substrate type.
 type SqlNamespaceTables = Readonly<Record<string, StorageTable>>;
+
+function documentScopedCodecTypes(
+  contract: Contract<SqlStorage>,
+): Record<string, StorageTypeInstance> | undefined {
+  const fromDomain = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'];
+  if (fromDomain !== undefined && typeof fromDomain === 'object') {
+    return blindCast<
+      Record<string, StorageTypeInstance>,
+      'contract domain types object validated by schema; shape confirmed as StorageTypeInstance map'
+    >(fromDomain);
+  }
+  return blindCast<
+    Record<string, StorageTypeInstance> | undefined,
+    'SqlStorage.types is typed for generic access; runtime shape is guaranteed by contract schema validation'
+  >(contract.storage.types);
+}
 
 import {
   createSqlOperationRegistry,
@@ -346,18 +364,18 @@ function collectTypeRefSites(
 
 function initializeTypeHelpers(
   storage: SqlStorage,
+  documentTypes: Record<string, StorageTypeInstance> | undefined,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): TypeHelperRegistry {
   const helpers: TypeHelperRegistry = {};
-  const storageTypes = storage.types;
 
-  if (!storageTypes) {
+  if (!documentTypes) {
     return helpers;
   }
 
   const typeRefSites = collectTypeRefSites(storage);
 
-  for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
+  for (const [typeName, typeInstance] of Object.entries(documentTypes)) {
     const enumView = readEnumViewIfApplicable(typeInstance);
     const codecId = enumView ? enumView.codecId : (typeInstance as StorageTypeInstance).codecId;
     const typeParams = enumView
@@ -508,7 +526,7 @@ function buildContractCodecRegistry(
   const nameByKey = new Map<string, string>();
 
   const typeRefSites = collectTypeRefSites(contract.storage);
-  for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
+  for (const [typeName, typeInstance] of Object.entries(documentScopedCodecTypes(contract) ?? {})) {
     const enumView = readEnumViewIfApplicable(typeInstance);
     const ref: CodecRef = enumView
       ? {
@@ -816,7 +834,11 @@ export function createExecutionContext<
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
   }
 
-  const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
+  const types = initializeTypeHelpers(
+    contract.storage,
+    documentScopedCodecTypes(contract),
+    parameterizedCodecDescriptors,
+  );
 
   const contractCodecs = buildContractCodecRegistry(contract, codecDescriptors);
 

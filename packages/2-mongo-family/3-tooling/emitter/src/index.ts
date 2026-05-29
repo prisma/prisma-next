@@ -1,7 +1,18 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
+
+const MONGO_NAMESPACE_KIND_FALLBACK = 'mongo-namespace' as const;
+
+function mongoNamespaceSerializedKind(ns: Namespace): string {
+  const kind = (ns as { kind?: unknown }).kind;
+  if (typeof kind === 'string') {
+    return `readonly kind: ${serializeValue(kind)}`;
+  }
+  return `readonly kind: '${MONGO_NAMESPACE_KIND_FALLBACK}'`;
+}
 
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
@@ -19,9 +30,9 @@ function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
 }
 
 function generateMongoCollectionEntryType(coll: MongoCollection): string {
-  const entries = Object.entries(coll).filter(([, v]) => v !== undefined);
+  const entries = Object.entries(coll).filter(([key, v]) => v !== undefined && key !== 'kind');
   if (entries.length === 0) {
-    return 'Record<string, never>';
+    return 'MongoCollection';
   }
   return serializeValue(coll);
 }
@@ -54,7 +65,7 @@ function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): st
       ns.collections as Readonly<Record<string, MongoCollection>>,
     );
     parts.push(
-      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; readonly kind: ${serializeValue(ns.kind)}; readonly collections: ${collectionsType} }`,
+      `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly collections: ${collectionsType} }`,
     );
   }
   return `{ ${parts.join('; ')} }`;
@@ -162,10 +173,10 @@ export const mongoEmission = {
       }
 
       if (model.base) {
-        const baseModel = models[model.base];
+        const baseModel = models[model.base.model];
         if (!baseModel) {
           throw new Error(
-            `Model "${modelName}" declares base "${model.base}" which does not exist in models`,
+            `Model "${modelName}" declares base "${model.base.model}" which does not exist in models`,
           );
         }
         const variantCollection = collection;
@@ -190,7 +201,8 @@ export const mongoEmission = {
 
       for (const [relName, rel] of Object.entries(model.relations)) {
         const relObj = rel as Record<string, unknown>;
-        const targetModelName = relObj['to'] as string | undefined;
+        const targetRef = relObj['to'] as { readonly model?: string } | undefined;
+        const targetModelName = targetRef?.model;
         if (targetModelName) {
           const targetModel = models[targetModelName];
           if (targetModel?.owner === modelName && !storageRelations?.[relName]) {
@@ -233,6 +245,7 @@ export const mongoEmission = {
   getFamilyImports(): string[] {
     return [
       'import type {',
+      '  MongoCollection,',
       '  MongoContractWithTypeMaps,',
       '  MongoTypeMaps,',
       "} from '@prisma-next/mongo-contract';",

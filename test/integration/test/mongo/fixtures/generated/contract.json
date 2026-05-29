@@ -4,8 +4,14 @@
   "target": "mongo",
   "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
   "roots": {
-    "tasks": "Task",
-    "users": "User"
+    "tasks": {
+      "model": "Task",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Address": {
@@ -37,7 +43,10 @@
       "storage": {}
     },
     "Bug": {
-      "base": "Task",
+      "base": {
+        "model": "Task",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "severity": {
           "nullable": false,
@@ -81,7 +90,10 @@
       "storage": {}
     },
     "Feature": {
-      "base": "Task",
+      "base": {
+        "model": "Task",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "priority": {
           "nullable": false,
@@ -148,11 +160,17 @@
               "_id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "comments": {
           "cardinality": "1:N",
-          "to": "Comment"
+          "to": {
+            "model": "Comment",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -199,7 +217,10 @@
       "relations": {
         "addresses": {
           "cardinality": "1:N",
-          "to": "Address"
+          "to": {
+            "model": "Address",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

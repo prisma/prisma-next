@@ -1,4 +1,4 @@
-import type { Contract, ContractFieldType } from '@prisma-next/contract/types';
+import type { Contract, ContractFieldType, CrossReference } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
@@ -10,7 +10,7 @@ type ModelEntry = {
   fields?: Record<string, { type?: ContractFieldType }>;
   discriminator?: { field: string };
   variants?: Record<string, { value: string }>;
-  base?: string;
+  base?: CrossReference;
 };
 type ModelsMap = Record<string, ModelEntry>;
 
@@ -263,19 +263,25 @@ export function resolveModelRelations(
     if (!value || typeof value !== 'object') continue;
 
     const rel = value as {
-      to?: unknown;
+      to?: CrossReference;
       cardinality?: unknown;
       on?: { localFields?: unknown; targetFields?: unknown };
     };
     const localFields = rel.on?.localFields;
     const targetFields = rel.on?.targetFields;
 
-    if (typeof rel.to !== 'string' || !Array.isArray(localFields) || !Array.isArray(targetFields)) {
+    if (
+      !rel.to ||
+      typeof rel.to !== 'object' ||
+      typeof rel.to.model !== 'string' ||
+      !Array.isArray(localFields) ||
+      !Array.isArray(targetFields)
+    ) {
       continue;
     }
 
     resolved[name] = {
-      to: rel.to,
+      to: rel.to.model,
       cardinality: parseRelationCardinality(rel.cardinality),
       on: {
         localFields: localFields as readonly string[],

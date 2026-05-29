@@ -236,7 +236,7 @@ describe('createModelAccessor', () => {
           ...base.models.User,
           relations: {
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
               on: {
                 localFields: [],
@@ -273,7 +273,7 @@ describe('createModelAccessor', () => {
           relations: {
             ...base.models.User.relations,
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
               on: {
                 localFields: ['id', 'email'],
@@ -314,7 +314,7 @@ describe('createModelAccessor', () => {
           relations: {
             ...base.models.User.relations,
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
               on: {
                 localFields: ['id', 'name'],
@@ -405,8 +405,9 @@ describe('createModelAccessor', () => {
           ...base.models.User,
           relations: {
             posts: {
-              to: 'Post',
+              to: { model: 'Post', namespace: '__unbound__' },
               cardinality: '1:N',
+              on: { localFields: [], targetFields: [] },
             },
           },
         },

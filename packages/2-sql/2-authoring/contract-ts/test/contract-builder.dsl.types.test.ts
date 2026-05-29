@@ -1,5 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { describe, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -35,6 +35,8 @@ describe('contract DSL type surface', () => {
       },
     });
 
+    expect(contract.target).toBe('postgres');
+    expect(contract.targetFamily).toBe('sql');
     expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
     expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
     expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();

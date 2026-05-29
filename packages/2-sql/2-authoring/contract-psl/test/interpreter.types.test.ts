@@ -1,9 +1,11 @@
+import { crossRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
@@ -52,27 +54,25 @@ model Event {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.storage).toMatchObject({
-      types: {
-        Id: { codecId: 'pg/text@1', nativeType: 'uuid' },
-        Slug: {
-          codecId: 'sql/varchar@1',
-          nativeType: 'character varying',
-          typeParams: { length: 191 },
-        },
-        Rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
-        HappenedAt: {
-          codecId: 'pg/time@1',
-          nativeType: 'time',
-          typeParams: { precision: 3 },
-        },
-        PublishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
-        Payload: { codecId: 'pg/json@1', nativeType: 'json' },
-        Amount: {
-          codecId: 'pg/numeric@1',
-          nativeType: 'numeric',
-          typeParams: { precision: 10, scale: 2 },
-        },
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      Id: { codecId: 'pg/text@1', nativeType: 'uuid' },
+      Slug: {
+        codecId: 'sql/varchar@1',
+        nativeType: 'character varying',
+        typeParams: { length: 191 },
+      },
+      Rating: { codecId: 'pg/int2@1', nativeType: 'int2' },
+      HappenedAt: {
+        codecId: 'pg/time@1',
+        nativeType: 'time',
+        typeParams: { precision: 3 },
+      },
+      PublishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+      Payload: { codecId: 'pg/json@1', nativeType: 'json' },
+      Amount: {
+        codecId: 'pg/numeric@1',
+        nativeType: 'numeric',
+        typeParams: { precision: 10, scale: 2 },
       },
     });
     expect(result.value.storage).toMatchObject({
@@ -125,7 +125,7 @@ model Event {
         },
       },
     });
-    expect(result.value.roots).toEqual({ event: 'Event' });
+    expect(result.value.roots).toEqual({ event: crossRef('Event') });
   });
 
   it('preserves enum native type names from @@map instead of lowercasing declarations', () => {
@@ -199,7 +199,7 @@ model User {
         },
       },
     });
-    expect(result.value.roots).toEqual({ user: 'User' });
+    expect(result.value.roots).toEqual({ user: crossRef('User') });
   });
 
   it('lowers additional Postgres native type attributes on named types', () => {
@@ -232,32 +232,30 @@ model Event {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.value.storage).toMatchObject({
-      types: {
-        Code: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: { length: 12 },
-        },
-        Score: {
-          codecId: 'pg/float4@1',
-          nativeType: 'float4',
-        },
-        CreatedAt: {
-          codecId: 'pg/timestamp@1',
-          nativeType: 'timestamp',
-          typeParams: { precision: 3 },
-        },
-        PublishedAt: {
-          codecId: 'pg/timestamptz@1',
-          nativeType: 'timestamptz',
-          typeParams: { precision: 6 },
-        },
-        ReminderAt: {
-          codecId: 'pg/timetz@1',
-          nativeType: 'timetz',
-          typeParams: { precision: 2 },
-        },
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      Code: {
+        codecId: 'sql/char@1',
+        nativeType: 'character',
+        typeParams: { length: 12 },
+      },
+      Score: {
+        codecId: 'pg/float4@1',
+        nativeType: 'float4',
+      },
+      CreatedAt: {
+        codecId: 'pg/timestamp@1',
+        nativeType: 'timestamp',
+        typeParams: { precision: 3 },
+      },
+      PublishedAt: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        typeParams: { precision: 6 },
+      },
+      ReminderAt: {
+        codecId: 'pg/timetz@1',
+        nativeType: 'timetz',
+        typeParams: { precision: 2 },
       },
     });
     expect(result.value.storage).toMatchObject({
@@ -303,7 +301,7 @@ model Event {
         },
       },
     });
-    expect(result.value.roots).toEqual({ event: 'Event' });
+    expect(result.value.roots).toEqual({ event: crossRef('Event') });
   });
 
   it('lowers a top-level enum into the public namespace enum slot', () => {

@@ -371,7 +371,7 @@ describe('builder integration', () => {
       });
 
       type RelShape = {
-        to: string;
+        to: { namespace: string; model: string };
         cardinality: string;
         on: { localFields: readonly string[]; targetFields: readonly string[] };
       };
@@ -381,14 +381,14 @@ describe('builder integration', () => {
       const postRels = models['Post']!.relations;
       expect(userRels).toBeDefined();
       expect(userRels['posts']).toBeDefined();
-      expect(userRels['posts']!.to).toBe('Post');
+      expect(userRels['posts']!.to).toEqual({ namespace: '__unbound__', model: 'Post' });
       expect(userRels['posts']!.cardinality).toBe('1:N');
       expect(userRels['posts']!.on.localFields).toEqual(['id']);
       expect(userRels['posts']!.on.targetFields).toEqual(['userId']);
 
       expect(postRels).toBeDefined();
       expect(postRels['user']).toBeDefined();
-      expect(postRels['user']!.to).toBe('User');
+      expect(postRels['user']!.to).toEqual({ namespace: '__unbound__', model: 'User' });
       expect(postRels['user']!.cardinality).toBe('N:1');
       expect(postRels['user']!.on.localFields).toEqual(['userId']);
       expect(postRels['user']!.on.targetFields).toEqual(['id']);
@@ -445,13 +445,13 @@ describe('builder integration', () => {
       const models = contract.models as Record<string, { relations: Record<string, unknown> }>;
       expect(models['User']?.relations).toMatchObject({
         roles: {
-          to: 'Role',
+          to: { namespace: '__unbound__', model: 'Role' },
           cardinality: 'N:M',
         },
       });
       expect(models['Role']?.relations).toMatchObject({
         users: {
-          to: 'User',
+          to: { namespace: '__unbound__', model: 'User' },
           cardinality: 'N:M',
         },
       });

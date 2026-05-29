@@ -3,6 +3,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { crossRef } from './cross-ref-helpers';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 import { unboundTables } from './unbound-tables';
 
@@ -257,7 +258,7 @@ describe('SqlContractSerializer structural validation', () => {
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
           relations: {
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
@@ -274,7 +275,7 @@ describe('SqlContractSerializer structural validation', () => {
           },
           relations: {
             user: {
-              to: 'User',
+              to: crossRef('User'),
               on: { localFields: ['userId'], targetFields: ['id'] },
               cardinality: 'N:1',
             },
@@ -318,7 +319,7 @@ describe('SqlContractSerializer structural validation', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
-        to: 'Post',
+        to: crossRef('Post'),
         on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },
@@ -333,7 +334,7 @@ describe('SqlContractSerializer structural validation', () => {
           fields: { id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false } },
           relations: {
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               on: { localFields: ['id'], targetFields: ['userId'] },
               cardinality: '1:N',
             },
@@ -387,7 +388,7 @@ describe('SqlContractSerializer structural validation', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
-        to: 'Post',
+        to: crossRef('Post'),
         on: { localFields: ['id'], targetFields: ['userId'] },
         cardinality: '1:N',
       },

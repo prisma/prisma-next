@@ -9,7 +9,7 @@ function deserializedContract() {
     targetFamily: 'mongo' as const,
     target: 'mongo',
     profileHash: 'sha256:test',
-    roots: { items: 'Item' },
+    roots: { items: { namespace: UNBOUND_NAMESPACE_ID, model: 'Item' } },
     storage: {
       storageHash: 'sha256:test',
       namespaces: {

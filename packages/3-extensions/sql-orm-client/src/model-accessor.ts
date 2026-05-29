@@ -18,8 +18,8 @@ import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/ex
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   getFieldToColumnMap,
-  modelOf,
   resolveFieldToColumn,
+  resolveModelRelations,
   resolveModelTableName,
 } from './collection-contract';
 import { and, not } from './filters';
@@ -30,14 +30,7 @@ import {
   type RelationFilterAccessor,
 } from './types';
 
-interface RelationMeta {
-  readonly to: string;
-  readonly cardinality?: string;
-  readonly on?: {
-    readonly localFields?: readonly string[];
-    readonly targetFields?: readonly string[];
-  };
-}
+type ResolvedModelRelation = ReturnType<typeof resolveModelRelations>[string];
 
 type RelationPredicateInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)
@@ -52,10 +45,7 @@ export function createModelAccessor<
   const contract = context.contract;
   const fieldToColumn = getFieldToColumnMap(contract, modelName);
   const tableName = resolveModelTableName(contract, modelName);
-  const modelRelations = (modelOf(contract, modelName)?.relations ?? {}) as Record<
-    string,
-    RelationMeta
-  >;
+  const modelRelations = resolveModelRelations(contract, modelName);
 
   const opsByCodecId = new Map<string, NamedOp[]>();
 
@@ -205,7 +195,7 @@ function createRelationFilterAccessor<
   context: ExecutionContext<TContract>,
   parentModelName: ParentModelName,
   parentTableName: string,
-  relation: RelationMeta,
+  relation: ResolvedModelRelation,
 ): RelationFilterAccessor<TContract, string> {
   const relatedTableName = resolveModelTableName(context.contract, relation.to);
 
@@ -235,7 +225,7 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   parentModelName: string,
   parentTableName: string,
   relatedTableName: string,
-  relation: RelationMeta,
+  relation: ResolvedModelRelation,
   options: {
     readonly mode: 'some' | 'every' | 'none';
     readonly predicate: RelationPredicateInput<TContract, string> | undefined;
@@ -344,7 +334,7 @@ function buildJoinWhere<TContract extends Contract<SqlStorage>>(
   parentModelName: string,
   parentTableName: string,
   relatedTableName: string,
-  relation: RelationMeta,
+  relation: ResolvedModelRelation,
 ): AnyExpression {
   const localFields = relation.on?.localFields ?? [];
   const targetFields = relation.on?.targetFields ?? [];
@@ -384,7 +374,7 @@ function buildJoinWhere<TContract extends Contract<SqlStorage>>(
 
 function firstTargetColumn<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-  relation: RelationMeta,
+  relation: ResolvedModelRelation,
 ): string | undefined {
   const targetFields = relation.on?.targetFields;
   const firstField = targetFields?.[0];

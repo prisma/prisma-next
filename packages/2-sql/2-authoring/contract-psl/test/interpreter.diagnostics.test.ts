@@ -8,6 +8,7 @@ import {
 
 import {
   createBuiltinLikeControlMutationDefaults,
+  documentScopedTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteScalarTypeDescriptors,
@@ -677,7 +678,7 @@ model User {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage).toMatchObject({ types: { Short: expect.any(Object) } });
+    expect(documentScopedTypes(result.value)).toMatchObject({ Short: expect.any(Object) });
   });
 
   it('surfaces value-object field errors through the diagnostics gate', () => {

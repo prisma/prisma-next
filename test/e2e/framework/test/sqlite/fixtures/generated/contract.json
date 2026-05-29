@@ -4,12 +4,30 @@
   "target": "sqlite",
   "profileHash": "sha256:c336398c1b6d00d93aa155a4f9072e69f55d1897ba5b9bbfd3d7d32f6b270bf4",
   "roots": {
-    "comments": "Comment",
-    "items": "Item",
-    "posts": "Post",
-    "profiles": "Profile",
-    "typed_rows": "TypedRow",
-    "users": "User"
+    "comments": {
+      "model": "Comment",
+      "namespace": "__unbound__"
+    },
+    "items": {
+      "model": "Item",
+      "namespace": "__unbound__"
+    },
+    "posts": {
+      "model": "Post",
+      "namespace": "__unbound__"
+    },
+    "profiles": {
+      "model": "Profile",
+      "namespace": "__unbound__"
+    },
+    "typed_rows": {
+      "model": "TypedRow",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Comment": {
@@ -134,7 +152,10 @@
               "id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         },
         "comments": {
           "cardinality": "1:N",
@@ -146,7 +167,10 @@
               "postId"
             ]
           },
-          "to": "Comment"
+          "to": {
+            "model": "Comment",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -309,7 +333,10 @@
               "userId"
             ]
           },
-          "to": "Post"
+          "to": {
+            "model": "Post",
+            "namespace": "__unbound__"
+          }
         },
         "profile": {
           "cardinality": "1:1",
@@ -321,7 +348,10 @@
               "userId"
             ]
           },
-          "to": "Profile"
+          "to": {
+            "model": "Profile",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {

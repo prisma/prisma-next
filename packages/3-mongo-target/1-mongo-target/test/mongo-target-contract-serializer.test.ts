@@ -36,7 +36,7 @@ function makeValidContractJson() {
     targetFamily: 'mongo' as const,
     target: 'mongo',
     profileHash: 'sha256:test',
-    roots: { items: 'Item' },
+    roots: { items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID } },
     storage: {
       storageHash: 'sha256:test',
       namespaces: {
@@ -112,7 +112,7 @@ describe('MongoTargetContractSerializer', () => {
         targetFamily: 'mongo' as const,
         target: 'mongo',
         profileHash: 'sha256:test',
-        roots: { items: 'Item' },
+        roots: { items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID } },
         storage: {
           storageHash: 'sha256:test',
           namespaces: {

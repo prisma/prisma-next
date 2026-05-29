@@ -1,3 +1,4 @@
+import { asNamespaceId } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
@@ -248,8 +249,16 @@ describe('buildCreateTableSql', () => {
 
 describe('buildForeignKeySql', () => {
   const baseFk: ForeignKey = {
-    source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['author_id'] },
-    target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+    source: {
+      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+      tableName: 'post',
+      columns: ['author_id'],
+    },
+    target: {
+      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+      tableName: 'user',
+      columns: ['id'],
+    },
     constraint: true,
     index: true,
   };

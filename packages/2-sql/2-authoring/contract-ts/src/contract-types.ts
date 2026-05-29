@@ -2,6 +2,7 @@ import type {
   ColumnDefault,
   Contract,
   ContractRelation,
+  NamespaceId,
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -533,12 +534,12 @@ type BuiltStorageTables<Definition> = {
     readonly indexes: ReadonlyArray<Index>;
     readonly foreignKeys: ReadonlyArray<{
       readonly source: {
-        readonly namespaceId: string;
+        readonly namespaceId: NamespaceId;
         readonly tableName: string;
         readonly columns: readonly string[];
       };
       readonly target: {
-        readonly namespaceId: string;
+        readonly namespaceId: NamespaceId;
         readonly tableName: string;
         readonly columns: readonly string[];
       };
@@ -562,15 +563,24 @@ type BuiltStorageTables<Definition> = {
     : Record<string, never>);
 };
 
-type BuiltStorageTypes<Definition> = {
+type BuiltDocumentScopedTypes<Definition> = {
   readonly [K in keyof DefinitionTypes<Definition> as DefinitionTypes<Definition>[K] extends PostgresEnumStorageEntry
     ? never
     : K]: DefinitionTypes<Definition>[K];
 };
 
+type BuiltDomain<Definition> =
+  BuiltDocumentScopedTypes<Definition> extends Record<never, never>
+    ? Record<string, never>
+    : {
+        readonly __unbound__: {
+          readonly types: BuiltDocumentScopedTypes<Definition>;
+        };
+      };
+
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly types: BuiltStorageTypes<Definition>;
+  readonly types?: BuiltDocumentScopedTypes<Definition>;
   // SQL contracts always carry a literal `__unbound__` namespace whose tables
   // slot is narrowed to the actual built table shape so downstream DSL
   // surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
@@ -628,7 +638,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
     readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-  } & {
+  } & { readonly domain: BuiltDomain<Definition> } & {
     readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
       : DefinitionExtensionPacks<Definition>;

@@ -1,3 +1,4 @@
+import { CrossReferenceSchema } from '@prisma-next/contract/types';
 import { type Type, type } from 'arktype';
 import type { MongoJsonObject, MongoJsonPrimitive, MongoJsonValue } from './contract-types';
 
@@ -45,7 +46,7 @@ const RelationOnSchema = type({
 
 const RelationSchema = type({
   '+': 'reject',
-  to: 'string',
+  to: CrossReferenceSchema,
   cardinality: "'1:1' | '1:N' | 'N:1'",
   'on?': RelationOnSchema,
 });
@@ -209,7 +210,7 @@ const ModelDefinitionSchema = type({
   'relations?': type({ '[string]': RelationSchema }),
   'discriminator?': DiscriminatorSchema,
   'variants?': type({ '[string]': VariantEntrySchema }),
-  'base?': 'string',
+  'base?': CrossReferenceSchema,
   'owner?': 'string',
 });
 
@@ -382,7 +383,7 @@ export function createMongoContractSchema(
     'target?': 'string',
     'storageHash?': 'string',
     'profileHash?': 'string',
-    roots: 'Record<string, string>',
+    roots: type({ '[string]': CrossReferenceSchema }),
     'capabilities?': 'Record<string, unknown>',
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': 'Record<string, unknown>',

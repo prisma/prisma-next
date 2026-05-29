@@ -3,13 +3,13 @@ import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
+  documentScopedTypes,
   pgvectorAuthoringContributions,
   pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
 } from './fixtures';
-import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 
 const baseInput = {
   target: postgresTarget,
@@ -184,43 +184,11 @@ model Document {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage).toMatchObject({
-      types: {
-        Embedding1536: {
-          codecId: 'custom/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
-        },
-      },
-      namespaces: {
-        public: {
-          enum: {
-            Role: {
-              kind: 'postgres-enum',
-              name: 'Role',
-              nativeType: 'Role',
-              values: ['USER', 'ADMIN'],
-            },
-          },
-        },
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            document: {
-              columns: {
-                role: {
-                  codecId: 'test/enum@1',
-                  nativeType: 'Role',
-                  typeRef: 'Role',
-                },
-                embedding: {
-                  codecId: 'custom/vector@1',
-                  nativeType: 'vector',
-                  typeRef: 'Embedding1536',
-                },
-              },
-            },
-          },
-        },
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      Embedding1536: {
+        codecId: 'custom/vector@1',
+        nativeType: 'vector',
+        typeParams: { length: 1536 },
       },
     });
   });
@@ -263,13 +231,11 @@ model Post {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage).toMatchObject({
-      types: {
-        Tag: {
-          codecId: 'custom/enum@1',
-          nativeType: 'Tag',
-          typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
-        },
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      Tag: {
+        codecId: 'custom/enum@1',
+        nativeType: 'Tag',
+        typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
       },
     });
   });
@@ -328,38 +294,16 @@ model Document {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage).toMatchObject({
-      types: {
-        ShortName: {
-          codecId: 'custom/varchar@1',
-          nativeType: 'character varying',
-          typeParams: { length: 35 },
-        },
-        Embedding1536: {
-          codecId: 'custom/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
-        },
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      ShortName: {
+        codecId: 'custom/varchar@1',
+        nativeType: 'character varying',
+        typeParams: { length: 35 },
       },
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            document: {
-              columns: {
-                shortName: {
-                  codecId: 'custom/varchar@1',
-                  nativeType: 'character varying',
-                  typeRef: 'ShortName',
-                },
-                embedding: {
-                  codecId: 'custom/vector@1',
-                  nativeType: 'vector',
-                  typeRef: 'Embedding1536',
-                },
-              },
-            },
-          },
-        },
+      Embedding1536: {
+        codecId: 'custom/vector@1',
+        nativeType: 'vector',
+        typeParams: { length: 1536 },
       },
     });
   });
@@ -413,8 +357,7 @@ model Document {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-    expect(storage.types).toEqual({});
+    expect(documentScopedTypes(result.value) ?? {}).toEqual({});
     expect(result.value.storage).toMatchObject({
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
@@ -486,30 +429,13 @@ model Document {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage).toMatchObject({
-      types: {
-        ShortName: {
-          codecId: 'custom/varchar@1',
-          nativeType: 'character varying',
-          typeParams: {
-            length: 35,
-            label: 'short',
-          },
-        },
-      },
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            document: {
-              columns: {
-                shortName: {
-                  codecId: 'custom/varchar@1',
-                  nativeType: 'character varying',
-                  typeRef: 'ShortName',
-                },
-              },
-            },
-          },
+    expect(documentScopedTypes(result.value)).toMatchObject({
+      ShortName: {
+        codecId: 'custom/varchar@1',
+        nativeType: 'character varying',
+        typeParams: {
+          length: 35,
+          label: 'short',
         },
       },
     });
@@ -562,8 +488,8 @@ model Doc {
 `);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.storage).toMatchObject({
-        types: { Short: { typeParams: { length: 35, label: 'short' } } },
+      expect(documentScopedTypes(result.value)).toMatchObject({
+        Short: { typeParams: { length: 35, label: 'short' } },
       });
     });
 

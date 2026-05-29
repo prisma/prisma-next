@@ -2,9 +2,12 @@ import type {
   ContractField,
   ContractModel,
   ContractValueObject,
+  CrossReference,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
+import { blindCast } from '@prisma-next/utils/casts';
 import { isSafeTypeExpression } from './type-expression-safety';
 
 export function serializeValue(value: unknown): string {
@@ -45,12 +48,22 @@ export function serializeObjectKey(key: string): string {
   return serializeValue(key);
 }
 
-export function generateRootsType(roots: Record<string, string> | undefined): string {
+export function serializeNamespaceId(value: string): string {
+  return `${serializeValue(value)} & NamespaceId`;
+}
+
+export function serializeCrossReference(ref: CrossReference): string {
+  const namespace = serializeNamespaceId(String(ref.namespace));
+  const model = serializeValue(ref.model);
+  return `{ readonly namespace: ${namespace}; readonly model: ${model} }`;
+}
+
+export function generateRootsType(roots: Record<string, CrossReference> | undefined): string {
   if (!roots || Object.keys(roots).length === 0) {
-    return 'Record<string, string>';
+    return 'Record<string, never>';
   }
   const entries = Object.entries(roots)
-    .map(([key, value]) => `readonly ${serializeObjectKey(key)}: ${serializeValue(value)}`)
+    .map(([key, value]) => `readonly ${serializeObjectKey(key)}: ${serializeCrossReference(value)}`)
     .join('; ');
   return `{ ${entries} }`;
 }
@@ -93,7 +106,10 @@ export function generateModelRelationsType(relations: Record<string, unknown>): 
     const relObj = rel as Record<string, unknown>;
     const parts: string[] = [];
 
-    if (relObj['to']) parts.push(`readonly to: ${serializeValue(relObj['to'])}`);
+    if (relObj['to'])
+      parts.push(
+        `readonly to: ${serializeCrossReference(blindCast<CrossReference, 'contract JSON schema-validated before serialization; truthy check above confirms presence'>(relObj['to']))}`,
+      );
     if (relObj['cardinality'])
       parts.push(`readonly cardinality: ${serializeValue(relObj['cardinality'])}`);
 
@@ -153,7 +169,7 @@ export function generateModelsType(
       modelParts.push(`readonly variants: ${serializeValue(model.variants)}`);
     }
     if (model.base) {
-      modelParts.push(`readonly base: ${serializeValue(model.base)}`);
+      modelParts.push(`readonly base: ${serializeCrossReference(model.base)}`);
     }
 
     modelTypes.push(`readonly ${modelName}: { ${modelParts.join('; ')} }`);
@@ -176,10 +192,14 @@ export function deduplicateImports(imports: TypesImportSpec[]): TypesImportSpec[
 }
 
 export function generateImportLines(imports: TypesImportSpec[]): string[] {
-  return imports.map((imp) => {
-    const importClause = imp.named === imp.alias ? imp.named : `${imp.named} as ${imp.alias}`;
-    return `import type { ${importClause} } from '${imp.package}';`;
-  });
+  const requirements: ImportRequirement[] = imports.map((imp) => ({
+    moduleSpecifier: imp.package,
+    symbol: imp.named,
+    alias: imp.alias,
+    typeOnly: true,
+  }));
+  const rendered = renderImports(requirements);
+  return rendered === '' ? [] : rendered.split('\n');
 }
 
 export function generateCodecTypeIntersection(

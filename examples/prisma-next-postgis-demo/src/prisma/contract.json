@@ -4,9 +4,18 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "cafe": "Cafe",
-    "neighborhood": "Neighborhood",
-    "route": "Route"
+    "cafe": {
+      "model": "Cafe",
+      "namespace": "__unbound__"
+    },
+    "neighborhood": {
+      "model": "Neighborhood",
+      "namespace": "__unbound__"
+    },
+    "route": {
+      "model": "Route",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Cafe": {
@@ -136,6 +145,20 @@
           }
         },
         "table": "route"
+      }
+    }
+  },
+  "domain": {
+    "__unbound__": {
+      "types": {
+        "WgsGeometry": {
+          "codecId": "pg/geometry@1",
+          "kind": "codec-instance",
+          "nativeType": "geometry",
+          "typeParams": {
+            "srid": 4326
+          }
+        }
       }
     }
   },

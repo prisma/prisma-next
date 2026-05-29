@@ -1,3 +1,5 @@
+import type { CrossReference } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -139,9 +141,9 @@ export type TestContract = MongoContract & {
     };
   };
   readonly roots: {
-    readonly orders: 'Order';
-    readonly users: 'User';
-    readonly customers: 'Customer';
+    readonly orders: CrossReference & { readonly model: 'Order' };
+    readonly users: CrossReference & { readonly model: 'User' };
+    readonly customers: CrossReference & { readonly model: 'Customer' };
   };
 };
 
@@ -161,7 +163,11 @@ export type TContract = MongoContractWithTypeMaps<TestContract, TestTypeMaps>;
 export const testContractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
-  roots: { orders: 'Order', users: 'User', customers: 'Customer' },
+  roots: {
+    orders: crossRef('Order'),
+    users: crossRef('User'),
+    customers: crossRef('Customer'),
+  },
   models: {
     Order: {
       fields: {

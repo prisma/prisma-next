@@ -1,7 +1,14 @@
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../src/contract-types';
+import type { CrossReference } from '../src/cross-reference';
 import type { ContractModel, ModelStorageBase } from '../src/domain-types';
+import type { NamespaceId } from '../src/namespace-id';
 import type { StorageBase, StorageHashBase } from '../src/types';
+
+type ExamplePostRef = CrossReference & {
+  readonly namespace: NamespaceId;
+  readonly model: 'Post';
+};
 
 // ── Example literal types for proofs ─────────────────────────────────────────
 
@@ -27,7 +34,7 @@ type ExampleModels = {
     };
     readonly relations: {
       readonly posts: {
-        readonly to: 'Post';
+        readonly to: ExamplePostRef;
         readonly cardinality: '1:N';
         readonly on: {
           readonly localFields: readonly ['id'];
@@ -79,7 +86,7 @@ test('preserves model field literal types through TModels', () => {
 test('preserves relation literal types through TModels', () => {
   expectTypeOf<
     ExampleContract['models']['User']['relations']['posts']['to']
-  >().toEqualTypeOf<'Post'>();
+  >().toEqualTypeOf<ExamplePostRef>();
 });
 
 test('preserves model storage bridge literals through TModels', () => {

@@ -8,6 +8,11 @@ import type {
 import { extractCodecTypeImports } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
+
+function crossRef(model: string) {
+  return { namespace: '__unbound__', model };
+}
+
 import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 type TestDescriptor =
@@ -51,7 +56,7 @@ describe('sql-target-family-hook', () => {
           },
           relations: {
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               cardinality: '1:N',
               on: {
                 localFields: ['id'],
@@ -103,7 +108,7 @@ describe('sql-target-family-hook', () => {
     const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('relations: {');
     expect(types).toContain(
-      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
+      "readonly posts: { readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
     );
   });
 
@@ -234,7 +239,7 @@ describe('sql-target-family-hook', () => {
           },
           relations: {
             posts: {
-              to: 'Post',
+              to: crossRef('Post'),
               cardinality: '1:N',
               on: {
                 localFields: ['id'],
@@ -242,7 +247,7 @@ describe('sql-target-family-hook', () => {
               },
             },
             comments: {
-              to: 'Comment',
+              to: crossRef('Comment'),
               cardinality: '1:N',
               on: {
                 localFields: ['id'],
@@ -294,10 +299,10 @@ describe('sql-target-family-hook', () => {
     const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).not.toContain('export type Relations');
     expect(types).toContain(
-      "readonly posts: { readonly to: 'Post'; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
+      "readonly posts: { readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' }; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['userId'] } }",
     );
     expect(types).toContain(
-      "readonly comments: { readonly to: 'Comment'; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['authorId'] } }",
+      "readonly comments: { readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Comment' }; readonly cardinality: '1:N'; readonly on: { readonly localFields: readonly ['id']; readonly targetFields: readonly ['authorId'] } }",
     );
   });
 
@@ -488,7 +493,7 @@ describe('sql-target-family-hook', () => {
           },
           fields: {},
           relations: {
-            partialRel: { to: 'Post' },
+            partialRel: { to: crossRef('Post') },
           },
         },
       },
@@ -505,7 +510,9 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = generateContractDts(ir, sqlEmission, [], testHashes);
-    expect(types).toContain("readonly partialRel: { readonly to: 'Post' }");
+    expect(types).toContain(
+      "readonly partialRel: { readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Post' } }",
+    );
   });
 
   it('generates models with empty fields object when model has no fields', () => {

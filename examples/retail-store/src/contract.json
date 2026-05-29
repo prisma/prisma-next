@@ -4,17 +4,41 @@
   "target": "mongo",
   "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
   "roots": {
-    "carts": "Cart",
-    "events": "Event",
-    "invoices": "Invoice",
-    "locations": "Location",
-    "orders": "Order",
-    "products": "Product",
-    "users": "User"
+    "carts": {
+      "model": "Cart",
+      "namespace": "__unbound__"
+    },
+    "events": {
+      "model": "Event",
+      "namespace": "__unbound__"
+    },
+    "invoices": {
+      "model": "Invoice",
+      "namespace": "__unbound__"
+    },
+    "locations": {
+      "model": "Location",
+      "namespace": "__unbound__"
+    },
+    "orders": {
+      "model": "Order",
+      "namespace": "__unbound__"
+    },
+    "products": {
+      "model": "Product",
+      "namespace": "__unbound__"
+    },
+    "users": {
+      "model": "User",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "AddToCartEvent": {
-      "base": "Event",
+      "base": {
+        "model": "Event",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "brand": {
           "nullable": false,
@@ -72,7 +96,10 @@
               "_id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -200,7 +227,10 @@
               "_id"
             ]
           },
-          "to": "Order"
+          "to": {
+            "model": "Order",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -315,7 +345,10 @@
               "orderId"
             ]
           },
-          "to": "Invoice"
+          "to": {
+            "model": "Invoice",
+            "namespace": "__unbound__"
+          }
         },
         "user": {
           "cardinality": "N:1",
@@ -327,7 +360,10 @@
               "_id"
             ]
           },
-          "to": "User"
+          "to": {
+            "model": "User",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -428,7 +464,10 @@
       }
     },
     "SearchEvent": {
-      "base": "Event",
+      "base": {
+        "model": "Event",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "query": {
           "nullable": false,
@@ -485,7 +524,10 @@
               "userId"
             ]
           },
-          "to": "Cart"
+          "to": {
+            "model": "Cart",
+            "namespace": "__unbound__"
+          }
         },
         "orders": {
           "cardinality": "1:N",
@@ -497,7 +539,10 @@
               "userId"
             ]
           },
-          "to": "Order"
+          "to": {
+            "model": "Order",
+            "namespace": "__unbound__"
+          }
         }
       },
       "storage": {
@@ -505,7 +550,10 @@
       }
     },
     "ViewProductEvent": {
-      "base": "Event",
+      "base": {
+        "model": "Event",
+        "namespace": "__unbound__"
+      },
       "fields": {
         "brand": {
           "nullable": false,

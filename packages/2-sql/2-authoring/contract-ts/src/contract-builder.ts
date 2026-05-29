@@ -11,6 +11,7 @@ import type {
   SqlNamespaceTablesInput,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { buildSqlContractFromDefinition } from './build-contract';
 import {
   type ComposedAuthoringHelpers,
@@ -88,6 +89,8 @@ type ContractScaffold<
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly namespaces?: Namespaces;
   readonly createNamespace?: (input: SqlNamespaceTablesInput) => Namespace;
+  readonly types?: never;
+  readonly models?: never;
   readonly codecLookup?: CodecLookup;
 };
 
@@ -270,11 +273,7 @@ function validateExtensionPackRefs(
 
 function buildContractFromDsl<Definition extends ContractInput>(
   definition: Definition,
-): SqlContractResult<Definition>;
-
-function buildContractFromDsl(
-  definition: ContractInput,
-): ReturnType<typeof buildSqlContractFromDefinition> {
+): SqlContractResult<Definition> {
   validateTargetPackRef(definition.family, definition.target);
   validateExtensionPackRefs(definition.target, definition.extensionPacks);
   validateNamespaceDeclarations(definition.target, definition.namespaces);
@@ -284,10 +283,10 @@ function buildContractFromDsl(
     (definition.models ?? {}) as Record<string, ModelLike>,
   );
 
-  return buildSqlContractFromDefinition(
-    buildContractDefinition(definition),
-    definition.codecLookup,
-  );
+  return blindCast<
+    SqlContractResult<Definition>,
+    'buildSqlContractFromDefinition return type is wide; SqlContractResult conditional resolves correctly at runtime for any concrete Definition'
+  >(buildSqlContractFromDefinition(buildContractDefinition(definition), definition.codecLookup));
 }
 
 export function defineContract<

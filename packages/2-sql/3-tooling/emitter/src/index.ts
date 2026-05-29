@@ -1,5 +1,9 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
-import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
+import {
+  serializeNamespaceId,
+  serializeObjectKey,
+  serializeValue,
+} from '@prisma-next/emitter/domain-type-generation';
 import type {
   GenerateContractTypesOptions,
   ValidationContext,
@@ -246,7 +250,10 @@ export const sqlEmission = {
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as unknown as SqlStorage;
     const namespacesType = generateStorageNamespacesType(storage.namespaces);
-    const docTypes = generateDocumentScopedStorageTypesType(storage.types);
+    const domainTypes = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
+      | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
+      | undefined;
+    const docTypes = generateDocumentScopedStorageTypesType(domainTypes ?? storage.types);
     const typesClause = docTypes === undefined ? '' : `; readonly types: ${docTypes}`;
     return `{ readonly namespaces: ${namespacesType}${typesClause}; readonly storageHash: ${storageHashTypeName} }`;
   },
@@ -301,7 +308,12 @@ export const sqlEmission = {
             ).enum
           : undefined;
       const fromNamespace = nsEnums?.[column.typeRef];
-      const fromDocument = storage.types?.[column.typeRef];
+      const fromDomain = (
+        contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
+          | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
+          | undefined
+      )?.[column.typeRef];
+      const fromDocument = fromDomain ?? storage.types?.[column.typeRef];
       const typeInstance = fromNamespace ?? fromDocument;
       if (typeInstance === undefined) return undefined;
       if (isPostgresEnumStorageEntry(typeInstance)) {
@@ -506,8 +518,8 @@ function generateTableLiteralType(table: StorageTable): string {
       const srcCols = fk.source.columns.map((c: string) => serializeValue(c)).join(', ');
       const tgtCols = fk.target.columns.map((c: string) => serializeValue(c)).join(', ');
       const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
-      const srcRef = `{ readonly namespaceId: ${serializeValue(fk.source.namespaceId)}; readonly tableName: ${serializeValue(fk.source.tableName)}; readonly columns: readonly [${srcCols}] }`;
-      const tgtRef = `{ readonly namespaceId: ${serializeValue(fk.target.namespaceId)}; readonly tableName: ${serializeValue(fk.target.tableName)}; readonly columns: readonly [${tgtCols}] }`;
+      const srcRef = `{ readonly namespaceId: ${serializeNamespaceId(String(fk.source.namespaceId))}; readonly tableName: ${serializeValue(fk.source.tableName)}; readonly columns: readonly [${srcCols}] }`;
+      const tgtRef = `{ readonly namespaceId: ${serializeNamespaceId(String(fk.target.namespaceId))}; readonly tableName: ${serializeValue(fk.target.tableName)}; readonly columns: readonly [${tgtCols}] }`;
       return `{ readonly source: ${srcRef}; readonly target: ${tgtRef}${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
     })
     .join(', ');

@@ -1,3 +1,4 @@
+import { crossRef } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
@@ -54,8 +55,8 @@ describe('mongo contract builder', () => {
       target: 'mongo',
     });
     expect(contract.roots).toEqual({
-      users: 'User',
-      posts: 'Post',
+      users: crossRef('User'),
+      posts: crossRef('Post'),
     });
     expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
       users: { kind: 'mongo-collection' },
@@ -72,7 +73,7 @@ describe('mongo contract builder', () => {
       },
       relations: {
         author: {
-          to: 'User',
+          to: crossRef('User'),
           cardinality: 'N:1',
           on: {
             localFields: ['authorId'],
@@ -139,7 +140,7 @@ describe('mongo contract builder', () => {
     });
 
     expect(contract.roots).toEqual({
-      tasks: 'Task',
+      tasks: crossRef('Task'),
     });
     expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
       tasks: { kind: 'mongo-collection' },
@@ -162,7 +163,7 @@ describe('mongo contract builder', () => {
     expect(contract.models.Task.variants).toEqual({
       Bug: { value: 'bug' },
     });
-    expect(contract.models.Bug.base).toBe('Task');
+    expect(contract.models.Bug.base).toEqual(crossRef('Task'));
     expect(contract.models.Comment.owner).toBe('Task');
   });
 

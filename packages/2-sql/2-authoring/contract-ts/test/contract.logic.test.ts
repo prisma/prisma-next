@@ -3,6 +3,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { crossRef } from './cross-ref-helpers';
 import { unboundTables } from './unbound-tables';
 
 function sqlStorageFixture(tables: Record<string, unknown>) {
@@ -347,7 +348,7 @@ describe('SqlContractSerializer logic validation', () => {
         >
       )['relations'] = {
         posts: {
-          to: 'Post',
+          to: crossRef('Post'),
           on: { localFields: ['id'], targetFields: ['userId'] },
           cardinality: '1:N',
         },
@@ -372,7 +373,7 @@ describe('SqlContractSerializer logic validation', () => {
         >
       )['relations'] = {
         user: {
-          to: 'User',
+          to: crossRef('User'),
           on: { localFields: ['userId'], targetFields: ['id'] },
           cardinality: 'N:1',
         },
@@ -389,7 +390,7 @@ describe('SqlContractSerializer logic validation', () => {
         >
       )['relations'] = {
         user: {
-          to: 'User',
+          to: crossRef('User'),
           on: { localFields: ['userId'], targetFields: ['id'] },
           cardinality: 'N:1',
         },

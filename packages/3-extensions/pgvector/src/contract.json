@@ -5,6 +5,18 @@
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {},
   "models": {},
+  "domain": {
+    "__unbound__": {
+      "types": {
+        "vector": {
+          "codecId": "pg/vector@1",
+          "kind": "codec-instance",
+          "nativeType": "vector",
+          "typeParams": {}
+        }
+      }
+    }
+  },
   "storage": {
     "namespaces": {
       "__unbound__": {

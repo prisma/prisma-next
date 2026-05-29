@@ -75,7 +75,7 @@ namespace public {
     });
 
     const pslStorage = pslResult.value.storage as SqlStorage;
-    const tsStorage = tsContract.storage as SqlStorage;
+    const tsStorage = tsContract.storage as unknown as SqlStorage;
 
     // Same namespace keys
     expect(Object.keys(pslStorage.namespaces).sort()).toEqual(

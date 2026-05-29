@@ -4,7 +4,10 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "document": "Document"
+    "document": {
+      "model": "Document",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Document": {
@@ -35,6 +38,20 @@
           }
         },
         "table": "document"
+      }
+    }
+  },
+  "domain": {
+    "__unbound__": {
+      "types": {
+        "Embedding1536": {
+          "codecId": "pg/vector@1",
+          "kind": "codec-instance",
+          "nativeType": "vector",
+          "typeParams": {
+            "length": 1536
+          }
+        }
       }
     }
   },

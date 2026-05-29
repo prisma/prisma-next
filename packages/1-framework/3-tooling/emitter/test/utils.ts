@@ -1,5 +1,5 @@
 import { createContract } from '@prisma-next/contract/testing';
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
@@ -27,7 +27,7 @@ export function emit(
 type TestContractOverrides = {
   target?: string;
   targetFamily?: string;
-  roots?: Record<string, string>;
+  roots?: Record<string, CrossReference>;
   models?: Record<string, unknown>;
   storage?: Record<string, unknown>;
   capabilities?: Record<string, Record<string, boolean>>;

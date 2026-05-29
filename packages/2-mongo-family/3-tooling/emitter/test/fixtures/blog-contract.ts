@@ -1,12 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 
 export const blogContract: Contract = {
   targetFamily: 'mongo',
   target: 'mongo',
   profileHash: 'sha256:test',
   roots: {
-    users: 'User',
-    posts: 'Post',
+    users: crossRef('User'),
+    posts: crossRef('Post'),
   },
   models: {
     User: {
@@ -18,7 +19,7 @@ export const blogContract: Contract = {
       },
       relations: {
         posts: {
-          to: 'Post',
+          to: crossRef('Post'),
           cardinality: '1:N',
           on: { localFields: ['_id'], targetFields: ['authorId'] },
         },
@@ -34,12 +35,12 @@ export const blogContract: Contract = {
       },
       relations: {
         author: {
-          to: 'User',
+          to: crossRef('User'),
           cardinality: 'N:1',
           on: { localFields: ['authorId'], targetFields: ['_id'] },
         },
         comments: {
-          to: 'Comment',
+          to: crossRef('Comment'),
           cardinality: '1:N',
         },
       },

@@ -1,5 +1,11 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import { asNamespaceId } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
+
+function crossRef(model: string, namespace = 'default') {
+  return { namespace: asNamespaceId(namespace), model };
+}
+
 import type { SqlStorage } from '../src/types';
 
 type AssertExtends<T, U> = T extends U ? true : never;
@@ -28,8 +34,8 @@ describe('domain type compatibility', () => {
   describe('roots accessible on Contract<SqlStorage>', () => {
     it('roots field exists on Contract<SqlStorage>', () => {
       type Roots = Contract<SqlStorage>['roots'];
-      const roots: Roots = { users: 'User' };
-      expect(roots.users).toBe('User');
+      const roots: Roots = { users: crossRef('User') };
+      expect(roots.users.model).toBe('User');
     });
   });
 

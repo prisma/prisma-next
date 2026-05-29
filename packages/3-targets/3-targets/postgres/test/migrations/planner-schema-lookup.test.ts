@@ -1,3 +1,4 @@
+import { asNamespaceId } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -46,11 +47,15 @@ describe('hasForeignKey — key encoding', () => {
           lookup,
           fk({
             source: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'post',
               columns: ['author_id'],
             },
-            target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+            target: {
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+              tableName: 'user',
+              columns: ['id'],
+            },
           }),
         ),
       ).toBe(true);
@@ -77,11 +82,11 @@ describe('hasForeignKey — key encoding', () => {
           lookup,
           fk({
             source: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'post',
               columns: ['author_id'],
             },
-            target: { namespaceId: 'auth', tableName: 'user', columns: ['id'] },
+            target: { namespaceId: asNamespaceId('auth'), tableName: 'user', columns: ['id'] },
           }),
         ),
       ).toBe(true);
@@ -108,11 +113,11 @@ describe('hasForeignKey — key encoding', () => {
           lookup,
           fk({
             source: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'post',
               columns: ['author_id'],
             },
-            target: { namespaceId: 'analytics', tableName: 'user', columns: ['id'] },
+            target: { namespaceId: asNamespaceId('analytics'), tableName: 'user', columns: ['id'] },
           }),
         ),
       ).toBe(false);
@@ -140,12 +145,12 @@ describe('hasForeignKey — key encoding', () => {
           lookup,
           fk({
             source: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'post',
               columns: ['weird|col'],
             },
             target: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'weird|table',
               columns: ['id|col'],
             },
@@ -174,12 +179,12 @@ describe('hasForeignKey — key encoding', () => {
           lookup,
           fk({
             source: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'post',
               columns: ['weird||col'],
             },
             target: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
               tableName: 'weird||table',
               columns: ['id||col'],
             },
@@ -208,8 +213,16 @@ describe('hasForeignKey — key encoding', () => {
         hasForeignKey(
           lookup,
           fk({
-            source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['a', 'b'] },
-            target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+            source: {
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+              tableName: 'post',
+              columns: ['a', 'b'],
+            },
+            target: {
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+              tableName: 'user',
+              columns: ['id'],
+            },
           }),
         ),
       ).toBe(false);
@@ -239,8 +252,12 @@ describe('hasForeignKey — key encoding', () => {
         hasForeignKey(
           lookup,
           fk({
-            source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['a'] },
-            target: { namespaceId: 'p', tableName: 'q|r', columns: ['s'] },
+            source: {
+              namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+              tableName: 'post',
+              columns: ['a'],
+            },
+            target: { namespaceId: asNamespaceId('p'), tableName: 'q|r', columns: ['s'] },
           }),
         ),
       ).toBe(false);

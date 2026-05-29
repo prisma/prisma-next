@@ -3,6 +3,7 @@ import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-
 import type {
   Contract as ContractShape,
   ExecutionHashBase,
+  type NamespaceId,
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -111,7 +112,7 @@ type ContractBase = ContractShape<
   }
 > & {
   readonly target: 'postgres';
-  readonly roots: { readonly shop: 'Shop' };
+  readonly roots: { readonly shop: { readonly model: 'Shop'; readonly namespace: NamespaceId } };
   readonly capabilities: {
     readonly postgres: {
       readonly 'defaults.autoincrement': true;

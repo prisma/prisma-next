@@ -1,0 +1,52 @@
+name: Detect inert diff
+description: >
+  Classify the current PR diff as "inert" — touching only files that cannot
+  affect build/test/fixture results (docs, markdown, rules, skills, transient
+  project artefacts). Fail-safe: a diff is inert only if *every* changed file
+  matches the allow-list below; any unrecognized path yields inert=false. The
+  caller must check out the repository with fetch-depth: 0 first. On any event
+  other than pull_request, inert is always false.
+
+outputs:
+  inert:
+    description: "'true' only if every changed file is in the inert allow-list."
+    value: ${{ steps.detect.outputs.inert }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -euo pipefail
+        if [ "$EVENT_NAME" != "pull_request" ]; then
+          echo "Not a pull_request event; treating diff as non-inert."
+          echo "inert=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+        echo "Changed files:"
+        echo "$files"
+        inert=true
+        while IFS= read -r f; do
+          [ -z "$f" ] && continue
+          case "$f" in
+            *.md) ;;             # any markdown, anywhere
+            docs/*) ;;           # documentation tree
+            projects/*) ;;       # transient project artefacts (never imported)
+            skills-contrib/*) ;; # skill sources (linted, not tested)
+            .agents/*) ;;        # rules/skills (linted, not tested)
+            .cursor/*) ;;
+            .claude/*) ;;
+            LICENSE) ;;
+            *) inert=false; break ;;
+          esac
+        done <<EOF
+        $files
+        EOF
+        echo "inert=$inert" >> "$GITHUB_OUTPUT"
+        echo "Diff is inert: $inert"

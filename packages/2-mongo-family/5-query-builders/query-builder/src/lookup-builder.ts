@@ -1,20 +1,20 @@
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { MongoContract, RootModelName } from '@prisma-next/mongo-contract';
 import { createFieldAccessor, type FieldAccessor, type LeafExpression } from './field-accessor';
 import type { ModelNestedShape } from './resolve-path';
 import type { DocField, DocShape, ModelToDocShape } from './types';
 
 /**
  * Resolved foreign-model name for a contract root. Looks `RootName` up
- * through `TContract['roots']` and intersects the result back with
- * `keyof TContract['models']` so it can be used as a `ModelName` index
- * into `models`. Resolves to `never` when the root is not present (this
- * surface should never be reachable through normal use because `from()`
- * constrains its `R` parameter to `keyof TContract['roots']`).
+ * through `TContract['roots']` and extracts the referenced model name
+ * so it can be used as a `ModelName` index into `models`. Resolves to
+ * `never` when the root is not present (this surface should never be
+ * reachable through normal use because `from()` constrains its `R`
+ * parameter to `keyof TContract['roots']`).
  */
 export type ModelOf<
   TContract extends MongoContract,
   RootName extends keyof TContract['roots'] & string,
-> = TContract['roots'][RootName] & string & keyof TContract['models'];
+> = RootModelName<TContract, RootName>;
 
 /**
  * Object returned by the user from the `on(...)` callback. Each side is
@@ -137,7 +137,7 @@ export function createLookupFrom<
   Nested extends Record<string, DocField>,
 >(contract: TContract): LookupFrom<TContract, Shape, Nested> {
   const callable = ((rootName) => {
-    const modelName = contract.roots[rootName];
+    const modelName = contract.roots[rootName]?.model;
     if (!modelName) {
       const validRoots = Object.keys(contract.roots).join(', ');
       throw new Error(`lookup() unknown root: "${rootName}". Valid roots: ${validRoots}`);
