@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, NamespaceId } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { Collection } from '../src/collection';
@@ -129,7 +129,7 @@ type PolyContract = Contract<
           readonly severity: { readonly column: 'severity' };
         };
       };
-      readonly base: 'Task';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
     };
     readonly Feature: {
       readonly fields: {
@@ -145,7 +145,7 @@ type PolyContract = Contract<
           readonly priority: { readonly column: 'priority' };
         };
       };
-      readonly base: 'Task';
+      readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
     };
     readonly PlainModel: {
       readonly fields: {
