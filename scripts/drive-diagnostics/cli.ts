@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { runAssertions } from './assertions/index.ts';
 import { loadTrace } from './load.ts';
 import { computeMetrics } from './metrics.ts';
+import { parseTranscript } from './posthoc.ts';
 import { renderReport } from './report.ts';
 import type { TraceEvent } from './schema.ts';
 
@@ -18,6 +19,7 @@ function main(): void {
   const args = process.argv.slice(2);
 
   let tracePath: string | undefined;
+  let posthocPath: string | undefined;
   let outPath: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -25,36 +27,57 @@ function main(): void {
     if (arg === '--out' && i + 1 < args.length) {
       i++;
       outPath = args[i];
-    } else if (arg === '--posthoc') {
-      if (i + 1 < args.length) i++;
-      // TODO: D6 will implement post-hoc transcript loading
+    } else if (arg === '--posthoc' && i + 1 < args.length) {
+      i++;
+      posthocPath = args[i];
     } else if (!arg.startsWith('--')) {
       tracePath = arg;
     }
   }
 
-  if (tracePath === undefined) {
+  if (tracePath === undefined && posthocPath === undefined) {
     process.stderr.write(
-      'Usage: node scripts/drive-diagnostics/cli.ts <trace.jsonl> [--out <path>]\n',
+      'Usage: node scripts/drive-diagnostics/cli.ts <trace.jsonl> [--posthoc <transcript.jsonl>] [--out <path>]\n',
     );
     process.exit(1);
   }
 
-  const { events, errors, unknown } = loadTrace(tracePath);
-  const metrics = computeMetrics(events);
-  const assertions = runAssertions(events);
-  const projectRunIds = getProjectRunIds(events);
+  const nativeEvents: TraceEvent[] = [];
+  const nativeErrors: ReturnType<typeof loadTrace>['errors'] = [];
+  const nativeUnknown: ReturnType<typeof loadTrace>['unknown'] = [];
+
+  if (tracePath !== undefined) {
+    const loaded = loadTrace(tracePath);
+    nativeEvents.push(...loaded.events);
+    nativeErrors.push(...loaded.errors);
+    nativeUnknown.push(...loaded.unknown);
+  }
+
+  const posthocResult = posthocPath !== undefined ? parseTranscript(posthocPath) : undefined;
+
+  const origin: 'native' | 'post-hoc' | 'mixed' =
+    tracePath !== undefined && posthocPath !== undefined
+      ? 'mixed'
+      : posthocPath !== undefined
+        ? 'post-hoc'
+        : 'native';
+
+  const metrics = computeMetrics(nativeEvents);
+  const assertions = runAssertions(nativeEvents);
+  const projectRunIds = getProjectRunIds(nativeEvents);
+  const reportTracePath = tracePath ?? posthocPath ?? '(unknown)';
 
   const report = renderReport({
     metrics,
     assertions,
-    loadErrors: errors,
-    unknown,
+    loadErrors: nativeErrors,
+    unknown: nativeUnknown,
     runMeta: {
-      tracePath,
-      eventCount: events.length,
+      tracePath: reportTracePath,
+      eventCount: nativeEvents.length,
       projectRunIds,
-      origin: 'native',
+      origin,
+      operatorTurnCount: posthocResult?.operatorTurnCount,
     },
   });
 

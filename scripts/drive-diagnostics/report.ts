@@ -7,6 +7,7 @@ export type RunMeta = {
   eventCount: number;
   projectRunIds: string[];
   origin: 'native' | 'post-hoc' | 'mixed';
+  operatorTurnCount?: number | null;
 };
 
 export type ReportInput = {
@@ -220,8 +221,10 @@ function renderLifecycle(m: Metrics['lifecycle']): string {
   return `### Lifecycle\n\n${mdTable(['Metric', 'Value'], rows)}`;
 }
 
-function renderOperator(m: Metrics['operator']): string {
-  const rows: string[][] = [['operator turn count', naCell(m.operator_turn_count_note)]];
+function renderOperator(m: Metrics['operator'], turnCountOverride?: number | null): string {
+  const value =
+    turnCountOverride != null ? String(turnCountOverride) : naCell(m.operator_turn_count_note);
+  const rows: string[][] = [['operator turn count', value]];
   return `### Operator\n\n${mdTable(['Metric', 'Value'], rows)}`;
 }
 
@@ -297,7 +300,7 @@ export function renderReport(input: ReportInput): string {
   lines.push('');
   lines.push(renderLifecycle(metrics.lifecycle));
   lines.push('');
-  lines.push(renderOperator(metrics.operator));
+  lines.push(renderOperator(metrics.operator, runMeta.operatorTurnCount));
   lines.push('');
   lines.push('---');
   lines.push('');
