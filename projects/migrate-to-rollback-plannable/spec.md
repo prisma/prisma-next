@@ -167,17 +167,28 @@ wording is a dispatch-time copy detail, not a design fork.
   `control-api/operations/migration-apply.ts` (`buildPathNotFoundFailure.why`). Not
   the planner behaviour (Dispatch 1).
 
-### Dispatch 3: docs + fixtures
+### Dispatch 3: docs + fixtures (+ `neverPlanned` `why` coherence)
 
 - **Outcome:** `docs/architecture docs/subsystems/7. Migration System.md`
   (`migration plan` synopsis + § Recovery affordances table) and the
   `@prisma-next/cli` README reflect `--to`; `pnpm fixtures:check` is green
-  (CLI-help / command snapshots regenerated for the new flag).
+  (CLI-help / command snapshots regenerated for the new flag). Additionally, the
+  sibling `neverPlanned` diagnostic's own `why` (`buildNeverPlannedFailure` in
+  `control-api/operations/migration-apply.ts`) no longer redundantly tells the
+  user to "run migration plan" now that D2's shared `fix` owns the recovery — the
+  two compose non-redundantly the same way the `pathUnreachable` branch does.
 - **Builds on:** Dispatch 1 (flag + help string) and Dispatch 2 (diagnostic text)
   — both feed snapshot fixtures and the docs.
-- **Hands to:** slice-DoD met — feature, honest diagnostics, current docs, green
-  fixtures.
-- **Focus:** docs + README + fixture regen. No behavioural code change.
+- **Hands to:** slice-DoD met — feature, honest diagnostics (both branches),
+  current docs, green fixtures.
+- **Focus:** docs + README + fixture regen + the one-line `neverPlanned` `why`
+  edit (folded from review item E1) with a test assertion. No planner/behavioural
+  change.
+
+> **E1 resolution (orchestrator decision).** Review of D2 surfaced that the
+> `neverPlanned` branch's `why` carries the same redundancy D2 removed from the
+> `pathUnreachable` branch. Folded into D3 as a one-line message edit rather than
+> a separate round — same diagnostic-coherence goal, trivially related.
 
 ## Open items
 
