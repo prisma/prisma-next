@@ -4,7 +4,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 ## Canonical home & sync
 
-Every rule has a single canonical home: `.agents/rules/<name>.{md,mdc}` — the only git-tracked copy. The `.cursor/rules/` and `.claude/rules/` trees are git-ignored presentation mirrors that contain nothing but relative symlinks back into `.agents/rules/`, exactly like the `skills add` model for skills.
+Every rule has a single canonical home: `.agents/rules/<name>.mdc` — the only git-tracked copy. Rule files must use the `.mdc` extension; the harnesses load `.mdc` only, so a `.md` rule is silently dead (`pnpm lint:rules:symlinks` rejects them). The `.cursor/rules/` and `.claude/rules/` trees are git-ignored presentation mirrors that contain nothing but relative symlinks back into `.agents/rules/`, exactly like the `skills add` model for skills.
 
 ```bash
 pnpm rules:sync           # Consolidate stray rules + (re)generate the symlink trees
@@ -112,7 +112,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 - `modular-refactoring-patterns.mdc` — Split monoliths into modules
 - `moving-packages.mdc` — Guidelines for moving packages and updating relative paths
 - `no-barrel-files.mdc` — Avoid barrels
-- `no-backward-compatibility.md` — No backward-compat shims; update call sites instead
+- `no-backward-compatibility.mdc` — No backward-compat shims; update call sites instead
 
 ## Architecture
 - `adr-writing.mdc` — ADR writing guidelines (clarity, flow, examples)
