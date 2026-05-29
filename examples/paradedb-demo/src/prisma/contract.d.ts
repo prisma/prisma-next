@@ -3,6 +3,7 @@
 // To regenerate, run: prisma-next contract emit
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as ParadeDbQueryOperationTypes } from '@prisma-next/extension-paradedb/operation-types';
+import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';
 import type {
   Bit,
   Char,
@@ -39,7 +40,8 @@ export type ProfileHash =
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+export type QueryOperationTypes = SqlFamilyQueryOperationTypes<CodecTypes> &
+  PgAdapterQueryOps<CodecTypes> &
   ParadeDbQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']

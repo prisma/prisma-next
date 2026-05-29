@@ -7,6 +7,7 @@
 // (@prisma-next/extension-pgvector → @prisma-next/postgres → @prisma-next/sql-orm-client)
 // The integration tests that exercise pgvector-specific operations live in test/integration/.
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
+import type { QueryOperationTypes as SqlFamilyQueryOperationTypes } from '@prisma-next/family-sql/operation-types';
 // pgvector types replaced with local aliases (see note above)
 type PgVectorTypes = object;
 type Vector<_N extends number> = number[];
@@ -48,7 +49,8 @@ export type ProfileHash =
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+export type QueryOperationTypes = SqlFamilyQueryOperationTypes<CodecTypes> &
+  PgAdapterQueryOps<CodecTypes> &
   PgVectorQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
