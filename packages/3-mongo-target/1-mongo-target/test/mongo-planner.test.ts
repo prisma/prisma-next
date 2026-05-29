@@ -671,11 +671,18 @@ describe('MongoMigrationPlanner', () => {
       expect(collModOps[0]!.operationClass).toBe('widening');
     });
 
-    it('classifies jsonSchema body change as destructive', () => {
+    it('classifies adding a non-required property as widening', () => {
       const contract = makeContract({
         users: {
           validator: {
-            jsonSchema: { bsonType: 'object', properties: { name: { bsonType: 'string' } } },
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: {
+                email: { bsonType: 'string' },
+                avatarUrl: { bsonType: ['null', 'string'] },
+              },
+            },
             validationLevel: 'strict',
             validationAction: 'error',
           },
@@ -685,7 +692,87 @@ describe('MongoMigrationPlanner', () => {
         new MongoSchemaCollection({
           name: 'users',
           validator: new MongoSchemaValidator({
-            jsonSchema: { bsonType: 'object' },
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: { email: { bsonType: 'string' } },
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('widening');
+    });
+
+    it('classifies narrowing an existing property type as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: {
+              bsonType: 'object',
+              properties: { age: { bsonType: 'int' } },
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          validator: new MongoSchemaValidator({
+            jsonSchema: {
+              bsonType: 'object',
+              properties: { age: { bsonType: ['null', 'int'] } },
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+    });
+
+    it('classifies adding a field to required as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email', 'name'],
+              properties: {
+                email: { bsonType: 'string' },
+                name: { bsonType: 'string' },
+              },
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          validator: new MongoSchemaValidator({
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: {
+                email: { bsonType: 'string' },
+                name: { bsonType: 'string' },
+              },
+            },
             validationLevel: 'strict',
             validationAction: 'error',
           }),
