@@ -13,6 +13,7 @@ export default defineConfig({
     'exports/migration-list-types': 'src/exports/migration-list-types.ts',
     'exports/enumerate-migration-spaces': 'src/exports/enumerate-migration-spaces.ts',
     'exports/migration-list-graph-topology': 'src/exports/migration-list-graph-topology.ts',
+    'exports/migration-list-graph-layout': 'src/exports/migration-list-graph-layout.ts',
     'exports/refs': 'src/exports/refs.ts',
     'exports/ref-resolution': 'src/exports/ref-resolution.ts',
     'exports/constants': 'src/exports/constants.ts',
