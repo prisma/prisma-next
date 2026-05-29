@@ -3,6 +3,15 @@
   "description": "WARNING-ONLY PACKAGES: Time-limited exceptions for packages with coverage/test failures. Each entry MUST have an expiry date. When expired, CI will fail until issues are resolved or config is updated with justification.",
   "warningOnly": [
     {
+      "package": "1-framework/0-foundation/contract",
+      "reason": "S1.C cross-reference encoding added CrossReference shape to Contract.roots and domain field support to canonicalization.ts. The new canonicalization branches (domain-plane key ordering, domain-unbound type params preservation) are exercised end-to-end through emit integration tests but fall ~2% below the 94% branch threshold. Direct canonicalization branch tests deferred to a follow-up slice.",
+      "addedDate": "2026-05-29",
+      "expiryDays": 90,
+      "assignee": null,
+      "linear": "TML-2624",
+      "notes": "Recovery via dedicated canonicalization.ts branch tests covering the domain-plane ordering and typeParams preservation paths."
+    },
+    {
       "package": "3-targets/3-targets/postgres",
       "reason": "operation-resolver.ts and runner.ts have descriptor-pipeline coverage gaps. The legacy planner is exhaustively integration-tested but bypasses the new resolver. Targeted tests added for dataTransform lifecycle and addColumn/alterColumnType options; per-kind glue coverage deferred until the descriptor pipeline replaces the legacy planner.",
       "addedDate": "2026-04-15",
