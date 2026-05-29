@@ -175,8 +175,7 @@ export function computeMigrationListGraphLayout(
       emitConnector('fanBelow', contract, 0, producers.length - 1, producers.length);
     }
 
-    for (let producerIndex = 0; producerIndex < producers.length; producerIndex++) {
-      const producer = producers[producerIndex]!;
+    for (const [producerIndex, producer] of producers.entries()) {
       ensureLane(producerIndex);
       lanes[producerIndex] = { want: canonicalFrom(producer.from), active: true };
       producerLaneByHash.set(producer.migrationHash, producerIndex);
@@ -243,8 +242,9 @@ export function computeMigrationListGraphLayout(
       continue;
     }
 
-    if (wantingTo.length > 0) {
-      placeWoven(entry, edgeKind, wantingTo[0]!);
+    const firstWanting = wantingTo[0];
+    if (firstWanting !== undefined) {
+      placeWoven(entry, edgeKind, firstWanting);
       continue;
     }
 
