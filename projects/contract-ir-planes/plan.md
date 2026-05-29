@@ -8,7 +8,7 @@
 
 ## At a glance
 
-The substrate (planes + entity coordinate + pack-contributed kinds) and both of its load-bearing migrations are delivered or in final review. **One in-project slice remains** — S1.D, which reaps the helpers the structural work made redundant. Alongside it runs **one parallel correctness fix** (S1.E) the structural work surfaced. Short stack of one, plus one independent parallel slice.
+The substrate (planes + entity coordinate + pack-contributed kinds) and both of its load-bearing migrations are merged. What remains is reaping the helpers the structural work made redundant. A 2026-05-29 inventory found the original single "reap" slice (S1.D) was really ~5 coherent slices: three are clean deletes with no structural prerequisite, three require structural changes (a `contract.json`-shape coordinate change, a hash-computation change, a query-builder type rewrite). Per the **narrow-and-defer** decision, S1.D ships the **three clean deletes now** (parallelisable, disjoint files) and **defers the three structural items** to follow-ups (recorded in [`deferred.md`](./deferred.md)). Alongside runs **one parallel correctness fix** (S1.E) the structural work surfaced. Everything remaining is parallel — no stack.
 
 ## Delivered / in-flight
 
@@ -22,15 +22,31 @@ These slices are done or in final review; their as-built dispatch history lives 
 
 ## Composition (remaining)
 
-### Stack (deliver in order)
+S1.D is tracked by [TML-2727](https://linear.app/prisma-company/issue/TML-2727) as one effort delivered as **three independent slices** (each its own PR referencing TML-2727). The inventory confirmed they touch disjoint files with no inter-dependency, so all three run **in parallel**, in separate worktrees off the shared replan base.
 
-1. **Slice S1.D — Reap subsumed surfaces** — Linear: [TML-2727](https://linear.app/prisma-company/issue/TML-2727)
-   - **Outcome:** The asymmetry-driven helpers that the new coordinate makes redundant are gone, and the entity coordinate is the only way the codebase walks IR entities. `findSqlTable`, `assertUniqueSqlTableNames`, `extractStorageElementNames`, `SqlNamespacePayload`, `DEFAULT_NAMESPACES`, `normaliseNamespaceEntry`, `stripNamespaceKinds`, and `UnboundTables<C>` no longer exist; remaining callers walk via the free-function `elementCoordinates(storage)`; the framework canonicalizer's SQL-specific preserve-empty paths are replaced by a family-contribution hook.
-   - **Builds on:** S1.C's `hands to` — object-pair cross-references live at every site, so the old name-keyed helpers have no remaining readers and can be deleted without leaving a consumer stranded.
-   - **Hands to:** Project close-out — a grep-clean tree (PDoD5 gate) and the canonicalizer family hook standing in for the last SQL-specific framework path (completes the PDoD6 consumer migration). (The subsumed Linear tickets TML-2579/2580/2582 are already Canceled, so PDoD10 needs no close-out dispatch here.)
-   - **Focus:** Deletions and call-site rewrites only. The structural shape (planes, coordinate, descriptor mechanism, encodings) is already shipped by S1.A–S1.C and is **not** re-opened here. Reviewer reads this slice for deletion correctness — does anything still depend on a removed surface? — without structural context-switching.
+### Parallel group A — S1.D clean deletes (independent of each other)
 
-### Parallel group A (independent of the stack)
+1. **Slice S1.D-1 — Construction-discipline shims** — spec: [`slices/construction-discipline-shims/spec.md`](./slices/construction-discipline-shims/spec.md)
+   - **Outcome:** `SqlNamespacePayload` / `MongoNamespacePayload`, `normaliseNamespaceEntry` (×2), and `DEFAULT_NAMESPACES` (×2) no longer exist. `SqlStorage` / `MongoStorage` constructors require fully-constructed `Namespace` instances — no POJO normalisation at construction, no default-singleton injection. Authoring builders are the sole construction point and already hand over built namespaces.
+   - **Builds on:** S1.A's `Namespace` class + builder construction path; S1.C's object-pair encoding (no name-keyed lookups remain that needed the default singleton).
+   - **Hands to:** Project close-out grep gate (these symbols vanish). May produce minor fixture regen if any contract relied on default-namespace injection — bounded, the slice owns the regen.
+   - **Focus:** Constructor-contract tightening + deletion. Reviewer checks: does any caller still pass a POJO / rely on the injected default?
+
+2. **Slice S1.D-2 — Canonicalizer family hook** — spec: [`slices/canonicalizer-family-hook/spec.md`](./slices/canonicalizer-family-hook/spec.md) — closes [TML-2579](https://linear.app/prisma-company/issue/TML-2579)
+   - **Outcome:** The framework canonicalizer's SQL-specific preserve-empty guards + `sortIndexesAndUniques` are replaced by family-contributed `shouldPreserveEmptyAt` / `sortStorage` hooks. The framework no longer hardcodes SQL-shaped knowledge. **Output-preserving** — canonical bytes are identical before/after (fixtures must not move).
+   - **Builds on:** S1.A's family-contribution mechanism (the hook rides the existing contribution surface).
+   - **Hands to:** Completes the PDoD6 consumer migration — the last SQL-specific framework canonicalizer path becomes a family hook.
+   - **Focus:** Move-don't-change. Reviewer checks: byte-identical canonical output; no framework→family circular import (risk #1 below).
+
+3. **Slice S1.D-3 — Migration aggregate → `elementCoordinates`** — spec: [`slices/migration-element-coordinates/spec.md`](./slices/migration-element-coordinates/spec.md) — closes [TML-2580](https://linear.app/prisma-company/issue/TML-2580)
+   - **Outcome:** `extractStorageElementNames`'s callers in `1-framework/3-tooling/migration` walk via `elementCoordinates(storage)`; the `StorageBase` vs `Storage` type gap is resolved; the helper is deleted. **Output-preserving** — no on-disk shape change.
+   - **Builds on:** S1.A's `elementCoordinates` free function.
+   - **Hands to:** Project close-out grep gate.
+   - **Focus:** Call-site rewrite + deletion. Reviewer checks: identical migration behaviour; the type-gap resolution doesn't widen any public surface.
+
+**Deferred from S1.D** (structural prerequisites — recorded in [`deferred.md`](./deferred.md), ticketed when picked up): `SqlModelStorage` namespaced coordinate → `findSqlTable` + `assertUniqueSqlTableNames`; `kind`-agnostic hashing → `stripNamespaceKinds`; namespace-aware query-builder selection → query-builder `UnboundTables`.
+
+### Parallel group B (independent of group A)
 
 - **Slice S1.E — Namespace-aware enum planning (Postgres planner correctness fix)** — Linear: [TML-2686](https://linear.app/prisma-company/issue/TML-2686)
   - **Outcome:** The Postgres migration planner keys enum lookups by `(namespaceId, name)` rather than bare name, so two namespaces holding an enum of the same name no longer collide. Enum lookup, enum collection, the consuming plan strategies, and the live-schema `readExistingEnumValues` read all thread the namespace coordinate; `EnumValuesChangedIssue` carries the namespace so verifier-produced issues are unambiguous.
@@ -41,7 +57,7 @@ These slices are done or in final review; their as-built dispatch history lives 
 ## Dependencies (external)
 
 - [x] **PR #534 merged** (predecessor; namespace exemplar) — landed at commit `66da80f96`.
-- [x] **S1.C in final review** — S1.D's only hard dependency. S1.D pickup waits on S1.C merge.
+- [x] **S1.C merged** (PR #600) — was S1.D's only hard dependency. All three clean-delete slices are now unblocked: object-pair encoding is the sole reader, so the name-keyed helpers have no remaining consumers.
 - [ ] **EA timeline** — pre-EA must-ship status is decided at the umbrella level; see [`projects/target-extensible-ir-namespaces/plan.md`](../target-extensible-ir-namespaces/plan.md). Does not gate the remaining slices.
 
 ## Scope note — S1.E is an adopted, not purpose-serving, slice
@@ -54,21 +70,22 @@ PDoD1–PDoD4 and PDoD7 are delivered or in review (table above). Remaining:
 
 | Project-DoD | Closed by |
 |---|---|
-| **PDoD5** — `Namespace` narrowed; subsumed helpers deleted; grep gate clean | S1.D (deletions + grep gate) |
-| **PDoD6** — `elementCoordinates(storage)` consumed by planner / migration / validators | S1.D (final consumer migration + canonicalizer hook) |
+| **PDoD5 (amended)** — `Namespace` narrowed; the *cleanly-removable* subsumed helpers deleted; grep gate clean over them | S1.D-1 + S1.D-2 + S1.D-3 (deletions + per-slice grep gates). **Amended 2026-05-29:** three structural helpers (`findSqlTable`/`assertUniqueSqlTableNames`, `stripNamespaceKinds`, query-builder `UnboundTables`) are explicitly **out of this project's PDoD5** and deferred — see [`deferred.md`](./deferred.md). The grep gate covers only the symbols this project deletes. |
+| **PDoD6** — `elementCoordinates(storage)` consumed by planner / migration / validators | S1.D-3 (migration consumer migrated) + S1.D-2 (canonicalizer family hook). Planner / validator consumers landed in S1.A. |
 | **PDoD8** — all validation gates clean | Each remaining slice's gate + final retro gate |
 | **PDoD9** — ADR migrated to `docs/architecture docs/adrs/` | Close-out |
-| **PDoD10** — subsumed tickets (TML-2579/2580/2582) closed | ✅ already satisfied — all Canceled in the 2026-05-20 ticket cleanup |
+| **PDoD10** — subsumed tickets (TML-2579/2580/2582) closed | ✅ already satisfied — all Canceled in the 2026-05-20 ticket cleanup. (S1.D-2 closes TML-2579, S1.D-3 closes TML-2580 on merge; TML-2582 stays Canceled until the deferred query-builder follow-up.) |
 | **PDoD11** — project folder deleted; references stripped | Close-out |
 
 ## Sequencing rationale
 
-- **S1.D after S1.C, not parallel:** the subsumed helpers can only come out once the new coordinate / object-pair encoding is the *sole* reader. Deleting them while S1.C is still in review would strand callers mid-migration. This is a real dependency, not pacing.
-- **S1.E parallel, not stacked:** the planner-correctness surface is disjoint from the structural slices and the bug pre-dates the project. The previous plan sequenced it after S1.D to keep reviewer attention on the critical path; under the default-to-parallel principle that serialization is throughput lost for no dependency reason, so it is parallelised. (If a single reviewer is the bottleneck, pull S1.E after S1.D as a pacing choice — but that is a reviewer-bandwidth decision, not a dependency.)
+- **S1.D narrowed, not whole:** the 2026-05-29 inventory falsified the "one deletions-only slice" premise — three of the eight subsumed surfaces carry structural prerequisites (a `contract.json`-shape coordinate change with hash regen, a hash-computation change, a query-builder type rewrite) that each warrant their own review focus and risk profile. Bundling them with the clean deletes would make one un-reviewably broad PR. They are deferred to follow-ups so the clean deletes ship now without waiting on structural work.
+- **S1.D-1/-2/-3 in parallel:** the three clean-delete slices touch disjoint files (contract-IR constructors vs framework canonicalizer + family hooks vs migration tooling) with no inter-dependency. Only S1.D-1 may regen fixtures; S1.D-2 and S1.D-3 are output-preserving. The real limit on concurrency is reviewer bandwidth, not technical coupling.
+- **S1.E parallel, not stacked:** the planner-correctness surface is disjoint from the structural slices and the bug pre-dates the project. Under the default-to-parallel principle it runs alongside S1.D. (If a single reviewer is the bottleneck, pace the PRs — that is a reviewer-bandwidth decision, not a dependency.)
 
 ## Risks + open questions
 
-1. **Canonicalizer family-contribution hook (A7).** S1.D replaces the framework canonicalizer's SQL-specific preserve-empty paths with a family-contribution hook. If the hook design would force framework-components to import family code (circular dependency), the pattern doesn't hold: S1.D's scope shrinks and TML-2579 stays open as a standalone follow-up. Discussion-mode re-entry trigger if it surfaces.
+1. **Canonicalizer family-contribution hook (A7) — S1.D-2.** S1.D-2 replaces the framework canonicalizer's SQL-specific preserve-empty paths with a family-contribution hook. If the hook design would force framework-components to import family code (circular dependency), the pattern doesn't hold: S1.D-2 is abandoned, the SQL-specific path stays, and TML-2579 stays open. Refusal trigger — the implementer halts and reports rather than introducing a cycle. Output must stay byte-identical (fixtures must not move); any fixture drift is a signal the move changed behaviour and is itself a halt condition.
 2. **S1.E `SchemaIssue` blast radius.** S1.E adds required `namespaceId` to `EnumValuesChangedIssue` and tightens population at every verifier enum-issue construction site. Integration goldens that snapshot Issue payloads (likely under `packages/3-targets/3-targets/postgres/test/migrations/`) shift shape-only (`+ namespaceId`). Risk materialises only if the goldens audit surfaces *content* drift (issue ordering, or an unexpected namespace value) beyond the field addition — that would expand the slice. Refusal trigger on content drift beyond the field addition.
 
 ## Close-out (required)
