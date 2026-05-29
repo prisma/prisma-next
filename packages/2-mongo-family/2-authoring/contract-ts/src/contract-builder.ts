@@ -390,12 +390,12 @@ type ContractRelationFromBuilder<TBuilder> =
   >
     ? On extends RelationOn
       ? {
-          readonly to: To;
+          readonly to: CrossRefFor<To>;
           readonly cardinality: Cardinality;
           readonly on: On;
         }
       : {
-          readonly to: To;
+          readonly to: CrossRefFor<To>;
           readonly cardinality: Cardinality;
         }
     : never;
@@ -413,7 +413,9 @@ type ContractModelStorageFromBuilder<TBuilder> = ModelStorageSection<TBuilder> &
 type MaybeOwner<Owner> = [Owner] extends [undefined]
   ? EmptyObject
   : { readonly owner: Owner & string };
-type MaybeBase<Base> = [Base] extends [undefined] ? EmptyObject : { readonly base: Base & string };
+type MaybeBase<Base> = [Base] extends [undefined]
+  ? EmptyObject
+  : { readonly base: CrossRefFor<Base & string> };
 type MaybeDiscriminator<Discriminator> = [Discriminator] extends [undefined]
   ? EmptyObject
   : { readonly discriminator: Discriminator & { readonly field: string } };
