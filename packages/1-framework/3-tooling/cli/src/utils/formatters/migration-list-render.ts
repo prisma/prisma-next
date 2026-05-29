@@ -45,6 +45,7 @@ export interface MigrationListStyler {
   sourceHash(text: string): string;
   destHash(text: string): string;
   glyph(text: string): string;
+  lane(text: string): string;
   invariants(ids: readonly string[]): string;
   refs(names: readonly string[]): string;
   spaceHeading(text: string): string;
@@ -58,6 +59,7 @@ export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
   sourceHash: (text) => text,
   destHash: (text) => text,
   glyph: (text) => text,
+  lane: (text) => text,
   invariants: (ids) => `{${ids.join(', ')}}`,
   refs: (names) => `(${names.join(', ')})`,
   spaceHeading: (text) => text,

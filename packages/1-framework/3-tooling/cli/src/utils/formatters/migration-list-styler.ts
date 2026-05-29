@@ -25,6 +25,7 @@ function styleRefName(name: string): string {
  * - `sourceHash`: dim cyan
  * - `destHash`: bright cyan
  * - `glyph` (`→` / `⟲` / `∅`): dim
+ * - `lane` (graph gutter lines `│` and fan/join connectors `├─┐` / `├─┘`): dim
  * - `invariants` (`{...}`): yellow
  * - `refs` (`(...)`): green; the live-DB `db` marker inside is green-bold
  * - `spaceHeading` (`<spaceId>:`): bold
@@ -43,6 +44,7 @@ export function createAnsiMigrationListStyler(opts: {
     sourceHash: (text) => dim(cyan(text)),
     destHash: (text) => cyanBright(text),
     glyph: (text) => dim(text),
+    lane: (text) => dim(text),
     invariants: (ids) => yellow(`{${ids.join(', ')}}`),
     refs: (names) => {
       const open = green('(');

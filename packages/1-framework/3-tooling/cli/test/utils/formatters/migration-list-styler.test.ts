@@ -48,6 +48,8 @@ describe('createAnsiMigrationListStyler', () => {
     expect(styler.glyph('→')).toBe('→');
     expect(styler.glyph('⟲')).toBe('⟲');
     expect(styler.glyph('∅')).toBe('∅');
+    expect(styler.lane('│')).toBe('│');
+    expect(styler.lane('├─┐')).toBe('├─┐');
     expect(styler.invariants(['a', 'b'])).toBe('{a, b}');
     expect(styler.refs(['production', 'staging'])).toBe('(production, staging)');
     expect(styler.refs(['db'])).toBe('(db)');
@@ -92,6 +94,8 @@ describe('createAnsiMigrationListStyler', () => {
     expect(styler.glyph('→')).toBe(dim('→'));
     expect(styler.glyph('⟲')).toBe(dim('⟲'));
     expect(styler.glyph('∅')).toBe(dim('∅'));
+    expect(styler.lane('│')).toBe(dim('│'));
+    expect(styler.lane('├─┐')).toBe(dim('├─┐'));
     expect(styler.invariants(['backfill_emails_v1'])).toBe(yellow('{backfill_emails_v1}'));
     expect(styler.spaceHeading('app:')).toBe(bold('app:'));
     expect(styler.summary('1 migration(s) on disk')).toBe(dim('1 migration(s) on disk'));

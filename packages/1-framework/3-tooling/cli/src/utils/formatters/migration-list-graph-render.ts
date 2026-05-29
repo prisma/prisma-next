@@ -112,13 +112,14 @@ function renderMigrationGutter(
   row: MigrationLayoutRow,
   maxLane: number,
   palette: GlyphPalette,
+  style: MigrationListStyler,
 ): string {
   const cells: string[] = [];
   for (let lane = 0; lane <= maxLane; lane++) {
     if (lane === row.laneIndex) {
       cells.push(laneCell(palette.kind[row.edgeKind]));
     } else if (row.passThroughLanes.includes(lane)) {
-      cells.push(laneCell(palette.lane));
+      cells.push(laneCell(style.lane(palette.lane)));
     } else {
       cells.push(emptyLaneCell());
     }
@@ -131,13 +132,14 @@ function renderNodeLineGutter(
   openLanes: ReadonlySet<number>,
   maxLane: number,
   palette: GlyphPalette,
+  style: MigrationListStyler,
 ): string {
   const cells: string[] = [];
   for (let lane = 0; lane <= maxLane; lane++) {
     if (lane === row.laneIndex) {
       cells.push(laneCell(palette.node));
     } else if (openLanes.has(lane)) {
-      cells.push(laneCell(palette.lane));
+      cells.push(laneCell(style.lane(palette.lane)));
     } else {
       cells.push(emptyLaneCell());
     }
@@ -150,6 +152,7 @@ function renderConnectorGutter(
   openLanes: ReadonlySet<number>,
   maxLane: number,
   palette: GlyphPalette,
+  style: MigrationListStyler,
 ): string {
   const spanLaneCount = row.endLane - row.startLane + 1;
   const spanWidth = spanLaneCount * 2;
@@ -168,11 +171,11 @@ function renderConnectorGutter(
 
   let gutter = '';
   for (let lane = 0; lane < row.startLane; lane++) {
-    gutter += openLanes.has(lane) ? laneCell(palette.lane) : emptyLaneCell();
+    gutter += openLanes.has(lane) ? laneCell(style.lane(palette.lane)) : emptyLaneCell();
   }
-  gutter += spanGlyph;
+  gutter += style.lane(spanGlyph);
   for (let lane = row.endLane + 1; lane <= maxLane; lane++) {
-    gutter += openLanes.has(lane) ? laneCell(palette.lane) : emptyLaneCell();
+    gutter += openLanes.has(lane) ? laneCell(style.lane(palette.lane)) : emptyLaneCell();
   }
   return gutter;
 }
@@ -209,16 +212,21 @@ export function renderMigrationListGraphWithStyle(
   const dirNameWidth = computeMigrationDirNameWidth(migrations);
   const gutterMaxLane = layoutMaxLane;
   const blockDataStart = layoutMaxLane === 0 ? 2 : (layoutMaxLane + 1) * 2 + 2;
+  // Migration and node-line gutters always occupy a fixed, ANSI-free visible
+  // width of two columns per lane. Padding is computed from this width rather
+  // than the rendered string length so dimmed lanes (which carry zero-width
+  // SGR bytes) stay column-aligned with the data that follows.
+  const gutterVisibleWidth = (gutterMaxLane + 1) * 2;
   const lines: string[] = [];
   let openLanes: ReadonlySet<number> = new Set();
 
   function padToDataColumn(gutter: string, dataStart: number): string {
-    return gutter + ' '.repeat(Math.max(0, dataStart - gutter.length));
+    return gutter + ' '.repeat(Math.max(0, dataStart - gutterVisibleWidth));
   }
 
   for (const row of layout.rows) {
     if (row.kind === 'migration') {
-      const gutter = renderMigrationGutter(row, gutterMaxLane, palette);
+      const gutter = renderMigrationGutter(row, gutterMaxLane, palette, style);
       const data = formatMigrationDataColumn(row.entry, {
         dirNameWidth,
         edgeKind: row.edgeKind,
@@ -228,11 +236,11 @@ export function renderMigrationListGraphWithStyle(
       });
       lines.push(`${padToDataColumn(gutter, blockDataStart)}${data}`);
     } else if (row.kind === 'nodeLine') {
-      const gutter = renderNodeLineGutter(row, openLanes, gutterMaxLane, palette);
+      const gutter = renderNodeLineGutter(row, openLanes, gutterMaxLane, palette, style);
       const data = formatNodeLineDataColumn(row.contractHash, style);
       lines.push(`${padToDataColumn(gutter, blockDataStart)}${data}`);
     } else {
-      lines.push(renderConnectorGutter(row, openLanes, gutterMaxLane, palette));
+      lines.push(renderConnectorGutter(row, openLanes, gutterMaxLane, palette, style));
     }
     openLanes = advanceOpenLanes(row, openLanes);
   }

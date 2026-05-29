@@ -5,8 +5,10 @@ import {
 } from '../../../src/utils/formatters/migration-list-graph-render';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
+  type MigrationListStyler,
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
+import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/migration-list-styler';
 import { HASH, layoutFor, migrationEntry } from './migration-list-graph-fixtures';
 
 function renderGraph(
@@ -425,5 +427,54 @@ describe('renderMigrationListGraph', () => {
         '+-/ | \n' +
         '*   |   20250115_add_users    -       -> abc1234',
     );
+  });
+});
+
+describe('renderMigrationListGraph line dimming', () => {
+  const laneMarkerStyler: MigrationListStyler = {
+    ...IDENTITY_MIGRATION_LIST_STYLER,
+    lane: (text) => `‹${text}›`,
+  };
+
+  const diamond = [
+    migrationEntry('20250302_merge_tags', HASH.nine4f1, HASH.d41a8c3),
+    migrationEntry('20250301_merge_posts', HASH.seven1b, HASH.d41a8c3),
+    migrationEntry('20250210_add_tags', HASH.abc1234, HASH.nine4f1),
+    migrationEntry('20250203_add_posts', HASH.abc1234, HASH.seven1b),
+    migrationEntry('20250115_add_users', null, HASH.abc1234),
+  ];
+
+  function stripAnsi(value: string): string {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI SGR sequences
+    return value.replace(/\u001b\[[0-9;]*m/g, '');
+  }
+
+  it('routes lane verticals and the fan/join connectors through the lane styler', () => {
+    const rows = renderMigrationListGraph(layoutFor(diamond), laneMarkerStyler, 'unicode').split(
+      '\n',
+    );
+    expect(rows).toContain('‹├─┐›');
+    expect(rows).toContain('‹├─┘›');
+    expect(rows.some((row) => row.includes('‹│›'))).toBe(true);
+  });
+
+  it('never dims the kind glyphs or the node marker', () => {
+    const out = renderMigrationListGraph(layoutFor(diamond), laneMarkerStyler, 'unicode');
+    expect(out).not.toContain('‹*›');
+    expect(out).not.toContain('‹o›');
+  });
+
+  it('keeps columns aligned when lanes are dimmed (padding measured on visible width)', () => {
+    const styled = renderMigrationListGraph(
+      layoutFor(diamond),
+      createAnsiMigrationListStyler({ useColor: true }),
+      'unicode',
+    );
+    const plain = renderMigrationListGraph(
+      layoutFor(diamond),
+      IDENTITY_MIGRATION_LIST_STYLER,
+      'unicode',
+    );
+    expect(stripAnsi(styled)).toBe(plain);
   });
 });
