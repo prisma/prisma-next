@@ -29,5 +29,14 @@ function hasNamespaceMap(storage: unknown): storage is Storage {
   if (typeof storage !== 'object' || storage === null) return false;
   if (!('namespaces' in storage)) return false;
   const { namespaces } = storage;
-  return typeof namespaces === 'object' && namespaces !== null && !Array.isArray(namespaces);
+  if (typeof namespaces !== 'object' || namespaces === null || Array.isArray(namespaces)) {
+    return false;
+  }
+  // elementCoordinates walks each namespace via Object.entries(ns), which
+  // throws on a null value. A validated contract never carries a null
+  // namespace, but this helper accepts arbitrary runtime shapes; require
+  // every entry to be a non-null object so the walk cannot throw.
+  return Object.values(namespaces).every(
+    (ns) => typeof ns === 'object' && ns !== null && !Array.isArray(ns),
+  );
 }
