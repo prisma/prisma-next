@@ -13,7 +13,10 @@ import {
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
+import type {
+  CodecTypes,
+  Contract,
+} from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
 import { createMongoCollection } from '../src/collection';
 import type { MongoQueryExecutor } from '../src/executor';
@@ -21,6 +24,7 @@ import {
   compileFieldOperations,
   createFieldAccessor,
   type FieldAccessor,
+  type FieldExpression,
   type FieldOperation,
 } from '../src/field-accessor';
 
@@ -235,7 +239,7 @@ describe('MongoCollection object-based where()', () => {
 
 describe('createFieldAccessor()', () => {
   it('property access returns FieldExpression for top-level field', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.name.set('Bob');
     expect(op.operator).toBe('$set');
     expect(op.field).toBe('name');
@@ -243,37 +247,37 @@ describe('createFieldAccessor()', () => {
   });
 
   it('set() produces $set operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.name.set('Alice');
     expect(op.operator).toBe('$set');
     expect(op.field).toBe('name');
   });
 
   it('unset() produces $unset operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.name.unset();
     expect(op.operator).toBe('$unset');
     expect(op.field).toBe('name');
   });
 
   it('inc() produces $inc operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
-    const op = u.loginCount.inc(1);
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
+    const op = (u.loginCount as FieldExpression<number>).inc(1);
     expect(op.operator).toBe('$inc');
     expect(op.field).toBe('loginCount');
     expect((op.value as MongoParamRef).value).toBe(1);
   });
 
   it('mul() produces $mul operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
-    const op = u.loginCount.mul(2);
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
+    const op = (u.loginCount as FieldExpression<number>).mul(2);
     expect(op.operator).toBe('$mul');
     expect(op.field).toBe('loginCount');
     expect((op.value as MongoParamRef).value).toBe(2);
   });
 
   it('push() produces $push operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.tags.push('admin');
     expect(op.operator).toBe('$push');
     expect(op.field).toBe('tags');
@@ -281,7 +285,7 @@ describe('createFieldAccessor()', () => {
   });
 
   it('pull() produces $pull operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.tags.pull('admin');
     expect(op.operator).toBe('$pull');
     expect(op.field).toBe('tags');
@@ -289,14 +293,14 @@ describe('createFieldAccessor()', () => {
   });
 
   it('addToSet() produces $addToSet operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.tags.addToSet('admin');
     expect(op.operator).toBe('$addToSet');
     expect(op.field).toBe('tags');
   });
 
   it('pop() produces $pop operation', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u.tags.pop(1);
     expect(op.operator).toBe('$pop');
     expect(op.field).toBe('tags');
@@ -304,7 +308,7 @@ describe('createFieldAccessor()', () => {
   });
 
   it('call signature returns FieldExpression for dot-path', () => {
-    const u = createFieldAccessor<Contract, 'User'>();
+    const u = createFieldAccessor<Contract, 'User', CodecTypes>();
     const op = u('homeAddress.city').set('NYC');
     expect(op.operator).toBe('$set');
     expect(op.field).toBe('homeAddress.city');

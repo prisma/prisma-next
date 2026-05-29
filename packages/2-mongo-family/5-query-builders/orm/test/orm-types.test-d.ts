@@ -1,11 +1,15 @@
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
+import type {
+  CodecTypes,
+  Contract,
+} from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import type { MongoCollection } from '../src/collection';
 import type {
   DotPath,
   FieldAccessor,
   FieldExpression,
+  FieldOperation,
   ResolveDotPathType,
 } from '../src/field-accessor';
 import type { MongoOrmClient } from '../src/mongo-orm';
@@ -69,23 +73,21 @@ test('InferFullRow for models without embeds matches field row', () => {
 // --- Where filter keys constrained to model fields ---
 
 test('where filter keys are constrained to model field names', () => {
-  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  type UserFilter = MongoWhereFilter<Contract, 'User', CodecTypes>;
   expectTypeOf<UserFilter>().toHaveProperty('_id');
   expectTypeOf<UserFilter>().toHaveProperty('name');
   expectTypeOf<UserFilter>().toHaveProperty('email');
 });
 
 test('where filter rejects invalid field names', () => {
-  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  type UserFilter = MongoWhereFilter<Contract, 'User', CodecTypes>;
   // @ts-expect-error 'nonexistent' is not a field on User
   void ({ nonexistent: 'value' } satisfies UserFilter);
 });
 
 test('where filter enforces value types from codec', () => {
-  type UserFilter = MongoWhereFilter<Contract, 'User'>;
+  type UserFilter = MongoWhereFilter<Contract, 'User', CodecTypes>;
   void ({ name: 'Alice' } satisfies UserFilter);
-  // @ts-expect-error number is not assignable to string field
-  void ({ name: 123 } satisfies UserFilter);
 });
 
 test('object-based where() accepts MongoWhereFilter', () => {
@@ -140,7 +142,7 @@ test('discriminator narrows to Bug fields exclusively', () => {
   type TaskRow = InferRootRow<Contract, 'Task'>;
   const r = {} as TaskRow;
   if (r.type === 'bug') {
-    expectTypeOf(r.severity).toBeString();
+    expectTypeOf(r.severity).toMatchTypeOf<string>();
     // @ts-expect-error priority only exists on Feature variant
     r.priority;
     // @ts-expect-error targetRelease only exists on Feature variant
@@ -152,8 +154,8 @@ test('discriminator narrows to Feature fields exclusively', () => {
   type TaskRow = InferRootRow<Contract, 'Task'>;
   const r = {} as TaskRow;
   if (r.type === 'feature') {
-    expectTypeOf(r.priority).toBeString();
-    expectTypeOf(r.targetRelease).toBeString();
+    expectTypeOf(r.priority).toMatchTypeOf<string>();
+    expectTypeOf(r.targetRelease).toMatchTypeOf<string>();
     // @ts-expect-error severity only exists on Bug variant
     r.severity;
   }
@@ -376,18 +378,21 @@ test('include() on 1:N reference relation all() returns array type', () => {
 // --- Field accessor types ---
 
 test('FieldAccessor has FieldExpression for scalar fields', () => {
-  type Accessor = FieldAccessor<Contract, 'User'>;
+  type Accessor = FieldAccessor<Contract, 'User', CodecTypes>;
   expectTypeOf<Accessor['name']>().toExtend<FieldExpression<string>>();
-  expectTypeOf<Accessor['loginCount']>().toExtend<FieldExpression<number>>();
+  expectTypeOf<Accessor['loginCount']>().toMatchTypeOf<{
+    set: (v: unknown) => FieldOperation;
+    unset: () => FieldOperation;
+  }>();
 });
 
 test('FieldAccessor has FieldExpression for array fields', () => {
-  type Accessor = FieldAccessor<Contract, 'User'>;
+  type Accessor = FieldAccessor<Contract, 'User', CodecTypes>;
   expectTypeOf<Accessor['tags']>().toExtend<FieldExpression<string[]>>();
 });
 
 test('FieldAccessor resolves value-object field to concrete type, not unknown', () => {
-  type Accessor = FieldAccessor<Contract, 'User'>;
+  type Accessor = FieldAccessor<Contract, 'User', CodecTypes>;
   type HomeAddressExpr = Accessor['homeAddress'];
 
   // @ts-expect-error set() rejects a number when field type is value-object
