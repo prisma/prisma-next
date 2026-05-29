@@ -202,6 +202,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered; the framework parameter type is the cross-family base.
       contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
       scope: 'runtime',
+      // Placeholder satisfying the required field on the cross-family base. The
+      // stored ctx is a runtime-level template; the per-execute ctxs constructed
+      // in `executeAgainstQueryable` / `executePreparedAgainstQueryable` spread
+      // this template and override `planExecutionId` with a fresh UUID. ADR 220.
+      planExecutionId: '',
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });
@@ -404,10 +409,16 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     // with the appropriate scope. Middleware that observe `ctx.scope`
     // (e.g. the cache middleware, which only intercepts at `'runtime'`)
     // see the right value without any out-of-band signaling.
+    //
+    // `planExecutionId` is minted here too: every execute() call — top-level,
+    // connection-scoped, or transaction-scoped — flows through this helper and
+    // gets its own fresh UUID. Hooks for one call see the same value; two
+    // calls (even with the same plan) see distinct values. ADR 220.
     const execMiddlewareCtx: RuntimeMiddlewareContext = {
       ...self.ctx,
       ...ifDefined('signal', signal),
       ...(scope !== 'runtime' ? { scope } : {}),
+      planExecutionId: crypto.randomUUID(),
     };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
@@ -527,10 +538,13 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const signal = options?.signal;
     const scope = options?.scope ?? 'runtime';
     const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+    // `executePrepared` is a parallel entry point to `executeAgainstQueryable`
+    // and mints its own fresh `planExecutionId` per call. ADR 220.
     const execMiddlewareCtx: RuntimeMiddlewareContext = {
       ...self.ctx,
       ...ifDefined('signal', signal),
       ...(scope !== 'runtime' ? { scope } : {}),
+      planExecutionId: crypto.randomUUID(),
     };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {

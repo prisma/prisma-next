@@ -35,6 +35,7 @@ test('a minimal RuntimeCore subclass typechecks', () => {
       log: { info: () => {}, warn: () => {}, error: () => {} },
       contentHash: async () => 'mock-hash',
       scope: 'runtime',
+      planExecutionId: 'test-fixture-plan-execution-id',
     },
   });
 });
@@ -60,6 +61,7 @@ test('execute(plan) enforces the TPlan constraint and returns AsyncIterableResul
       log: { info: () => {}, warn: () => {}, error: () => {} },
       contentHash: async () => 'mock-hash',
       scope: 'runtime',
+      planExecutionId: 'test-fixture-plan-execution-id',
     },
   });
   const result = runtime.execute(plan);

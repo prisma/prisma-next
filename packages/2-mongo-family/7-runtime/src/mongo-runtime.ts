@@ -5,6 +5,7 @@ import {
   checkMiddlewareCompatibility,
   RuntimeCore,
   type RuntimeExecuteOptions,
+  type RuntimeMiddlewareContext,
   runBeforeExecuteChain,
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
@@ -93,6 +94,11 @@ class MongoRuntimeImpl
       // derive a scope-narrowed ctx per call (mirror
       // SqlRuntimeImpl#executeAgainstQueryable in `sql-runtime.ts`).
       scope: 'runtime',
+      // Placeholder satisfying the required field on the cross-family base. The
+      // stored ctx is a runtime-level template; the per-execute ctx constructed
+      // in `execute()` spreads this template and overrides `planExecutionId`
+      // with a fresh UUID. ADR 220.
+      planExecutionId: '',
     };
 
     super({ middleware, ctx });
@@ -126,15 +132,26 @@ class MongoRuntimeImpl
     const self = this;
     const signal = options?.signal;
     const codecCtx: CodecCallContext = signal === undefined ? {} : { signal };
+
+    // Per-execute middleware context. Spread the stored runtime-level
+    // template and mint a fresh `planExecutionId` so every hook in this
+    // call observes the same value, and two executions of the same plan
+    // observe distinct values. ADR 220. The plan itself flows through
+    // unchanged.
+    const execCtx: RuntimeMiddlewareContext = {
+      ...self.ctx,
+      planExecutionId: crypto.randomUUID(),
+    };
+
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
       const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
-      await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, self.ctx);
+      await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, execCtx);
       const stream = runWithMiddleware<MongoExecutionPlan, Record<string, unknown>>(
         exec,
         self.middleware,
-        self.ctx,
+        execCtx,
         () => self.runDriver(exec),
       );
       for await (const rawRow of stream) {

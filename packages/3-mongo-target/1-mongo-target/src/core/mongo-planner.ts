@@ -66,21 +66,66 @@ function classifyValidatorUpdate(
   origin: MongoSchemaValidator,
   dest: MongoSchemaValidator,
 ): 'widening' | 'destructive' {
-  let hasDestructive = false;
-
-  if (canonicalize(origin.jsonSchema) !== canonicalize(dest.jsonSchema)) {
-    hasDestructive = true;
+  // Moving to a stricter action or level narrows the accepted value space.
+  if (origin.validationAction !== dest.validationAction && dest.validationAction === 'error') {
+    return 'destructive';
+  }
+  if (origin.validationLevel !== dest.validationLevel && dest.validationLevel === 'strict') {
+    return 'destructive';
   }
 
-  if (origin.validationAction !== dest.validationAction) {
-    if (dest.validationAction === 'error') hasDestructive = true;
+  if (canonicalize(origin.jsonSchema) === canonicalize(dest.jsonSchema)) {
+    return 'widening';
   }
 
-  if (origin.validationLevel !== dest.validationLevel) {
-    if (dest.validationLevel === 'strict') hasDestructive = true;
+  // Check whether the schema change only adds non-required properties (widening).
+  return isWideningSchemaChange(origin.jsonSchema, dest.jsonSchema) ? 'widening' : 'destructive';
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Returns true when `dest` is a structural superset of `origin` for the common
+ * additive case: adding non-required properties to a top-level object schema.
+ * Anything uncertain falls through to the safe `destructive` default.
+ */
+function isWideningSchemaChange(
+  origin: Record<string, unknown>,
+  dest: Record<string, unknown>,
+): boolean {
+  // Only handle top-level object schemas.
+  if (origin['bsonType'] !== 'object' || dest['bsonType'] !== 'object') {
+    return false;
   }
 
-  return hasDestructive ? 'destructive' : 'widening';
+  // Any change to keys besides 'required' and 'properties' is uncertain → destructive.
+  const allKeys = new Set([...Object.keys(origin), ...Object.keys(dest)]);
+  for (const key of allKeys) {
+    if (key === 'required' || key === 'properties') continue;
+    if (canonicalize(origin[key]) !== canonicalize(dest[key])) return false;
+  }
+
+  // dest.required must be a subset of origin.required — no new required fields.
+  const originRequired = new Set<unknown>(
+    Array.isArray(origin['required']) ? origin['required'] : [],
+  );
+  const destRequired = Array.isArray(dest['required']) ? dest['required'] : [];
+  for (const field of destRequired) {
+    if (!originRequired.has(field)) return false;
+  }
+
+  // All properties that existed in origin must still exist unchanged.
+  // New properties in dest (absent from origin) are allowed — widening.
+  const originProps = isPlainObject(origin['properties']) ? origin['properties'] : {};
+  const destProps = isPlainObject(dest['properties']) ? dest['properties'] : {};
+  for (const field of Object.keys(originProps)) {
+    if (!Object.hasOwn(destProps, field)) return false; // Property removed → destructive.
+    if (canonicalize(originProps[field]) !== canonicalize(destProps[field])) return false; // Property narrowed → destructive.
+  }
+
+  return true;
 }
 
 function hasImmutableOptionChange(

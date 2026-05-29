@@ -4,9 +4,7 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadTrace, loadTraceFromString } from '../load.ts';
 
-const TRACE_PATH = fileURLToPath(
-  new URL('../../../projects/drive-instrumentation/trace.jsonl', import.meta.url),
-);
+const TRACE_PATH = fileURLToPath(new URL('./fixtures/sample-trace.jsonl', import.meta.url));
 
 describe('loadTraceFromString', () => {
   it('returns all-empty result for empty string', () => {
