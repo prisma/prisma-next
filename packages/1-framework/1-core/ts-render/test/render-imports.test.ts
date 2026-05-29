@@ -157,6 +157,32 @@ describe('renderImports', () => {
     expect(out).toBe("import { a } from 'm';");
   });
 
+  it('renders an aliased named import', () => {
+    const out = renderImports([{ moduleSpecifier: 'm', symbol: 'A', alias: 'B' }]);
+    expect(out).toBe("import { A as B } from 'm';");
+  });
+
+  it('omits the alias clause when alias equals the symbol', () => {
+    const out = renderImports([{ moduleSpecifier: 'm', symbol: 'A', alias: 'A' }]);
+    expect(out).toBe("import { A } from 'm';");
+  });
+
+  it('emits `import type` when every symbol from a module is type-only', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'B', typeOnly: true, alias: 'C' },
+      { moduleSpecifier: 'm', symbol: 'A', typeOnly: true },
+    ]);
+    expect(out).toBe("import type { A, B as C } from 'm';");
+  });
+
+  it('prefixes individual type-only specifiers when a module mixes value and type imports', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'val' },
+      { moduleSpecifier: 'm', symbol: 'T', typeOnly: true },
+    ]);
+    expect(out).toBe("import { type T, val } from 'm';");
+  });
+
   it('stringifies multi-key attribute maps in sorted order in the conflict message', () => {
     try {
       renderImports([

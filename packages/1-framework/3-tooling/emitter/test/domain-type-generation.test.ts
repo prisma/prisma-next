@@ -389,6 +389,34 @@ describe('generateImportLines', () => {
     const lines = generateImportLines(imports);
     expect(lines).toEqual(["import type { Vector } from '@prisma-next/adapter';"]);
   });
+
+  it('merges multiple named imports from the same package onto one line', () => {
+    const imports: TypesImportSpec[] = [
+      {
+        package: '@prisma-next/adapter-mongo/codec-types',
+        named: 'CodecTypes',
+        alias: 'MongoCodecTypes',
+      },
+      { package: '@prisma-next/adapter-mongo/codec-types', named: 'Vector', alias: 'Vector' },
+    ];
+    const lines = generateImportLines(imports);
+    expect(lines).toEqual([
+      "import type { CodecTypes as MongoCodecTypes, Vector } from '@prisma-next/adapter-mongo/codec-types';",
+    ]);
+  });
+
+  it('emits one line per distinct package, sorted by specifier', () => {
+    const imports: TypesImportSpec[] = [
+      { package: '@scope/zeta/codec-types', named: 'Numeric', alias: 'Numeric' },
+      { package: '@scope/zeta/codec-types', named: 'CodecTypes', alias: 'ZetaTypes' },
+      { package: '@scope/alpha/operation-types', named: 'QueryOperationTypes', alias: 'AlphaOps' },
+    ];
+    const lines = generateImportLines(imports);
+    expect(lines).toEqual([
+      "import type { QueryOperationTypes as AlphaOps } from '@scope/alpha/operation-types';",
+      "import type { CodecTypes as ZetaTypes, Numeric } from '@scope/zeta/codec-types';",
+    ]);
+  });
 });
 
 describe('generateCodecTypeIntersection', () => {
