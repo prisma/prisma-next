@@ -13,7 +13,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
-import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import { createSqlExecutionStack } from '../src/sql-context';
@@ -28,9 +28,10 @@ import {
 
 /**
  * Pins ADR 220 semantics for the SQL runtime: every `execute()` and every
- * `executePrepared()` call stamps a fresh `meta.planExecutionId` onto the
- * dispatched plan. Hooks within one call observe the same ID; hooks across
- * two calls of the same plan/prepared-statement observe distinct IDs.
+ * `executePrepared()` call mints a fresh `ctx.planExecutionId` for the
+ * per-execute middleware context. Hooks within one call observe the same
+ * ID; hooks across two calls of the same plan/prepared-statement observe
+ * distinct IDs.
  */
 
 const testContract = createTestContract({ targetFamily: 'sql', target: 'postgres' });
@@ -110,18 +111,18 @@ function buildEqUserIdPlan(userId: Expression<ScopeField>): SqlQueryPlan<{ id: n
 
 interface Observation {
   readonly hook: 'beforeExecute' | 'afterExecute';
-  readonly planExecutionId: string | undefined;
+  readonly planExecutionId: string;
 }
 
 function observerMiddleware(log: Observation[]): SqlMiddleware {
   return {
     name: 'observer',
     familyId: 'sql',
-    async beforeExecute(plan) {
-      log.push({ hook: 'beforeExecute', planExecutionId: plan.meta.planExecutionId });
+    async beforeExecute(_plan, ctx) {
+      log.push({ hook: 'beforeExecute', planExecutionId: ctx.planExecutionId });
     },
-    async afterExecute(plan) {
-      log.push({ hook: 'afterExecute', planExecutionId: plan.meta.planExecutionId });
+    async afterExecute(_plan, _result, ctx) {
+      log.push({ hook: 'afterExecute', planExecutionId: ctx.planExecutionId });
     },
   };
 }
@@ -161,40 +162,6 @@ describe('SqlRuntime.execute planExecutionId (ADR 220)', () => {
     expect(firstExecId).not.toBe(secondExecId);
   });
 
-  it('overrides a caller-supplied planExecutionId on every execute call', async () => {
-    const log: Observation[] = [];
-    const { runtime } = createSetup([observerMiddleware(log)]);
-    const basePlan = buildSelectAllUsersPlan();
-    const plan: SqlQueryPlan<{ id: number }> = Object.freeze({
-      ...basePlan,
-      meta: { ...basePlan.meta, planExecutionId: 'caller-supplied' },
-    });
-
-    await runtime.execute(plan).toArray();
-
-    expect(log[0]?.planExecutionId).toBeTypeOf('string');
-    expect(log[0]?.planExecutionId).not.toBe('caller-supplied');
-  });
-
-  it('accepts a pre-lowered execution plan and stamps a fresh planExecutionId', async () => {
-    const log: Observation[] = [];
-    const { runtime } = createSetup([observerMiddleware(log)]);
-    const queryPlan = buildSelectAllUsersPlan();
-    const exec: SqlExecutionPlan<{ id: number }> = Object.freeze({
-      sql: 'select id from users',
-      params: [],
-      ast: queryPlan.ast,
-      meta,
-    });
-
-    await runtime.execute(exec).toArray();
-    await runtime.execute(exec).toArray();
-
-    expect(log).toHaveLength(4);
-    expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
-    expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
-    expect(log[0]?.planExecutionId).not.toBe(log[2]?.planExecutionId);
-  });
 });
 
 describe('SqlRuntime.executePrepared planExecutionId (ADR 220)', () => {

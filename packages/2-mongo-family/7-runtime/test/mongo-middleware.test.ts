@@ -357,17 +357,17 @@ describe('MongoRuntime middleware lifecycle', () => {
 describe('MongoRuntime planExecutionId (ADR 220)', () => {
   interface Observation {
     readonly hook: 'beforeExecute' | 'afterExecute';
-    readonly planExecutionId: string | undefined;
+    readonly planExecutionId: string;
   }
 
   function observerMiddleware(log: Observation[]): MongoMiddleware {
     return {
       name: 'observer',
-      async beforeExecute(plan) {
-        log.push({ hook: 'beforeExecute', planExecutionId: plan.meta.planExecutionId });
+      async beforeExecute(_plan, ctx) {
+        log.push({ hook: 'beforeExecute', planExecutionId: ctx.planExecutionId });
       },
-      async afterExecute(plan) {
-        log.push({ hook: 'afterExecute', planExecutionId: plan.meta.planExecutionId });
+      async afterExecute(_plan, _result, ctx) {
+        log.push({ hook: 'afterExecute', planExecutionId: ctx.planExecutionId });
       },
     };
   }
@@ -413,26 +413,6 @@ describe('MongoRuntime planExecutionId (ADR 220)', () => {
     expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
     expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
     expect(log[0]?.planExecutionId).not.toBe(log[2]?.planExecutionId);
-  });
-
-  it('overrides a caller-supplied planExecutionId on every execute call', async () => {
-    const log: Observation[] = [];
-    const adapter = createMockAdapter();
-    const runtime = createMongoRuntime({
-      context: makeContext(adapter),
-      driver: createMockDriver([{ _id: '1' }]),
-      middleware: [observerMiddleware(log)],
-    });
-
-    const plan = createPlan({
-      meta: { ...baseMeta, planExecutionId: 'caller-supplied' },
-    });
-    for await (const _row of runtime.execute(plan)) {
-      void _row;
-    }
-
-    expect(log[0]?.planExecutionId).toBeTypeOf('string');
-    expect(log[0]?.planExecutionId).not.toBe('caller-supplied');
   });
 });
 
