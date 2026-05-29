@@ -17,8 +17,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Skip the whole preview build+publish on inert (docs-only) PRs — there is no
+  # publishable package change to preview. "Publish preview" is not a required
+  # status check, so skipping the job does not wedge the merge ruleset. On
+  # push-to-main the detector reports non-inert, so previews still publish.
+  changes:
+    name: Detect inert diff
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      inert: ${{ steps.detect.outputs.inert }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: detect
+        uses: ./.github/actions/detect-inert-diff
+
   preview:
     name: Publish preview
+    needs: changes
+    if: needs.changes.outputs.inert != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,6 +48,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1

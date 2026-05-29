@@ -51,8 +51,8 @@ export default async function CheckoutPage() {
         <CardContent>
           <h2 className="font-semibold mb-3">Order Summary</h2>
           <div className="flex flex-col gap-2 mb-4">
-            {items.map((item, i) => (
-              <div key={`${item.productId}-${i}`} className="flex justify-between text-sm">
+            {items.map((item) => (
+              <div key={item.productId} className="flex justify-between text-sm">
                 <span>
                   {item.name} ×{item.amount}
                 </span>

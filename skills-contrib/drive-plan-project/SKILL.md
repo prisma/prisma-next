@@ -73,6 +73,8 @@ For each slice, create (or align with) a Linear issue under the project's Linear
 
 Open [`./templates/plan.template.md`](./templates/plan.template.md) and fill it from the data assembled in steps 3–5.
 
+> **Emit `plan-authored` or `plan-amended`** (immediately after writing `projects/<project>/plan.md`). Existence-check on `PLAN_PATH`: file present before write → `plan-amended` with `bytes_delta`, `reason`; else → `plan-authored`. Payload: `plan_kind: "project"`, `byte_length`, `slice_count`, `dispatch_count: null`, `dispatch_size_distribution: null`, `open_items_count`, plus envelope fields. Default `reason`: `"operator-correction"`; `"replan-from-discussion"` / `"falsified-assumption"` when caller signals. See the `drive-record-traces` skill — `events.md` § `plan-authored` / `plan-amended` and `emission.md` § Existence-check pattern + § Append protocol.
+
 ### Step 7 — Sanity-check, then hand off
 
 Before handing off:

@@ -135,20 +135,18 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
   }
 
   try {
-    let parsed: unknown;
     if (typeof wireValue === 'string') {
-      parsed = JSON.parse(wireValue);
-    } else if (Array.isArray(wireValue)) {
-      parsed = wireValue;
-    } else {
-      parsed = JSON.parse(String(wireValue));
+      return JSON.parse(wireValue);
     }
-
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Expected array for include alias '${alias}', got ${typeof parsed}`);
+    if (typeof wireValue === 'object') {
+      // Driver layer has already parsed the JSON wire value (pg returns
+      // json / jsonb columns as JS values). Pass through unchanged —
+      // both row include arrays (`json_agg`) and scalar / combine
+      // include envelopes (`json_build_object`) flow through this path,
+      // each with their own downstream shape decoder.
+      return wireValue;
     }
-
-    return parsed;
+    return JSON.parse(String(wireValue));
   } catch (error) {
     wrapIncludeAggregateFailure(error, alias, wireValue);
   }

@@ -246,6 +246,8 @@ Commit cadence per `commit-as-you-go` skill — at minimum one commit per:
 
 Push and open the PR.
 
+> **Emit `project-closed`:** Fields: `dod_status` (`"all-met"` if every AC was met; `"some-deferred"` if any slice or AC was deferred with a follow-up ticket; `"some-cancelled"` if any AC was cancelled-with-rationale), `slices_completed` (count of slices that merged, not deferred/cancelled), `final_retro_done` (`true` — the mandatory final retro is verified complete before this step), plus envelope fields (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`). See the `drive-record-traces` skill — `events.md` § `project-closed` for the payload schema and `emission.md` § Append protocol for the file-append mechanics.
+
 ## What this skill doesn't do
 
 - **Run the final retro for you.** The retro is a separate skill (`drive-run-retro`, mandatory-final trigger). This skill verifies the retro happened and refuses to proceed if it didn't.

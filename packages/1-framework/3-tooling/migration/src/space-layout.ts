@@ -46,3 +46,33 @@ export function spaceMigrationDirectory(projectMigrationsDir: string, spaceId: s
   assertValidSpaceId(spaceId);
   return join(projectMigrationsDir, spaceId);
 }
+
+/**
+ * Per-space subdirectory name reserved for the ref store
+ * (`migrations/<space>/<SPACE_REFS_DIRNAME>/*.json`). Single source of
+ * truth: every helper that composes a per-space refs path imports this
+ * constant, and the enumerator uses it (via
+ * {@link RESERVED_SPACE_SUBDIR_NAMES}) to exclude reserved names from
+ * the contract-space candidate list.
+ */
+export const SPACE_REFS_DIRNAME = 'refs';
+
+/**
+ * Names reserved as per-space subdirectories of `migrations/<space>/`.
+ * Used by the enumerator to filter contract-space candidates so a
+ * reserved name (e.g. a top-level `migrations/refs/` left in the wrong
+ * place) is never enumerated as a phantom contract space. Currently
+ * holds `SPACE_REFS_DIRNAME`; extend if future per-space layouts add
+ * more reserved subdirectories.
+ */
+export const RESERVED_SPACE_SUBDIR_NAMES: ReadonlySet<string> = new Set([SPACE_REFS_DIRNAME]);
+
+/**
+ * Resolve the per-space refs directory for `spaceMigrationsDir`
+ * (typically the value returned by {@link spaceMigrationDirectory}).
+ * Composes the canonical {@link SPACE_REFS_DIRNAME} so callers do not
+ * hard-code the literal.
+ */
+export function spaceRefsDirectory(spaceMigrationsDir: string): string {
+  return join(spaceMigrationsDir, SPACE_REFS_DIRNAME);
+}

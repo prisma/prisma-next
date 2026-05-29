@@ -30,7 +30,6 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
-import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
 import {
   compileRelationSelect,
   compileSelect,
@@ -40,6 +39,7 @@ import { augmentSelectionForJoinColumns } from './selection-shaping';
 import type {
   CollectionContext,
   CollectionState,
+  IncludeCombineBranch,
   IncludeExpr,
   IncludeScalar,
   RelationCardinalityTag,
@@ -78,19 +78,13 @@ function dispatchWithIncludeStrategy<Row>(options: {
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
-  // Nested row includes (depth >= 2) are emitted recursively by the
-  // lateral / correlated builders — they no longer force a fallback to
-  // multi-query (TML-2594). `distinct()` on a non-leaf include is also
-  // handled by the lateral / correlated builders via a wrapped-subquery
-  // lowering (TML-2656). Scalar (`count`/`sum`/...) and `combine()`
-  // descriptors still force multi-query until TML-2595 lands; the
-  // recursive scan below catches them at any depth so a nested
-  // `count()` inside a row include doesn't accidentally hit the throw
-  // in `compileSelectWithIncludeStrategy`.
-  if (hasScalarOrCombineIncludeDescriptors(options.state.includes)) {
-    return dispatchWithMultiQueryIncludes<Row>(options);
-  }
-
+  // Both single-query builders (lateral, correlated) lower every
+  // include descriptor shape — row, scalar reducers, and combine() —
+  // at any depth (TML-2594 + TML-2595 + TML-2588). Dispatch routes
+  // purely on the contract's capability flags via `selectIncludeStrategy`.
+  // The `'multiQuery'` arm remains reachable only from synthetic test
+  // contracts that declare neither `lateral` nor `jsonAgg` capabilities;
+  // its removal is tracked separately.
   switch (strategy) {
     case 'lateral':
       return dispatchWithSingleQueryIncludes<Row>({
@@ -494,25 +488,34 @@ function uniqueValues(values: unknown[]): unknown[] {
  * include; values nested inside that JSON are already-parsed JS values
  * after the outer `JSON.parse`, so `parseIncludedRows` recognises both
  * the string (top-level) and array (nested) forms.
+ *
+ * Scalar leaves arrive wrapped in a `{ value: <primitive> }` JSON
+ * envelope (see `buildIncludeChildScalarSelect`); the branch below
+ * unwraps that envelope and passes the value straight through. The
+ * empty-relation default is driven by SQL semantics, not the decoder:
+ * `COUNT(*)` over an empty input set is `0`; `SUM` / `AVG` / `MIN` /
+ * `MAX` over an empty input set are SQL `NULL`, which surfaces as
+ * `null` in TS — the documented contract for those reducers.
+ *
+ * Combine descriptors arrive as a JSON object keyed by branch name;
+ * each branch is dispatched to the row or scalar decoder per its
+ * declared shape (see `decodeCombineIncludePayload`).
  */
 function decodeIncludePayload(
   contract: Contract<SqlStorage>,
   include: IncludeExpr,
   raw: unknown,
-): Record<string, unknown>[] | Record<string, unknown> | null {
+): unknown {
+  if (include.scalar) {
+    return decodeScalarIncludePayload(include, include.scalar, raw);
+  }
+  if (include.combine) {
+    return decodeCombineIncludePayload(contract, include, include.combine, raw);
+  }
   const rawChildren = parseIncludedRows(raw);
   const mappedChildren = rawChildren.map((childRow) => {
     const mapped = mapStorageRowToModelFields(contract, include.relatedModelName, childRow);
     for (const nestedInclude of include.nested.includes) {
-      // Defence in depth: the dispatch gate filters scalar/combine at
-      // any depth via `hasScalarOrCombineIncludeDescriptors`. This branch
-      // is unreachable in production but documents the contract the
-      // recursion relies on.
-      if (nestedInclude.scalar || nestedInclude.combine) {
-        throw new Error(
-          'single-query include strategy does not support nested scalar include selectors or combine()',
-        );
-      }
       mapped[nestedInclude.relationName] = decodeIncludePayload(
         contract,
         nestedInclude,
@@ -522,6 +525,117 @@ function decodeIncludePayload(
     return mapped;
   });
   return coerceSingleQueryIncludeResult(mappedChildren, include.cardinality);
+}
+
+/**
+ * Decode the combine payload produced by `buildIncludeChildCombineSelect`.
+ *
+ * The raw value is a JSON object (already parsed by the SQL layer when
+ * top-level, or already a JS object when nested) whose keys are branch
+ * names. Each branch value is decoded per its declared kind:
+ *  - row branch -> recurse via `decodeIncludePayload` with a synthetic
+ *    IncludeExpr carrying the branch's state in `nested`. This walks
+ *    nested row-level includes the same way a plain row include would.
+ *  - scalar branch -> unwrap the `{value: ...}` envelope via the
+ *    standalone scalar decoder.
+ *
+ * On a parent with zero matching child rows the LATERAL still produces
+ * one row (aggregates collapse the empty input to a single row), so
+ * the combine envelope here is always present. The `assignEmptyIncludeResult`
+ * no-LATERAL-row short-circuit writes the empty per-branch shape
+ * directly to `parent.mapped[relationName]` and never enters the
+ * decoder, so a missing or non-object envelope here is always a
+ * planner/decoder bug — `parseCombineEnvelope` throws loudly rather
+ * than papering over it with an empty shape.
+ */
+function decodeCombineIncludePayload(
+  contract: Contract<SqlStorage>,
+  include: IncludeExpr,
+  branches: Readonly<Record<string, IncludeCombineBranch>>,
+  raw: unknown,
+): Record<string, unknown> {
+  const parsed = parseCombineEnvelope(include, raw);
+  const result: Record<string, unknown> = {};
+  for (const [branchName, branch] of Object.entries(branches)) {
+    const branchRaw = parsed[branchName];
+    if (branch.kind === 'rows') {
+      const syntheticInclude: IncludeExpr = {
+        ...include,
+        nested: branch.state,
+        scalar: undefined,
+        combine: undefined,
+      };
+      result[branchName] = decodeIncludePayload(contract, syntheticInclude, branchRaw);
+    } else {
+      result[branchName] = decodeScalarIncludePayload(include, branch.selector, branchRaw);
+    }
+  }
+  return result;
+}
+
+function parseCombineEnvelope(include: IncludeExpr, raw: unknown): Record<string, unknown> {
+  if (raw === null || raw === undefined) {
+    throw new Error(
+      `combine() envelope for include "${include.relationName}" is missing (got ${raw === null ? 'null' : 'undefined'}); the LATERAL / correlated subquery should always produce a JSON object — this indicates a planner or decoder bug.`,
+    );
+  }
+  const parsed = parseIncludePayload(raw);
+  if (!isPlainObjectEnvelope(parsed)) {
+    throw new Error(
+      `combine() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
+    );
+  }
+  return parsed;
+}
+
+function isPlainObjectEnvelope(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function describeEnvelopeShape(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+/**
+ * Pull the primitive scalar value out of the JSON envelope emitted by
+ * the lateral / correlated scalar builder.
+ *
+ * Contract: the envelope is always either
+ *   - a `{ value: <primitive> }` JSON object (the SQL path), or
+ *   - `null` / `undefined` (the `assignEmptyIncludeResult`
+ *     no-LATERAL-row short-circuit before this decoder runs).
+ *
+ * Any other shape — array, primitive, string that JSON-parses to
+ * non-object — indicates a planner / decoder bug, so we throw
+ * loudly naming the include relation rather than soft-handling.
+ * Mirrors `parseCombineEnvelope`'s strict shape gate.
+ *
+ * Values are passed through unchanged — no JS-side `Number()` coercion
+ * and no JS-side empty-relation defaulting. SQL semantics drive the
+ * empty-relation case: `COUNT(*)` over an empty input set is `0`;
+ * `SUM` / `AVG` / `MIN` / `MAX` over an empty input set return SQL
+ * `NULL`, which surfaces as `null` here. The outer `raw === null`
+ * fallback is defensive cover for an empty parent set; in single-query
+ * dispatch the LATERAL / correlated subquery always produces a row,
+ * so the inner envelope's `value` is always set by SQL.
+ */
+function decodeScalarIncludePayload(
+  include: IncludeExpr,
+  scalar: IncludeScalar<unknown>,
+  raw: unknown,
+): unknown {
+  if (raw === null || raw === undefined) {
+    return emptyScalarResult(scalar.fn);
+  }
+  const parsed = parseIncludePayload(raw);
+  if (!isPlainObjectEnvelope(parsed)) {
+    throw new Error(
+      `scalar() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
+    );
+  }
+  return parsed['value'];
 }
 
 function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {

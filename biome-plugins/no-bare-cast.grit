@@ -24,9 +24,5 @@
   not $t <: r"^const$",
   not $filename <: r".*\.(?:test|test-d)\.ts",
   not $filename <: r".*/test/.*\.ts",
-  register_diagnostic(
-    span = $x,
-    message = "no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast",
-    severity = "info"
-  )
+  register_diagnostic(span=$x, message="no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast", severity="info")
 }

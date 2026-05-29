@@ -1,4 +1,6 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
+import { mergeCapabilityMatrices } from '@prisma-next/framework-components/components';
+import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
@@ -6,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
   type SqlExecutionStack,
+  type SqlRuntimeAdapterDescriptor,
+  type SqlRuntimeDriverInstance,
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
@@ -89,7 +93,7 @@ describe('createExecutionContext', () => {
       stack: createStack(),
     });
 
-    expect(context.contract).toBe(testContract);
+    expect(context.contract).toEqual(testContract);
     expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
     expect(context.queryOperations).toBeDefined();
   });
@@ -782,5 +786,160 @@ describe('applyMutationDefaults', () => {
     expect(counterMarker.invocations).toBe(2);
     expect(row1).toEqual([{ column: 'id', value: 1 }]);
     expect(row2).toEqual([{ column: 'id', value: 2 }]);
+  });
+});
+
+describe('capability folding', () => {
+  function targetWithCapabilities(
+    capabilities: Record<string, unknown>,
+  ): SqlRuntimeTargetDescriptor<'postgres'> {
+    return { ...createTestTargetDescriptor(), capabilities };
+  }
+
+  function adapterWithCapabilities(
+    capabilities: Record<string, unknown>,
+  ): SqlRuntimeAdapterDescriptor<'postgres'> {
+    return {
+      ...createTestAdapterDescriptor(createStubAdapter()),
+      capabilities,
+    };
+  }
+
+  function extensionWithCapabilities(
+    id: string,
+    capabilities: Record<string, unknown>,
+  ): SqlRuntimeExtensionDescriptor<'postgres'> {
+    return {
+      kind: 'extension' as const,
+      id,
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      capabilities,
+      codecs: () => [],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+  }
+
+  function driverWithCapabilities(
+    capabilities: Record<string, unknown>,
+  ): RuntimeDriverDescriptor<'sql', 'postgres', unknown, SqlRuntimeDriverInstance<'postgres'>> {
+    return {
+      kind: 'driver' as const,
+      id: 'test-driver',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      capabilities,
+      create() {
+        return {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        } as unknown as SqlRuntimeDriverInstance<'postgres'>;
+      },
+    };
+  }
+
+  it('folds adapter capabilities into context.contract.capabilities', () => {
+    const stack: SqlExecutionStack<'postgres'> = {
+      target: createTestTargetDescriptor(),
+      adapter: adapterWithCapabilities({ sql: { returning: true } }),
+      extensionPacks: [],
+    };
+
+    const context = createExecutionContext({ contract: testContract, stack });
+
+    expect(context.contract.capabilities).toEqual({ sql: { returning: true } });
+  });
+
+  it('folds driver capabilities when a driver is supplied via options', () => {
+    const context = createExecutionContext({
+      contract: testContract,
+      stack: {
+        target: createTestTargetDescriptor(),
+        adapter: createTestAdapterDescriptor(createStubAdapter()),
+        extensionPacks: [],
+      },
+      driver: driverWithCapabilities({ postgres: { cursor: true } }),
+    });
+
+    expect(context.contract.capabilities).toEqual({ postgres: { cursor: true } });
+  });
+
+  it('later contributor wins on key collision (adapter overrides target)', () => {
+    const stack: SqlExecutionStack<'postgres'> = {
+      target: targetWithCapabilities({ sql: { returning: false } }),
+      adapter: adapterWithCapabilities({ sql: { returning: true } }),
+      extensionPacks: [],
+    };
+
+    const context = createExecutionContext({ contract: testContract, stack });
+
+    expect(context.contract.capabilities['sql']?.['returning']).toBe(true);
+  });
+
+  it('does not mutate the input contract', () => {
+    const inputCapabilities = Object.freeze({ sql: Object.freeze({ select: true }) });
+    const inputContract: Contract<SqlStorage> = Object.freeze({
+      ...testContract,
+      capabilities: inputCapabilities,
+    });
+
+    const context = createExecutionContext({
+      contract: inputContract,
+      stack: {
+        target: createTestTargetDescriptor(),
+        adapter: adapterWithCapabilities({ sql: { returning: true } }),
+        extensionPacks: [],
+      },
+    });
+
+    expect(inputContract.capabilities).toBe(inputCapabilities);
+    expect(inputCapabilities).toEqual({ sql: { select: true } });
+    expect(context.contract).not.toBe(inputContract);
+    expect(context.contract.capabilities).toEqual({
+      sql: { returning: true, select: true },
+    });
+  });
+
+  it('matches mergeCapabilityMatrices output across the full stack', () => {
+    const target = targetWithCapabilities({ sql: { select: true } });
+    const adapter = adapterWithCapabilities({ sql: { returning: true } });
+    const driver = driverWithCapabilities({ postgres: { cursor: true } });
+    const extension = extensionWithCapabilities('pgvector-test', {
+      postgres: { 'vector.cosine': true },
+    });
+
+    const expected = mergeCapabilityMatrices(testContract.capabilities, [
+      target,
+      adapter,
+      driver,
+      extension,
+    ]);
+
+    const context = createExecutionContext({
+      contract: testContract,
+      stack: { target, adapter, extensionPacks: [extension] },
+      driver,
+    });
+
+    expect(context.contract.capabilities).toEqual(expected);
+  });
+
+  it('is idempotent when the same extension descriptor appears twice in the stack', () => {
+    const extension = extensionWithCapabilities('dup-ext', {
+      postgres: { lateral: true },
+    });
+    const stack: SqlExecutionStack<'postgres'> = {
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(createStubAdapter()),
+      extensionPacks: [extension, extension],
+    };
+
+    const context = createExecutionContext({ contract: testContract, stack });
+
+    expect(context.contract.capabilities).toEqual({ postgres: { lateral: true } });
   });
 });

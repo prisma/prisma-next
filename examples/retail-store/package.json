@@ -14,7 +14,8 @@
     "dev": "next dev",
     "build": "next build",
     "test": "vitest run",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings"
   },
   "dependencies": {
     "@prisma-next/adapter-mongo": "workspace:0.11.0",

@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  AggregateExpr,
   AndExpr,
   type AnyExpression,
   type AnyFromSource,
@@ -31,10 +32,9 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
-import { hasScalarOrCombineIncludeDescriptors } from './include-tree-predicates';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
-import type { CollectionState, IncludeExpr } from './types';
+import type { CollectionState, IncludeCombineBranch, IncludeExpr, IncludeScalar } from './types';
 import { bindWhereExpr } from './where-binding';
 import { combineWhereExprs } from './where-utils';
 
@@ -622,6 +622,326 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   };
 }
 
+/**
+ * Build the inner SELECT for a scalar include reducer (`count` /
+ * `sum` / `avg` / `min` / `max`).
+ *
+ * Emits one row containing `json_build_object('value', AGG(...))`
+ * over the child relation correlated to the parent via the FK. The
+ * JSON wrap lets the value flow through the existing include-payload
+ * decoder unchanged (it JSON.parses the column and the scalar branch
+ * pulls `.value` out).
+ *
+ * The refine state's pipeline composes through to the aggregate's
+ * input set: `where` / `orderBy` / `take` / `skip` / `distinct` shape
+ * the rows the aggregate sees, matching the natural compositional
+ * semantic of
+ *
+ *   `db.User.include('posts', p => p.where(W).take(N).count())  // ≤ N`
+ *
+ * When `take` / `skip` / `distinct` is set, the aggregate's input
+ * cannot just be the bare correlated table — a top-level `LIMIT` on
+ * the aggregating SELECT only trims the (already one-row) output, not
+ * the rows being aggregated. We therefore wrap the source in a
+ * derived SELECT that materialises the shaped row set, then
+ * aggregate over that. `orderBy` alone (no `take` / `skip` /
+ * `distinct`) is dropped at the SQL level since reordering does not
+ * change which rows are aggregated.
+ */
+function buildIncludeChildScalarSelect(
+  contract: Contract<SqlStorage>,
+  parentTableName: string,
+  include: IncludeExpr,
+  scalar: IncludeScalar<unknown>,
+): SelectAst {
+  const childTableAlias =
+    include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
+  const childTableRef = childTableAlias ?? include.relatedTableName;
+  const state = scalar.state;
+
+  const joinExpr = BinaryExpr.eq(
+    ColumnRef.of(childTableRef, include.targetColumn),
+    ColumnRef.of(parentTableName, include.localColumn),
+  );
+  const childWhere = buildStateWhere(contract, childTableRef, state, {
+    filterTableName: include.relatedTableName,
+  });
+  const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
+
+  // Self-relations rename the inner table source via `childTableAlias`;
+  // remap any ColumnRef the user-supplied `orderBy` carries against
+  // the original table name to the alias — mirrors the row-include
+  // path.
+  const remappedOrderBy =
+    childTableAlias && state.orderBy
+      ? state.orderBy.map((item) =>
+          item.rewrite(createTableRefRemapper(include.relatedTableName, childTableRef)),
+        )
+      : state.orderBy;
+
+  const hasPagination = state.limit !== undefined || state.offset !== undefined;
+  const hasDistinct =
+    (state.distinct !== undefined && state.distinct.length > 0) ||
+    (state.distinctOn !== undefined && state.distinctOn.length > 0);
+  const needsInnerScoping = hasPagination || hasDistinct;
+
+  if (!needsInnerScoping) {
+    const aggregateExpr = buildIncludeAggregateExpr(scalar, childTableRef);
+    const jsonObjectExpr = JsonObjectExpr.fromEntries([
+      JsonObjectExpr.entry('value', aggregateExpr),
+    ]);
+    return SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+      .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
+      .withWhere(whereExpr);
+  }
+
+  // Inner SELECT: materialise the shaped row set. Project only what
+  // the outer aggregate needs (the aggregate's column, or a constant
+  // for COUNT). ORDER BY columns are accessible via the FROM scope
+  // and don't need to be in the projection. Distinct columns are
+  // accessible to ROW_NUMBER OVER PARTITION BY the same way.
+  //
+  // Exception: when `state.distinct` (Prisma-style ROW_NUMBER dedup)
+  // is combined with `orderBy`, we must reapply the ordering on the
+  // wrapped (post-dedup) result so subsequent LIMIT / OFFSET slices
+  // the ordered deduped rows. Postgres has no contract that rows
+  // exit the `WHERE rn=1` wrap in any particular order. To do that
+  // we carry hidden order columns through the wrap and re-reference
+  // them on the wrapped alias — mirrors the row-include lowering in
+  // `buildIncludeChildRowsSelect`'s distinct branch.
+  const innerAlias = `${include.relationName}__scalar`;
+  const needsHiddenOrderProjection =
+    state.distinct !== undefined &&
+    state.distinct.length > 0 &&
+    remappedOrderBy !== undefined &&
+    remappedOrderBy.length > 0;
+  const hiddenOrderProjection: ReadonlyArray<ProjectionItem> = needsHiddenOrderProjection
+    ? remappedOrderBy.map((item, index) =>
+        ProjectionItem.of(`${include.relationName}__order_${index}`, item.expr),
+      )
+    : [];
+  const innerProjection: ProjectionItem[] = [
+    ...(scalar.column !== undefined
+      ? [ProjectionItem.of(scalar.column, ColumnRef.of(childTableRef, scalar.column))]
+      : [ProjectionItem.of('__row', LiteralExpr.of(1))]),
+    ...hiddenOrderProjection,
+  ];
+
+  let inner = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+    .withProjection(innerProjection)
+    .withWhere(whereExpr);
+
+  if (state.distinctOn !== undefined && state.distinctOn.length > 0) {
+    inner = inner.withDistinctOn(
+      state.distinctOn.map((column) => ColumnRef.of(childTableRef, column)),
+    );
+    if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
+      inner = inner.withOrderBy(remappedOrderBy);
+    }
+  } else if (state.distinct !== undefined && state.distinct.length > 0) {
+    // Prisma-style `.distinct(cols)`: ROW_NUMBER dedup, mirroring
+    // `buildIncludeChildRowsSelect`'s distinct lowering. The ranking
+    // orderBy feeds the OVER clause so dedup picks the right
+    // representative; the reapplied orderBy below sequences the
+    // surviving rows for LIMIT / OFFSET.
+    const rankedAlias = `${include.relationName}__scalar_distinct`;
+    inner = wrapWithRowNumberDedup({
+      base: inner,
+      distinctColumnRefs: state.distinct.map((column) => ColumnRef.of(childTableRef, column)),
+      rankingOrderBy: remappedOrderBy ?? [],
+      rankedAlias,
+    });
+    if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
+      inner = inner.withOrderBy(
+        remappedOrderBy.map(
+          (item, index) =>
+            new OrderByItem(
+              ColumnRef.of(rankedAlias, `${include.relationName}__order_${index}`),
+              item.dir,
+            ),
+        ),
+      );
+    }
+  } else if (remappedOrderBy !== undefined && remappedOrderBy.length > 0) {
+    inner = inner.withOrderBy(remappedOrderBy);
+  }
+
+  if (state.limit !== undefined) {
+    inner = inner.withLimit(state.limit);
+  }
+  if (state.offset !== undefined) {
+    inner = inner.withOffset(state.offset);
+  }
+
+  // Outer aggregating SELECT over the shaped inner row set.
+  const outerAggregateExpr = buildIncludeAggregateExpr(scalar, innerAlias);
+  const outerJsonObjectExpr = JsonObjectExpr.fromEntries([
+    JsonObjectExpr.entry('value', outerAggregateExpr),
+  ]);
+
+  return SelectAst.from(DerivedTableSource.as(innerAlias, inner)).withProjection([
+    ProjectionItem.of(include.relationName, outerJsonObjectExpr),
+  ]);
+}
+
+function buildIncludeAggregateExpr(
+  scalar: IncludeScalar<unknown>,
+  childTableRef: string,
+): AggregateExpr {
+  if (scalar.fn === 'count') {
+    return AggregateExpr.count();
+  }
+  if (scalar.column === undefined) {
+    throw new Error(`Aggregate selector "${scalar.fn}" requires a column`);
+  }
+  const columnRef = ColumnRef.of(childTableRef, scalar.column);
+  switch (scalar.fn) {
+    case 'sum':
+      return AggregateExpr.sum(columnRef);
+    case 'avg':
+      return AggregateExpr.avg(columnRef);
+    case 'min':
+      return AggregateExpr.min(columnRef);
+    case 'max':
+      return AggregateExpr.max(columnRef);
+    default:
+      throw new Error(`Unsupported aggregate selector: ${scalar.fn satisfies never}`);
+  }
+}
+
+/**
+ * Build the inner SELECT for a `combine({ a, b, ... })` include.
+ *
+ * Each branch produces a self-contained SELECT projecting one row
+ * with one column aliased to the relation name. The branches are
+ * stitched together as cross-joined derived tables (FROM <first>
+ * INNER JOIN <second> ON TRUE ...), and the outer projection packs
+ * them into a single `json_build_object` keyed by branch name. The
+ * resulting subquery emits exactly one row per parent row containing
+ * the combined JSON — wrapped as a LATERAL join under the lateral
+ * strategy or embedded as a correlated subquery under the correlated
+ * strategy.
+ *
+ * Row branches reuse the standalone row-include builder; scalar
+ * branches reuse `buildIncludeChildScalarSelect` — the `{value: ...}`
+ * envelope survives into the combined JSON and the decoder unwraps
+ * it per scalar branch. Distinct/take/skip semantics inside a row
+ * branch fan out naturally because the row builder is invoked with
+ * a synthetic IncludeExpr whose `nested` is the branch's state.
+ */
+function buildIncludeChildCombineSelect(
+  contract: Contract<SqlStorage>,
+  parentTableName: string,
+  include: IncludeExpr,
+  branches: Readonly<Record<string, IncludeCombineBranch>>,
+  strategy: 'lateral' | 'correlated',
+): SelectAst {
+  const branchEntries = Object.entries(branches);
+  if (branchEntries.length === 0) {
+    throw new Error(`combine() include "${include.relationName}" has no branches`);
+  }
+
+  const compiledBranches = branchEntries.map(([name, branch]) => ({
+    name,
+    alias: `${include.relationName}__combine__${name}`,
+    select: buildIncludeChildCombineBranchSelect(
+      contract,
+      parentTableName,
+      include,
+      branch,
+      strategy,
+    ),
+  }));
+
+  const jsonObjectExpr = JsonObjectExpr.fromEntries(
+    compiledBranches.map((branch) =>
+      JsonObjectExpr.entry(branch.name, ColumnRef.of(branch.alias, include.relationName)),
+    ),
+  );
+
+  const [firstBranch, ...restBranches] = compiledBranches;
+  if (!firstBranch) {
+    // Unreachable given the empty-branches guard above; keeps the
+    // type-narrowing honest for the destructuring read below.
+    throw new Error(`combine() include "${include.relationName}" has no branches`);
+  }
+
+  const joins = restBranches.map((branch) =>
+    JoinAst.inner(DerivedTableSource.as(branch.alias, branch.select), AndExpr.true(), false),
+  );
+
+  return SelectAst.from(DerivedTableSource.as(firstBranch.alias, firstBranch.select))
+    .withProjection([ProjectionItem.of(include.relationName, jsonObjectExpr)])
+    .withJoins(joins);
+}
+
+/**
+ * Compile one branch of a `combine({ ... })` into a SelectAst that
+ * projects exactly one row with one column aliased to the parent
+ * relation name. Dispatches to the standalone scalar / row builders
+ * with the branch's state spliced into a synthetic IncludeExpr. The
+ * `strategy` is forwarded so that nested includes inside a row branch
+ * stay on the same emission strategy as the outer query.
+ */
+function buildIncludeChildCombineBranchSelect(
+  contract: Contract<SqlStorage>,
+  parentTableName: string,
+  include: IncludeExpr,
+  branch: IncludeCombineBranch,
+  strategy: 'lateral' | 'correlated',
+): SelectAst {
+  if (branch.kind === 'scalar') {
+    return buildIncludeChildScalarSelect(contract, parentTableName, include, branch.selector);
+  }
+  // Row branch: synthesize an IncludeExpr whose `nested` is the
+  // branch's state, then build the standard row-aggregate inner shape.
+  const syntheticInclude: IncludeExpr = {
+    ...include,
+    nested: branch.state,
+    scalar: undefined,
+    combine: undefined,
+  };
+  return buildIncludeChildRowsAggregateSelect(
+    contract,
+    parentTableName,
+    syntheticInclude,
+    strategy,
+  );
+}
+
+/**
+ * Internal helper: build the inner aggregate SELECT that `json_agg`s
+ * child rows into a single JSON-array column aliased to the relation
+ * name. Used by both the standalone row LATERAL / correlated path and
+ * by combine's row branches. The `strategy` parameter propagates into
+ * `buildIncludeChildRowsSelect` so that nested includes inside the
+ * aggregated child rows use the same emission shape as the outer query.
+ */
+function buildIncludeChildRowsAggregateSelect(
+  contract: Contract<SqlStorage>,
+  parentTableName: string,
+  include: IncludeExpr,
+  strategy: 'lateral' | 'correlated',
+): SelectAst {
+  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+    contract,
+    parentTableName,
+    include,
+    strategy,
+  );
+  const jsonObjectExpr = JsonObjectExpr.fromEntries(
+    childProjection.map((item) =>
+      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
+    ),
+  );
+  return SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection([
+    ProjectionItem.of(
+      include.relationName,
+      JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
+    ),
+  ]);
+}
+
 function buildLateralIncludeArtifacts(
   contract: Contract<SqlStorage>,
   parentTableName: string,
@@ -630,26 +950,46 @@ function buildLateralIncludeArtifacts(
   readonly join: JoinAst;
   readonly projection: ProjectionItem;
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+  const lateralAlias = `${include.relationName}_lateral`;
+
+  if (include.scalar) {
+    const scalarSelect = buildIncludeChildScalarSelect(
+      contract,
+      parentTableName,
+      include,
+      include.scalar,
+    );
+    return {
+      join: JoinAst.left(DerivedTableSource.as(lateralAlias, scalarSelect), AndExpr.true(), true),
+      projection: ProjectionItem.of(
+        include.relationName,
+        ColumnRef.of(lateralAlias, include.relationName),
+      ),
+    };
+  }
+
+  if (include.combine) {
+    const combineSelect = buildIncludeChildCombineSelect(
+      contract,
+      parentTableName,
+      include,
+      include.combine,
+      'lateral',
+    );
+    return {
+      join: JoinAst.left(DerivedTableSource.as(lateralAlias, combineSelect), AndExpr.true(), true),
+      projection: ProjectionItem.of(
+        include.relationName,
+        ColumnRef.of(lateralAlias, include.relationName),
+      ),
+    };
+  }
+
+  const aggregateQuery = buildIncludeChildRowsAggregateSelect(
     contract,
     parentTableName,
     include,
     'lateral',
-  );
-  const lateralAlias = `${include.relationName}_lateral`;
-  const jsonObjectExpr = JsonObjectExpr.fromEntries(
-    childProjection.map((item) =>
-      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
-    ),
-  );
-
-  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection(
-    [
-      ProjectionItem.of(
-        include.relationName,
-        JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
-      ),
-    ],
   );
 
   return {
@@ -668,26 +1008,37 @@ function buildCorrelatedIncludeProjection(
 ): {
   readonly projection: ProjectionItem;
 } {
-  const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
+  if (include.scalar) {
+    const scalarSelect = buildIncludeChildScalarSelect(
+      contract,
+      parentTableName,
+      include,
+      include.scalar,
+    );
+    return {
+      projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(scalarSelect)),
+    };
+  }
+
+  if (include.combine) {
+    const combineSelect = buildIncludeChildCombineSelect(
+      contract,
+      parentTableName,
+      include,
+      include.combine,
+      'correlated',
+    );
+    return {
+      projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(combineSelect)),
+    };
+  }
+
+  const aggregateQuery = buildIncludeChildRowsAggregateSelect(
     contract,
     parentTableName,
     include,
     'correlated',
   );
-  const jsonObjectExpr = JsonObjectExpr.fromEntries(
-    childProjection.map((item) =>
-      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
-    ),
-  );
-  const aggregateQuery = SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection(
-    [
-      ProjectionItem.of(
-        include.relationName,
-        JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
-      ),
-    ],
-  );
-
   return {
     projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(aggregateQuery)),
   };
@@ -896,12 +1247,6 @@ export function compileSelectWithIncludeStrategy(
   strategy: 'lateral' | 'correlated',
   modelName?: string,
 ): SqlQueryPlan<Record<string, unknown>> {
-  if (hasScalarOrCombineIncludeDescriptors(state.includes)) {
-    throw new Error(
-      'single-query include strategy does not support scalar include selectors or combine()',
-    );
-  }
-
   const includeJoins: JoinAst[] = [];
   const includeProjection: ProjectionItem[] = [];
   const topLevelWhere = buildStateWhere(contract, tableName, state);

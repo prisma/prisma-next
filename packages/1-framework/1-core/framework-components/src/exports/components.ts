@@ -1,3 +1,4 @@
+export { mergeCapabilityMatrices } from '../shared/capabilities';
 export type {
   AdapterDescriptor,
   AdapterInstance,
