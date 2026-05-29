@@ -246,12 +246,12 @@ describe('generateModelsType', () => {
 });
 
 describe('generateRootsType', () => {
-  it('returns Record<string, CrossReference> for undefined roots', () => {
-    expect(generateRootsType(undefined)).toBe('Record<string, CrossReference>');
+  it('returns Record<string, never> for undefined roots', () => {
+    expect(generateRootsType(undefined)).toBe('Record<string, never>');
   });
 
-  it('returns Record<string, CrossReference> for empty roots', () => {
-    expect(generateRootsType({})).toBe('Record<string, CrossReference>');
+  it('returns Record<string, never> for empty roots', () => {
+    expect(generateRootsType({})).toBe('Record<string, never>');
   });
 
   it('generates literal object type for roots', () => {

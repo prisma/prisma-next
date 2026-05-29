@@ -327,8 +327,8 @@ describe('mongoEmission.generateContractTypes', () => {
       const types = generateContractDts(contract, mongoEmission, [], testHashes);
       expect(types).toContain('readonly namespaces:');
       expect(types).toContain('readonly collections:');
-      expect(types).toContain('readonly users: Record<string, never>');
-      expect(types).toContain('readonly posts: Record<string, never>');
+      expect(types).toContain('readonly users: MongoCollection');
+      expect(types).toContain('readonly posts: MongoCollection');
     });
 
     it('generates collection metadata for indexes and options', () => {
