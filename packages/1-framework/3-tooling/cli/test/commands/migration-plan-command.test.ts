@@ -1,8 +1,14 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
+import {
+  createContractSpaceAggregate,
+  createContractSpaceMember,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { timeouts } from '@prisma-next/test-utils';
+import { ok } from '@prisma-next/utils/result';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MigrationPlanResult } from '../../src/commands/migration-plan';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
@@ -435,27 +441,34 @@ describe('migration plan command', () => {
           },
         ],
       });
-      const emptyGraph = reconstructGraph([]);
-      mocks.buildContractSpaceAggregate.mockResolvedValueOnce({
-        ok: true,
-        value: {
-          targetId: 'mongo',
-          app: {
-            spaceId: 'app',
-            contract: JSON.parse(makeContractJson(NEW_HASH)),
-            headRef: { hash: NEW_HASH, invariants: [] },
-            migrations: { graph: emptyGraph, packagesByMigrationHash: new Map() },
-          },
-          extensions: [
-            {
-              spaceId: 'cipherstash',
-              contract: JSON.parse(makeContractJson(OLD_HASH)),
-              headRef: { hash: OLD_HASH, invariants: [] },
-              migrations: { graph: emptyGraph, packagesByMigrationHash: new Map() },
-            },
-          ],
-        },
-      });
+      // Hand-built aggregate in the new tolerant-member shape: `contract()`
+      // and `graph()` are lazy methods, not eager values. `plan` only reads
+      // `app.spaceId` and `app.contract()` here, so the extension member is
+      // present for completeness but its facets are never invoked.
+      mocks.buildContractSpaceAggregate.mockResolvedValueOnce(
+        ok(
+          createContractSpaceAggregate({
+            targetId: 'mongo',
+            app: createContractSpaceMember({
+              spaceId: 'app',
+              packages: [],
+              refs: {},
+              headRef: { hash: NEW_HASH, invariants: [] },
+              resolveContract: () => JSON.parse(makeContractJson(NEW_HASH)) as Contract,
+            }),
+            extensions: [
+              createContractSpaceMember({
+                spaceId: 'cipherstash',
+                packages: [],
+                refs: {},
+                headRef: { hash: OLD_HASH, invariants: [] },
+                resolveContract: () => JSON.parse(makeContractJson(OLD_HASH)) as Contract,
+              }),
+            ],
+            checkIntegrity: () => [],
+          }),
+        ),
+      );
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
       setupDbRefFromHash(OLD_HASH);

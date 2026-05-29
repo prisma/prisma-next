@@ -9,6 +9,7 @@ import type {
 import {
   type AggregateVerifierOutput,
   type ContractSpaceMember,
+  requireHeadRef,
   verifyAggregate,
 } from '@prisma-next/migration-tools/aggregate';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -247,15 +248,17 @@ function finaliseVerifyResult(args: {
 }
 
 function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSchemaResult {
-  const profileHash = (member.contract as { profileHash?: string }).profileHash;
+  const contract = member.contract();
+  const headRef = requireHeadRef(member);
+  const profileHash = (contract as { profileHash?: string }).profileHash;
   return {
     ok: true,
     summary: 'Schema verification skipped',
     contract: {
-      storageHash: member.headRef.hash,
+      storageHash: headRef.hash,
       ...(profileHash ? { profileHash } : {}),
     },
-    target: { expected: member.contract.target },
+    target: { expected: contract.target },
     schema: {
       issues: [],
       root: {

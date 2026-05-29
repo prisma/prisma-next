@@ -3,8 +3,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSpaceAggregate,
   ContractSpaceMember,
-  HydratedMigrationGraph,
 } from '@prisma-next/migration-tools/aggregate';
+import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ok, type Result } from '@prisma-next/utils/result';
@@ -54,21 +54,12 @@ function makeEmptyGraph(): MigrationGraph {
   };
 }
 
-function makeHydratedGraph(empty: boolean): HydratedMigrationGraph {
-  if (empty) {
-    return {
-      graph: makeEmptyGraph(),
-      packagesByMigrationHash: new Map(),
-    };
-  }
+function makeNonEmptyGraph(): MigrationGraph {
   return {
-    graph: {
-      nodes: new Set<string>([APP_HASH]),
-      forwardChain: new Map(),
-      reverseChain: new Map(),
-      migrationByHash: new Map(),
-    },
-    packagesByMigrationHash: new Map(),
+    nodes: new Set<string>([APP_HASH]),
+    forwardChain: new Map(),
+    reverseChain: new Map(),
+    migrationByHash: new Map(),
   };
 }
 
@@ -81,11 +72,16 @@ function makeMember(spaceId: string, hash: string, empty = false): ContractSpace
       storageHash: hash as Contract['storage'] extends { storageHash: infer H } ? H : never,
     },
   };
+  // Construct the new tolerant-member shape directly: the code path under
+  // test reads `spaceId`, `headRef`, and `graph().nodes.size`; the graph is
+  // stubbed so emptiness is controlled without materialising packages.
   return {
     spaceId,
-    contract,
+    packages: [],
+    refs: {},
     headRef: { hash, invariants: [] },
-    migrations: makeHydratedGraph(empty),
+    graph: () => (empty ? makeEmptyGraph() : makeNonEmptyGraph()),
+    contract: () => contract,
   };
 }
 
@@ -93,11 +89,14 @@ function makeAggregate(args: {
   app: ContractSpaceMember;
   extensions?: readonly ContractSpaceMember[];
 }): Result<ContractSpaceAggregate, never> {
-  return ok({
-    targetId: 'postgres',
-    app: args.app,
-    extensions: args.extensions ?? [],
-  });
+  return ok(
+    createContractSpaceAggregate({
+      targetId: 'postgres',
+      app: args.app,
+      extensions: args.extensions ?? [],
+      checkIntegrity: () => [],
+    }),
+  );
 }
 
 describe('loadAggregateStatusSpaces', () => {

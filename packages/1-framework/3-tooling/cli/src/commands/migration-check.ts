@@ -1,6 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
+import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
 import { readRefs } from '@prisma-next/migration-tools/refs';
@@ -9,7 +12,6 @@ import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   addGlobalOptions,
-  loadMigrationPackages,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
@@ -135,36 +137,60 @@ async function executeMigrationCheckCommand(
 
   const failures: CheckFailure[] = [];
 
-  let bundles: Awaited<ReturnType<typeof loadMigrationPackages>>['bundles'];
-  let graph: Awaited<ReturnType<typeof loadMigrationPackages>>['graph'];
+  // Load tolerantly and report every problem, rather than bailing on the
+  // first. `readMigrationsDir` retains hash-/invariant-mismatched packages
+  // (the per-package checks below re-derive those) and omits unparseable
+  // ones, recording each as a `problem`. Surfacing the omitted/invariant
+  // problems here keeps `check` reporting them as `PN-MIG-CHECK-002`
+  // instead of silently dropping them.
+  const loaded = await readMigrationsDir(appMigrationsDir);
+  const bundles: readonly OnDiskMigrationPackage[] = loaded.packages;
+  let graph: MigrationGraph;
   try {
-    const loaded = await loadMigrationPackages(appMigrationsDir);
-    bundles = loaded.bundles;
-    graph = loaded.graph;
+    graph = reconstructGraph(bundles);
   } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      const pnCode =
-        error.code === 'MIGRATION.HASH_MISMATCH' ? 'PN-MIG-CHECK-001' : 'PN-MIG-CHECK-002';
-      // Normalise to a cwd-relative path. `error.details.dir` is absolute
-      // (the migration-tools layer doesn't know the caller's cwd); the
-      // `filePath` fallback is also absolute. Surfacing the relative form
-      // matches the rest of the command's `where` shape and keeps `--json`
-      // consumers from having to special-case the bootstrap-failure path.
-      const rawWhere =
-        (error.details?.['dir'] as string) ?? (error.details?.['filePath'] as string) ?? null;
-      const where = rawWhere ? relative(process.cwd(), rawWhere) : 'unknown';
+    // `reconstructGraph` only throws on structural impossibilities the
+    // per-package checks can't express (e.g. duplicate migration hashes).
+    // Record it as an integrity failure and continue with an empty graph
+    // so the file-level checks below still run and report.
+    const why = MigrationToolsError.is(error)
+      ? error.why
+      : error instanceof Error
+        ? error.message
+        : String(error);
+    const fix = MigrationToolsError.is(error)
+      ? error.fix
+      : 'Inspect the migration packages for structural inconsistencies.';
+    failures.push({ pnCode: 'PN-MIG-CHECK-002', where: appMigrationsRelative, why, fix });
+    graph = {
+      nodes: new Set<string>(),
+      forwardChain: new Map(),
+      reverseChain: new Map(),
+      migrationByHash: new Map(),
+    };
+  }
+
+  for (const problem of loaded.problems) {
+    // Hash mismatches are retained in `bundles` and re-derived by the
+    // per-package hash check below, so skip them here to avoid
+    // double-reporting the same `PN-MIG-CHECK-001`.
+    if (problem.kind === 'hashMismatch') continue;
+    const where = relative(process.cwd(), join(appMigrationsDir, problem.dirName));
+    if (problem.kind === 'packageUnloadable') {
       failures.push({
-        pnCode,
+        pnCode: 'PN-MIG-CHECK-002',
         where,
-        why: error.why,
-        fix: error.fix,
+        why: `Migration "${problem.dirName}" could not be loaded: ${problem.detail}`,
+        fix: 'Re-emit the migration package or restore from version control.',
       });
-      return {
-        result: { ok: false, failures, summary: `${failures.length} integrity failure(s)` },
-        exitCode: INTEGRITY_FAILED,
-      };
+    } else {
+      failures.push({
+        pnCode: 'PN-MIG-CHECK-002',
+        where,
+        why: `Migration "${problem.dirName}" providedInvariants in migration.json disagrees with ops.json.`,
+        fix: 'Re-emit the migration package so migration.json and ops.json agree.',
+      });
     }
-    throw error;
   }
 
   if (existsSync(appMigrationsDir)) {

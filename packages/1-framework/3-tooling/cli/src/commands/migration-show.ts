@@ -183,7 +183,7 @@ export async function resolveLatestFromDir(
   spaceDir: string,
 ): Promise<Result<OnDiskMigrationPackage | null, CliStructuredError>> {
   try {
-    const allPackages = await readMigrationsDir(spaceDir);
+    const { packages: allPackages } = await readMigrationsDir(spaceDir);
     if (allPackages.length === 0) return ok(null);
     const graph = reconstructGraph(allPackages);
     const latestMigration = findLatestMigration(graph);
@@ -302,7 +302,7 @@ async function executeMigrationShowCommand(
         if (!resolved.ok) return resolved;
         appPkg = await readMigrationPackage(resolved.value);
       } else {
-        const allPackages = await readMigrationsDir(appMigrationsDir);
+        const { packages: allPackages } = await readMigrationsDir(appMigrationsDir);
         if (allPackages.length === 0) {
           return notOk(
             errorRuntime('No migrations found', {
@@ -404,7 +404,7 @@ async function executeMigrationShowCommand(
 
   // App space: latest leaf.
   try {
-    const allPackages = await readMigrationsDir(appMigrationsDir);
+    const { packages: allPackages } = await readMigrationsDir(appMigrationsDir);
     if (allPackages.length === 0) {
       return notOk(
         errorRuntime('No migrations found', {

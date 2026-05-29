@@ -115,7 +115,7 @@ describe('migration plan — core flow', () => {
     );
 
     // Read migrations and find leaf — leaf should be 'sha256:same-hash'
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const graph = reconstructGraph(packages);
     const leaf = findLeaf(graph);
 
@@ -164,7 +164,7 @@ describe('migration plan — core flow', () => {
       );
 
       // Verify migration chain
-      const packages = await readMigrationsDir(migrationsDir);
+      const { packages } = await readMigrationsDir(migrationsDir);
       expect(packages).toHaveLength(2);
 
       const graph = reconstructGraph(packages);
@@ -213,7 +213,7 @@ describe('--from hash lookup', () => {
       [],
     );
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const found = packages.find((p) => p.metadata.to === 'sha256:nonexistent');
     expect(found).toBeUndefined();
   });
@@ -236,7 +236,7 @@ describe('--from hash lookup', () => {
       [],
     );
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const result = resolveBundleByPrefix(packages, 'abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -262,7 +262,7 @@ describe('--from hash lookup', () => {
       [],
     );
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const result = resolveBundleByPrefix(packages, 'sha256:abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -302,7 +302,7 @@ describe('--from hash lookup', () => {
         [],
       );
 
-      const packages = await readMigrationsDir(migrationsDir);
+      const { packages } = await readMigrationsDir(migrationsDir);
       const result = resolveBundleByPrefix(packages, 'sha256:abc');
       expect(result.ok).toBe(false);
       if (!result.ok) {
