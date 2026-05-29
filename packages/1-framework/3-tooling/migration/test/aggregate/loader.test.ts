@@ -277,4 +277,77 @@ describe('loadContractSpaceAggregate', () => {
       );
     });
   });
+
+  describe('extension enumeration', () => {
+    it('excludes reserved-named and grammar-invalid directories from extensions', async () => {
+      // A grammar-valid extension dir is enumerated as a space.
+      await writePackage('valid', '20260101T0000_init', { from: null, to: 'sha256:v1' });
+      // The reserved per-space `refs` name at the migrations root is not a space.
+      await mkdir(join(migrationsDir, 'refs'), { recursive: true });
+      await writeFile(join(migrationsDir, 'refs', 'head.json'), '{}');
+      // A directory whose name violates the space-id grammar (uppercase) is not a space.
+      await mkdir(join(migrationsDir, 'Invalid_Caps'), { recursive: true });
+      await writeFile(join(migrationsDir, 'Invalid_Caps', 'placeholder'), 'x');
+
+      const aggregate = await load();
+
+      expect(aggregate.listSpaces()).toEqual(['app', 'valid']);
+      expect(aggregate.extensions.map((m) => m.spaceId)).toEqual(['valid']);
+    });
+  });
+
+  describe('refUnreadable', () => {
+    it('omits a corrupt named ref and surfaces refUnreadable for it', async () => {
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writeHeadRef('alpha', { hash: 'sha256:a1', invariants: [] });
+      const refsDir = join(migrationsDir, 'alpha', 'refs');
+      await mkdir(refsDir, { recursive: true });
+      await writeFile(join(refsDir, 'production.json'), 'not json');
+
+      const aggregate = await load();
+      expect(aggregate.space('alpha')?.refs).not.toHaveProperty('production');
+
+      const violations = aggregate.checkIntegrity();
+      expect(
+        violationsOfKind(violations, 'refUnreadable').map((v) => ({
+          spaceId: v.spaceId,
+          refName: v.refName,
+        })),
+      ).toContainEqual({ spaceId: 'alpha', refName: 'production' });
+    });
+
+    it('reports a corrupt head.json as refUnreadable, not headRefMissing', async () => {
+      await writePackage('beta', '20260101T0000_init', { from: null, to: 'sha256:b1' });
+      const refsDir = join(migrationsDir, 'beta', 'refs');
+      await mkdir(refsDir, { recursive: true });
+      await writeFile(join(refsDir, 'head.json'), '{ corrupt');
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+
+      expect(
+        violationsOfKind(violations, 'refUnreadable').map((v) => ({
+          spaceId: v.spaceId,
+          refName: v.refName,
+        })),
+      ).toContainEqual({ spaceId: 'beta', refName: 'head' });
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).not.toContain(
+        'beta',
+      );
+    });
+
+    it('still reports headRefMissing when head.json is genuinely absent', async () => {
+      await writePackage('gamma', '20260101T0000_init', { from: null, to: 'sha256:g1' });
+
+      const aggregate = await load();
+      const violations = aggregate.checkIntegrity();
+
+      expect(violationsOfKind(violations, 'headRefMissing').map((v) => v.spaceId)).toContain(
+        'gamma',
+      );
+      expect(violationsOfKind(violations, 'refUnreadable').map((v) => v.spaceId)).not.toContain(
+        'gamma',
+      );
+    });
+  });
 });

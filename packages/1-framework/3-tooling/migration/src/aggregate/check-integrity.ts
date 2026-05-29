@@ -6,6 +6,7 @@ import type {
   IntegrityViolation,
 } from '../integrity-violation';
 import type { PackageLoadProblem } from '../io';
+import type { RefLoadProblem } from '../refs';
 import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractSpaceMember } from './types';
 
@@ -18,6 +19,15 @@ import type { ContractSpaceMember } from './types';
 export interface IntegritySpaceState {
   readonly member: ContractSpaceMember;
   readonly problems: readonly PackageLoadProblem[];
+  /** Per-ref problems: a user ref `*.json` that exists but is unparseable. */
+  readonly refProblems: readonly RefLoadProblem[];
+  /**
+   * The space's `refs/head.json` problem when it exists but is unparseable.
+   * `null` means the head ref was read cleanly or is genuinely absent —
+   * the absent case is judged `headRefMissing`, the corrupt case here is
+   * judged `refUnreadable` (and suppresses `headRefMissing`).
+   */
+  readonly headRefProblem: RefLoadProblem | null;
   readonly isApp: boolean;
 }
 
@@ -39,11 +49,28 @@ export function computeIntegrityViolations(
 ): readonly IntegrityViolation[] {
   const violations: IntegrityViolation[] = [];
 
-  for (const { member, problems, isApp } of input.spaces) {
+  for (const { member, problems, refProblems, headRefProblem, isApp } of input.spaces) {
     const { spaceId } = member;
 
     for (const problem of problems) {
       violations.push(loadProblemToViolation(spaceId, problem));
+    }
+
+    for (const refProblem of refProblems) {
+      violations.push({
+        kind: 'refUnreadable',
+        spaceId,
+        refName: refProblem.refName,
+        detail: refProblem.detail,
+      });
+    }
+    if (headRefProblem !== null) {
+      violations.push({
+        kind: 'refUnreadable',
+        spaceId,
+        refName: headRefProblem.refName,
+        detail: headRefProblem.detail,
+      });
     }
 
     for (const pkg of member.packages) {
@@ -57,8 +84,10 @@ export function computeIntegrityViolations(
 
     // The app head ref is synthesised from the live contract, so it is
     // always present and reachable; only extension spaces read their head
-    // ref from disk and can be missing or point outside the graph.
-    if (!isApp) {
+    // ref from disk and can be missing or point outside the graph. A head
+    // ref that exists but is unparseable is already surfaced above as
+    // `refUnreadable`, so it is not also reported as `headRefMissing`.
+    if (!isApp && headRefProblem === null) {
       if (member.headRef === null) {
         violations.push({ kind: 'headRefMissing', spaceId });
       } else if (!headRefPresentInGraph(member, member.headRef.hash)) {

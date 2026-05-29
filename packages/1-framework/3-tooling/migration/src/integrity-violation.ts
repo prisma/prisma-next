@@ -38,6 +38,12 @@ export type IntegrityViolation =
     }
   | { readonly kind: 'headRefMissing'; readonly spaceId: string }
   | { readonly kind: 'headRefNotInGraph'; readonly spaceId: string; readonly hash: string }
+  | {
+      readonly kind: 'refUnreadable';
+      readonly spaceId: string;
+      readonly refName: string;
+      readonly detail: string;
+    }
   // config/contract-dependent — produced only when the matching opt is set
   | { readonly kind: 'orphanSpaceDir'; readonly spaceId: string }
   | { readonly kind: 'declaredButUnmigrated'; readonly spaceId: string }
@@ -85,7 +91,7 @@ export interface DeclaredExtensionEntry {
  * Both opts default to disabled: a caller without the app contract or
  * declared extensions still gets the structurally-derivable violations
  * (hashMismatch, providedInvariantsMismatch, headRefMissing,
- * headRefNotInGraph, sameSourceAndTarget, packageUnloadable).
+ * headRefNotInGraph, refUnreadable, sameSourceAndTarget, packageUnloadable).
  */
 export interface IntegrityQueryOptions {
   /**

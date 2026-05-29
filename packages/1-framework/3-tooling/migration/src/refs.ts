@@ -15,6 +15,29 @@ export interface RefEntry {
 
 export type Refs = Readonly<Record<string, RefEntry>>;
 
+/**
+ * The system head ref lives at `refs/head.json`. It is read (and its
+ * corruption judged) through `readContractSpaceHeadRef`, not as a
+ * user-authored ref, so {@link readRefsTolerant} excludes it.
+ */
+export const HEAD_REF_NAME = 'head';
+
+/**
+ * A single ref file that exists on disk but cannot be turned into a
+ * {@link RefEntry} (unparseable JSON or schema-invalid content). The ref
+ * is omitted from the result; the problem is surfaced for the integrity
+ * layer to report as `refUnreadable` rather than aborting the load.
+ */
+export interface RefLoadProblem {
+  readonly refName: string;
+  readonly detail: string;
+}
+
+export interface TolerantRefsResult {
+  readonly refs: Refs;
+  readonly problems: readonly RefLoadProblem[];
+}
+
 const REF_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 const REF_VALUE_PATTERN = /^sha256:(empty|[0-9a-f]{64})$/;
 
@@ -134,6 +157,77 @@ export async function readRefs(refsDir: string): Promise<Refs> {
   }
 
   return refs;
+}
+
+/**
+ * Read a space's user-authored refs without ever throwing on disk
+ * content. A ref whose JSON is unparseable or whose shape fails
+ * {@link RefEntrySchema} is omitted from `refs` and reported as a
+ * {@link RefLoadProblem}; the remaining well-formed refs are still
+ * returned. A missing `refs/` directory yields no refs and no problems.
+ *
+ * `refs/head.json` is deliberately skipped here: the system head ref is
+ * read through `readContractSpaceHeadRef` (which validates head-ref
+ * shape, distinct from the strict user-ref hash grammar), so it is judged
+ * there and never doubles as a user ref. Genuine I/O faults (EACCES, EIO,
+ * …) still propagate — only parse / schema problems are made tolerant.
+ */
+export async function readRefsTolerant(refsDir: string): Promise<TolerantRefsResult> {
+  let entries: string[];
+  try {
+    entries = await readdir(refsDir, { recursive: true, encoding: 'utf-8' });
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      return { refs: {}, problems: [] };
+    }
+    throw error;
+  }
+
+  const jsonFiles = entries.filter(
+    (entry) =>
+      entry.endsWith('.json') &&
+      !entry.endsWith('.contract.json') &&
+      entry !== `${HEAD_REF_NAME}.json`,
+  );
+  const refs: Record<string, RefEntry> = {};
+  const problems: RefLoadProblem[] = [];
+
+  for (const jsonFile of jsonFiles) {
+    const filePath = join(refsDir, jsonFile);
+    const name = refNameFromPath(refsDir, filePath);
+
+    let raw: string;
+    try {
+      raw = await readFile(filePath, 'utf-8');
+    } catch (error) {
+      // Tolerate the TOCTOU race between `readdir` and `readFile` (ENOENT)
+      // and benign EISDIR if a directory happens to end in `.json`.
+      // Anything else (EACCES, EIO, …) is a real failure and propagates.
+      const code = error instanceof Error ? (error as { code?: string }).code : undefined;
+      if (code === 'ENOENT' || code === 'EISDIR') {
+        continue;
+      }
+      throw error;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      problems.push({ refName: name, detail: e instanceof Error ? e.message : String(e) });
+      continue;
+    }
+
+    const result = RefEntrySchema(parsed);
+    if (result instanceof type.errors) {
+      problems.push({ refName: name, detail: result.summary });
+      continue;
+    }
+
+    refs[name] = result;
+  }
+
+  return { refs, problems };
 }
 
 export async function writeRef(refsDir: string, name: string, entry: RefEntry): Promise<void> {

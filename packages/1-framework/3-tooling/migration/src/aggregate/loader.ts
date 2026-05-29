@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { readMigrationsDir } from '../io';
 import { readContractSpaceContract } from '../read-contract-space-contract';
 import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
-import { readRefs } from '../refs';
+import { HEAD_REF_NAME, type RefLoadProblem, readRefsTolerant } from '../refs';
 import {
   APP_SPACE_ID,
   isValidSpaceId,
@@ -76,7 +76,7 @@ async function loadAppSpace(
 ): Promise<IntegritySpaceState> {
   const spaceDir = spaceMigrationDirectory(migrationsDir, APP_SPACE_ID);
   const { packages, problems } = await readMigrationsDir(spaceDir);
-  const refs = await readRefsTolerant(spaceRefsDirectory(spaceDir));
+  const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
 
   const member = createContractSpaceMember({
     spaceId: APP_SPACE_ID,
@@ -86,7 +86,9 @@ async function loadAppSpace(
     resolveContract: () => appContract,
   });
 
-  return { member, problems, isApp: true };
+  // The app head ref is synthesised from the live contract, so there is
+  // no on-disk head.json to be missing or corrupt for it.
+  return { member, problems, refProblems, headRefProblem: null, isApp: true };
 }
 
 async function loadExtensionSpaces(
@@ -114,8 +116,8 @@ async function loadExtensionSpace(
 ): Promise<IntegritySpaceState> {
   const spaceDir = spaceMigrationDirectory(migrationsDir, spaceId);
   const { packages, problems } = await readMigrationsDir(spaceDir);
-  const refs = await readRefsTolerant(spaceRefsDirectory(spaceDir));
-  const headRef = await readHeadRefTolerant(migrationsDir, spaceId);
+  const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
+  const { headRef, problem: headRefProblem } = await readHeadRefTolerant(migrationsDir, spaceId);
   const rawContract = await readRawContractDeferred(migrationsDir, spaceId);
 
   const member = createContractSpaceMember({
@@ -126,33 +128,42 @@ async function loadExtensionSpace(
     resolveContract: () => deserializeContract(rawContract()),
   });
 
-  return { member, problems, isApp: false };
+  return { member, problems, refProblems, headRefProblem, isApp: false };
 }
 
 /**
- * Read a space's user refs without letting a corrupt or unreadable ref
- * file abort the whole load — a malformed ref surfaces as that space
- * having no refs rather than a construction throw.
+ * The result of resolving an extension's `refs/head.json`: the parsed
+ * head ref (or `null` when the file is absent or corrupt) plus a problem
+ * when the file exists but cannot be parsed.
  */
-async function readRefsTolerant(refsDir: string): ReturnType<typeof readRefs> {
-  try {
-    return await readRefs(refsDir);
-  } catch {
-    return {};
-  }
+interface HeadRefReadResult {
+  readonly headRef: Awaited<ReturnType<typeof readContractSpaceHeadRef>>;
+  readonly problem: RefLoadProblem | null;
 }
 
 /**
- * Read an extension's head ref, treating an unreadable head file the same
- * as an absent one (`null` → `headRefMissing`) so construction never
- * throws on disk content.
+ * Read an extension's head ref, distinguishing a *genuinely absent*
+ * `head.json` (`headRef: null`, no problem — judged `headRefMissing`)
+ * from one that *exists but cannot be parsed* (`headRef: null` plus a
+ * problem — judged `refUnreadable`, not `headRefMissing`).
+ * `readContractSpaceHeadRef` already returns `null` only for ENOENT and
+ * throws for unparseable / schema-invalid content, so the throw is the
+ * corruption signal. Construction never throws on disk content.
  */
-async function readHeadRefTolerant(migrationsDir: string, spaceId: string) {
+async function readHeadRefTolerant(
+  migrationsDir: string,
+  spaceId: string,
+): Promise<HeadRefReadResult> {
   try {
-    return await readContractSpaceHeadRef(migrationsDir, spaceId);
-  } catch {
-    return null;
+    const headRef = await readContractSpaceHeadRef(migrationsDir, spaceId);
+    return { headRef, problem: null };
+  } catch (error) {
+    return { headRef: null, problem: { refName: HEAD_REF_NAME, detail: detailOf(error) } };
   }
+}
+
+function detailOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
