@@ -198,12 +198,15 @@ function removeTopLevelKey(text: string, key: string): string {
 
 function replaceMigrationHash(text: string, oldHash: string, newHash: string): string {
   if (oldHash === newHash) return text;
-  const needle = `"migrationHash": "${oldHash}"`;
-  const idx = text.indexOf(needle);
-  if (idx === -1) {
+  // Tolerate any whitespace around the colon (`"migrationHash":"…"`,
+  // `"migrationHash" : "…"`), matching the leniency of `removeTopLevelKey`.
+  const escapedOld = oldHash.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`("migrationHash"[ \\t]*:[ \\t]*)"${escapedOld}"`);
+  const match = re.exec(text);
+  if (match === null) {
     throw new Error('could not locate the migrationHash value to replace');
   }
-  return `${text.slice(0, idx)}"migrationHash": "${newHash}"${text.slice(idx + needle.length)}`;
+  return text.replace(re, (_full, prefix: string) => `${prefix}"${newHash}"`);
 }
 
 // --- Filesystem walk ------------------------------------------------------
