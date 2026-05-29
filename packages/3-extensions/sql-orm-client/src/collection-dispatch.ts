@@ -160,10 +160,10 @@ function dispatchWithIncludes<Row>(options: {
  * The mutated parent rows already carry their scalar columns from
  * `RETURNING`; this loads their relations with a single follow-up
  * SELECT keyed by `identity IN (...)`, lowered through the same
- * lateral / correlated single-query builders the read path uses, then
- * decodes the JSON-aggregated include columns and assigns them onto
- * each parent's mapped row. One round-trip regardless of row count or
- * include depth — there is no per-relation N+1 stitch (TML-2657).
+ * lateral / correlated builders the read path uses, then decodes the
+ * JSON-aggregated include columns and assigns them onto each parent's
+ * mapped row. One round-trip regardless of row count or include depth —
+ * there is no per-relation N+1 stitch.
  *
  * Delete read-back does NOT come through here: a parent-anchored
  * include query can't observe an already-deleted row, so delete reads
