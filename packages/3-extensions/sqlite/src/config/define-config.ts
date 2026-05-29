@@ -8,10 +8,11 @@ import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
 import sqlite from '@prisma-next/target-sqlite/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { extname } from 'pathe';
+import { extname, join } from 'pathe';
 
 export interface SqliteConfigOptions {
   readonly contract: string;
+  readonly outputPath?: string;
   readonly db?: {
     readonly connection?: string;
   };
@@ -31,7 +32,10 @@ function deriveOutputPath(contractPath: string): string {
 
 export function defineConfig(options: SqliteConfigOptions): PrismaNextConfig<'sql', 'sqlite'> {
   const extensions = options.extensions ?? [];
-  const output = deriveOutputPath(options.contract);
+  const output =
+    options.outputPath !== undefined
+      ? join(options.outputPath, 'contract.json')
+      : deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
   const contractConfig =
