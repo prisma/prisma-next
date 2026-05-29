@@ -76,36 +76,23 @@ export function dispatchCollectionRows<Row>(options: {
     return mapResultRows(source, mapper);
   }
 
-  return dispatchWithIncludeStrategy<Row>(options);
+  return dispatchWithIncludes<Row>(options);
 }
 
-function dispatchWithIncludeStrategy<Row>(options: {
+// Both include builders — lateral and correlated — lower every include
+// descriptor shape (row, scalar reducers, and combine()) at any depth
+// into a single query. Dispatch picks one purely on the `lateral`
+// capability flag via `selectIncludeStrategy`; the read path has no
+// multi-query fallback.
+function dispatchWithIncludes<Row>(options: {
   contract: Contract<SqlStorage>;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
   modelName: string;
 }): AsyncIterableResult<Row> {
-  // Both single-query builders (lateral, correlated) lower every
-  // include descriptor shape — row, scalar reducers, and combine() —
-  // at any depth (TML-2594 + TML-2595 + TML-2588). Dispatch routes
-  // purely on the `lateral` capability flag via `selectIncludeStrategy`;
-  // there is no multi-query fallback on the read path (TML-2657).
-  return dispatchWithSingleQueryIncludes<Row>({
-    ...options,
-    strategy: selectIncludeStrategy(options.contract),
-  });
-}
-
-function dispatchWithSingleQueryIncludes<Row>(options: {
-  strategy: 'lateral' | 'correlated';
-  contract: Contract<SqlStorage>;
-  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
-  state: CollectionState;
-  tableName: string;
-  modelName: string;
-}): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName, strategy } = options;
+  const { contract, runtime, state, tableName, modelName } = options;
+  const strategy = selectIncludeStrategy(contract);
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
