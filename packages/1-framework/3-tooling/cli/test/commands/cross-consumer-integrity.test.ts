@@ -73,11 +73,11 @@ const TAMPERED_OPS: readonly MigrationPlanOperation[] = [
   { id: 'tamper.synthetic', label: 'Synthetic tamper op', operationClass: 'additive' },
 ];
 
-function setupConfigMock(): void {
+function baseConfig(): Record<string, unknown> {
   // Pass-through `deserializeContract` keeps the contract read crossing the
   // family seam (TML-2536's invariant) while letting the skeletal contract
   // (`storage.storageHash` only) drive the post-read integrity gate.
-  mocks.loadConfig.mockResolvedValue({
+  return {
     family: {
       familyId: TARGET_FAMILY,
       create: vi.fn().mockReturnValue({
@@ -95,6 +95,34 @@ function setupConfigMock(): void {
     driver: { kind: 'driver' },
     db: { connection: 'postgres://localhost/cross-consumer-test' },
     contract: { output: 'src/prisma/contract.json' },
+  };
+}
+
+function setupConfigMock(): void {
+  mocks.loadConfig.mockResolvedValue(baseConfig());
+}
+
+/**
+ * Config that declares a contract-space extension. `contractSpace` must be
+ * a defined own property for `toDeclaredExtensionsFromRaw` to surface the
+ * entry; the aggregate loader reads the extension's contract from disk, not
+ * from this descriptor, so the in-descriptor fields are intentionally
+ * skeletal.
+ */
+function setupConfigMockWithExtension(extId: string): void {
+  mocks.loadConfig.mockResolvedValue({
+    ...baseConfig(),
+    extensionPacks: [
+      {
+        id: extId,
+        targetId: TARGET,
+        contractSpace: {
+          contractJson: {},
+          headRef: { hash: HASH_C, invariants: [] },
+          migrations: [],
+        },
+      },
+    ],
   });
 }
 
@@ -245,6 +273,52 @@ async function setupIntegrityOnlyFixture(): Promise<Fixture> {
   return { cwd, selfEdgeRelDir: join('migrations', 'app', '00001_base') };
 }
 
+/**
+ * Extension-space corruption fixture: a clean app space plus a *declared*
+ * extension (`ext_a`) carrying a hash-mismatched package. Declaring the
+ * extension (and giving it a valid, target-matching contract + head ref)
+ * isolates the `hashMismatch` signal — no `orphanSpaceDir`,
+ * `declaredButUnmigrated`, or `targetMismatch` noise — so the only fault
+ * `check` can report for the space is the corruption. `check`'s legacy
+ * on-disk pass reads the app space only, so this fault is reportable only
+ * through the aggregate fold.
+ */
+async function setupExtSpaceCorruptionFixture(): Promise<{ cwd: string; extId: string }> {
+  const cwd = await mkdtemp(join(tmpdir(), 'cross-consumer-extcorrupt-'));
+  const extId = 'ext_a';
+
+  const appDir = join(cwd, 'migrations', 'app');
+  await mkdir(appDir, { recursive: true });
+  await writePackage(appDir, { dirName: '00001_base', from: null, to: HASH_A, ops: ADDITIVE_OPS });
+  await writeContract(cwd, HASH_A);
+
+  const extDir = join(cwd, 'migrations', extId);
+  await writePackage(extDir, { dirName: '00001_base', from: null, to: HASH_B, ops: ADDITIVE_OPS });
+  await writePackage(extDir, {
+    dirName: '00002_tamper',
+    from: HASH_B,
+    to: HASH_C,
+    ops: ADDITIVE_OPS,
+    tamperedOps: TAMPERED_OPS,
+  });
+  await mkdir(join(extDir, 'refs'), { recursive: true });
+  await writeFile(
+    join(extDir, 'refs', 'head.json'),
+    `${JSON.stringify({ hash: HASH_C, invariants: [] }, null, 2)}\n`,
+  );
+  await writeFile(
+    join(extDir, 'contract.json'),
+    JSON.stringify({
+      storage: { storageHash: HASH_C },
+      schemaVersion: SCHEMA_VERSION,
+      target: TARGET,
+      targetFamily: TARGET_FAMILY,
+    }),
+  );
+
+  return { cwd, extId };
+}
+
 interface CliErrorEnvelope {
   readonly summary: string;
   readonly code: string;
@@ -253,7 +327,7 @@ interface CliErrorEnvelope {
 
 interface CheckEnvelope {
   readonly ok: boolean;
-  readonly failures?: ReadonlyArray<{ readonly pnCode: string }>;
+  readonly failures?: ReadonlyArray<{ readonly pnCode: string; readonly where: string }>;
 }
 
 async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number> {
@@ -322,6 +396,34 @@ describe('cross-consumer contract-space integrity matrix', () => {
       expect(codes).toContain('PN-MIG-CHECK-001'); // hash mismatch
       expect(codes).toContain('PN-MIG-CHECK-007'); // self-edge (sameSourceAndTarget)
       expect(codes).toContain('PN-MIG-CHECK-008'); // orphan space dir
+
+      // The app-space hash mismatch is reported exactly once: the legacy
+      // on-disk pass owns it, and the aggregate fold's app-space duplicate
+      // is suppressed (no double-report — the reason for the skip).
+      expect(codes.filter((c) => c === 'PN-MIG-CHECK-001')).toHaveLength(1);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
+  it(
+    'migration check reports extension-space package corruption the app-only legacy pass cannot see',
+    async () => {
+      const { createMigrationCheckCommand } = await import('../../src/commands/migration-check');
+      const fixture = await setupExtSpaceCorruptionFixture();
+      tempDirs.push(fixture.cwd);
+      setupConfigMockWithExtension(fixture.extId);
+      process.chdir(fixture.cwd);
+
+      await runAndCaptureExit(() => executeCommand(createMigrationCheckCommand(), ['--json']));
+      const envelope = firstJsonLine<CheckEnvelope>(consoleOutput);
+
+      // Before the app-space-scoped skip, the fold dropped this `hashMismatch`
+      // by kind and the legacy pass (app space only) never saw it: silently
+      // unreported. It now surfaces, located in the extension space.
+      expect(envelope.ok).toBe(false);
+      const hashFailures = (envelope.failures ?? []).filter((f) => f.pnCode === 'PN-MIG-CHECK-001');
+      expect(hashFailures).toHaveLength(1);
+      expect(hashFailures[0]?.where).toContain(fixture.extId);
     },
     timeouts.typeScriptCompilation,
   );

@@ -11,6 +11,7 @@ import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
 import { readRefs } from '@prisma-next/migration-tools/refs';
+import { APP_SPACE_ID } from '@prisma-next/migration-tools/spaces';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
@@ -117,13 +118,32 @@ function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | n
  * own legacy on-disk checks: package hash mismatch (`PN-MIG-CHECK-001`)
  * and the manifest-disagreement / unloadable cases (`PN-MIG-CHECK-002`).
  * These are skipped when folding in the `checkIntegrity()` view so the
- * same on-disk fault is never reported twice.
+ * same on-disk fault is never reported twice — but only for the **app
+ * space**, since the legacy pass reads `appMigrationsDir` exclusively.
+ * The identical kinds in an extension or orphan space are seen by neither
+ * path, so the fold must report those (see {@link isAppSpaceLegacyCovered}).
  */
 const COVERED_BY_LEGACY_CHECKS: ReadonlySet<IntegrityViolation['kind']> = new Set([
   'hashMismatch',
   'providedInvariantsMismatch',
   'packageUnloadable',
 ]);
+
+/**
+ * Whether the legacy on-disk pass already reported this violation, making
+ * the fold's row a duplicate. True only for the covered kinds **in the app
+ * space**: the legacy pass walks `appMigrationsDir` alone, so the same kind
+ * in an extension or orphan space is invisible to it and must surface
+ * through the fold. All covered kinds carry `spaceId`, so the `in` guard
+ * both narrows the union and excludes the (spaceId-less) `disjointness`.
+ */
+function isAppSpaceLegacyCovered(violation: IntegrityViolation): boolean {
+  return (
+    COVERED_BY_LEGACY_CHECKS.has(violation.kind) &&
+    'spaceId' in violation &&
+    violation.spaceId === APP_SPACE_ID
+  );
+}
 
 /**
  * Map one {@link IntegrityViolation} onto a `check` failure row. The
@@ -495,10 +515,11 @@ async function executeMigrationCheckCommand(
     // above only walks the app space; `checkIntegrity` reports the full set
     // across every space — re-acquiring the relocated `from === to` self-edge
     // and the cross-space layout / contract checks the prior throw-on-load
-    // loader enforced. Kinds already covered by the legacy pass above are
-    // skipped so the same fault is never reported twice.
+    // loader enforced. Only app-space duplicates of the legacy pass are
+    // skipped; the same kinds in an extension/orphan space are seen by
+    // neither path, so the fold must report them.
     for (const violation of await loadAggregateIntegrityViolations(config, migrationsDir)) {
-      if (COVERED_BY_LEGACY_CHECKS.has(violation.kind)) continue;
+      if (isAppSpaceLegacyCovered(violation)) continue;
       failures.push(integrityViolationToCheckFailure(violation, migrationsDir));
     }
   }
