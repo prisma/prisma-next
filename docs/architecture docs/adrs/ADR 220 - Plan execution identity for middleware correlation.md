@@ -2,7 +2,7 @@
 
 ## Context
 
-Today's `PlanMeta` carries the contract binding (`storageHash`, `profileHash`), the lane label, and informational metadata like [`groupingKey`](ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md). What it does **not** carry is anything that identifies *this particular execution attempt* of a plan.
+Today's `PlanMeta` carries the contract binding (`storageHash`, `profileHash`), the lane label, and informational metadata like [`groupingKey`](ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md). The shared per-execute surface — `RuntimeMiddlewareContext` — carries cancellation (`signal`), the queryable scope (`'runtime' | 'connection' | 'transaction'`), the contract reference, the log sink, and the `contentHash` callable. What neither carries is anything that identifies *this particular execution attempt* of a plan.
 
 Middleware authors keep running into the same gap. A middleware that observes `beforeExecute` and wants to correlate the corresponding `afterExecute` callback — for tracing, timing, audit, or replay — has nothing stable to key on. The two hooks fire on the same plan reference, but there is no per-execute identity to thread through external systems (spans, log records, downstream collectors).
 
@@ -12,13 +12,13 @@ Middleware authors keep running into the same gap. A middleware that observes `b
 
 ## Decision
 
-Add an optional `planExecutionId` field to `PlanMeta`. The **framework runtime** (`RuntimeCore` and every concrete runtime that overrides `execute()` without delegating to `super`) assigns a fresh value via `crypto.randomUUID()` at the entry of every `execute()` call, wraps the input plan with a new `meta` carrying the ID, and dispatches the wrapped plan through the middleware pipeline.
+Add a required `planExecutionId: string` field to `RuntimeMiddlewareContext`. Every runtime that constructs a per-execute middleware context mints a fresh value via `crypto.randomUUID()` and includes it in that context. The same context reference is threaded through `beforeExecute`, `intercept`, `onRow`, and `afterExecute`, so every hook fired during one `execute()` call observes the same `planExecutionId`. The next `execute()` call constructs a new context with a new ID.
 
 ```ts
-interface PlanMeta {
-  // ... existing fields ...
-  /** Runtime-assigned identity for one execute() invocation. */
-  readonly planExecutionId?: string;
+interface RuntimeMiddlewareContext {
+  // ... existing fields (contract, mode, now, log, contentHash, signal?, scope) ...
+  /** Fresh per execute() call; same across all hooks within one call. */
+  readonly planExecutionId: string;
 }
 ```
 
@@ -26,51 +26,62 @@ interface PlanMeta {
 sequenceDiagram
     participant Caller
     participant Runtime
-    participant BC as beforeCompile
     participant BE as beforeExecute
     participant Driver
     participant AE as afterExecute
 
     Caller->>Runtime: execute(plan)
     Runtime->>Runtime: planExecutionId = crypto.randomUUID()
-    Runtime->>Runtime: wrap plan with new meta { ...meta, planExecutionId }
-    Runtime->>BC: wrapped plan (planExecutionId = X)
-    BC-->>Runtime: rewritten plan (planExecutionId = X)
-    Runtime->>BE: exec plan (planExecutionId = X)
+    Runtime->>Runtime: ctx = { ...baseCtx, signal, scope, planExecutionId }
+    Runtime->>BE: (plan, ctx, params?)  ctx.planExecutionId = X
     BE->>Driver: query
     Driver-->>BE: rows
-    BE-->>AE: result (planExecutionId = X)
+    BE-->>AE: (plan, result, ctx)  ctx.planExecutionId = X
 
-    Note over Caller,AE: Second execute(plan) — same plan instance, new ID
+    Note over Caller,AE: Second execute(plan) — same plan instance, new ctx, new ID
     Caller->>Runtime: execute(plan)
     Runtime->>Runtime: planExecutionId = crypto.randomUUID()  [different]
-    Runtime->>BE: exec plan (planExecutionId = Y)
-    BE-->>AE: result (planExecutionId = Y)
+    Runtime->>BE: (plan, ctx, params?)  ctx.planExecutionId = Y
+    BE-->>AE: (plan, result, ctx)  ctx.planExecutionId = Y
 ```
 
 ### Semantics
 
-- **Per-execute, not per-plan.** A plan executed twice receives two distinct `planExecutionId`s — one per `execute()` call. Reuse is a first-class pattern (prepared queries, repeated requests); two executions of the same plan are two events.
-- **All hooks for one execute see the same ID.** `beforeCompile`, `beforeExecute`, `intercept`, `onRow`, `afterExecute` — every hook fired during one `execute()` call observes the same `planExecutionId`. The plan flows through `runBeforeCompile` → `lower` → `runBeforeExecuteChain` → `runWithMiddleware` with `meta` preserved by the spread pattern (`{ ...d, ast, meta }`); the ID rides along automatically.
-- **Runtime overrides any caller-supplied value.** If a caller hands the runtime a plan with `planExecutionId` already set, the runtime overrides it. Every execute is a fresh identity by contract.
-- **Excluded from hashing.** `planExecutionId` does not participate in `computeSqlContentHash` (which picks `storageHash`, `sql`, `params`) or in `computeSqlFingerprint` (which operates on normalised SQL text). Same query shape, same hash — regardless of execute identity.
+- **Per-execute, not per-plan.** A plan executed twice produces two distinct `planExecutionId`s — one per `execute()` call. Reuse is a first-class pattern (prepared queries, repeated requests); two executions of the same plan are two events.
+- **All hooks for one execute see the same ID.** `beforeExecute`, `intercept`, `onRow`, `afterExecute` — every hook fired during one `execute()` call receives the same `ctx` reference and therefore the same `planExecutionId`.
+- **The plan flows through unchanged.** The runtime does not wrap the plan to attach identity. The plan reference a caller passes in is the plan reference middleware sees.
+- **Excluded from hashing by construction.** `planExecutionId` lives on the context, not the plan, so `computeSqlContentHash` and `computeSqlFingerprint` see nothing to exclude. Two executions of the same plan produce the same content hash and the same fingerprint.
 
-### Why the runtime owns this
+### Why the middleware context, not `PlanMeta`
 
-The lifecycle the name describes — "the ID of an execution of a plan" — is a runtime lifecycle, not a builder lifecycle. The identity belongs at the boundary that owns the lifecycle.
+Metadata lives with the thing it characterises. `PlanMeta` describes the plan: target, storage hash, lane, annotations. Everything on it characterises the *thing being executed*. `planExecutionId` characterises the *execute call* — a different lifecycle with a different owner (the runtime, which knows when execute starts).
 
-Two concrete properties fall out of this choice:
+Putting it on `PlanMeta` would have several knock-on consequences worth avoiding:
 
-1. **Plan reuse stays a first-class pattern.** A plan built once and executed many times (the idiomatic shape for prepared queries and repeated requests) emits a distinct `planExecutionId` for every execution, because the runtime mints a fresh value at each `execute()` call. Middleware can tell two execute calls of the same plan apart — which is the entire point of the field.
-2. **One assignment site per runtime, not one per builder.** `RuntimeCore.execute()` covers any future family runtime that delegates to `super`. Family runtimes that override `execute()` (SQL and Mongo today) apply the same wrap at the top of their generator — a single, greppable rule per runtime rather than per-builder coverage that has to be re-audited every time a new plan builder lands.
+- The runtime would have to wrap the plan to attach the ID, creating a new plan reference on every execute. The contract that "the plan a caller passes in is the plan that flows through the chain" would weaken.
+- Plans would appear to "carry" execution identity even though they do not — a caller inspecting `plan.meta` would see a field whose value changes every time the plan is executed.
+- Content hashing and fingerprinting would have to consciously exclude the field.
+- Tests would have to pin an override-on-execute contract because callers could otherwise pre-set the ID on construction.
+
+`RuntimeMiddlewareContext` is already per-execute, already threaded through every hook, already the home for sibling per-execute facts (`signal`, `scope`). Adding a field is cheaper than inventing a new container, and the placement matches what the field describes.
+
+### Why a flat field, not an `executionMeta` container
+
+Grouping execution-scoped fields under `ctx.executionMeta` was considered and held off:
+
+1. **The existing context fields are already mixed.** `signal`, `scope`, `now` are per-execute facts; `contract`, `mode`, `log`, `contentHash` are runtime-config facilities. We have not grouped them historically, and the type stays scannable today. Adding a container for one new field would be a stylistic precedent without a corresponding group to populate it.
+2. **`signal` and `scope` are not "metadata".** `signal` is a control primitive used to *abort*; `scope` is a routing/policy field used to *decide whether* to act. Only identity-style fields would belong under `executionMeta`, and there is one such field today.
+3. **The refactor stays cheap.** If additional identity-style fields land later (attempt number, trace IDs, started-at timestamps), the move to `executionMeta` is mechanical: rename fields, update call sites. Holding off today avoids speculative grouping.
+
+`ctx.planExecutionId` reads cleanly at middleware call sites and matches the existing `ctx.signal` / `ctx.scope` shape.
 
 ### Why a new field, not `planId`
 
-ADR 013's `planId` is a content hash. It is stable across executions of the same logical query — that is its job. Reusing the name for a per-execute random ID would conflate two distinct concepts. We keep ADR 013's content-based identity intact and add a sibling field for execution identity.
+ADR 013's `planId` is a content hash. It is stable across executions of the same logical query — that is its job. Reusing the name for a per-execute random ID would conflate two distinct concepts. We keep ADR 013's content-based identity intact and add a sibling on the context for execution identity.
 
 ### Why a new field, not `groupingKey`
 
-ADR 160's `groupingKey` is orchestrator-assigned and groups *multiple* plans that serve one higher-level operation. It is unrelated to "which execute call am I in?" — two plans inside one ORM operation share a `groupingKey` but receive distinct `planExecutionId`s when executed (one per `execute()` call). They answer different questions, both on `PlanMeta`.
+ADR 160's `groupingKey` is orchestrator-assigned and groups *multiple* plans that serve one higher-level operation. It is unrelated to "which execute call am I in?" — two plans inside one ORM operation share a `groupingKey` but receive distinct `planExecutionId`s when executed (one per `execute()` call). They answer different questions and live in different places (one on `PlanMeta`, one on the context).
 
 ### Why `crypto.randomUUID()`
 
@@ -81,40 +92,41 @@ ADR 160's `groupingKey` is orchestrator-assigned and groups *multiple* plans tha
 
 ## Implementation
 
-`RuntimeCore.execute()` in `@prisma-next/framework-components` generates the ID at the top of its generator and wraps the input plan:
+`RuntimeCore.execute()` in `@prisma-next/framework-components` constructs the per-execute context at the top of its generator:
 
 ```ts
-const planExecutionId = crypto.randomUUID();
-const wrapped = { ...plan, meta: { ...plan.meta, planExecutionId } };
-// ...subsequent template-method steps see `wrapped` instead of `plan`.
+const execCtx: RuntimeMiddlewareContext = {
+  ...this.ctx,
+  planExecutionId: crypto.randomUUID(),
+};
+// ...threaded into runBeforeExecuteChain and runWithMiddleware.
 ```
 
-`SqlRuntimeImpl` overrides `execute()` and runs its own pipeline through `executeAgainstQueryable` (it does not delegate to `super`). It applies the same wrap at the top of that generator. `executePrepared` follows the same pattern through `executePreparedAgainstQueryable`. The SQL runtime keeps the assignment inline (three lines per entry point) rather than extracting a helper — extracting saves no meaningful complexity and would obscure the per-entry-point grep target.
+`SqlRuntimeImpl.executeAgainstQueryable` and `executePreparedAgainstQueryable` already construct a per-execute middleware context (`execMiddlewareCtx`) that spreads the stored runtime-level ctx with `signal` and `scope`. They gain `planExecutionId: crypto.randomUUID()` in the same spread.
 
-`MongoRuntimeImpl` likewise overrides `execute()` and runs its own pipeline. It applies the same wrap at the top of its generator.
-
-Both family runtimes — SQL and Mongo — inherit the field on `PlanMeta` from `@prisma-next/contract/types` and therefore need no per-family type changes.
+`MongoRuntimeImpl.execute` constructs its own per-execute context with the same shape. The pattern is uniform across runtimes; family-specific detail is that SQL and Mongo override `execute()` and do not delegate to `super`, so the assignment happens at each entry point.
 
 ## Consequences
 
 ### Positive
 
-- Middleware authors can correlate `beforeExecute` and `afterExecute` for the same execute call by reading `plan.meta.planExecutionId`.
+- Middleware authors correlate `beforeExecute` and `afterExecute` for the same execute call by reading `ctx.planExecutionId`.
 - Two executions of the same plan are observably distinct events.
-- Identity is generated where the lifecycle lives; plan builders stay focused on plan content.
-- Excluded from content hashing, so cache keys and telemetry fingerprints are unaffected.
+- Identity lives where the lifecycle lives; plans, plan builders, and content hashing are unaffected.
+- The plan reference flows through the pipeline unchanged.
 
 ### Trade-offs
 
-- The framework base assigns the ID, but family runtimes that override `execute()` (SQL and Mongo today) must remember to assign it too. The discipline is enforced by tests; if a future family runtime adds an `execute()` override, the implementer must add the wrap. This is the same trade-off as any template-method base whose family runtimes override the template.
+- Family runtimes that override `execute()` (SQL and Mongo today) must remember to include `planExecutionId` in their per-execute ctx spread. Tests pin the property at every runtime entry point; a future family runtime that adds an `execute()` override must add the spread.
+- `RuntimeMiddlewareContext` gains a required field, so every consumer that constructs a context literal (test fixtures, alternative runtime implementations) must include it. The migration is mechanical.
 
 ## Alternatives considered
 
-- **Assign at plan construction.** Rejected — would tie identity to the plan instance, which means two `execute()` calls of the same plan share an ID. Also requires every plan builder (across SQL ORM, raw SQL, SQL DSL, Mongo) to remember to mint one, which scales poorly as new builders land.
+- **Put `planExecutionId` on `PlanMeta`.** Rejected — would tie identity to the plan instance, force plan wrapping at execute entry, complicate content hashing, and require an override-on-execute contract for caller-supplied values. The field describes an execute call, not a plan.
+- **`executionMeta` container on `RuntimeMiddlewareContext`.** Considered and held off — single field today does not pay for the container; reintroduce if the per-execute identity-field surface grows.
 - **Reuse ADR 013's `planId`.** Rejected — different concept. Content-based identity is per-query-shape; execution identity is per-execute call.
+- **Per-hook ID parameter.** Add `planExecutionId` as an extra argument to every middleware hook signature. Rejected — changes the hook API surface for a value the existing context already serves naturally.
 - **`AsyncLocalStorage` for execution context.** Rejected — implicit propagation conflicts with the codebase's "explicit over implicit" stance (cf. ADR 160's reasoning for `groupingKey`).
-- **Per-hook ID parameter.** Add `planExecutionId` to every middleware hook signature. Rejected — changes the hook API surface for a value that fits naturally on `PlanMeta`.
-- **Store in `meta.annotations`.** Annotations are extension metadata; this is a cross-cutting runtime concern. First-class field on `PlanMeta` matches the precedent set by ADR 160's `groupingKey`.
 
 ## References
 
