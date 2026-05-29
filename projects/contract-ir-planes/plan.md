@@ -24,10 +24,10 @@ These slices are done or in final review; their as-built dispatch history lives 
 
 ### Stack (deliver in order)
 
-1. **Slice S1.D — Reap subsumed surfaces** — Linear: [TML-2625](https://linear.app/prisma-company/issue/TML-2625)
+1. **Slice S1.D — Reap subsumed surfaces** — Linear: [TML-2727](https://linear.app/prisma-company/issue/TML-2727)
    - **Outcome:** The asymmetry-driven helpers that the new coordinate makes redundant are gone, and the entity coordinate is the only way the codebase walks IR entities. `findSqlTable`, `assertUniqueSqlTableNames`, `extractStorageElementNames`, `SqlNamespacePayload`, `DEFAULT_NAMESPACES`, `normaliseNamespaceEntry`, `stripNamespaceKinds`, and `UnboundTables<C>` no longer exist; remaining callers walk via the free-function `elementCoordinates(storage)`; the framework canonicalizer's SQL-specific preserve-empty paths are replaced by a family-contribution hook.
    - **Builds on:** S1.C's `hands to` — object-pair cross-references live at every site, so the old name-keyed helpers have no remaining readers and can be deleted without leaving a consumer stranded.
-   - **Hands to:** Project close-out — a grep-clean tree (PDoD5 gate) and the canonicalizer family hook standing in for the last SQL-specific framework path (completes the PDoD6 consumer migration). Closes subsumed tickets TML-2579, TML-2580, TML-2582 via PR-merge integration.
+   - **Hands to:** Project close-out — a grep-clean tree (PDoD5 gate) and the canonicalizer family hook standing in for the last SQL-specific framework path (completes the PDoD6 consumer migration). (The subsumed Linear tickets TML-2579/2580/2582 are already Canceled, so PDoD10 needs no close-out dispatch here.)
    - **Focus:** Deletions and call-site rewrites only. The structural shape (planes, coordinate, descriptor mechanism, encodings) is already shipped by S1.A–S1.C and is **not** re-opened here. Reviewer reads this slice for deletion correctness — does anything still depend on a removed surface? — without structural context-switching.
 
 ### Parallel group A (independent of the stack)
@@ -58,7 +58,7 @@ PDoD1–PDoD4 and PDoD7 are delivered or in review (table above). Remaining:
 | **PDoD6** — `elementCoordinates(storage)` consumed by planner / migration / validators | S1.D (final consumer migration + canonicalizer hook) |
 | **PDoD8** — all validation gates clean | Each remaining slice's gate + final retro gate |
 | **PDoD9** — ADR migrated to `docs/architecture docs/adrs/` | Close-out |
-| **PDoD10** — subsumed tickets (TML-2579/2580/2582) closed | S1.D PR body links them |
+| **PDoD10** — subsumed tickets (TML-2579/2580/2582) closed | ✅ already satisfied — all Canceled in the 2026-05-20 ticket cleanup |
 | **PDoD11** — project folder deleted; references stripped | Close-out |
 
 ## Sequencing rationale
