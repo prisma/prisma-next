@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const RULES_DIR = '.cursor/rules';
+const RULES_DIR = '.agents/rules';
 
 const REQUIRED = ['description', 'alwaysApply'];
 

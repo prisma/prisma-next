@@ -30,13 +30,15 @@
     "lint:code": "node scripts/lint-no-contract-cast.mjs",
     "lint:no-contract-cast": "node scripts/lint-no-contract-cast.mjs",
     "lint:rules": "node scripts/validate-rules.mjs",
+    "lint:rules:symlinks": "node scripts/sync-agent-rules.mjs --check",
     "lint:skills": "node scripts/validate-skills.mjs",
     "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
+    "rules:sync": "node scripts/sync-agent-rules.mjs",
     "rules:footprint": "node scripts/rules-footprint.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "lint:manifests": "node scripts/validate-package-manifests.mjs",
     "lint:workflows": "node scripts/lint-workflow-triggers.mjs",
-    "test:scripts": "node --test scripts/lint-workflow-triggers.test.mjs scripts/validate-skills.test.mjs scripts/determine-version-utils.test.ts scripts/check-upgrade-coverage.test.mjs scripts/set-version-utils.test.ts scripts/check-publish-deps-pn-pins.test.mjs scripts/publish-packages-utils.test.mjs scripts/check-clean-tree.test.mjs scripts/lint-casts.test.mjs",
+    "test:scripts": "node --test scripts/lint-workflow-triggers.test.mjs scripts/validate-skills.test.mjs scripts/determine-version-utils.test.ts scripts/check-upgrade-coverage.test.mjs scripts/set-version-utils.test.ts scripts/check-publish-deps-pn-pins.test.mjs scripts/publish-packages-utils.test.mjs scripts/check-clean-tree.test.mjs scripts/lint-casts.test.mjs scripts/sync-agent-rules.test.mjs",
     "bump-minor": "node scripts/bump-minor.ts",
     "check:publish-deps": "node scripts/check-publish-deps.mjs",
     "check:upgrade-coverage": "node scripts/check-upgrade-coverage.mjs",
@@ -49,7 +51,7 @@
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "record": "turbo run record --filter=@prisma-next/cli --",
     "clean": "turbo run clean",
-    "prepare": "husky && skills add ./skills-contrib --skill '*' --agent universal claude-code -y"
+    "prepare": "husky && skills add ./skills-contrib --skill '*' --agent universal claude-code -y && node scripts/sync-agent-rules.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",

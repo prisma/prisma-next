@@ -7,7 +7,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 - [Docs Index](docs/README.md) — How the docs are organized and what to read next
 - [Architecture Overview](docs/Architecture%20Overview.md) — High-level design principles
 - [Testing Guide](docs/Testing%20Guide.md) — Philosophy, patterns, and commands
-- [Rules Index](.cursor/rules/README.md) — All Cursor rules organized by topic
+- [Rules Index](.agents/rules/README.md) — All agent rules organized by topic
 - [ADRs](docs/architecture%20docs/adrs/) — Architecture Decision Records
 
 ### Modular Onboarding
@@ -35,7 +35,8 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 - **Skills — canonical home:** `skills-contrib/<skill-name>/SKILL.md`. These are the tracked, deliverable source-of-truth files.
 - **Skills — presentation symlinks:** `.claude/skills/<skill-name>` and `.agents/skills/<skill-name>` are symlink directories pointing into `skills-contrib/`. They exist so the various agent harnesses (Cursor, Claude Code, …) can find the skills at the paths they expect. Both symlink trees are gitignored.
 - **Skills — wired post-install:** the symlink trees (and any tooling-specific copies) are materialized by the `prepare` script in [`package.json`](./package.json), which runs `skills add ./skills-contrib --skill '*' --agent universal claude-code -y`. After `pnpm install`, `.claude/skills/` and `.agents/skills/` are populated automatically — no manual setup. If you add a new skill under `skills-contrib/`, re-run `pnpm install` (or just the prepare hook) to wire it into the tooling locations. `pnpm lint:skills` validates skill frontmatter in CI.
-- **Rules — canonical home:** `.agents/rules/<rule-name>.mdc` (tracked via a whitelist exception in `.gitignore`). The `.cursor/rules/` and `.claude/rules/` paths are presentation symlinks into `.agents/rules/`.
+- **Rules — canonical home:** `.agents/rules/<rule-name>.{md,mdc}` — the only tracked copy (a whitelist exception in `.gitignore` keeps `.agents/rules/**` tracked even though the rest of `.agents/` is ignored). The `.cursor/rules/` and `.claude/rules/` trees are gitignored presentation mirrors containing only relative symlinks back into `.agents/rules/`.
+- **Rules — wired post-install:** like skills, the symlink trees are materialized by `prepare` (which runs `node scripts/sync-agent-rules.mjs` after `skills add`). After `pnpm install` the trees are regenerated automatically — no manual setup. A rule added only to `.cursor/rules` is gitignored and silently lost, so **always add it under `.agents/rules/`** and run `pnpm rules:sync`. `pnpm lint:rules:symlinks` enforces tree/canonical consistency in CI.
 - **Practical implication for editors and sub-agents:** when amending or authoring a skill or rule, **edit at the canonical path** (`skills-contrib/` for skills, `.agents/rules/` for rules) — not at the symlinked path. An edit through a symlink writes to the canonical file on disk, but `git status` and `git ls-files` report against the canonical path; addressing the canonical path keeps diffs legible and avoids surface churn.
 
 ## Golden Rules
@@ -50,9 +51,9 @@ The repo keeps a single canonical home for each kind of agent surface, with pres
 - Don't add backwards-compat exports unless asked.
 - Always write tests before creating or modifying implementation.
 - Don't reexport from one file in another, except in `exports/` folders.
-- Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`.
-- Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`.
-- Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`.
+- Don't branch on target; use adapters: `.agents/rules/no-target-branches.mdc`.
+- Keep tests concise; omit "should": `.agents/rules/omit-should-in-tests.mdc`.
+- Keep docs current (READMEs, rules, links): `.agents/rules/doc-maintenance.mdc`.
 - Prefer links to canonical docs over long comments.
 
 ## Typesafety rules

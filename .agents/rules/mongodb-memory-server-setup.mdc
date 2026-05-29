@@ -1,3 +1,8 @@
+---
+description: mongodb-memory-server (MMS) version pinning via the pnpm catalog, mandatory vitest timeouts, and the new-package checklist.
+alwaysApply: false
+---
+
 # mongodb-memory-server setup
 
 When adding `mongodb-memory-server` (MMS) to a package or writing tests that use it, follow these rules to prevent CI failures.
