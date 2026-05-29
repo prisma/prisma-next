@@ -124,20 +124,19 @@ export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: 
 }
 
 /**
- * Finds a type entry by name across all namespace type registries.
- * Namespace types (e.g. Postgres enums) live under
- * `storage.namespaces[nsId].enum`, not under `storage.types`.
+ * Finds a type entry by explicit namespace coordinate. Namespace types (e.g.
+ * Postgres enums) live under `storage.namespaces[nsId].enum`. Returns the
+ * entry from the named namespace only — never scans other namespaces, so two
+ * namespaces that hold an enum with the same name resolve independently.
  */
 function locateNamespaceType(
   storage: SqlStorage,
+  namespaceId: string,
   typeName: string,
 ): PostgresEnumStorageEntry | undefined {
-  for (const ns of Object.values(storage.namespaces)) {
-    if (!('enum' in ns) || ns.enum == null) continue;
-    const entry = (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
-    if (entry !== undefined) return entry;
-  }
-  return undefined;
+  const ns = storage.namespaces[namespaceId];
+  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
+  return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
 }
 
 // ============================================================================
@@ -369,10 +368,11 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
 };
 
 function enumRebuildCallRecipe(
+  namespaceId: string,
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toType = locateNamespaceType(ctx.toContract.storage, typeName);
+  const toType = locateNamespaceType(ctx.toContract.storage, namespaceId, typeName);
   if (!toType) return [];
   const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
@@ -380,13 +380,14 @@ function enumRebuildCallRecipe(
     ? toType.values
     : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
+  const ddlSchema = resolveDdlSchemaForNamespace(ctx, namespaceId);
 
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
     for (const [tableName, tableNode] of Object.entries(ns.tables)) {
       const table = tableNode as StorageTable;
       for (const [columnName, column] of Object.entries(table.columns)) {
-        if (column.typeRef === typeName) {
+        if (column.typeRef === typeName && nsId === namespaceId) {
           columnRefs.push({ namespaceId: nsId, table: tableName, column: columnName });
         }
       }
@@ -394,7 +395,7 @@ function enumRebuildCallRecipe(
   }
 
   return [
-    new CreateEnumTypeCall(ctx.schemaName, tempName, desiredValues),
+    new CreateEnumTypeCall(ddlSchema, tempName, desiredValues),
     ...columnRefs.map((ref) => {
       const using = `${ref.column}::text::${tempName}`;
       return new AlterColumnTypeCall(
@@ -409,8 +410,8 @@ function enumRebuildCallRecipe(
         },
       );
     }),
-    new DropEnumTypeCall(ctx.schemaName, nativeType),
-    new RenameTypeCall(ctx.schemaName, tempName, nativeType),
+    new DropEnumTypeCall(ddlSchema, nativeType),
+    new RenameTypeCall(ddlSchema, tempName, nativeType),
   ];
 }
 
@@ -463,10 +464,21 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   let emittedRebuildRecipe = false;
 
   for (const [typeName, enumType] of enumTypes) {
+    // Partial D2: extract namespaceId for this typeName from the contract storage.
+    // D3 will thread this directly once collectPostgresEnumTypes returns compound-keyed entries.
+    let enumNamespaceId = ctx.schemaName;
+    for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
+      if ('enum' in ns && (ns.enum as Record<string, unknown>)?.[typeName] !== undefined) {
+        enumNamespaceId = nsId;
+        break;
+      }
+    }
+
     const desired = enumType.values;
     const existing = readExistingEnumValues(ctx.schema, enumType.nativeType);
     if (!existing) {
-      calls.push(new CreateEnumTypeCall(ctx.schemaName, typeName, desired, enumType.nativeType));
+      const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
+      calls.push(new CreateEnumTypeCall(ddlSchema, typeName, desired, enumType.nativeType));
       handledTypeNames.add(typeName);
       introducedTypeNames.add(typeName);
       continue;
@@ -477,7 +489,8 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
       continue;
     }
     if (diff.kind === 'add_values') {
-      calls.push(new AddEnumValuesCall(ctx.schemaName, typeName, enumType.nativeType, diff.values));
+      const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
+      calls.push(new AddEnumValuesCall(ddlSchema, typeName, enumType.nativeType, diff.values));
       handledTypeNames.add(typeName);
       continue;
     }
@@ -490,7 +503,7 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
         ),
       );
     }
-    calls.push(...enumRebuildCallRecipe(typeName, ctx));
+    calls.push(...enumRebuildCallRecipe(enumNamespaceId, typeName, ctx));
     emittedRebuildRecipe = true;
     handledTypeNames.add(typeName);
     rebuiltTypeNames.add(typeName);
