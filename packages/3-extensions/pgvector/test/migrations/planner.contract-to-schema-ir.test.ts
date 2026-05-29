@@ -1,5 +1,5 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   NativeTypeExpander,
@@ -751,8 +751,16 @@ const DEMO_BASE_TABLES = {
     primaryKey: { columns: ['id'] },
     foreignKeys: [
       {
-        source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
-        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+        source: {
+          namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+          tableName: 'post',
+          columns: ['userId'],
+        },
+        target: {
+          namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+          tableName: 'user',
+          columns: ['id'],
+        },
         constraint: true,
         index: true,
       },

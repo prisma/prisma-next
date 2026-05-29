@@ -84,8 +84,9 @@ export function defineContract(
     target: sqlitePack,
   } as ContractInput;
   if (factory !== undefined) {
+    const { types: _t, models: _m, ...scaffoldOnly } = full;
     return baseDefineContract(
-      full,
+      scaffoldOnly,
       factory as Parameters<typeof baseDefineContract>[1],
     ) as unknown as SqliteResult<TypesConstraint, ModelsConstraint, undefined>;
   }
