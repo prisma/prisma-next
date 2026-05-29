@@ -110,13 +110,13 @@ export function errorRefSetEmptySentinel(hash: string): CliStructuredError {
 
 /**
  * `--space <id>` was given a value that doesn't satisfy the contract-space
- * naming rule (`[A-Za-z][A-Za-z0-9_-]*` per `isValidSpaceId`). Fires before
+ * naming rule (`[a-z][a-z0-9_-]{0,63}` per `isValidSpaceId`). Fires before
  * any fs work — the input is syntactically rejected the same way an on-disk
  * directory with that name would be skipped by the enumerator.
  */
 export function errorInvalidSpaceId(spaceId: string): CliStructuredError {
   return errorRuntime(`Invalid contract space id: ${spaceId}`, {
-    why: 'Contract space ids must match [A-Za-z][A-Za-z0-9_-]* (the rule applied to every on-disk space directory).',
+    why: 'Contract space ids must match [a-z][a-z0-9_-]{0,63} (lowercase, starts with a letter, max 64 characters — the rule applied to every on-disk space directory).',
     fix: 'Pass a space id that matches the directory naming rule, or omit --space to list every space.',
     meta: {
       code: 'MIGRATION.INVALID_SPACE_ID',

@@ -5,6 +5,7 @@ import type {
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
 import { APP_SPACE_ID, isValidSpaceId } from '@prisma-next/migration-tools/spaces';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -177,7 +178,7 @@ async function executeMigrationListCommand(
 
   return runMigrationList({
     migrationsDir,
-    ...(options.space !== undefined ? { spaceFilter: options.space } : {}),
+    ...ifDefined('spaceFilter', options.space),
   });
 }
 

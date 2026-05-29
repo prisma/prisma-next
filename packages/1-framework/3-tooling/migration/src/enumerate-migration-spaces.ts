@@ -20,9 +20,9 @@ import { listContractSpaceDirectories } from './verify-contract-spaces';
  * in the same order).
  *
  * Refs whose hash matches no migration on disk are still indexed; the
- * caller decides whether to surface them. The `migration list` use case
- * ignores them per the slice's edge-case ruling — a row is required to
- * carry a `(refs)` decoration.
+ * caller decides whether to surface them. Migration rows only carry
+ * `(refs)` decorations when a matching destination contract hash exists
+ * on disk — orphan refs are not rendered on any row.
  *
  * Returns an empty map when the refs directory does not exist
  * ({@link readRefs} treats `ENOENT` as "no refs").
@@ -57,7 +57,7 @@ function compareSpaceIds(a: string, b: string): number {
 
 /**
  * Sort `dirName` descending so the rendered output reads latest-first,
- * matching the `git log` convention the slice spec calls out.
+ * matching the `git log` latest-first convention.
  */
 function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry): number {
   if (a.dirName < b.dirName) return 1;

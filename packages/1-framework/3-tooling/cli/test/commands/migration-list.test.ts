@@ -79,8 +79,15 @@ async function writePackage(migrationsRoot: string, spec: PackageSpec): Promise<
     providedInvariants:
       spec.providedInvariants ??
       ops
-        .map((op) => (op as { invariantId?: string }).invariantId)
-        .filter((inv): inv is string => typeof inv === 'string'),
+        .map((op) =>
+          typeof op === 'object' &&
+          op !== null &&
+          'invariantId' in op &&
+          typeof op.invariantId === 'string'
+            ? op.invariantId
+            : undefined,
+        )
+        .filter((inv): inv is string => inv !== undefined),
     createdAt: '2026-02-25T14:30:00.000Z',
   };
   const metadata: MigrationMetadata = {
