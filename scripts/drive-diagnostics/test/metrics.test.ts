@@ -707,120 +707,87 @@ describe('computeMetrics — lifecycle: retro_distribution', () => {
   });
 });
 
+// The live project trace keeps growing as this project dogfoods its own
+// instrumentation, so these assertions are internally consistent (derived from
+// the loaded events) rather than pinned to magic counts. Exact-value coverage
+// lives in the inline-fixture suites above.
 describe('computeMetrics — real trace (projects/drive-instrumentation/trace.jsonl)', () => {
-  const { events } = loadTrace(TRACE_PATH);
+  const { events, errors } = loadTrace(TRACE_PATH);
 
-  it('loads 37 events with no errors', () => {
-    assert.equal(events.length, 37);
+  const countOf = (t: string): number => events.filter((e) => e.event_type === t).length;
+
+  it('loads the live trace with no parse/validation errors', () => {
+    assert.equal(errors.length, 0);
+    assert.ok(events.length > 0);
   });
 
-  it('rounds_per_dispatch.mean is 1 (all 7 dispatches have exactly 1 round-start)', () => {
+  it('computeMetrics never throws and returns all metric groups', () => {
+    const m = computeMetrics(events);
+    assert.ok(m.rework && m.planning_quality && m.artefact_churn && m.lifecycle && m.operator);
+  });
+
+  it('rounds_per_dispatch covers every dispatch-start and means the round-starts', () => {
     const m = computeMetrics(events);
     assert.ok(m.rework.rounds_per_dispatch !== null);
-    assert.equal(m.rework.rounds_per_dispatch.mean, 1);
-    assert.equal(Object.keys(m.rework.rounds_per_dispatch.per_dispatch).length, 7);
+    const dispatches = countOf('dispatch-start');
+    const rounds = countOf('round-start');
+    assert.equal(Object.keys(m.rework.rounds_per_dispatch.per_dispatch).length, dispatches);
+    assert.equal(m.rework.rounds_per_dispatch.mean, rounds / dispatches);
   });
 
-  it('spec_stability.count is 0 (no spec-amended events in trace)', () => {
+  it('spec_stability + i12_halt_rate counts match the raw event counts', () => {
     const m = computeMetrics(events);
-    assert.equal(m.planning_quality.spec_stability.count, 0);
+    assert.equal(m.planning_quality.spec_stability.count, countOf('spec-amended'));
+    assert.equal(m.planning_quality.i12_halt_rate.count, countOf('falsified-assumption'));
   });
 
-  it('i12_halt_rate.count is 0 (no falsified-assumption events in trace)', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.planning_quality.i12_halt_rate.count, 0);
-  });
-
-  it('first_pass_acceptance_rate is 1 (all 6 completed dispatches satisfied on round 1)', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.rework.first_pass_acceptance_rate, 1);
-  });
-
-  it('backtrack_ratio is 0 (no non-satisfied verdicts)', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.rework.backtrack_ratio, 0);
-  });
-
-  it('all 7 brief-issued events are initial disposition', () => {
+  it('brief_stability dispositions sum to the brief-issued count', () => {
     const m = computeMetrics(events);
     assert.ok(m.rework.brief_stability !== null);
-    assert.equal(m.rework.brief_stability.overall['initial'], 7);
+    const total = Object.values(m.rework.brief_stability.overall).reduce((a, b) => a + b, 0);
+    assert.equal(total, countOf('brief-issued'));
   });
 
-  it('tier_mix shows 7 dispatches all on claude-4.6-sonnet-high-thinking', () => {
+  it('tier_mix tallies sum to the dispatch-start count', () => {
     const m = computeMetrics(events);
     assert.ok(m.rework.tier_mix !== null);
-    assert.equal(m.rework.tier_mix['claude-4.6-sonnet-high-thinking'], 7);
+    const total = Object.values(m.rework.tier_mix).reduce((a, b) => a + b, 0);
+    assert.equal(total, countOf('dispatch-start'));
   });
 
-  it('dispatch_wallclock_ms has 6 entries (S3-D2 has no dispatch-end)', () => {
+  it('dispatch + round wall-clock entries match the *-end event counts', () => {
     const m = computeMetrics(events);
     assert.ok(m.rework.dispatch_wallclock_ms !== null);
-    assert.equal(Object.keys(m.rework.dispatch_wallclock_ms.per_dispatch).length, 6);
-  });
-
-  it('dispatch_wallclock_ms.total is 2898000ms (hand-summed)', () => {
-    const m = computeMetrics(events);
-    assert.ok(m.rework.dispatch_wallclock_ms !== null);
-    assert.equal(m.rework.dispatch_wallclock_ms.total, 2_898_000);
-  });
-
-  it('dispatch_wallclock_ms.mean is 483000ms (2898000 / 6)', () => {
-    const m = computeMetrics(events);
-    assert.ok(m.rework.dispatch_wallclock_ms !== null);
-    assert.equal(m.rework.dispatch_wallclock_ms.mean, 483_000);
-  });
-
-  it('round_wallclock_ms has 6 entries (6 round-end events)', () => {
-    const m = computeMetrics(events);
     assert.ok(m.rework.round_wallclock_ms !== null);
-    assert.equal(Object.keys(m.rework.round_wallclock_ms).length, 6);
+    assert.equal(
+      Object.keys(m.rework.dispatch_wallclock_ms.per_dispatch).length,
+      countOf('dispatch-end'),
+    );
+    assert.equal(Object.keys(m.rework.round_wallclock_ms).length, countOf('round-end'));
   });
 
-  it('plan_accuracy.dispatch_size_distributions has 2 entries (from 2 plan-authored events)', () => {
+  it('plan_accuracy.dispatch_size_distributions has one entry per plan-authored', () => {
     const m = computeMetrics(events);
-    assert.equal(m.planning_quality.plan_accuracy.dispatch_size_distributions.length, 2);
+    assert.equal(
+      m.planning_quality.plan_accuracy.dispatch_size_distributions.length,
+      countOf('plan-authored'),
+    );
   });
 
-  it('write_amplification: 4 paths each with 1 write, mean 1', () => {
+  it('write_amplification per-path count equals distinct authored artefact paths', () => {
     const m = computeMetrics(events);
-    assert.equal(Object.keys(m.artefact_churn.write_amplification.per_path).length, 4);
-    assert.equal(m.artefact_churn.write_amplification.mean, 1);
-  });
-
-  it('time_to_stability_ms: all 4 paths have 0 (never amended)', () => {
-    const m = computeMetrics(events);
-    for (const v of Object.values(m.artefact_churn.time_to_stability_ms.per_path)) {
-      assert.equal(v, 0);
+    const authoredPaths = new Set<string>();
+    for (const e of events) {
+      if (e.event_type === 'spec-authored') authoredPaths.add(e.spec_path);
+      if (e.event_type === 'plan-authored') authoredPaths.add(e.plan_path);
     }
+    assert.equal(
+      Object.keys(m.artefact_churn.write_amplification.per_path).length,
+      authoredPaths.size,
+    );
   });
 
-  it('project_wallclock_ms is null (no project-started or project-closed events)', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.lifecycle.project_wallclock_ms, null);
-  });
-
-  it('slice_wallclock_ms is null (no slice-started or slice-completed events)', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.lifecycle.slice_wallclock_ms, null);
-  });
-
-  it('health_check_cadence.count is 0', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.lifecycle.health_check_cadence.count, 0);
-  });
-
-  it('retro_distribution.count is 0', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.lifecycle.retro_distribution.count, 0);
-  });
-
-  it('triage_stability is null (no triage-verdict events)', () => {
-    const m = computeMetrics(events);
-    assert.equal(m.planning_quality.triage_stability, null);
-  });
-
-  it('operator_turn_count is null', () => {
+  it('operator_turn_count is null with a note (post-hoc only in the native path)', () => {
     const m = computeMetrics(events);
     assert.equal(m.operator.operator_turn_count, null);
     assert.ok(typeof m.operator.operator_turn_count_note === 'string');
