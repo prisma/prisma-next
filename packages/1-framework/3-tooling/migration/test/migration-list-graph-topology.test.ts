@@ -168,6 +168,19 @@ describe('classifyMigrationListGraphTopology', () => {
     expect(forwardIn(topology, 'ghi7890')).toBe(1);
   });
 
+  it('picks the B-C back-edge via dirName-desc neighbour order at A', () => {
+    const eAtoB = entry('20250309_fan_b', 'hash_a', 'hash_b');
+    const eAtoC = entry('20250310_fan_c', 'hash_a', 'hash_c');
+    const eBtoC = entry('20250305_b_to_c', 'hash_b', 'hash_c');
+    const eCtoB = entry('20250304_c_to_b', 'hash_c', 'hash_b');
+    const topology = classify([eCtoB, eBtoC, eAtoB, eAtoC]);
+
+    expect(kind(topology, eBtoC.migrationHash)).toBe('rollback');
+    expect(kind(topology, eCtoB.migrationHash)).toBe('forward');
+    expect(kind(topology, eAtoC.migrationHash)).toBe('forward');
+    expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
+  });
+
   it('marks exactly one edge rollback in a two-node cycle', () => {
     const eBtoA = entry('20250302_edge_ba', 'hash_b', 'hash_a');
     const eAtoB = entry('20250301_edge_ab', 'hash_a', 'hash_b');
