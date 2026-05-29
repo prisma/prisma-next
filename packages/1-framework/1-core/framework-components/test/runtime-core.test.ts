@@ -144,7 +144,7 @@ describe('RuntimeCore', () => {
     ]);
   });
 
-  it('runBeforeCompile defaults to identity (forwards the runtime-wrapped plan)', async () => {
+  it('runBeforeCompile defaults to identity (does not transform the plan)', async () => {
     class IdentityRuntime extends RuntimeCore<MockPlan, MockExec, RuntimeMiddleware<MockExec>> {
       observed: MockPlan | undefined;
       protected override runBeforeCompile(plan: MockPlan): MockPlan {
@@ -167,14 +167,7 @@ describe('RuntimeCore', () => {
 
     await runtime.execute(plan).toArray();
 
-    // The runtime wraps the plan with `meta.planExecutionId` before any hook
-    // fires (ADR 220), so `runBeforeCompile` observes the wrapped plan
-    // rather than the caller's reference. The wrapped plan carries every
-    // field of the original plus the runtime-assigned identity.
-    expect(runtime.observed).not.toBe(plan);
-    expect(runtime.observed?.draftId).toBe('d-3');
-    expect(runtime.observed?.meta).toMatchObject(meta);
-    expect(typeof runtime.observed?.meta.planExecutionId).toBe('string');
+    expect(runtime.observed).toBe(plan);
   });
 
   it('forwards the lowered exec to runDriver and to middleware hooks', async () => {
@@ -223,17 +216,17 @@ describe('RuntimeCore', () => {
   describe('planExecutionId', () => {
     interface Observation {
       readonly hook: 'beforeExecute' | 'afterExecute';
-      readonly planExecutionId: string | undefined;
+      readonly planExecutionId: string;
     }
 
     function observer(log: Observation[]): RuntimeMiddleware<MockExec> {
       return {
         name: 'observer',
-        async beforeExecute(plan) {
-          log.push({ hook: 'beforeExecute', planExecutionId: plan.meta.planExecutionId });
+        async beforeExecute(_plan, hookCtx) {
+          log.push({ hook: 'beforeExecute', planExecutionId: hookCtx.planExecutionId });
         },
-        async afterExecute(plan) {
-          log.push({ hook: 'afterExecute', planExecutionId: plan.meta.planExecutionId });
+        async afterExecute(_plan, _result, hookCtx) {
+          log.push({ hook: 'afterExecute', planExecutionId: hookCtx.planExecutionId });
         },
       };
     }
@@ -270,20 +263,6 @@ describe('RuntimeCore', () => {
       expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
       // Across execute calls, the IDs differ.
       expect(firstExecId).not.toBe(secondExecId);
-    });
-
-    it('overrides a caller-supplied planExecutionId on every execute call', async () => {
-      const log: Observation[] = [];
-      const runtime = new MockRuntime([observer(log)], ctx, []);
-      const plan: MockPlan = {
-        draftId: 'preset',
-        meta: { ...meta, planExecutionId: 'caller-supplied' },
-      };
-
-      await runtime.execute(plan).toArray();
-
-      expect(log[0]?.planExecutionId).toBeTypeOf('string');
-      expect(log[0]?.planExecutionId).not.toBe('caller-supplied');
     });
   });
 });

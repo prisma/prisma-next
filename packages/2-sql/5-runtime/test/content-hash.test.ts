@@ -167,30 +167,4 @@ describe('computeSqlContentHash', () => {
       expect(await computeSqlContentHash(a)).toBe(await computeSqlContentHash(b));
     });
   });
-
-  describe('planExecutionId exclusion (ADR 220)', () => {
-    it('produces the same hash for two plans that differ only in meta.planExecutionId', async () => {
-      const a = makeExec({
-        sql: 'select * from users where id = $1',
-        params: [42],
-        meta: { planExecutionId: '00000000-0000-4000-8000-000000000001' },
-      });
-      const b = makeExec({
-        sql: 'select * from users where id = $1',
-        params: [42],
-        meta: { planExecutionId: '00000000-0000-4000-8000-000000000002' },
-      });
-      expect(await computeSqlContentHash(a)).toBe(await computeSqlContentHash(b));
-    });
-
-    it('produces the same hash whether planExecutionId is present or absent', async () => {
-      const withId = makeExec({
-        sql: 'select 1',
-        params: [],
-        meta: { planExecutionId: '00000000-0000-4000-8000-000000000003' },
-      });
-      const withoutId = makeExec({ sql: 'select 1', params: [] });
-      expect(await computeSqlContentHash(withId)).toBe(await computeSqlContentHash(withoutId));
-    });
-  });
 });
