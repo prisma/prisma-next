@@ -124,6 +124,21 @@ The check uses the orchestrator's filesystem view at write time. A same-session 
 7. Merge payload fields for the event type.
 8. Run the § Append protocol command.
 
+## Direct-change build-loop spine reuse
+
+A **direct change** (triage verdict `"direct-change"`, routed through `drive-start-workflow` Step 5) emits no new event types. Instead, it reuses the five build-loop events — [`dispatch-start`](./events.md#dispatch-start), [`round-start`](./events.md#round-start), [`brief-issued`](./events.md#brief-issued), [`round-end`](./events.md#round-end), [`dispatch-end`](./events.md#dispatch-end) — from the direct-change sub-path in `drive-start-workflow`, modelling the work as a single-dispatch, single-round unit:
+
+| Field | Direct-change value |
+|---|---|
+| `dispatch_name` | `"direct-change <ticket>"` (ticket slug or short descriptor when no Linear ticket) |
+| `parent_dispatch_id` | `null` (direct changes have no parent dispatch) |
+| `round_number` | `1` (one-shot; direct changes do not loop by default) |
+| `brief_disposition` | `"initial"` (first and only brief for this dispatch) |
+| `project_run_id` | `"direct-<ISO-ts>"` (resolved from the direct-change row in § Trace file path resolution) |
+| `TRACE_FILE` | `wip/drive-trace/direct-<ISO-ts>.jsonl` |
+
+The emit-sites live in `drive-start-workflow` (Step 5 direct-change sub-path: three events before the `drive-dispatch` call, two after). `drive-dispatch` itself carries **no** emit-sites.
+
 ## References
 
 - Event vocabulary (envelope, payloads, arktype, examples): [`events.md`](./events.md).

@@ -35,7 +35,7 @@ For spec/plan writes that pick between `*-authored` and `*-amended`, the Emit st
 
 ## Instrumented skills (current)
 
-The build loop and the planning chain emit eleven event types:
+The build loop, planning chain, and lifecycle/cadence skills emit seventeen event types:
 
 | Skill | Events |
 |---|---|
@@ -44,8 +44,14 @@ The build loop and the planning chain emit eleven event types:
 | `drive-plan-project`, `drive-plan-slice` | `plan-authored`, `plan-amended` |
 | `drive-triage-work` | `triage-verdict` |
 | `drive-discussion` | `falsified-assumption` (mid-flight I12 falsified-assumption entries only) |
+| `drive-create-project` | `project-started` |
+| `drive-close-project` | `project-closed` |
+| `drive-deliver-workflow` | `slice-started`, `slice-completed` |
+| `drive-check-health` | `health-check-fired` |
+| `drive-run-retro` | `retro-landed` |
+| `drive-start-workflow` | `dispatch-start`, `round-start`, `brief-issued`, `round-end`, `dispatch-end` (direct-change sub-path only — build-loop spine reuse; see `emission.md` § Direct-change build-loop spine reuse) |
 
-Lifecycle / cadence / direct-change instrumentation and the read-time assertion + diagnostic-metrics tooling extend this vocabulary in later work; additions go in [`events.md`](./events.md) under the same `schema_version` discipline (additive changes keep `"1"`; a breaking change bumps the version).
+The read-time assertion + diagnostic-metrics tooling extends this vocabulary in later work; additions go in [`events.md`](./events.md) under the same `schema_version` discipline (additive changes keep `"1"`; a breaking change bumps the version).
 
 ## References
 
