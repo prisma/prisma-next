@@ -301,6 +301,12 @@ export function collMod(
               // Include the $jsonSchema body so the idempotency probe only skips when the
               // live validator body genuinely already equals the target — not merely when
               // level/action happen to be unchanged (which was the silent-skip bug for widen ops).
+              // MongoFieldFilter.eq compares with order-sensitive deepEqual, not canonicalize.
+              // That is safe here because MongoDB preserves BSON key order when round-tripping
+              // the $jsonSchema through listCollections (confirmed by the MMS integration test),
+              // so a matching live validator compares equal. The only consequence of skipping
+              // canonicalization is a safe false-negative on the skip: a validator installed
+              // out-of-band with a different key order simply re-runs the collMod harmlessly.
               // The cast is safe: CollModOptions.validator is Record<string,unknown>, and its
               // $jsonSchema value is always a plain BSON object (MongoDocument at runtime).
               ...(options.validator?.['$jsonSchema'] !== undefined

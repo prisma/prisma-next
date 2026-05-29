@@ -198,7 +198,7 @@ describe('MongoMigrationRunner - validator widen', () => {
     expect(marker?.storageHash).toBe('sha256:dest');
   });
 
-  it('skips validator collMod via idempotency when live schema already equals target', async () => {
+  it('emits no operations when origin and destination validators are identical', async () => {
     // Collection already has the widened schema — re-running should be skipped.
     await db.createCollection('users', {
       validator: { $jsonSchema: WIDENED_SCHEMA },
@@ -232,5 +232,75 @@ describe('MongoMigrationRunner - validator widen', () => {
     if (planResult.kind !== 'success') throw new Error('Planner failed');
     // Planner should emit no operations (validators are identical).
     expect(planResult.plan.operations).toHaveLength(0);
+  });
+
+  it('runner skips a validator collMod via the postcheck idempotency probe when the live schema already matches', async () => {
+    // The live collection already carries the widened validator.
+    await db.createCollection('users', {
+      validator: { $jsonSchema: WIDENED_SCHEMA },
+      validationLevel: 'strict',
+      validationAction: 'error',
+    });
+
+    await initMarker(db, 'app', { storageHash: 'sha256:origin', profileHash: 'sha256:p1' });
+
+    // Build a plan that STILL contains the widening collMod by feeding the planner
+    // a stale (narrower) origin IR — this simulates a re-apply where the planner's
+    // origin assumption lags the live database. The op targets the same widened
+    // schema the live collection already has, so the runner's postcheck idempotency
+    // probe must skip it rather than re-executing.
+    const staleOriginIR = new MongoSchemaIR([
+      new MongoSchemaCollection({
+        name: 'users',
+        validator: new MongoSchemaValidator({
+          jsonSchema: { ...ORIGIN_SCHEMA },
+          validationLevel: 'strict',
+          validationAction: 'error',
+        }),
+      }),
+    ]);
+
+    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'sha256:dest');
+
+    const planner = new MongoMigrationPlanner();
+    const planResult = planner.plan({
+      contract: destContract,
+      schema: staleOriginIR,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromContract: null,
+      frameworkComponents: [],
+    });
+    expect(planResult.kind).toBe('success');
+    if (planResult.kind !== 'success') throw new Error('Planner failed');
+
+    // Sanity: the plan really does contain the validator collMod we want skipped.
+    const collModOps = planResult.plan.operations.filter((op) => {
+      const execute = (op as { execute?: { command: { kind: string } }[] }).execute;
+      return execute?.[0]?.command.kind === 'collMod';
+    });
+    expect(collModOps).toHaveLength(1);
+
+    const serialized = serializePlan(planResult.plan);
+
+    const runner = makeRunner();
+    const result = await runner.execute({
+      plan: serialized,
+      destinationContract: destContract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error(`Runner failed: ${result.failure.code} — ${result.failure.summary}`);
+    }
+
+    // The collMod was skipped by the postcheck idempotency probe (live === target).
+    expect(result.value.operationsExecuted).toBe(0);
+
+    // The apply still succeeds: live schema already satisfies the contract, so verify
+    // passes and the marker advances to the destination hash.
+    const marker = await readMarker(db, 'app');
+    expect(marker?.storageHash).toBe('sha256:dest');
   });
 });
