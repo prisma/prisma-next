@@ -122,7 +122,7 @@ Test tool: `node --test` with `node:assert` (the `scripts/` precedent — not vi
 - [x] **SDoD1.** All "Done when" gates from the slice plan pass. (D1–D7 all SATISFIED in `plan.md`.)
 - [x] **SDoD2.** Every pre-named edge case handled per disposition; no new edge cases required an I12 amendment.
 - [x] **SDoD3.** Reviewer verdict `SATISFIED` on each dispatch (D1–D6 reviewed at dispatch close; D7 orchestrator-direct).
-- [x] **SDoD4.** `cli.ts … trace.jsonl` runs clean + emits the dashboard; `pnpm test:scripts` green (397) incl. the new suites; `tsc`/`biome` clean (0 `no-bare-cast`). Captured in `qa-run-01.md`.
+- [x] **SDoD4.** `cli.ts … trace.jsonl` runs clean + emits the dashboard; `pnpm test:scripts` green (407) incl. the new suites; `tsc`/`biome` clean (0 `no-bare-cast`). Captured in `qa-run-01.md`.
 - [x] **SDoD5.** Slice diff (merge-base..HEAD) confined to `scripts/drive-diagnostics/**`, root `package.json`, `projects/drive-instrumentation/**`, and the one lesson surface (`drive/retro/findings.md`). Verified by QA C6.
 - [x] **SDoD6.** Assertion library covers I1–I12 + 8 cascade rules + brief-discipline; every `not-checkable` carries a one-line rationale (24 named coverage gaps in the self-grade report).
 - [x] **SDoD7.** Diagnostic metrics compute or degrade to `null`/`0` with a note; each has ≥1 test with a hand-checked expected value (inline fixtures).
