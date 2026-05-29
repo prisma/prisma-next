@@ -178,3 +178,12 @@ wording is a dispatch-time copy detail, not a design fork.
 - **Hands to:** slice-DoD met — feature, honest diagnostics, current docs, green
   fixtures.
 - **Focus:** docs + README + fixture regen. No behavioural code change.
+
+## Open items
+
+- **Pre-existing CLI spawn-timeout flakes (not this slice).** Nine `@prisma-next/cli`
+  tests (`version.test.ts`, `removed-verb-redirects.test.ts`,
+  `no-parallel-ci-detection.test.ts`) `spawnSync` the built `dist/cli.mjs` and hit
+  the 500ms `vitestPackageDefault` cap against a ~680ms cold start — a structural
+  config mismatch pre-dating this work. Out of scope here; candidate follow-up:
+  raise the timeout for these spawn tests or move them to the e2e suite.
