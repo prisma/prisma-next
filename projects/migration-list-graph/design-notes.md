@@ -171,6 +171,12 @@ single hash (`⟲  <dirName>  <hash>`).
 >   mirrors the existing 3-colour DFS in `migration-graph.ts` `detectCycles`;
 > - **forward** (`*`) otherwise.
 >
+> The DFS seeds from forward-in-degree-0 nodes (`EMPTY_CONTRACT_HASH` first, then
+> lexicographic), falling back to all nodes lexicographically for a pure cycle
+> with no such root — so the partition is fully determined even with no genesis /
+> multiple roots. (Root-start order matters only for graphs where it has freedom;
+> where an "intended" rollback exists, this seeding recovers it.)
+>
 > Kind classification therefore lives in the topology layer (see § Topology
 > source), not in either renderer. Both the flat list and `--graph` consume the
 > same classifier. **The forward edges (everything not a back-edge or self-edge)
@@ -277,7 +283,7 @@ divergence — the consumer lanes **join into it from above**, and it **fans out
 to producers below**, on **separate gutter rows**:
 
 ```
-* │   20250320_add_x      d41a8c3 → e1f2a3b
+*     20250320_add_x      d41a8c3 → e1f2a3b
 │ *   20250319_add_y      d41a8c3 → c4d5e6f
 ├─┘
 o     d41a8c3
@@ -291,7 +297,12 @@ o     d41a8c3
 ```
 
 Trace it through: `add_x`/`add_y` both depart `d41a8c3` (forward out-degree 2),
-so their two lanes **join into the node from above** (`├─┘`). The node `o
+so their two lanes **join into the node from above** (`├─┘`). Note the
+**lane-opening is lazy**: a divergence consumer's lane opens only where its own
+tip row appears (reading top-down), so the topmost consumer `add_x` is a bare
+`*` and `add_y` opens lane 1 below it — the same tip discipline the diamond and
+partial-rollback cases use (the diamond's `* │` first-merge row comes from the
+node's **fan** opening both lanes, not from eager pre-opening). The node `o
 d41a8c3` is emitted because `d41a8c3` has forward in-degree 2 (`merge_a`,
 `merge_b`), which **fan below** it (`├─┐`). `merge_a`/`merge_b` then continue on
 their own lanes down to their producers `branch_a`/`branch_b`, which both depart

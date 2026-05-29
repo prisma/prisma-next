@@ -52,6 +52,22 @@ function connectorRows(rows: readonly LayoutRow[]): readonly ConnectorLayoutRow[
   return rows.filter(isConnector);
 }
 
+function migrationByDirName(
+  rows: readonly LayoutRow[],
+  dirName: string,
+): MigrationLayoutRow | undefined {
+  return migrationRows(rows).find((r) => r.entry.dirName === dirName);
+}
+
+function expectMigrationGeometry(
+  rows: readonly LayoutRow[],
+  dirName: string,
+  laneIndex: number,
+  passThroughLanes: readonly number[],
+): void {
+  expect(migrationByDirName(rows, dirName)).toMatchObject({ laneIndex, passThroughLanes });
+}
+
 describe('computeMigrationListGraphLayout', () => {
   it('degrades linear chain to lane-zero migrations without connectors or node-lines', () => {
     const eComments = entry('20250310_add_comments', 'hash_7e1', 'hash_f03');
@@ -93,18 +109,14 @@ describe('computeMigrationListGraphLayout', () => {
       branchCount: 2,
     });
 
-    const mergeTags = migrationRows(rows).find((r) => r.entry.dirName === '20250302_merge_tags');
-    const mergePosts = migrationRows(rows).find((r) => r.entry.dirName === '20250301_merge_posts');
-    expect(mergeTags?.laneIndex).toBe(0);
-    expect(mergeTags?.passThroughLanes).toEqual([1]);
-    expect(mergePosts?.laneIndex).toBe(1);
-    expect(mergePosts?.passThroughLanes).toEqual([0]);
+    expectMigrationGeometry(rows, '20250302_merge_tags', 0, [1]);
+    expectMigrationGeometry(rows, '20250301_merge_posts', 1, [0]);
+    expectMigrationGeometry(rows, '20250210_add_tags', 0, [1]);
+    expectMigrationGeometry(rows, '20250203_add_posts', 1, [0]);
+    expectMigrationGeometry(rows, '20250115_add_users', 0, []);
 
     const join = connectorRows(rows).find((c) => c.connectorKind === 'joinBelow');
     expect(join).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
-
-    const users = migrationRows(rows).find((r) => r.entry.dirName === '20250115_add_users');
-    expect(users?.laneIndex).toBe(0);
   });
 
   it('lays out N-way convergence with fan-below spanning three producer lanes', () => {
@@ -120,8 +132,13 @@ describe('computeMigrationListGraphLayout', () => {
     const fan = connectorRows(rows).find((c) => c.connectorKind === 'fanBelow');
     expect(fan).toMatchObject({ startLane: 0, endLane: 2, branchCount: 3 });
 
-    const merges = migrationRows(rows).filter((r) => r.entry.to === 'hash_d41');
-    expect(merges.map((r) => r.laneIndex)).toEqual([0, 1, 2]);
+    expectMigrationGeometry(rows, '20250310_merge_a', 0, [1, 2]);
+    expectMigrationGeometry(rows, '20250309_merge_b', 1, [0, 2]);
+    expectMigrationGeometry(rows, '20250308_merge_c', 2, [0, 1]);
+    expectMigrationGeometry(rows, '20250304_branch_a', 0, [1, 2]);
+    expectMigrationGeometry(rows, '20250303_branch_b', 1, [0, 2]);
+    expectMigrationGeometry(rows, '20250302_branch_c', 2, [0, 1]);
+    expectMigrationGeometry(rows, '20250115_add_base', 0, []);
 
     const baseJoin = connectorRows(rows)
       .filter((c) => c.connectorKind === 'joinBelow')
@@ -143,10 +160,9 @@ describe('computeMigrationListGraphLayout', () => {
     const fan = connectorRows(rows).find((c) => c.connectorKind === 'fanBelow');
     expect(fan).toMatchObject({ branchCount: 2, endLane: 1 });
 
-    const v2 = migrationRows(rows).find((r) => r.entry.dirName.includes('v2'));
-    const posts = migrationRows(rows).find((r) => r.entry.dirName === '20250203_add_posts');
-    expect(v2?.laneIndex).toBe(0);
-    expect(posts?.laneIndex).toBe(1);
+    expectMigrationGeometry(rows, '20250203_add_posts_v2', 0, [1]);
+    expectMigrationGeometry(rows, '20250203_add_posts', 1, [0]);
+    expectMigrationGeometry(rows, '20250115_add_users', 0, []);
   });
 
   it('lays out convergence and divergence with join-above, node-line, and fan-below on separate rows', () => {
@@ -172,9 +188,33 @@ describe('computeMigrationListGraphLayout', () => {
     expect(joinIndex).toBeLessThan(nodeIndex);
     expect(nodeIndex).toBeLessThan(fanIndex);
 
-    expect(eAddX.dirName).toBe(migrationRows(rows)[0]?.entry.dirName);
-    expect(migrationRows(rows)[0]?.laneIndex).toBe(0);
-    expect(migrationRows(rows)[1]?.laneIndex).toBe(1);
+    expect(migrationRows(rows).map((r) => r.entry.dirName)).toEqual([
+      '20250320_add_x',
+      '20250319_add_y',
+      '20250310_merge_a',
+      '20250309_merge_b',
+      '20250304_branch_a',
+      '20250303_branch_b',
+      '20250115_add_base',
+    ]);
+
+    expectMigrationGeometry(rows, '20250320_add_x', 0, []);
+    expectMigrationGeometry(rows, '20250319_add_y', 1, [0]);
+    expectMigrationGeometry(rows, '20250310_merge_a', 0, [1]);
+    expectMigrationGeometry(rows, '20250309_merge_b', 1, [0]);
+    expectMigrationGeometry(rows, '20250304_branch_a', 0, [1]);
+    expectMigrationGeometry(rows, '20250303_branch_b', 1, [0]);
+    expectMigrationGeometry(rows, '20250115_add_base', 0, []);
+
+    const joinD41 = connectorRows(rows).find(
+      (c) => c.connectorKind === 'joinBelow' && c.contractHash === 'hash_d41',
+    );
+    expect(joinD41).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+
+    const fanD41 = connectorRows(rows).find(
+      (c) => c.connectorKind === 'fanBelow' && c.contractHash === 'hash_d41',
+    );
+    expect(fanD41).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
   });
 
   it('places multi-hop rollback in lane zero without weaving', () => {
@@ -204,20 +244,34 @@ describe('computeMigrationListGraphLayout', () => {
     const eLikes = entry('20250320_add_likes', 'hash_def', 'hash_jkl');
     const rows = layout([eLikes, eRollback, eComments, ePosts, eUsers]).rows;
 
-    const likes = migrationRows(rows).find((r) => r.entry.dirName === '20250320_add_likes');
-    const rollback = migrationRows(rows).find(
-      (r) => r.entry.dirName === '20250312_rollback_comments',
-    );
-    expect(likes?.laneIndex).toBe(0);
-    expect(rollback).toMatchObject({
+    expectMigrationGeometry(rows, '20250320_add_likes', 0, []);
+    expect(migrationByDirName(rows, '20250312_rollback_comments')).toMatchObject({
       laneIndex: 1,
       woven: false,
       edgeKind: 'rollback',
       passThroughLanes: [0],
     });
+    expectMigrationGeometry(rows, '20250310_add_comments', 1, [0]);
 
     const join = connectorRows(rows).find((c) => c.connectorKind === 'joinBelow');
     expect(join).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+  });
+
+  it('passes open producer lanes through intervening rows before producers appear', () => {
+    const eUsers = entry('20250115_add_users', null, 'hash_abc');
+    const ePosts = entry('20250203_add_posts', 'hash_abc', 'hash_7e1');
+    const eTags = entry('20250210_add_tags', 'hash_abc', 'hash_9c4');
+    const eUnrelated = entry('20250220_unrelated', 'hash_feed', 'hash_dead');
+    const eMergePosts = entry('20250301_merge_posts', 'hash_7e1', 'hash_d41');
+    const eMergeTags = entry('20250302_merge_tags', 'hash_9c4', 'hash_d41');
+    const rows = layout([eMergeTags, eMergePosts, eUnrelated, eTags, ePosts, eUsers]).rows;
+
+    expectMigrationGeometry(rows, '20250302_merge_tags', 0, [1]);
+    expectMigrationGeometry(rows, '20250301_merge_posts', 1, [0]);
+    expectMigrationGeometry(rows, '20250220_unrelated', 2, [0, 1]);
+    expectMigrationGeometry(rows, '20250210_add_tags', 0, [1, 2]);
+    expectMigrationGeometry(rows, '20250203_add_posts', 1, [0, 2]);
+    expectMigrationGeometry(rows, '20250115_add_users', 0, [2]);
   });
 
   it('starts separate lanes at multiple forward roots without throwing', () => {
