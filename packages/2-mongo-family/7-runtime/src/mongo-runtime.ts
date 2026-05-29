@@ -5,6 +5,7 @@ import {
   checkMiddlewareCompatibility,
   RuntimeCore,
   type RuntimeExecuteOptions,
+  type RuntimeMiddlewareContext,
   runBeforeExecuteChain,
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
@@ -132,25 +133,25 @@ class MongoRuntimeImpl
     const signal = options?.signal;
     const codecCtx: CodecCallContext = signal === undefined ? {} : { signal };
 
-    // Per-execute identity stamped onto the plan before any hook fires (ADR
-    // 220). MongoRuntimeImpl overrides `execute()` and runs its own pipeline
-    // here rather than delegating to `RuntimeCore.execute`, so the wrap is
-    // applied at this entry point as well.
-    const planExecutionId = crypto.randomUUID();
-    const wrappedPlan = {
-      ...plan,
-      meta: { ...plan.meta, planExecutionId },
+    // Per-execute middleware context. Spread the stored runtime-level
+    // template and mint a fresh `planExecutionId` so every hook in this
+    // call observes the same value, and two executions of the same plan
+    // observe distinct values. ADR 220. The plan itself flows through
+    // unchanged.
+    const execCtx: RuntimeMiddlewareContext = {
+      ...self.ctx,
+      planExecutionId: crypto.randomUUID(),
     };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
-      const compiled = await self.runBeforeCompile(wrappedPlan);
+      const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
-      await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, self.ctx);
+      await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, execCtx);
       const stream = runWithMiddleware<MongoExecutionPlan, Record<string, unknown>>(
         exec,
         self.middleware,
-        self.ctx,
+        execCtx,
         () => self.runDriver(exec),
       );
       for await (const rawRow of stream) {

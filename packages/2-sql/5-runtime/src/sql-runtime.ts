@@ -1,4 +1,4 @@
-import type { Contract, PlanMeta } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ExecutionStackInstance,
   RuntimeDriverInstance,
@@ -37,7 +37,6 @@ import {
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
-import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { buildDecodeContext, type DecodeContext, decodeRow } from './codecs/decoding';
 import { deriveParamMetadata, encodeParams, encodeParamsWithMetadata } from './codecs/encoding';
@@ -387,23 +386,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   private executeAgainstQueryable<Row>(
-    inputPlan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
+    plan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
     queryable: SqlQueryable,
     options?: RuntimeExecuteOptions,
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated();
-
-    // Per-execute identity stamped onto the plan before any hook fires (ADR
-    // 220). SqlRuntimeImpl overrides `execute()` and runs its own pipeline
-    // through this helper rather than delegating to `RuntimeCore.execute`,
-    // so the wrap is applied here too. Each call to `execute()` /
-    // `connection.execute()` / `transaction.execute()` flows through this
-    // method and gets its own fresh `meta.planExecutionId`.
-    const planExecutionId = crypto.randomUUID();
-    const plan = castAs<typeof inputPlan>({
-      ...inputPlan,
-      meta: { ...inputPlan.meta, planExecutionId },
-    });
 
     const self = this;
     const signal = options?.signal;
@@ -422,10 +409,16 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     // with the appropriate scope. Middleware that observe `ctx.scope`
     // (e.g. the cache middleware, which only intercepts at `'runtime'`)
     // see the right value without any out-of-band signaling.
+    //
+    // `planExecutionId` is minted here too: every execute() call — top-level,
+    // connection-scoped, or transaction-scoped — flows through this helper and
+    // gets its own fresh UUID. Hooks for one call see the same value; two
+    // calls (even with the same plan) see distinct values. ADR 220.
     const execMiddlewareCtx: RuntimeMiddlewareContext = {
       ...self.ctx,
       ...ifDefined('signal', signal),
       ...(scope !== 'runtime' ? { scope } : {}),
+      planExecutionId: crypto.randomUUID(),
     };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
@@ -541,20 +534,17 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated();
 
-    // Per-execute identity for this prepared-statement invocation (ADR 220).
-    // `executePrepared` is a parallel entry point to `executeAgainstQueryable`
-    // and must assign its own fresh ID per call.
-    const planExecutionId = crypto.randomUUID();
-    const execMeta: PlanMeta = { ...ps.meta, planExecutionId };
-
     const self = this;
     const signal = options?.signal;
     const scope = options?.scope ?? 'runtime';
     const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+    // `executePrepared` is a parallel entry point to `executeAgainstQueryable`
+    // and mints its own fresh `planExecutionId` per call. ADR 220.
     const execMiddlewareCtx: RuntimeMiddlewareContext = {
       ...self.ctx,
       ...ifDefined('signal', signal),
       ...(scope !== 'runtime' ? { scope } : {}),
+      planExecutionId: crypto.randomUUID(),
     };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
@@ -568,7 +558,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         sql: ps.sql,
         params: preEncodeValues,
         ast: ps.ast,
-        meta: execMeta,
+        meta: ps.meta,
       };
 
       const mutator: SqlParamRefMutatorInternal = createSqlParamRefMutator(preEncodeExec);
@@ -589,7 +579,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         sql: ps.sql,
         params: encodedParams,
         ast: ps.ast,
-        meta: execMeta,
+        meta: ps.meta,
       };
 
       const handles = self.#preparedStatementHandles;
