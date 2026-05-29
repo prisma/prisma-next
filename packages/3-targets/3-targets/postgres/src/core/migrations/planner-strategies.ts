@@ -384,7 +384,13 @@ function enumRebuildCallRecipe(
     ? toType.values
     : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
-  const ddlSchema = resolveDdlSchemaForNamespace(ctx, namespaceId);
+  // Type DDL targets the enum's real schema — the unbound coordinate resolves
+  // to the introspected `current_schema()`, never the `__unbound__` sentinel.
+  const ddlSchema = resolveDdlSchemaForNamespaceStorage(
+    ctx.toContract.storage,
+    namespaceId,
+    ctx.schema,
+  );
 
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
@@ -485,16 +491,17 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
     const typeName = key.slice(sepIdx + 1);
 
     const desired = enumType.values;
-    const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
-    // The live-schema lookup keys by the *introspected* schema name, which for
-    // the unbound namespace is the resolved `current_schema()` (not the
-    // `__unbound__` DDL-emit sentinel) — see `resolveDdlSchemaForNamespaceStorage`.
-    const readSchema = resolveDdlSchemaForNamespaceStorage(
+    // The enum's live schema: for the unbound coordinate this resolves to the
+    // introspected `current_schema()` (e.g. `public`), never the `__unbound__`
+    // DDL-emit sentinel — so both the existing-values lookup key and the
+    // emitted `CREATE TYPE` / `ALTER TYPE` target the real schema the type
+    // lives in. Named namespaces resolve to their own DDL schema.
+    const ddlSchema = resolveDdlSchemaForNamespaceStorage(
       ctx.toContract.storage,
       enumNamespaceId,
       ctx.schema,
     );
-    const existing = readExistingEnumValues(ctx.schema, readSchema, enumType.nativeType);
+    const existing = readExistingEnumValues(ctx.schema, ddlSchema, enumType.nativeType);
     if (!existing) {
       calls.push(new CreateEnumTypeCall(ddlSchema, typeName, desired, enumType.nativeType));
       handledKeys.add(key);
@@ -507,7 +514,6 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
       continue;
     }
     if (diff.kind === 'add_values') {
-      const ddlSchema = resolveDdlSchemaForNamespace(ctx, enumNamespaceId);
       calls.push(new AddEnumValuesCall(ddlSchema, typeName, enumType.nativeType, diff.values));
       handledKeys.add(key);
       continue;
