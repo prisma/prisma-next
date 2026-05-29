@@ -468,4 +468,79 @@ describe('integration/mutation-include-readback', () => {
       timeouts.spinUpPpgDev,
     );
   });
+
+  // Nested mutations write the relations in the same call, then the
+  // read-back resolves them. These go through the nested-mutation reload
+  // path; assert the same explicit-projection shapes so the read-back is
+  // pinned regardless of which mutation path produced the rows.
+  describe('nested mutations', () => {
+    it(
+      'create() with a nested create() resolves the just-written relation',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          const users = createReturningUsersCollection(runtime);
+
+          const created = await users
+            .select('name')
+            .include('posts', (posts) => posts.select('title').orderBy((post) => post.id.asc()))
+            .create({
+              id: 1,
+              name: 'Nested',
+              email: 'nested@example.com',
+              posts: (posts) =>
+                posts.create([
+                  { id: 10, title: 'First', views: 100 },
+                  { id: 11, title: 'Second', views: 200 },
+                ]),
+            });
+
+          expect(created).toEqual({
+            name: 'Nested',
+            posts: [{ title: 'First' }, { title: 'Second' }],
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'update() with a deep nested create() resolves a depth-2 relation',
+      async () => {
+        await withCollectionRuntime(async (runtime) => {
+          const users = createReturningUsersCollection(runtime);
+
+          await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+
+          const updated = await users
+            .where({ id: 1 })
+            .select('name')
+            .include('posts', (posts) =>
+              posts
+                .select('title')
+                .orderBy((post) => post.id.asc())
+                .include('comments', (comments) =>
+                  comments.select('body').orderBy((comment) => comment.id.asc()),
+                ),
+            )
+            .update({
+              posts: (posts) =>
+                posts.create([
+                  {
+                    id: 30,
+                    title: 'Deep Post',
+                    views: 300,
+                    comments: (comments) => comments.create([{ id: 40, body: 'Deep Comment' }]),
+                  },
+                ]),
+            });
+
+          expect(updated).toEqual({
+            name: 'Alice',
+            posts: [{ title: 'Deep Post', comments: [{ body: 'Deep Comment' }] }],
+          });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });
