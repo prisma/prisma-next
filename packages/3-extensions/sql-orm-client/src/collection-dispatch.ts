@@ -170,7 +170,7 @@ function dispatchWithIncludes<Row>(options: {
  * include query can't observe an already-deleted row, so delete reads
  * its snapshot before issuing the DELETE (see `collection.ts`).
  */
-export async function reloadMutationRowsByIdentities<Row>(options: {
+export function reloadMutationRowsByIdentities<Row>(options: {
   contract: Contract<SqlStorage>;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   tableName: string;
@@ -178,11 +178,11 @@ export async function reloadMutationRowsByIdentities<Row>(options: {
   identityRows: readonly Record<string, unknown>[];
   selectedFields: readonly string[] | undefined;
   includes: readonly IncludeExpr[];
-}): Promise<Row[]> {
+}): AsyncIterableResult<Row> {
   const { contract, runtime, tableName, modelName, identityRows, selectedFields, includes } =
     options;
   if (identityRows.length === 0) {
-    return [];
+    return emptyResult<Row>();
   }
 
   const identityColumns = resolveRowIdentityColumns(contract, tableName);
@@ -194,7 +194,7 @@ export async function reloadMutationRowsByIdentities<Row>(options: {
 
   const identityFilter = buildIdentityInFilter(contract, tableName, identityColumns, identityRows);
   if (!identityFilter) {
-    return [];
+    return emptyResult<Row>();
   }
 
   return dispatchCollectionRows<Row>({
@@ -208,72 +208,47 @@ export async function reloadMutationRowsByIdentities<Row>(options: {
     },
     tableName,
     modelName,
-  }).toArray();
+  });
 }
 
+function emptyResult<Row>(): AsyncIterableResult<Row> {
+  return new AsyncIterableResult((async function* (): AsyncGenerator<Row, void, unknown> {})());
+}
+
+// Identity values come straight from the mutation's `RETURNING`, so they
+// are unique by construction — no JS-side dedup; the database evaluates
+// the `IN` list (or the composite-key `OR` of equality tuples) directly.
 function buildIdentityInFilter(
   contract: Contract<SqlStorage>,
   tableName: string,
   identityColumns: readonly string[],
   identityRows: readonly Record<string, unknown>[],
 ): AnyExpression | undefined {
-  if (identityColumns.length === 1) {
-    const column = identityColumns[0]!;
-    const values = uniqueByKey(
-      identityRows.map((row) => row[column]).filter((value) => value !== undefined),
-      (value) => identityValueKey(value),
-    );
+  const [singleColumn, ...rest] = identityColumns;
+  if (singleColumn !== undefined && rest.length === 0) {
+    const values = identityRows
+      .map((row) => row[singleColumn])
+      .filter((value) => value !== undefined);
     if (values.length === 0) {
       return undefined;
     }
     return bindWhereExpr(
       contract,
-      BinaryExpr.in(ColumnRef.of(tableName, column), ListExpression.fromValues(values)),
+      BinaryExpr.in(ColumnRef.of(tableName, singleColumn), ListExpression.fromValues(values)),
     );
   }
 
-  const tuples: AnyExpression[] = [];
-  const seen = new Set<string>();
-  for (const row of identityRows) {
-    const key = identityKey(row, identityColumns);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    tuples.push(
-      AndExpr.of(
-        identityColumns.map((column) =>
-          BinaryExpr.eq(ColumnRef.of(tableName, column), LiteralExpr.of(row[column])),
-        ),
-      ),
-    );
-  }
-  if (tuples.length === 0) {
+  if (identityRows.length === 0) {
     return undefined;
   }
+  const tuples = identityRows.map((row) =>
+    AndExpr.of(
+      identityColumns.map((column) =>
+        BinaryExpr.eq(ColumnRef.of(tableName, column), LiteralExpr.of(row[column])),
+      ),
+    ),
+  );
   return bindWhereExpr(contract, OrExpr.of(tuples));
-}
-
-function uniqueByKey<T>(values: readonly T[], keyOf: (value: T) => string): T[] {
-  const seen = new Set<string>();
-  const result: T[] = [];
-  for (const value of values) {
-    const key = keyOf(value);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(value);
-  }
-  return result;
-}
-
-function identityKey(row: Record<string, unknown>, identityColumns: readonly string[]): string {
-  return JSON.stringify(identityColumns.map((column) => identityValueKey(row[column])));
-}
-
-function identityValueKey(value: unknown): string {
-  return typeof value === 'bigint' ? `bigint:${value.toString()}` : JSON.stringify(value ?? null);
 }
 
 /**
