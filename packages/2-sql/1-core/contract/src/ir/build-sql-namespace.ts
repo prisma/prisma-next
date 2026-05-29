@@ -4,6 +4,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import type { PostgresEnumStorageEntry } from './postgres-enum-storage-entry';
 import type { SqlNamespace, SqlNamespaceTablesInput } from './sql-storage';
 import { SqlUnboundNamespace } from './sql-unbound-namespace';
@@ -49,9 +50,9 @@ export function buildSqlNamespace(input: SqlNamespaceTablesInput): SqlNamespace 
   const tableCount = Object.keys(input.tables ?? {}).length;
   const enumCount = Object.keys(input.enum ?? {}).length;
   if (input.id === UNBOUND_NAMESPACE_ID && tableCount === 0 && enumCount === 0) {
-    return SqlUnboundNamespace.instance as SqlNamespace;
+    return castAs<SqlNamespace>(SqlUnboundNamespace.instance);
   }
-  return new SqlNamespaceFromTablesInput(input) as SqlNamespace;
+  return castAs<SqlNamespace>(new SqlNamespaceFromTablesInput(input));
 }
 
 export function buildSqlNamespaceMap(
@@ -60,7 +61,12 @@ export function buildSqlNamespaceMap(
   return Object.fromEntries(
     Object.entries(namespaces).map(([nsKey, ns]) => [
       nsKey,
-      ns instanceof NamespaceBase ? (ns as SqlNamespace) : buildSqlNamespace(ns),
+      ns instanceof NamespaceBase
+        ? blindCast<
+            SqlNamespace,
+            'an already-built NamespaceBase in an SQL-family namespace map is a SqlNamespace'
+          >(ns)
+        : buildSqlNamespace(ns),
     ]),
   );
 }

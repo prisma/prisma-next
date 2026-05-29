@@ -2448,6 +2448,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:0.11.0
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/utils':
+        specifier: workspace:0.11.0
+        version: link:../../../1-framework/0-foundation/utils
       arktype:
         specifier: ^2.2.0
         version: 2.2.0
