@@ -177,7 +177,9 @@ function toSpaceMember(
     // a runner consumes). The caller is the aggregate runner,
     // which only forwards a value already validated through the
     // family `deserializeContract` seam at the aggregate boundary.
-    contract: opts.destinationContract as unknown as Contract,
+    // `contract` is a lazy accessor on `ContractSpaceMember`; the
+    // projector invokes it, so the thunk must return the value.
+    contract: () => opts.destinationContract as unknown as Contract,
     headRef: { hash: '', invariants: [] },
     migrations: {
       graph: {
