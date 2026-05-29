@@ -27,8 +27,8 @@ describe('computeMigrationHash', () => {
 
   it('changes when a metadata field changes', () => {
     const ops = createTestOps();
-    const id1 = computeMigrationHash(createTestMetadata({ labels: [] }), ops);
-    const id2 = computeMigrationHash(createTestMetadata({ labels: ['custom'] }), ops);
+    const id1 = computeMigrationHash(createTestMetadata({ from: null }), ops);
+    const id2 = computeMigrationHash(createTestMetadata({ from: 'sha256:custom' }), ops);
     expect(id1).not.toBe(id2);
   });
 
@@ -37,25 +37,6 @@ describe('computeMigrationHash', () => {
     const id1 = computeMigrationHash(metadata, createTestOps());
     const id2 = computeMigrationHash(metadata, []);
     expect(id1).not.toBe(id2);
-  });
-
-  it('is unchanged when metadata.hints.plannerVersion is mutated', () => {
-    const ops = createTestOps();
-    const m1 = createTestMetadata({
-      hints: {
-        used: [],
-        applied: ['additive_only'],
-        plannerVersion: '0.0.1',
-      },
-    });
-    const m2 = createTestMetadata({
-      hints: {
-        used: [],
-        applied: ['additive_only'],
-        plannerVersion: '9.9.9',
-      },
-    });
-    expect(computeMigrationHash(m1, ops)).toBe(computeMigrationHash(m2, ops));
   });
 
   it('changes when metadata.from changes', () => {
@@ -76,7 +57,7 @@ describe('computeMigrationHash', () => {
     const metadata = createTestMetadata();
     const ops = createTestOps();
 
-    const { migrationHash: _migrationHash, hints: _hints, ...strippedMeta } = metadata;
+    const { migrationHash: _migrationHash, ...strippedMeta } = metadata;
 
     const canonicalParts = [canonicalizeJson(strippedMeta), canonicalizeJson(ops)];
     const partHashes = canonicalParts.map((part) =>
@@ -93,7 +74,7 @@ describe('computeMigrationHash', () => {
   });
 
   it('changes when canonical part boundaries change', () => {
-    const metadata = createTestMetadata({ labels: ['a:b'] });
+    const metadata = createTestMetadata({ from: 'sha256:a:b' });
     const baseOps = createTestOps();
     const boundaryShiftedOps = baseOps.map((op) => ({ ...op, label: `${op.label}:suffix` }));
 
@@ -121,8 +102,6 @@ describe('verifyMigrationHash', () => {
     const baseMetadata = {
       from: null,
       to: 'sha256:abc123',
-      hints: { used: [], applied: [], plannerVersion: '0.0.1' },
-      labels: [],
       providedInvariants: [],
       createdAt: '2026-02-25T14:30:00.000Z',
     };

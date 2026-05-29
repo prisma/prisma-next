@@ -63,12 +63,6 @@ async function writeAttestedMigration(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
-    hints: {
-      used: [],
-      applied: ['additive_only'],
-      plannerVersion: '1.0.0',
-    },
-    labels: [],
     providedInvariants: [],
     createdAt: opts.timestamp.toISOString(),
   };

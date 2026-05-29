@@ -16,10 +16,9 @@ describe('PlannerProducedMongoMigration', () => {
   });
 
   it('exposes describe() metadata as supplied', () => {
-    const meta = { ...META, labels: ['initial'] };
-    const migration = new PlannerProducedMongoMigration([], meta);
+    const migration = new PlannerProducedMongoMigration([], META);
 
-    expect(migration.describe()).toEqual(meta);
+    expect(migration.describe()).toEqual(META);
   });
 
   it('derives origin/destination from describe() (round-trips through MigrationPlan surface)', () => {
@@ -82,27 +81,15 @@ describe('PlannerProducedMongoMigration', () => {
     expect(source).toContain(META.to);
   });
 
-  it('passes optional describe() metadata (labels) through to renderTypeScript', () => {
+  it('renderTypeScript does not include labels in the describe block', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
-    const migration = new PlannerProducedMongoMigration(calls, {
-      ...META,
-      labels: ['initial', 'seed'],
-    });
+    const migration = new PlannerProducedMongoMigration(calls, META);
 
     const source = migration.renderTypeScript();
 
     expect(source).toContain('class M extends Migration');
     expect(source).toContain(META.from);
     expect(source).toContain(META.to);
-    expect(source).toContain('labels: ["initial", "seed"]');
-  });
-
-  it('omits optional describe() metadata from renderTypeScript when not supplied', () => {
-    const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
-    const migration = new PlannerProducedMongoMigration(calls, META);
-
-    const source = migration.renderTypeScript();
-
     expect(source).not.toContain('labels:');
   });
 });

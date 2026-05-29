@@ -349,7 +349,7 @@ describe('MigrationCLI.run', () => {
     expect(loadConfigMock).toHaveBeenCalledWith('/equals/config.ts');
   });
 
-  it('preserves contract bookends from a previously-scaffolded migration.json', async () => {
+  it('preserves createdAt from a previously-scaffolded migration.json', async () => {
     loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
@@ -357,8 +357,6 @@ describe('MigrationCLI.run', () => {
       from: 'sha256:from',
       to: 'sha256:to',
       migrationHash: null,
-      hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-      labels: ['scaffolded'],
       createdAt: '2026-01-15T10:00:00.000Z',
     };
     writeFileSync(join(workDir, 'migration.json'), JSON.stringify(existing, null, 2));
@@ -373,7 +371,6 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(0);
     const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
-    expect(manifest.labels).toEqual(existing.labels);
     expect(manifest.createdAt).toBe(existing.createdAt);
     // Even though the on-disk fixture started with `migrationHash: null`,
     // MigrationCLI.run must rewrite it to a real `sha256:...` digest —

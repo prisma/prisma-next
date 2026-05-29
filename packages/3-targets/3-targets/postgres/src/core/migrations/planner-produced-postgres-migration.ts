@@ -29,7 +29,6 @@ import type {
   OpFactoryCall,
 } from '@prisma-next/framework-components/control';
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import { PostgresMigration } from './postgres-migration';
 import { renderOps } from './render-ops';
@@ -73,7 +72,6 @@ export class TypeScriptRenderablePostgresMigration
     return renderCallsToTypeScript(this.#calls, {
       from: this.#meta.from,
       to: this.#meta.to,
-      ...ifDefined('labels', this.#meta.labels),
     });
   }
 }

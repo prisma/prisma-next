@@ -180,12 +180,6 @@ async function executeMigrationNewCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
-    hints: {
-      used: [],
-      applied: [],
-      plannerVersion: '1.0.0',
-    },
-    labels: [],
     providedInvariants: [],
     createdAt: timestamp.toISOString(),
   };

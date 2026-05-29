@@ -24,8 +24,6 @@ function makeMetadata(args: {
     from: args.from,
     to: args.to,
     migrationHash: `mh:${args.to}`,
-    hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-    labels: [],
     providedInvariants: [],
     createdAt: '2026-01-01T00:00:00.000Z',
   };

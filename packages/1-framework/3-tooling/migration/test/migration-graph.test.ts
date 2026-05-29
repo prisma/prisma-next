@@ -23,14 +23,13 @@ function pkg(
   to: string,
   dirName: string,
   createdAt = '2026-02-25T14:00:00.000Z',
-  labels: readonly string[] = [],
 ): OnDiskMigrationPackage {
   // Bake a per-pkg counter into createdAt so distinct packages get distinct
   // hashes — and use the same metadata for both hashing and the returned
   // package, so each fixture is internally consistent (round-trips through
   // readMigrationPackage()).
   const uniqueCreatedAt = `${createdAt}-${migrationCounter++}`;
-  const metadata = createTestMetadata({ from, to, createdAt: uniqueCreatedAt, labels });
+  const metadata = createTestMetadata({ from, to, createdAt: uniqueCreatedAt });
   const ops = createTestOps();
   const migrationHash = computeMigrationHash(metadata, ops);
   return {
@@ -47,7 +46,6 @@ function chain(...specs: Array<[string, string, string]>): OnDiskMigrationPackag
 
 interface PkgWithInvariantsOpts {
   readonly invariants?: readonly string[];
-  readonly labels?: readonly string[];
   readonly createdAt?: string;
 }
 
@@ -62,7 +60,6 @@ function pkgWithInvariants(
     from,
     to,
     createdAt: uniqueCreatedAt,
-    labels: opts.labels ?? [],
     providedInvariants: opts.invariants ?? [],
   });
   const ops = createTestOps();
@@ -411,7 +408,6 @@ describe('detectCycles', () => {
         migrationHash: `mid:${i}`,
         dirName: `m${i}`,
         createdAt: new Date(i * 1000).toISOString(),
-        labels: [],
         invariants: [],
       };
       const fwd = forwardChain.get(prev);

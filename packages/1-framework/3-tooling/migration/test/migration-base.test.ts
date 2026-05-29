@@ -19,7 +19,7 @@ describe('Migration', () => {
           ];
         }
         override describe() {
-          return { from: 'abc', to: 'def', labels: ['test'] };
+          return { from: 'abc', to: 'def' };
         }
       }
 
@@ -28,7 +28,7 @@ describe('Migration', () => {
         { id: 'op1', label: 'Op 1', operationClass: 'additive' },
         { id: 'op2', label: 'Op 2', operationClass: 'additive' },
       ]);
-      expect(m.describe()).toEqual({ from: 'abc', to: 'def', labels: ['test'] });
+      expect(m.describe()).toEqual({ from: 'abc', to: 'def' });
     });
 
     it('derives origin/destination from describe()', () => {
@@ -136,7 +136,6 @@ describe('buildMigrationArtifacts', () => {
     meta: {
       readonly from: string | null;
       readonly to: string;
-      readonly labels?: readonly string[];
     } = {
       from: 'abc',
       to: 'def',
@@ -167,23 +166,15 @@ describe('buildMigrationArtifacts', () => {
     expect(metadata.from).toBe('abc');
     expect(metadata.to).toBe('def');
     expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(metadata.labels).toEqual([]);
     expect(metadata.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(metadata.hints).toMatchObject({ used: [], applied: [] });
 
     expect(JSON.parse(metadataJson)).toEqual(metadata);
   });
 
-  it('preserves hints, labels, and createdAt from existing metadata', () => {
+  it('preserves createdAt from existing metadata', () => {
     const existingMetadata: Partial<MigrationMetadata> = {
       from: 'sha256:from',
       to: 'sha256:to',
-      hints: {
-        used: ['idx_a'],
-        applied: ['additive_only'],
-        plannerVersion: '2.0.0',
-      } as never,
-      labels: ['scaffolded'],
       createdAt: '2026-01-15T10:00:00.000Z',
     };
 
@@ -195,40 +186,8 @@ describe('buildMigrationArtifacts', () => {
       existingMetadata,
     );
 
-    expect(metadata.hints).toEqual(existingMetadata.hints);
-    expect(metadata.labels).toEqual(existingMetadata.labels);
     expect(metadata.createdAt).toBe(existingMetadata.createdAt);
     expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-  });
-
-  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting older metadata', () => {
-    const existingMetadata: Partial<MigrationMetadata> = {
-      from: 'sha256:from',
-      to: 'sha256:to',
-      hints: {
-        used: ['idx_a'],
-        applied: ['additive_only'],
-        plannerVersion: '2.0.0',
-        planningStrategy: 'legacy-strategy',
-      } as never,
-      labels: [],
-      createdAt: '2026-01-15T10:00:00.000Z',
-    };
-
-    const { metadata } = buildMigrationArtifacts(
-      makeMigration([{ id: 'op1', label: 'Op', operationClass: 'additive' }], {
-        from: 'sha256:from',
-        to: 'sha256:to',
-      }),
-      existingMetadata,
-    );
-
-    expect(metadata.hints).toEqual({
-      used: ['idx_a'],
-      applied: ['additive_only'],
-      plannerVersion: '2.0.0',
-    });
-    expect(metadata.hints).not.toHaveProperty('planningStrategy');
   });
 
   it('throws when operations is not an array', () => {

@@ -155,7 +155,6 @@ describe('toPathDecisionResult', () => {
             migrationHash: 'mh:1',
             dirName: 'm1',
             createdAt: '2026-01-01T00:00:00.000Z',
-            labels: [],
             invariants: ['X', 'Y'],
           },
           {
@@ -164,7 +163,6 @@ describe('toPathDecisionResult', () => {
             migrationHash: 'mh:2',
             dirName: 'm2',
             createdAt: '2026-01-02T00:00:00.000Z',
-            labels: [],
             invariants: [],
           },
         ],
@@ -173,7 +171,7 @@ describe('toPathDecisionResult', () => {
     expect(result.selectedPath.map((e) => e.invariants)).toEqual([['X', 'Y'], []]);
   });
 
-  it('omits createdAt and labels from per-edge entries (slim view)', () => {
+  it('omits createdAt from per-edge entries (slim view)', () => {
     const result = toPathDecisionResult(
       decision({
         selectedPath: [
@@ -183,7 +181,6 @@ describe('toPathDecisionResult', () => {
             migrationHash: 'mh:1',
             dirName: 'm1',
             createdAt: '2026-01-01T00:00:00.000Z',
-            labels: ['main'],
             invariants: [],
           },
         ],
@@ -208,7 +205,6 @@ describe('toStructuralEdge', () => {
       migrationHash: 'mh:1',
       dirName: 'm1',
       createdAt: '2026-01-01T00:00:00.000Z',
-      labels: [],
       invariants: [],
       ...overrides,
     };
@@ -217,7 +213,6 @@ describe('toStructuralEdge', () => {
   it('extracts the wire-shape fields and drops authoring metadata', () => {
     const result = toStructuralEdge(
       edge({
-        labels: ['main'],
         createdAt: '2026-02-01T00:00:00.000Z',
         invariants: ['X', 'Y'],
       }),

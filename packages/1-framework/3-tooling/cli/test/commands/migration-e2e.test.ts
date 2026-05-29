@@ -85,12 +85,6 @@ describe('migration plan → emit end-to-end', () => {
         {
           from: null,
           to: 'sha256:initial-hash',
-          hints: {
-            used: [],
-            applied: ['additive_only'],
-            plannerVersion: '1.0.0',
-          },
-          labels: [],
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -121,12 +115,6 @@ describe('migration plan → emit end-to-end', () => {
           {
             from: null,
             to: 'sha256:hash-a',
-            hints: {
-              used: [],
-              applied: ['additive_only'],
-              plannerVersion: '1.0.0',
-            },
-            labels: [],
             providedInvariants: [],
             createdAt: new Date().toISOString(),
           },
@@ -142,12 +130,6 @@ describe('migration plan → emit end-to-end', () => {
           {
             from: 'sha256:hash-a',
             to: 'sha256:hash-b',
-            hints: {
-              used: [],
-              applied: ['additive_only'],
-              plannerVersion: '1.0.0',
-            },
-            labels: [],
             providedInvariants: [],
             createdAt: new Date().toISOString(),
           },
@@ -183,12 +165,6 @@ describe('migration plan → emit end-to-end', () => {
         {
           from: null,
           to: 'sha256:target-hash',
-          hints: {
-            used: [],
-            applied: ['additive_only'],
-            plannerVersion: '1.0.0',
-          },
-          labels: [],
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -221,8 +197,6 @@ describe('migration plan → emit end-to-end', () => {
         from: null,
         to: EMPTY_CONTRACT_HASH,
         migrationHash: null,
-        hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-        labels: [],
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       };

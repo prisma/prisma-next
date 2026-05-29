@@ -7,7 +7,6 @@ export function entry(from: string, to: string, dirName: string): MigrationEdge 
     dirName,
     migrationHash: `mid_${dirName}`,
     createdAt: '',
-    labels: [],
     invariants: [],
   };
 }

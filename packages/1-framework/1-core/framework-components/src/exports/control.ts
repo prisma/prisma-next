@@ -28,7 +28,6 @@ export type {
   ControlTargetInstance,
 } from '../control/control-instances';
 export type {
-  MigrationHints,
   MigrationMetadata,
   MigrationOperationClass,
   MigrationOperationPolicy,

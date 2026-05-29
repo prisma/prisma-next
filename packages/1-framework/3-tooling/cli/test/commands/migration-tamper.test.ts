@@ -133,8 +133,6 @@ async function setupTamperFixture(): Promise<TamperFixture> {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
-      labels: [],
       providedInvariants: [],
       createdAt: CREATED_AT,
     },

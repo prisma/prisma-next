@@ -66,7 +66,6 @@ export function reconstructGraph(packages: readonly OnDiskMigrationPackage[]): M
       migrationHash: pkg.metadata.migrationHash,
       dirName: pkg.dirName,
       createdAt: pkg.metadata.createdAt,
-      labels: pkg.metadata.labels,
       invariants: pkg.metadata.providedInvariants,
     };
 
@@ -85,23 +84,10 @@ export function reconstructGraph(packages: readonly OnDiskMigrationPackage[]): M
 // ---------------------------------------------------------------------------
 // Deterministic tie-breaking for BFS neighbour order.
 // Used by path-finders only; not a general-purpose utility.
-// Ordering: label priority → createdAt → to → migrationHash.
+// Ordering: createdAt → to → migrationHash.
 // ---------------------------------------------------------------------------
 
-const LABEL_PRIORITY: Record<string, number> = { main: 0, default: 1, feature: 2 };
-
-function labelPriority(labels: readonly string[]): number {
-  let best = 3;
-  for (const l of labels) {
-    const p = LABEL_PRIORITY[l];
-    if (p !== undefined && p < best) best = p;
-  }
-  return best;
-}
-
 function compareTieBreak(a: MigrationEdge, b: MigrationEdge): number {
-  const lp = labelPriority(a.labels) - labelPriority(b.labels);
-  if (lp !== 0) return lp;
   const ca = a.createdAt.localeCompare(b.createdAt);
   if (ca !== 0) return ca;
   const tc = a.to.localeCompare(b.to);
@@ -119,7 +105,7 @@ function sortedNeighbors(edges: readonly MigrationEdge[]): readonly MigrationEdg
  * exists. Returns an empty array when `fromHash === toHash` (no-op).
  *
  * Neighbor ordering is deterministic via the tie-break sort key:
- * label priority → createdAt → to → migrationHash.
+ * createdAt → to → migrationHash.
  */
 export function findPath(
   graph: MigrationGraph,
@@ -165,8 +151,8 @@ export function findPath(
  * control chars at authoring time).
  *
  * Neighbour ordering when `required ≠ ∅`: edges covering ≥1 still-needed
- * invariant come first, with `labelPriority → createdAt → to → migrationHash`
- * as the secondary key. The heuristic steers BFS toward the satisfying path;
+ * invariant come first, with `createdAt → to → migrationHash` as the
+ * secondary key. The heuristic steers BFS toward the satisfying path;
  * correctness (shortest, deterministic) does not depend on it.
  */
 export function findPathWithInvariants(

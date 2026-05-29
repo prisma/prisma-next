@@ -11,7 +11,6 @@ let migrationCounter = 0;
 interface PkgOpts {
   readonly invariants?: readonly string[];
   readonly createdAt?: string;
-  readonly labels?: readonly string[];
 }
 
 function pkg(
@@ -26,7 +25,6 @@ function pkg(
     from,
     to,
     createdAt: uniqueCreatedAt,
-    labels: opts.labels ?? [],
     providedInvariants: opts.invariants ?? [],
   });
   const ops = createTestOps();

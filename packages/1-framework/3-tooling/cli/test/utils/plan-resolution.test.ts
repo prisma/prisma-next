@@ -41,8 +41,6 @@ function makePkg(from: string, to: string, dirName: string): OnDiskMigrationPack
       to,
       migrationHash: `sha256:mig-${migrationCounter.toString().padStart(64, '0')}`,
       createdAt: `2026-03-01T09:00:00.${migrationCounter.toString().padStart(3, '0')}Z`,
-      labels: [],
-      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       providedInvariants: [],
     },
     ops: [],

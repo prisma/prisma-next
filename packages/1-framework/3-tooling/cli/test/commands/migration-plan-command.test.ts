@@ -130,8 +130,6 @@ function makeBundle(from: string, to: string, dirName: string): OnDiskMigrationP
       to,
       migrationHash: 'sha256:prev-id',
       createdAt: '2026-03-01T09:00:00.000Z',
-      labels: [],
-      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       providedInvariants: [],
     },
     ops: [],

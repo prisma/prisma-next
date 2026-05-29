@@ -66,13 +66,11 @@ describe('renderCallsToTypeScript', () => {
     const output = renderTypeScript(calls, {
       from: 'sha256:abc',
       to: 'sha256:def',
-      labels: ['drop-users'],
     });
 
     expect(output).toContain('override describe()');
     expect(output).toContain('"sha256:abc"');
     expect(output).toContain('"sha256:def"');
-    expect(output).toContain('"drop-users"');
   });
 
   it('always renders describe() since migration.json is required', () => {

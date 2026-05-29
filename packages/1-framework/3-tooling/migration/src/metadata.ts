@@ -1,1 +1,1 @@
-export type { MigrationHints, MigrationMetadata } from '@prisma-next/framework-components/control';
+export type { MigrationMetadata } from '@prisma-next/framework-components/control';
