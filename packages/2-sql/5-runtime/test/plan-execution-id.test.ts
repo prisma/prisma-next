@@ -168,7 +168,7 @@ describe('SqlRuntime.executePrepared planExecutionId (ADR 220)', () => {
     const log: Observation[] = [];
     const { runtime } = createSetup([observerMiddleware(log)]);
     const ps = await runtime.prepare({ userId: 'pg/int4@1' as const }, (params) =>
-      buildEqUserIdPlan((params as { readonly userId: Expression<ScopeField> }).userId),
+      buildEqUserIdPlan(params.userId),
     );
 
     await ps.execute(runtime, { userId: 1 }).toArray();
@@ -182,7 +182,7 @@ describe('SqlRuntime.executePrepared planExecutionId (ADR 220)', () => {
     const log: Observation[] = [];
     const { runtime } = createSetup([observerMiddleware(log)]);
     const ps = await runtime.prepare({ userId: 'pg/int4@1' as const }, (params) =>
-      buildEqUserIdPlan((params as { readonly userId: Expression<ScopeField> }).userId),
+      buildEqUserIdPlan(params.userId),
     );
 
     await ps.execute(runtime, { userId: 1 }).toArray();
