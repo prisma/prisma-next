@@ -4,25 +4,40 @@
   "target": "postgres",
   "profileHash": "sha256:vo-sql-test-profile-hash",
   "roots": {
-    "shop": "Shop"
+    "shop": {
+      "model": "Shop",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "Shop": {
       "fields": {
         "id": {
-          "type": { "kind": "scalar", "codecId": "pg/int4@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/int4@1"
+          },
           "nullable": false
         },
         "name": {
-          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "location": {
-          "type": { "kind": "valueObject", "name": "Location" },
+          "type": {
+            "kind": "valueObject",
+            "name": "Location"
+          },
           "nullable": false
         },
         "notes": {
-          "type": { "kind": "valueObject", "name": "Location" },
+          "type": {
+            "kind": "valueObject",
+            "name": "Location"
+          },
           "nullable": true
         }
       },
@@ -30,10 +45,18 @@
       "storage": {
         "table": "shop",
         "fields": {
-          "id": { "column": "id" },
-          "name": { "column": "name" },
-          "location": { "column": "location" },
-          "notes": { "column": "notes" }
+          "id": {
+            "column": "id"
+          },
+          "name": {
+            "column": "name"
+          },
+          "location": {
+            "column": "location"
+          },
+          "notes": {
+            "column": "notes"
+          }
         }
       }
     }
@@ -42,15 +65,24 @@
     "Location": {
       "fields": {
         "street": {
-          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "city": {
-          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         },
         "zip": {
-          "type": { "kind": "scalar", "codecId": "pg/text@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "pg/text@1"
+          },
           "nullable": false
         }
       }
@@ -91,7 +123,9 @@
               }
             },
             "primaryKey": {
-              "columns": ["id"]
+              "columns": [
+                "id"
+              ]
             },
             "uniques": [],
             "indexes": [],
