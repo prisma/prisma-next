@@ -95,16 +95,6 @@ function layoutMaxLaneIndex(layout: MigrationListGraphLayout): number {
   return max;
 }
 
-function maxLaneForRow(row: LayoutRow, openLanes: ReadonlySet<number>): number {
-  if (row.kind === 'migration') {
-    return Math.max(row.laneIndex, ...row.passThroughLanes, 0);
-  }
-  if (row.kind === 'connector') {
-    return Math.max(row.endLane, ...openLanes, 0);
-  }
-  return Math.max(row.laneIndex, ...openLanes, 0);
-}
-
 function laneCell(glyph: string): string {
   return `${glyph} `;
 }
@@ -211,31 +201,19 @@ export function renderMigrationListGraphWithStyle(
   const palette = paletteFor(glyphMode);
   const migrations = migrationEntries(layout);
   const layoutMaxLane = layoutMaxLaneIndex(layout);
-  const maxDirNameLen = Math.max(0, ...migrations.map((entry) => entry.dirName.length));
-  const dirNameWidth =
-    layoutMaxLane === 0 ? computeMigrationDirNameWidth(migrations) : maxDirNameLen + 3;
-  const nodeDataStart = layoutMaxLane === 0 ? 2 : (layoutMaxLane + 1) * 2 + 2;
-
-  function migrationDataStartForRow(rowMaxLane: number): number {
-    if (layoutMaxLane === 0) return 2;
-    const laneCount = rowMaxLane === 0 ? layoutMaxLane : rowMaxLane;
-    const branchSpanBonus = rowMaxLane >= 2 ? 1 : 0;
-    return (laneCount + 1) * 2 + 2 + branchSpanBonus;
-  }
+  const dirNameWidth = computeMigrationDirNameWidth(migrations);
+  const gutterMaxLane = layoutMaxLane;
+  const blockDataStart = layoutMaxLane === 0 ? 2 : (layoutMaxLane + 1) * 2 + 2;
   const lines: string[] = [];
   let openLanes: ReadonlySet<number> = new Set();
-  let runningMaxLane = 0;
 
   function padToDataColumn(gutter: string, dataStart: number): string {
     return gutter + ' '.repeat(Math.max(0, dataStart - gutter.length));
   }
 
   for (const row of layout.rows) {
-    const rowMaxLane = maxLaneForRow(row, openLanes);
-    runningMaxLane = Math.max(runningMaxLane, rowMaxLane);
-
     if (row.kind === 'migration') {
-      const gutter = renderMigrationGutter(row, runningMaxLane, palette);
+      const gutter = renderMigrationGutter(row, gutterMaxLane, palette);
       const data = formatMigrationDataColumn(row.entry, {
         dirNameWidth,
         edgeKind: row.edgeKind,
@@ -243,13 +221,13 @@ export function renderMigrationListGraphWithStyle(
         forwardArrow: palette.forwardArrow,
         emptySource: palette.emptySource,
       });
-      lines.push(`${padToDataColumn(gutter, migrationDataStartForRow(rowMaxLane))}${data}`);
+      lines.push(`${padToDataColumn(gutter, blockDataStart)}${data}`);
     } else if (row.kind === 'nodeLine') {
-      const gutter = renderNodeLineGutter(row, openLanes, runningMaxLane, palette);
+      const gutter = renderNodeLineGutter(row, openLanes, gutterMaxLane, palette);
       const data = formatNodeLineDataColumn(row.contractHash, style);
-      lines.push(`${padToDataColumn(gutter, nodeDataStart)}${data}`);
+      lines.push(`${padToDataColumn(gutter, blockDataStart)}${data}`);
     } else {
-      lines.push(renderConnectorGutter(row, openLanes, runningMaxLane, palette));
+      lines.push(renderConnectorGutter(row, openLanes, gutterMaxLane, palette));
     }
     openLanes = advanceOpenLanes(row, openLanes);
   }
