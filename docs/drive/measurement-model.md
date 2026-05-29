@@ -1,152 +1,123 @@
 # Drive — measurement model
 
-How a Drive run is measured. Drive runs emit a structured `trace.jsonl` (see the `drive-record-traces` skill) from which deterministic invariant assertions and diagnostic metrics are computed (see the `drive-diagnose-run` skill). This document defines the model those tools implement: what counts as a good run, how the axes relate, and which diagnostics are reported alongside.
+A Drive run is judged on two axes in a fixed priority: **correctness is a gate; speed is the optimisation target.** A run that isn't correct never enters the speed comparison. Among correct runs, the faster one wins — wall-clock first, tokens second. And the output of measurement is never a single score: it is a **diagnostic dashboard** that shows *which* runs fail and *why*. The goal is floor-raising — surfacing the failures that actually hurt — not maximising a benchmark number.
 
-The model has two layers. The **deterministic layer** — everything computable straight off the trace — is implemented today. The **qualitative layer** — an LLM judge for the intent rubric, failure-mode classification, operator-turn classification, plus a controlled-experiment A/B harness — is tracked separately and slots in alongside the same trace contract.
+A measured run produces a scorecard shaped like this:
 
-The framing is **floor-raising, not benchmark-maxxing.** The point is to surface the failure patterns that actually hurt (artefact churn, dispatch rework, pathological backtracks, operator rescues) so the drive-* skills can be tuned with measurement-driven feedback instead of complaint-driven feedback. The headline is always the diagnostic dashboard — *which 1% fails, and why* — never a single composite score.
+```
+Run verdict: CORRECT
+  correctness   mechanical ✓   requirements ✓   intent 0.91
+  wall-clock    3h 08m to merge
+  tokens        1.2M   (orchestrator 38% · mid 41% · cheap 21%)
 
-## Correctness is a gate; speed is the optimisation target
+diagnostics
+  rounds / dispatch      mean 1.3 · max 3        ← dispatch 04 flagged (3 rounds)
+  first-pass acceptance  86%
+  write amplification    1.4×
+  backtracks             3 legitimate · 0 pathological
+  phase mix              specify 22% · plan 14% · build 51% · review 9% · close 4%
+```
 
-The naive framing treats operator-involvement minutes as the primary metric. That is wrong: a Drive run can already proceed largely unattended — the problem is that runs take *too long*, burning tokens re-reading and re-writing artefacts. The speed of arriving at a *correct* result matters more than minimising operator turns. Operator-time stays as a diagnostic (it catches over-asking and wrong-altitude responses), but the headline shape is:
+Two things in that scorecard are load-bearing. First, the verdict is gated: `correctness` must pass before `wall-clock` and `tokens` mean anything. Second, the diagnostics — not the verdict — are where the value is; they tell you what to change. Any axis whose signal isn't present renders as `n/a` rather than being silently dropped, so the dashboard never implies a verdict it can't compute.
 
-- **Correctness** is a gate. A run that fails correctness does not enter the speed comparison.
-- **Speed** (wall-clock primary, tokens secondary) is the optimisation target *conditional on* the gate.
+Every number above is derived from one source: a structured `trace.jsonl` that the run emits as it goes. Some numbers are computed directly from the trace (the deterministic signals); others — judging whether intent was met, classifying operator turns and failure modes — require an LLM judge over the same trace. Both read the one trace; nothing re-derives signal from raw transcripts after the fact.
 
-This matches how SWE-bench and most agent benchmarks worth copying are structured. Single-axis metrics hide where the failure modes live.
+## Correctness is a gate
 
-## Correctness has three layers
+Correctness is checked in three layers, cheapest and most objective first:
 
 | Layer | Checks | Mechanism |
 |---|---|---|
 | Mechanical | typecheck, tests, lint, fixtures | Run the gates. Binary. |
 | Requirements | the brief's stated outcomes hold | Per-brief acceptance set (each brief ships with its own). Binary. |
-| Intent | the spirit of the brief was delivered | LLM judge with calibrated rubric. Continuous 0–1; threshold at 0.8 for the gate. |
+| Intent | the spirit of the brief was delivered | LLM judge with a calibrated rubric. Continuous 0–1; gate threshold 0.8. |
 
-A run is `CORRECT` iff mechanical + requirements pass and intent ≥ 0.8. Intent stays continuous in the dashboard for trend analysis even though it's thresholded for the gate.
+A run is `CORRECT` iff mechanical and requirements pass and intent ≥ 0.8. Intent stays continuous on the dashboard for trend analysis even though it is thresholded for the gate. Mechanical and requirements are computed straight from the trace and the brief's acceptance set; intent is the one correctness signal that needs the judge.
 
-Mechanical + Requirements are deterministic — read from the emitted trace plus the brief's acceptance set. Intent requires the qualitative judge layer.
+A run that fails the gate is excluded from the speed comparison entirely — a fast wrong answer is not a partial win.
 
-## Speed has two numbers, in priority order
+## Speed is the optimisation target
+
+Conditional on the gate, two numbers rank a run, in priority order:
 
 1. **Wall-clock to merge** — the headline.
 2. **Total tokens** — broken down by tier (orchestrator / mid / cheap).
 
-Both reported as distributions (p50, p90), not means. Variance matters as much as central tendency for methodology comparison — a config that's fast 50% of the time and stalls 50% of the time is worse than a consistently mid-pace one with the same mean. Both are deterministically computable from the trace's per-event timestamps and tier-tagged token counts.
+When comparing methodology configurations across many runs, both are reported as distributions (p50, p90), not means. Variance matters as much as central tendency: a config that is fast half the time and stalls the other half is worse than a consistently mid-pace one with the same mean. Both are computed from the trace's per-event timestamps and tier-tagged token counts.
 
-## Composite for ranking — decision-time only, never the headline
+## The dashboard is the headline
 
-When ranking two configs requires a single scalar:
+The verdict tells you *whether* a run was good; the diagnostics tell you *where* it spent itself and *what to change*. Six families are always reported:
+
+1. **Artefact churn.** Write amplification (total bytes written / final bytes), time-to-stability, re-read count, cross-artefact contamination. This is the failure mode the framework exists to surface, so it gets first-class treatment.
+2. **Phase distribution.** Share of wall-clock in specify / plan / build / review / close. Front-loading design is visible here: when it works, `specify + plan` grow as a share, `build` shrinks, and the total shrinks.
+3. **Dispatch rework.** First-pass acceptance rate; rounds per dispatch (p50, p90, max); high-round dispatches flagged as sharpening candidates. Each extra round costs a full validation-gate re-run plus an executor↔reviewer round-trip.
+4. **Backtracks.** Legitimate (a readiness check refusing work, or a halt-and-discuss when a load-bearing assumption is falsified) versus pathological (post-execution retry, post-merge revert). The ratio is its own signal — a high legitimate share means the gates are firing in the right places.
+5. **Operator turns.** Counted by kind: legitimate-design, legitimate-authorisation, illegitimate-asked, illegitimate-correction, illegitimate-rescue. The trace yields raw counts; sorting them into those buckets needs the judge.
+6. **Tier mix.** Tokens consumed at the orchestrator / mid / cheap tiers. Smaller dispatches should grow the cheap-tier share.
+
+### Pairs of metrics catch what neither catches alone
+
+The sharpest diagnostic is a cross-table, not a single number. Intent score against rounds-per-dispatch:
+
+| Rounds | Intent | Diagnosis |
+|---|---|---|
+| Low | High | One-shot success (best case). |
+| High | High | Brief under-specified; got there eventually. **Sharpen the brief.** |
+| High | Low | Reviewer catches problems but can't get the executor there. **Re-decompose or discuss.** |
+| Low | Low | Reviewer rubber-stamping — passes the done-checks without catching drift. **The silent killer.** |
+
+The fourth row is invisible to either metric alone; only the pair exposes it.
+
+### What the dashboard is for
+
+A measurement framework earns its keep by making methodology changes *falsifiable*. A change aimed at shrinking briefs, for example, predicts a concrete signature on the dashboard: write amplification trending toward ~1.0×, first-pass acceptance rising, the cheap-tier token share growing, pathological backtracks falling. Ship the change, let runs accumulate, and the dashboard confirms or refutes the prediction — the difference between measurement-driven and complaint-driven iteration. (For one such change, see the artifact-cascade redesign in [`design-decisions/`](./design-decisions/2026-05-28-artifact-cascade-redesign.md).)
+
+## Reducing to a single number (sparingly)
+
+Some decisions need one scalar — picking between two skill versions in a controlled A/B when the diagnostics are ambiguous. For that, and only that:
 
 ```
 expected_wallclock_to_correct_run = E[wallclock | CORRECT] / P(CORRECT)
 ```
 
-Lower is better. Penalises rare success proportionally to how rare it is — the standard ML-ops shape.
+Lower is better; it penalises rare success in proportion to how rare it is. This composite is a tie-breaker, never the headline — its whole job is to collapse the "which 1% fails, and why" that the dashboard exists to show. Whenever the dashboard can answer the question, prefer it. (Computing the composite needs the intent gate, so it lives in the judge layer.)
 
-**The composite is a decision-time tool, used sparingly** — e.g. when picking between two candidate skill versions in a controlled A/B and the diagnostics are ambiguous. It is **never** the iteration headline. The litmus test is "if 1% fails, which 1%?" — the diagnostic dashboard answers that; the composite hides it. The headline is always the tuple `(P(CORRECT), wallclock_p50, wallclock_p90, tokens_p50)` plus the diagnostic decomposition. Computing the composite requires the intent gate, so it belongs to the qualitative layer; even there it is the secondary ranking tool, not the dashboard headline.
+## How runs are measured
 
-## Diagnostics
+### The unit is a ProjectRun, anchored on the orchestrator agent
 
-Six diagnostic families, always reported alongside the headline:
+The unit of measurement is a **ProjectRun**, identified by the orchestrator agent that drove it (its per-session transcript ID — known by construction for live runs, recoverable from the transcript store for past ones). This identifier is the only thing stable across a run's whole life, because a single run routinely spans several branches and the issue tracker is treated as informational, never as the source of truth for any boundary or metric.
 
-1. **Artefact churn.** Write amplification (total bytes written / final bytes), time-to-stability, re-read count, cross-artefact contamination. This is the failure mode the model exists to surface; it gets first-class treatment.
-2. **Phase distribution.** Share of wall-clock in specify / plan / build / review / close. The "front-load design" hypothesis is observable here: if it's working, `specify + plan` grow as share, `build` shrinks, total shrinks.
-3. **Dispatch rework.** First-pass acceptance rate; rounds per dispatch (p50, p90, max); high-round slices flagged as sharpening candidates. Each round costs a full validation-gate re-run plus an executor↔reviewer message round-trip.
-4. **Backtracks.** Legitimate (DoR refusals + halt-and-route-to-discussion when a load-bearing assumption is falsified) vs pathological (post-execution retry + post-merge revert). The ratio is its own diagnostic — a high legitimate ratio means gates fire in the right places.
-5. **Operator turns.** Five buckets (legitimate-design / legitimate-authz / illegitimate-asked / illegitimate-correction / illegitimate-rescue). The deterministic layer reports raw counts only; classification into buckets is the qualitative judge's job.
-6. **Tier mix.** Tokens consumed at orchestrator / mid / cheap tiers. Smaller dispatches should grow the cheap-tier share materially.
+A single orchestrator can interleave many ProjectRuns — projects, standalone slices, direct changes, retros, methodology work — so boundaries are delimited by two detectors: the **lifecycle-skill invocations** themselves (mechanical, primary — opening and closing a project, or a standalone slice's spec and merge), and **operator-authored markers** as a fallback when the mechanical signal is absent. Each ProjectRun records which detector delimited it, so the dashboard can flag runs delimited by weaker evidence honestly.
 
-## Interactions between metrics matter
+### Skills emit their own events
 
-The intent-score × rounds-per-dispatch cross-table is diagnostic in a way neither metric is on its own:
+The skill is the thing that knows when it starts a dispatch, finishes a round, or passes a readiness check — so the skill emits a structured event at each such transition. This makes the trace schema a contract the skills satisfy, rather than a shape a parser tries to recover from transcript prose. Events are JSONL appended to the run's trace file with ordinary file writes — visible, debuggable, no infrastructure required.
 
-| Rounds | Intent | Diagnosis |
-|---|---|---|
-| Low | High | One-shot success (best case) |
-| High | High | Brief under-specified; eventually right. **Sharpen the brief.** |
-| High | Low | Reviewer catching problems but can't get the executor there. **Re-decompose / discuss.** |
-| Low | Low | Reviewer rubber-stamping. **Worst case — passes DoD without catching drift.** |
+The vocabulary of event types and the emission protocol live in one shared library skill (`drive-record-traces`), which every instrumented skill references **by name**. The Agent Skills model treats each skill as a self-contained, independently-installable unit with no mechanism for importing another skill's files; a by-name reference lets the runtime resolve the shared definitions without coupling an emitting skill to any particular on-disk layout. One shared home also keeps the common envelope and append protocol from drifting across copies. The deterministic assertions, metrics, and report generator that read the trace live in a sibling skill (`drive-diagnose-run`).
 
-The fourth row is the silent killer; tracking both metrics catches it. The cross-table needs `rounds_per_dispatch` (deterministic) plus the intent judge (qualitative) — both layers must land to make the diagnosis legible.
+### Two invariants on instrumentation
 
-## Falsification predictions
+- **Emission is behaviour-preserving.** Adding emit steps must never change what a skill does; this is verified by running an instrumented skill against the uninstrumented baseline.
+- **Assertions are pruned, not accumulated.** The assertion library is a memory of failures we refuse to reintroduce, not speculative coverage. An assertion with zero fires across many consecutive runs is demoted to documentation or removed; a new one is justified only by a real observed failure or a load-bearing invariant from a principle doc.
 
-A measurement framework earns its keep by falsifying-or-confirming methodology changes that were made without instrumentation. The 2026-05-28 artifact-cascade redesign (see [`design-decisions/2026-05-28-artifact-cascade-redesign.md`](./design-decisions/2026-05-28-artifact-cascade-redesign.md)) was a major qualitative shift; once enough instrumented runs accumulate, these six predicted shifts become checkable:
+## Alternatives considered
 
-1. Brief write-amplification drops toward ~1.0× (was higher when briefs were 200+ lines with rewrites).
-2. Project-spec stability — stable within a couple of hours of first creation (vs mutating throughout the project).
-3. Phase mix — `specify + plan` share grows; `build` share shrinks; total shrinks.
-4. Tier mix — cheap-tier token share grows materially.
-5. Pathological backtrack rate drops.
-6. First-pass dispatch acceptance rate rises.
+- **Operator-involvement minutes as the primary metric.** Rejected: a run can already proceed largely unattended, so minutes spent is a weak proxy for cost. Operator turns stay as a *diagnostic* (they catch over-asking and wrong-altitude responses), not the optimisation target.
+- **A single composite score as the headline.** Rejected: it hides which runs fail and why — exactly what iteration needs. The composite survives only as a decision-time tie-breaker.
+- **Anchoring a run on the issue tracker or the branch.** Rejected: tracker state is frequently stale or absent, and a run spans multiple branches. The orchestrator agent ID is the only durable anchor.
+- **Delimiting runs by session boundary alone.** Rejected: a run can span several sessions, and a session can host several runs.
+- **Reconstructing the trace from transcripts as the primary source.** Rejected as primary — brittle and tied to a specific transcript format. Retained only as a best-effort fallback for runs that were never instrumented, with per-event confidence recorded and the reconstructed origin flagged.
+- **A custom emit-time tool/hook instead of file writes.** Rejected for now: lower friction at emit time but adds infrastructure; revisit only if plain file writes prove painful.
+- **Copying the emission protocol into each skill.** Rejected: duplicates the envelope and append protocol across every skill and invites drift; one shared library skill is the single source.
+- **Self-diagnostics via an injected hidden tool.** Rejected: structured event emission gives the same trajectory signal in a cleaner shape.
+- **A volume-tiered eval workflow** (escalating tooling as runs/day climb). Not adopted: warranted only at run volumes well beyond what this framework operates at; revisit if that changes.
 
-These are outcomes of the iteration loop the instrumentation enables, not deliverables of the instrumentation itself.
+## Further reading
 
-## Design rationale
-
-The decisions that shaped the measurement approach, with the alternatives considered.
-
-### The ProjectRun is the unit of measurement, anchored on the orchestrator-agent ID
-
-A `ProjectRun` is the unit measured. It is anchored on the orchestrator-agent ID (the per-session transcript UUID — known by construction for live runs via the SDK; extractable from the agent-transcripts directory for retrospective runs). Linear is **informational only** — issue/project status changes annotate the report but are never the source of truth for ProjectRun boundaries or any computed metric.
-
-- **Why.** Linear is frequently stale or absent; branch-anchoring breaks because a project typically spans multiple branches (one per slice). The orchestrator-agent ID is the only stable identifier across the life of a run.
-- **Alternatives rejected.** Linear-anchored (kept informational, not load-bearing); branch-anchored (multi-branch projects break it).
-
-### ProjectRun boundaries are delimited by skill-invocation signals, with the detection method exposed
-
-A single orchestrator can host many ProjectRuns interleaved (projects, orphan slices, direct changes, retros, methodology work). Boundaries are delimited by two complementary detectors:
-
-- **Skill-boundary** (primary, mechanical). Opening/closing a project run maps to the lifecycle skills (project create/close; orphan-slice spec opens, slice-PR merge closes).
-- **Operator-marker** (fallback). Operator-authored markers ("Starting project X", "Closing out project X") detected when the skill-boundary signal is absent.
-
-Each ProjectRun records `detection_method: "drive-skill-boundary" | "operator-marker" | "session-boundary-fallback"` so the report flags runs delimited by weaker evidence honestly.
-
-- **Alternatives rejected.** Session boundary (`/new`) alone — multi-session projects break it.
-
-### Observation from inside: skills emit native trace events
-
-The skill knows when it is starting a dispatch, finishing a round, passing/failing a DoR — so it emits a structured event at each known transition. The trace schema becomes a contract the skills satisfy, not a thing a parser derives. Parser brittleness disappears.
-
-- **Alternatives rejected.** Parse-from-outside as the primary signal source — brittle and tied to a specific transcript format. It is retained only as a best-effort fallback for reconstructing uninstrumented historical runs, with per-event confidence recorded and the post-hoc origin flagged in the report.
-
-### Trace events are JSONL appended to the run's trace file
-
-Events append to `projects/<slug>/trace.jsonl` for in-project work (orphan-slice / direct-change paths resolve to a scratch trace location). Visible, debuggable, no infrastructure ask; the agent does the write with existing file tools.
-
-- **Alternatives rejected.** A custom emit-time tooling hook — lower friction at emit-time but adds infrastructure; deferred unless the file-write approach proves painful.
-
-### The trace vocabulary and emission protocol live in a library skill
-
-The vocabulary (`events.md`) and emission protocol (`emission.md`) live in the `drive-record-traces` library skill, and every instrumented skill references it **by name**, not by file path.
-
-- **Why a library skill.** A per-skill copy would duplicate the common envelope, append protocol, and existence-check pattern across every instrumented skill, inviting drift. One canonical home keeps the cluster checkable against a single source.
-- **Why by-name reference.** The Agent Skills model treats each skill as a self-contained, independently-installable unit with no cross-skill file-import mechanism. A hard relative path would couple an emitting skill to this skill's on-disk layout and to being installed as an adjacent sibling — neither guaranteed. By-name reference lets the runtime resolve and load the skill, keeping every skill independently installable. This is the portable form, and it is what keeps the instrumented skills free of dependencies on any one repo's project layout.
-
-### Instrumentation never changes what a skill does
-
-Adding "Emit" steps to a skill body must not change the work the skill performs. This is verified by spot-running an instrumented skill against a small task and confirming behaviour matches the uninstrumented baseline.
-
-### Assertions are pruned, not accumulated
-
-The assertion library is a memory of failures we refuse to reintroduce, not speculative coverage. A small high-signal set beats a large low-signal one. Assertions with zero fires across N consecutive instrumented runs are demoted to documentation-only or removed; adding a new assertion requires either a real observed failure or a load-bearing invariant from a Drive principle doc.
-
-## External corroboration
-
-The design was cross-checked against external eval-craft writing (["How to Eval AI Agents — The 2026 Guide"](https://www.howtoeval.com/), Ben Hylak), which corroborated the core shape and sharpened five anchors now folded into this model:
-
-1. **Floor-raising frame** — composite scalars are decision-time tools at most, never the iteration headline.
-2. **Golden cases** — a small library of canonical Drive briefs the harness runs against on every skill change; failing a golden case means don't ship the change (a qualitative-layer deliverable).
-3. **"Asking the agent"** as an auto-retro shape — pass an instrumented trace back to the model that produced it and ask "what would you have needed to get this right?"; treat as a clue, not truth (qualitative layer).
-4. **Eval-suite pruning discipline** — prune assertions with zero fires across N runs.
-5. **Collapse-of-harnesses trend** — as models grow more capable, framework scaffolding collapses into the model. Implication: instrumentation must remain a contract the *skill body* satisfies, not externally-imposed scaffolding; the experiment harness should anticipate being thin (fresh agent + canonical brief + verify outputs), not elaborate.
-
-Aligned-without-amendment: trajectory-over-final-output (covered by trace events), code-aware-over-prompt-scored (assertions read the trace), no-hosted-eval-dashboard (JSONL + per-run markdown reports), diagnose-the-pattern-not-the-incident (the intent × rounds cross-table), production-A/B-with-pinned-models (the harness layer). Considered and not adopted: self-diagnostics via an injected hidden tool (structured event emission is a better shape); volume-tiered workflow (our run volume doesn't warrant it yet).
-
-## References
-
-- Trace vocabulary + emission protocol: the `drive-record-traces` skill (`events.md`, `emission.md`).
-- Deterministic assertions + metrics + report generator: the `drive-diagnose-run` skill.
-- The methodology change this model was built to measure: [`design-decisions/2026-05-28-artifact-cascade-redesign.md`](./design-decisions/2026-05-28-artifact-cascade-redesign.md).
-- Failure-mode catalogue (the rubric the qualitative F-mode classifier will use): [`../../drive/calibration/failure-modes.md`](../../drive/calibration/failure-modes.md).
+- Trace vocabulary and emission protocol: the `drive-record-traces` skill (`events.md`, `emission.md`).
+- Deterministic assertions, metrics, and report generator: the `drive-diagnose-run` skill.
+- Failure-mode catalogue (the rubric the qualitative failure-mode classifier uses): [`../../drive/calibration/failure-modes.md`](../../drive/calibration/failure-modes.md).
+- A worked methodology change this model exists to measure: [`design-decisions/2026-05-28-artifact-cascade-redesign.md`](./design-decisions/2026-05-28-artifact-cascade-redesign.md).
+- External background on agent eval craft: ["How to Eval AI Agents — The 2026 Guide"](https://www.howtoeval.com/) (Ben Hylak) — the source of the golden-cases and assertion-pruning ideas above.
