@@ -88,7 +88,6 @@ import {
   compileUpsertReturning,
   mergeAnnotations,
 } from './query-plan';
-import { augmentSelectionForJoinColumns } from './selection-shaping';
 import {
   type AggregateBuilder,
   type AggregateResult,
@@ -1201,7 +1200,9 @@ export class Collection<
         runtime: this.ctx.runtime,
         plans,
         tableName: this.tableName,
+        modelName: this.modelName,
         includes: this.state.includes,
+        selectedFields: this.state.selectedFields,
         hiddenColumns,
         mapRow: (mapped) => mapped as Row,
       });
@@ -1218,6 +1219,7 @@ export class Collection<
       tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
@@ -1508,6 +1510,7 @@ export class Collection<
       tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
       onMissingRowMessage: `upsert() for model "${this.modelName}" did not return a row`,
@@ -1675,6 +1678,7 @@ export class Collection<
       tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
@@ -1818,6 +1822,7 @@ export class Collection<
       tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
@@ -1927,24 +1932,27 @@ export class Collection<
   /**
    * Shape the projection for a mutation's `RETURNING` clause.
    *
-   * Always forces the include join columns into the projection. When
-   * the operation carries includes, also forces the row identity
-   * columns so the single-query include read-back
-   * (`loadIncludesForMutationRows`) can key returned rows back to their
-   * relations. Both sets are reported as `hiddenColumns` when the user
-   * did not select them, so they are stripped before the row is
-   * returned.
+   * Without includes, the mutation returns the caller's projection
+   * directly. With includes, it returns only the row identity columns
+   * (PK / unique): those rows are reloaded through the read path
+   * (`reloadMutationRowsByIdentities`), which re-selects the caller's
+   * projection together with the relations, so the `RETURNING` clause
+   * need only carry enough to key that read-back.
    */
   #augmentMutationSelection(): {
     selectedForQuery: readonly string[] | undefined;
     hiddenColumns: readonly string[];
   } {
-    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
-    const requiredColumns =
-      this.state.includes.length > 0
-        ? [...parentJoinColumns, ...resolveRowIdentityColumns(this.contract, this.tableName)]
-        : parentJoinColumns;
-    return augmentSelectionForJoinColumns(this.state.selectedFields, requiredColumns);
+    if (this.state.includes.length > 0) {
+      const identityColumns = resolveRowIdentityColumns(this.contract, this.tableName);
+      if (identityColumns.length === 0) {
+        throw new Error(
+          `Cannot load includes for the mutation result on model "${this.modelName}": table "${this.tableName}" has no primary key or unique constraint to key the include read-back on.`,
+        );
+      }
+      return { selectedForQuery: identityColumns, hiddenColumns: [] };
+    }
+    return { selectedForQuery: this.state.selectedFields, hiddenColumns: [] };
   }
 
   async #findFirstMatchingRowIdentityWhere(): Promise<AnyExpression | null> {
