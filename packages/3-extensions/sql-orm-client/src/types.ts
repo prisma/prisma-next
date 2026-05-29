@@ -945,7 +945,7 @@ type AllModelRelationEntries<TContract extends Contract<SqlStorage>> = {
 }[keyof ModelsOf<TContract>];
 
 type RelationDefWithTargetFields = {
-  readonly to: string;
+  readonly to: { readonly model: string };
   readonly on: {
     readonly targetFields: readonly string[];
   };
@@ -954,7 +954,7 @@ type RelationDefWithTargetFields = {
 type ChildForeignKeyFieldNames<TContract extends Contract<SqlStorage>, ModelName extends string> =
   Extract<AllModelRelationEntries<TContract>, RelationDefWithTargetFields> extends infer Relation
     ? Relation extends {
-        readonly to: ModelName;
+        readonly to: { readonly model: ModelName };
         readonly on: {
           readonly targetFields: infer Fields extends readonly string[];
         };
@@ -1041,7 +1041,9 @@ export type RelationNames<
   : keyof RelationsOf<TContract, ModelName>) &
   string;
 
-type RelationModelName<Relation> = Relation extends { readonly to: infer To extends string }
+type RelationModelName<Relation> = Relation extends {
+  readonly to: { readonly model: infer To extends string };
+}
   ? To
   : never;
 
