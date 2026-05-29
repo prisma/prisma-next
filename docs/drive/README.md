@@ -8,6 +8,7 @@ Long-lived methodology for the Drive workflow used in prisma-next: a Kanban-shap
 
 - [`model.md`](./model.md) — the pinned domain model: units (Direct change / Slice / Project / Dispatch), workflows, invariants, the two-tier skill architecture.
 - [`workflow.md`](./workflow.md) — the operational lifecycle map: which skill plugs into which phase.
+- [`measurement-model.md`](./measurement-model.md) — how a Drive run is measured: the correctness gate, speed targets, and diagnostic families the `drive-record-traces` + `drive-diagnose-run` skills implement.
 
 **Then read** the principles that the workflow embodies:
 
