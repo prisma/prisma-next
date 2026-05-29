@@ -1,6 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { StorageTableInput } from '@prisma-next/sql-contract/types';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -15,7 +16,7 @@ import {
   DropEnumTypeCall,
 } from '../../src/core/migrations/op-factory-call';
 import { nativeEnumPlanCallStrategy } from '../../src/core/migrations/planner-strategies';
-import { PostgresSchema } from '../../src/core/postgres-schema';
+import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
 import { PostgresEnumType } from '../../src/exports/types';
 
 const defaultCtx = {
@@ -266,6 +267,74 @@ describe('enum namespace collision planning', () => {
 
       expect(dropCalls).toHaveLength(1);
       expect(dropCalls[0]?.schemaName).toBe('audit');
+    });
+  });
+
+  describe('cross-namespace column binding: public enum, unbound-namespace table', () => {
+    // The authoring builder places contract-level `types:` enums in the
+    // default `public` namespace, while a model's table lands in the unbound
+    // namespace. A column there carries a bare `typeRef` that must still bind
+    // to the `public` enum so the rebuild migrates it (regression for the
+    // D2 `nsId === namespaceId` over-narrowing).
+    it('rebuilds the public enum and migrates the unbound-namespace column', () => {
+      const userTable: StorageTableInput = {
+        columns: {
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          status: {
+            nativeType: 'status',
+            codecId: 'pg/enum@1',
+            nullable: false,
+            typeRef: 'status',
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+      const toContract: Contract<SqlStorage> = {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: profileHash('sha256:public-enum-unbound-col'),
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:public-enum-unbound-col'),
+          namespaces: {
+            public: new PostgresSchema({
+              id: 'public',
+              tables: {},
+              enum: {
+                status: new PostgresEnumType({ name: 'status', values: ['active', 'archived'] }),
+              },
+            }),
+            [UNBOUND_NAMESPACE_ID]: new PostgresUnboundSchema({
+              id: UNBOUND_NAMESPACE_ID,
+              tables: { user: userTable },
+            }),
+          },
+        }),
+        roots: {},
+        models: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+      };
+      // Live enum has a value the contract drops → forces the rebuild recipe.
+      const schema = makeLiveEnumSchema([
+        { schemaName: 'public', nativeType: 'status', values: ['active', 'pending', 'archived'] },
+      ]);
+      const policy: MigrationOperationPolicy = {
+        allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'],
+      };
+
+      const calls = planEnumCalls({ toContract, schema, policy });
+      const alterCalls = calls.filter(
+        (c): c is AlterColumnTypeCall => c instanceof AlterColumnTypeCall,
+      );
+
+      expect(alterCalls).toHaveLength(1);
+      expect(alterCalls[0]?.tableName).toBe('user');
+      expect(calls.some((c) => c instanceof CreateEnumTypeCall)).toBe(true);
+      expect(calls.some((c) => c instanceof DropEnumTypeCall)).toBe(true);
     });
   });
 });

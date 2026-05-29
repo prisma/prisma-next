@@ -17,6 +17,7 @@ export type { SqlControlFamilyInstance } from '../core/control-instance';
 export type {
   ContractToSchemaIROptions,
   DefaultRenderer,
+  EnumStorageKeyResolver,
   NativeTypeExpander,
 } from '../core/migrations/contract-to-schema-ir';
 // Contract → SchemaIR conversion for offline migration planning

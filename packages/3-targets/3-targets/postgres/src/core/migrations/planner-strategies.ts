@@ -127,6 +127,43 @@ export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: 
   return namespaceId;
 }
 
+/** Default Postgres enum landing namespace — where contract-level (`types:`)
+ * enums are placed by the authoring builder when no explicit namespace is
+ * given. Mirrors `POSTGRES_ENUM_NAMESPACE_ID` in the contract-ts builder. */
+const DEFAULT_ENUM_NAMESPACE_ID = 'public';
+
+function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
+  const ns = storage.namespaces[namespaceId];
+  if (!ns || !('enum' in ns) || ns.enum == null) return false;
+  return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName] !== undefined;
+}
+
+/**
+ * Resolves which namespace's enum a column's bare `typeRef` binds to.
+ *
+ * Columns carry a bare (non-namespace-qualified) `typeRef`; the enum it names
+ * may live in a different namespace than the column's own (the authoring
+ * builder places contract-level `types:` enums in the default `public`
+ * namespace while a model's table may sit in the unbound namespace). The
+ * binding rule: an enum declared in the column's *own* namespace shadows
+ * everything; otherwise the column references the ambient enum — the sole
+ * namespace that defines `typeName`, preferring the default `public`
+ * namespace when several do. Returns `undefined` when no namespace defines it.
+ */
+function resolveColumnEnumNamespace(
+  storage: SqlStorage,
+  columnNamespaceId: string,
+  typeName: string,
+): string | undefined {
+  if (namespaceHasEnum(storage, columnNamespaceId, typeName)) return columnNamespaceId;
+  const owners = Object.keys(storage.namespaces).filter((nsId) =>
+    namespaceHasEnum(storage, nsId, typeName),
+  );
+  if (owners.length === 1) return owners[0];
+  if (owners.includes(DEFAULT_ENUM_NAMESPACE_ID)) return DEFAULT_ENUM_NAMESPACE_ID;
+  return owners[0];
+}
+
 /**
  * Finds a type entry by explicit namespace coordinate. Namespace types (e.g.
  * Postgres enums) live under `storage.namespaces[nsId].enum`. Returns the
@@ -392,12 +429,20 @@ function enumRebuildCallRecipe(
     ctx.schema,
   );
 
+  // Migrate every column whose `typeRef` binds to *this* enum. The column's
+  // bare `typeRef` resolves to an enum namespace (own-namespace shadows;
+  // otherwise the ambient/default `public` enum), so a column in the unbound
+  // namespace correctly binds to a `public`-namespace enum, while two
+  // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
     for (const [tableName, tableNode] of Object.entries(ns.tables)) {
       const table = tableNode as StorageTable;
       for (const [columnName, column] of Object.entries(table.columns)) {
-        if (column.typeRef === typeName && nsId === namespaceId) {
+        if (
+          column.typeRef === typeName &&
+          resolveColumnEnumNamespace(ctx.toContract.storage, nsId, typeName) === namespaceId
+        ) {
           columnRefs.push({ namespaceId: nsId, table: tableName, column: columnName });
         }
       }
