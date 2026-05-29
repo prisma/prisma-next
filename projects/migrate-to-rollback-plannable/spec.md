@@ -126,3 +126,55 @@ wording is a dispatch-time copy detail, not a design fork.
   shapes), ADR 039 — Migration graph path resolution, ADR 218 — Refs with paired
   contract snapshots. No new ADR — this adds a flag and tightens copy; it doesn't
   shift the edge/graph model.
+
+## Dispatch plan
+
+### Dispatch 1: `migration plan --to <contract>`
+
+- **Outcome:** `prisma-next migration plan` accepts an optional `--to <contract>`
+  (same reference grammar as `--from`, resolved via `parseContractRef`) and plans
+  toward the resolved contract instead of the emitted `contract.json`; with `--to`
+  omitted, behaviour is byte-identical to today. The ref→contract resolution core
+  of `resolveFromForPlan` is generalized so both `--from` and `--to` share it
+  (greenfield / auto-baseline branches stay `--from`-only). Test-first: failing
+  CLI/integration tests for reverse-delta emission (DROP ops + destructive
+  warning), `--to` + explicit `--from`, and default-preservation land before the
+  implementation.
+- **Builds on:** the spec's chosen design; the merged TML-2629 `resolveFromForPlan`
+  / snapshot-materialization machinery.
+- **Hands to:** a `migration plan --to <ref>` that emits a committable
+  arbitrary-target (incl. reverse/rollback) migration package; the `--to` flag and
+  its `--help` string exist.
+- **Focus:** `migration-plan.ts` (`--to` registration + destination wiring),
+  `plan-resolution.ts` (shared resolver extraction). Not the `migrate`-side
+  diagnostics (Dispatch 2) or docs/fixtures (Dispatch 3).
+
+### Dispatch 2: `pathUnreachable` diagnostic coherence
+
+- **Outcome:** `migrate --to`'s `MIGRATION.PATH_UNREACHABLE` / `PN-RUN-3000`
+  diagnostic reads as one plan-then-apply sequence — `why` (no edge from
+  `<current>` to `<target>`) + `fix` (`migration plan --from <current> --to
+  <target> --name <slug>`, then re-run `migrate --to <target>`) — including the
+  one-line note that a rollback plan is expected to contain destructive (`DROP`)
+  ops to review, and acknowledging that narrower cases (rename / NOT-NULL re-add /
+  type change) may need a hint. The advertised command now actually works (built in
+  Dispatch 1). Tests assert the message chain.
+- **Builds on:** Dispatch 1's `migration plan --to` (the command the `fix` text
+  advertises must exist).
+- **Hands to:** a coherent end-to-end recovery story: the `migrate` refusal points
+  at a real, working command sequence.
+- **Focus:** `cli-errors.ts` (`errorPathUnreachable`) and
+  `control-api/operations/migration-apply.ts` (`buildPathNotFoundFailure.why`). Not
+  the planner behaviour (Dispatch 1).
+
+### Dispatch 3: docs + fixtures
+
+- **Outcome:** `docs/architecture docs/subsystems/7. Migration System.md`
+  (`migration plan` synopsis + § Recovery affordances table) and the
+  `@prisma-next/cli` README reflect `--to`; `pnpm fixtures:check` is green
+  (CLI-help / command snapshots regenerated for the new flag).
+- **Builds on:** Dispatch 1 (flag + help string) and Dispatch 2 (diagnostic text)
+  — both feed snapshot fixtures and the docs.
+- **Hands to:** slice-DoD met — feature, honest diagnostics, current docs, green
+  fixtures.
+- **Focus:** docs + README + fixture regen. No behavioural code change.
