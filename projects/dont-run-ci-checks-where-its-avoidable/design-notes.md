@@ -34,9 +34,9 @@ The single-writer rule is load-bearing for correctness *and* safety: because onl
 
 ### Lever B: gate the steps, not the jobs (Pattern 1)
 
-A lightweight `changes` job computes whether the diff is **inert** (`git diff --name-only origin/main...HEAD`, first-party, no `dorny/paths-filter`) and emits a boolean. The predicate is an **allow-list, fail-safe to run**: inert only if *every* changed file matches a known-inert pattern; any unrecognized path → not inert → run everything. `.github/workflows/**`, source, `package.json`, lockfile, and config files are explicitly non-inert.
+A lightweight `changes` job computes whether the diff is **inert** and emits a boolean. The predicate lives in one place — the `.github/actions/detect-inert-diff` composite action — so `ci.yml` and `preview-publish.yml` share a single allow-list rather than two copies that can drift. It diffs the PR's `base.sha`…`head.sha` (first-party `git diff`, no `dorny/paths-filter`). The predicate is an **allow-list, fail-safe to run**: inert only if *every* changed file matches a known-inert pattern (`**/*.md`, `docs/**`, `projects/**`, `skills-contrib/**`, `.agents/**`, `.cursor/**`, `.claude/**`, `LICENSE`); any unrecognized path → not inert → run everything. `.github/workflows/**`, source, `package.json`, lockfile, and config files are explicitly non-inert. On any non-`pull_request` event (e.g. push to `main`) it reports non-inert, so nothing is skipped off a PR.
 
-The required-status-checks ruleset forbids skipping a required *job* (a skipped required context never reports and wedges the merge). So every required job still launches and reports; only its **expensive steps** carry `if: needs.changes.outputs.inert != 'true'`. On a docs-only PR the `Test`/`E2E`/`Integration`/`Coverage`/`Fixtures` jobs start, skip their heavy step, and go green in seconds. `Lint` always runs in full (it is exactly what catches docs/rules/skills/README/manifest changes); `Type Check` and `Build` always run but are ~free via Turbo cache. The same predicate also gates `preview-publish.yml`'s build+publish.
+The required-status-checks ruleset forbids skipping a required *job* (a skipped required context never reports and wedges the merge). So every required job still launches and reports; only its **expensive steps** carry `if: needs.changes.outputs.inert != 'true'`. On a docs-only PR the `Test`/`E2E`/`Integration`/`Coverage`/`Fixtures` jobs start, skip their heavy steps, and go green in seconds. `Lint` always runs in full (it is exactly what catches docs/rules/skills/README/manifest changes); `Type Check` and `Build` always run but are ~free via Turbo cache. `preview-publish.yml`'s "Publish preview" is *not* a required context, so there the whole job is skipped at the job level (`needs: changes` + a job-level `if:`) rather than step-by-step.
 
 ### Why these jobs gate and these don't
 
@@ -58,7 +58,7 @@ The required-status-checks ruleset forbids skipping a required *job* (a skipped 
 
 ## Open questions
 
-- **Inert allow-list membership** — working position: minimal-but-useful set (`**/*.md`, `docs/**`, `LICENSE`, `skills-contrib/**`, `.agents/**`, `.cursor/**`, `.claude/**`), expanded conservatively later.
+- **Inert allow-list membership** — resolved: `**/*.md`, `docs/**`, `projects/**`, `skills-contrib/**`, `.agents/**`, `.cursor/**`, `.claude/**`, `LICENSE`. `projects/**` is safe because nothing outside `projects/` imports it; `**/*.md` is safe because `fixtures:check` only diffs `**/contract.*` and no test reads markdown fixtures. Expand conservatively later.
 - **Cache-key scope** — working position: lockfile + Turbo input hashes, relying on GitHub's default branch-scoped cache isolation for fork safety.
 
 ## References
