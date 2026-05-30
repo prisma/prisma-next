@@ -263,8 +263,8 @@ export async function executeContractEmit(
         emit(enrichedIR, stack, config.family.emission, {
           outputJsonPath,
           serializeContract,
-          ...ifDefined('shouldPreserveEmpty', contractSerializer?.shouldPreserveEmpty),
-          ...ifDefined('sortStorage', contractSerializer?.sortStorage),
+          ...ifDefined('shouldPreserveEmpty', contractSerializer.shouldPreserveEmpty),
+          ...ifDefined('sortStorage', contractSerializer.sortStorage),
         }),
       );
     } catch (error) {

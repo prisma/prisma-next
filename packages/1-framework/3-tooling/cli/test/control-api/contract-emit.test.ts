@@ -90,6 +90,10 @@ function createSuccessfulConfig(output: string) {
       version: '0.0.1',
       familyId: 'test-family',
       targetId: 'test-target',
+      contractSerializer: {
+        serializeContract: (contract: unknown) => contract,
+        deserializeContract: (json: unknown) => json,
+      },
     },
     adapter: {
       kind: 'adapter',
