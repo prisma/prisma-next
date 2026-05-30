@@ -759,7 +759,10 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contract: { target: 'postgres', storage: { storageHash: 'sha256:fixture', tables: {} } },
+        contract: {
+          target: 'postgres',
+          storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
+        },
         mode: 'apply',
         connection: 'postgres://test',
         migrationsDir: '/tmp/__test-client-migrations',
@@ -818,7 +821,10 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contract: { target: 'postgres', storage: { storageHash: 'sha256:fixture', tables: {} } },
+        contract: {
+          target: 'postgres',
+          storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
+        },
         mode: 'plan',
         connection: 'postgres://test',
         migrationsDir: '/tmp/__test-client-migrations',
@@ -841,7 +847,10 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contract: { target: 'postgres', storage: { storageHash: 'sha256:fixture', tables: {} } },
+        contract: {
+          target: 'postgres',
+          storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
+        },
         mode: 'plan',
         connection: 'postgres://test',
         migrationsDir: '/tmp/__test-client-migrations',

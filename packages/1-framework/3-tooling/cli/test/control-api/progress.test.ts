@@ -59,7 +59,7 @@ describe('executeDbInit progress emission', () => {
       familyInstance: mockFamilyInstance,
       contract: {
         target: 'postgres',
-        storage: { storageHash: 'sha256:fixture', tables: {} },
+        storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
       } as unknown as Contract,
       mode: 'plan',
       migrations: mockMigrations,
@@ -144,7 +144,7 @@ describe('executeDbInit progress emission', () => {
       familyInstance: mockFamilyInstance,
       contract: {
         target: 'postgres',
-        storage: { storageHash: 'sha256:fixture', tables: {} },
+        storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
       } as unknown as Contract,
       mode: 'apply',
       migrations: mockMigrations,
@@ -211,7 +211,7 @@ describe('executeDbInit progress emission', () => {
       familyInstance: mockFamilyInstance,
       contract: {
         target: 'postgres',
-        storage: { storageHash: 'sha256:fixture', tables: {} },
+        storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
       } as unknown as Contract,
       mode: 'plan',
       migrations: mockMigrations,
