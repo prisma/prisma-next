@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSerializer,
   MigratableTargetDescriptor,
@@ -19,7 +20,7 @@ import type { MongoControlFamilyInstance } from './control-instance';
  * The descriptor itself is the aggregator; no extra `Target<TContract,
  * TSchema>` interface is introduced.
  */
-export interface MongoControlTargetDescriptor<TContract extends MongoContract = MongoContract>
+export interface MongoControlTargetDescriptor<TContract extends Contract = MongoContract>
   extends MigratableTargetDescriptor<'mongo', 'mongo', MongoControlFamilyInstance> {
   readonly contractSerializer: ContractSerializer<TContract>;
   readonly schemaVerifier: SchemaVerifier<TContract, MongoSchemaIR>;

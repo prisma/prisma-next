@@ -1,8 +1,17 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
-import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { MongoCollection, MongoStorage } from '@prisma-next/mongo-contract';
+import {
+  getStorageNamespace,
+  type Namespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+} from '@prisma-next/framework-components/ir';
+import type {
+  MongoCollection,
+  MongoNamespaceShape,
+  MongoStorage,
+} from '@prisma-next/mongo-contract';
 
 const MONGO_NAMESPACE_KIND_FALLBACK = 'mongo-namespace' as const;
 
@@ -16,8 +25,10 @@ function mongoNamespaceSerializedKind(ns: Namespace): string {
 
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const coll of Object.keys(ns.collections)) {
+  for (const [namespaceId, ns] of [
+    ...storageNamespaceEntries(storage as unknown as Record<string, unknown>),
+  ]) {
+    for (const coll of Object.keys((ns as MongoNamespaceShape).collections)) {
       const existing = seen.get(coll);
       if (existing !== undefined && existing !== namespaceId) {
         throw new Error(
@@ -54,21 +65,23 @@ function generateMongoNamespaceCollectionsType(
   return `{ ${entries.join('; ')} }`;
 }
 
-function generateMongoNamespacesType(namespaces: MongoStorage['namespaces']): string {
-  const sorted = Object.entries(namespaces ?? {}).sort(([a], [b]) => a.localeCompare(b));
+function generateMongoFlatStorageType(storage: MongoStorage): string {
+  const sorted = [...storageNamespaceEntries(storage as unknown as Record<string, unknown>)].sort(
+    ([a], [b]) => a.localeCompare(b),
+  );
   if (sorted.length === 0) {
-    return 'Record<string, never>';
+    return '';
   }
   const parts: string[] = [];
   for (const [name, ns] of sorted) {
     const collectionsType = generateMongoNamespaceCollectionsType(
-      ns.collections as Readonly<Record<string, MongoCollection>>,
+      (ns as MongoNamespaceShape).collections as Readonly<Record<string, MongoCollection>>,
     );
     parts.push(
       `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly collections: ${collectionsType} }`,
     );
   }
-  return `{ ${parts.join('; ')} }`;
+  return `; ${parts.join('; ')}`;
 }
 
 export const mongoEmission = {
@@ -119,15 +132,21 @@ export const mongoEmission = {
     }
 
     const storage = contract.storage as MongoStorage | undefined;
-    if (!storage?.namespaces || typeof storage.namespaces !== 'object') {
-      throw new Error('Mongo contract must have storage.namespaces');
+    if (!storage) {
+      throw new Error('Mongo contract must have storage');
+    }
+    if (
+      storageNamespaceValues(storage as unknown as Record<string, unknown>).length === 0 &&
+      !getStorageNamespace(storage as unknown as Record<string, unknown>, '__unbound__')
+    ) {
+      throw new Error('Mongo contract must have at least one storage namespace entry');
     }
 
     assertUniqueMongoCollectionNames(storage);
 
     const collectionNames = new Set<string>();
-    for (const ns of Object.values(storage.namespaces)) {
-      for (const c of Object.keys(ns.collections)) {
+    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+      for (const c of Object.keys((ns as MongoNamespaceShape).collections)) {
         collectionNames.add(c);
       }
     }
@@ -167,7 +186,7 @@ export const mongoEmission = {
       } else if (collection) {
         if (!collectionNames.has(collection)) {
           throw new Error(
-            `Model "${modelName}" references collection "${collection}" which is not in storage.namespaces[..].collections`,
+            `Model "${modelName}" references collection "${collection}" which is not in getStorageNamespace(storage as unknown as Record<string, unknown>, ..).collections`,
           );
         }
       }
@@ -188,7 +207,9 @@ export const mongoEmission = {
         }
       }
 
-      const storageRelations = model.storage['relations'] as Record<string, unknown> | undefined;
+      const storageRelations = model.storage['relations'] as unknown as
+        | Record<string, unknown>
+        | undefined;
       if (storageRelations) {
         for (const relName of Object.keys(storageRelations)) {
           if (!model.relations[relName]) {
@@ -200,7 +221,7 @@ export const mongoEmission = {
       }
 
       for (const [relName, rel] of Object.entries(model.relations)) {
-        const relObj = rel as Record<string, unknown>;
+        const relObj = rel as unknown as Record<string, unknown>;
         const targetRef = relObj['to'] as { readonly model?: string } | undefined;
         const targetModelName = targetRef?.model;
         if (targetModelName) {
@@ -217,8 +238,8 @@ export const mongoEmission = {
 
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as MongoStorage;
-    const namespacesType = generateMongoNamespacesType(storage.namespaces);
-    return `{ readonly namespaces: ${namespacesType}; readonly storageHash: ${storageHashTypeName} }`;
+    const flatType = generateMongoFlatStorageType(storage);
+    return `{ readonly storageHash: ${storageHashTypeName}${flatType} }`;
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {

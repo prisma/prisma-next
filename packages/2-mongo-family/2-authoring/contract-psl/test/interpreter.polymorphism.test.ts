@@ -1,6 +1,7 @@
 import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { MongoNamespaceShape } from '@prisma-next/mongo-contract';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToMongoContract } from '../src/interpreter';
@@ -41,10 +42,12 @@ const mongoCodecLookup: CodecLookup = {
 };
 
 function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, unknown> {
-  const storage = ir.storage as {
-    namespaces: Record<string, { collections: Record<string, unknown> }>;
-  };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+  return (
+    getStorageNamespace(
+      ir.storage as Record<string, unknown>,
+      UNBOUND_NAMESPACE_ID,
+    ) as MongoNamespaceShape
+  ).collections as Record<string, unknown>;
 }
 
 function interpret(schema: string) {

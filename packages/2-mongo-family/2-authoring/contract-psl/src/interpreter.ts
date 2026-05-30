@@ -16,6 +16,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyPolymorphicScopeToMongoIndex,
   buildMongoNamespace,
+  buildMongoStorageInput,
   MongoCollection,
   MongoIndex,
   type MongoIndexKeyDirection,
@@ -1142,15 +1143,17 @@ export function interpretPslDocumentToMongoContract(
     storage: storageWithoutHash,
     ...mongoContractCanonicalizationHooks,
   });
-  const storage = new MongoStorage({
-    storageHash,
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        collections: collectionsAsClasses,
-      }),
-    },
-  }) as Contract['storage'];
+  const storage = new MongoStorage(
+    buildMongoStorageInput({
+      storageHash,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          collections: collectionsAsClasses,
+        }),
+      },
+    }),
+  ) as Contract['storage'];
   const capabilities: Record<string, Record<string, boolean>> = {};
 
   return ok({

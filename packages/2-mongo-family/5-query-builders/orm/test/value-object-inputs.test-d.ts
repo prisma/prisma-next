@@ -72,12 +72,10 @@ type VOContract = MongoContractWithTypeMaps<
     };
     readonly storage: {
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'mongo-namespace';
-          readonly collections: { readonly users: MongoCollection };
-        };
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
+        readonly collections: { readonly users: MongoCollection };
       };
     };
   },
@@ -211,12 +209,10 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
     };
     readonly storage: {
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'mongo-namespace';
-          readonly collections: { readonly users: MongoCollection };
-        };
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
+        readonly collections: { readonly users: MongoCollection };
       };
     };
   },
@@ -388,14 +384,12 @@ type ExtContract = MongoContractWithTypeMaps<
     };
     readonly storage: {
       readonly storageHash: StorageHashBase<'sha256:ext-storage'>;
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'mongo-namespace';
-          readonly collections: {
-            readonly tasks: MongoCollection;
-            readonly users: MongoCollection;
-          };
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
+        readonly collections: {
+          readonly tasks: MongoCollection;
+          readonly users: MongoCollection;
         };
       };
     };

@@ -1,8 +1,10 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import type {
   MongoCollection,
   MongoCollectionOptions,
-  MongoContract,
   MongoIndex,
+  MongoNamespaceShape,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
 import {
@@ -71,14 +73,14 @@ function convertCollection(name: string, def: MongoCollection): MongoSchemaColle
   });
 }
 
-export function contractToMongoSchemaIR(contract: MongoContract | null): MongoSchemaIR {
+export function contractToMongoSchemaIR(contract: Contract | null): MongoSchemaIR {
   if (!contract) {
     return new MongoSchemaIR([]);
   }
 
   const collections: MongoSchemaCollection[] = [];
-  for (const ns of Object.values(contract.storage.namespaces)) {
-    for (const [name, def] of Object.entries(ns.collections)) {
+  for (const ns of storageNamespaceValues(contract.storage as unknown as Record<string, unknown>)) {
+    for (const [name, def] of Object.entries((ns as MongoNamespaceShape).collections)) {
       collections.push(convertCollection(name, def));
     }
   }

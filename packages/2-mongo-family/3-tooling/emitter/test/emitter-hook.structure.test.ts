@@ -1,5 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+} from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import {
@@ -36,7 +41,9 @@ describe('mongoEmission.validateStructure', () => {
       ...createMongoContract(),
       storage: { storageHash: 'sha256:test' },
     } as Contract;
-    expect(() => mongoEmission.validateStructure(contract)).toThrow('must have storage.namespaces');
+    expect(() => mongoEmission.validateStructure(contract)).toThrow(
+      'must have storage namespace entries',
+    );
   });
 
   it('throws when model references non-existent collection', () => {
@@ -53,7 +60,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: namespacedMongoStorageFromCollections({}),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'references collection "users" which is not in storage.namespaces[..].collections',
+      'references collection "users" which is not in getStorageNamespace(storage as Record<string, unknown>, ..).collections',
     );
   });
 

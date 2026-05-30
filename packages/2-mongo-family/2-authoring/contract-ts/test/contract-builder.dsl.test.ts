@@ -1,6 +1,7 @@
 import { crossRef } from '@prisma-next/contract/types';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { MongoNamespaceShape } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, index, model, rel, valueObject } from '../src/contract-builder';
 
@@ -58,7 +59,14 @@ describe('mongo contract builder', () => {
       users: crossRef('User'),
       posts: crossRef('Post'),
     });
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
+    expect(
+      (
+        getStorageNamespace(
+          contract.storage as Record<string, unknown>,
+          UNBOUND_NAMESPACE_ID,
+        ) as MongoNamespaceShape
+      ).collections,
+    ).toEqual({
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
     });
@@ -142,7 +150,14 @@ describe('mongo contract builder', () => {
     expect(contract.roots).toEqual({
       tasks: crossRef('Task'),
     });
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
+    expect(
+      (
+        getStorageNamespace(
+          contract.storage as Record<string, unknown>,
+          UNBOUND_NAMESPACE_ID,
+        ) as MongoNamespaceShape
+      ).collections,
+    ).toEqual({
       tasks: { kind: 'mongo-collection' },
     });
     expect(contract.valueObjects).toEqual({
@@ -189,7 +204,14 @@ describe('mongo contract builder', () => {
       models: { User },
     });
 
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
+    expect(
+      (
+        getStorageNamespace(
+          contract.storage as Record<string, unknown>,
+          UNBOUND_NAMESPACE_ID,
+        ) as MongoNamespaceShape
+      ).collections,
+    ).toEqual({
       users: {
         kind: 'mongo-collection',
         indexes: [
@@ -258,7 +280,14 @@ describe('mongo contract builder', () => {
       models: { TaskBase, TaskDerived },
     });
 
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
+    expect(
+      (
+        getStorageNamespace(
+          contract.storage as Record<string, unknown>,
+          UNBOUND_NAMESPACE_ID,
+        ) as MongoNamespaceShape
+      ).collections,
+    ).toEqual({
       tasks: {
         kind: 'mongo-collection',
         indexes: [
@@ -395,7 +424,14 @@ describe('mongo contract builder', () => {
       models: { User },
     });
 
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections).toEqual({
+    expect(
+      (
+        getStorageNamespace(
+          contract.storage as Record<string, unknown>,
+          UNBOUND_NAMESPACE_ID,
+        ) as MongoNamespaceShape
+      ).collections,
+    ).toEqual({
       users: {
         kind: 'mongo-collection',
         options: {

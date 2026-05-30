@@ -1,5 +1,6 @@
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
+import { storageNamespaceEntries } from '@prisma-next/framework-components/ir';
 import {
   createMongoContractSchema,
   MongoCollection,
@@ -77,7 +78,7 @@ export abstract class MongoContractSerializerBase<TContract>
    * default.
    *
    * The returned `MongoContract` carries class instances under
-   * `storage.namespaces[namespaceId].collections[collectionName]` (each value is a
+   * `getStorageNamespace(storage as Record<string, unknown>, namespaceId).collections[collectionName]` (each value is a
    * `MongoCollection`, with nested `MongoIndex` / `MongoValidator` /
    * `MongoCollectionOptions` constructed by the `MongoCollection` constructor).
    * The rest of the contract envelope (models, valueObjects, capabilities, …)
@@ -99,7 +100,7 @@ export abstract class MongoContractSerializerBase<TContract>
     // hand-authored `MongoContract<S, M>` generic surface. The schema and
     // the type are kept in lockstep by the round-trip fixtures under
     // `test/validate.test.ts`. The hydration walk below additionally
-    // re-shapes `storage.namespaces.*.collections` from plain data into IR-class
+    // re-shapes `storage.*.collections` from plain data into IR-class
     // instances, so the `MongoContract` returned here carries class identity
     // under those collections maps (and transitively under `indexes` / `validator`
     // / `options`).
@@ -115,37 +116,34 @@ export abstract class MongoContractSerializerBase<TContract>
 
   /**
    * Walk a structurally-validated Mongo contract and convert each
-   * `storage.namespaces[nsId].collections[collectionName]` entry from plain
+   * `getStorageNamespace(storage as Record<string, unknown>, nsId).collections[collectionName]` entry from plain
    * data into `MongoCollection` IR-class instances. Idempotent: already-class
    * instances pass through unchanged.
    */
   protected hydrateMongoContract(contract: MongoContract): MongoContract {
-    const rawNamespaces = contract.storage.namespaces;
-    const hydratedNamespaces = Object.fromEntries(
-      Object.entries(rawNamespaces).map(([nsId, nsEnvelope]) => {
-        const rawCollections = nsEnvelope.collections ?? {};
-        const hydratedCollections = Object.fromEntries(
-          Object.entries(rawCollections).map(([name, raw]) => [
-            name,
-            raw instanceof MongoCollection ? raw : new MongoCollection(raw as MongoCollectionInput),
-          ]),
-        );
-        return [
-          nsId,
-          {
-            ...nsEnvelope,
-            id: nsEnvelope.id,
-            collections: hydratedCollections,
-          },
-        ];
-      }),
-    );
+    const hydratedStorage: Record<string, unknown> = {
+      storageHash: contract.storage.storageHash,
+    };
+    for (const [nsId, nsEnvelope] of storageNamespaceEntries(
+      contract.storage as Record<string, unknown>,
+    )) {
+      const rawCollections =
+        (nsEnvelope as { collections?: Record<string, unknown> }).collections ?? {};
+      const hydratedCollections = Object.fromEntries(
+        Object.entries(rawCollections).map(([name, raw]) => [
+          name,
+          raw instanceof MongoCollection ? raw : new MongoCollection(raw as MongoCollectionInput),
+        ]),
+      );
+      hydratedStorage[nsId] = {
+        ...nsEnvelope,
+        id: nsEnvelope.id,
+        collections: hydratedCollections,
+      };
+    }
     return {
       ...contract,
-      storage: {
-        ...contract.storage,
-        namespaces: hydratedNamespaces,
-      },
+      storage: hydratedStorage as MongoContract['storage'],
     };
   }
 

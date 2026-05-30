@@ -5,12 +5,13 @@ import type {
   SchemaVerifyResult,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { storageNamespaceEntries } from '@prisma-next/framework-components/ir';
 import type { MongoStorage } from '@prisma-next/mongo-contract';
 
 /**
  * Mongo family `SchemaVerifier` abstract base. Commits the Mongo family
  * to namespace-keyed verification: the family-shared walk iterates
- * `storage.namespaces` in sorted order and dispatches per-namespace
+ * storage namespace entries in sorted order and dispatches per-namespace
  * through the protected `verifyNamespace` hook, then aggregates
  * target-extension issues from `verifyTargetExtensions`.
  *
@@ -44,10 +45,10 @@ export abstract class MongoSchemaVerifierBase<
     options: SchemaVerifyOptions<TContract, TSchema>,
   ): readonly SchemaIssue[] {
     const issues: SchemaIssue[] = [];
-    const { namespaces } = options.contract.storage;
-    const namespaceIds = Object.keys(namespaces).sort();
-    for (const namespaceId of namespaceIds) {
-      const namespace = namespaces[namespaceId];
+    const namespaceEntries = [
+      ...storageNamespaceEntries(options.contract.storage as unknown as Record<string, unknown>),
+    ].sort(([a], [b]) => a.localeCompare(b));
+    for (const [namespaceId, namespace] of namespaceEntries) {
       if (!namespace) continue;
       issues.push(
         ...this.verifyNamespace({

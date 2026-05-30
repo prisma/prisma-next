@@ -5,10 +5,12 @@ import type {
 } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildMongoNamespace,
+  buildMongoStorageInput,
   MongoCollection,
+  type MongoNamespaceShape,
   MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
@@ -57,10 +59,12 @@ const mongoCodecLookup: CodecLookup = {
 function mongoCollectionsFromIr(ir: {
   readonly storage: unknown;
 }): Record<string, Record<string, unknown>> {
-  const storage = ir.storage as {
-    namespaces: Record<string, { collections: Record<string, Record<string, unknown>> }>;
-  };
-  return storage.namespaces[UNBOUND_NAMESPACE_ID]!.collections;
+  return (
+    getStorageNamespace(
+      ir.storage as Record<string, unknown>,
+      UNBOUND_NAMESPACE_ID,
+    ) as MongoNamespaceShape
+  ).collections as unknown as Record<string, Record<string, unknown>>;
 }
 
 interface MongoModel {
@@ -809,51 +813,53 @@ describe('interpretPslDocumentToMongoContract', () => {
             storage: { collection: 'posts' },
           },
         },
-        storage: new MongoStorage({
-          storageHash: expect.stringMatching(
-            /^sha256:/,
-          ) as unknown as StorageHashBase<`sha256:${string}`>,
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
-              id: UNBOUND_NAMESPACE_ID,
-              collections: {
-                users: new MongoCollection({
-                  validator: new MongoValidator({
-                    jsonSchema: {
-                      bsonType: 'object',
-                      required: ['_id', 'email', 'name'],
-                      properties: {
-                        _id: { bsonType: 'objectId' },
-                        name: { bsonType: 'string' },
-                        email: { bsonType: 'string' },
-                        bio: { bsonType: ['null', 'string'] },
+        storage: new MongoStorage(
+          buildMongoStorageInput({
+            storageHash: expect.stringMatching(
+              /^sha256:/,
+            ) as unknown as StorageHashBase<`sha256:${string}`>,
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
+                id: UNBOUND_NAMESPACE_ID,
+                collections: {
+                  users: new MongoCollection({
+                    validator: new MongoValidator({
+                      jsonSchema: {
+                        bsonType: 'object',
+                        required: ['_id', 'email', 'name'],
+                        properties: {
+                          _id: { bsonType: 'objectId' },
+                          name: { bsonType: 'string' },
+                          email: { bsonType: 'string' },
+                          bio: { bsonType: ['null', 'string'] },
+                        },
                       },
-                    },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
+                      validationLevel: 'strict',
+                      validationAction: 'error',
+                    }),
                   }),
-                }),
-                posts: new MongoCollection({
-                  validator: new MongoValidator({
-                    jsonSchema: {
-                      bsonType: 'object',
-                      required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
-                      properties: {
-                        _id: { bsonType: 'objectId' },
-                        title: { bsonType: 'string' },
-                        content: { bsonType: 'string' },
-                        authorId: { bsonType: 'objectId' },
-                        createdAt: { bsonType: 'date' },
+                  posts: new MongoCollection({
+                    validator: new MongoValidator({
+                      jsonSchema: {
+                        bsonType: 'object',
+                        required: ['_id', 'authorId', 'content', 'createdAt', 'title'],
+                        properties: {
+                          _id: { bsonType: 'objectId' },
+                          title: { bsonType: 'string' },
+                          content: { bsonType: 'string' },
+                          authorId: { bsonType: 'objectId' },
+                          createdAt: { bsonType: 'date' },
+                        },
                       },
-                    },
-                    validationLevel: 'strict',
-                    validationAction: 'error',
+                      validationLevel: 'strict',
+                      validationAction: 'error',
+                    }),
                   }),
-                }),
-              },
-            }),
-          },
-        }),
+                },
+              }),
+            },
+          }),
+        ),
         extensionPacks: {},
         capabilities: {},
         meta: {},
