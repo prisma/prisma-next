@@ -12,8 +12,10 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
   buildSqlNamespaceMap,
+  buildSqlStorageInput,
   SqlStorage,
   type SqlStorageInput,
+  type SqlStorageNamespacesInput,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -533,7 +535,10 @@ describe('buildBuiltinIdentityValue (built-in fallback)', () => {
 
 function createTestContract(
   overrides?: Partial<Omit<Contract<SqlStorage>, 'storage'>> & {
-    storage?: Partial<Omit<SqlStorageInput, 'storageHash'>>;
+    storage?: {
+      readonly namespaces?: SqlStorageNamespacesInput['namespaces'];
+      readonly types?: SqlStorageInput['types'];
+    };
   },
 ): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:contract');
@@ -589,16 +594,18 @@ function createTestContract(
             tables: defaultTables,
           }),
         }
-  ) as SqlStorageInput['namespaces'];
+  ) as SqlStorageNamespacesInput['namespaces'];
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      ...(storageInput.types !== undefined ? { types: storageInput.types } : {}),
-      namespaces,
-      storageHash: storageHashValue,
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: storageHashValue,
+        ...(storageInput.types !== undefined ? { types: storageInput.types } : {}),
+        namespaces,
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
