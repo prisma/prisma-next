@@ -395,9 +395,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       expect(codes).toContain('PN-MIG-CHECK-007'); // self-edge (sameSourceAndTarget)
       expect(codes).toContain('PN-MIG-CHECK-008'); // orphan space dir
 
-      // The app-space hash mismatch is reported exactly once: the legacy
-      // on-disk pass owns it, and the aggregate fold's app-space duplicate
-      // is suppressed (no double-report — the reason for the skip).
+      // The app-space hash mismatch is reported exactly once via checkIntegrity().
       expect(codes.filter((c) => c === 'PN-MIG-CHECK-001')).toHaveLength(1);
     },
     timeouts.typeScriptCompilation,
@@ -415,8 +413,8 @@ describe('cross-consumer contract-space integrity matrix', () => {
       await runAndCaptureExit(() => executeCommand(createMigrationCheckCommand(), ['--json']));
       const envelope = firstJsonLine<CheckEnvelope>(consoleOutput);
 
-      // Before the app-space-scoped skip, the fold dropped this `hashMismatch`
-      // by kind and the legacy pass (app space only) never saw it: silently
+      // checkIntegrity() sees every space; the extension hash mismatch surfaces
+      // through the shared mapper (no app-only legacy pass):
       // unreported. It now surfaces, located in the extension space.
       expect(envelope.ok).toBe(false);
       const hashFailures = (envelope.failures ?? []).filter((f) => f.pnCode === 'PN-MIG-CHECK-001');

@@ -2,19 +2,13 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { IntegrityViolation } from '@prisma-next/migration-tools/aggregate';
-import {
-  loadContractSpaceAggregate,
-  loadProblemToViolation,
-} from '@prisma-next/migration-tools/aggregate';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
+import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
 import { readRefs } from '@prisma-next/migration-tools/refs';
-import { APP_SPACE_ID } from '@prisma-next/migration-tools/spaces';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
@@ -49,11 +43,6 @@ export interface MigrationCheckResult {
   readonly summary: string;
 }
 
-/**
- * Canonical user-facing locator for a check failure: the cwd-relative path
- * to the migration package directory. Surfacing the same shape across every
- * PN code means `--json` consumers can branch uniformly on `where`.
- */
 function migrationPathRelative(dirPath: string): string {
   return relative(process.cwd(), dirPath);
 }
@@ -74,21 +63,6 @@ function checkFileExists(dirPath: string, dirName: string, fileName: string): Ch
   return null;
 }
 
-/**
- * Within-migration snapshot-consistency check (PN-MIG-CHECK-005).
- *
- * Compares the migration's stored `metadata.to` against the `storageHash`
- * recorded in its on-disk `end-contract.json` snapshot. The two values are
- * independent on-disk records of the same fact (the migration's destination
- * contract); drift between them indicates the package is internally
- * corrupt. Cross-migration consistency (one migration's end-contract.json
- * agreeing with the next migration's start-contract.json) is a separate
- * check that requires shadow execution and is deferred to
- * `migration preflight`.
- *
- * Shared between the graph-wide and per-migration code paths so both report
- * the same failure for the same on-disk state.
- */
 function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | null {
   const endContractPath = join(pkg.dirPath, 'end-contract.json');
   if (!existsSync(endContractPath)) return null;
@@ -115,51 +89,6 @@ function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | n
   return null;
 }
 
-/**
- * Integrity-violation kinds `migration check` already reports through its
- * own legacy on-disk checks: package hash mismatch (`PN-MIG-CHECK-001`)
- * and the manifest-disagreement / unloadable cases (`PN-MIG-CHECK-002`).
- * These are skipped when folding in the `checkIntegrity()` view so the
- * same on-disk fault is never reported twice — but only for the **app
- * space**, since the legacy pass reads `appMigrationsDir` exclusively.
- * The identical kinds in an extension or orphan space are seen by neither
- * path, so the fold must report those (see {@link isAppSpaceLegacyCovered}).
- */
-const COVERED_BY_LEGACY_CHECKS: ReadonlySet<IntegrityViolation['kind']> = new Set([
-  'hashMismatch',
-  'providedInvariantsMismatch',
-  'packageUnloadable',
-]);
-
-/**
- * Whether the legacy on-disk pass already reported this violation, making
- * the fold's row a duplicate. True only for the covered kinds **in the app
- * space**: the legacy pass walks `appMigrationsDir` alone, so the same kind
- * in an extension or orphan space is invisible to it and must surface
- * through the fold. All covered kinds carry `spaceId`, so the `in` guard
- * both narrows the union and excludes the (spaceId-less) `disjointness`.
- */
-function isAppSpaceLegacyCovered(violation: IntegrityViolation): boolean {
-  return (
-    COVERED_BY_LEGACY_CHECKS.has(violation.kind) &&
-    'spaceId' in violation &&
-    violation.spaceId === APP_SPACE_ID
-  );
-}
-
-/**
- * The aggregate-level integrity view for the graph-wide check: build the
- * tolerant {@link loadContractSpaceAggregate} from the live app contract +
- * on-disk state and return the full `checkIntegrity` violation set. This
- * re-acquires the checks the prior throw-on-load loader enforced that
- * `check`'s app-space-only on-disk pass cannot see — the `from === to`
- * self-edge and the cross-space layout / contract violations.
- *
- * Best-effort: if the live contract cannot be read or deserialized the
- * aggregate cannot be built, and the file-level checks above still run and
- * report on their own. (A missing/invalid contract is surfaced by the
- * commands that require it, not by this offline diagnostic.)
- */
 async function loadAggregateIntegrityViolations(
   config: Awaited<ReturnType<typeof loadConfig>>,
   migrationsDir: string,
@@ -210,51 +139,9 @@ async function executeMigrationCheckCommand(
 
   const failures: CheckFailure[] = [];
 
-  // Load tolerantly and report every problem, rather than bailing on the
-  // first. `readMigrationsDir` retains hash-/invariant-mismatched packages
-  // (the per-package checks below re-derive those) and omits unparseable
-  // ones, recording each as a `problem`. Surfacing the omitted/invariant
-  // problems here keeps `check` reporting them as `PN-MIG-CHECK-002`
-  // instead of silently dropping them.
   const loaded = await readMigrationsDir(appMigrationsDir);
   const bundles: readonly OnDiskMigrationPackage[] = loaded.packages;
-  let graph: MigrationGraph;
-  try {
-    graph = reconstructGraph(bundles);
-  } catch (error) {
-    // `reconstructGraph` only throws on structural impossibilities the
-    // per-package checks can't express (e.g. duplicate migration hashes).
-    // Record it as an integrity failure and continue with an empty graph
-    // so the file-level checks below still run and report.
-    const why = MigrationToolsError.is(error)
-      ? error.why
-      : error instanceof Error
-        ? error.message
-        : String(error);
-    const fix = MigrationToolsError.is(error)
-      ? error.fix
-      : 'Inspect the migration packages for structural inconsistencies.';
-    failures.push({ pnCode: 'PN-MIG-CHECK-002', where: appMigrationsRelative, why, fix });
-    graph = {
-      nodes: new Set<string>(),
-      forwardChain: new Map(),
-      reverseChain: new Map(),
-      migrationByHash: new Map(),
-    };
-  }
-
-  for (const problem of loaded.problems) {
-    // Hash mismatches are retained in `bundles` and re-derived by the
-    // per-package hash check below, so skip them here to avoid
-    // double-reporting the same `PN-MIG-CHECK-001`.
-    if (problem.kind === 'hashMismatch') continue;
-    failures.push(
-      integrityViolationToCheckFailure(
-        loadProblemToViolation(APP_SPACE_ID, problem),
-        migrationsDir,
-      ),
-    );
-  }
+  const graph = reconstructGraph(bundles);
 
   if (existsSync(appMigrationsDir)) {
     const loadedDirNames = new Set(bundles.map((p) => p.dirName));
@@ -325,29 +212,9 @@ async function executeMigrationCheckCommand(
       });
     }
 
-    // PN-MIG-CHECK-005 must fire per-migration as well as graph-wide; both
-    // call sites delegate to the shared helper so the same on-disk drift
-    // produces the same failure regardless of how the user invoked check.
     const snapshotFailure = checkSnapshotConsistency(matchedPkg);
     if (snapshotFailure) failures.push(snapshotFailure);
   } else {
-    for (const pkg of bundles) {
-      for (const f of ['migration.json', 'ops.json']) {
-        const fail = checkFileExists(pkg.dirPath, pkg.dirName, f);
-        if (fail) failures.push(fail);
-      }
-
-      const verification = verifyMigrationHash(pkg);
-      if (!verification.ok) {
-        failures.push({
-          pnCode: 'PN-MIG-CHECK-001',
-          where: migrationFileRelative(pkg.dirPath, 'migration.json'),
-          why: `Stored hash ${verification.storedHash} does not match recomputed hash ${verification.computedHash}`,
-          fix: 'Re-emit the migration package or restore from version control.',
-        });
-      }
-    }
-
     for (const pkg of bundles) {
       const snapshotFailure = checkSnapshotConsistency(pkg);
       if (snapshotFailure) failures.push(snapshotFailure);
@@ -385,15 +252,7 @@ async function executeMigrationCheckCommand(
       // Refs unreadable — skip ref checks
     }
 
-    // Fold in the aggregate-level integrity view. `check`'s on-disk pass
-    // above only walks the app space; `checkIntegrity` reports the full set
-    // across every space — re-acquiring the relocated `from === to` self-edge
-    // and the cross-space layout / contract checks the prior throw-on-load
-    // loader enforced. Only app-space duplicates of the legacy pass are
-    // skipped; the same kinds in an extension/orphan space are seen by
-    // neither path, so the fold must report them.
     for (const violation of await loadAggregateIntegrityViolations(config, migrationsDir)) {
-      if (isAppSpaceLegacyCovered(violation)) continue;
       failures.push(integrityViolationToCheckFailure(violation, migrationsDir));
     }
   }
