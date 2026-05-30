@@ -28,10 +28,8 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
  *     `migrate` the gate is a pure offline check that fires *before*
  *     `client.connect()`, preserving the "refuse before connecting"
  *     safety property — the stub driver is never reached.
- *   - **Explicit single-package read** (`migration show <path>`) still
- *     throws `MIGRATION.HASH_MISMATCH` via `readMigrationPackage`: it is
- *     a named-package read outside the aggregate consumption path, out of
- *     scope for the tolerant model.
+ *   - **Read / render** (`migration show <target>`) loads the tolerant
+ *     aggregate without an integrity gate and renders the named package.
  *
  * `loadConfig` is mocked because resolving a real `prisma-next.config.ts`
  * would pull in TypeScript transpilation and a target adapter. Everything
@@ -508,37 +506,30 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
     );
   });
 
-  describe('explicit single-package read is outside the aggregate path', () => {
+  describe('migration show uses the tolerant aggregate', () => {
     it(
-      'migration show <path> still throws MIGRATION.HASH_MISMATCH via readMigrationPackage',
+      'migration show <path> renders a tampered package from aggregate load (exit 0)',
       async () => {
-        // `migration show <path>` calls `readMigrationPackage` directly on
-        // a single named package — a read outside the tolerant aggregate
-        // consumption path. That loader still verifies-on-read and throws
-        // `MIGRATION.HASH_MISMATCH`, which is intentionally left as-is for
-        // this slice.
         const { createMigrationShowCommand } = await import('../../src/commands/migration-show');
         const fixture = await setupTamperFixture();
         tempDirs.push(fixture.cwd);
         process.chdir(fixture.cwd);
 
-        const captured = await captureDiagnostic(
-          () =>
-            executeCommand(createMigrationShowCommand(), [fixture.relativePackageDir, '--json']),
-          () =>
-            executeCommand(createMigrationShowCommand(), [
-              fixture.relativePackageDir,
-              '--no-color',
-              '--quiet',
-            ]),
-          consoleOutput,
-          consoleErrors,
-          fixture.cwd,
-        );
+        try {
+          await executeCommand(createMigrationShowCommand(), [
+            fixture.relativePackageDir,
+            '--json',
+          ]);
+        } catch {
+          // process.exit
+        }
+        const exitCode = getExitCode() ?? 1;
 
-        expect(captured.exitCode).not.toBe(0);
-        expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-        expect(captured.humanText).toContain('Migration package is corrupt');
+        const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+        expect(exitCode, jsonLine ?? consoleErrors.join('\n')).toBe(0);
+        expect(jsonLine).toBeDefined();
+        const payload = JSON.parse(jsonLine!) as { readonly ok?: boolean };
+        expect(payload.ok).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
