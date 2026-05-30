@@ -22,9 +22,10 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { VECTOR_CODEC_ID } from '../src/core/constants';
 import {
@@ -48,11 +49,10 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
   it('exposes a contractSpace declaring the vector parameterised native type', () => {
     const space = pgvectorExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    const namespaces = space!.contractJson.storage as Record<string, unknown> as Record<
-      string,
-      { readonly tables?: Record<string, unknown> }
-    >;
-    expect(Object.keys(namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {})).toEqual([]);
+    const unboundTables =
+      getStorageNamespace<SqlNamespace>(space!.contractJson.storage, UNBOUND_NAMESPACE_ID)
+        ?.tables ?? {};
+    expect(Object.keys(unboundTables)).toEqual([]);
     expect(space!.contractJson.storage.types).toBeDefined();
     expect(space!.contractJson.storage.types?.[PGVECTOR_NATIVE_TYPE]).toMatchObject({
       codecId: VECTOR_CODEC_ID,

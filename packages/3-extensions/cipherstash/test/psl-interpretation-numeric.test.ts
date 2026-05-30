@@ -11,8 +11,9 @@
  *     byte-for-byte (PSL/TS parity).
  */
 
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { describe, expect, it } from 'vitest';
 import cipherstashControl from '../src/exports/control';
@@ -56,7 +57,7 @@ type StorageView = {
 };
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
 const unboundTables = (s: StorageView) =>
-  getStorageNamespace(s, UNBOUND_NAMESPACE_ID)?.tables ?? {};
+  getStorageNamespace<SqlNamespace>(s, UNBOUND_NAMESPACE_ID)?.tables ?? {};
 
 describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
   it('lowers full args to a column with cipherstash/double@1 codec, eql_v2_encrypted nativeType', () => {

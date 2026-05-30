@@ -22,13 +22,10 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
-import {
-  getStorageNamespace,
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
+import { getStorageNamespace } from '@prisma-next/framework-components/ir';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
@@ -53,7 +50,7 @@ describe('cipherstash extension descriptor (contract-space package layout)', () 
     const space = cipherstashExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
     const unboundTables =
-      space!.getStorageNamespace(contractJson.storage, '__unbound__')?.tables ?? {};
+      getStorageNamespace<SqlNamespace>(space!.contractJson.storage, '__unbound__')?.tables ?? {};
     expect(Object.keys(unboundTables)).toEqual([EQL_V2_CONFIGURATION_TABLE]);
   });
 
