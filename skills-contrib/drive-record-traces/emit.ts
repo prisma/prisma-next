@@ -68,6 +68,10 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function parsePayload(raw: string): Record<string, unknown> {
   let parsed: unknown;
   try {
@@ -75,10 +79,10 @@ function parsePayload(raw: string): Record<string, unknown> {
   } catch (err) {
     fail(`--payload is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     fail('--payload must be a JSON object');
   }
-  return parsed as Record<string, unknown>;
+  return parsed;
 }
 
 function main(): void {
