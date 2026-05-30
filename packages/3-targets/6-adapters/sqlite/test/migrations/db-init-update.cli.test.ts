@@ -15,7 +15,11 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -57,30 +61,32 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash(`sha256:ext-test-v${version}`),
-    storage: new SqlStorage({
-      storageHash: coreHash(`sha256:ext-contract-v${version}`),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            _ext_helper: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                ...(version === 2
-                  ? {
-                      note: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
-                    }
-                  : {}),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash(`sha256:ext-contract-v${version}`),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              _ext_helper: {
+                columns: {
+                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                  ...(version === 2
+                    ? {
+                        note: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
+                      }
+                    : {}),
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-        }),
-      },
-    }),
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
@@ -443,30 +449,32 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     const hookedAppContract: Contract<SqlStorage> = {
       ...appContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:app-with-hooked-email'),
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                  email: {
-                    nativeType: 'text',
-                    codecId: HOOKED_CODEC,
-                    nullable: false,
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:app-with-hooked-email'),
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                    email: {
+                      nativeType: 'text',
+                      codecId: HOOKED_CODEC,
+                      nullable: false,
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [{ columns: ['email'] }],
+                  indexes: [{ columns: ['email'] }],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [{ columns: ['email'] }],
-                indexes: [{ columns: ['email'] }],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       profileHash: profileHash('sha256:app-with-hooked-email'),
     };
 

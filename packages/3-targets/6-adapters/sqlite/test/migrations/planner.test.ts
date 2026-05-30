@@ -3,6 +3,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   type StorageColumn,
   type StorageTable,
@@ -34,12 +35,14 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash(`sha256:test-${Date.now()}`),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
-      },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash(`sha256:test-${Date.now()}`),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},

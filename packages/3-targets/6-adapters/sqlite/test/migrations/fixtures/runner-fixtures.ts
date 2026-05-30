@@ -10,7 +10,11 @@ import sqlFamilyDescriptor, {
 } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
@@ -21,26 +25,28 @@ export const contract: Contract<SqlStorage> = {
   target: 'sqlite',
   targetFamily: 'sql',
   profileHash: profileHash('sha256:test'),
-  storage: new SqlStorage({
-    storageHash: coreHash('sha256:contract'),
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+  storage: new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:contract'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['email'] }],
+              indexes: [{ columns: ['email'] }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'] }],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
           },
-        },
-      }),
-    },
-  }),
+        }),
+      },
+    }),
+  ),
   roots: {},
   models: {},
   capabilities: {},
