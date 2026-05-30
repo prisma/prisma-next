@@ -1,3 +1,4 @@
+import { elementCoordinates } from '@prisma-next/framework-components/ir';
 import { EMPTY_CONTRACT_HASH } from '../constants';
 import { MigrationToolsError } from '../errors';
 import type {
@@ -8,7 +9,6 @@ import type {
 import type { PackageLoadProblem } from '../io';
 import type { OnDiskMigrationPackage } from '../package';
 import type { RefLoadProblem } from '../refs';
-import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractSpaceMember } from './types';
 
 /**
@@ -216,7 +216,7 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
       });
     }
 
-    for (const elementName of extractStorageElementNames(contract)) {
+    for (const { entityName: elementName } of elementCoordinates(contract.storage)) {
       const claimers = elementClaimedBy.get(elementName);
       if (claimers) claimers.push(member.spaceId);
       else elementClaimedBy.set(elementName, [member.spaceId]);

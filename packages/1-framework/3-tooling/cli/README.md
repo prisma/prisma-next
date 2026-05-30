@@ -932,25 +932,26 @@ The `contract.output` field specifies the path to `contract.json`. This is the c
 
 ### `prisma-next migration plan`
 
-Plan a migration from contract changes. Compares the emitted contract against the latest on-disk migration state and produces a new migration package with the required operations. No database connection is needed — fully offline.
+Plan a migration from contract changes. Compares a starting contract against a destination contract and produces a new migration package with the required operations. No database connection is needed — fully offline.
 
 ```bash
-prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next migration plan [--config <path>] [--name <slug>] [--from <contract>] [--to <contract>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--name <slug>`: Name slug for the migration directory (default: `migration`)
-- `--from <hash>`: Explicit starting contract hash (overrides latest migration target detection)
+- `--from <contract>`: Starting contract reference (hash, prefix, ref name, migration directory, `<dir>^`, or filesystem path). Defaults to the `db` ref (greenfield when absent).
+- `--to <contract>`: Destination contract reference (same grammar as `--from`). Defaults to the emitted `contract.json`. Use `--to <migration-dir>^` to plan a rollback toward a predecessor state.
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 
 **What it does:**
-1. Loads config and reads `contract.json` (the "to" contract)
+1. Loads config and resolves the destination contract: `--to <contract>` if provided, otherwise `contract.json`
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
-3. Determines the starting point: `--from <hash>` if provided, otherwise the latest migration target
-4. Diffs the starting contract against the new contract using the target's migration planner
+3. Determines the starting point: `--from <contract>` if provided, otherwise the `db` ref (greenfield when absent)
+4. Diffs the starting contract against the destination using the target's migration planner
 5. Scaffolds a new migration package: `migration.ts` (containing `placeholder(...)` lambdas for any data transforms), `migration.json` (with a content-addressed `migrationHash` over the planned ops, or over `[]` when the planner could not lower any calls because of placeholders), `ops.json` (the planned ops, or `[]` in the placeholder-blocked case), and contract bookends. The package is **always** fully attested — there is no draft state on disk.
 6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before re-emitting. The on-disk `ops.json` is `[]` and `migrationHash` is the hash of `(metadata, [])`, so applying the migration as-written will not advance the storage hash to the intended destination — the runner's destination-hash post-check surfaces this as a state mismatch. After filling in the placeholders, run `node migrations/<dir>/migration.ts` to re-emit `ops.json` and the corresponding `migrationHash`. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
 
@@ -961,7 +962,7 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 - `migrations/<dir>/start-contract.{json,d.ts}` — bookend from the "from" side (when applicable)
 - `migrations/<dir>/end-contract.{json,d.ts}` — bookend from the "to" side
 
-**Branching with `--from`:** Use `--from` to create a migration edge from a specific contract hash instead of the latest migration target. This enables branched migration graphs where multiple environments diverge from a common ancestor.
+**Branching with `--from` and `--to`:** Use `--from` to create a migration edge from a specific contract hash instead of the default starting point. Use `--to` to plan toward any resolved contract — including a rollback via `<migration-dir>^` — instead of the emitted contract. This enables branched migration graphs and arbitrary-target (including reverse) edges without editing contract source.
 
 ### `prisma-next migration show`
 
@@ -1027,6 +1028,7 @@ prisma-next migrate [--db <url>] [--to <contract>] [--config <path>] [--json] [-
 
 **Options:**
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection`)
+- `--to <contract>`: Target contract reference (hash, prefix, ref name, migration directory, `<dir>^`, or filesystem path). When omitted, applies toward the emitted `contract.json`. When `--to` resolves to an on-disk graph node, verification and apply use that bundle's `end-contract.json` — so a planned rollback or other arbitrary-target edge applies without editing contract source.
 - `--ref <name>`: Target a named ref from `migrations/refs.json` instead of the current contract hash
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--json`: Output as JSON object
@@ -1036,12 +1038,14 @@ prisma-next migrate [--db <url>] [--to <contract>] [--config <path>] [--json] [-
 **What it does:**
 1. Reads migration packages from `config.migrations.dir`. Every package is attested — there is no on-disk draft state. The loader (`readMigrationPackage` in `@prisma-next/migration-tools/io`) rehashes `(metadata, ops)` for each `MigrationPackage` it returns and confirms the result matches the stored `migrationHash`. If a package has been hand-edited or partially written since emit, the load fails with `MIGRATION.HASH_MISMATCH` pointing at the offending directory and asks the developer to re-run `node migrations/<dir>/migration.ts` (or restore from version control).
 2. Reconstructs the migration graph from all loaded packages
-3. Determines the destination hash: from `--ref` (via `refs.json`) or from `contract.json`
+3. Determines the destination hash and apply contract: from `--to` / `--ref`, or from `contract.json` when neither is supplied
 4. Connects to the database and reads the current marker hash
 5. Finds the shortest path from the marker hash to the destination using graph pathfinding
 6. Executes each pending migration in order using the target's `MigrationRunner`
 7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
-8. After each migration, the runner verifies the schema and updates the marker/ledger
+8. After each migration, the runner runs the migration's post-checks and verifies the resulting state matches the target contract's storage hash, then updates the marker/ledger
+
+**Rollback workflow:** When no on-disk edge reaches the target (for example `migrate --to <migration-dir>^`), the command refuses with `MIGRATION.PATH_UNREACHABLE` and suggests planning the missing edge with `migration plan --from <current> --to <target> --name <slug>`, then re-running `migrate --to <target>`. No contract-source edit is required.
 
 **Config requirements:** Requires `driver` and `db.connection` (or `--db`). `migrations.dir` is optional and defaults to `migrations/`.
 

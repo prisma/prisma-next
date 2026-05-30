@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { createContractSpaceMember } from '../../src/aggregate/aggregate';
 import type { IntegritySpaceState } from '../../src/aggregate/check-integrity';
@@ -22,9 +23,11 @@ describe('computeIntegrityViolations', () => {
       packages,
       refs: {},
       headRef: { hash: 'sha256:t2', invariants: [] },
+      refsDir: '/tmp/refs',
       resolveContract: () => {
         throw new Error('unused in this test');
       },
+      deserializeContract: (raw) => raw as Contract,
     });
 
     const state: IntegritySpaceState = {
@@ -51,9 +54,11 @@ describe('computeIntegrityViolations', () => {
       packages: [],
       refs: {},
       headRef: { hash: 'sha256:head', invariants: [] },
+      refsDir: '/tmp/refs',
       resolveContract: () => {
         throw new Error('unused');
       },
+      deserializeContract: (raw) => raw as Contract,
     });
     const faultyMember = {
       ...member,
