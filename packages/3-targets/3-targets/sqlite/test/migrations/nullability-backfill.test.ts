@@ -1,7 +1,12 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
@@ -33,7 +38,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
       },
     }),
     roots: {},

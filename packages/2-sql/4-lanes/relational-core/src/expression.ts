@@ -3,8 +3,8 @@ import type { ParamSpec } from '@prisma-next/operations';
 import type { QueryOperationReturn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import type { CodecRef } from './ast/codec-types';
-import type { AnyExpression as AstExpression } from './ast/types';
-import { OperationExpr, ParamRef } from './ast/types';
+import type { AnyExpression as AstExpression, RawSqlLiteral } from './ast/types';
+import { OperationExpr, ParamRef, RawExpr } from './ast/types';
 
 export type ScopeField = {
   codecId: string;
@@ -95,6 +95,13 @@ export function toExpr(value: unknown, codec?: CodecRef): AstExpression {
 }
 
 /**
+ * Construct a `ParamRef` for a value whose codec identity is known at call time. Use this when interpolating a value into a raw SQL expression and the codec cannot be inferred from context — e.g. `param(myDate, { codecId: 'pg/timestamptz@1' })`.
+ */
+export function param<T>(value: T, opts: { codecId: string }): ParamRef {
+  return ParamRef.of(value, { codec: { codecId: opts.codecId } });
+}
+
+/**
  * Derive the {@link CodecRef} carried by an expression-like value.
  *
  * Resolution order:
@@ -151,4 +158,103 @@ export function buildOperation<R extends ScopeField>(spec: BuildOperationSpec<R>
     returnType: spec.returns,
     buildAst: () => op,
   };
+}
+
+/**
+ * Resolves a codec id for a bare JavaScript value interpolated into a raw-SQL
+ * template — e.g. `` rawSql`SELECT ${42}` `` calls `inferCodec(42)` to pick
+ * the codec id (`pg/int4`, `sqlite/integer@1`, etc.) that will encode the
+ * value as a bound parameter.
+ *
+ * Targets implement this once per dialect: examine the JS value's runtime
+ * shape (number, bigint, string, boolean, `Uint8Array`) and return a codec
+ * id known to the target's codec registry. Throw when the value falls
+ * outside the supported set — callers should wrap such values with
+ * `param(value, { codecId })` to declare the codec explicitly.
+ */
+export interface RawCodecInferer {
+  inferCodec(value: RawSqlLiteral): string;
+}
+
+/** The one-method builder returned by a `RawSqlTag` template call before `.returns()` is called. */
+export interface RawSqlBuilder {
+  returns<S extends string>(spec: S): Expression<{ codecId: S; nullable: false }>;
+  returns<S extends string, N extends boolean = false>(spec: {
+    readonly codecId: S;
+    readonly nullable?: N;
+  }): Expression<{ codecId: S; nullable: N }>;
+}
+
+/** Tagged-template function returned by {@link createRawSql}. */
+export type RawSqlTag = (
+  strings: TemplateStringsArray,
+  ...values: RawSqlInterpolation[]
+) => RawSqlBuilder;
+
+type RawSqlInterpolation = Expression<ScopeField> | ParamRef | RawSqlLiteral;
+
+function resolveInterpolation(
+  adapter: RawCodecInferer,
+  value: RawSqlInterpolation,
+): AstExpression | ParamRef {
+  if (isExpressionLike(value)) {
+    return value.buildAst();
+  }
+  if (value instanceof ParamRef) {
+    return value;
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    value instanceof Uint8Array
+  ) {
+    return ParamRef.of(value, { codec: { codecId: adapter.inferCodec(value) } });
+  }
+
+  value satisfies never;
+  throw runtimeError(
+    'RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION',
+    'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+  );
+}
+
+/**
+ * Create a tagged-template builder for raw SQL expressions. The returned tag accepts SQL string fragments interleaved with typed {@link Expression}, {@link ParamRef}, or bare {@link RawSqlLiteral} interpolations. Call `.returns(spec)` on the result to obtain a typed {@link Expression} whose AST is a {@link RawExpr}.
+ *
+ * Bare {@link RawSqlLiteral} interpolations are wrapped as `ParamRef` nodes with the codec resolved via `adapter.inferCodec(value)`. Use {@link param} when the codec cannot be inferred from the value alone (e.g. `Date`).
+ */
+export function createRawSql(adapter: RawCodecInferer): RawSqlTag {
+  return (strings, ...values) => {
+    const parts: (string | AstExpression | ParamRef)[] = [];
+    parts.push(strings[0] ?? '');
+    values.forEach((value, i) => {
+      parts.push(resolveInterpolation(adapter, value));
+      parts.push(strings[i + 1] ?? '');
+    });
+    return new RawSqlBuilderImpl(parts);
+  };
+}
+
+class RawSqlBuilderImpl implements RawSqlBuilder {
+  constructor(private readonly parts: readonly (string | AstExpression | ParamRef)[]) {}
+
+  returns<S extends string>(spec: S): Expression<{ codecId: S; nullable: false }>;
+  returns<S extends string, N extends boolean = false>(spec: {
+    readonly codecId: S;
+    readonly nullable?: N;
+  }): Expression<{ codecId: S; nullable: N }>;
+  returns(
+    spec: string | { readonly codecId: string; readonly nullable?: boolean },
+  ): Expression<{ codecId: string; nullable: boolean }> {
+    const codecId = typeof spec === 'string' ? spec : spec.codecId;
+    const nullable = typeof spec === 'string' ? false : (spec.nullable ?? false);
+    const paramSpec: ParamSpec = { codecId, nullable };
+    const node = new RawExpr({ parts: this.parts, returns: paramSpec });
+    return {
+      returnType: { codecId, nullable },
+      buildAst: () => node,
+    };
+  }
 }

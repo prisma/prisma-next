@@ -7,7 +7,7 @@ import {
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
 import type { RuntimeLog } from '@prisma-next/framework-components/runtime';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
   MarkerReadResult,
@@ -44,7 +44,10 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test-profile'),
   models: {},
   roots: {},
-  storage: new SqlStorage({ storageHash: coreHash('sha256:test') }),
+  storage: new SqlStorage({
+    storageHash: coreHash('sha256:test'),
+    namespaces: { __unbound__: SqlUnboundNamespace.instance },
+  }),
   extensionPacks: {},
   capabilities: {},
   meta: {},
@@ -137,6 +140,7 @@ function createAdapterDescriptor(
   const descriptors = descriptorsFromCodecs(adapter.profile.codecs());
   return {
     kind: 'adapter',
+    rawCodecInferer: { inferCodec: () => 'pg/text' },
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,

@@ -1,11 +1,18 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import {
+  type Namespace,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
+import {
+  buildSqlNamespace,
   type SqlNamespaceTablesInput,
   SqlStorage,
+  type SqlStorageInput,
   type SqlStorageTypeEntry,
+  SqlUnboundNamespace,
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
@@ -13,6 +20,8 @@ import {
   createSqlContractSchema,
   validateSqlContractFully,
 } from '@prisma-next/sql-contract/validators';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type Type, type } from 'arktype';
 
@@ -102,27 +111,48 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         : undefined;
 
     const rawNamespaces = validated.storage.namespaces;
-    const hydratedNamespaces =
-      rawNamespaces !== undefined ? this.hydrateSqlNamespaceMap(rawNamespaces) : undefined;
+    if (rawNamespaces === undefined) {
+      throw new ContractValidationError(
+        'Contract storage.namespaces is required after structural validation',
+        'structural',
+      );
+    }
+    const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
+    // Keep the `__unbound__` brand sound: a deserialized contract may declare
+    // only named namespaces (cross-namespace contracts omit the late-bound
+    // slot), so inject the family unbound singleton when absent rather than
+    // asserting a shape that isn't present.
+    const unbound = hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
 
     return {
       ...validated,
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
-        ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
-        ...(hydratedNamespaces !== undefined ? { namespaces: hydratedNamespaces } : {}),
+        ...ifDefined('types', hydratedTypes),
+        // `__unbound__` is guaranteed present above; the residual narrowing is
+        // the family invariant that hydrated SQL namespaces are `SqlNamespace`
+        // instances (target/family classes, not the wider framework `Namespace`).
+        namespaces: blindCast<
+          SqlStorageInput['namespaces'],
+          'hydrated SQL namespaces are SqlNamespace instances; __unbound__ guaranteed present (injected above)'
+        >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
       }),
     };
   }
 
   protected hydrateSqlNamespaceMap(
     namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
-  ): Readonly<Record<string, Namespace | SqlNamespaceTablesInput>> {
+  ): Readonly<Record<string, Namespace>> {
     return Object.fromEntries(
-      Object.entries(namespaces).map(([nsId, raw]) => [
-        nsId,
-        this.hydrateSqlNamespaceEntry(nsId, raw),
-      ]),
+      Object.entries(namespaces).map(([nsId, namespaceEntryRaw]) => {
+        // Raw entries passed structural validation; hydrate materialises family IR class instances.
+        const namespaceHydrated = this.hydrateSqlNamespaceEntry(nsId, namespaceEntryRaw);
+        const namespaceMaterialised =
+          namespaceHydrated instanceof NamespaceBase
+            ? namespaceHydrated
+            : buildSqlNamespace(namespaceHydrated);
+        return [nsId, namespaceMaterialised];
+      }),
     );
   }
 

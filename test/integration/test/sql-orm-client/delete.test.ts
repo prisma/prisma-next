@@ -6,7 +6,7 @@ import {
   timeouts,
   withCollectionRuntime,
 } from './integration-helpers';
-import { seedUsers } from './runtime-helpers';
+import { seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/delete', () => {
   it(
@@ -120,6 +120,96 @@ describe('integration/delete', () => {
           'select id, name from users order by id',
         );
         expect(rows).toEqual([{ id: 3, name: 'Keep' }]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'delete() with include() returns the deleted row with a pre-delete snapshot of its relations',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+        ]);
+
+        const deleted = await users
+          .where({ id: 1 })
+          .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
+          .delete();
+
+        // The relations are read together with the row before the DELETE
+        // is issued, so the deleted row carries the posts it owned.
+        expect(deleted).toEqual({
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          invitedById: null,
+          address: null,
+          posts: [
+            { id: 10, title: 'Post A', userId: 1, views: 100, embedding: null },
+            { id: 11, title: 'Post B', userId: 1, views: 200, embedding: null },
+          ],
+        });
+
+        const userRows = await runtime.query<{ id: number }>('select id from users order by id');
+        expect(userRows).toEqual([]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'deleteAll() with include() returns every deleted row with its relations',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Remove', email: 'a@example.com' },
+          { id: 2, name: 'Remove', email: 'b@example.com' },
+          { id: 3, name: 'Keep', email: 'c@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 2, views: 200 },
+        ]);
+
+        const deleted = await users
+          .where({ name: 'Remove' })
+          .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
+          .deleteAll();
+
+        expect(deleted).toEqual(
+          expect.arrayContaining([
+            {
+              id: 1,
+              name: 'Remove',
+              email: 'a@example.com',
+              invitedById: null,
+              address: null,
+              posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
+            },
+            {
+              id: 2,
+              name: 'Remove',
+              email: 'b@example.com',
+              invitedById: null,
+              address: null,
+              posts: [{ id: 11, title: 'Post B', userId: 2, views: 200, embedding: null }],
+            },
+          ]),
+        );
+        expect(deleted).toHaveLength(2);
+
+        const remaining = await runtime.query<{ id: number; name: string }>(
+          'select id, name from users order by id',
+        );
+        expect(remaining).toEqual([{ id: 3, name: 'Keep' }]);
       });
     },
     timeouts.spinUpPpgDev,

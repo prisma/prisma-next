@@ -14,7 +14,6 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
-  ListExpression,
   LiteralExpr,
   OrderByItem,
   OrExpr,
@@ -502,18 +501,16 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   } = options;
   const childState = include.nested;
 
-  // Mirror of `resolveRowsByParent` in `collection-dispatch.ts`: force-
-  // include every grandchild's `localColumn` into the distinct projection
-  // so the outer aggregates can join against the deduped rows. When the
-  // user's `.select(...)` already covers the join keys this is a no-op;
-  // when it doesn't (e.g. `.select('title').distinct('title').include('comments')`)
+  // Force-include every grandchild's `localColumn` into the distinct
+  // projection so the outer aggregates can join against the deduped rows.
+  // When the user's `.select(...)` already covers the join keys this is a
+  // no-op; when it doesn't (e.g. `.select('title').distinct('title').include('comments')`)
   // the join keys appear inside the wrapper subquery only and are stripped
   // from the user-visible projection in the outer SELECT.
   //
   // De-duplicate before projection: two sibling nested includes can share
   // the same `localColumn` on the distinct child (e.g. a `User` whose
   // `posts` and `invitedUsers` grandchildren both join from `users.id`).
-  // Mirrors the `new Set` collapse in `resolveRowsByParent`.
   const grandchildJoinColumns = Array.from(
     new Set(childState.includes.map((nested) => nested.localColumn)),
   );
@@ -1217,27 +1214,6 @@ export function compileSelect(
 
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params, state.annotations);
-}
-
-export function compileRelationSelect(
-  contract: Contract<SqlStorage>,
-  relatedTableName: string,
-  targetColumn: string,
-  parentPks: readonly unknown[],
-  nestedState: CollectionState,
-): SqlQueryPlan<Record<string, unknown>> {
-  const inFilter: AnyExpression = BinaryExpr.in(
-    ColumnRef.of(relatedTableName, targetColumn),
-    ListExpression.fromValues(parentPks),
-  );
-
-  return compileSelect(contract, relatedTableName, {
-    ...nestedState,
-    includes: [],
-    limit: undefined,
-    offset: undefined,
-    filters: [bindWhereExpr(contract, inFilter), ...nestedState.filters],
-  });
 }
 
 export function compileSelectWithIncludeStrategy(

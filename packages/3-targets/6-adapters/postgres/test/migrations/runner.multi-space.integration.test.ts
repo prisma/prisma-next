@@ -1,7 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -23,7 +23,9 @@ const extensionContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:ext-test'),
   storage: new SqlStorage({
     storageHash: coreHash('sha256:ext-contract'),
-    namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: {} } },
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables: {} }),
+    },
   }),
   roots: {},
   models: {},

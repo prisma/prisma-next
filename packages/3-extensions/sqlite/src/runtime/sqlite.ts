@@ -8,7 +8,8 @@ import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
-import type { CodecTypesBase } from '@prisma-next/sql-relational-core/expression';
+import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
+import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   BindSiteParams,
@@ -37,6 +38,7 @@ type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBu
 export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
+  readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<SqliteTargetId>;
   connect(bindingInput?: { readonly path: string }): Promise<Runtime>;
@@ -111,7 +113,10 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context });
+  const rawCodecInferer = stack.adapter.rawCodecInferer;
+  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
+
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -190,6 +195,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
   return {
     sql,
     orm,
+    raw: rawSqlTag,
     context,
     stack,
     async connect(bindingInput) {

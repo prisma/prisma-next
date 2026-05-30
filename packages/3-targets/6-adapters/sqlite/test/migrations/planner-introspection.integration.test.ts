@@ -11,7 +11,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
 import { SqliteControlAdapter } from '../../src/core/control-adapter';
@@ -60,7 +65,9 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:test-${Date.now()}`),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      },
     }),
     roots: {},
     models: {},

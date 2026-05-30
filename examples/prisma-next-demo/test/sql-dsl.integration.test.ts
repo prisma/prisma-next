@@ -76,7 +76,7 @@ function unorderedPairKey(a: string, b: string): string {
 }
 
 async function seedCrossAuthorSimilarity(runtime: Runtime): Promise<void> {
-  const builder = sql({ context });
+  const builder = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
   const users = [
     {
