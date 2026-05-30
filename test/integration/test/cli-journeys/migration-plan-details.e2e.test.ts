@@ -84,7 +84,7 @@ withTempDir(({ createTempDir }) => {
 
         // H.03: verify attestation on disk
         const migrationsDir = join(ctx.testDir, 'migrations', 'app');
-        const packages = await readMigrationsDir(migrationsDir);
+        const { packages } = await readMigrationsDir(migrationsDir);
         expect(packages, 'H.03: one migration package').toHaveLength(1);
 
         // `readMigrationPackage`'s load boundary integrates verification:
@@ -162,7 +162,7 @@ withTempDir(({ createTempDir }) => {
 
         // I.04: verify destructive operation class on disk
         const migrationsDir = join(ctx.testDir, 'migrations', 'app');
-        const packages = await readMigrationsDir(migrationsDir);
+        const { packages } = await readMigrationsDir(migrationsDir);
         expect(packages, 'I.04: two migration packages').toHaveLength(2);
 
         const destructivePkg = packages.find((p) => p.metadata.from !== null)!;

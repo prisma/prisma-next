@@ -9,8 +9,10 @@ import type {
 import {
   type AggregateVerifierOutput,
   type ContractSpaceMember,
+  requireHeadRef,
   verifyAggregate,
 } from '@prisma-next/migration-tools/aggregate';
+import { castAs } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -162,7 +164,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
  * `ok` result so the verifier still runs the (cheap) schemaCheck loop
  * without invoking the family's verification path.
  */
-function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
+export function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
 ): (
   projectedSchema: unknown,
@@ -173,7 +175,7 @@ function createPerMemberVerifier<TFamilyId extends string, TTargetId extends str
   return (projectedSchema, member, verifyMode) => {
     if (skipSchema) return buildSkippedSchemaResult(member);
     return familyInstance.verifySchema({
-      contract: member.contract,
+      contract: member.contract(),
       // The family's `TSchemaIR` is opaque to migration-tools; the
       // aggregate verifier passes through whatever we hand it. The
       // family expects its own IR shape on the way back.
@@ -247,15 +249,17 @@ function finaliseVerifyResult(args: {
 }
 
 function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSchemaResult {
-  const profileHash = (member.contract as { profileHash?: string }).profileHash;
+  const contract = member.contract();
+  const headRef = requireHeadRef(member);
+  const profileHash = castAs<{ profileHash?: string }>(contract).profileHash;
   return {
     ok: true,
     summary: 'Schema verification skipped',
     contract: {
-      storageHash: member.headRef.hash,
+      storageHash: headRef.hash,
       ...(profileHash ? { profileHash } : {}),
     },
-    target: { expected: member.contract.target },
+    target: { expected: contract.target },
     schema: {
       issues: [],
       root: {

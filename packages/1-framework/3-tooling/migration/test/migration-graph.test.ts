@@ -161,19 +161,15 @@ describe('reconstructGraph', () => {
     expect(edge?.invariants).toEqual([]);
   });
 
-  it('rejects self-edge with no data ops with code MIGRATION.SAME_SOURCE_AND_TARGET', () => {
-    try {
-      reconstructGraph([pkg('H1', 'H1', 'm1')]);
-      expect.fail('expected error');
-    } catch (e) {
-      expect(MigrationToolsError.is(e)).toBe(true);
-      const mte = e as MigrationToolsError;
-      expect(mte.code).toBe('MIGRATION.SAME_SOURCE_AND_TARGET');
-      expect(mte.category).toBe('MIGRATION');
-      expect(mte.details).toHaveProperty('dirName', 'm1');
-      expect(mte.details).toHaveProperty('hash', 'H1');
-      expect(mte.fix).toBeTruthy();
-    }
+  it('includes a no-data-ops self-edge in the graph (sameSourceAndTarget is a violation, not a fatal)', () => {
+    const graph = reconstructGraph([pkg('H1', 'H1', 'm1')]);
+    expect(graph.nodes.size).toBe(1);
+    expect(graph.nodes.has('H1')).toBe(true);
+    expect(graph.forwardChain.get('H1')).toHaveLength(1);
+    expect(graph.reverseChain.get('H1')).toHaveLength(1);
+    const [edge] = [...graph.migrationByHash.values()];
+    expect(edge?.from).toBe('H1');
+    expect(edge?.to).toBe('H1');
   });
 
   it('accepts a self-edge that declares at least one data op', () => {
@@ -188,7 +184,7 @@ describe('reconstructGraph', () => {
     expect(edge?.invariants).toEqual(['X']);
   });
 
-  it('rejects duplicate migrationHash values', () => {
+  it('does not throw on duplicate migrationHash values (first edge wins in migrationByHash)', () => {
     const first = pkg(E, 'H1', 'm1');
     const secondBase = pkg('H1', 'H2', 'm2');
     const second = {
@@ -199,7 +195,9 @@ describe('reconstructGraph', () => {
       },
     };
 
-    expect(() => reconstructGraph([first, second])).toThrow('Duplicate migrationHash');
+    const graph = reconstructGraph([first, second]);
+    expect(graph.migrationByHash.get(first.metadata.migrationHash)?.dirName).toBe('m1');
+    expect(graph.migrationByHash.size).toBe(1);
   });
 });
 

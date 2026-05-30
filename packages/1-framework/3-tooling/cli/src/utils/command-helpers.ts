@@ -242,9 +242,14 @@ export async function loadMigrationPackages(migrationsDir: string): Promise<{
   bundles: readonly OnDiskMigrationPackage[];
   graph: MigrationGraph;
 }> {
-  const bundles = await readMigrationsDir(migrationsDir);
-  const graph = reconstructGraph(bundles);
-  return { bundles, graph };
+  // `readMigrationsDir` is tolerant: it retains hash-/invariant-mismatched
+  // packages and omits unparseable ones, reporting both via `problems`.
+  // This helper preserves its historical `{ bundles, graph }` contract by
+  // exposing the retained packages; callers that need to surface load
+  // problems read them from the tolerant primitive directly.
+  const { packages } = await readMigrationsDir(migrationsDir);
+  const graph = reconstructGraph(packages);
+  return { bundles: packages, graph };
 }
 
 /**

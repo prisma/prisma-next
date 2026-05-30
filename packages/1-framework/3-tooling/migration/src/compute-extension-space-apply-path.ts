@@ -97,7 +97,7 @@ export async function computeExtensionSpaceApplyPath(
   }
 
   const spaceDir = spaceMigrationDirectory(projectMigrationsDir, spaceId);
-  const packages = await readMigrationsDir(spaceDir);
+  const { packages } = await readMigrationsDir(spaceDir);
   const graph = reconstructGraph(packages);
 
   // Live-marker layer encodes "no prior state" as EMPTY_CONTRACT_HASH;

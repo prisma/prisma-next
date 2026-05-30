@@ -473,7 +473,6 @@ class ControlClientImpl implements ControlClient {
       migrationsDir: options.migrationsDir,
       extensionPacks: this.options.extensionPacks ?? [],
       targetId: this.options.target.targetId,
-      appMigrationPackages: options.appMigrationPackages,
       ...ifDefined('refHash', options.refHash),
       ...ifDefined('refInvariants', options.refInvariants),
       ...ifDefined('refName', options.refName),

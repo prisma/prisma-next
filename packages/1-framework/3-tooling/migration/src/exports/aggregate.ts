@@ -1,11 +1,15 @@
 export {
-  type DeclaredExtensionEntry,
-  type LayoutViolation,
-  type LoadAggregateError,
-  type LoadAggregateInput,
-  type LoadAggregateOutput,
-  loadContractSpaceAggregate,
-} from '../aggregate/loader';
+  createContractSpaceAggregate,
+  createContractSpaceMember,
+  requireHeadRef,
+} from '../aggregate/aggregate';
+export {
+  computeIntegrityViolations,
+  type IntegrityComputationInput,
+  type IntegritySpaceState,
+  loadProblemToViolation,
+} from '../aggregate/check-integrity';
+export { type LoadAggregateInput, loadContractSpaceAggregate } from '../aggregate/loader';
 export type { ContractMarkerRecordLike } from '../aggregate/marker-types';
 export {
   type AggregateCurrentDBState,
@@ -24,11 +28,7 @@ export {
   type GraphWalkStrategyInputs,
   graphWalkStrategy,
 } from '../aggregate/strategies/graph-walk';
-export type {
-  ContractSpaceAggregate,
-  ContractSpaceMember,
-  HydratedMigrationGraph,
-} from '../aggregate/types';
+export type { ContractSpaceAggregate, ContractSpaceMember } from '../aggregate/types';
 export {
   type AggregateVerifierError,
   type AggregateVerifierInput,
@@ -40,3 +40,8 @@ export {
   type SchemaCheckSection,
   verifyAggregate,
 } from '../aggregate/verifier';
+export type {
+  DeclaredExtensionEntry,
+  IntegrityQueryOptions,
+  IntegrityViolation,
+} from '../integrity-violation';

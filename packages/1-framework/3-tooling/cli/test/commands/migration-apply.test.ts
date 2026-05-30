@@ -75,7 +75,7 @@ describe('migrate — pending migration resolution', {
       slug: 'initial',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -110,7 +110,7 @@ describe('migrate — pending migration resolution', {
       slug: 'add_post',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -147,7 +147,7 @@ describe('migrate — pending migration resolution', {
       slug: 'add_post',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
 
@@ -169,7 +169,7 @@ describe('migrate — pending migration resolution', {
       slug: 'initial',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -191,7 +191,7 @@ describe('migrate — pending migration resolution', {
       slug: 'initial',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -200,11 +200,13 @@ describe('migrate — pending migration resolution', {
     expect(path).toBeNull();
   });
 
-  it('rejects migration.json with `migrationHash: null` at read time', async () => {
+  it('surfaces migration.json with `migrationHash: null` as a load problem', async () => {
     // The arktype schema in `io.ts` requires `migrationHash` to be a
-    // string; a null value (or any non-string) must surface as
-    // `MIGRATION.INVALID_MANIFEST` from `readMigrationsDir` rather than
-    // being silently skipped, so users know which directory to re-emit.
+    // string; a null value (or any non-string) must surface as a
+    // `packageUnloadable` problem from the tolerant `readMigrationsDir`
+    // (the invalid directory is omitted from `packages` but recorded in
+    // `problems`) rather than being silently skipped, so users know
+    // which directory to re-emit.
     const tempDir = await createTempDir('reject-invalid-hash');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -232,9 +234,14 @@ describe('migrate — pending migration resolution', {
     await writeFile(join(invalidDir, 'migration.json'), invalidJson);
     await writeFile(join(invalidDir, 'ops.json'), '[]');
 
-    await expect(readMigrationsDir(migrationsDir)).rejects.toMatchObject({
-      code: 'MIGRATION.INVALID_MANIFEST',
-    });
+    const { packages, problems } = await readMigrationsDir(migrationsDir);
+    expect(packages).toHaveLength(1);
+    expect(problems).toContainEqual(
+      expect.objectContaining({
+        kind: 'packageUnloadable',
+        dirName: formatMigrationDirName(new Date(2026, 0, 2), 'invalid-hash'),
+      }),
+    );
   });
 
   it('distinguishes corrupted empty-sentinel marker from absent marker', async () => {
@@ -258,7 +265,7 @@ describe('migrate — pending migration resolution', {
       slug: 'add_post',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -289,7 +296,7 @@ describe('migrate — pending migration resolution', {
       slug: 'second',
     });
 
-    const packages = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir);
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
