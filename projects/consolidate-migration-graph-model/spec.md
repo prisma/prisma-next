@@ -47,6 +47,8 @@ The end state: **one** model, founded on the tolerant view, with targeting made 
 
 **Owning package.** `@prisma-next/migration-tools` (`packages/1-framework/3-tooling/migration`) owns the graph model (`migration-graph.ts`, `graph.ts`, `graph-membership.ts`, `migration-list-graph-topology.ts`, `errors.ts`, `constants.ts`).
 
+**Graph sourcing is the aggregate's job, not the consumer's.** `ContractSpaceAggregate` (`aggregate/types.ts`, `aggregate/aggregate.ts`) is the tolerant per-invocation snapshot of on-disk migration state; each member's `graph()` memoises `reconstructGraph(packages)`, and the aggregate's contract is that consumers get graphs *from it* rather than re-deriving them from disk. The consolidated reasoning model therefore operates on the aggregate-provided `MigrationGraph` (recommended: hung off the member as a memoised `topology()` facet beside `graph()`/`contract()`), and **no consumer calls `reconstructGraph` directly.** See [`design-notes.md`](./design-notes.md) § "Where the graph comes from".
+
 **Consumers that bake in the golden-path assumption** (all in `packages/1-framework/3-tooling/cli`, plus aggregate strategies in migration-tools):
 
 - `commands/migrate.ts` — `findLatestMigration` for marker-mismatch diagnostics; targeting via `--to` ref resolution.
@@ -55,6 +57,10 @@ The end state: **one** model, founded on the tolerant view, with targeting made 
 - `commands/migration-new.ts`, `commands/ref.ts`, `utils/plan-resolution.ts` — `findLatestMigration` for "the" graph tip.
 - `utils/formatters/graph-migration-mapper.ts` — `migration graph` spine hardcodes `rootId = ∅`.
 - `migration-tools/aggregate/strategies/graph-walk.ts` and `compute-extension-space-apply-path.ts` — origin defaults to `∅` when no marker.
+
+**Consumers that bypass the aggregate and build their own graph** (the "wires its own logic" cases — re-read disk + call `reconstructGraph`): `utils/command-helpers.ts` (`loadMigrationPackages`), `compute-extension-space-apply-path.ts`, and `commands/migration-check.ts`. These are migrated to source their graph from the aggregate member.
+
+**Relationship to TML-2716.** `migration list` / `list --graph` / `log` source from `enumerateMigrationSpaces`, not the aggregate; moving them is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) (backlog). Because the tolerant classifier we generalise *from* lives on that not-yet-migrated path, there is a sequencing fork between this project and TML-2716 — see § Open Questions.
 
 **Sibling already-correct surface:** `migration list` / `migration list --graph` (tolerant classifier). This project promotes that view's model to be *the* model.
 
@@ -67,6 +73,7 @@ The end state: **one** model, founded on the tolerant view, with targeting made 
 ## Cross-cutting requirements
 
 - **One model, one vocabulary.** After this project, there is a single graph-reasoning module with a single vocabulary for roots (forward-in-degree-0), tips (forward-out-degree-0), reachability, and edge-kind classification. The strict `findLeaf`/`findLatestMigration`/`NO_INITIAL_MIGRATION`/`AMBIGUOUS_TARGET` golden-path constructs are either deleted or refounded on the tolerant base — no surface still asserts "history starts at `∅`" or "there is exactly one tip."
+- **Graphs come from the aggregate, never re-derived from disk.** Every consumer obtains its `MigrationGraph` (and the derived root/tip/edge-kind facts) from the `ContractSpaceAggregate` member, not by calling `reconstructGraph` or re-reading the migrations directory. `reconstructGraph` remains the aggregate's internal builder only. Any consumer that genuinely must run before an aggregate exists is documented as a named exception, not an ad-hoc rebuild.
 - **Targeting is explicit, never inferred from graph shape.** Every command resolves "which contract do I act on" from a ref, the live marker, `--to`, or `--from` — not from a presumed-unique leaf. Where no target is supplied and none can be unambiguously defaulted, the command asks the user to name one (actionable error), rather than guessing or throwing a "your history is malformed" error.
 - **No command treats a pruned / multi-root / cyclic graph as corruption.** Partial graphs (a `from` whose producing migration was pruned), multiple roots, multiple tips, and rollback cycles are all *normal*. Diagnostics phrased as "your migration history is broken" for these shapes are removed or reworded.
 - **Every merged slice keeps the workspace green** (`pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e`, `pnpm lint:deps`) and leaves the CLI behaviourally coherent — no slice may leave `migrate`/`status`/`log`/`graph` in a half-migrated state on `main`.
@@ -84,6 +91,7 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 
 - [ ] A single graph-reasoning surface in `migration-tools` is the only model the migration commands consume; no second model with conflicting "valid graph" assumptions remains.
 - [ ] `findLeaf`, `findLatestMigration`, and the `NO_INITIAL_MIGRATION` / `AMBIGUOUS_TARGET` golden-path error paths are either removed or demonstrably refounded so they no longer assume a `∅` genesis or a unique tip. A repo grep shows no surface defaulting a traversal origin to `EMPTY_CONTRACT_HASH` as a stand-in for "the start of history."
+- [ ] No consumer calls `reconstructGraph` directly: a repo grep finds `reconstructGraph` only as the aggregate's internal builder (and tests). The three current bypassers (`command-helpers.ts` `loadMigrationPackages`, `compute-extension-space-apply-path.ts`, `migration-check.ts`) source their graph from the aggregate, or are documented as named pre-aggregate exceptions.
 - [ ] `migrate`, `migration status`, `migration log`, `migration graph`, `migration new`, `ref`, and `plan-resolution` resolve their target/origin explicitly and behave correctly on at least: a pruned-root graph, a multi-tip graph, and a rollback-cycle graph — each pinned by a test.
 - [ ] Golden-path inputs produce byte-identical user-visible output to pre-project behaviour (regression-pinned).
 - [ ] An ADR records the model change; `docs/architecture docs/subsystems/7. Migration System.md` reflects it; the rendering reference is cross-linked. (Migrated into `docs/` at close-out.)
@@ -100,7 +108,9 @@ The initial design forks were resolved with the operator (2026-05-30); recorded 
 
 ## Open Questions
 
-_None at the design level — the forks above are resolved. Residual implementation-level questions (exact disposition of `isGraphNode`'s `∅` special-case, precise new error code/shape for the multi-tip case) are settled in the slice that touches them._
+**Open (needs operator input): the list-view / TML-2716 sequencing fork.** Founding the reasoning model on the aggregate-provided `MigrationGraph` is clean for every command *except* the list views, which aren't on the aggregate (they enumerate via `enumerateMigrationSpaces`, and the tolerant classifier we generalise from consumes `MigrationListEntry[]`, not a graph). Options: (1) depend on / fold in [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) so the list views move onto the aggregate too; (2) found the canonical vocabulary on `MigrationGraph` now and converge the list views later (transient duplication, tracked follow-up); (3) keep the entry-based classifier as the canonical input (likely wrong primitive). Recommendation (1), else (2). This sets slice 1's model input type and possibly adds a dependency, so it is resolved before slice 1 starts. Full analysis in [`design-notes.md`](./design-notes.md) § Open questions.
+
+_The earlier design forks (delete golden-path helpers; no silent multi-tip default; explicit targeting; dagre roots at actual roots) are resolved — see § Settled design decisions. Residual implementation-level questions (exact disposition of `isGraphNode`'s `∅` special-case, precise new error code/shape for the multi-tip case) are settled in the slice that touches them._
 
 ## References
 
