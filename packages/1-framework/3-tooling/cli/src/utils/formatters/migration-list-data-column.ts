@@ -1,4 +1,4 @@
-import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
+import type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
 import type { MigrationListStyler } from './migration-list-render';
 
@@ -46,7 +46,7 @@ export function formatDecorations(
 
 export interface MigrationDataColumnOptions {
   readonly dirNameWidth: number;
-  readonly edgeKind: EdgeKind;
+  readonly edgeKind: MigrationEdgeKind;
   readonly style: MigrationListStyler;
   readonly forwardArrow?: string;
   readonly emptySource?: string;

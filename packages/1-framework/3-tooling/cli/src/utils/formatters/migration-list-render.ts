@@ -1,6 +1,6 @@
 import {
   classifyMigrationListGraphTopology,
-  type EdgeKind,
+  type MigrationEdgeKind,
 } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
@@ -12,7 +12,7 @@ import {
   MIGRATION_LIST_FORWARD_EDGE_GLYPH,
 } from './migration-list-data-column';
 
-export type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
+export type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 
 export type {
   MigrationListEntry,
@@ -20,7 +20,7 @@ export type {
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
 
-const KIND_GLYPH: Record<EdgeKind, string> = {
+const KIND_GLYPH: Record<MigrationEdgeKind, string> = {
   forward: '*',
   rollback: '↩',
   self: '⟲',
@@ -69,15 +69,15 @@ export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
 
 function resolveEdgeKind(
   migrationHash: string,
-  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
-): EdgeKind {
+  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
+): MigrationEdgeKind {
   return kindByMigrationHash.get(migrationHash) ?? 'forward';
 }
 
 function formatMigrationRow(
   migration: MigrationListEntry,
   dirNameWidth: number,
-  edgeKind: EdgeKind,
+  edgeKind: MigrationEdgeKind,
   style: MigrationListStyler,
 ): string {
   const kindColumn = `${style.kind(KIND_GLYPH[edgeKind])} `;
