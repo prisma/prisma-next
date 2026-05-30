@@ -140,25 +140,43 @@ export async function runOneBrief(
   }
 
   const usageUpdates: TurnUsage[] = [];
-  for await (const event of run.stream()) {
-    if (event.kind === 'turn-ended') {
-      usageUpdates.push(event.usage);
+  try {
+    for await (const event of run.stream()) {
+      if (event.kind === 'turn-ended') {
+        usageUpdates.push(event.usage);
+      }
     }
-  }
-  const outcome = await run.wait();
-  const tokens: TokenTotals = accumulateUsage(usageUpdates);
+    const outcome = await run.wait();
+    const tokens: TokenTotals = accumulateUsage(usageUpdates);
 
-  const manifest: RunManifest = {
-    ...baseManifest,
-    status: outcome.status,
-    run_id: outcome.runId,
-    agent_id: outcome.agentId,
-    tokens,
-    finished_at: now(),
-    notes: [],
-  };
-  const manifestContent = writeManifest(config.manifestFile, manifest);
-  return { status: outcome.status, manifest, manifestContent, createAgentCalled: true };
+    const manifest: RunManifest = {
+      ...baseManifest,
+      status: outcome.status,
+      run_id: outcome.runId,
+      agent_id: outcome.agentId,
+      tokens,
+      finished_at: now(),
+      notes: [],
+    };
+    const manifestContent = writeManifest(config.manifestFile, manifest);
+    return { status: outcome.status, manifest, manifestContent, createAgentCalled: true };
+  } catch (err) {
+    // A live stream/wait can throw mid-run; write an error manifest with the
+    // usage gathered so far so the token signal and the failure survive rather
+    // than escaping as an unhandled rejection out of `void main()`.
+    const tokens: TokenTotals = accumulateUsage(usageUpdates);
+    const manifest: RunManifest = {
+      ...baseManifest,
+      status: 'error',
+      run_id: null,
+      agent_id: null,
+      tokens,
+      finished_at: now(),
+      notes: [`error: ${err instanceof Error ? err.message : String(err)}`],
+    };
+    const manifestContent = writeManifest(config.manifestFile, manifest);
+    return { status: 'error', manifest, manifestContent, createAgentCalled: true };
+  }
 }
 
 // ---------------------------------------------------------------------------

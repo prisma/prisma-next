@@ -189,6 +189,36 @@ describe('runOneBrief — live path with mock SDK', () => {
     assert.equal(result.status, 'error');
     assert.equal(result.manifest.tokens?.totalTokens, 12);
   });
+
+  it('writes an error manifest (with tokens) when the stream throws mid-run', async () => {
+    const createAgent: CreateAgent = async () => ({
+      async *stream() {
+        yield { kind: 'turn-ended', usage: { inputTokens: 7, outputTokens: 3 } };
+        throw new Error('stream died');
+      },
+      async wait() {
+        return { status: 'finished', runId: 'unreached', agentId: null };
+      },
+    });
+    const manifestFile = join(dir, 'run.json');
+    const result = await runOneBrief(
+      {
+        caseDir: CASE_DIR,
+        traceFile: join(dir, 'trace.jsonl'),
+        manifestFile,
+        model: 'pinned-model',
+        live: true,
+        apiKeyPresent: true,
+      },
+      { createAgent, now: FIXED_NOW },
+    );
+    assert.equal(result.status, 'error');
+    assert.equal(result.manifest.tokens?.totalTokens, 10);
+    assert.match(result.manifest.notes.join(' '), /stream died/);
+    // The manifest is still written to disk despite the throw.
+    const parsed = JSON.parse(readFileSync(manifestFile, 'utf8'));
+    assert.equal(parsed.status, 'error');
+  });
 });
 
 describe('assemblePrompt', () => {
