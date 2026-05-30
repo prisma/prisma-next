@@ -578,32 +578,30 @@ type BuiltDomain<Definition> =
         };
       };
 
+// SQL contracts always carry a literal `__unbound__` namespace whose tables
+// slot is narrowed to the actual built table shape so downstream DSL
+// surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
+// access without an optional-narrowing dance. Namespace ids are direct keys
+// under `storage` (ADR 221 canonical flat shape), alongside the reserved
+// `storageHash` (and optional document-scoped `types`). The shapes are
+// described inline (rather than intersecting with a `Record<string,
+// Namespace>` index signature) so `keyof tables` does not collapse to
+// `string`. Each value still satisfies the framework `Namespace` interface.
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
   readonly types?: BuiltDocumentScopedTypes<Definition>;
-  // SQL contracts always carry a literal `__unbound__` namespace whose tables
-  // slot is narrowed to the actual built table shape so downstream DSL
-  // surfaces (TableProxyContract, Ref, SelectBuilder) keep literal-keyed
-  // access without an optional-narrowing dance. The shape is described
-  // inline (rather than intersecting with `SqlStorage['namespaces']`) so
-  // its `Readonly<Record<string, Namespace>>` index signature doesn't
-  // collapse `keyof tables` to `string`. The literal object is still
-  // structurally assignable to `SqlStorage['namespaces']` because every
-  // value satisfies the framework `Namespace` interface.
-  readonly namespaces: {
-    readonly __unbound__: {
-      readonly id: '__unbound__';
-      readonly kind: string;
-      readonly tables: BuiltStorageTables<Definition>;
-      readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
-    };
-  } & {
-    readonly [Ns in Exclude<DefinitionNamespaces<Definition>, '__unbound__'>]: {
-      readonly id: Ns;
-      readonly kind: string;
-      readonly tables: Record<never, never>;
-      readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
-    };
+  readonly __unbound__: {
+    readonly id: '__unbound__';
+    readonly kind: string;
+    readonly tables: BuiltStorageTables<Definition>;
+    readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
+  };
+} & {
+  readonly [Ns in Exclude<DefinitionNamespaces<Definition>, '__unbound__'>]: {
+    readonly id: Ns;
+    readonly kind: string;
+    readonly tables: Record<never, never>;
+    readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
   };
 };
 
