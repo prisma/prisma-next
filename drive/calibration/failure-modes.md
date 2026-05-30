@@ -265,6 +265,23 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715). The final dispatch reported all-green; PR #626 CI failed **Type Check** (unused `mkdir` import in `loader.catastrophic-io.test.ts`) + **Lint** (formatter diff in `loader.test.ts`) + **Test** (2 `migration-status-aggregate-spaces` failures that were pure behind-`main` drift, resolved by merging `main`). All three classes were caught by the babysit loop after the PR was open, not by the dispatch gates — exactly the work the gates exist to front-load.
 
+### F15. Behavioural "reports-all / tolerates / refuses" AC verified by code-reading instead of a populated fixture
+
+**Symptom.** An AC asserts a behaviour *over a populated input* — "`check` reports all violations at once", "`list` tolerates a hash-mismatched package", "apply refuses on a self-edge". The reviewer (or implementer) marks it satisfied by **reading** the code for the enabling property (e.g. "no first-failure bail across the command's own codes") rather than **running** the command against a fixture that actually carries every case the AC enumerates. A wiring gap the code-read can't see ships green.
+
+**Detection signal.**
+
+- An AC verdict cites a code-read ("confirmed no early return", "the loop covers all entries") for an AC whose subject is *runtime behaviour over data*.
+- No fixture in the dispatch exercises the command against an input that *populates* all the cases the AC enumerates ("all" / "every" / "each").
+- The behaviour depends on a wiring step (which integrity surface the command calls) that the code-read assumed but didn't trace end-to-end.
+
+**Mitigation.**
+
+- An AC of the form "X reports / tolerates / refuses all / every `<case>`" is satisfied **only** by running X against a fixture that carries every `<case>` at once and observing the full result — never by a structural code read. Add the populated-fixture run to the dispatch DoD for any behavioural-over-input AC.
+- Sibling of **F13** (a regression test must fail under ¬P): F13 is about the *test fixture* discriminating; F15 is about the AC's *verification method* being empirical, not a read.
+
+**Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715), D3→D4. The D3 reviewer passed the AC "`migration check` reports all violations at once" by reading `check`'s own `PN-MIG-CHECK-*` path for no-first-failure-bail — but `check` was never wired to `checkIntegrity()`, so the *relocated* self-edge (`sameSourceAndTarget`) and orphan-space-dir checks were never re-acquired there. Invisible to code-reading; surfaced only when D4 ran a real all-three-problems fixture through `check` and got 1-of-3.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.
