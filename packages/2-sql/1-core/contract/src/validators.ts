@@ -6,18 +6,26 @@ import {
   CrossReferenceSchema,
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
-import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  getStorageNamespace,
+  type Namespace,
+  storageNamespaceEntries,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
+import type { SqlNamespace } from './ir/sql-storage';
 import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
+  buildSqlStorageInput,
   type ForeignKeyInput,
   type ForeignKeyReferenceInput,
   type PrimaryKeyInput,
   type ReferentialAction,
   type SqlModelStorage,
+  type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
   type StorageTable,
@@ -107,7 +115,7 @@ const StorageTypeInstanceSchema = type
   });
 
 /**
- * Postgres native enum entry under `storage.namespaces[namespaceId].enum[name]`.
+ * Postgres native enum entry under `getStorageNamespace(storage as Record<string, unknown>, namespaceId).enum[name]`.
  * Document-scoped `storage.types` carries codec aliases only
  * (`DocumentScopedStorageTypeSchema`).
  */
@@ -233,7 +241,7 @@ function namespaceSlotEntrySchema(
 }
 
 /**
- * Builds the per-namespace entry schema for `storage.namespaces[id]`.
+ * Builds the per-namespace entry schema for `storage.<namespaceId>`.
  * Pack-contributed `validatorSchema` fragments — keyed by the
  * descriptor's `discriminator` — validate each entry by matching the
  * entry's `kind` field on the `'enum?'` slot.
@@ -266,41 +274,41 @@ export function createSqlStorageSchema(
     '+': 'reject',
     storageHash: 'string',
     'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
-    // `__unbound__` is NOT required here: cross-namespace contracts can
-    // declare only named namespaces (see cross-namespace FK fixtures). The
-    // `__unbound__` brand on `SqlStorageInput['namespaces']` is kept sound at
-    // construction time by injecting the unbound singleton when absent
-    // (see `validateStorage` / `hydrateSqlStorage`), not by structural require.
-    'namespaces?': type({ '[string]': namespaceEntry }),
+  }).narrow((storage, ctx) => {
+    if (typeof storage !== 'object' || storage === null) {
+      return ctx.mustBe('an object');
+    }
+    for (const [key, value] of Object.entries(storage)) {
+      if (key === 'storageHash' || key === 'types') continue;
+      const parsed = namespaceEntry(value);
+      if (parsed instanceof type.errors) {
+        return ctx.reject({ expected: `storage.${key}: ${parsed.summary}` });
+      }
+    }
+    return true;
   }) as Type<unknown>;
 }
 
 const StorageSchema = createSqlStorageSchema();
 
-// SQL-specific namespace walk shape (`tables` is the SQL family's idiom —
-// the framework `Namespace` interface no longer carries it). The wider
-// `object` table value keeps this helper structurally compatible with
-// `SqlNamespace` (whose tables narrow to `StorageTable`) and the JSON
-// envelope variants that lose class identity.
-type NamespacedStorageWalk = {
-  readonly namespaces: Readonly<
-    Record<string, Namespace & { readonly tables?: Readonly<Record<string, object>> }>
-  >;
-};
-
-function eachStorageTable(storage: NamespacedStorageWalk) {
-  return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
-    Object.entries(ns.tables ?? {}).map(([tableName, table]) => ({
-      namespaceId,
-      tableName,
-      table,
-    })),
+function eachStorageTable(storage: unknown) {
+  return [...storageNamespaceEntries(storage as Record<string, unknown>)].flatMap(
+    ([namespaceId, ns]) =>
+      Object.entries(
+        (ns as Namespace & { readonly tables?: Readonly<Record<string, object>> }).tables ?? {},
+      ).map(([tableName, table]) => ({
+        namespaceId,
+        tableName,
+        table,
+      })),
   );
 }
 
-function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: string): unknown {
-  for (const ns of Object.values(storage.namespaces)) {
-    const t = ns.tables?.[tableName];
+function findStorageTableByTableName(storage: unknown, tableName: string): unknown {
+  for (const [, ns] of storageNamespaceEntries(storage as Record<string, unknown>)) {
+    const t = (ns as Namespace & { readonly tables?: Readonly<Record<string, unknown>> }).tables?.[
+      tableName
+    ];
     if (t !== undefined) {
       return t;
     }
@@ -452,21 +460,26 @@ export function validateStorage(value: unknown): SqlStorage {
   // can't express (see NOTE above), so bridge the validated shape to the
   // input type. Construction below re-materialises nested IR fields.
   const validated = blindCast<
-    SqlStorageInput & { readonly namespaces?: SqlStorageInput['namespaces'] },
+    SqlStorageInput & Record<string, unknown>,
     'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
   >(result);
-  const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
-  // The `__unbound__` brand is made true at construction: if the validated
-  // namespaces omit the late-bound slot (e.g. a contract declaring only named
-  // namespaces), inject the family unbound singleton rather than asserting a
-  // shape that isn't there. Reconstructing the literal lets the branded
-  // `SqlStorageInput['namespaces']` hold with no cast.
+  const namespaceEntries = Object.fromEntries(
+    Object.entries(validated).filter(([key]) => key !== 'storageHash' && key !== 'types'),
+  );
+  const namespaces = buildSqlNamespaceMap(
+    blindCast<
+      Readonly<Record<string, Namespace | SqlNamespaceTablesInput>>,
+      'flat storage keys validated as namespace entries by createSqlStorageSchema'
+    >(namespaceEntries),
+  );
   const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
-  return new SqlStorage({
-    storageHash: validated.storageHash,
-    ...ifDefined('types', validated.types),
-    namespaces: { ...namespaces, [UNBOUND_NAMESPACE_ID]: unbound },
-  });
+  return new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: validated.storageHash,
+      ...ifDefined('types', validated.types),
+      namespaces: { ...namespaces, [UNBOUND_NAMESPACE_ID]: unbound },
+    }),
+  );
 }
 
 export function validateModel(value: unknown): unknown {
@@ -794,8 +807,11 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      const targetNamespace = contract.storage.namespaces[fk.target.namespaceId];
-      const referencedRaw = targetNamespace?.tables?.[fk.target.tableName];
+      const targetNamespace = getStorageNamespace(
+        contract.storage as unknown as Record<string, unknown>,
+        fk.target.namespaceId,
+      ) as SqlNamespace | undefined;
+      const referencedRaw = targetNamespace?.tables[fk.target.tableName];
       if (referencedRaw === undefined) {
         throw new ContractValidationError(
           `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.target.namespaceId}.${fk.target.tableName}"`,

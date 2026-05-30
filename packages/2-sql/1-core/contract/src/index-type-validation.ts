@@ -1,15 +1,19 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract } from '@prisma-next/contract/types';
+import { storageNamespaceEntries } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
 import type { IndexTypeRegistry } from './index-types';
+import type { SqlNamespace } from './ir/sql-storage';
 import type { SqlStorage, StorageTable } from './types';
 
 export function validateIndexTypes(
   contract: Contract<SqlStorage>,
   indexTypeRegistry: IndexTypeRegistry,
 ): void {
-  for (const [namespaceId, ns] of Object.entries(contract.storage.namespaces)) {
-    for (const [tableName, rawTable] of Object.entries(ns.tables)) {
+  for (const [namespaceId, ns] of [
+    ...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
+  ]) {
+    for (const [tableName, rawTable] of Object.entries((ns as SqlNamespace).tables)) {
       const table = rawTable as StorageTable;
       for (const index of table.indexes) {
         if (index.type === undefined && index.options !== undefined) {

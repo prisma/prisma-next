@@ -1,5 +1,11 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
+import {
+  flatStorageInput,
+  freezeNode,
+  isStoragePlaneReservedKey,
+  type Namespace,
+  type Storage,
+} from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
@@ -16,7 +22,7 @@ import {
  * Polymorphic value type for document-scoped `SqlStorage.types` entries
  * (codec aliases / parameterised native type registrations). Postgres
  * native enum registrations live under
- * `storage.namespaces[namespaceId].enum` instead.
+ * `storage.<namespaceId>.enum` instead.
  */
 export type SqlStorageTypeEntry =
   | StorageTypeInstance
@@ -29,12 +35,29 @@ export interface SqlNamespaceTablesInput {
   readonly enum?: Record<string, PostgresEnumStorageEntry>;
 }
 
-export interface SqlStorageInput<THash extends string = string> {
+export type SqlStorageInput<THash extends string = string> = {
+  readonly storageHash: StorageHashBase<THash>;
+  readonly types?: Record<string, SqlStorageTypeEntry>;
+} & Readonly<Record<string, SqlNamespace>> & {
+    readonly __unbound__: SqlNamespace;
+  };
+
+export type SqlStorageNamespacesInput<THash extends string = string> = {
   readonly storageHash: StorageHashBase<THash>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
   readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
     readonly __unbound__: SqlNamespace;
   };
+};
+
+export function buildSqlStorageInput<THash extends string>(
+  input: SqlStorageNamespacesInput<THash>,
+): SqlStorageInput<THash> {
+  return flatStorageInput({
+    storageHash: input.storageHash,
+    ...(input.types !== undefined ? { types: input.types } : {}),
+    namespaces: input.namespaces,
+  }) as SqlStorageInput<THash>;
 }
 
 /**
@@ -46,8 +69,9 @@ export interface SqlStorageInput<THash extends string = string> {
  * target-specific concretion (target-specific derived fields,
  * target-specific storage extensions).
  *
- * Honours the framework `Storage` interface: every SQL IR carries a
- * `namespaces` map keyed by namespace id. Callers must supply fully
+ * Honours the framework `Storage` interface: namespace ids are direct
+ * keys on the storage object alongside the reserved `storageHash` (and
+ * optional document-scoped `types`). Callers must supply fully
  * constructed `Namespace` instances — construction discipline lives
  * in the authoring builders and deserializer hydration paths.
  *
@@ -75,21 +99,27 @@ export type SqlNamespace = Namespace & {
 
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
-    readonly __unbound__: SqlNamespace;
-  };
+  declare readonly __unbound__: SqlNamespace;
   declare readonly types?: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.namespaces = Object.freeze(input.namespaces);
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(
           Object.entries(input.types).map(([name, ti]) => [name, normaliseTypeEntry(name, ti)]),
         ),
       );
+    }
+    for (const [key, value] of Object.entries(input)) {
+      if (isStoragePlaneReservedKey(key)) continue;
+      Object.defineProperty(this, key, {
+        value: Object.freeze(value),
+        writable: false,
+        enumerable: true,
+        configurable: false,
+      });
     }
     freezeNode(this);
   }
