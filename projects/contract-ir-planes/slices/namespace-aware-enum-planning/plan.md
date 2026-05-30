@@ -274,7 +274,7 @@ What stays the same: no production source edits unless test surfaces a real bug 
 - [ ] Edge-case disposition audit: every row in spec § Edge cases marked Handle/Defer/Out with evidence (grep output, test name, or PR note) — SDoD2
 - [ ] SDoD4: Manual-QA N/A noted in PR body
 - [ ] SDoD5: PR diff excludes domain-plane population, cross-ref encoding, subsumed helper deletion, plural rename, Mongo, SQLite, new pack-contributed kinds, on-disk format changes (grep PR diff)
-- [ ] PR body lists: motivation (CodeRabbit finding on PR #595), spec link, three SDoD gates with evidence, sequencing note (after S1.D), Linear ticket reference (post-file)
+- [ ] PR body lists: motivation (CodeRabbit finding on PR #595), spec link, three SDoD gates with evidence, sequencing note (parallel to S1.D — disjoint surfaces), Linear ticket reference ([TML-2686](https://linear.app/prisma-company/issue/TML-2686))
 
 **Size.** S. Verification + PR authoring only.
 

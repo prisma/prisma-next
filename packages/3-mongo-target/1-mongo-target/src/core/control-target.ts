@@ -20,12 +20,13 @@ import type {
   MultiSpaceRunnerResult,
 } from '@prisma-next/framework-components/control';
 import {
-  type ContractSpaceMember,
+  createContractSpaceMember,
   projectSchemaToSpace,
 } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { mongoTargetDescriptorMeta } from './descriptor-meta';
 import { MongoMigrationPlanner } from './mongo-planner';
@@ -156,37 +157,20 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
 };
 
 /**
- * Synthesise the minimum {@link projectSchemaToSpace}-compatible
- * `ContractSpaceMember` shape from a per-space option entry. The
- * projector only reads `spaceId` and `contract.storage`; the rest of
- * `ContractSpaceMember` (head ref invariants, hydrated migration
- * graph) is irrelevant at runner time and stubbed with sentinels.
- *
- * The `as unknown as ContractSpaceMember` cast is the load-bearing bit
- * — the projector duck-types its members so a sentinel-shaped graph
- * never gets read, but the framework type carries a richer shape.
+ * Synthesise a {@link projectSchemaToSpace}-compatible member from a
+ * per-space option entry. The projector only reads `spaceId` and
+ * `contract()`; migration graph state is empty because the runner
+ * consumes the destination contract directly.
  */
-function toSpaceMember(
-  opts: MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>,
-): ContractSpaceMember {
-  return {
+function toSpaceMember(opts: MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>) {
+  return createContractSpaceMember({
     spaceId: opts.space,
-    // Blind cast: `MultiSpaceRunnerPerSpaceOptions.destinationContract`
-    // is intentionally typed `unknown` at the framework boundary
-    // (the framework does not know which family's `Contract` shape
-    // a runner consumes). The caller is the aggregate runner,
-    // which only forwards a value already validated through the
-    // family `deserializeContract` seam at the aggregate boundary.
-    contract: opts.destinationContract as unknown as Contract,
-    headRef: { hash: '', invariants: [] },
-    migrations: {
-      graph: {
-        nodes: new Set<string>(),
-        forwardChain: new Map(),
-        reverseChain: new Map(),
-        migrationByHash: new Map(),
-      },
-      packagesByMigrationHash: new Map(),
-    },
-  } as unknown as ContractSpaceMember;
+    packages: [],
+    refs: {},
+    headRef: null,
+    resolveContract: () =>
+      blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
+        opts.destinationContract,
+      ),
+  });
 }

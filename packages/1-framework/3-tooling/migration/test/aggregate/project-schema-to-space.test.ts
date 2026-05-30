@@ -1,9 +1,10 @@
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
-import type { StorageBase } from '@prisma-next/contract/types';
+import type { Contract, StorageBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-space';
 import type { ContractSpaceMember } from '../../src/aggregate/types';
+import { makeContractSpaceMember } from '../fixtures';
 
 type MongoStorageLike = StorageBase & {
   readonly namespaces: Record<
@@ -33,20 +34,8 @@ describe('projectSchemaToSpace', () => {
    * with empty / sentinel values to satisfy the type without committing
    * to a particular family.
    */
-  function emptyMigrations(): ContractSpaceMember['migrations'] {
-    return {
-      graph: {
-        nodes: new Set<string>(),
-        forwardChain: new Map(),
-        reverseChain: new Map(),
-        migrationByHash: new Map(),
-      },
-      packagesByMigrationHash: new Map(),
-    };
-  }
-
   function memberWithTables(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
-    return {
+    return makeContractSpaceMember({
       spaceId,
       contract: createSqlContract({
         storage: {
@@ -55,9 +44,7 @@ describe('projectSchemaToSpace', () => {
           },
         },
       }),
-      headRef: { hash: 'sha256:test', invariants: [] },
-      migrations: emptyMigrations(),
-    };
+    });
   }
 
   /**
@@ -70,7 +57,7 @@ describe('projectSchemaToSpace', () => {
     spaceId: string,
     collections: Record<string, unknown>,
   ): ContractSpaceMember {
-    return {
+    return makeContractSpaceMember({
       spaceId,
       contract: createContract<MongoStorageLike>({
         target: 'mongo',
@@ -85,9 +72,7 @@ describe('projectSchemaToSpace', () => {
           },
         },
       }),
-      headRef: { hash: 'sha256:test', invariants: [] },
-      migrations: emptyMigrations(),
-    };
+    });
   }
 
   /**
@@ -104,12 +89,10 @@ describe('projectSchemaToSpace', () => {
    */
   function memberWithMalformedStorage(spaceId: string, storage: unknown): ContractSpaceMember {
     const baseContract = createContract();
-    return {
+    return makeContractSpaceMember({
       spaceId,
-      contract: { ...baseContract, storage } as unknown as ContractSpaceMember['contract'],
-      headRef: { hash: 'sha256:test', invariants: [] },
-      migrations: emptyMigrations(),
-    };
+      contract: { ...baseContract, storage } as unknown as Contract,
+    });
   }
 
   describe('duck-typing fall-through (returns input unchanged)', () => {

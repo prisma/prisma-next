@@ -3,6 +3,8 @@ export {
   formatMigrationDirName,
   materialiseExtensionMigrationPackageIfMissing,
   materialiseMigrationPackage,
+  type PackageLoadProblem,
+  type ReadMigrationsDirResult,
   readMigrationPackage,
   readMigrationsDir,
   writeMigrationMetadata,

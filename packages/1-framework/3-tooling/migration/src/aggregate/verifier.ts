@@ -1,5 +1,6 @@
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
 import { projectSchemaToSpace } from './project-schema-to-space';
 import { storageElementNames } from './storage-element-names';
@@ -145,16 +146,17 @@ function runVerifyAggregate<TSchemaResult>(
       markerPerSpace.set(member.spaceId, { kind: 'absent' });
       continue;
     }
-    if (marker.storageHash !== member.headRef.hash) {
+    const headRef = requireHeadRef(member);
+    if (marker.storageHash !== headRef.hash) {
       markerPerSpace.set(member.spaceId, {
         kind: 'hashMismatch',
         markerHash: marker.storageHash,
-        expected: member.headRef.hash,
+        expected: headRef.hash,
       });
       continue;
     }
     const markerInvariants = new Set(marker.invariants);
-    const missing = member.headRef.invariants.filter((id) => !markerInvariants.has(id));
+    const missing = headRef.invariants.filter((id) => !markerInvariants.has(id));
     if (missing.length > 0) {
       markerPerSpace.set(member.spaceId, {
         kind: 'missingInvariants',
@@ -211,7 +213,7 @@ function detectOrphanElements(
 
   const claimedTables = new Set<string>();
   for (const member of members) {
-    for (const name of storageElementNames(member.contract)) {
+    for (const name of storageElementNames(member.contract())) {
       claimedTables.add(name);
     }
   }

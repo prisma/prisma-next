@@ -1,11 +1,16 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { createContractSpaceMember } from '../src/aggregate/aggregate';
+import type { ContractSpaceMember } from '../src/aggregate/types';
+import { EMPTY_CONTRACT_HASH } from '../src/constants';
 import { computeMigrationHash } from '../src/hash';
 import { deriveProvidedInvariants } from '../src/invariants';
 import { writeMigrationPackage } from '../src/io';
 import type { MigrationMetadata } from '../src/metadata';
 import type { MigrationOps, OnDiskMigrationPackage } from '../src/package';
+import type { Refs } from '../src/refs';
+import type { ContractSpaceHeadRecord } from '../src/verify-contract-spaces';
 
 export function createTestContract(overrides: Partial<Contract> = {}): Contract {
   return createContract(overrides);
@@ -52,6 +57,31 @@ export function createAttestedPackage(
     metadata: createTestMetadata(metadataOverrides, ops),
     ops,
   };
+}
+
+/**
+ * Build a {@link ContractSpaceMember} for engine tests from the fields a
+ * test cares about. `graph()` is reconstructed from `packages` and
+ * `contract()` returns the supplied (already-deserialized) contract.
+ * Defaults: empty packages / refs, an empty-contract head ref, and a
+ * blank SQL/postgres contract.
+ */
+export function makeContractSpaceMember(args: {
+  spaceId: string;
+  contract?: Contract;
+  headRef?: ContractSpaceHeadRecord | null;
+  packages?: readonly OnDiskMigrationPackage[];
+  refs?: Refs;
+}): ContractSpaceMember {
+  const contract = args.contract ?? createContract();
+  return createContractSpaceMember({
+    spaceId: args.spaceId,
+    packages: args.packages ?? [],
+    refs: args.refs ?? {},
+    headRef:
+      args.headRef === undefined ? { hash: EMPTY_CONTRACT_HASH, invariants: [] } : args.headRef,
+    resolveContract: () => contract,
+  });
 }
 
 export function createTestOps(): readonly MigrationPlanOperation[] {

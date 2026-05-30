@@ -2,24 +2,14 @@ import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
+import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types';
 import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
 import { verifyAggregate } from '../../src/aggregate/verifier';
+import { makeContractSpaceMember } from '../fixtures';
 
 interface StubSchemaResult {
   readonly tablesSeen: readonly string[];
-}
-
-function emptyMigrations(): ContractSpaceMember['migrations'] {
-  return {
-    graph: {
-      nodes: new Set<string>(),
-      forwardChain: new Map(),
-      reverseChain: new Map(),
-      migrationByHash: new Map(),
-    },
-    packagesByMigrationHash: new Map(),
-  };
 }
 
 function makeMember(args: {
@@ -37,19 +27,23 @@ function makeMember(args: {
       },
     },
   });
-  return {
+  return makeContractSpaceMember({
     spaceId: args.spaceId,
     contract: contract as Contract,
     headRef: { hash: args.headHash, invariants: args.invariants ?? [] },
-    migrations: emptyMigrations(),
-  };
+  });
 }
 
 function makeAggregate(args: {
   app: ContractSpaceMember;
   extensions?: ContractSpaceMember[];
 }): ContractSpaceAggregate {
-  return { targetId: 'postgres', app: args.app, extensions: args.extensions ?? [] };
+  return createContractSpaceAggregate({
+    targetId: 'postgres',
+    app: args.app,
+    extensions: args.extensions ?? [],
+    checkIntegrity: () => [],
+  });
 }
 
 const STUB_VERIFY = (

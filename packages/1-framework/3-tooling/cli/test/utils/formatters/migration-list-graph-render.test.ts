@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import {
-  detectGlyphMode,
-  renderMigrationListGraph,
-} from '../../../src/utils/formatters/migration-list-graph-render';
+import { renderMigrationListGraph } from '../../../src/utils/formatters/migration-list-graph-render';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
   type MigrationListStyler,
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/migration-list-styler';
+import { detectGlyphMode } from '../../../src/utils/glyph-mode';
 import { HASH, layoutFor, migrationEntry } from './migration-list-graph-fixtures';
 
 function renderGraph(
@@ -237,14 +235,36 @@ describe('renderMigrationListGraph', () => {
     ];
     expect(renderGraph(entries, 'unicode')).toBe(
       'o     d41a8c3\n' +
-        '├─┐  \n' +
+        '├─┐\n' +
         '* │   20250302_merge_tags   9c4f1e7 → d41a8c3\n' +
         '│ *   20250301_merge_posts  7e1b9a0 → d41a8c3\n' +
         '│ │ * 20250220_unrelated    feed000 → dead000\n' +
         '* │ │ 20250210_add_tags     abc1234 → 9c4f1e7\n' +
         '│ * │ 20250203_add_posts    abc1234 → 7e1b9a0\n' +
-        '├─┘ │ \n' +
+        '├─┘ │\n' +
         '*   │ 20250115_add_users    ∅       → abc1234',
+    );
+  });
+
+  it('renders unplaceable forward edge unwoven in unicode', () => {
+    const entries = [
+      migrationEntry('20250320_orphan_producer', 'hash_big', 'hash_mid'),
+      migrationEntry('20250310_consumer', 'hash_mid', 'hash_end'),
+    ];
+    expect(renderGraph(entries, 'unicode')).toBe(
+      '* 20250320_orphan_producer  hash_bi → hash_mi\n' +
+        '* 20250310_consumer         hash_mi → hash_en',
+    );
+  });
+
+  it('renders unplaceable forward edge unwoven in ascii', () => {
+    const entries = [
+      migrationEntry('20250320_orphan_producer', 'hash_big', 'hash_mid'),
+      migrationEntry('20250310_consumer', 'hash_mid', 'hash_end'),
+    ];
+    expect(renderAscii(entries)).toBe(
+      '* 20250320_orphan_producer  hash_bi -> hash_mi\n' +
+        '* 20250310_consumer         hash_mi -> hash_en',
     );
   });
 
@@ -418,13 +438,13 @@ describe('renderMigrationListGraph', () => {
     ];
     expect(renderAscii(entries)).toBe(
       'o     d41a8c3\n' +
-        '+-\\  \n' +
+        '+-\\\n' +
         '* |   20250302_merge_tags   9c4f1e7 -> d41a8c3\n' +
         '| *   20250301_merge_posts  7e1b9a0 -> d41a8c3\n' +
         '| | * 20250220_unrelated    feed000 -> dead000\n' +
         '* | | 20250210_add_tags     abc1234 -> 9c4f1e7\n' +
         '| * | 20250203_add_posts    abc1234 -> 7e1b9a0\n' +
-        '+-/ | \n' +
+        '+-/ |\n' +
         '*   | 20250115_add_users    -       -> abc1234',
     );
   });

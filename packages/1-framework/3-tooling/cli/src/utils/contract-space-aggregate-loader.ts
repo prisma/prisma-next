@@ -2,109 +2,161 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import type {
   ContractSpaceAggregate,
-  LoadAggregateError,
-  LoadAggregateInput,
-  LoadAggregateOutput,
+  DeclaredExtensionEntry,
+  IntegrityQueryOptions,
+  IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
 import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
 
+const CONTRACT_SPACES_DOCS_URL = 'https://pris.ly/contract-spaces';
+
+function contractSpaceError5002(
+  summary: string,
+  options: {
+    readonly why: string;
+    readonly fix: string;
+    readonly violations: readonly IntegrityViolation[];
+  },
+): CliStructuredError {
+  return new CliStructuredError('5002', summary, {
+    domain: 'MIG',
+    why: options.why,
+    fix: options.fix,
+    docsUrl: CONTRACT_SPACES_DOCS_URL,
+    meta: { violations: options.violations },
+  });
+}
+
 /**
- * Render a {@link LoadAggregateError} into a CLI structured-error
- * envelope. Preserves error codes `5001` (layout) and `5002` (marker /
- * disjointness / etc.) so existing integration tests and downstream
- * tooling continue to assert on the same `meta.violations[]` shape
- * they did under the old precheck/marker-check helpers.
+ * Build the `5002` structured-error envelope for a contract-space
+ * target mismatch. Shared between the declared-extension precheck (the
+ * descriptor's configured target disagrees with the project target) and
+ * the on-disk-contract check surfaced by `checkIntegrity`.
  */
-export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredError {
-  if (error.kind === 'layoutViolation') {
-    const lines = error.violations.map((v) => `- [${v.kind}] ${v.spaceId}`);
+function targetMismatchError(
+  spaceId: string,
+  expected: string,
+  actual: string,
+): CliStructuredError {
+  return contractSpaceError5002(`Contract-space target mismatch for "${spaceId}"`, {
+    why: `Space "${spaceId}" targets "${actual}" but the project's adapter targets "${expected}".`,
+    fix: 'Update the extension descriptor to target the configured database, or change the project adapter.',
+    violations: [{ kind: 'targetMismatch', spaceId, expected, actual }],
+  });
+}
+
+/**
+ * Human-readable detail for an integrity violation, used as the `why`
+ * of the `integrityFailure` envelope. Mirrors the messages the prior
+ * throw-on-load loader produced so downstream consumers see the same
+ * text for the same on-disk state.
+ */
+function describeIntegrityViolation(violation: IntegrityViolation): string {
+  switch (violation.kind) {
+    case 'hashMismatch':
+      return `Migration "${violation.dirName}" stored hash "${violation.stored}" does not match computed hash "${violation.computed}".`;
+    case 'providedInvariantsMismatch':
+      return `Migration "${violation.dirName}" providedInvariants in migration.json disagrees with ops.json.`;
+    case 'packageUnloadable':
+      return `Migration "${violation.dirName}" could not be loaded: ${violation.detail}`;
+    case 'sameSourceAndTarget':
+      return `Migration "${violation.dirName}" has source equal to target (${violation.hash}) with no data invariant — a true no-op self-edge.`;
+    case 'headRefMissing':
+      return `Head ref \`refs/head.json\` is missing for contract space "${violation.spaceId}".`;
+    case 'headRefNotInGraph':
+      return `Head ref ${violation.hash} for contract space "${violation.spaceId}" is not present in the migration graph.`;
+    case 'refUnreadable':
+      return `Ref "${violation.refName}" for contract space "${violation.spaceId}" is unreadable: ${violation.detail}`;
+    case 'duplicateMigrationHash':
+      return `Multiple migrations in space "${violation.spaceId}" share migrationHash "${violation.migrationHash}" (${violation.dirNames.join(', ')}).`;
+    default: {
+      const spaceId = 'spaceId' in violation ? violation.spaceId : '*';
+      return `Integrity violation "${violation.kind}" for contract space "${spaceId}".`;
+    }
+  }
+}
+
+/**
+ * Map the integrity violations `checkIntegrity` reports into a single
+ * CLI structured-error envelope, preserving the error codes the prior
+ * throw-on-load loader emitted: `5001` (layout drift, bundled) and
+ * `5002` (target / disjointness / contract-validation / structural
+ * integrity). Returns `null` when there is nothing to refuse on.
+ *
+ * Precedence reproduces the prior loader's first-failure ordering:
+ * layout drift first (every offence bundled into one envelope), then
+ * target mismatch, then disjointness, then a contract-validation
+ * failure, then any remaining structural integrity violation.
+ */
+export function mapIntegrityViolations(
+  violations: readonly IntegrityViolation[],
+): CliStructuredError | null {
+  if (violations.length === 0) return null;
+
+  const layout = violations.filter(
+    (v): v is Extract<IntegrityViolation, { kind: 'orphanSpaceDir' | 'declaredButUnmigrated' }> =>
+      v.kind === 'orphanSpaceDir' || v.kind === 'declaredButUnmigrated',
+  );
+  if (layout.length > 0) {
+    const lines = layout.map((v) => `- [${v.kind}] ${v.spaceId}`);
     const summary =
-      error.violations.length === 1
+      layout.length === 1
         ? 'Contract-space layout violation detected'
-        : `Contract-space layout violations detected (${error.violations.length})`;
+        : `Contract-space layout violations detected (${layout.length})`;
     return new CliStructuredError('5001', summary, {
       domain: 'MIG',
       why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
-      fix: 'Run `prisma-next migrate` to materialise on-disk artefacts for declared extensions, or remove the orphan directory.',
-      docsUrl: 'https://pris.ly/contract-spaces',
-      meta: {
-        violations: error.violations.map((v) => ({
-          kind: v.kind,
-          spaceId: v.spaceId,
-        })),
-      },
+      fix: 'Declare the extension in `extensionPacks` and re-emit its contract-space artefacts, or remove the orphan `migrations/<space>` directory.',
+      docsUrl: CONTRACT_SPACES_DOCS_URL,
+      meta: { violations: layout },
     });
   }
-  if (error.kind === 'disjointnessViolation') {
-    return new CliStructuredError(
-      '5002',
-      `Contract-space disjointness violation: storage element "${error.element}" claimed by multiple spaces`,
+
+  const targetMismatch = violations.find((v) => v.kind === 'targetMismatch');
+  if (targetMismatch && targetMismatch.kind === 'targetMismatch') {
+    return targetMismatchError(
+      targetMismatch.spaceId,
+      targetMismatch.expected,
+      targetMismatch.actual,
+    );
+  }
+
+  const disjointness = violations.find((v) => v.kind === 'disjointness');
+  if (disjointness && disjointness.kind === 'disjointness') {
+    return contractSpaceError5002(
+      `Contract-space disjointness violation: storage element "${disjointness.element}" claimed by multiple spaces`,
       {
-        domain: 'MIG',
-        why: `Spaces ${error.claimedBy.map((s) => `"${s}"`).join(', ')} all claim the storage element "${error.element}". Each storage element must be owned by exactly one contract space.`,
+        why: `Spaces ${disjointness.claimedBy.map((s) => `"${s}"`).join(', ')} all claim the storage element "${disjointness.element}". Each storage element must be owned by exactly one contract space.`,
         fix: 'Update the conflicting contracts so each storage element is claimed by exactly one space.',
-        docsUrl: 'https://pris.ly/contract-spaces',
-        meta: {
-          violations: [
-            {
-              kind: 'disjointness',
-              spaceId: error.claimedBy.join(','),
-              element: error.element,
-              claimedBy: error.claimedBy,
-            },
-          ],
-        },
+        violations: [disjointness],
       },
     );
   }
-  if (error.kind === 'integrityFailure') {
-    return new CliStructuredError(
-      '5002',
-      `Contract-space integrity failure for "${error.spaceId}"`,
+
+  const contractUnreadable = violations.find((v) => v.kind === 'contractUnreadable');
+  if (contractUnreadable && contractUnreadable.kind === 'contractUnreadable') {
+    return contractSpaceError5002(
+      `Contract-space contract validation failed for "${contractUnreadable.spaceId}"`,
       {
-        domain: 'MIG',
-        why: error.detail,
-        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or restore the on-disk `migrations/` directory from version control.',
-        docsUrl: 'https://pris.ly/contract-spaces',
-        meta: {
-          violations: [{ kind: 'integrity', spaceId: error.spaceId, detail: error.detail }],
-        },
+        why: contractUnreadable.detail,
+        fix: 'Re-emit the extension contract with `prisma-next contract emit`, or fix the extension pack descriptor producing the invalid contract.',
+        violations: [contractUnreadable],
       },
     );
   }
-  if (error.kind === 'validationFailure') {
-    return new CliStructuredError(
-      '5002',
-      `Contract-space contract validation failed for "${error.spaceId}"`,
-      {
-        domain: 'MIG',
-        why: error.detail,
-        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or fix the extension descriptor producing the invalid contract.',
-        meta: {
-          violations: [{ kind: 'validation', spaceId: error.spaceId, detail: error.detail }],
-        },
-      },
-    );
-  }
-  // targetMismatch
-  return new CliStructuredError('5002', `Contract-space target mismatch for "${error.spaceId}"`, {
-    domain: 'MIG',
-    why: `Space "${error.spaceId}" targets "${error.actual}" but the project's adapter targets "${error.expected}".`,
-    fix: 'Update the extension descriptor to target the configured database, or change the project adapter.',
-    meta: {
-      violations: [
-        {
-          kind: 'targetMismatch',
-          spaceId: error.spaceId,
-          expected: error.expected,
-          actual: error.actual,
-        },
-      ],
-    },
+
+  // Any remaining recoverable structural violation refuses as an
+  // integrity failure, surfacing the first one's detail (every violation
+  // is still computed; the gate just renders one envelope).
+  const structural = violations[0]!;
+  const spaceId = 'spaceId' in structural ? structural.spaceId : '*';
+  return contractSpaceError5002(`Contract-space integrity failure for "${spaceId}"`, {
+    why: describeIntegrityViolation(structural),
+    fix: 'Re-emit the affected migration package(s) or restore the on-disk `migrations/` directory from version control.',
+    violations: [structural],
   });
 }
 
@@ -121,34 +173,91 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
   readonly appContract: Contract;
   readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly deserializeContract: (contractJson: unknown) => Contract;
-  /**
-   * App-space migration packages to hydrate the app member's
-   * migration graph with. Defaults to `[]` (matches the `db init` /
-   * `db update` daily-driver behaviour, where the app's authored
-   * `migrations/` graph is not walked — the planner uses the synth
-   * strategy for the app member instead).
-   *
-   * `migrate` callers thread the user's authored app-space
-   * packages (loaded via `loadMigrationPackages(appMigrationsDir)`)
-   * through here so the graph-walk strategy can plot a path through
-   * them — the prod-time replay path explicitly forbids synth.
-   */
-  readonly appMigrationPackages?: ReadonlyArray<OnDiskMigrationPackage>;
+}
+
+function declaredExtensionsFromInputs(
+  extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'],
+): readonly DeclaredExtensionEntry[] {
+  return toDeclaredExtensionsFromRaw(extensionPacks as ReadonlyArray<unknown>);
 }
 
 /**
- * Run the aggregate loader at the CLI surface, mapping any
- * {@link LoadAggregateError} into a {@link CliStructuredError} envelope.
+ * Reject extension descriptors whose configured target disagrees with
+ * the project target before any on-disk read.
+ */
+export function refuseDeclaredExtensionTargetMismatch<
+  TFamilyId extends string,
+  TTargetId extends string,
+>(inputs: BuildAggregateInputs<TFamilyId, TTargetId>): CliStructuredError | null {
+  for (const declared of declaredExtensionsFromInputs(inputs.extensionPacks)) {
+    if (declared.targetId !== inputs.targetId) {
+      return targetMismatchError(declared.id, inputs.targetId, declared.targetId);
+    }
+  }
+  return null;
+}
+
+/**
+ * Load the tolerant {@link ContractSpaceAggregate} once at the CLI
+ * surface. Construction never throws on disk content; callers query
+ * {@link ContractSpaceAggregate.app} / extension facets instead of
+ * re-reading `migrations/`.
+ */
+export async function loadContractSpaceAggregateForCli<
+  TFamilyId extends string,
+  TTargetId extends string,
+>(
+  inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
+): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
+  const targetFailure = refuseDeclaredExtensionTargetMismatch(inputs);
+  if (targetFailure) {
+    return notOk(targetFailure);
+  }
+
+  const aggregate = await loadContractSpaceAggregate({
+    migrationsDir: inputs.migrationsDir,
+    deserializeContract: inputs.deserializeContract,
+    appContract: inputs.appContract,
+  });
+  return ok(aggregate);
+}
+
+/**
+ * Run `checkIntegrity` on a loaded aggregate and map violations into
+ * the contract-space refusal envelope, or return `null` when the model
+ * is acceptable for the requested check scope.
+ */
+export function refuseContractSpaceIntegrity(
+  aggregate: ContractSpaceAggregate,
+  options: IntegrityQueryOptions,
+): CliStructuredError | null {
+  return mapIntegrityViolations(aggregate.checkIntegrity(options));
+}
+
+const PACKAGE_CORRUPTION_KINDS = new Set<IntegrityViolation['kind']>([
+  'hashMismatch',
+  'providedInvariantsMismatch',
+  'packageUnloadable',
+]);
+
+/**
+ * Reader-subset integrity refusal for `migration status`: package
+ * corruptions only (`hashMismatch`, `providedInvariantsMismatch`,
+ * `packageUnloadable`).
+ */
+export function refusePackageCorruptionOnAggregate(
+  aggregate: ContractSpaceAggregate,
+): CliStructuredError | null {
+  const corruption = aggregate.checkIntegrity().filter((v) => PACKAGE_CORRUPTION_KINDS.has(v.kind));
+  return mapIntegrityViolations(corruption);
+}
+
+/**
+ * Construct the tolerant {@link ContractSpaceAggregate} at the CLI
+ * surface and apply the explicit integrity refusal.
  *
- * App-side migration packages flow through `inputs.appMigrationPackages`
- * (defaulting to `[]`). `db init` / `db update` leave it empty: the
- * planner's `synth` strategy is used for the app member (driven by
- * `callerPolicy.ignoreGraphFor`), so the app's authored `migrations/`
- * graph does not need to be walked. `migrate` threads the
- * already-loaded app-space packages through so the graph-walk strategy
- * can plot a path through them — replay forbids synth.
- *
- * @see specs/contract-space-aggregate-spec.md § Loader.
+ * App-space migration packages are read from `migrations/<app>/` by the
+ * loader itself; callers no longer thread them through.
  */
 export async function buildContractSpaceAggregate<
   TFamilyId extends string,
@@ -156,22 +265,17 @@ export async function buildContractSpaceAggregate<
 >(
   inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
 ): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
-  const declaredExtensions = toDeclaredExtensionsFromRaw(
-    inputs.extensionPacks as ReadonlyArray<unknown>,
-  );
-
-  const loadInput: LoadAggregateInput = {
-    targetId: inputs.targetId,
-    migrationsDir: inputs.migrationsDir,
-    appContract: inputs.appContract,
-    declaredExtensions,
-    deserializeContract: inputs.deserializeContract,
-    appMigrationPackages: inputs.appMigrationPackages ?? [],
-  };
-
-  const result: LoadAggregateOutput = await loadContractSpaceAggregate(loadInput);
-  if (!result.ok) {
-    return notOk(mapLoadAggregateError(result.failure));
+  const declaredExtensions = declaredExtensionsFromInputs(inputs.extensionPacks);
+  const loaded = await loadContractSpaceAggregateForCli(inputs);
+  if (!loaded.ok) {
+    return loaded;
   }
-  return ok(result.value.aggregate);
+  const failure = refuseContractSpaceIntegrity(loaded.value, {
+    declaredExtensions,
+    checkContracts: true,
+  });
+  if (failure) {
+    return notOk(failure);
+  }
+  return ok(loaded.value);
 }

@@ -1,4 +1,8 @@
-import type { SerializeContract } from '@prisma-next/contract/hashing';
+import type {
+  PreserveEmptyPredicate,
+  SerializeContract,
+  StorageSort,
+} from '@prisma-next/contract/hashing';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
@@ -26,6 +30,16 @@ export interface EmitOptions {
    * via property enumerability.
    */
   readonly serializeContract: SerializeContract;
+  /**
+   * Optional family-contributed preserve-empty predicate. Threaded from
+   * `descriptor.contractSerializer.shouldPreserveEmpty` when present.
+   */
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+  /**
+   * Optional family-contributed storage sort hook. Threaded from
+   * `descriptor.contractSerializer.sortStorage` when present.
+   */
+  readonly sortStorage?: StorageSort;
 }
 
 export interface EmitResult {

@@ -14,6 +14,25 @@ import type { Contract } from './contract-types';
  */
 export type SerializeContract = (contract: Contract) => JsonObject;
 
+/**
+ * Family-contributed predicate for the default-omission walk. Called when
+ * a value at `path` is a default (empty object/array or `false`); if this
+ * returns `true` the value is kept rather than stripped.
+ *
+ * The framework only calls the predicate inside the `isDefaultValue` branch,
+ * so there is no need to guard against non-default values.
+ */
+export type PreserveEmptyPredicate = (path: readonly string[]) => boolean;
+
+/**
+ * Family-contributed storage sort. Applied to the serialized `storage`
+ * subtree after the default-omission walk; the result replaces the
+ * `storage` field before the final key sort. Use to establish a
+ * deterministic order for storage arrays (indexes, uniques) that the
+ * family-agnostic `sortObjectKeys` pass cannot handle.
+ */
+export type StorageSort = (storage: unknown) => unknown;
+
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
   'canonicalVersion',
@@ -42,13 +61,17 @@ function isDefaultValue(value: unknown): boolean {
   return false;
 }
 
-function omitDefaults(obj: unknown, path: readonly string[]): unknown {
+function omitDefaults(
+  obj: unknown,
+  path: readonly string[],
+  shouldPreserveEmpty: PreserveEmptyPredicate | undefined,
+): unknown {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => omitDefaults(item, path));
+    return obj.map((item) => omitDefaults(item, path, shouldPreserveEmpty));
   }
 
   const result: Record<string, unknown> = {};
@@ -74,20 +97,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isNamespaceSlot =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'namespaces']);
-      const isRequiredNamespaceTables =
-        currentPath.length === 4 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'tables';
-      // Preserve per-table payloads even when empty. SQL tables are never
-      // emitted empty; Mongo collections legitimately are (a declared
-      // collection with no schema is a valid representation), and the
-      // family-agnostic canonicalizer must not strip them.
-      const isNamespaceTableEntry =
-        currentPath.length === 5 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'tables';
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
@@ -104,33 +113,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isModelStorage =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[2]], ['models', 'storage']);
-      const isNamespaceTableUniques =
-        currentPath.length === 6 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'tables' &&
-        currentPath[5] === 'uniques';
-      const isNamespaceTableIndexes =
-        currentPath.length === 6 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'tables' &&
-        currentPath[5] === 'indexes';
-      const isNamespaceTableForeignKeys =
-        currentPath.length === 6 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'tables' &&
-        currentPath[5] === 'foreignKeys';
-
-      // `storage.types.<name>.typeParams` is part of the StorageTypeInstance
-      // shape (validators require it). Preserve it even when empty so the
-      // emitted contract.json remains structurally valid after a round-trip.
-      const isStorageTypeTypeParams =
-        currentPath.length === 4 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'types' &&
-        key === 'typeParams';
 
       const isDomainUnboundTypeParams =
         currentPath.length === 5 &&
@@ -138,22 +120,14 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         currentPath[2] === 'types' &&
         key === 'typeParams';
 
-      const isFkBooleanField =
-        currentPath.length === 7 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'tables' &&
-        currentPath[5] === 'foreignKeys' &&
-        (key === 'constraint' || key === 'index');
-
       const isNullableField = key === 'nullable';
+
+      const isFamilyPreserved = shouldPreserveEmpty?.(currentPath) ?? false;
 
       if (
         !isRequiredModels &&
         !isRequiredNamespaces &&
         !isNamespaceSlot &&
-        !isRequiredNamespaceTables &&
-        !isNamespaceTableEntry &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
@@ -162,19 +136,15 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isExtensionNamespace &&
         !isModelRelations &&
         !isModelStorage &&
-        !isNamespaceTableUniques &&
-        !isNamespaceTableIndexes &&
-        !isNamespaceTableForeignKeys &&
-        !isFkBooleanField &&
         !isNullableField &&
-        !isStorageTypeTypeParams &&
-        !isDomainUnboundTypeParams
+        !isDomainUnboundTypeParams &&
+        !isFamilyPreserved
       ) {
         continue;
       }
     }
 
-    result[key] = omitDefaults(value, currentPath);
+    result[key] = omitDefaults(value, currentPath, shouldPreserveEmpty);
   }
 
   return result;
@@ -196,88 +166,6 @@ function sortObjectKeys(obj: unknown): unknown {
   }
 
   return sorted;
-}
-
-type NamespaceObject = {
-  tables?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
-type StorageObject = {
-  namespaces?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
-type TableObject = {
-  indexes?: unknown[];
-  uniques?: unknown[];
-  [key: string]: unknown;
-};
-
-function sortTableArrays(tableObj: TableObject): TableObject {
-  const sortedTable: TableObject = { ...tableObj };
-
-  if (Array.isArray(tableObj.indexes)) {
-    sortedTable.indexes = [...tableObj.indexes].sort((a, b) => {
-      const nameA = (a as { name?: string })?.name || '';
-      const nameB = (b as { name?: string })?.name || '';
-      return nameA.localeCompare(nameB);
-    });
-  }
-
-  if (Array.isArray(tableObj.uniques)) {
-    sortedTable.uniques = [...tableObj.uniques].sort((a, b) => {
-      const nameA = (a as { name?: string })?.name || '';
-      const nameB = (b as { name?: string })?.name || '';
-      return nameA.localeCompare(nameB);
-    });
-  }
-
-  return sortedTable;
-}
-
-function sortIndexesAndUniques(storage: unknown): unknown {
-  if (!storage || typeof storage !== 'object') {
-    return storage;
-  }
-
-  const storageObj = storage as StorageObject;
-  if (!storageObj.namespaces || typeof storageObj.namespaces !== 'object') {
-    return storage;
-  }
-
-  const namespaces = storageObj.namespaces;
-  const result: StorageObject = { ...storageObj, namespaces: {} };
-  const resultNamespaces = result.namespaces as Record<string, unknown>;
-
-  for (const nsId of Object.keys(namespaces)) {
-    const ns = namespaces[nsId];
-    if (!ns || typeof ns !== 'object') {
-      resultNamespaces[nsId] = ns;
-      continue;
-    }
-
-    const nsObj = ns as NamespaceObject;
-    if (!nsObj.tables || typeof nsObj.tables !== 'object') {
-      resultNamespaces[nsId] = ns;
-      continue;
-    }
-
-    const sortedTables: Record<string, unknown> = {};
-    const sortedTableNames = Object.keys(nsObj.tables).sort();
-    for (const tableName of sortedTableNames) {
-      const table = nsObj.tables[tableName];
-      if (!table || typeof table !== 'object') {
-        sortedTables[tableName] = table;
-        continue;
-      }
-      sortedTables[tableName] = sortTableArrays(table as TableObject);
-    }
-
-    resultNamespaces[nsId] = { ...nsObj, tables: sortedTables };
-  }
-
-  return result;
 }
 
 export function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
@@ -311,6 +199,21 @@ export interface CanonicalizeContractOptions {
    * the per-target serializer not putting them in the JSON shape.
    */
   readonly serializeContract: SerializeContract;
+  /**
+   * Family-contributed preserve-empty predicate. When the walk encounters a
+   * default value (empty object/array or `false`) at `path`, calling this
+   * with the full path allows the family to veto the omission. If absent,
+   * only the framework's family-agnostic required-slot rules apply.
+   */
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+  /**
+   * Family-contributed storage sort. Applied to the serialized `storage`
+   * subtree after the default-omission walk, before the final key sort.
+   * SQL family uses this to impose a deterministic order on `indexes` and
+   * `uniques` arrays within each namespace table. Families that require no
+   * special storage ordering omit this hook.
+   */
+  readonly sortStorage?: StorageSort;
 }
 
 /**
@@ -338,9 +241,13 @@ export function canonicalizeContractToObject(
     capabilities: serialized['capabilities'],
     meta: serialized['meta'],
   };
-  const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;
-  const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);
-  const withSortedStorage = { ...withDefaultsOmitted, storage: withSortedIndexes };
+  const withDefaultsOmitted = omitDefaults(normalized, [], options.shouldPreserveEmpty) as Record<
+    string,
+    unknown
+  >;
+  const withSortedStorage = options.sortStorage
+    ? { ...withDefaultsOmitted, storage: options.sortStorage(withDefaultsOmitted['storage']) }
+    : withDefaultsOmitted;
   const withSortedKeys = sortObjectKeys(withSortedStorage) as Record<string, unknown>;
   return orderTopLevel(withSortedKeys);
 }

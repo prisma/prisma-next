@@ -9,6 +9,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import { enumStorageCompoundKey } from '../../src/core/migrations/enum-planning';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
@@ -52,13 +53,22 @@ const defaultCtx = {
   storageTypes: {},
 };
 
-function makeSchemaWithEnum(nativeType: string, values: readonly string[]): SqlSchemaIR {
+function makeSchemaWithEnum(
+  nativeType: string,
+  values: readonly string[],
+  schemaName = UNBOUND_NAMESPACE_ID,
+): SqlSchemaIR {
+  // Introspection always keys `storageTypes` by the *live* schema name the
+  // adapter walked — the unbound coordinate resolves to `current_schema()`
+  // (`public` here), never the `__unbound__` DDL-emit sentinel.
+  const liveSchema = schemaName === UNBOUND_NAMESPACE_ID ? 'public' : schemaName;
   return {
     tables: {},
     annotations: {
       pg: {
+        schema: liveSchema,
         storageTypes: {
-          [nativeType]: {
+          [enumStorageCompoundKey(liveSchema, nativeType)]: {
             kind: 'postgres-enum',
             codecId: 'pg/enum@1',
             nativeType,
@@ -387,6 +397,7 @@ describe('planIssues', () => {
       const issues: SchemaIssue[] = [
         {
           kind: 'enum_values_changed',
+          namespaceId: UNBOUND_NAMESPACE_ID,
           typeName: 'status',
           addedValues: ['archived'],
           removedValues: [],
@@ -464,6 +475,7 @@ describe('planIssues', () => {
       const issues: SchemaIssue[] = [
         {
           kind: 'enum_values_changed',
+          namespaceId: UNBOUND_NAMESPACE_ID,
           typeName: 'status',
           addedValues: [],
           removedValues: ['inactive'],

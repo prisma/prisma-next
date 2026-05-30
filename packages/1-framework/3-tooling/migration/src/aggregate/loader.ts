@@ -1,376 +1,198 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { EMPTY_CONTRACT_HASH } from '../constants';
 import { MigrationToolsError } from '../errors';
 import { readMigrationsDir } from '../io';
-import { reconstructGraph } from '../migration-graph';
-import type { OnDiskMigrationPackage } from '../package';
 import { readContractSpaceContract } from '../read-contract-space-contract';
 import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
-import { APP_SPACE_ID, spaceMigrationDirectory } from '../space-layout';
+import { HEAD_REF_NAME, type RefLoadProblem, readRefsTolerant } from '../refs';
+import {
+  APP_SPACE_ID,
+  isValidSpaceId,
+  RESERVED_SPACE_SUBDIR_NAMES,
+  spaceMigrationDirectory,
+  spaceRefsDirectory,
+} from '../space-layout';
 import { listContractSpaceDirectories } from '../verify-contract-spaces';
-import { storageElementNames } from './storage-element-names';
-import type { ContractSpaceAggregate, ContractSpaceMember, HydratedMigrationGraph } from './types';
+import { createContractSpaceAggregate, createContractSpaceMember } from './aggregate';
+import { computeIntegrityViolations, type IntegritySpaceState } from './check-integrity';
+import type { ContractSpaceAggregate } from './types';
 
-function integrityDetail(error: unknown): string {
-  if (MigrationToolsError.is(error)) {
-    return error.why;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
-/**
- * Single declared extension entry the loader needs from `Config.extensionPacks`.
- *
- * Only the subset of fields the loader operates on:
- *
- * - `id` — the space id (also the directory name under `migrations/`).
- * - `targetId` — the configured `Config.adapter.targetId` value the
- *   declaring extension declared. The loader rejects mismatches against
- *   the aggregate's `targetId` with `targetMismatch`.
- *
- * Whether the descriptor declares a contract space is decided by whether
- * its corresponding `migrations/<id>/` directory exists on disk
- * (materialised by the seed phase before the loader runs); the loader
- * never reads the descriptor's `contractJson` itself. That makes the
- * aggregate's apply / verify paths byte-for-byte independent of the
- * descriptor module — `db verify` succeeds even if the descriptor's
- * `contractJson` is a throwing getter.
- *
- * Typed structurally so the migration-tools layer stays framework-neutral.
- */
-export interface DeclaredExtensionEntry {
-  readonly id: string;
-  readonly targetId: string;
-}
+export type { DeclaredExtensionEntry } from '../integrity-violation';
 
 /**
  * Inputs for {@link loadContractSpaceAggregate}.
  *
- * The loader is the **sole** descriptor-import boundary in the M2.5
- * pipeline: callers gather the descriptor data (already-validated app
- * contract, declared extension entries) and pass it through. Once the
- * loader returns, no descriptor module is imported again for this
- * aggregate's lifetime.
+ * Construction reads migration **state** from disk (`migrations/<space>/`
+ * packages + refs + head refs). The app's *live* contract is not a disk
+ * artefact — in Prisma Next it is always compiled from the project's
+ * central contract, so the caller always has it and threads it in as
+ * `appContract`. `deserializeContract` is held and called lazily only for
+ * the on-disk extension contracts (`migrations/<ext>/contract.json`).
  */
 export interface LoadAggregateInput {
-  readonly targetId: string;
   readonly migrationsDir: string;
+  readonly deserializeContract: (raw: unknown) => Contract;
   readonly appContract: Contract;
-  readonly declaredExtensions: ReadonlyArray<DeclaredExtensionEntry>;
-  readonly deserializeContract: (contractJson: unknown) => Contract;
-  /**
-   * Hydrated migration graph for the **app member**.
-   *
-   * The framework-neutral migration-tools layer doesn't know how to read
-   * the user's authored `migrations/` directory (the app member's
-   * migration-package layout is family-aware: ops.json shape, manifest
-   * keys, etc.). Callers — the SQL family today — read the user's
-   * `migrations/` and hand the resulting `OnDiskMigrationPackage[]` through.
-   *
-   * Passing `[]` is valid (greenfield project, no authored migrations).
-   * Equivalent to `migrations/` not existing or being empty.
-   */
-  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
 }
 
 /**
- * Discriminated failure variants the loader emits.
+ * Build a tolerant, queryable {@link ContractSpaceAggregate} from on-disk
+ * migration state plus the caller's live app contract.
  *
- * Every variant short-circuits at first hit; the loader does not keep
- * collecting after the first violation in any phase except for layout
- * (where every layout offence is bundled into one `layoutViolation`).
- */
-export type LoadAggregateError =
-  | { readonly kind: 'layoutViolation'; readonly violations: readonly LayoutViolation[] }
-  | { readonly kind: 'integrityFailure'; readonly spaceId: string; readonly detail: string }
-  | { readonly kind: 'validationFailure'; readonly spaceId: string; readonly detail: string }
-  | {
-      readonly kind: 'disjointnessViolation';
-      readonly element: string;
-      readonly claimedBy: readonly string[];
-    }
-  | {
-      readonly kind: 'targetMismatch';
-      readonly spaceId: string;
-      readonly expected: string;
-      readonly actual: string;
-    };
-
-/**
- * Single layout violation; bundled into a `layoutViolation` error so
- * users see every layout offence at once rather than fixing them one
- * at a time across re-runs.
+ * Building **never throws on disk content**: a hash- or
+ * invariants-mismatched package is retained, an unparseable package is
+ * omitted, a missing extension head ref leaves `headRef: null`, and an
+ * unreadable on-disk contract defers its failure to `member.contract()`.
+ * Every such problem is judged by {@link ContractSpaceAggregate.checkIntegrity}
+ * rather than aborting the load. The only rejections are catastrophic I/O
+ * (a `migrations/` that exists but is unreadable for reasons other than
+ * absence).
  *
- * - `declaredButUnmigrated`: extension declared in `extensionPacks` with
- *   a `contractSpace` but no contract-space dir on disk. Remediation:
- *   `prisma-next migrate`.
- * - `orphanSpaceDir`: contract-space dir under `migrations/` for an extension
- *   not in `extensionPacks`. Remediation: remove the directory, or
- *   re-add the extension to `extensionPacks`.
- */
-export type LayoutViolation =
-  | { readonly kind: 'declaredButUnmigrated'; readonly spaceId: string }
-  | { readonly kind: 'orphanSpaceDir'; readonly spaceId: string };
-
-export type LoadAggregateOutput = Result<
-  { readonly aggregate: ContractSpaceAggregate },
-  LoadAggregateError
->;
-
-interface LoadedExtensionState {
-  readonly entry: DeclaredExtensionEntry;
-  readonly contract: Contract;
-  readonly headRefHash: string;
-  readonly headRefInvariants: readonly string[];
-  readonly migrations: HydratedMigrationGraph;
-}
-
-/**
- * Hydrate a {@link ContractSpaceAggregate} from on-disk state and
- * the app contract value the caller supplies.
- *
- * The loader is the **only** descriptor-import boundary at apply /
- * verify time, but it intentionally does **not** read the extension
- * descriptor's `contractJson` value. Each extension space's contract
- * is read from its on-disk `migrations/<id>/contract.json` mirror; the
- * descriptor's role is exhausted by the seed phase that wrote that
- * mirror in the first place. The loader composes existing
- * migration-tools primitives — layout precheck (via
- * {@link listContractSpaceDirectories}), integrity checks (via
- * {@link readMigrationsDir} / {@link readContractSpaceHeadRef} /
- * {@link readContractSpaceContract} / `deserializeContract`), and
- * disjointness — into a single typed value.
- *
- * Failure semantics: every failure variant in {@link LoadAggregateError}
- * short-circuits the load.
+ * The app space's head ref is synthesised from the live contract's
+ * storage hash (the app contract is authored independently of the
+ * migration graph), and `app.contract()` returns the supplied contract.
+ * Extension spaces read their contract, refs, and head ref from disk.
  */
 export async function loadContractSpaceAggregate(
   input: LoadAggregateInput,
-): Promise<LoadAggregateOutput> {
-  // 1. Validate target consistency on the app contract.
-  const appContractTarget = input.appContract.target;
-  if (appContractTarget !== input.targetId) {
-    return notOk({
-      kind: 'targetMismatch',
-      spaceId: APP_SPACE_ID,
-      expected: input.targetId,
-      actual: appContractTarget,
-    });
-  }
+): Promise<ContractSpaceAggregate> {
+  const { migrationsDir, deserializeContract, appContract } = input;
+  const targetId = appContract.target;
 
-  for (const entry of input.declaredExtensions) {
-    if (entry.targetId !== input.targetId) {
-      return notOk({
-        kind: 'targetMismatch',
-        spaceId: entry.id,
-        expected: input.targetId,
-        actual: entry.targetId,
-      });
-    }
-  }
+  const appState = await loadAppSpace(migrationsDir, appContract);
+  const extensionStates = await loadExtensionSpaces(migrationsDir, deserializeContract);
 
-  // 2. Layout precheck: bundle every layout offence at once.
-  //
-  // Every declared extension contributes an entry to the aggregate when
-  // a corresponding `migrations/<id>/` directory exists on disk. The
-  // loader treats the directory's presence as the membership signal —
-  // the descriptor itself is not read — so codec-only extensions (no
-  // on-disk dir) and contract-space extensions (dir present) are
-  // distinguished structurally.
-  const declaredSpaceIds = new Set(input.declaredExtensions.map((e) => e.id));
-  const allDirs = await listContractSpaceDirectories(input.migrationsDir);
-  // The app member is implicitly declared (it is always part of the
-  // aggregate); its `migrations/<APP_SPACE_ID>/` directory may exist or
-  // not (greenfield projects start with neither). Filter it out of the
-  // orphan / declared-but-unmigrated checks so the layout precheck is
-  // about extensions only.
-  const extensionDirsOnDisk = allDirs.filter((d) => d !== APP_SPACE_ID);
-  const spaceDirSet = new Set(extensionDirsOnDisk);
+  const spaces: readonly IntegritySpaceState[] = [appState, ...extensionStates];
 
-  const layoutViolations: LayoutViolation[] = [];
-  for (const dir of extensionDirsOnDisk) {
-    if (!declaredSpaceIds.has(dir)) {
-      layoutViolations.push({ kind: 'orphanSpaceDir', spaceId: dir });
-    }
-  }
-  for (const id of [...declaredSpaceIds].sort()) {
-    if (!spaceDirSet.has(id)) {
-      layoutViolations.push({ kind: 'declaredButUnmigrated', spaceId: id });
-    }
-  }
-  if (layoutViolations.length > 0) {
-    return notOk({ kind: 'layoutViolation', violations: layoutViolations });
-  }
-
-  // 3-5. Per-extension: read + validate + integrity-check.
-  const loadedExtensions: LoadedExtensionState[] = [];
-  for (const entry of [...input.declaredExtensions].sort((a, b) => a.id.localeCompare(b.id))) {
-    const headRef = await readContractSpaceHeadRef(input.migrationsDir, entry.id);
-    if (headRef === null) {
-      return notOk({
-        kind: 'integrityFailure',
-        spaceId: entry.id,
-        detail: `Head ref \`refs/head.json\` is missing for extension space "${entry.id}".`,
-      });
-    }
-
-    let spaceContractRaw: unknown;
-    try {
-      spaceContractRaw = await readContractSpaceContract(input.migrationsDir, entry.id);
-    } catch (error) {
-      return notOk({
-        kind: 'integrityFailure',
-        spaceId: entry.id,
-        detail: integrityDetail(error),
-      });
-    }
-
-    let spaceContract: Contract;
-    try {
-      spaceContract = input.deserializeContract(spaceContractRaw);
-    } catch (error) {
-      return notOk({
-        kind: 'validationFailure',
-        spaceId: entry.id,
-        detail: integrityDetail(error),
-      });
-    }
-
-    if (spaceContract.target !== input.targetId) {
-      return notOk({
-        kind: 'targetMismatch',
-        spaceId: entry.id,
-        expected: input.targetId,
-        actual: spaceContract.target,
-      });
-    }
-
-    // Read + integrity-check the migration packages. `readMigrationsDir`
-    // re-derives `providedInvariants` and verifies migrationHash for
-    // every package.
-    let packages: readonly OnDiskMigrationPackage[];
-    try {
-      packages = await readMigrationsDir(spaceMigrationDirectory(input.migrationsDir, entry.id));
-    } catch (error) {
-      return notOk({
-        kind: 'integrityFailure',
-        spaceId: entry.id,
-        detail: integrityDetail(error),
-      });
-    }
-
-    let graph: ReturnType<typeof reconstructGraph>;
-    try {
-      graph = reconstructGraph(packages);
-    } catch (error) {
-      return notOk({
-        kind: 'integrityFailure',
-        spaceId: entry.id,
-        detail: integrityDetail(error),
-      });
-    }
-
-    // The on-disk head ref must be reachable in the graph. Empty graphs
-    // are tolerated only when the head ref points at the empty-contract
-    // sentinel (a never-emitted extension space; not a typical scenario
-    // because the layout precheck would have flagged the missing
-    // dir, but defensible).
-    if (graph.nodes.size === 0) {
-      if (headRef.hash !== EMPTY_CONTRACT_HASH) {
-        return notOk({
-          kind: 'integrityFailure',
-          spaceId: entry.id,
-          detail: `Head ref "${headRef.hash}" is not present in the (empty) on-disk migration graph.`,
-        });
-      }
-    } else if (!graph.nodes.has(headRef.hash)) {
-      return notOk({
-        kind: 'integrityFailure',
-        spaceId: entry.id,
-        detail: `Head ref "${headRef.hash}" is not present in the on-disk migration graph.`,
-      });
-    }
-
-    const packagesByMigrationHash = new Map<string, OnDiskMigrationPackage>(
-      packages.map((p) => [p.metadata.migrationHash, p]),
-    );
-
-    loadedExtensions.push({
-      entry,
-      contract: spaceContract,
-      headRefHash: headRef.hash,
-      headRefInvariants: [...headRef.invariants].sort(),
-      migrations: { graph, packagesByMigrationHash },
-    });
-  }
-
-  // 6. Build app member with hydrated graph from caller-supplied packages.
-  let appGraph: ReturnType<typeof reconstructGraph>;
-  try {
-    appGraph = reconstructGraph(input.appMigrationPackages);
-  } catch (error) {
-    return notOk({
-      kind: 'integrityFailure',
-      spaceId: APP_SPACE_ID,
-      detail: error instanceof Error ? error.message : String(error),
-    });
-  }
-  const appPackagesByMigrationHash = new Map<string, OnDiskMigrationPackage>(
-    input.appMigrationPackages.map((p) => [p.metadata.migrationHash, p]),
-  );
-
-  const appMember: ContractSpaceMember = {
-    spaceId: APP_SPACE_ID,
-    contract: input.appContract,
-    headRef: {
-      hash: input.appContract.storage.storageHash,
-      invariants: [],
-    },
-    migrations: {
-      graph: appGraph,
-      packagesByMigrationHash: appPackagesByMigrationHash,
-    },
-  };
-
-  const extensionMembers: ContractSpaceMember[] = loadedExtensions.map((s) => ({
-    spaceId: s.entry.id,
-    contract: s.contract,
-    headRef: {
-      hash: s.headRefHash,
-      invariants: s.headRefInvariants,
-    },
-    migrations: s.migrations,
-  }));
-
-  // 7. Disjointness: no two members claim the same storage element.
-  const elementClaimedBy = new Map<string, string[]>();
-  for (const member of [appMember, ...extensionMembers]) {
-    const elements = storageElementNames(member.contract);
-    for (const elementName of elements) {
-      const claimers = elementClaimedBy.get(elementName);
-      if (claimers) claimers.push(member.spaceId);
-      else elementClaimedBy.set(elementName, [member.spaceId]);
-    }
-  }
-  for (const [element, claimedBy] of elementClaimedBy) {
-    if (claimedBy.length > 1) {
-      return notOk({
-        kind: 'disjointnessViolation',
-        element,
-        claimedBy: [...claimedBy].sort(),
-      });
-    }
-  }
-
-  return ok({
-    aggregate: {
-      targetId: input.targetId,
-      app: appMember,
-      extensions: extensionMembers,
-    },
+  return createContractSpaceAggregate({
+    targetId,
+    app: appState.member,
+    extensions: extensionStates.map((state) => state.member),
+    checkIntegrity: (opts) => computeIntegrityViolations({ targetId, spaces }, opts),
   });
+}
+
+async function loadAppSpace(
+  migrationsDir: string,
+  appContract: Contract,
+): Promise<IntegritySpaceState> {
+  const spaceDir = spaceMigrationDirectory(migrationsDir, APP_SPACE_ID);
+  const { packages, problems } = await readMigrationsDir(spaceDir);
+  const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
+
+  const member = createContractSpaceMember({
+    spaceId: APP_SPACE_ID,
+    packages,
+    refs,
+    headRef: { hash: appContract.storage.storageHash, invariants: [] },
+    resolveContract: () => appContract,
+  });
+
+  // The app head ref is synthesised from the live contract, so there is
+  // no on-disk head.json to be missing or corrupt for it.
+  return { member, problems, refProblems, headRefProblem: null, isApp: true };
+}
+
+async function loadExtensionSpaces(
+  migrationsDir: string,
+  deserializeContract: (raw: unknown) => Contract,
+): Promise<readonly IntegritySpaceState[]> {
+  const candidateDirs = await listContractSpaceDirectories(migrationsDir);
+  const extensionIds = candidateDirs
+    .filter((name) => name !== APP_SPACE_ID)
+    .filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name))
+    .filter(isValidSpaceId)
+    .sort();
+
+  const states: IntegritySpaceState[] = [];
+  for (const spaceId of extensionIds) {
+    states.push(await loadExtensionSpace(migrationsDir, spaceId, deserializeContract));
+  }
+  return states;
+}
+
+async function loadExtensionSpace(
+  migrationsDir: string,
+  spaceId: string,
+  deserializeContract: (raw: unknown) => Contract,
+): Promise<IntegritySpaceState> {
+  const spaceDir = spaceMigrationDirectory(migrationsDir, spaceId);
+  const { packages, problems } = await readMigrationsDir(spaceDir);
+  const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
+  const { headRef, problem: headRefProblem } = await readHeadRefTolerant(migrationsDir, spaceId);
+  const rawContract = await readRawContractDeferred(migrationsDir, spaceId);
+
+  const member = createContractSpaceMember({
+    spaceId,
+    packages,
+    refs,
+    headRef,
+    resolveContract: () => deserializeContract(rawContract()),
+  });
+
+  return { member, problems, refProblems, headRefProblem, isApp: false };
+}
+
+/**
+ * The result of resolving an extension's `refs/head.json`: the parsed
+ * head ref (or `null` when the file is absent or corrupt) plus a problem
+ * when the file exists but cannot be parsed.
+ */
+interface HeadRefReadResult {
+  readonly headRef: Awaited<ReturnType<typeof readContractSpaceHeadRef>>;
+  readonly problem: RefLoadProblem | null;
+}
+
+/**
+ * Read an extension's head ref, distinguishing a *genuinely absent*
+ * `head.json` (`headRef: null`, no problem — judged `headRefMissing`)
+ * from one that *exists but cannot be parsed* (`headRef: null` plus a
+ * problem — judged `refUnreadable`, not `headRefMissing`).
+ * `readContractSpaceHeadRef` already returns `null` only for ENOENT and
+ * throws for unparseable / schema-invalid content, so the throw is the
+ * corruption signal. Construction never throws on disk content.
+ */
+function isToleratedRefHeadReadError(error: unknown): boolean {
+  if (MigrationToolsError.is(error)) return true;
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'ENOENT' || code === 'EISDIR';
+}
+
+async function readHeadRefTolerant(
+  migrationsDir: string,
+  spaceId: string,
+): Promise<HeadRefReadResult> {
+  try {
+    const headRef = await readContractSpaceHeadRef(migrationsDir, spaceId);
+    return { headRef, problem: null };
+  } catch (error) {
+    if (!isToleratedRefHeadReadError(error)) {
+      throw error;
+    }
+    return { headRef: null, problem: { refName: HEAD_REF_NAME, detail: detailOf(error) } };
+  }
+}
+
+function detailOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Read the raw on-disk contract eagerly (cheap I/O) but defer its
+ * (throwing) failure to call time, so a missing or unparseable
+ * `contract.json` becomes a `contract()` throw — surfaced as
+ * `contractUnreadable` — rather than a construction failure.
+ */
+async function readRawContractDeferred(
+  migrationsDir: string,
+  spaceId: string,
+): Promise<() => unknown> {
+  try {
+    const raw = await readContractSpaceContract(migrationsDir, spaceId);
+    return () => raw;
+  } catch (error) {
+    return () => {
+      throw error;
+    };
+  }
 }

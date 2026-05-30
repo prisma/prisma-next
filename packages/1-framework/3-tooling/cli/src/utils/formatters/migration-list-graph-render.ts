@@ -1,85 +1,67 @@
+import type { MigrationListGraphTopology } from '@prisma-next/migration-tools/migration-list-graph-topology';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+} from '@prisma-next/migration-tools/migration-list-types';
+import type { GlyphMode } from '../glyph-mode';
+import {
+  abbreviateContractHash,
+  computeMigrationDirNameWidth,
+  formatMigrationDataColumn,
+  formatNodeLineDataColumn,
+  MIGRATION_LIST_ASCII_KIND_GLYPH,
+  MIGRATION_LIST_UNICODE_KIND_GLYPH,
+  migrationListEmptySource,
+  migrationListForwardArrow,
+} from './migration-list-data-column';
 import type {
   ConnectorLayoutRow,
   LayoutRow,
   MigrationLayoutRow,
   MigrationListGraphLayout,
   NodeLineLayoutRow,
-} from '@prisma-next/migration-tools/migration-list-graph-layout';
-import { computeMigrationListGraphLayout } from '@prisma-next/migration-tools/migration-list-graph-layout';
-import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
-import type {
-  MigrationListEntry,
-  MigrationListResult,
-} from '@prisma-next/migration-tools/migration-list-types';
-import {
-  abbreviateContractHash,
-  computeMigrationDirNameWidth,
-  formatMigrationDataColumn,
-  formatNodeLineDataColumn,
-  MIGRATION_LIST_EMPTY_SOURCE,
-  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
-} from './migration-list-data-column';
+} from './migration-list-graph-layout';
+import { computeMigrationListGraphLayout } from './migration-list-graph-layout';
 import type { MigrationListStyler } from './migration-list-render';
 
-export type GlyphMode = 'unicode' | 'ascii';
-
-export interface GlyphModeInput {
-  readonly isTTY: boolean;
-  readonly env: Readonly<Record<string, string | undefined>>;
-}
+export type { GlyphMode } from '../glyph-mode';
 
 interface GlyphPalette {
   readonly lane: string;
   readonly node: string;
   readonly forwardArrow: string;
   readonly emptySource: string;
-  readonly kind: Record<EdgeKind, string>;
+  readonly kind: typeof MIGRATION_LIST_UNICODE_KIND_GLYPH;
   readonly fanBelow: (branchCount: number) => string;
-  readonly joinBelow: (branchCount: number) => string;
+  readonly joinAbove: (branchCount: number) => string;
 }
 
 const UNICODE_PALETTE: GlyphPalette = {
   lane: '│',
   node: 'o',
-  forwardArrow: MIGRATION_LIST_FORWARD_EDGE_GLYPH,
-  emptySource: MIGRATION_LIST_EMPTY_SOURCE,
-  kind: { forward: '*', rollback: '↩', self: '⟲' },
+  forwardArrow: migrationListForwardArrow('unicode'),
+  emptySource: migrationListEmptySource('unicode'),
+  kind: MIGRATION_LIST_UNICODE_KIND_GLYPH,
   fanBelow: (branchCount) => (branchCount === 2 ? '├─┐' : '├─┬─┐'),
-  joinBelow: (branchCount) => (branchCount === 2 ? '├─┘' : '└─┴─┘'),
+  joinAbove: (branchCount) => (branchCount === 2 ? '├─┘' : '└─┴─┘'),
 };
 
 const ASCII_PALETTE: GlyphPalette = {
   lane: '|',
   node: 'o',
-  forwardArrow: '->',
-  emptySource: '-',
-  kind: { forward: '*', rollback: '<', self: '~' },
+  forwardArrow: migrationListForwardArrow('ascii'),
+  emptySource: migrationListEmptySource('ascii'),
+  kind: MIGRATION_LIST_ASCII_KIND_GLYPH,
   fanBelow: (branchCount) => (branchCount === 2 ? '+-\\' : '+-|-\\'),
-  joinBelow: (branchCount) => (branchCount === 2 ? '+-/' : '/-+-/'),
+  joinAbove: (branchCount) => (branchCount === 2 ? '+-/' : '/-+-/'),
 };
 
 function paletteFor(mode: GlyphMode): GlyphPalette {
   return mode === 'ascii' ? ASCII_PALETTE : UNICODE_PALETTE;
 }
 
-function localeString(env: Readonly<Record<string, string | undefined>>): string {
-  return env['LC_ALL'] ?? env['LC_CTYPE'] ?? env['LANG'] ?? '';
-}
-
-function isUtf8Locale(env: Readonly<Record<string, string | undefined>>): boolean {
-  const locale = localeString(env);
-  if (locale.length === 0) return false;
-  return /UTF-8|utf8/i.test(locale);
-}
-
-export function detectGlyphMode(input: GlyphModeInput): GlyphMode {
-  if (!input.isTTY) return 'ascii';
-  if (!isUtf8Locale(input.env)) return 'ascii';
-  return 'unicode';
-}
-
-function migrationEntries(layout: MigrationListGraphLayout) {
-  const entries = [];
+function migrationEntries(layout: MigrationListGraphLayout): MigrationListEntry[] {
+  const entries: MigrationListEntry[] = [];
   for (const row of layout.rows) {
     if (row.kind === 'migration') entries.push(row.entry);
   }
@@ -117,7 +99,7 @@ function renderMigrationGutter(
   const cells: string[] = [];
   for (let lane = 0; lane <= maxLane; lane++) {
     if (lane === row.laneIndex) {
-      cells.push(laneCell(palette.kind[row.edgeKind]));
+      cells.push(laneCell(style.kind(palette.kind[row.edgeKind])));
     } else if (row.passThroughLanes.includes(lane)) {
       cells.push(laneCell(style.lane(palette.lane)));
     } else {
@@ -159,7 +141,7 @@ function renderConnectorGutter(
   let spanGlyph = (
     row.connectorKind === 'fanBelow'
       ? palette.fanBelow(row.branchCount)
-      : palette.joinBelow(row.branchCount)
+      : palette.joinAbove(row.branchCount)
   )
     .padEnd(spanWidth, ' ')
     .slice(0, spanWidth);
@@ -245,7 +227,7 @@ export function renderMigrationListGraphWithStyle(
     openLanes = advanceOpenLanes(row, openLanes);
   }
 
-  return lines.join('\n');
+  return lines.map((line) => line.trimEnd()).join('\n');
 }
 
 export function renderMigrationListGraph(
@@ -270,6 +252,7 @@ function renderGraphSpaceBlock(
   multiSpace: boolean,
   style: MigrationListStyler,
   glyphMode: GlyphMode,
+  topology: MigrationListGraphTopology,
 ): readonly string[] {
   if (migrations.length === 0) {
     const emptyLine = formatGraphEmptyStateLine(spaceId, style);
@@ -279,7 +262,7 @@ function renderGraphSpaceBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
-  const layout = computeMigrationListGraphLayout(migrations);
+  const layout = computeMigrationListGraphLayout(migrations, topology);
   const graphBody = renderMigrationListGraphWithStyle(layout, style, glyphMode);
   const rows = graphBody.split('\n');
   if (!multiSpace) {
@@ -292,6 +275,7 @@ export function renderMigrationListGraphResult(
   result: MigrationListResult,
   style: MigrationListStyler,
   glyphMode: GlyphMode,
+  topologyBySpaceId: ReadonlyMap<string, MigrationListGraphTopology>,
 ): string {
   const multiSpace = result.spaces.length > 1;
   const lines: string[] = [];
@@ -301,8 +285,19 @@ export function renderMigrationListGraphResult(
     if (index > 0) {
       lines.push('');
     }
+    const topology = topologyBySpaceId.get(space.spaceId);
+    if (topology === undefined) {
+      throw new Error(`missing topology for space ${space.spaceId}`);
+    }
     lines.push(
-      ...renderGraphSpaceBlock(space.spaceId, space.migrations, multiSpace, style, glyphMode),
+      ...renderGraphSpaceBlock(
+        space.spaceId,
+        space.migrations,
+        multiSpace,
+        style,
+        glyphMode,
+        topology,
+      ),
     );
   }
 
