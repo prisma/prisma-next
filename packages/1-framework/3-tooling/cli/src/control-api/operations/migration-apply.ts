@@ -450,16 +450,37 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
   };
 }
 
-function buildNeverPlannedFailure(spaceId: string, targetHash: string): MigrationApplyFailure {
+/**
+ * Build the `neverPlanned` failure raised when a contract space has no on-disk
+ * migration graph but migrate was asked to reach a target hash. The `why`
+ * states only the condition; the recovery sequence is composed by
+ * `errorPathUnreachable`'s `fix`.
+ *
+ * @internal Exported for testing only.
+ */
+export function buildNeverPlannedFailure(
+  spaceId: string,
+  targetHash: string,
+): MigrationApplyFailure {
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary: `No on-disk migrations for contract space "${spaceId}"`,
-    why: `migrate is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}". Run \`prisma-next migration plan\` first to materialise the path.`,
+    why: `migrate is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}".`,
     meta: { spaceId, target: targetHash, kind: 'neverPlanned' },
   };
 }
 
-function buildPathNotFoundFailure(
+/**
+ * Build the `pathUnreachable` failure raised when an emitted contract has no
+ * on-disk migration edge from the current marker to the target. The `why`
+ * states only the condition (no edge between the two named states, and migrate
+ * replays edges rather than inventing them); the recovery sequence — plan the
+ * edge, then re-apply — is composed by `errorPathUnreachable`'s `fix`, so the
+ * two read as one non-redundant plan-then-apply story.
+ *
+ * @internal Exported for testing only.
+ */
+export function buildPathNotFoundFailure(
   spaceId: string,
   marker: ContractMarkerRecordLike | null,
   targetHash: string,
@@ -477,7 +498,7 @@ function buildPathNotFoundFailure(
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary,
-    why: `Cannot reach target "${targetHash}" from current marker "${fromHash}" in space "${spaceId}". The on-disk migration graph for this space does not connect the two states. Run \`prisma-next migration plan\` to materialise the path.`,
+    why: `No migration edge connects the current state "${fromHash}" to the target "${targetHash}" in contract space "${spaceId}". The on-disk migration graph does not join the two, and migrate replays existing edges — it never invents one.`,
     meta: { spaceId, fromHash, targetHash, kind: 'pathUnreachable' },
   };
 }

@@ -163,14 +163,17 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
  * consumes the destination contract directly.
  */
 function toSpaceMember(opts: MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>) {
+  const contract = blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
+    opts.destinationContract,
+  );
   return createContractSpaceMember({
     spaceId: opts.space,
     packages: [],
     refs: {},
     headRef: null,
-    resolveContract: () =>
-      blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
-        opts.destinationContract,
-      ),
+    refsDir: '',
+    resolveContract: () => contract,
+    deserializeContract: (raw) =>
+      blindCast<Contract, 'destinationContract validated at aggregate boundary'>(raw),
   });
 }
