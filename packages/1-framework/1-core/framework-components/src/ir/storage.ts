@@ -38,7 +38,7 @@ export interface EntityCoordinate {
  * property whose value is a non-null object, yields one coordinate per
  * entry key in that map. No family-specific slot vocabulary is required.
  */
-export function* elementCoordinates(storage: Record<string, unknown>): Generator<EntityCoordinate> {
+export function* elementCoordinates(storage: object): Generator<EntityCoordinate> {
   for (const [namespaceId, ns] of storageNamespaceEntries(storage)) {
     for (const [entityKind, slot] of Object.entries(ns)) {
       if (entityKind === 'id') continue;

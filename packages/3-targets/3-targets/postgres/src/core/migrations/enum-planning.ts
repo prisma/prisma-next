@@ -5,7 +5,7 @@
  */
 
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PG_ENUM_CODEC_ID } from '../codec-ids';
@@ -115,7 +115,7 @@ export function resolveDdlSchemaForNamespaceStorage(
   if (namespaceId === UNBOUND_NAMESPACE_ID) {
     return (schemaIr ? readPostgresSchemaIrAnnotations(schemaIr).schema : undefined) ?? 'public';
   }
-  const namespace = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
+  const namespace = getStorageNamespace(storage, namespaceId);
   if (namespace && isPostgresSchema(namespace)) {
     return namespace.ddlSchemaName(storage);
   }

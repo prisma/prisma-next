@@ -4,10 +4,11 @@ import {
   SqlContractSerializerBase,
   type SqlEntityHydrationFactory,
 } from '@prisma-next/family-sql/ir';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   ForeignKey,
   PrimaryKey,
+  type SqlNamespace,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -25,41 +26,39 @@ function makeValidContractJson() {
 function makeContractWithTablesJson() {
   return createSqlContract({
     storage: {
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
-            post: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                  constraint: true,
-                  index: true,
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'post',
+                  columns: ['userId'],
                 },
-              ],
-            },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+                constraint: true,
+                index: true,
+              },
+            ],
           },
         },
       },
@@ -78,8 +77,7 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
     expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
-        .tables,
+      getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)!.tables,
     ).toEqual({});
   });
 
@@ -88,8 +86,8 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const tables = getStorageNamespace(
-      contract.storage as Record<string, unknown>,
+    const tables = getStorageNamespace<SqlNamespace>(
+      contract.storage,
       UNBOUND_NAMESPACE_ID,
     )!.tables;
     const userTable = tables['user'] as StorageTable | undefined;
@@ -115,29 +113,25 @@ describe('PostgresContractSerializer', () => {
     expect(reparsed).toMatchObject({
       targetFamily: 'sql',
       storage: {
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            kind: 'postgres-unbound-schema',
-            tables: {
-              user: {
-                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          kind: 'postgres-unbound-schema',
+          tables: {
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
             },
-            enum: {},
           },
+          enum: {},
         },
       },
     });
     expect(reparsed.storage).not.toHaveProperty('kind');
-    expect(
-      getStorageNamespace(reparsed.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables
-        .user,
-    ).not.toHaveProperty('kind');
-    expect(
-      getStorageNamespace(reparsed.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables
-        .user.columns.id,
-    ).not.toHaveProperty('kind');
+    const reparsedUnbound = getStorageNamespace<SqlNamespace>(
+      reparsed.storage,
+      UNBOUND_NAMESPACE_ID,
+    )!;
+    expect(reparsedUnbound.tables['user']).not.toHaveProperty('kind');
+    expect(reparsedUnbound.tables['user']!.columns['id']).not.toHaveProperty('kind');
   });
 
   it('hydrates storage.types entries via the family registry dispatch path', () => {

@@ -18,11 +18,7 @@ import type {
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import {
-  getStorageNamespace,
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
+import { getStorageNamespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   SqlStorage,
@@ -77,7 +73,7 @@ function locateNamespaceTypeInStorage(
   namespaceId: string,
   typeName: string,
 ): unknown {
-  const ns = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
+  const ns = getStorageNamespace(storage, namespaceId);
   if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
   return (ns.enum as Record<string, unknown>)[typeName];
 }

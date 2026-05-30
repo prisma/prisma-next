@@ -1,11 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  getStorageNamespace,
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { getStorageNamespace } from '@prisma-next/framework-components/ir';
+import { type SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { join, relative, resolve } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
@@ -93,8 +89,9 @@ describe('snapshot-read shape fixtures — per-kind round-trip (TML-2536)', () =
     const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, 'postgres-enum.json'), 'utf-8'));
     const contract = serializer.deserializeContract(raw);
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const entry = getStorageNamespace(contract.storage as Record<string, unknown>, 'public')
-      ?.enum?.['user_role'];
+    const entry = getStorageNamespace<SqlNamespace>(contract.storage, 'public')?.enum?.[
+      'user_role'
+    ];
     expect(entry).toBeInstanceOf(PostgresEnumType);
     expect(entry).toMatchObject({
       kind: 'postgres-enum',

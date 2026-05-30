@@ -1,5 +1,6 @@
 import {
   freezeNode,
+  getStorageNamespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -173,7 +174,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
    * (e.g. emit a conflict instead of silently picking a schema).
    */
   override ddlSchemaName(storage: SqlStorage): string {
-    if (getStorageNamespace(storage as Record<string, unknown>, 'public') !== undefined) {
+    if (getStorageNamespace(storage, 'public') !== undefined) {
       return 'public';
     }
     return UNBOUND_NAMESPACE_ID;

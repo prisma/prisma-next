@@ -4,7 +4,7 @@ import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, StorageTableInput } from '@prisma-next/sql-contract/types';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { buildSqlStorageInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
 import { describe, expect, it } from 'vitest';
@@ -46,22 +46,24 @@ function makeCollisionContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:enum-collision'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:enum-collision-contract'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-        audit: new PostgresSchema({
-          id: 'audit',
-          tables: overrides.audit?.tables ?? {},
-          ...(auditEnum !== undefined ? { enum: { Status: auditEnum } } : {}),
-        }),
-        public: new PostgresSchema({
-          id: 'public',
-          tables: overrides.public?.tables ?? {},
-          ...(publicEnum !== undefined ? { enum: { Status: publicEnum } } : {}),
-        }),
-      },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:enum-collision-contract'),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+          audit: new PostgresSchema({
+            id: 'audit',
+            tables: overrides.audit?.tables ?? {},
+            ...(auditEnum !== undefined ? { enum: { Status: auditEnum } } : {}),
+          }),
+          public: new PostgresSchema({
+            id: 'public',
+            tables: overrides.public?.tables ?? {},
+            ...(publicEnum !== undefined ? { enum: { Status: publicEnum } } : {}),
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
@@ -298,22 +300,24 @@ describe('enum namespace collision planning', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:public-enum-unbound-col'),
-        storage: new SqlStorage({
-          storageHash: coreHash('sha256:public-enum-unbound-col'),
-          namespaces: {
-            public: new PostgresSchema({
-              id: 'public',
-              tables: {},
-              enum: {
-                status: new PostgresEnumType({ name: 'status', values: ['active', 'archived'] }),
-              },
-            }),
-            [UNBOUND_NAMESPACE_ID]: new PostgresUnboundSchema({
-              id: UNBOUND_NAMESPACE_ID,
-              tables: { user: userTable },
-            }),
-          },
-        }),
+        storage: new SqlStorage(
+          buildSqlStorageInput({
+            storageHash: coreHash('sha256:public-enum-unbound-col'),
+            namespaces: {
+              public: new PostgresSchema({
+                id: 'public',
+                tables: {},
+                enum: {
+                  status: new PostgresEnumType({ name: 'status', values: ['active', 'archived'] }),
+                },
+              }),
+              [UNBOUND_NAMESPACE_ID]: new PostgresUnboundSchema({
+                id: UNBOUND_NAMESPACE_ID,
+                tables: { user: userTable },
+              }),
+            },
+          }),
+        ),
         roots: {},
         models: {},
         capabilities: {},

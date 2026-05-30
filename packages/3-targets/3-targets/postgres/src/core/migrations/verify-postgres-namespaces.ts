@@ -1,6 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema } from '../postgres-schema';
@@ -15,7 +19,7 @@ import { isPostgresSchema } from '../postgres-schema';
  * itself.
  */
 function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string {
-  const namespace = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
+  const namespace = getStorageNamespace(storage, namespaceId);
   if (isPostgresSchema(namespace)) {
     return namespace.ddlSchemaName(storage);
   }
@@ -71,9 +75,7 @@ export function verifyPostgresNamespacePresence(input: {
   const { contract, schema } = input;
   const existing = new Set(existingSchemasFromSchema(schema));
   const issues: SchemaIssue[] = [];
-  const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
-    .map(([id]) => id)
-    .sort();
+  const namespaceIds = [...storageNamespaceEntries(contract.storage)].map(([id]) => id).sort();
   for (const namespaceId of namespaceIds) {
     if (namespaceId === UNBOUND_NAMESPACE_ID) continue;
     const ddlName = resolveDdlSchemaName(contract.storage, namespaceId);

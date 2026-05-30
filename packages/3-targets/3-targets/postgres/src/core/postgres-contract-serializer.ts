@@ -12,9 +12,11 @@ import {
 import {
   type Namespace,
   NamespaceBase,
+  storageNamespaceEntries,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import type {
+  SqlNamespace,
   SqlNamespaceTablesInput,
   SqlStorage,
   SqlStorageTypeEntry,
@@ -113,7 +115,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   override serializeContract(contract: Contract<SqlStorage>): JsonObject {
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
-    for (const [nsId, ns] of [...storageNamespaceEntries(storage as Record<string, unknown>)]) {
+    for (const [nsId, ns] of [...storageNamespaceEntries<SqlNamespace>(storage)]) {
       if (isPostgresSchema(ns)) {
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
       } else {

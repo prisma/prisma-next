@@ -1,6 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { buildSqlStorageInput, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { PostgresEnumType } from '../src/core/postgres-enum-type';
 import {
@@ -77,21 +77,25 @@ describe('PostgresUnboundSchema', () => {
 });
 
 describe('ddlSchemaName', () => {
-  const storageWithPublic = new SqlStorage({
-    storageHash: coreHash('sha256:test-with-public'),
-    namespaces: {
-      public: new PostgresSchema({ id: 'public' }),
-      [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-    },
-  });
+  const storageWithPublic = new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:test-with-public'),
+      namespaces: {
+        public: new PostgresSchema({ id: 'public' }),
+        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+      },
+    }),
+  );
 
-  const storageWithoutPublic = new SqlStorage({
-    storageHash: coreHash('sha256:test-without-public'),
-    namespaces: {
-      auth: new PostgresSchema({ id: 'auth' }),
-      [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-    },
-  });
+  const storageWithoutPublic = new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:test-without-public'),
+      namespaces: {
+        auth: new PostgresSchema({ id: 'auth' }),
+        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+      },
+    }),
+  );
 
   it('returns its own id for a named public schema', () => {
     const schema = new PostgresSchema({ id: 'public' });

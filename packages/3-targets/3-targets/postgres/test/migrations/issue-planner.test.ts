@@ -2,9 +2,10 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  buildSqlStorageInput,
   type PostgresEnumStorageEntry,
   SqlStorage,
-  type SqlStorageInput,
+  type SqlStorageNamespacesInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -35,10 +36,12 @@ function makeContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:contract'),
+        namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
@@ -781,7 +784,7 @@ describe('planIssues', () => {
     function makeNamespacedContract(
       namespaces: Record<string, { tables: Record<string, StorageTableInput> }>,
     ): Contract<SqlStorage> {
-      const nsMap: SqlStorageInput['namespaces'] = {
+      const nsMap: SqlStorageNamespacesInput['namespaces'] = {
         [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
         ...Object.fromEntries(
           Object.entries(namespaces).map(([id, ns]) => [
@@ -794,10 +797,12 @@ describe('planIssues', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract'),
-          namespaces: nsMap,
-        }),
+        storage: new SqlStorage(
+          buildSqlStorageInput({
+            storageHash: coreHash('sha256:contract'),
+            namespaces: nsMap,
+          }),
+        ),
         roots: {},
         models: {},
         capabilities: {},
@@ -896,14 +901,16 @@ describe('planIssues', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: new SqlStorage({
-          storageHash: coreHash('sha256:multi-namespace-contract'),
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
-            tenant_a: new PostgresSchema({ id: 'tenant_a', tables: { users: userTable } }),
-            tenant_b: new PostgresSchema({ id: 'tenant_b', tables: { users: userTable } }),
-          },
-        }),
+        storage: new SqlStorage(
+          buildSqlStorageInput({
+            storageHash: coreHash('sha256:multi-namespace-contract'),
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+              tenant_a: new PostgresSchema({ id: 'tenant_a', tables: { users: userTable } }),
+              tenant_b: new PostgresSchema({ id: 'tenant_b', tables: { users: userTable } }),
+            },
+          }),
+        ),
         roots: {},
         models: {},
         capabilities: {},
