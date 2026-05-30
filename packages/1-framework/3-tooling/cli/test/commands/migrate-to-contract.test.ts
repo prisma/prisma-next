@@ -68,6 +68,7 @@ async function writeBundle(
     join(dir, 'end-contract.json'),
     JSON.stringify(contractEnvelope(endContractHash)),
   );
+  await writeFile(join(dir, 'end-contract.d.ts'), 'export type Contract = unknown;\n');
 }
 
 /**
