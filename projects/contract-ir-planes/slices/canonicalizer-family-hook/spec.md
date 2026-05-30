@@ -50,6 +50,17 @@ The hooks landed as hand-rolled imperative logic: `shouldPreserveEmpty` is a `pa
 - If the generic matcher cannot reproduce the production predicate without re-introducing SQL/Mongo path literals into the foundation layer, HALT and report — do not smear family path knowledge back into the framework (the "framework canonicalizer has no SQL/Mongo storage path knowledge" guard test must stay green).
 - If neither importing the real hook nor building the test predicate from the shared util is layering-clean (R4), HALT and report rather than leaving a third drift-prone copy.
 
+## Round 3 — review actions (PR #631, follow-on)
+
+Review found the same hand-rolled `sqlPreserveEmpty` / `sqlSortStorage` logic the R1–R4 utilities replaced still living in two more test-helper sites. Apply the shared `@prisma-next/contract/hashing-utils` mechanism there too.
+
+| # | Site | Action |
+|---|---|---|
+| R5 | `packages/1-framework/3-tooling/emitter/test/utils.ts` (the `sqlPreserveEmpty` + `sqlSortStorage` block) | Replace both hand-rolled functions with `createPreserveEmptyPredicate` / `createStorageSort` composed from SQL pattern data (same approach R4 used for the emitter canonicalization test). |
+| R6 | `packages/1-framework/3-tooling/migration/test/assert-descriptor-self-consistency.test.ts` (the `sqlPreserveEmpty` predicate) | Replace with `createPreserveEmptyPredicate` over the SQL preserve-empty pattern data. |
+
+**Layering:** these framework-tooling test files may import `@prisma-next/contract/hashing-utils` (foundation) but NOT the SQL-family `sqlContractCanonicalizationHooks` (`lint:deps` forbids framework/tooling → sql domain). Build the predicate/sort from the shared util + local pattern data, exactly as R4 did. The shared comparator (still `localeCompare`, deferred to TML-2732) is inherited unchanged — no behaviour change, fixtures stay zero-diff.
+
 ## Slice-specific done conditions
 
 - [ ] `pnpm fixtures:check` shows zero diff (byte-stability is the slice's defining invariant) and the framework canonicalizer no longer references SQL/Mongo storage path shapes (grep gate over the moved guards / sort).
