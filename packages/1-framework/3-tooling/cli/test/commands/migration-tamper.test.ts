@@ -235,7 +235,7 @@ async function captureDiagnostic(
  * Assert the shared contract-space integrity refusal produced by the
  * gating commands: a non-zero exit, the `PN-MIG-5002` structured
  * envelope, the tamper carried in `meta.violations[]` (a
- * `hashMismatch`-derived `integrity` violation against the `app` space),
+ * `hashMismatch` violation against the `app` space),
  * and the human-rendered "Contract-space integrity failure" line.
  */
 function expectIntegrityRefusal(captured: CapturedDiagnostic): void {
@@ -247,7 +247,9 @@ function expectIntegrityRefusal(captured: CapturedDiagnostic): void {
     | ReadonlyArray<Record<string, unknown>>
     | undefined;
   expect(Array.isArray(violations)).toBe(true);
-  expect(violations?.some((v) => v['kind'] === 'integrity' && v['spaceId'] === 'app')).toBe(true);
+  expect(violations?.some((v) => v['kind'] === 'hashMismatch' && v['spaceId'] === 'app')).toBe(
+    true,
+  );
 
   expect(captured.humanText).toContain('Contract-space integrity failure');
 }

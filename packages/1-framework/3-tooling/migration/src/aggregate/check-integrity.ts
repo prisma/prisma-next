@@ -110,7 +110,10 @@ export function computeIntegrityViolations(
   return violations;
 }
 
-function loadProblemToViolation(spaceId: string, problem: PackageLoadProblem): IntegrityViolation {
+export function loadProblemToViolation(
+  spaceId: string,
+  problem: PackageLoadProblem,
+): IntegrityViolation {
   switch (problem.kind) {
     case 'hashMismatch':
       return {

@@ -10,6 +10,25 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
 import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
 
+const CONTRACT_SPACES_DOCS_URL = 'https://pris.ly/contract-spaces';
+
+function contractSpaceError5002(
+  summary: string,
+  options: {
+    readonly why: string;
+    readonly fix: string;
+    readonly violations: readonly IntegrityViolation[];
+  },
+): CliStructuredError {
+  return new CliStructuredError('5002', summary, {
+    domain: 'MIG',
+    why: options.why,
+    fix: options.fix,
+    docsUrl: CONTRACT_SPACES_DOCS_URL,
+    meta: { violations: options.violations },
+  });
+}
+
 /**
  * Build the `5002` structured-error envelope for a contract-space
  * target mismatch. Shared between the declared-extension precheck (the
@@ -21,13 +40,10 @@ function targetMismatchError(
   expected: string,
   actual: string,
 ): CliStructuredError {
-  return new CliStructuredError('5002', `Contract-space target mismatch for "${spaceId}"`, {
-    domain: 'MIG',
+  return contractSpaceError5002(`Contract-space target mismatch for "${spaceId}"`, {
     why: `Space "${spaceId}" targets "${actual}" but the project's adapter targets "${expected}".`,
     fix: 'Update the extension descriptor to target the configured database, or change the project adapter.',
-    meta: {
-      violations: [{ kind: 'targetMismatch', spaceId, expected, actual }],
-    },
+    violations: [{ kind: 'targetMismatch', spaceId, expected, actual }],
   });
 }
 
@@ -93,10 +109,8 @@ export function mapIntegrityViolations(
       domain: 'MIG',
       why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
       fix: 'Run `prisma-next migrate` to materialise on-disk artefacts for declared extensions, or remove the orphan directory.',
-      docsUrl: 'https://pris.ly/contract-spaces',
-      meta: {
-        violations: layout.map((v) => ({ kind: v.kind, spaceId: v.spaceId })),
-      },
+      docsUrl: CONTRACT_SPACES_DOCS_URL,
+      meta: { violations: layout },
     });
   }
 
@@ -111,46 +125,24 @@ export function mapIntegrityViolations(
 
   const disjointness = violations.find((v) => v.kind === 'disjointness');
   if (disjointness && disjointness.kind === 'disjointness') {
-    return new CliStructuredError(
-      '5002',
+    return contractSpaceError5002(
       `Contract-space disjointness violation: storage element "${disjointness.element}" claimed by multiple spaces`,
       {
-        domain: 'MIG',
         why: `Spaces ${disjointness.claimedBy.map((s) => `"${s}"`).join(', ')} all claim the storage element "${disjointness.element}". Each storage element must be owned by exactly one contract space.`,
         fix: 'Update the conflicting contracts so each storage element is claimed by exactly one space.',
-        docsUrl: 'https://pris.ly/contract-spaces',
-        meta: {
-          violations: [
-            {
-              kind: 'disjointness',
-              spaceId: disjointness.claimedBy.join(','),
-              element: disjointness.element,
-              claimedBy: disjointness.claimedBy,
-            },
-          ],
-        },
+        violations: [disjointness],
       },
     );
   }
 
   const contractUnreadable = violations.find((v) => v.kind === 'contractUnreadable');
   if (contractUnreadable && contractUnreadable.kind === 'contractUnreadable') {
-    return new CliStructuredError(
-      '5002',
+    return contractSpaceError5002(
       `Contract-space contract validation failed for "${contractUnreadable.spaceId}"`,
       {
-        domain: 'MIG',
         why: contractUnreadable.detail,
         fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or fix the extension descriptor producing the invalid contract.',
-        meta: {
-          violations: [
-            {
-              kind: 'validation',
-              spaceId: contractUnreadable.spaceId,
-              detail: contractUnreadable.detail,
-            },
-          ],
-        },
+        violations: [contractUnreadable],
       },
     );
   }
@@ -160,14 +152,10 @@ export function mapIntegrityViolations(
   // is still computed; the gate just renders one envelope).
   const structural = violations[0]!;
   const spaceId = 'spaceId' in structural ? structural.spaceId : '*';
-  return new CliStructuredError('5002', `Contract-space integrity failure for "${spaceId}"`, {
-    domain: 'MIG',
+  return contractSpaceError5002(`Contract-space integrity failure for "${spaceId}"`, {
     why: describeIntegrityViolation(structural),
     fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or restore the on-disk `migrations/` directory from version control.',
-    docsUrl: 'https://pris.ly/contract-spaces',
-    meta: {
-      violations: [{ kind: 'integrity', spaceId, detail: describeIntegrityViolation(structural) }],
-    },
+    violations: [structural],
   });
 }
 

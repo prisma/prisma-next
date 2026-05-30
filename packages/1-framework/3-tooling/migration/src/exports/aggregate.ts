@@ -7,6 +7,7 @@ export {
   computeIntegrityViolations,
   type IntegrityComputationInput,
   type IntegritySpaceState,
+  loadProblemToViolation,
 } from '../aggregate/check-integrity';
 export { type LoadAggregateInput, loadContractSpaceAggregate } from '../aggregate/loader';
 export type { ContractMarkerRecordLike } from '../aggregate/marker-types';
