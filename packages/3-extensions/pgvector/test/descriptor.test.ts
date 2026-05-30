@@ -24,6 +24,7 @@
 
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { describe, expect, it } from 'vitest';
 import { VECTOR_CODEC_ID } from '../src/core/constants';
 import {
@@ -117,6 +118,7 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
         targetFamily: space.contractJson.targetFamily,
         storage: space.contractJson.storage as unknown as Record<string, unknown>,
         headRefHash: space.headRef.hash,
+        ...sqlContractCanonicalizationHooks,
       }),
     ).not.toThrow();
   });

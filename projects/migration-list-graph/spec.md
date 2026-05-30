@@ -32,10 +32,9 @@ behaviour.**
   / self) + convergence/divergence detection over a space's
   `MigrationListEntry[]`. Kind is **not** a per-row predicate — `↩` requires
   knowing `to` is an ancestor of `from` over the forward edge set — so it is
-  computed here, reusing the `MigrationGraph` adjacency idiom. It is a
-  **tolerant** pass (does not call `reconstructGraph`, which throws on
-  self-edge-without-data-op / duplicate hash) so the list view stays robust and
-  offline. **No genesis/single-root assumption:** the node set is exactly the
+  computed here via an **independent** tolerant adjacency + 3-colour DFS (does
+  not call `reconstructGraph` or share `detectCycles` — those throw / assume
+  strict genesis). The list view stays robust and offline. **No genesis/single-root assumption:** the node set is exactly the
   hashes present as `from`/`to`; roots are forward-in-degree-0 nodes (zero, one, or
   several), and `EMPTY_CONTRACT_HASH` is only one possible root — many on-disk
   graphs have no genesis edge. Both renderers consume this classifier.
@@ -138,7 +137,9 @@ in one sitting and it rolls back as one unit.
 - Reusing the shipped `migration graph` dagre renderer (`graph-render.ts`) — it
   is a node-per-row drawing contract, incompatible with this flat-list-aligned
   edge-per-row view (cheapest-alternative considered + rejected in design-notes
-  § Relationship to the other views). We *do* reuse its topology model.
+  § Relationship to the other views). We also do **not** reuse `MigrationGraph` /
+  `reconstructGraph`; the classifier is an independent tolerant pass over the same
+  edge model.
 - Full graph rendering with back-edge arcs / cycle drawing — that is `migration
   graph` (tier 3, already shipped).
 - Weaving non-forward edges into active lanes (settled: not woven).
@@ -201,6 +202,6 @@ in one sitting and it rolls back as one unit.
 - Companion sketch: [`assets/migration-graph-display-scenarios.md`](./assets/migration-graph-display-scenarios.md) (tier-3 inspiration, not this spec).
 - Linear issue: TML-2702.
 - Shipped flat list (TML-2697): `migration-list-render.ts`, `migration-list-types.ts`, `enumerate-migration-spaces.ts`.
-- Topology model to reuse: `migration-tools/graph.ts` (`MigrationGraph`), `migration-graph.ts` (`reconstructGraph`, reachability), `constants.ts` (`EMPTY_CONTRACT_HASH`).
+- Topology context (idiom referenced, not code-reused): `migration-tools/graph.ts` (`MigrationGraph`) and `migration-graph.ts` (`reconstructGraph`, `detectCycles`) are the strict-path back-edge idiom the tolerant classifier mirrors independently — they throw / assume a genesis, so they are not reused. `constants.ts` (`EMPTY_CONTRACT_HASH`) is imported.
 - Shipped `migration graph` (different drawing contract, not reused): `graph-render.ts`, `graph-types.ts`, `graph-migration-mapper.ts`.
 - Terminal seam for detection: `cli/src/utils/terminal-ui.ts` (`isTTY`).

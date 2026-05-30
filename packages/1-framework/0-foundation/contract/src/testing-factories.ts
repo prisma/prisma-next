@@ -1,4 +1,5 @@
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { PreserveEmptyPredicate, StorageSort } from './canonicalization';
 import type { Contract } from './contract-types';
 import type { CrossReference } from './cross-reference';
 import type {
@@ -26,6 +27,8 @@ type ContractOverrides<
   execution?: Omit<ExecutionSection, 'executionHash'>;
   profileHash?: ProfileHashBase<string>;
   meta?: Record<string, unknown>;
+  shouldPreserveEmpty?: PreserveEmptyPredicate;
+  sortStorage?: StorageSort;
 };
 
 const DUMMY_HASH = coreHash('sha256:test');
@@ -57,6 +60,8 @@ export function createContract<
     target,
     targetFamily,
     storage: rawStorage as Record<string, unknown>,
+    ...ifDefined('shouldPreserveEmpty', overrides.shouldPreserveEmpty),
+    ...ifDefined('sortStorage', overrides.sortStorage),
   });
 
   const storage = {

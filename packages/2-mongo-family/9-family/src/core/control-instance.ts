@@ -21,6 +21,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
@@ -149,6 +150,7 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
         targetFamily: contractJson.targetFamily,
         storage: contractJson.storage,
         headRefHash: headRef.hash,
+        ...mongoContractCanonicalizationHooks,
       });
     }
   }

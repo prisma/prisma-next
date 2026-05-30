@@ -1,30 +1,28 @@
 import {
   classifyMigrationListGraphTopology,
-  type EdgeKind,
+  type MigrationEdgeKind,
+  type MigrationListGraphTopology,
 } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
   MigrationListResult,
 } from '@prisma-next/migration-tools/migration-list-types';
+import type { GlyphMode } from '../glyph-mode';
 import {
   computeMigrationDirNameWidth,
   formatMigrationDataColumn,
-  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+  migrationListEmptySource,
+  migrationListForwardArrow,
+  migrationListKindGlyph,
 } from './migration-list-data-column';
 
-export type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
-
+export type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 export type {
   MigrationListEntry,
   MigrationListResult,
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
-
-const KIND_GLYPH: Record<EdgeKind, string> = {
-  forward: '*',
-  rollback: '↩',
-  self: '⟲',
-};
+export type { GlyphMode } from '../glyph-mode';
 
 /**
  * Semantic styler for `migration list` output tokens. Token-typed so
@@ -69,23 +67,25 @@ export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
 
 function resolveEdgeKind(
   migrationHash: string,
-  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
-): EdgeKind {
+  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
+): MigrationEdgeKind {
   return kindByMigrationHash.get(migrationHash) ?? 'forward';
 }
 
 function formatMigrationRow(
   migration: MigrationListEntry,
   dirNameWidth: number,
-  edgeKind: EdgeKind,
+  edgeKind: MigrationEdgeKind,
+  glyphMode: GlyphMode,
   style: MigrationListStyler,
 ): string {
-  const kindColumn = `${style.kind(KIND_GLYPH[edgeKind])} `;
+  const kindColumn = `${style.kind(migrationListKindGlyph(glyphMode, edgeKind))} `;
   const data = formatMigrationDataColumn(migration, {
     dirNameWidth,
     edgeKind,
     style,
-    forwardArrow: MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+    forwardArrow: migrationListForwardArrow(glyphMode),
+    emptySource: migrationListEmptySource(glyphMode),
   });
   return `${kindColumn}${data}`;
 }
@@ -98,6 +98,8 @@ function renderSpaceBlock(
   spaceId: string,
   migrations: readonly MigrationListEntry[],
   multiSpace: boolean,
+  glyphMode: GlyphMode,
+  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
   style: MigrationListStyler,
 ): readonly string[] {
   if (migrations.length === 0) {
@@ -108,13 +110,13 @@ function renderSpaceBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
-  const kindByMigrationHash = classifyMigrationListGraphTopology(migrations).kindByMigrationHash;
   const dirNameWidth = computeMigrationDirNameWidth(migrations);
   const rows = migrations.map((entry) =>
     formatMigrationRow(
       entry,
       dirNameWidth,
       resolveEdgeKind(entry.migrationHash, kindByMigrationHash),
+      glyphMode,
       style,
     ),
   );
@@ -122,6 +124,16 @@ function renderSpaceBlock(
     return rows;
   }
   return [style.spaceHeading(`${spaceId}:`), ...rows.map((row) => `  ${row}`)];
+}
+
+export function buildMigrationListTopologyBySpace(
+  result: MigrationListResult,
+): ReadonlyMap<string, MigrationListGraphTopology> {
+  const topologyBySpaceId = new Map<string, MigrationListGraphTopology>();
+  for (const space of result.spaces) {
+    topologyBySpaceId.set(space.spaceId, classifyMigrationListGraphTopology(space.migrations));
+  }
+  return topologyBySpaceId;
 }
 
 /**
@@ -135,6 +147,11 @@ function renderSpaceBlock(
 export function renderMigrationListWithStyle(
   result: MigrationListResult,
   style: MigrationListStyler,
+  glyphMode: GlyphMode = 'unicode',
+  topologyBySpaceId: ReadonlyMap<
+    string,
+    MigrationListGraphTopology
+  > = buildMigrationListTopologyBySpace(result),
 ): string {
   const multiSpace = result.spaces.length > 1;
   const lines: string[] = [];
@@ -144,7 +161,20 @@ export function renderMigrationListWithStyle(
     if (index > 0) {
       lines.push('');
     }
-    lines.push(...renderSpaceBlock(space.spaceId, space.migrations, multiSpace, style));
+    const topology = topologyBySpaceId.get(space.spaceId);
+    const kindByMigrationHash =
+      topology?.kindByMigrationHash ??
+      classifyMigrationListGraphTopology(space.migrations).kindByMigrationHash;
+    lines.push(
+      ...renderSpaceBlock(
+        space.spaceId,
+        space.migrations,
+        multiSpace,
+        glyphMode,
+        kindByMigrationHash,
+        style,
+      ),
+    );
   }
 
   const totalMigrations = result.spaces.reduce(

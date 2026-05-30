@@ -1,3 +1,4 @@
+import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
 import { describe, expect, it } from 'vitest';
 import {
   type ConnectorLayoutRow,
@@ -5,8 +6,7 @@ import {
   type LayoutRow,
   type MigrationLayoutRow,
   type NodeLineLayoutRow,
-} from '../src/migration-list-graph-layout';
-import type { MigrationListEntry } from '../src/migration-list-types';
+} from '../../../src/utils/formatters/migration-list-graph-layout';
 
 let hashCounter = 0;
 
@@ -115,7 +115,7 @@ describe('computeMigrationListGraphLayout', () => {
     expectMigrationGeometry(rows, '20250203_add_posts', 1, [0]);
     expectMigrationGeometry(rows, '20250115_add_users', 0, []);
 
-    const join = connectorRows(rows).find((c) => c.connectorKind === 'joinBelow');
+    const join = connectorRows(rows).find((c) => c.connectorKind === 'joinAbove');
     expect(join).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
   });
 
@@ -141,7 +141,7 @@ describe('computeMigrationListGraphLayout', () => {
     expectMigrationGeometry(rows, '20250115_add_base', 0, []);
 
     const baseJoin = connectorRows(rows)
-      .filter((c) => c.connectorKind === 'joinBelow')
+      .filter((c) => c.connectorKind === 'joinAbove')
       .at(-1);
     expect(baseJoin).toMatchObject({ startLane: 0, endLane: 2, branchCount: 3 });
   });
@@ -176,7 +176,7 @@ describe('computeMigrationListGraphLayout', () => {
     const rows = layout([eAddX, eAddY, eMergeA, eMergeB, eBranchA, eBranchB, eBase]).rows;
 
     const joinAbove = connectorRows(rows).find(
-      (c) => c.connectorKind === 'joinBelow' && c.contractHash === 'hash_d41',
+      (c) => c.connectorKind === 'joinAbove' && c.contractHash === 'hash_d41',
     );
     expect(joinAbove).toBeDefined();
 
@@ -207,7 +207,7 @@ describe('computeMigrationListGraphLayout', () => {
     expectMigrationGeometry(rows, '20250115_add_base', 0, []);
 
     const joinD41 = connectorRows(rows).find(
-      (c) => c.connectorKind === 'joinBelow' && c.contractHash === 'hash_d41',
+      (c) => c.connectorKind === 'joinAbove' && c.contractHash === 'hash_d41',
     );
     expect(joinD41).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
 
@@ -253,7 +253,7 @@ describe('computeMigrationListGraphLayout', () => {
     });
     expectMigrationGeometry(rows, '20250310_add_comments', 1, [0]);
 
-    const join = connectorRows(rows).find((c) => c.connectorKind === 'joinBelow');
+    const join = connectorRows(rows).find((c) => c.connectorKind === 'joinAbove');
     expect(join).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
   });
 
@@ -272,6 +272,19 @@ describe('computeMigrationListGraphLayout', () => {
     expectMigrationGeometry(rows, '20250210_add_tags', 0, [1, 2]);
     expectMigrationGeometry(rows, '20250203_add_posts', 1, [0, 2]);
     expectMigrationGeometry(rows, '20250115_add_users', 0, [2]);
+  });
+
+  it('routes an unplaceable forward edge through placeUnwoven when its producer sorts above its consumer', () => {
+    const eProducer = entry('20250320_orphan_producer', 'hash_big', 'hash_mid');
+    const eConsumer = entry('20250310_consumer', 'hash_mid', 'hash_end');
+    const rows = layout([eProducer, eConsumer]).rows;
+
+    expect(migrationByDirName(rows, '20250320_orphan_producer')).toMatchObject({
+      woven: false,
+      laneIndex: 0,
+      passThroughLanes: [],
+      edgeKind: 'forward',
+    });
   });
 
   it('starts separate lanes at multiple forward roots without throwing', () => {

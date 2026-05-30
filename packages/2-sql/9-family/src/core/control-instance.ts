@@ -27,6 +27,7 @@ import {
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
@@ -347,6 +348,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         targetFamily: contractJson.targetFamily,
         storage: contractJson.storage,
         headRefHash: headRef.hash,
+        ...sqlContractCanonicalizationHooks,
       });
     }
   }
@@ -527,6 +529,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
       const controlAdapter = getControlAdapter();
+      const resolveExistingEnumValues =
+        controlAdapter.resolveExistingEnumValuesForContract?.(contract) ??
+        controlAdapter.resolveExistingEnumValues;
       return verifySqlSchema({
         contract,
         schema: options.schema,
@@ -535,7 +540,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-        ...ifDefined('resolveExistingEnumValues', controlAdapter.resolveExistingEnumValues),
+        ...ifDefined('resolveExistingEnumValues', resolveExistingEnumValues),
       });
     },
     async sign(options: {

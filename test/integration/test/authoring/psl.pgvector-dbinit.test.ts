@@ -7,6 +7,7 @@ import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
@@ -94,7 +95,12 @@ describe(
 
       const enrichedIR = enrichContract(pslResult.value, frameworkComponents);
 
-      const emitted = await emit(enrichedIR, stack, sqlEmission);
+      // Thread the SQL family's canonicalization hooks so the emitted
+      // contract preserves the empty `uniques`/`indexes`/`foreignKeys`
+      // arrays the SQL contract validator requires — production emit gets
+      // these from `descriptor.contractSerializer`; this inline emit must
+      // supply them the same way the side-by-side fixture test does.
+      const emitted = await emit(enrichedIR, stack, sqlEmission, sqlContractCanonicalizationHooks);
       return JSON.parse(emitted.contractJson) as Record<string, unknown>;
     }
 

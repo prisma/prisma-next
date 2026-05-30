@@ -12,9 +12,9 @@ import {
   renderMigrationListHumanOutput,
   runMigrationList,
 } from '../../src/commands/migration-list';
-import { detectGlyphMode } from '../../src/utils/formatters/migration-list-graph-render';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { detectGlyphMode } from '../../src/utils/glyph-mode';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
 
 /**
@@ -45,6 +45,8 @@ const HASH_FAN_A = `sha256:${'d'.repeat(64)}`;
 const HASH_FAN_B = `sha256:${'e'.repeat(64)}`;
 const HASH_FAN_C = `sha256:${'f'.repeat(64)}`;
 const HASH_POSTGIS = `sha256:9aabbcc${'0'.repeat(57)}`;
+const HASH_SHARED = `sha256:shared0${'0'.repeat(57)}`;
+const HASH_LINEAR_TIP = `sha256:lintip0${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',
@@ -77,7 +79,7 @@ interface RefSpec {
 async function writePackage(migrationsRoot: string, spec: PackageSpec): Promise<void> {
   const pkgDir = join(migrationsRoot, spec.spaceId, spec.dirName);
   const ops = spec.ops ?? [ADDITIVE_OP];
-  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
+  const baseMetadata = {
     from: spec.from,
     to: spec.to,
     providedInvariants:
@@ -93,7 +95,7 @@ async function writePackage(migrationsRoot: string, spec: PackageSpec): Promise<
         )
         .filter((inv): inv is string => inv !== undefined),
     createdAt: '2026-02-25T14:30:00.000Z',
-  };
+  } as Omit<MigrationMetadata, 'migrationHash'>;
   const metadata: MigrationMetadata = {
     ...baseMetadata,
     migrationHash: computeMigrationHash(baseMetadata, ops),
@@ -682,6 +684,56 @@ describe('runMigrationList — JSON output shape', () => {
     expectOk(result);
     expect(result.value.spaces.map((s) => s.spaceId)).toEqual(['app', 'postgis']);
     expect(result.value.summary).toBe('2 migration(s) across 2 contract space(s)');
+  });
+});
+
+describe('runMigrationList — per-space topology classification', () => {
+  it('keeps a cross-space spurious cycle forward in both spaces', async () => {
+    // `app` carries HASH_SHARED -> HASH_LINEAR_TIP and `ext` carries the reverse
+    // edge. The two form a 2-cycle only when the spaces are merged into one
+    // graph. Classifying per space (correct) leaves both edges forward;
+    // reverting to a single global classification would turn exactly one into a
+    // rollback back-edge. Asserting neither space renders `↩` fails the moment
+    // classification stops being scoped per space.
+    const { migrationsRoot } = await setupFixture();
+
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_app_init',
+      from: null,
+      to: HASH_SHARED,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_app_fwd',
+      from: HASH_SHARED,
+      to: HASH_LINEAR_TIP,
+    });
+
+    await writePackage(migrationsRoot, {
+      spaceId: 'ext',
+      dirName: '20260101T0000_ext_init',
+      from: null,
+      to: HASH_LINEAR_TIP,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'ext',
+      dirName: '20260101T0001_ext_fwd',
+      from: HASH_LINEAR_TIP,
+      to: HASH_SHARED,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const flat = renderListed(result.value);
+    const appBlock = flat.split('\n\next:')[0] ?? '';
+    const extBlock = flat.split('\n\next:')[1]?.split('\n\n')[0] ?? '';
+
+    expect(appBlock).not.toContain('↩');
+    expect(appBlock).toContain('* 20260101T0001_app_fwd');
+    expect(extBlock).not.toContain('↩');
+    expect(extBlock).toContain('* 20260101T0001_ext_fwd');
   });
 });
 

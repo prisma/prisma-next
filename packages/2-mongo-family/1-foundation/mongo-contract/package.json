@@ -35,6 +35,7 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
+    "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
     "./package.json": "./package.json"
   },
   "types": "./dist/index.d.mts",
