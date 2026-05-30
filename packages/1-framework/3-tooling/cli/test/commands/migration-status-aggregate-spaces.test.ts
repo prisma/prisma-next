@@ -4,28 +4,11 @@ import type {
   ContractSpaceAggregate,
   ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
+import * as migrationAggregate from '@prisma-next/migration-tools/aggregate';
 import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
-const mocks = vi.hoisted(() => ({
-  graphWalkStrategy: vi.fn(),
-}));
-
-vi.mock('@prisma-next/migration-tools/aggregate', async () => {
-  const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/aggregate')>(
-    '@prisma-next/migration-tools/aggregate',
-  );
-  // Default behaviour: delegate to the real strategy. Tests installing
-  // `mockReturnValue` / `mockReturnValueOnce` override this.
-  mocks.graphWalkStrategy.mockImplementation(actual.graphWalkStrategy);
-  return {
-    ...actual,
-    graphWalkStrategy: (input: Parameters<typeof actual.graphWalkStrategy>[0]) =>
-      mocks.graphWalkStrategy(input),
-  };
-});
 
 const { loadAggregateStatusSpaces, computeTotalPendingAcrossSpaces } = await import(
   '../../src/commands/migration-status'
@@ -86,12 +69,8 @@ function makeAggregate(args: {
 }
 
 describe('loadAggregateStatusSpaces', () => {
-  afterEach(async () => {
-    const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/aggregate')>(
-      '@prisma-next/migration-tools/aggregate',
-    );
-    mocks.graphWalkStrategy.mockReset();
-    mocks.graphWalkStrategy.mockImplementation(actual.graphWalkStrategy);
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders per-space rows as marker-unknown when markersBySpace is null', async () => {
@@ -143,7 +122,7 @@ describe('loadAggregateStatusSpaces', () => {
     const app = makeMember('app', APP_HASH, /*empty*/ false);
     // One graph edge that lowers to three ops: pendingCount must be 1,
     // not 3 — a single authored migration is one unit of pending work.
-    mocks.graphWalkStrategy.mockReturnValue({
+    vi.spyOn(migrationAggregate, 'graphWalkStrategy').mockReturnValue({
       kind: 'ok',
       result: {
         plan: { operations: [{}, {}, {}] },
@@ -170,7 +149,7 @@ describe('loadAggregateStatusSpaces', () => {
 
   it('counts a zero-op migration as one pending unit', async () => {
     const app = makeMember('app', APP_HASH, /*empty*/ false);
-    mocks.graphWalkStrategy.mockReturnValue({
+    vi.spyOn(migrationAggregate, 'graphWalkStrategy').mockReturnValue({
       kind: 'ok',
       result: {
         plan: { operations: [] },
