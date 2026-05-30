@@ -3,9 +3,9 @@ import type { ControlExtensionDescriptor } from '@prisma-next/framework-componen
 import type {
   ContractSpaceAggregate,
   DeclaredExtensionEntry,
+  IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
-import type { IntegrityViolation } from '@prisma-next/migration-tools/integrity-violation';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
 import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
@@ -53,6 +53,8 @@ function describeIntegrityViolation(violation: IntegrityViolation): string {
       return `Head ref ${violation.hash} for contract space "${violation.spaceId}" is not present in the migration graph.`;
     case 'refUnreadable':
       return `Ref "${violation.refName}" for contract space "${violation.spaceId}" is unreadable: ${violation.detail}`;
+    case 'duplicateMigrationHash':
+      return `Multiple migrations in space "${violation.spaceId}" share migrationHash "${violation.migrationHash}" (${violation.dirNames.join(', ')}).`;
     default: {
       const spaceId = 'spaceId' in violation ? violation.spaceId : '*';
       return `Integrity violation "${violation.kind}" for contract space "${spaceId}".`;
@@ -192,7 +194,7 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
  * every space's packages, refs, and head ref tolerantly, synthesising
  * the app head ref from the live contract's storage hash and reading
  * extension state (packages / refs / contract.json) from disk. The gate
- * then runs `checkIntegrity({ declaredExtensions, requireContracts })`
+ * then runs `checkIntegrity({ declaredExtensions, checkContracts })`
  * — the same checks the prior throw-on-load loader enforced — and maps
  * any violation into a {@link CliStructuredError}, so callers that
  * previously relied on construction-time throws refuse identically.
@@ -226,7 +228,7 @@ export async function buildContractSpaceAggregate<
     appContract: inputs.appContract,
   });
 
-  const violations = aggregate.checkIntegrity({ declaredExtensions, requireContracts: true });
+  const violations = aggregate.checkIntegrity({ declaredExtensions, checkContracts: true });
   const failure = mapIntegrityViolations(violations);
   if (failure) {
     return notOk(failure);

@@ -34,7 +34,7 @@ import type { ContractSpaceHeadRecord } from '../verify-contract-spaces';
  *   `migrations/<spaceId>/contract.json` run through the family's
  *   `deserializeContract`. Throws if the on-disk contract is missing or
  *   undeserializable (surfaced as `contractUnreadable` by `checkIntegrity`
- *   under `requireContracts`); callers gate before querying it.
+ *   under `checkContracts`); callers gate before querying it.
  */
 export interface ContractSpaceMember {
   readonly spaceId: string;
@@ -57,7 +57,7 @@ export interface ContractSpaceMember {
  *
  * - `targetId`: the app contract's target; every member is expected to
  *   share it (a mismatch surfaces as a `targetMismatch` violation under
- *   `requireContracts`).
+ *   `checkContracts`).
  * - `app` / `extensions`: retained as fields for the existing planner /
  *   verifier / runner consumers. `extensions` is sorted alphabetically
  *   by `spaceId` (the apply-ordering convention).
