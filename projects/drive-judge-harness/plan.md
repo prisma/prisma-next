@@ -18,6 +18,7 @@ The two foundation slices (1 and 2) have no dependency on each other and form **
    - **Builds on:** Slice 1's external-correctness feed slot + Slice 2's instrumented-run corpus (≥10–20 runs to calibrate against).
    - **Hands to:** a calibrated Tier-1 correctness signal the scorecard and the experiment engine consume.
    - **Focus:** judge prompt sets + calibration to ≥80% held-out agreement, cross-family judge model. Not the A/B engine, not the dashboard.
+   - **Spike (time-boxed, first):** check whether a third-party eval framework (Inspect / Braintrust / promptfoo) can host just the correctness rubric + calibration bookkeeping with _less_ net complexity than a bespoke scorer. Default is bespoke-minimal; adopt a framework only on a clear simplicity win (spec Open Question 6).
 
 4. **Slice `experiment-engine`** — Linear: `TML-2737`
    - **Outcome:** the operator can A/B two skill versions and read deltas; CI catches a regression in a sandbox experiment.

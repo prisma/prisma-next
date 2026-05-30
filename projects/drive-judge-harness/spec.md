@@ -31,6 +31,7 @@ The headline is the **two-tier scorecard**: a binary correctness gate sourced fr
 - **Not a general-purpose agent-eval framework.** Scoped to Drive runs against Drive briefs. Generalising to arbitrary agents is out of scope.
 - **Not new trace-emission plumbing.** The emission vocabulary and the deterministic emitter are drive-instrumentation's remit (landed). This project _consumes_ the trace and extends the vocabulary only where the scorecard needs inputs that don't exist yet (a token signal, an external-correctness feed).
 - **Not solving the self-asserted-verdict trust gap by instrumentation alone.** A skill-emitted `round-end.verdict: satisfied` is the emitter's claim, not ground truth. Establishing real correctness is precisely the judge's job; the deterministic emitter removed _formatting_ freedom, not _semantic_ freedom.
+- **Not an industrial-grade eval platform.** The default is the minimal bespoke scorer that does the job — an LLM-judge call plus a simple held-out agreement tally. A third-party eval framework (Inspect, Braintrust, promptfoo, …) is adopted **only if it reduces net complexity** vs. building it ourselves; if standing one up is itself a lot of machinery, we don't bother. Minimal-that-works beats feature-complete.
 
 ## Place in the larger world
 
@@ -73,6 +74,7 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 3. **Where the token signal comes from.** Working position: the SDK reports per-run usage for harness-spawned runs; add a `tokens` field to the trace vocabulary that the harness populates. Hand-runs leave it `null` → scorecard renders `n/a (no signal)`.
 4. **External-correctness feed source + precedence.** Working position: accept all three (CI result, merge status, judge verdict); precedence CI/merge > judge when both exist.
 5. **Baseline for "how good."** Working position: A/B against the immediately-previous skill version; cross-run aggregation against an accreting corpus is the longer-term baseline.
+6. **Bespoke scorer vs. third-party eval framework.** Existing eval frameworks (Inspect, Braintrust, promptfoo, LangSmith) assume the unit-under-test is a single model call or a RAG pipeline; our unit is a multi-hour SDK-spawned agent run scored from heterogeneous signals (trace + PR + CI/merge + judge). Working position: **build the minimal bespoke scorer; the run-production harness stays ours regardless.** Slice 3 (TML-2736) carries a time-boxed spike to check whether one of these frameworks can host just the correctness rubric + calibration bookkeeping with _less_ total complexity than hand-rolling it — adopt only on a clear win, otherwise stay bespoke.
 
 ## References
 

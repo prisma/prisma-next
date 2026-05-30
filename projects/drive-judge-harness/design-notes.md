@@ -46,6 +46,7 @@ The single hardest sequencing constraint: judge calibration needs ~10–20 instr
 - **Same-family judge (model grades its own family).** Attractive: cheaper, simpler. **Rejected because:** same-family grading bias inflates agreement without measuring real correctness.
 - **A large speculative golden-case corpus (hundreds of briefs).** Attractive: coverage. **Rejected because:** floor-raising needs a handful of high-signal cases; 200 speculative ones cost more to maintain than they signal, and dilute the regression gate.
 - **Wall-clock alone as the efficiency metric.** **Rejected because:** wall-clock is a weak proxy; tokens are the stated #1 optimization target after correctness and must be instrumented directly.
+- **Adopting an industrial-grade eval framework (Inspect / Braintrust / promptfoo / LangSmith) as the substrate.** Attractive: dataset management, judge scoring, experiment-diff dashboards out of the box. **Rejected as the default because:** they assume the unit-under-test is a single model call or RAG pipeline, not a multi-hour SDK-spawned agent run scored from heterogeneous signals — and standing one up is itself non-trivial machinery. The default is a minimal bespoke scorer; a framework is adopted only if a time-boxed slice-3 spike shows it reduces _net_ complexity. The run-production harness stays bespoke regardless (it's Cursor-SDK-specific; nothing off-the-shelf spawns and grades it).
 - **Split into two projects (judge / harness).** Attractive: each lands at ≤3 slices, cleaner boundaries. **Rejected (for now) because:** the harness exists to _feed_ the judge a corpus and the A/B engine exists to _consume_ the judge's signal — splitting severs the refinement loop across two trackers. Revisit if slice 4 splits and the count crosses 4 (spec Open Question 1).
 
 ## Open questions
@@ -55,6 +56,7 @@ The single hardest sequencing constraint: judge calibration needs ~10–20 instr
 - **Token-signal source.** Working position: SDK per-run usage for harness-spawned runs; add a `tokens` field to the trace vocabulary; hand-runs leave it `null` → `n/a (no signal)`.
 - **External-correctness feed precedence.** Working position: CI/merge > judge when both exist.
 - **Baseline for "how good."** Working position: A/B against the immediately-previous skill version; cross-run aggregation is the longer-term baseline.
+- **Bespoke scorer vs. third-party framework.** Working position: bespoke-minimal by default; slice-3 spike checks whether a framework hosts the rubric + calibration with less net complexity; adopt only on a clear win. Harness stays bespoke.
 
 ## References
 
