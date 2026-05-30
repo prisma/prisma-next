@@ -1,11 +1,12 @@
-import { EMPTY_CONTRACT_HASH } from './constants';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
   classifyMigrationListGraphTopology,
   type MigrationEdgeKind,
-} from './migration-list-graph-topology';
-import type { MigrationListEntry } from './migration-list-types';
+  type MigrationListGraphTopology,
+} from '@prisma-next/migration-tools/migration-list-graph-topology';
+import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
 
-export type ConnectorKind = 'fanBelow' | 'joinBelow';
+export type ConnectorKind = 'fanBelow' | 'joinAbove';
 
 export interface MigrationLayoutRow {
   readonly kind: 'migration';
@@ -46,21 +47,11 @@ function canonicalFrom(from: string | null): string {
   return from ?? EMPTY_CONTRACT_HASH;
 }
 
-function canonicalTo(entry: MigrationListEntry): string {
-  return entry.to;
-}
-
-function forwardInDegree(
-  topology: ReturnType<typeof classifyMigrationListGraphTopology>,
-  hash: string,
-): number {
+function forwardInDegree(topology: MigrationListGraphTopology, hash: string): number {
   return topology.forwardInDegree.get(hash) ?? 0;
 }
 
-function forwardOutDegree(
-  topology: ReturnType<typeof classifyMigrationListGraphTopology>,
-  hash: string,
-): number {
+function forwardOutDegree(topology: MigrationListGraphTopology, hash: string): number {
   return topology.forwardOutDegree.get(hash) ?? 0;
 }
 
@@ -71,10 +62,9 @@ function buildForwardProducersByTo(
   const byTo = new Map<string, MigrationListEntry[]>();
   for (const entry of entries) {
     if (kindByMigrationHash.get(entry.migrationHash) !== 'forward') continue;
-    const to = canonicalTo(entry);
-    const bucket = byTo.get(to);
+    const bucket = byTo.get(entry.to);
     if (bucket) bucket.push(entry);
-    else byTo.set(to, [entry]);
+    else byTo.set(entry.to, [entry]);
   }
   return byTo;
 }
@@ -84,6 +74,21 @@ function countForwardProducersTo(
   contract: string,
 ): number {
   return forwardProducersByTo.get(contract)?.length ?? 0;
+}
+
+function hasLaterForwardDepartingFrom(
+  entries: readonly MigrationListEntry[],
+  startIndex: number,
+  contract: string,
+  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
+): boolean {
+  for (let index = startIndex + 1; index < entries.length; index++) {
+    const later = entries[index];
+    if (later === undefined) continue;
+    if (kindByMigrationHash.get(later.migrationHash) !== 'forward') continue;
+    if (canonicalFrom(later.from) === contract) return true;
+  }
+  return false;
 }
 
 export function computeMigrationListGraphLayout(
@@ -153,11 +158,11 @@ export function computeMigrationListGraphLayout(
     if (lane) lane.active = false;
   }
 
-  function emitJoinBelow(contractHash: string, laneIndices: readonly number[]): void {
+  function emitJoinAbove(contractHash: string, laneIndices: readonly number[]): void {
     if (laneIndices.length < 2) return;
     const startLane = Math.min(...laneIndices);
     const endLane = Math.max(...laneIndices);
-    emitConnector('joinBelow', contractHash, startLane, endLane, laneIndices.length);
+    emitConnector('joinAbove', contractHash, startLane, endLane, laneIndices.length);
     for (const index of laneIndices) {
       if (index !== startLane) closeLane(index);
     }
@@ -169,7 +174,7 @@ export function computeMigrationListGraphLayout(
 
     const consumersWanting = lanesWanting(contract);
     if (forwardOutDegree(topology, contract) >= 2 && consumersWanting.length >= 2) {
-      emitJoinBelow(contract, consumersWanting);
+      emitJoinAbove(contract, consumersWanting);
     }
 
     emitNodeLine(contract);
@@ -185,12 +190,6 @@ export function computeMigrationListGraphLayout(
     }
 
     convergencesEmitted.add(contract);
-  }
-
-  function assignProducerLane(entry: MigrationListEntry): number | undefined {
-    const preset = producerLaneByHash.get(entry.migrationHash);
-    if (preset !== undefined) return preset;
-    return undefined;
   }
 
   function placeWoven(
@@ -224,9 +223,10 @@ export function computeMigrationListGraphLayout(
     });
   }
 
-  for (const entry of entries) {
+  for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    const entry = entries[entryIndex]!;
     const edgeKind = kindByMigrationHash.get(entry.migrationHash) ?? 'forward';
-    const to = canonicalTo(entry);
+    const to = entry.to;
 
     if (edgeKind !== 'forward') {
       placeUnwoven(entry, edgeKind);
@@ -237,11 +237,11 @@ export function computeMigrationListGraphLayout(
       emitConvergencePreamble(to);
     }
 
-    const presetLane = assignProducerLane(entry);
+    const presetLane = producerLaneByHash.get(entry.migrationHash);
     const wantingTo = lanesWanting(to);
 
     if (wantingTo.length >= 2 && countForwardProducersTo(forwardProducersByTo, to) === 1) {
-      emitJoinBelow(to, wantingTo);
+      emitJoinAbove(to, wantingTo);
     }
 
     if (presetLane !== undefined) {
@@ -252,6 +252,11 @@ export function computeMigrationListGraphLayout(
     const firstWanting = wantingTo[0];
     if (firstWanting !== undefined) {
       placeWoven(entry, edgeKind, firstWanting);
+      continue;
+    }
+
+    if (hasLaterForwardDepartingFrom(entries, entryIndex, to, kindByMigrationHash)) {
+      placeUnwoven(entry, edgeKind);
       continue;
     }
 

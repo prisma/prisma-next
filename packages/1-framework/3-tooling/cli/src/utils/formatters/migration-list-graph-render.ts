@@ -1,11 +1,3 @@
-import type {
-  ConnectorLayoutRow,
-  LayoutRow,
-  MigrationLayoutRow,
-  MigrationListGraphLayout,
-  NodeLineLayoutRow,
-} from '@prisma-next/migration-tools/migration-list-graph-layout';
-import { computeMigrationListGraphLayout } from '@prisma-next/migration-tools/migration-list-graph-layout';
 import type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
@@ -19,6 +11,14 @@ import {
   MIGRATION_LIST_EMPTY_SOURCE,
   MIGRATION_LIST_FORWARD_EDGE_GLYPH,
 } from './migration-list-data-column';
+import type {
+  ConnectorLayoutRow,
+  LayoutRow,
+  MigrationLayoutRow,
+  MigrationListGraphLayout,
+  NodeLineLayoutRow,
+} from './migration-list-graph-layout';
+import { computeMigrationListGraphLayout } from './migration-list-graph-layout';
 import type { MigrationListStyler } from './migration-list-render';
 
 export type GlyphMode = 'unicode' | 'ascii';
@@ -35,7 +35,7 @@ interface GlyphPalette {
   readonly emptySource: string;
   readonly kind: Record<MigrationEdgeKind, string>;
   readonly fanBelow: (branchCount: number) => string;
-  readonly joinBelow: (branchCount: number) => string;
+  readonly joinAbove: (branchCount: number) => string;
 }
 
 const UNICODE_PALETTE: GlyphPalette = {
@@ -45,7 +45,7 @@ const UNICODE_PALETTE: GlyphPalette = {
   emptySource: MIGRATION_LIST_EMPTY_SOURCE,
   kind: { forward: '*', rollback: '↩', self: '⟲' },
   fanBelow: (branchCount) => (branchCount === 2 ? '├─┐' : '├─┬─┐'),
-  joinBelow: (branchCount) => (branchCount === 2 ? '├─┘' : '└─┴─┘'),
+  joinAbove: (branchCount) => (branchCount === 2 ? '├─┘' : '└─┴─┘'),
 };
 
 const ASCII_PALETTE: GlyphPalette = {
@@ -55,7 +55,7 @@ const ASCII_PALETTE: GlyphPalette = {
   emptySource: '-',
   kind: { forward: '*', rollback: '<', self: '~' },
   fanBelow: (branchCount) => (branchCount === 2 ? '+-\\' : '+-|-\\'),
-  joinBelow: (branchCount) => (branchCount === 2 ? '+-/' : '/-+-/'),
+  joinAbove: (branchCount) => (branchCount === 2 ? '+-/' : '/-+-/'),
 };
 
 function paletteFor(mode: GlyphMode): GlyphPalette {
@@ -159,7 +159,7 @@ function renderConnectorGutter(
   let spanGlyph = (
     row.connectorKind === 'fanBelow'
       ? palette.fanBelow(row.branchCount)
-      : palette.joinBelow(row.branchCount)
+      : palette.joinAbove(row.branchCount)
   )
     .padEnd(spanWidth, ' ')
     .slice(0, spanWidth);
@@ -245,7 +245,7 @@ export function renderMigrationListGraphWithStyle(
     openLanes = advanceOpenLanes(row, openLanes);
   }
 
-  return lines.join('\n');
+  return lines.map((line) => line.trimEnd()).join('\n');
 }
 
 export function renderMigrationListGraph(
