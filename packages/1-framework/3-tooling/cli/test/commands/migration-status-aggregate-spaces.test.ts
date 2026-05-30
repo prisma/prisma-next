@@ -3,6 +3,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSpaceAggregate,
   ContractSpaceMember,
+  GraphWalkOutcome,
 } from '@prisma-next/migration-tools/aggregate';
 import * as migrationAggregate from '@prisma-next/migration-tools/aggregate';
 import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
@@ -136,7 +137,7 @@ describe('loadAggregateStatusSpaces', () => {
           },
         ],
       },
-    });
+    } as unknown as GraphWalkOutcome);
 
     const rows = await loadAggregateStatusSpaces({
       aggregate: makeAggregate({ app }),
@@ -163,7 +164,7 @@ describe('loadAggregateStatusSpaces', () => {
           },
         ],
       },
-    });
+    } as unknown as GraphWalkOutcome);
 
     const rows = await loadAggregateStatusSpaces({
       aggregate: makeAggregate({ app }),
