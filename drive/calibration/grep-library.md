@@ -50,6 +50,17 @@ rg '@ts-expect-error' packages/ -g '*.ts' -g '!*.test-d.ts'
 rg '@ts-nocheck' packages/
 ```
 
+## Docs claim-scrub (F12)
+
+When asked to remove / correct a claim across docs, scrub exhaustively: grep every phrasing of the claim, correct each hit, then re-grep until the residual is empty. The pattern is claim-specific; the discipline is not. Worked example (the "tolerant classifier reuses `MigrationGraph`" claim):
+
+```bash
+# Enumerate every phrasing, then re-run after correcting until empty:
+rg -in "reuse|mirror|model|adjacency|detectCycles" projects/<project>/*.md
+```
+
+The closing re-grep belongs in the dispatch DoD for any docs-correction task.
+
 ## When to extend the library
 
 - A failure mode is detected by a pattern not already here.

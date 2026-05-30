@@ -161,7 +161,7 @@ async function setupTamperFixture(): Promise<TamperFixture> {
   await writeFile(
     join(contractDir, 'contract.json'),
     JSON.stringify({
-      storage: { storageHash: TO_HASH },
+      storage: { storageHash: TO_HASH, namespaces: {} },
       schemaVersion: SCHEMA_VERSION,
       target: TARGET,
       targetFamily: TARGET_FAMILY,
@@ -439,7 +439,7 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
         await writeFile(
           join(orphanDir, 'contract.json'),
           JSON.stringify({
-            storage: { storageHash: ORPHAN_HASH },
+            storage: { storageHash: ORPHAN_HASH, namespaces: {} },
             schemaVersion: SCHEMA_VERSION,
             target: TARGET,
             targetFamily: TARGET_FAMILY,
@@ -451,7 +451,7 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
         await writeFile(
           join(contractDir, 'contract.json'),
           JSON.stringify({
-            storage: { storageHash: TO_HASH },
+            storage: { storageHash: TO_HASH, namespaces: {} },
             schemaVersion: SCHEMA_VERSION,
             target: TARGET,
             targetFamily: TARGET_FAMILY,

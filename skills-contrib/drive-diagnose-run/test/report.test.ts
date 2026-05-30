@@ -4,6 +4,7 @@ import type { AssertionResult } from '../assertions/types.ts';
 import type { LoadError, UnknownEvent } from '../load.ts';
 import type { Metrics } from '../metrics.ts';
 import { renderReport } from '../report.ts';
+import type { Scorecard } from '../scorecard.ts';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -63,6 +64,63 @@ const EMPTY_METRICS: Metrics = {
     operator_turn_count: null,
     operator_turn_count_note: 'post-hoc only — no native operator-turn event exists in slice 1',
   },
+};
+
+const EMPTY_SCORECARD: Scorecard = {
+  runs: [],
+  correct_run_ids: [],
+  correct_tokens: {
+    input_tokens: null,
+    output_tokens: null,
+    cache_read_tokens: null,
+    cache_write_tokens: null,
+  },
+  has_any_correctness_signal: false,
+};
+
+const NOT_COMPUTABLE_SCORECARD: Scorecard = {
+  runs: [
+    {
+      run_id: 'run-abc',
+      correctness: null,
+      verdict: 'not-computable',
+      missing_inputs: ['external correctness signal (no `correctness-recorded` event)'],
+      tokens: null,
+    },
+  ],
+  correct_run_ids: [],
+  correct_tokens: {
+    input_tokens: null,
+    output_tokens: null,
+    cache_read_tokens: null,
+    cache_write_tokens: null,
+  },
+  has_any_correctness_signal: false,
+};
+
+const CORRECT_SCORECARD: Scorecard = {
+  runs: [
+    {
+      run_id: 'run-abc',
+      correctness: { mechanical: 'pass', qa: 'pass', intent: 'pass' },
+      verdict: 'correct',
+      missing_inputs: [],
+      tokens: {
+        input_tokens: 1_900_000,
+        output_tokens: 42_000,
+        cache_read_tokens: null,
+        cache_write_tokens: null,
+      },
+    },
+  ],
+  correct_run_ids: ['run-abc'],
+  correct_tokens: {
+    input_tokens: 1_900_000,
+    output_tokens: 42_000,
+    cache_read_tokens: null,
+    cache_write_tokens: null,
+  },
+  has_any_correctness_signal: true,
 };
 
 const FAIL_EVIDENCE_ID = 'bbbbbbbb-0000-4000-8000-000000000001';
@@ -125,6 +183,7 @@ const RUN_META = {
 describe('renderReport — header', () => {
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions: FIXTURE_ASSERTIONS,
     loadErrors: [],
     unknown: [],
@@ -152,6 +211,7 @@ describe('renderReport — header', () => {
 describe('renderReport — parse-health banner', () => {
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions: FIXTURE_ASSERTIONS,
     loadErrors: [FIXTURE_LOAD_ERROR],
     unknown: [FIXTURE_UNKNOWN_EVENT],
@@ -170,6 +230,7 @@ describe('renderReport — parse-health banner', () => {
 describe('renderReport — no banner when no errors', () => {
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions: [],
     loadErrors: [],
     unknown: [],
@@ -184,6 +245,7 @@ describe('renderReport — no banner when no errors', () => {
 describe('renderReport — null metrics render as n/a (no signal)', () => {
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions: [],
     loadErrors: [],
     unknown: [],
@@ -202,6 +264,7 @@ describe('renderReport — null metrics render as n/a (no signal)', () => {
 describe('renderReport — assertion sections', () => {
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions: FIXTURE_ASSERTIONS,
     loadErrors: [FIXTURE_LOAD_ERROR],
     unknown: [FIXTURE_UNKNOWN_EVENT],
@@ -241,6 +304,7 @@ describe('renderReport — mdTable cell escaping', () => {
   ];
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions,
     loadErrors: [],
     unknown: [],
@@ -266,6 +330,7 @@ describe('renderReport — determinism', () => {
   it('renders identically on two successive calls', () => {
     const input = {
       metrics: EMPTY_METRICS,
+      scorecard: EMPTY_SCORECARD,
       assertions: FIXTURE_ASSERTIONS,
       loadErrors: [FIXTURE_LOAD_ERROR],
       unknown: [FIXTURE_UNKNOWN_EVENT],
@@ -278,18 +343,19 @@ describe('renderReport — determinism', () => {
 describe('renderReport — verdict + coverage + provenance', () => {
   const report = renderReport({
     metrics: EMPTY_METRICS,
+    scorecard: EMPTY_SCORECARD,
     assertions: FIXTURE_ASSERTIONS,
     loadErrors: [],
     unknown: [],
     runMeta: RUN_META,
   });
 
-  it('includes Run verdict heading', () => {
+  it('includes Run verdict line', () => {
     assert.ok(report.includes('Run verdict'));
   });
 
-  it('includes Not computable text', () => {
-    assert.ok(report.includes('Not computable'));
+  it('includes not computable text', () => {
+    assert.ok(report.includes('not computable'));
   });
 
   it('includes Assertion coverage line', () => {
@@ -300,7 +366,56 @@ describe('renderReport — verdict + coverage + provenance', () => {
     assert.ok(report.includes('Provenance'));
   });
 
-  it('includes token usage row with not instrumented', () => {
-    assert.ok(report.includes('not instrumented'));
+  it('no longer claims token usage is "not instrumented"', () => {
+    assert.ok(!report.includes('not instrumented'));
+  });
+});
+
+describe('renderReport — scorecard (no correctness signal)', () => {
+  const report = renderReport({
+    metrics: EMPTY_METRICS,
+    scorecard: NOT_COMPUTABLE_SCORECARD,
+    assertions: [],
+    loadErrors: [],
+    unknown: [],
+    runMeta: RUN_META,
+  });
+
+  it('renders a two-tier Scorecard heading', () => {
+    assert.ok(report.includes('## Scorecard'));
+    assert.ok(report.includes('Tier 1'));
+    assert.ok(report.includes('Tier 2'));
+  });
+
+  it('reads not computable and names the missing correctness signal', () => {
+    assert.ok(report.includes('not computable'));
+    assert.ok(report.includes('correctness-recorded'));
+  });
+
+  it('hides Tier 2 efficiency when no run passed Tier 1', () => {
+    assert.ok(report.includes('Hidden'));
+  });
+});
+
+describe('renderReport — scorecard (a CORRECT run)', () => {
+  const report = renderReport({
+    metrics: EMPTY_METRICS,
+    scorecard: CORRECT_SCORECARD,
+    assertions: [],
+    loadErrors: [],
+    unknown: [],
+    runMeta: RUN_META,
+  });
+
+  it('reports the run as CORRECT', () => {
+    assert.ok(report.includes('CORRECT'));
+  });
+
+  it('shows Tier 2 token values for the correct run', () => {
+    assert.ok(report.includes('1900000'));
+  });
+
+  it('renders n/a (no signal) for the null token components', () => {
+    assert.ok(report.includes('n/a (no signal)'));
   });
 });
