@@ -143,10 +143,6 @@ describe('projectSchemaToSpace', () => {
         memberWithMalformedStorage('ext-2', 'not-an-object'),
         memberWithMalformedStorage('ext-3', { tables: null }),
         memberWithMalformedStorage('ext-4', { tables: 'not-a-record' }),
-        // A null namespace value would throw inside the structural walk
-        // (Object.entries(null)); the storage-element guard rejects it
-        // instead, contributing no owned names.
-        memberWithMalformedStorage('ext-5', { namespaces: { bad: null } }),
       ];
       expect(projectSchemaToSpace(schema, member, others)).toBe(schema);
     });

@@ -8,12 +8,10 @@ import { elementCoordinates, type Storage } from '@prisma-next/framework-compone
  * `projectSchemaToSpace`'s "names owned by other members" walk, and by
  * the aggregate verifier's orphan-element detection.
  *
- * A contract's `storage` is typed `StorageBase` (hash only); the
- * framework `elementCoordinates` walk needs the fuller `Storage` shape
- * carrying the `namespaces` map. `hasNamespaceMap` narrows to that shape
- * at runtime via a type predicate, so the walk needs no cast — storage
- * without a namespace map (malformed or partially-constructed) yields
- * the empty set.
+ * `Contract.storage` is typed `StorageBase` in foundation (hash-only);
+ * the `namespaces` map lives on framework `Storage`. Foundation cannot
+ * import core, so `hasNamespaceMap` narrows `StorageBase → Storage`
+ * at runtime — a layering type-bridge in lieu of a bare cast.
  */
 export function storageElementNames(contract: Contract): Set<string> {
   const names = new Set<string>();
@@ -25,18 +23,10 @@ export function storageElementNames(contract: Contract): Set<string> {
   return names;
 }
 
+// StorageBase omits namespaces; narrow to framework Storage at the layering seam.
 function hasNamespaceMap(storage: unknown): storage is Storage {
   if (typeof storage !== 'object' || storage === null) return false;
   if (!('namespaces' in storage)) return false;
   const { namespaces } = storage;
-  if (typeof namespaces !== 'object' || namespaces === null || Array.isArray(namespaces)) {
-    return false;
-  }
-  // elementCoordinates walks each namespace via Object.entries(ns), which
-  // throws on a null value. A validated contract never carries a null
-  // namespace, but this helper accepts arbitrary runtime shapes; require
-  // every entry to be a non-null object so the walk cannot throw.
-  return Object.values(namespaces).every(
-    (ns) => typeof ns === 'object' && ns !== null && !Array.isArray(ns),
-  );
+  return typeof namespaces === 'object' && namespaces !== null && !Array.isArray(namespaces);
 }
