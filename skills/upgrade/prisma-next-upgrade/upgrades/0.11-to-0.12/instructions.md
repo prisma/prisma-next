@@ -30,6 +30,15 @@ changes:
         - '"hints"'
       anyMatch: true
     script: ./strip-migration-labels-hints.ts
+  - id: re-emit-closed-mongo-contracts
+    summary: |
+      Re-emit Mongo contract artefacts so emitted `$jsonSchema` validators are closed (`additionalProperties: false` at every level, including polymorphic `oneOf` branches). Each non-variant Mongo model must resolve to an `objectId` `_id` before emit succeeds — otherwise interpret fails with `PSL_MONGO_ID_REQUIRED`. After re-emitting, apply the open→closed validator migration with `prisma-next db update -y`; the planner classifies the tightening as `destructive` and refuses without confirmation.
+    detection:
+      glob: "**/contract.json"
+      contains:
+        - '"kind": "mongo-database"'
+      anyMatch: true
+    script: ./re-emit-closed-mongo-contracts.ts
 ---
 
 # 0.11 → 0.12 — User upgrade instructions
@@ -210,3 +219,51 @@ pnpm exec tsx ./strip-migration-labels-hints.ts --check
 ### Validation
 
 After running the codemod, exercise any command that loads your migrations (your deploy or migration-status step). The loader recomputes and verifies each manifest's `migrationHash` on read: a manifest that still carried `labels`/`hints` would have thrown `INVALID_MANIFEST`, and a manifest with a stale hash would fail verification. Once the codemod has run, every manifest loads cleanly and its recomputed hash verifies against the slimmed envelope.
+
+## `re-emit-closed-mongo-contracts`
+
+Starting at the 0.12 release, MongoDB emits **closed** `$jsonSchema` validators by default. Every object schema in the emitted contract — collection validators, nested objects, and each branch of a polymorphic `oneOf` — carries `additionalProperties: false`. The contract canonicalizer also preserves `additionalProperties` through emission, so the on-disk migration for consumers is to re-emit their Mongo contracts and apply the resulting validator change to the database.
+
+Two authoring constraints apply before emit succeeds:
+
+- **Closed validators** land automatically on re-emit; no hand-editing of `contract.json` is required.
+- **Non-variant models need an `objectId` `_id`**. The new interpret-time rule `PSL_MONGO_ID_REQUIRED` rejects any non-variant Mongo model whose `_id` field does not resolve to `objectId`. Fix the PSL or TS contract source first — for example, ensure `@id` is present and typed as MongoDB's default `ObjectId` — then re-emit.
+
+### Re-emit your Mongo contracts
+
+Run the colocated script from your project root:
+
+```bash
+pnpm exec tsx ./re-emit-closed-mongo-contracts.ts
+```
+
+It finds every directory with a `prisma-next.config.ts` and a committed Mongo `contract.json`, then runs `pnpm emit` (or `prisma-next contract emit` when no emit script exists) in each. The regenerated `contract.json` / `contract.d.ts` pick up closed validators and an updated `storageHash`.
+
+Use `--check` to list contracts that still need re-emitting without writing files:
+
+```bash
+pnpm exec tsx ./re-emit-closed-mongo-contracts.ts --check
+```
+
+### Apply the validator migration
+
+Re-emitting changes the contract's `$jsonSchema` shape. The planner classifies the open→closed validator tightening as **`destructive`** — MongoDB replaces collection validators, and documents with fields outside the closed schema will fail validation after apply.
+
+Plan first to review the ops:
+
+```bash
+pnpm prisma-next db update --plan-only
+# or: prisma-next migration plan
+```
+
+Then apply with explicit confirmation:
+
+```bash
+pnpm prisma-next db update -y
+```
+
+Wire `-y` into your deploy pipeline only after you have reviewed the plan in a lower environment. Without `-y`, apply refuses when destructive ops are present.
+
+### Validation
+
+After re-emitting and applying, run `pnpm typecheck && pnpm test` (or your application's equivalent). Contract hash/type drift shows up immediately in TypeScript imports of `StorageHash`. At runtime, confirm `db verify` passes against the updated validators.

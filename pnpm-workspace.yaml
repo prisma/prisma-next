@@ -39,3 +39,7 @@ trustPolicyExclude:
   - chokidar@4.0.3
   - evlog@1.9.0
   - semver@6.3.1
+  # Dev-only: pulled transitively by @cursor/sdk (→ @connectrpc/connect-node).
+  # Newer undici publishes dropped provenance attestation; 5.29.0 is a
+  # legitimate Node.js-team release, not a known compromise.
+  - undici@5.29.0
