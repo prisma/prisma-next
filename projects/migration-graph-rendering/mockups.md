@@ -46,7 +46,10 @@ of a node; it is always the connector between two contracts.
    backward edge runs against the grain, so a non-adjacent one has nowhere in the
    spine to live and is drawn as an **explicit arc**.
 9. **Self-edges** are also their own edge row — `⟲` is the direction glyph (a loop),
-   name and `hash → hash` data intact; never collapsed onto the node row.
+   name and `hash → hash` data intact; never collapsed onto the node row. A self-edge
+   row sits **immediately above the contract node it loops on** — adjacent to that node,
+   on the same (outgoing) side as the node's forward edges — so the loop reads as
+   attached to its contract rather than floating between unrelated rows.
 10. **Node overlays reuse the `migration list --graph` `(refs)` decoration** — *not*
     the old `migration graph` per-marker glyph tags (`◆ db`, `◇ contract`, rotating
     ref colours). Whatever points at a contract is appended to its node row as a single
@@ -350,12 +353,14 @@ root is **not** `∅` — its parent was pruned (no `○ ∅` beneath it).
 A no-op migration whose result equals its input. It's still an edge with a name
 and ops, so it gets its own row — `⟲` is just the direction glyph (a loop, neither
 up nor down), and the `hash → hash` data column makes the self-loop self-evident.
+The self-edge row sits **immediately above the node it loops on** (`aaaaaaa`), grouped
+with that node's outgoing edges, so the loop reads as attached to its contract.
 
 ```
 ○   bbbbbbb
 │↑  next                 aaaaaaa → bbbbbbb
-○   aaaaaaa
 │⟲  noop                 aaaaaaa → aaaaaaa
+○   aaaaaaa
 │↑  init                 ∅ → aaaaaaa
 ○   ∅
 ```

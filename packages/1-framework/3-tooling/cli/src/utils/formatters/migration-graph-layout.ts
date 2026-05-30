@@ -36,6 +36,7 @@ export interface MigrationGraphGridRow {
   readonly startLane?: number;
   readonly endLane?: number;
   readonly branchCount?: number;
+  readonly convergenceProducer?: boolean;
   readonly cells: readonly StructuralCell[];
 }
 
@@ -106,9 +107,55 @@ function splitComponents(nodes: readonly (string | null)[]): readonly (readonly 
   return components;
 }
 
-function laneHasVerticalPass(row: MigrationGraphGridRow, laneIndex: number): boolean {
-  const cell = row.cells[laneIndex];
-  return cell?.kind === 'vertical-pass';
+function classifyForwardShortConvergenceAdjacency(
+  rows: readonly MigrationGraphGridRow[],
+  edgeRowIndex: number,
+  edge: ClassifiedEdge,
+  laneIndex: number,
+): EdgeAdjacency {
+  for (let index = edgeRowIndex + 1; index < rows.length; index++) {
+    const row = rows[index];
+    if (row === undefined) break;
+    if (row.kind === 'component-separator' || row.kind === 'branch-connector') continue;
+    if (row.kind === 'merge-connector') {
+      if (row.contractHash === edge.from) return 'node-skipping-forward';
+      continue;
+    }
+    if (row.kind === 'edge') {
+      if (row.laneIndex === laneIndex) return 'node-skipping-forward';
+      continue;
+    }
+    if (row.kind === 'node' && row.contractHash === edge.from) {
+      return 'adjacent';
+    }
+  }
+  return 'node-skipping-forward';
+}
+
+function convergenceProducerUsesShortAdjacency(
+  edge: ClassifiedEdge,
+  laneIndex: number,
+  forwardProducersByTo: ReadonlyMap<string, readonly ClassifiedEdge[]>,
+  producerLaneByHash: ReadonlyMap<string, number>,
+): boolean {
+  const producers = (forwardProducersByTo.get(edge.to) ?? []).filter(
+    (candidate) => candidate.kind === 'forward',
+  );
+  if (producers.length < 2) return false;
+
+  const fanLanes = [
+    ...new Set(
+      producers
+        .map((producer) => producerLaneByHash.get(producer.migrationHash))
+        .filter((candidate): candidate is number => candidate !== undefined),
+    ),
+  ].sort((a, b) => a - b);
+  const fanStart = fanLanes[0];
+  const fanEnd = fanLanes[fanLanes.length - 1];
+  if (fanStart === undefined || fanEnd === undefined) return false;
+
+  if (fanStart === 0) return laneIndex === fanStart;
+  return laneIndex === fanEnd;
 }
 
 function classifyForwardLayoutAdjacency(
@@ -116,60 +163,46 @@ function classifyForwardLayoutAdjacency(
   edgeRowIndex: number,
   edge: ClassifiedEdge,
   laneIndex: number,
+  passThroughLanes: readonly number[],
   nodeColumn: ReadonlyMap<string, number>,
+  convergenceProducer: boolean,
+  divergenceBranchEdge: boolean,
 ): EdgeAdjacency {
-  let passedThroughNode = false;
+  let sawObstruction = false;
+  const passThroughLaneSet = new Set(passThroughLanes);
 
   for (let index = edgeRowIndex + 1; index < rows.length; index++) {
     const row = rows[index];
     if (row === undefined) break;
-    if (
-      row.kind === 'component-separator' ||
-      row.kind === 'branch-connector' ||
-      row.kind === 'merge-connector'
-    ) {
+    if (row.kind === 'component-separator') continue;
+    if (row.kind === 'merge-connector') {
+      if (convergenceProducer) {
+        if (row.contractHash === edge.from) sawObstruction = true;
+      } else if (!divergenceBranchEdge && row.contractHash !== edge.from) {
+        sawObstruction = true;
+      }
       continue;
     }
+    if (row.kind === 'branch-connector') continue;
     if (row.kind === 'edge') {
       if (row.laneIndex === laneIndex) return 'node-skipping-forward';
+      if (!divergenceBranchEdge && row.edge !== undefined && row.edge.to !== edge.to) {
+        sawObstruction = true;
+      }
       continue;
     }
     if (row.kind === 'node' && row.contractHash !== undefined) {
       if (row.contractHash === edge.from) {
-        const column = nodeColumn.get(row.contractHash) ?? 0;
-        if (column === laneIndex) {
-          return passedThroughNode ? 'node-skipping-forward' : 'adjacent';
-        }
-        if (passedThroughNode) return 'node-skipping-forward';
-        return 'adjacent';
+        return sawObstruction ? 'node-skipping-forward' : 'adjacent';
       }
-      const column = nodeColumn.get(row.contractHash) ?? 0;
-      if (column !== laneIndex) {
-        if (laneHasVerticalPass(row, laneIndex)) passedThroughNode = true;
-        continue;
+      const nodeCol = nodeColumn.get(row.contractHash) ?? 0;
+      if (!passThroughLaneSet.has(nodeCol)) {
+        sawObstruction = true;
       }
-      return 'node-skipping-forward';
     }
   }
 
   return 'node-skipping-forward';
-}
-
-function isSecondaryConvergenceTip(
-  contract: string,
-  forwardInDegree: ReadonlyMap<string, number>,
-  forwardOutDegree: ReadonlyMap<string, number>,
-  componentNodes: readonly string[],
-): boolean {
-  const inDegree = forwardInDegree.get(contract) ?? 0;
-  const outDegree = forwardOutDegree.get(contract) ?? 0;
-  if (outDegree !== 0 || inDegree < 2) return false;
-  return componentNodes.some(
-    (node) =>
-      node !== contract &&
-      (forwardOutDegree.get(node) ?? 0) === 0 &&
-      (forwardInDegree.get(node) ?? 0) < inDegree,
-  );
 }
 
 function classifyLayoutAdjacency(
@@ -177,11 +210,12 @@ function classifyLayoutAdjacency(
   edgeRowIndex: number,
   edge: ClassifiedEdge,
   laneIndex: number,
+  passThroughLanes: readonly number[],
   nodeColumn: ReadonlyMap<string, number>,
   position: ReadonlyMap<string, number>,
   forwardInDegree: ReadonlyMap<string, number>,
-  forwardOutDegree: ReadonlyMap<string, number>,
-  componentNodes: readonly string[],
+  convergenceProducer: boolean,
+  divergenceBranchEdge: boolean,
 ): EdgeAdjacency {
   if (edge.kind === 'self') return 'adjacent';
 
@@ -190,26 +224,19 @@ function classifyLayoutAdjacency(
 
   if (edge.kind === 'forward') {
     const inDegree = forwardInDegree.get(edge.to) ?? 0;
-    if (
-      laneIndex > 0 &&
-      inDegree >= 2 &&
-      (nodeColumn.get(edge.from) ?? 0) === laneIndex &&
-      isSecondaryConvergenceTip(edge.to, forwardInDegree, forwardOutDegree, componentNodes)
-    ) {
-      return 'adjacent';
-    }
-    if (
-      laneIndex > 0 &&
-      inDegree >= 2 &&
-      (nodeColumn.get(edge.from) ?? 0) === 0 &&
-      isSecondaryConvergenceTip(edge.to, forwardInDegree, forwardOutDegree, componentNodes)
-    ) {
-      return 'node-skipping-forward';
-    }
     if (inDegree <= 1 && fromPos !== undefined && toPos !== undefined && fromPos === toPos + 1) {
       return 'adjacent';
     }
-    return classifyForwardLayoutAdjacency(rows, edgeRowIndex, edge, laneIndex, nodeColumn);
+    return classifyForwardLayoutAdjacency(
+      rows,
+      edgeRowIndex,
+      edge,
+      laneIndex,
+      passThroughLanes,
+      nodeColumn,
+      convergenceProducer,
+      divergenceBranchEdge,
+    );
   }
 
   if (fromPos !== undefined && toPos !== undefined && toPos === fromPos + 1) {
@@ -240,23 +267,49 @@ function refineAdjacency(
   position: ReadonlyMap<string, number>,
   forwardInDegree: ReadonlyMap<string, number>,
   forwardOutDegree: ReadonlyMap<string, number>,
-  componentNodes: readonly string[],
+  edges: readonly ClassifiedEdge[],
+  producerLaneByHash: ReadonlyMap<string, number>,
 ): MigrationGraphGridRow[] {
+  const forwardProducersByTo = buildForwardProducersByTo(edges);
+  function branchLaneForEdge(producer: ClassifiedEdge): number | undefined {
+    const children = edges.filter(
+      (edge) => edge.from === producer.from && edge.kind === 'forward' && edge.from !== edge.to,
+    );
+    if (children.length < 2) return undefined;
+    const index = children.findIndex((child) => child.migrationHash === producer.migrationHash);
+    return index >= 0 ? index : undefined;
+  }
+
   return rows.map((row, index) => {
     if (row.kind !== 'edge' || row.edge === undefined || row.laneIndex === undefined) {
       return row;
     }
-    const adjacency = classifyLayoutAdjacency(
-      rows,
-      index,
-      row.edge,
-      row.laneIndex,
-      nodeColumn,
-      position,
-      forwardInDegree,
-      forwardOutDegree,
-      componentNodes,
-    );
+    const divergenceBranchEdge =
+      row.edge.kind === 'forward' &&
+      !(row.convergenceProducer ?? false) &&
+      (forwardOutDegree.get(row.edge.from) ?? 0) >= 2 &&
+      branchLaneForEdge(row.edge) !== undefined;
+    const adjacency =
+      row.convergenceProducer === true &&
+      convergenceProducerUsesShortAdjacency(
+        row.edge,
+        row.laneIndex,
+        forwardProducersByTo,
+        producerLaneByHash,
+      )
+        ? classifyForwardShortConvergenceAdjacency(rows, index, row.edge, row.laneIndex)
+        : classifyLayoutAdjacency(
+            rows,
+            index,
+            row.edge,
+            row.laneIndex,
+            row.passThroughLanes ?? [],
+            nodeColumn,
+            position,
+            forwardInDegree,
+            row.convergenceProducer ?? false,
+            divergenceBranchEdge,
+          );
     return {
       ...row,
       cells: buildEdgeCells(
@@ -395,8 +448,43 @@ function layoutComponent(
   const nodeColumnByHash = new Map<string, number>();
   const edgeColumnByHash = new Map<string, number>();
   const producerLaneByHash = new Map<string, number>();
+  const divergenceBranchLaneByHash = new Map<string, number>();
+  const spineLaneByNode = new Map<string, number>();
+  const divergenceRootByNode = new Map<string, string>();
   const convergencesEmitted = new Set<string>();
   let gridWidth = 1;
+
+  function presetBranchLayout(): void {
+    for (const node of componentNodes) {
+      const children = forwardChildrenFrom(node);
+      if (children.length < 2) continue;
+
+      for (const [branchLane, child] of children.entries()) {
+        presetColumnAlongSpine(child.to, branchLane, node);
+        divergenceBranchLaneByHash.set(child.migrationHash, branchLane);
+      }
+    }
+  }
+
+  function presetColumnAlongSpine(start: string, column: number, divergeFrom: string): void {
+    let current: string | undefined = start;
+    while (current !== undefined) {
+      if (!nodeColumnByHash.has(current)) {
+        nodeColumnByHash.set(current, column);
+      }
+      spineLaneByNode.set(current, column);
+      divergenceRootByNode.set(current, divergeFrom);
+
+      const outs = forwardChildrenFrom(current);
+      if (outs.length !== 1) break;
+      const next = outs[0];
+      if (next === undefined) break;
+      if ((forwardInDegree.get(next.to) ?? 0) >= 2) break;
+      current = next.to;
+    }
+  }
+
+  presetBranchLayout();
 
   function ensureGridWidth(minWidth: number): void {
     if (minWidth > gridWidth) gridWidth = minWidth;
@@ -432,9 +520,19 @@ function layoutComponent(
     if (lane) lane.active = false;
   }
 
-  function emitBranchConnector(contractHash: string, branchCount: number): void {
-    const startLane = 0;
-    const endLane = branchCount - 1;
+  function passThroughLaneCount(excludeContract?: string): number {
+    return activeLaneIndices().filter((index) => {
+      const lane = lanes[index];
+      return lane?.active && lane.want !== excludeContract;
+    }).length;
+  }
+
+  function emitBranchConnector(
+    contractHash: string,
+    startLane: number,
+    endLane: number,
+    branchCount: number,
+  ): void {
     ensureGridWidth(endLane + 1);
     rows.push({
       kind: 'branch-connector',
@@ -444,6 +542,45 @@ function layoutComponent(
       branchCount,
       cells: buildBranchConnectorCells(startLane, endLane),
     });
+  }
+
+  function emitMergeIfNeeded(contract: string): void {
+    const wanting = lanesWanting(contract);
+    if (wanting.length >= 2) {
+      emitMergeConnector(contract, wanting);
+      return;
+    }
+
+    const producers = (forwardProducersByTo.get(contract) ?? []).filter(
+      (edge) => edge.kind === 'forward',
+    );
+    if (producers.length >= 2) {
+      const producerLanes = [
+        ...new Set(
+          producers
+            .map((producer) => edgeColumnByHash.get(producer.migrationHash))
+            .filter((lane): lane is number => lane !== undefined),
+        ),
+      ];
+      if (producerLanes.length >= 2) {
+        emitMergeConnector(contract, producerLanes);
+        return;
+      }
+    }
+
+    const divergingChildren = forwardChildrenFrom(contract);
+    if (divergingChildren.length >= 2) {
+      const childLanes = [
+        ...new Set(
+          divergingChildren
+            .map((child) => edgeColumnByHash.get(child.migrationHash))
+            .filter((lane): lane is number => lane !== undefined),
+        ),
+      ];
+      if (childLanes.length >= 2) {
+        emitMergeConnector(contract, childLanes);
+      }
+    }
   }
 
   function emitMergeConnector(contractHash: string, laneIndices: readonly number[]): void {
@@ -479,50 +616,48 @@ function layoutComponent(
     return edges.filter((e) => e.from === from && e.kind === 'forward' && e.from !== e.to);
   }
 
-  function ensureSiblingLanesAtDivergence(from: string, activeLane: number): void {
-    const children = forwardChildrenFrom(from);
-    if (children.length < 2) return;
-
-    for (const [childIndex, child] of children.entries()) {
-      ensureLane(childIndex);
-      if (childIndex === activeLane) continue;
-      const lane = lanes[childIndex];
-      if (lane?.active && lane.want === from) continue;
-      lanes[childIndex] = { want: child.to, active: true };
+  function passThroughForBranchEdge(from: string, laneIndex: number): number[] {
+    const siblingSpan = forwardChildrenFrom(from).length - 1;
+    const passThrough: number[] = [];
+    for (let index = 0; index <= siblingSpan; index++) {
+      if (index !== laneIndex) passThrough.push(index);
     }
+    return passThrough;
   }
 
   function emitEdgeRow(
     edge: ClassifiedEdge,
     laneIndex: number,
     passThroughLanes: readonly number[],
+    options?: { readonly convergenceProducer?: boolean },
   ): void {
     let effectivePassThrough = passThroughLanes;
+    const branchLane = divergenceBranchLaneByHash.get(edge.migrationHash);
     if (
-      edge.kind === 'forward' &&
-      (forwardOutDegree.get(edge.from) ?? 0) >= 2 &&
-      (forwardOutDegree.get(edge.to) ?? 0) === 0
+      !(options?.convergenceProducer ?? false) &&
+      branchLane !== undefined &&
+      branchLane === laneIndex
     ) {
-      ensureSiblingLanesAtDivergence(edge.from, laneIndex);
-      effectivePassThrough = activeLaneIndices().filter((index) => index !== laneIndex);
+      effectivePassThrough = passThroughForBranchEdge(edge.from, laneIndex);
     }
 
     const adjacency = classifyEdgeAdjacency(edge, position);
     ensureGridWidth(Math.max(laneIndex, ...effectivePassThrough, 0) + 1);
-    rows.push({
+    const row: MigrationGraphGridRow = {
       kind: 'edge',
       edge,
       laneIndex,
       passThroughLanes: effectivePassThrough,
       cells: buildEdgeCells(edge, laneIndex, effectivePassThrough, adjacency, gridWidth),
-    });
+    };
+    if (options?.convergenceProducer === true) {
+      rows.push({ ...row, convergenceProducer: true });
+    } else {
+      rows.push(row);
+    }
     edgeColumnByHash.set(edge.migrationHash, laneIndex);
     ensureLane(laneIndex);
     lanes[laneIndex] = { want: canonicalFrom(edge.from), active: true };
-  }
-
-  function isLocalSecondaryConvergenceTip(contract: string): boolean {
-    return isSecondaryConvergenceTip(contract, forwardInDegree, forwardOutDegree, componentNodes);
   }
 
   function emitConvergenceAfterNode(contract: string): void {
@@ -531,15 +666,18 @@ function layoutComponent(
 
     const producers = forwardProducersByTo.get(contract) ?? [];
     if (producers.length >= 2) {
-      emitBranchConnector(contract, producers.length);
+      const startLane = passThroughLaneCount(contract);
+      const endLane = startLane + producers.length - 1;
+      emitBranchConnector(contract, startLane, endLane, producers.length);
       for (const [producerIndex, producer] of producers.entries()) {
-        const lane = isLocalSecondaryConvergenceTip(contract)
-          ? producers.length - 1
-          : producerIndex;
+        const lane = startLane + producerIndex;
         ensureLane(lane);
         lanes[lane] = { want: canonicalFrom(producer.from), active: true };
         producerLaneByHash.set(producer.migrationHash, lane);
-        if ((forwardOutDegree.get(producer.from) ?? 0) < 2) {
+        if (
+          (forwardOutDegree.get(producer.from) ?? 0) < 2 &&
+          !nodeColumnByHash.has(producer.from)
+        ) {
           nodeColumnByHash.set(producer.from, lane);
         }
       }
@@ -568,19 +706,31 @@ function layoutComponent(
       return a.from.localeCompare(b.from);
     });
 
+    const convergenceProducers: ClassifiedEdge[] = [];
     for (const producer of sorted) {
-      const presetLane = producerLaneByHash.get(producer.migrationHash);
-      if (presetLane !== undefined) {
-        const passThrough = activeLaneIndices().filter((index) => index !== presetLane);
-        emitEdgeRow(producer, presetLane, passThrough);
+      const convergenceLane = producerLaneByHash.get(producer.migrationHash);
+      if (convergenceLane !== undefined) {
+        convergenceProducers.push(producer);
         continue;
       }
 
-      const branchLane = branchLaneForProducerEdge(producer);
+      const branchLane =
+        divergenceBranchLaneByHash.get(producer.migrationHash) ??
+        branchLaneForProducerEdge(producer);
       if (branchLane !== undefined) {
-        ensureSiblingLanesAtDivergence(producer.from, branchLane);
-        const passThrough = activeLaneIndices().filter((index) => index !== branchLane);
-        emitEdgeRow(producer, branchLane, passThrough);
+        emitEdgeRow(producer, branchLane, passThroughForBranchEdge(producer.from, branchLane));
+        spineLaneByNode.set(producer.to, branchLane);
+        continue;
+      }
+
+      const spineLane = spineLaneByNode.get(producer.from);
+      if (spineLane !== undefined) {
+        const divergeFrom = divergenceRootByNode.get(producer.from);
+        const passThrough =
+          divergeFrom !== undefined
+            ? passThroughForBranchEdge(divergeFrom, spineLane)
+            : activeLaneIndices().filter((index) => index !== spineLane);
+        emitEdgeRow(producer, spineLane, passThrough);
         continue;
       }
 
@@ -595,21 +745,47 @@ function layoutComponent(
       const laneIndex = activeLaneIndices().length === 0 ? 0 : Math.max(...activeLaneIndices()) + 1;
       emitEdgeRow(producer, laneIndex, activeLaneIndices());
     }
+
+    for (const producer of convergenceProducers) {
+      const presetLane = producerLaneByHash.get(producer.migrationHash);
+      if (presetLane === undefined) continue;
+      const fanLanes = [
+        ...new Set(
+          convergenceProducers
+            .map((candidate) => producerLaneByHash.get(candidate.migrationHash))
+            .filter((lane): lane is number => lane !== undefined),
+        ),
+      ].sort((a, b) => a - b);
+      const fanStart = fanLanes[0] ?? presetLane;
+      const spinePassThrough: number[] = [];
+      for (let index = 0; index < fanStart; index++) {
+        spinePassThrough.push(index);
+      }
+      const passThrough = [...spinePassThrough, ...fanLanes.filter((lane) => lane !== presetLane)];
+      emitEdgeRow(producer, presetLane, passThrough, { convergenceProducer: true });
+    }
+  }
+
+  function emitSelfEdgesBeforeNode(contract: string): void {
+    const fromEdges = edgesByFrom.get(contract) ?? [];
+    const selfEdges = fromEdges.filter((e) => e.kind === 'self');
+    selfEdges.sort((a, b) => b.dirName.localeCompare(a.dirName));
+
+    const nodeColumn = nodeColumnByHash.get(contract) ?? 0;
+    for (const edge of selfEdges) {
+      const passThrough = activeLaneIndices().filter((index) => index !== nodeColumn);
+      emitEdgeRow(edge, nodeColumn, passThrough);
+    }
   }
 
   function emitDepartingEdgesFrom(contract: string): void {
     const fromEdges = edgesByFrom.get(contract) ?? [];
-    const rollbacksAndSelf = fromEdges.filter((e) => e.kind === 'rollback' || e.kind === 'self');
-    rollbacksAndSelf.sort((a, b) => b.dirName.localeCompare(a.dirName));
+    const rollbacks = fromEdges.filter((e) => e.kind === 'rollback');
+    rollbacks.sort((a, b) => b.dirName.localeCompare(a.dirName));
 
-    for (const edge of rollbacksAndSelf) {
-      const nodePosAdjacency = classifyEdgeAdjacency(edge, position);
-      if (nodePosAdjacency === 'adjacent' || edge.kind === 'self') {
-        emitEdgeRow(edge, 0, []);
-        continue;
-      }
-
-      emitEdgeRow(edge, 0, []);
+    for (const edge of rollbacks) {
+      const passThrough = activeLaneIndices().filter((index) => index !== 0);
+      emitEdgeRow(edge, 0, passThrough);
     }
   }
 
@@ -625,7 +801,9 @@ function layoutComponent(
       return laneA - laneB;
     });
     for (const producer of sorted) {
-      visitNode(producer.from);
+      if (!emittedNodes.has(producer.from)) {
+        visitNode(producer.from);
+      }
     }
   }
 
@@ -634,23 +812,21 @@ function layoutComponent(
   function visitNode(contract: string): void {
     if (emittedNodes.has(contract)) return;
 
-    const wanting = lanesWanting(contract);
-    if (wanting.length >= 2) {
-      emitMergeConnector(contract, wanting);
-    }
+    emitMergeIfNeeded(contract);
 
     const producerCount = (forwardProducersByTo.get(contract) ?? []).length;
-    if (isLocalSecondaryConvergenceTip(contract) && producerCount >= 2) {
-      nodeColumnByHash.set(contract, producerCount - 1);
+    if ((forwardInDegree.get(contract) ?? 0) >= 2 && producerCount >= 2) {
+      nodeColumnByHash.set(contract, passThroughLaneCount(contract));
     }
 
+    emitSelfEdgesBeforeNode(contract);
     emitNodeRow(contract);
     emittedNodes.add(contract);
 
     emitConvergenceAfterNode(contract);
     emitForwardProducersTo(contract);
-    visitBranchRoots(contract);
     emitDepartingEdgesFrom(contract);
+    visitBranchRoots(contract);
   }
 
   const tipStarts = componentNodes
@@ -679,7 +855,8 @@ function layoutComponent(
       position,
       forwardInDegree,
       forwardOutDegree,
-      componentNodes,
+      edges,
+      producerLaneByHash,
     ),
     nodeColumn: nodeColumnByHash,
     edgeColumn: edgeColumnByHash,

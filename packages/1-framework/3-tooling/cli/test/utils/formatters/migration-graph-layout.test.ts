@@ -219,7 +219,7 @@ describe('buildMigrationGraphLayout', () => {
     expect(model.nodeColumn.get('avatar')).toBe(2);
   });
 
-  it('lays out cross-link with a long forward lane spanning branch rows', () => {
+  it('lays out cross-link with three lanes per mockup', () => {
     const aToB = edge('A', 'B', 'A_to_B');
     const bToC = edge('B', 'C', 'B_to_C');
     const aToD = edge('A', 'D', 'A_to_D');
@@ -227,9 +227,20 @@ describe('buildMigrationGraphLayout', () => {
     const bToE = edge('B', 'E', 'B_to_E');
     const model = layout([aToB, bToC, aToD, dToE, bToE]);
 
+    const branchAtE = model.rows.find(
+      (r) => r.kind === 'branch-connector' && r.contractHash === 'E',
+    );
+    expect(branchAtE).toMatchObject({ startLane: 1, endLane: 2, branchCount: 2 });
+
+    const mergeAtB = model.rows.find((r) => r.kind === 'merge-connector' && r.contractHash === 'B');
+    expect(mergeAtB).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+
+    const mergeAtA = model.rows.find((r) => r.kind === 'merge-connector' && r.contractHash === 'A');
+    expect(mergeAtA).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+
     expectEdgeGeometry(model.rows, 'B_to_C', 0, [1], 'adjacent');
-    expectEdgeGeometry(model.rows, 'B_to_E', 1, [0], 'node-skipping-forward');
-    expectEdgeGeometry(model.rows, 'D_to_E', 1, [0], 'adjacent');
+    expectEdgeGeometry(model.rows, 'B_to_E', 1, [0, 2], 'node-skipping-forward');
+    expectEdgeGeometry(model.rows, 'D_to_E', 2, [0, 1], 'adjacent');
     expectEdgeGeometry(model.rows, 'A_to_B', 0, [1], 'adjacent');
     expectEdgeGeometry(model.rows, 'A_to_D', 1, [0], 'adjacent');
 
@@ -238,6 +249,62 @@ describe('buildMigrationGraphLayout', () => {
     expect(model.nodeColumn.get('B')).toBe(0);
     expect(model.nodeColumn.get('D')).toBe(1);
     expect(model.nodeColumn.get('A')).toBe(0);
+  });
+
+  it('lays out kitchen-sink with unequal branch lengths per mockup', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
+    const addPhone = edge('root', 'n1', 'add_phone');
+    const emailDefault = edge('n1', 'n2', 'email_default');
+    const changeDefault = edge('n2', 'n3', 'change_default');
+    const addPosts = edge('n3', 'n4', 'add_posts');
+    const addComments = edge('n4', 'n5', 'add_comments');
+    const kitchenSink = edge('n5', 'tip_long', 'kitchen_sink');
+    const rollback = edge('tip_long', 'n5', 'rollback');
+    const widenEmail = edge('root', 's1', 'widen_email');
+    const migration = edge('s1', 'tip_short', 'migration');
+    const model = layout([
+      init,
+      addPhone,
+      emailDefault,
+      changeDefault,
+      addPosts,
+      addComments,
+      kitchenSink,
+      rollback,
+      widenEmail,
+      migration,
+    ]);
+
+    const mergeAtRoot = model.rows.find(
+      (r) => r.kind === 'merge-connector' && r.contractHash === 'root',
+    );
+    expect(mergeAtRoot).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+
+    expectEdgeGeometry(model.rows, 'add_phone', 0, [1], 'adjacent');
+    expectEdgeGeometry(model.rows, 'widen_email', 1, [0], 'adjacent');
+    expectEdgeGeometry(model.rows, 'migration', 1, [0], 'adjacent');
+    expectEdgeGeometry(model.rows, 'rollback', 0, [1], 'adjacent');
+
+    expect(model.nodeColumn.get('root')).toBe(0);
+    expect(model.nodeColumn.get('tip_short')).toBe(1);
+    expect(model.nodeColumn.get('tip_long')).toBe(0);
+  });
+
+  it('places self-edge row immediately above its node', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
+    const noop = edge('aaa', 'aaa', 'noop');
+    const next = edge('aaa', 'bbb', 'next');
+    const model = layout([init, noop, next]);
+
+    const aaaNodeIndex = model.rows.findIndex((r) => r.kind === 'node' && r.contractHash === 'aaa');
+    const noopIndex = model.rows.findIndex((r) => r.kind === 'edge' && r.edge?.dirName === 'noop');
+    const nextIndex = model.rows.findIndex((r) => r.kind === 'edge' && r.edge?.dirName === 'next');
+
+    expect(noopIndex).toBeGreaterThanOrEqual(0);
+    expect(aaaNodeIndex).toBeGreaterThan(noopIndex);
+    expect(noopIndex).toBe(aaaNodeIndex - 1);
+    expect(nextIndex).toBeLessThan(noopIndex);
+    expectEdgeGeometry(model.rows, 'noop', 0, [], 'adjacent');
   });
 
   it('separates disjoint components with a blank separator row', () => {
