@@ -97,6 +97,7 @@ describe('ContractSpaceMember.contractAt', () => {
     const result = await member.contractAt(HASH_A, { refName: 'staging' });
 
     expect(result.hash).toBe(HASH_A);
+    expect(result.provenance).toBe('snapshot');
     expect(result.contractDts).toBe(sampleContractDts('snapshot'));
     expect((result.contractJson as { storage: { storageHash: string } }).storage.storageHash).toBe(
       HASH_A,
@@ -111,6 +112,8 @@ describe('ContractSpaceMember.contractAt', () => {
     const result = await member.contractAt(HASH_B);
 
     expect(result.hash).toBe(HASH_B);
+    expect(result.provenance).toBe('graph-node');
+    expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
     expect((result.contractJson as { storage: { storageHash: string } }).storage.storageHash).toBe(
       HASH_B,
@@ -124,6 +127,8 @@ describe('ContractSpaceMember.contractAt', () => {
 
     const result = await member.contractAt(HASH_B, { refName: 'staging' });
 
+    expect(result.provenance).toBe('graph-node');
+    expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
   });
 

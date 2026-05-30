@@ -14,6 +14,8 @@ export interface ContractAtResult {
   readonly contractJson: unknown;
   readonly contractDts: string;
   readonly contract: Contract;
+  readonly provenance: 'snapshot' | 'graph-node';
+  readonly sourceDir?: string;
 }
 
 /**

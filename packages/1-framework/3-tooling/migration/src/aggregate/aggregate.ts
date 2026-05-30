@@ -107,6 +107,7 @@ async function resolveContractAt(args: {
         contractJson: snapshot.contract,
         contractDts: snapshot.contractDts,
         contract: deserializeContractAtPath(jsonPath, snapshot.contract, deserializeContract),
+        provenance: 'snapshot',
       };
     }
 
@@ -145,7 +146,14 @@ async function resolveGraphNodeContractAt(args: {
     matchingBundle.dirPath,
     deserializeContract,
   );
-  return { hash, contractJson, contractDts, contract };
+  return {
+    hash,
+    contractJson,
+    contractDts,
+    contract,
+    provenance: 'graph-node',
+    sourceDir: matchingBundle.dirPath,
+  };
 }
 
 /**

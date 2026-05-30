@@ -15,7 +15,6 @@ import {
   CliStructuredError,
   errorPlanForgotTheFlag,
   errorSnapshotMissing,
-  errorUnexpected,
   mapRefResolutionError,
 } from './cli-errors';
 import { mapContractAtError } from './contract-at-errors';
@@ -108,7 +107,7 @@ async function resolveContractRef(
   try {
     const at = await member.contractAt(hash, refName !== undefined ? { refName } : undefined);
 
-    if (refName !== undefined) {
+    if (at.provenance === 'snapshot') {
       return ok({
         kind: 'snapshot',
         hash: at.hash,
@@ -118,28 +117,13 @@ async function resolveContractRef(
       });
     }
 
-    const matchingBundle = member.packages.find((pkg) => pkg.metadata.to === hash);
-    if (!matchingBundle) {
-      return notOk(
-        errorUnexpected(
-          options?.explicitLabel
-            ? `No migration bundle found for reference "${options.explicitLabel}" (resolved hash: ${hash})`
-            : `No migration bundle found for graph node ${hash}`,
-          {
-            why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
-            fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
-          },
-        ),
-      );
-    }
-
     return ok({
       kind: 'graph-node',
       hash: at.hash,
       contract: at.contract,
       contractJson: at.contractJson,
       contractDts: at.contractDts,
-      sourceDir: matchingBundle.dirPath,
+      sourceDir: at.sourceDir!,
     });
   } catch (error) {
     return mapContractAtError(

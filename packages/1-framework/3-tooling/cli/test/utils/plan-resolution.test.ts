@@ -57,18 +57,26 @@ function sampleContractIR(storageHash: string): ContractIR {
   };
 }
 
-function contractAtResult(storageHash: string): {
+function contractAtResult(
+  storageHash: string,
+  opts?: { readonly provenance?: 'snapshot' | 'graph-node'; readonly sourceDir?: string },
+): {
   hash: string;
   contract: Contract;
   contractJson: unknown;
   contractDts: string;
+  provenance: 'snapshot' | 'graph-node';
+  sourceDir?: string;
 } {
   const ir = sampleContractIR(storageHash);
+  const provenance = opts?.provenance ?? 'snapshot';
   return {
     hash: storageHash,
     contract: ir.contract as Contract,
     contractJson: ir.contract,
     contractDts: ir.contractDts,
+    provenance,
+    ...(provenance === 'graph-node' ? { sourceDir: opts?.sourceDir ?? '/migrations/app/m1' } : {}),
   };
 }
 
@@ -247,7 +255,11 @@ describe('resolveFromForPlan', () => {
 
   it('returns graph-node for explicit full hash that is a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const contractAt = vi.fn().mockResolvedValue(contractAtResult(HASH_A));
+    const contractAt = vi
+      .fn()
+      .mockResolvedValue(
+        contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
+      );
     const member = makeMember(bundles, {}, contractAt);
     const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_A }));
 
@@ -292,14 +304,46 @@ describe('resolveFromForPlan', () => {
     const member = makeMember(
       bundles,
       { db: { hash: HASH_A, invariants: [] } },
-      vi.fn().mockResolvedValue(contractAtResult(HASH_A)),
+      vi
+        .fn()
+        .mockResolvedValue(
+          contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
+        ),
     );
     const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.kind).toBe('snapshot');
+      expect(result.value).toMatchObject({
+        kind: 'graph-node',
+        fromHash: HASH_A,
+        sourceDir: '/migrations/app/m1',
+      });
     }
+  });
+
+  it('returns graph-node for explicit ref when snapshot is missing but hash is a graph node', async () => {
+    const bundles = [makePkg(E, HASH_A, 'm1')];
+    const member = makeMember(
+      bundles,
+      { staging: { hash: HASH_A, invariants: [] } },
+      vi
+        .fn()
+        .mockResolvedValue(
+          contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
+        ),
+    );
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        kind: 'graph-node',
+        fromHash: HASH_A,
+        sourceDir: '/migrations/app/m1',
+      });
+    }
+    expect(member.contractAt).toHaveBeenCalledWith(HASH_A, { refName: 'staging' });
   });
 
   it('refuses snapshot-missing for explicit ref name without snapshot when hash is not a graph node', async () => {
@@ -419,7 +463,11 @@ describe('resolveToForPlan', () => {
 
   it('resolves a full hash that is a graph node via the bundle end-contract artifacts', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const contractAt = vi.fn().mockResolvedValue(contractAtResult(HASH_A));
+    const contractAt = vi
+      .fn()
+      .mockResolvedValue(
+        contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
+      );
     const member = makeMember(bundles, {}, contractAt);
     const result = await resolveToForPlan(HASH_A, baseToInput({ member }));
 
@@ -433,7 +481,11 @@ describe('resolveToForPlan', () => {
 
   it('resolves <dir>^ to the predecessor (from) contract via the bundle artifacts', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const contractAt = vi.fn().mockResolvedValue(contractAtResult(HASH_A));
+    const contractAt = vi
+      .fn()
+      .mockResolvedValue(
+        contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
+      );
     const member = makeMember(bundles, {}, contractAt);
     const result = await resolveToForPlan('m2^', baseToInput({ member }));
 

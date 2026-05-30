@@ -150,6 +150,7 @@ function buildResolutionMember(
           contract: snap.contract as Contract,
           contractJson: snap.contract,
           contractDts: snap.contractDts,
+          provenance: 'snapshot',
         };
       }
 
@@ -180,6 +181,8 @@ function buildResolutionMember(
           contract: contractJson as Contract,
           contractJson,
           contractDts,
+          provenance: 'graph-node',
+          sourceDir: matchingBundle.dirPath,
         };
       } catch (error) {
         if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
