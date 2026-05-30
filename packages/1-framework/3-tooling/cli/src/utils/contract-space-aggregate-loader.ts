@@ -1,5 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type {
   ContractSpaceAggregate,
   DeclaredExtensionEntry,
@@ -7,8 +10,12 @@ import type {
   IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { CliStructuredError } from './cli-errors';
+import { CliStructuredError, errorUnexpected, mapMigrationToolsError } from './cli-errors';
+import { readContractEnvelope, resolveContractPath } from './command-helpers';
 import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
 
 const CONTRACT_SPACES_DOCS_URL = 'https://pris.ly/contract-spaces';
@@ -278,4 +285,95 @@ export async function buildContractSpaceAggregate<
     return notOk(failure);
   }
   return ok(loaded.value);
+}
+
+export function appContractShellForAggregateLoad(args: {
+  readonly contractHash: string;
+  readonly targetId: string;
+  readonly targetFamily: string;
+}): Contract {
+  return blindCast<Contract, 'offline read aggregate without contract.json'>({
+    storage: { storageHash: args.contractHash },
+    schemaVersion: '0.0.0',
+    target: args.targetId,
+    targetFamily: args.targetFamily,
+    models: {},
+    profileHash: EMPTY_CONTRACT_HASH,
+  });
+}
+
+export async function loadContractRawSafely(config: {
+  contract?: { output?: string };
+}): Promise<unknown | null> {
+  try {
+    const path = resolveContractPath(config);
+    const raw = await readFile(path, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Offline tolerant {@link ContractSpaceAggregate} assembly for read-only
+ * CLI commands. No integrity gate — callers query `aggregate.app` (or
+ * other facets) without re-reading `migrations/`.
+ */
+export async function buildReadAggregate(
+  config: PrismaNextConfig,
+  options: { readonly migrationsDir: string },
+): Promise<
+  Result<
+    { readonly aggregate: ContractSpaceAggregate; readonly contractHash: string },
+    CliStructuredError
+  >
+> {
+  let contractHash: string = EMPTY_CONTRACT_HASH;
+  try {
+    const envelope = await readContractEnvelope(config);
+    contractHash = envelope.storageHash;
+  } catch {
+    // Contract unreadable — marker uses EMPTY_CONTRACT_HASH
+  }
+
+  const contractRawForAggregate = await loadContractRawSafely(config);
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+  const deserializeContract = (json: unknown): Contract => familyInstance.deserializeContract(json);
+  const appContractShell = appContractShellForAggregateLoad({
+    contractHash,
+    targetId: config.target.id,
+    targetFamily: config.target.familyId,
+  });
+  let appContractForLoad: Contract = appContractShell;
+  if (contractRawForAggregate !== null) {
+    try {
+      appContractForLoad = deserializeContract(contractRawForAggregate);
+    } catch {
+      // Deserialization failed — shell fallback
+    }
+  }
+
+  try {
+    const loaded = await loadContractSpaceAggregateForCli({
+      targetId: config.target.id,
+      migrationsDir: options.migrationsDir,
+      appContract: appContractForLoad,
+      extensionPacks: config.extensionPacks ?? [],
+      deserializeContract,
+    });
+    if (!loaded.ok) {
+      return loaded;
+    }
+    return ok({ aggregate: loaded.value, contractHash });
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read migrations directory: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
 }
