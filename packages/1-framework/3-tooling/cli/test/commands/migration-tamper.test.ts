@@ -358,6 +358,37 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
     );
 
     it(
+      'migration status tolerates package corruption when the app contract is unreadable',
+      async () => {
+        const { createMigrationStatusCommand } = await import(
+          '../../src/commands/migration-status'
+        );
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
+
+        await rm(join(fixture.cwd, 'src', 'prisma', 'contract.json'));
+
+        consoleOutput.length = 0;
+        consoleErrors.length = 0;
+        const exitCode = await runAndCaptureExit(() =>
+          executeCommand(createMigrationStatusCommand(), ['--json']),
+        );
+        expect(exitCode).toBe(0);
+
+        const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+        expect(jsonLine).toBeDefined();
+        const payload = JSON.parse(jsonLine!) as {
+          readonly ok?: boolean;
+          readonly diagnostics?: ReadonlyArray<{ readonly code?: string }>;
+        };
+        expect(payload.ok).toBe(true);
+        expect(payload.diagnostics?.some((d) => d.code === 'CONTRACT.UNREADABLE')).toBe(true);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
       'migration new refuses before scaffolding the new migration',
       async () => {
         // `migration new` is mutating: the gate runs before it computes

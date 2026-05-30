@@ -648,9 +648,11 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  const corruptionFailure = refusePackageCorruptionOnAggregate(aggregate);
-  if (corruptionFailure) {
-    return notOk(corruptionFailure);
+  if (contractRawForAggregate !== null) {
+    const corruptionFailure = refusePackageCorruptionOnAggregate(aggregate);
+    if (corruptionFailure) {
+      return notOk(corruptionFailure);
+    }
   }
 
   const appGraph = aggregate.app.graph();
