@@ -45,6 +45,14 @@ The classification lives in one place — the [`.github/actions/detect-inert-dif
 - **No third-party cache action or remote-cache token.** Caching is first-party `actions/cache` only, preserving the fork-PR posture in [supply chain](./supply-chain.md) (fork PRs get cold caches by design).
 - **Least-privilege token.** `ci.yml` grants `GITHUB_TOKEN` only `contents: read`; the caches use the runner's cache runtime token, not `GITHUB_TOKEN`. Checkout steps set `persist-credentials: false`.
 
+## Adjacent workflows
+
+A second PR workflow ([`.github/workflows/bundle-size.yml`](../../.github/workflows/bundle-size.yml)) reports the gzipped cost of `@prisma-next/postgres` and `@prisma-next/mongo` for a single-table contract against both authoring styles (no-emit vs. emitted `contract.json`). It runs [`andresz1/size-limit-action`](https://github.com/andresz1/size-limit-action) against the bundles produced by [`examples/bundle-size`](../../examples/bundle-size); the action checks out the head and the base ref, runs `pnpm size:build` (workspace Turbo build + esbuild) in each, and posts/updates a PR comment with the head-vs-base delta for the four entries.
+
+The workflow is **not a required check** — bundle size is a signal, not a gate, and a required check holding `pull-requests: write` would widen the trust surface on every run. It reuses the same `Detect inert diff` composite so docs-only PRs skip the build entirely. The job scopes `pull-requests: write` to itself; the workflow-wide baseline stays at `contents: read` to match `ci.yml`.
+
+The action is SHA-pinned and must be added to the repository's allowed-actions list (Settings → Actions → "Allow specified actions and reusable workflows") before the workflow can execute — see [supply chain](./supply-chain.md).
+
 ## Deliberately out of scope
 
 - **`turbo run test --affected` package-scoped test selection** — would run only the affected packages, but correctness depends on the package dependency graph being complete, which needs its own audit.

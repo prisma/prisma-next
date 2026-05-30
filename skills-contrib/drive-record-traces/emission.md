@@ -24,7 +24,7 @@ Resolve the trace file path once per orchestrator session from current project c
 
 ## First emit (file and directory creation)
 
-If the trace file or its parent directory does not exist, the first append creates both (`mkdir -p` semantics on the parent directory, then create-or-append on the file). No separate initialization step is required.
+If the trace file or its parent directory does not exist, the emitter (§ Append protocol) creates both on the first write — it runs `mkdir -p` on the parent directory before appending. No separate initialization step is required.
 
 Partial traces are acceptable: a `dispatch-start` without a matching `dispatch-end` is a recognised diagnostic signal for later assertion tooling. There are no transactional guarantees across events.
 
@@ -39,39 +39,40 @@ Partial traces are acceptable: a `dispatch-start` without a matching `dispatch-e
 
 ## Schema validation
 
-Slice 1 does not validate payloads at emit time. The orchestrator constructs events from known state; conformant shape is the implementer's responsibility against [`events.md`](./events.md). Read-time validation against the documented arktype schemas is a slice-3 deliverable.
+Validation happens **at emit time**. The emitter (§ Append protocol) validates the fully-merged event against the canonical arktype schema in [`schema.ts`](./schema.ts) *before* writing, and refuses to append a non-conformant event (fail-closed: it exits non-zero and writes nothing). This is the first gate — a malformed line never reaches the file.
+
+Read-time validation in `drive-diagnose-run` runs against the same schema and remains a second gate for traces from other sources or older runs.
 
 ## Append protocol
 
-### File-write tool
+The canonical emit mechanic is the **deterministic emitter CLI** this skill ships, [`emit.ts`](./emit.ts). The orchestrator computes the event's payload fields and invokes the emitter; the emitter owns the envelope (`event_id`, `schema_version`, `ts`), merges payload and envelope, validates the merged event against [`schema.ts`](./schema.ts), and appends exactly one compact JSON line **only if validation passes**. It creates the trace file's parent directory on first write. Because the envelope is generated and the event is validated before the append, malformed lines never reach the file — the agent no longer hand-builds the envelope or hand-appends the line.
 
-**Use the `Shell` tool with `>>` append.**
-
-| Option | Verdict |
-|---|---|
-| `Shell` + `>>` | **Chosen.** One syscall appends a line without read-modify-write races; creates the file if missing when combined with `mkdir -p` on the parent directory. |
-| Read-then-Write | Rejected for emit hot path. Reads the entire trace file on every event; scales poorly and invites lost updates if concurrency ever appears. |
-| StrReplace append | Rejected. Requires reading the file to find an anchor; fragile on empty files and not designed for append-only JSONL. |
-
-### Command pattern
-
-After constructing the event object and serialising it to a single-line JSON string (variable `EVENT_JSON` in the sketch below):
+### Invocation
 
 ```bash
-mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FILE"
+node skills-contrib/drive-record-traces/emit.ts \
+  --trace-file <path> \
+  --project-run-id <id> \
+  --event <event-type> \
+  --payload '<json-object-of-payload-only-fields>' \
+  [--orchestrator-agent-id <id>]
 ```
+
+In this repo, `pnpm drive:emit` is the equivalent shortcut.
 
 Concrete example for in-project work:
 
 ```bash
-TRACE_FILE="projects/sample-project/trace.jsonl"
-EVENT_JSON='{"event_id":"…","event_type":"dispatch-start",…}'
-mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FILE"
+node skills-contrib/drive-record-traces/emit.ts \
+  --trace-file projects/sample-project/trace.jsonl \
+  --project-run-id sample-project \
+  --event triage-verdict \
+  --payload '{"verdict":"in-project-slice","input_shape":"linear-ticket","input_ref":"TML-2704"}'
 ```
 
-**Shell hygiene:** Ensure `EVENT_JSON` is single-quoted or safely escaped so the shell does not interpret `$`, backticks, or quotes inside the JSON. Prefer generating JSON in the orchestrator's structured context, then passing it as one quoted argument to `printf`.
+**Payload is payload-only.** `--payload` carries the per-event fields documented in [`events.md`](./events.md) — including any fresh UUIDs the event itself needs (e.g. `dispatch_id`, `round_id`), which are payload fields the orchestrator generates. It must **not** carry envelope keys (`event_id`, `event_type`, `schema_version`, `ts`, `project_run_id`, `orchestrator_agent_id`); the emitter owns those and rejects any payload that includes one, naming the offending key.
 
-**Why `printf` not `echo`:** `printf '%s\n'` emits exactly one trailing newline without implementation-defined `echo` flags.
+**Shell hygiene:** single-quote the `--payload` JSON so the shell does not interpret `$`, backticks, or quotes inside it.
 
 ### Concurrency
 
@@ -79,9 +80,9 @@ Slice 1 assumes a single orchestrator writer per trace file (`drive-build-workfl
 
 ## Canonical Emit snippet (for skill bodies)
 
-Instrumented skills grow by ~one line per transition point. Each emit step names the event type, lists payload fields the orchestrator must compute, refers to this skill **by name** (no path — the runtime resolves `drive-record-traces`), and delegates append mechanics here:
+Instrumented skills grow by ~one line per transition point. Each emit step names the event type, lists payload fields the orchestrator must compute, refers to this skill **by name** (no path — the runtime resolves `drive-record-traces`), and delegates the emit mechanic here:
 
-> **Emit `{event_type}`:** Build the envelope (`event_id`, `schema_version: "1"`, `ts`, `project_run_id`, `orchestrator_agent_id`) plus this event's payload fields (see the `drive-record-traces` skill — `events.md` § `{event_type}`). Append one JSON line per the same skill's `emission.md` § Append protocol (`Shell` + `mkdir -p` + `printf … >> trace file`).
+> **Emit `{event_type}`:** Compute this event's payload fields (see the `drive-record-traces` skill — `events.md` § `{event_type}`), then invoke that skill's emitter per its `emission.md` § Append protocol: `--event {event_type} --payload '<payload-only fields>'`, supplying `--trace-file` and `--project-run-id` from the resolved session context. The emitter owns the envelope (`event_id`, `schema_version`, `ts`) and validates before appending — pass payload-only fields, not envelope keys.
 
 Replace `{event_type}` with the event name for the transition point. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. For spec/plan writes, apply § Existence-check pattern before choosing `*-authored` vs `*-amended`. Resolve `TRACE_FILE` from § Trace file path resolution before the first emit in the session.
 
@@ -105,8 +106,10 @@ if [ -f "$SPEC_PATH" ]; then
 else
   EVENT_TYPE="spec-authored"
 fi
-# Build EVENT_JSON for $EVENT_TYPE per ./events.md, then:
-mkdir -p "$(dirname "$TRACE_FILE")" && printf '%s\n' "$EVENT_JSON" >> "$TRACE_FILE"
+# Compute PAYLOAD_JSON for $EVENT_TYPE per ./events.md (payload-only fields), then:
+node skills-contrib/drive-record-traces/emit.ts \
+  --trace-file "$TRACE_FILE" --project-run-id "$PROJECT_RUN_ID" \
+  --event "$EVENT_TYPE" --payload "$PAYLOAD_JSON"
 ```
 
 Equivalent one-liner gate: `[ -f "<path>" ] && emit "*-amended" || emit "*-authored"`.
@@ -116,13 +119,9 @@ The check uses the orchestrator's filesystem view at write time. A same-session 
 ## Operator checklist (emit time)
 
 1. Resolve `TRACE_FILE` from project context (in-project / orphan / direct-change).
-2. Assign fresh UUIDs for `event_id` and any new `dispatch_id` / `round_id`.
-3. Set `schema_version` to `"1"`.
-4. Set `ts` to current UTC ISO 8601.
-5. Set `project_run_id` to match the resolved context row in the path table.
-6. Set `orchestrator_agent_id` to the session UUID when knowable, else `null`.
-7. Merge payload fields for the event type.
-8. Run the § Append protocol command.
+2. Resolve `project_run_id` to match the resolved context row in the path table.
+3. Compute the payload fields for the event type (see [`events.md`](./events.md)), including any fresh UUIDs the event itself needs (`dispatch_id`, `round_id`) — these are payload fields. For spec/plan writes, apply § Existence-check pattern to choose the `--event` value.
+4. Run the emitter (§ Append protocol) with `--trace-file`, `--project-run-id`, `--event`, and `--payload`; pass `--orchestrator-agent-id` when the session UUID is knowable (else omit — it defaults to `null`). The emitter assigns `event_id`, sets `schema_version` and `ts`, validates the merged event, and appends.
 
 ## Direct-change build-loop spine reuse
 

@@ -19,9 +19,8 @@ import type { PgIntegrationRuntime } from './runtime-helpers';
  * Build a `Collection` whose contract carries the given capability
  * overrides. The runtime itself still uses the default postgres test
  * contract; only `dispatchWithIncludeStrategy` reads from the override,
- * so this is the right knob for exercising the three dispatch
- * strategies (lateral / correlated / multi-query) against the same
- * real database.
+ * so this is the right knob for exercising both single-query dispatch
+ * strategies (lateral / correlated) against the same real database.
  */
 export function collectionWithCapabilities<ModelName extends keyof TestContract['models']>(
   runtime: PgIntegrationRuntime,
@@ -46,4 +45,3 @@ export const LATERAL_CAPABILITIES = {
 export const CORRELATED_CAPABILITIES = {
   sql: { jsonAgg: true },
 } as const;
-export const MULTI_QUERY_CAPABILITIES = {} as const;

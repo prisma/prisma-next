@@ -64,6 +64,7 @@ function createCtx(overrides?: Partial<SqlMiddlewareContext>): SqlMiddlewareCont
     },
     contentHash: async () => 'mock-hash',
     scope: 'runtime',
+    planExecutionId: 'test-fixture-plan-execution-id',
     ...overrides,
   };
 }

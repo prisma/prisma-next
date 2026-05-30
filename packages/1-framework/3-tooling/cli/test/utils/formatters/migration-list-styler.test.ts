@@ -15,13 +15,15 @@ import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/mig
 const HASH_C = 'sha256:4cb4256c30b7a8123456789012345678901234567890123456';
 const HASH_D = 'sha256:55bada2f123456789012345678901234567890123456789012';
 
+let migrationHashSeq = 0;
+
 function migration(
   overrides: Pick<MigrationListEntry, 'dirName' | 'to'> &
     Partial<Omit<MigrationListEntry, 'dirName' | 'to'>>,
 ): MigrationListEntry {
   return {
     from: null,
-    migrationHash: 'sha256:placeholder0000000000000000000000000000000000000000',
+    migrationHash: overrides.migrationHash ?? `sha256:styler-mig-${migrationHashSeq++}`,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
     refs: [],
@@ -37,12 +39,17 @@ function result(spaces: readonly MigrationSpaceListEntry[], summary: string): Mi
 describe('createAnsiMigrationListStyler', () => {
   it('returns an identity styler when useColor is false (suppresses ANSI for non-TTY / --no-color)', () => {
     const styler = createAnsiMigrationListStyler({ useColor: false });
+    expect(styler.kind('*')).toBe('*');
+    expect(styler.kind('↩')).toBe('↩');
+    expect(styler.kind('⟲')).toBe('⟲');
     expect(styler.dirName('20260422T0720_initial')).toBe('20260422T0720_initial');
     expect(styler.sourceHash('4cb4256')).toBe('4cb4256');
     expect(styler.destHash('55bada2')).toBe('55bada2');
     expect(styler.glyph('→')).toBe('→');
     expect(styler.glyph('⟲')).toBe('⟲');
     expect(styler.glyph('∅')).toBe('∅');
+    expect(styler.lane('│')).toBe('│');
+    expect(styler.lane('├─┐')).toBe('├─┐');
     expect(styler.invariants(['a', 'b'])).toBe('{a, b}');
     expect(styler.refs(['production', 'staging'])).toBe('(production, staging)');
     expect(styler.refs(['db'])).toBe('(db)');
@@ -78,12 +85,17 @@ describe('createAnsiMigrationListStyler', () => {
 
   it('wraps each token with the expected SGR style when useColor is true', () => {
     const styler = createAnsiMigrationListStyler({ useColor: true });
+    expect(styler.kind('*')).toBe(dim('*'));
+    expect(styler.kind('↩')).toBe(dim('↩'));
+    expect(styler.kind('⟲')).toBe(dim('⟲'));
     expect(styler.dirName('20260422T0720_initial')).toBe(bold('20260422T0720_initial'));
     expect(styler.sourceHash('4cb4256')).toBe(dim(cyan('4cb4256')));
     expect(styler.destHash('55bada2')).toBe(cyanBright('55bada2'));
     expect(styler.glyph('→')).toBe(dim('→'));
     expect(styler.glyph('⟲')).toBe(dim('⟲'));
     expect(styler.glyph('∅')).toBe(dim('∅'));
+    expect(styler.lane('│')).toBe(dim('│'));
+    expect(styler.lane('├─┐')).toBe(dim('├─┐'));
     expect(styler.invariants(['backfill_emails_v1'])).toBe(yellow('{backfill_emails_v1}'));
     expect(styler.spaceHeading('app:')).toBe(bold('app:'));
     expect(styler.summary('1 migration(s) on disk')).toBe(dim('1 migration(s) on disk'));
@@ -129,9 +141,9 @@ describe('renderMigrationListWithStyle', () => {
       createAnsiMigrationListStyler({ useColor: true }),
     );
     const expectedRow =
-      `${bold('20260601T1200_backfill_emails')}  ` +
-      `${dim(cyan('55bada2'))} ${dim('⟲')}         ` +
-      ` ${yellow('{backfill_emails_v1}')} ` +
+      `${dim('⟲')} ${bold('20260601T1200_backfill_emails')}  ` +
+      `${dim(cyan('55bada2'))}` +
+      `  ${yellow('{backfill_emails_v1}')} ` +
       `${green('(') + [green('production'), bold(greenBright('db'))].join(green(', ')) + green(')')}`;
     const expected = `${expectedRow}\n\n${dim('1 migration(s) on disk')}`;
     expect(styled).toBe(expected);

@@ -20,6 +20,9 @@ export type AggregateFn = AggregateCountFn | AggregateOpFn;
  */
 export type WindowFn = 'row_number' | 'rank' | 'dense_rank';
 
+/** Scalar JS values that map directly to a SQL wire type. Values outside this set must be routed through `param(value, { codecId })` to declare the target codec explicitly. */
+export type RawSqlLiteral = number | bigint | string | boolean | Uint8Array;
+
 export interface ExpressionSource {
   toExpr(): AnyExpression;
 }
@@ -32,6 +35,7 @@ export interface ExpressionRewriter {
   literal?(expr: LiteralExpr): LiteralExpr;
   list?(expr: ListExpression): ListExpression | LiteralExpr;
   select?(ast: SelectAst): SelectAst;
+  rawExpr?(expr: RawExpr): AnyExpression;
 }
 
 export interface AstRewriter extends ExpressionRewriter {
@@ -58,6 +62,7 @@ export interface ExprVisitor<R> {
   param(expr: ParamRef): R;
   preparedParam(expr: PreparedParamRef): R;
   list(expr: ListExpression): R;
+  rawExpr(expr: RawExpr): R;
 }
 
 export interface ExpressionFolder<T> {
@@ -71,6 +76,7 @@ export interface ExpressionFolder<T> {
   literal?(expr: LiteralExpr): T;
   list?(expr: ListExpression): T;
   select?(ast: SelectAst): T;
+  rawExpr?(expr: RawExpr): T;
 }
 
 export type ProjectionExpr = AnyExpression;
@@ -614,6 +620,42 @@ export class OperationExpr extends Expression {
 
   override baseColumnRef(): ColumnRef {
     return this.self.baseColumnRef();
+  }
+}
+
+export class RawExpr extends Expression {
+  readonly kind = 'raw-expr' as const;
+  readonly parts: ReadonlyArray<string | AnyExpression>;
+  readonly returns: ParamSpec;
+
+  constructor(options: {
+    readonly parts: ReadonlyArray<string | AnyExpression>;
+    readonly returns: ParamSpec;
+  }) {
+    super();
+    this.parts = frozenArrayCopy(options.parts);
+    this.returns = options.returns;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.rawExpr(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return rewriter.rawExpr ? rewriter.rawExpr(this) : this;
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    if (folder.rawExpr) {
+      return folder.rawExpr(this);
+    }
+    return combineAll(
+      folder,
+      this.parts
+        .filter((p): p is AnyExpression => typeof p !== 'string')
+        .map((p) => () => p.fold(folder)),
+    );
   }
 }
 
@@ -1851,7 +1893,8 @@ export type AnyExpression =
   | OrExpr
   | ExistsExpr
   | NullCheckExpr
-  | NotExpr;
+  | NotExpr
+  | RawExpr;
 export type AnyParamRef = ParamRef | PreparedParamRef;
 export type AnyInsertOnConflictAction = DoNothingConflictAction | DoUpdateSetConflictAction;
 export type AnyInsertValue = ColumnRef | ParamRef | PreparedParamRef | DefaultValueExpr;

@@ -30,7 +30,10 @@ export const context = createExecutionContext({
   stack,
 });
 
-export const sql = sqlBuilder<typeof contract>({ context });
+export const sql = sqlBuilder<typeof contract>({
+  context,
+  rawCodecInferer: { inferCodec: () => 'pg/text' },
+});
 
 export function createOrmClient(runtime: Runtime) {
   return orm({

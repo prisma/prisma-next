@@ -79,6 +79,17 @@ export interface RuntimeMiddlewareContext {
    * scope. Existing middleware that ignore the field are unaffected.
    */
   readonly scope: 'runtime' | 'connection' | 'transaction';
+  /**
+   * Identity for one `execute()` call. The runtime mints a fresh value via
+   * `crypto.randomUUID()` when it constructs the per-execute context, and
+   * the same context reference is threaded through every middleware phase
+   * (`beforeExecute`, `intercept`, `onRow`, `afterExecute`). Every hook in
+   * one execute call therefore observes the same `planExecutionId`; two
+   * executions of the same plan observe distinct values. Use this to
+   * correlate observations across the lifecycle of a single execute call
+   * (tracing, timing, audit). See ADR 220.
+   */
+  readonly planExecutionId: string;
 }
 
 export interface AfterExecuteResult {

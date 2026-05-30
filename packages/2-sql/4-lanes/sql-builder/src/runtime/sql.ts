@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db, TableProxyContract } from '../types/db';
 import type { BuilderContext } from './builder-base';
@@ -7,6 +8,7 @@ import { TableProxyImpl } from './table-proxy-impl';
 
 export interface SqlOptions<C extends Contract<SqlStorage> & TableProxyContract> {
   readonly context: ExecutionContext<C>;
+  readonly rawCodecInferer: RawCodecInferer;
 }
 
 // Find a table by name across every declared namespace. Mirrors the
@@ -27,7 +29,7 @@ function findTableAcrossNamespaces(storage: SqlStorage, name: string): StorageTa
 export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
   options: SqlOptions<C>,
 ): Db<C> {
-  const { context } = options;
+  const { context, rawCodecInferer } = options;
   const ctx: BuilderContext = {
     capabilities: context.contract.capabilities,
     queryOperationTypes: context.queryOperations.entries(),
@@ -35,6 +37,7 @@ export function sql<C extends Contract<SqlStorage> & TableProxyContract>(
     storageHash: context.contract.storage.storageHash ?? 'unknown',
     storage: context.contract.storage,
     applyMutationDefaults: (options) => context.applyMutationDefaults(options),
+    rawCodecInferer,
   };
 
   return new Proxy({} as Db<C>, {

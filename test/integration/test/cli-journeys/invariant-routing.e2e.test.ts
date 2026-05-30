@@ -60,7 +60,7 @@ function writeRefFile(
 
 /**
  * Patches the planner-emitted `migration.ts` for a NOT-NULL backfill to:
- *   1. inject a `db = sql({ context })` setup block
+ *   1. inject a `db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } })` setup block
  *   2. fill in the `check` and `run` placeholders with real query-builder calls
  *   3. (optionally) add an `invariantId` to the dataTransform options
  *

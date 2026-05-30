@@ -14,6 +14,7 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  buildSqlNamespace,
   SqlStorage,
   type SqlStorageInput,
   type StorageColumn,
@@ -33,7 +34,11 @@ const expandParameterizedNativeType: NativeTypeExpander = (input) => {
 };
 
 function ns(tables: Record<string, StorageTable>): Pick<SqlStorageInput, 'namespaces'> {
-  return { namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } } };
+  return {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+    },
+  };
 }
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {

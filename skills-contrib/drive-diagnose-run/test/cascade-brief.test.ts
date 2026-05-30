@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import type { TraceEvent } from '../../drive-record-traces/schema.ts';
 import { checkBriefDiscipline } from '../assertions/brief.ts';
 import { checkCascadeRules } from '../assertions/cascade.ts';
 import { runAssertions } from '../assertions/index.ts';
 import { loadTrace } from '../load.ts';
-import type { TraceEvent } from '../schema.ts';
 
 const TRACE_PATH = fileURLToPath(new URL('./fixtures/sample-trace.jsonl', import.meta.url));
 

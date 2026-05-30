@@ -352,8 +352,8 @@ function collectionEntrySchema(fragments?: ReadonlyMap<string, Type<unknown>>): 
  * has no pack contributions; the composition surface exists for symmetry
  * with SQL and as the substrate for future entity kinds.
  *
- * `'kind?': 'string'` because `kind` is non-enumerable on
- * `MongoNamespacePayload` and therefore absent from the wire shape; the
+ * `'kind?': 'string'` because `kind` is non-enumerable on built
+ * Mongo namespace IR classes and therefore absent from the wire shape; the
  * type-side narrowing is enforced by the IR class, not by this validator.
  */
 export function createMongoNamespaceEnvelopeSchema(

@@ -92,7 +92,7 @@ test('sql() exposes table as a literal-keyed property', () => {
     singleModelContract,
   ) as typeof singleModelContract;
   const context = createTestContext(validated, createStubAdapter());
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
   db.user.select('id', 'email').build();
 });
@@ -102,7 +102,7 @@ test('ResultType inference produces literal field keys', () => {
     singleModelContract,
   ) as typeof singleModelContract;
   const context = createTestContext(validated, createStubAdapter());
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
   const plan = db.user.select('id', 'email').build();
 
   type Row = ResultType<typeof plan>;
@@ -140,7 +140,7 @@ test('multi-model sql() dot access works for all tables', () => {
     multiModelContract,
   ) as typeof multiModelContract;
   const context = createTestContext(validated, createStubAdapter());
-  const db = sql({ context });
+  const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
   db.user.select('id', 'email').build();
   db.post.select('id', 'title').build();

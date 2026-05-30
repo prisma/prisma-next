@@ -30,11 +30,14 @@ const stubBase = {
   applyMutationDefaults: () => [],
 };
 
+const stubInferer = { inferCodec: () => 'pg/text@1' };
+
 function db() {
   return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
     >,
+    rawCodecInferer: stubInferer,
   });
 }
 
@@ -47,6 +50,7 @@ function dbNoCapabilities() {
     context: { ...stubBase, contract: noLateralContract } as unknown as ExecutionContext<
       typeof noLateralContract
     >,
+    rawCodecInferer: stubInferer,
   });
 }
 
@@ -444,6 +448,7 @@ describe('mutation defaults', () => {
         contract: sqlContract,
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
+      rawCodecInferer: stubInferer,
     });
     return { d, spy };
   }
@@ -487,6 +492,7 @@ describe('INSERT multi-row', () => {
         contract: sqlContract,
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
+      rawCodecInferer: stubInferer,
     });
     d.users.insert([{ id: 1, name: 'A' }]).build();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -505,6 +511,7 @@ describe('INSERT multi-row', () => {
         contract: sqlContract,
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
+      rawCodecInferer: stubInferer,
     });
     const plan = d.users
       .insert([
@@ -547,6 +554,7 @@ describe('INSERT multi-row', () => {
         contract: sqlContract,
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
+      rawCodecInferer: stubInferer,
     });
     const plan = d.users
       .insert([
@@ -587,6 +595,7 @@ describe('UPDATE callback overload', () => {
         contract: sqlContract,
         applyMutationDefaults: spy,
       } as unknown as ExecutionContext<typeof sqlContract>,
+      rawCodecInferer: stubInferer,
     });
     d.users
       .update((f) => ({ name: f.name }))
