@@ -1,12 +1,12 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import {
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
