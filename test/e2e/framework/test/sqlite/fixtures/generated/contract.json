@@ -374,200 +374,198 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "comments": {
-            "columns": {
-              "body": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "post_id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              }
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "comments": {
+          "columns": {
+            "body": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
             },
-            "uniques": []
+            "post_id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            }
           },
-          "items": {
-            "columns": {
-              "id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "label": {
-                "codecId": "sqlite/text@1",
-                "default": {
-                  "kind": "literal",
-                  "value": "unnamed"
-                },
-                "nativeType": "text",
-                "nullable": false
-              },
-              "name": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
           },
-          "posts": {
-            "columns": {
-              "id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "title": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "user_id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "views": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              }
+          "uniques": []
+        },
+        "items": {
+          "columns": {
+            "id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "label": {
+              "codecId": "sqlite/text@1",
+              "default": {
+                "kind": "literal",
+                "value": "unnamed"
+              },
+              "nativeType": "text",
+              "nullable": false
             },
-            "uniques": []
+            "name": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
           },
-          "profiles": {
-            "columns": {
-              "bio": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "user_id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
-            },
-            "uniques": []
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
           },
-          "typed_rows": {
-            "columns": {
-              "active": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "created_at": {
-                "codecId": "sqlite/datetime@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "label": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "metadata": {
-                "codecId": "sqlite/json@1",
-                "nativeType": "text",
-                "nullable": true
-              }
+          "uniques": []
+        },
+        "posts": {
+          "columns": {
+            "id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "title": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "uniques": []
+            "user_id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            },
+            "views": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            }
           },
-          "users": {
-            "columns": {
-              "email": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": false
-              },
-              "invited_by_id": {
-                "codecId": "sqlite/integer@1",
-                "nativeType": "integer",
-                "nullable": true
-              },
-              "name": {
-                "codecId": "sqlite/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        },
+        "profiles": {
+          "columns": {
+            "bio": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
             },
-            "uniques": []
-          }
+            "user_id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        },
+        "typed_rows": {
+          "columns": {
+            "active": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            },
+            "created_at": {
+              "codecId": "sqlite/datetime@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            },
+            "label": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "metadata": {
+              "codecId": "sqlite/json@1",
+              "nativeType": "text",
+              "nullable": true
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        },
+        "users": {
+          "columns": {
+            "email": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": false
+            },
+            "invited_by_id": {
+              "codecId": "sqlite/integer@1",
+              "nativeType": "integer",
+              "nullable": true
+            },
+            "name": {
+              "codecId": "sqlite/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:f52ad65b0b6148af276fd084c349f8f21a4a4da2ba8644dfac21b53dd47d9791"
+    "storageHash": "sha256:c9b8112d2bc5ad1845c89c5e6c1e6d24e9970755d5e274cef0d11b0e9e36447e"
   },
   "capabilities": {
     "sql": {

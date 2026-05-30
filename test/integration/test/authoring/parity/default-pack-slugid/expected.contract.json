@@ -32,29 +32,27 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "user": {
-            "columns": {
-              "id": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
-          }
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:6764054ee730ad25f73bf02601c20f277c697af7d97fcd328ed820413b8d18a0"
+    "storageHash": "sha256:02e6cb58f66d21d15708b18cd1314ec95e3b91a9caa0321b480f89866a28b9bd"
   },
   "execution": {
     "executionHash": "sha256:91b2baa0b7cc5262f4706a2deb109734404c5edc7873bb666525f077278adce1",

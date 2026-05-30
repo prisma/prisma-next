@@ -32,33 +32,31 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "user": {
-            "columns": {
-              "id": {
-                "codecId": "pg/text@1",
-                "default": {
-                  "expression": "gen_random_uuid()",
-                  "kind": "function"
-                },
-                "nativeType": "text",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
-          }
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "codecId": "pg/text@1",
+              "default": {
+                "expression": "gen_random_uuid()",
+                "kind": "function"
+              },
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:f83367183867bad124b5fc91b8913d1a1e36bccedfba80a471df5751201d63cc"
+    "storageHash": "sha256:fc56bbb2475e94d9c0ee07db843d5d5dbdd1ac39e61641bd621e8788b38d1ff2"
   },
   "capabilities": {
     "postgres": {

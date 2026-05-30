@@ -56,39 +56,37 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "document": {
-            "columns": {
-              "embedding": {
-                "codecId": "pg/vector@1",
-                "nativeType": "vector",
-                "nullable": false,
-                "typeRef": "Embedding1536"
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "document": {
+          "columns": {
+            "embedding": {
+              "codecId": "pg/vector@1",
+              "nativeType": "vector",
+              "nullable": false,
+              "typeRef": "Embedding1536"
+            },
+            "id": {
+              "codecId": "pg/int4@1",
+              "default": {
+                "expression": "autoincrement()",
+                "kind": "function"
               },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
-          }
+              "nativeType": "int4",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:923650d8962586ae327c2224a8d4a589abf94ce9465182179bf7939228ef8cef",
+    "storageHash": "sha256:a51b8bbde9f188ed3546fab64ac73745174afb6ea5788f3c79dc5ca85f2c68a9",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

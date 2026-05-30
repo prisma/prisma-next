@@ -11,6 +11,7 @@ import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import sql from '@prisma-next/family-sql/control';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { isStoragePlaneReservedKey } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
@@ -71,6 +72,28 @@ interface FixtureCase {
 interface LoadedFixture {
   readonly tsContract: Contract;
 }
+
+const stripMongoValidatorFieldsFromStorage = (
+  storage: Record<string, unknown>,
+): Record<string, unknown> => {
+  const { storageHash: _sh, ...restStorage } = storage;
+  const stripped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(restStorage)) {
+    if (isStoragePlaneReservedKey(key)) {
+      stripped[key] = value;
+      continue;
+    }
+    const ns = value as Record<string, Record<string, unknown>>;
+    const collections = ns['collections'] as Record<string, Record<string, unknown>>;
+    const strippedCollections: Record<string, unknown> = {};
+    for (const [name, coll] of Object.entries(collections)) {
+      const { validator: _, ...rest } = coll;
+      strippedCollections[name] = rest;
+    }
+    stripped[key] = { ...ns, collections: strippedCollections };
+  }
+  return stripped;
+};
 
 const fixtureNames = ['postgres', 'mongo'] as const satisfies readonly FixtureName[];
 
@@ -254,19 +277,7 @@ describe('side-by-side contract examples', () => {
 
       const stripValidatorFields = (contract: typeof normalizedTs) => {
         const storage = contract.storage as unknown as Record<string, unknown>;
-        const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>>;
-        const strippedNamespaces: Record<string, unknown> = {};
-        for (const [nsId, ns] of Object.entries(namespaces)) {
-          const collections = ns['collections'] as Record<string, Record<string, unknown>>;
-          const strippedCollections: Record<string, unknown> = {};
-          for (const [name, coll] of Object.entries(collections)) {
-            const { validator: _, ...rest } = coll;
-            strippedCollections[name] = rest;
-          }
-          strippedNamespaces[nsId] = { ...ns, collections: strippedCollections };
-        }
-        const { storageHash: _sh, ...restStorage } = storage;
-        return { ...contract, storage: { ...restStorage, namespaces: strippedNamespaces } };
+        return { ...contract, storage: stripMongoValidatorFieldsFromStorage(storage) };
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
@@ -284,19 +295,7 @@ describe('side-by-side contract examples', () => {
       const stripForComparison = (json: string) => {
         const parsed = JSON.parse(json) as Record<string, unknown>;
         const storage = parsed['storage'] as Record<string, unknown>;
-        const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>>;
-        const strippedNamespaces: Record<string, unknown> = {};
-        for (const [nsId, ns] of Object.entries(namespaces)) {
-          const collections = ns['collections'] as Record<string, Record<string, unknown>>;
-          const strippedCollections: Record<string, unknown> = {};
-          for (const [name, coll] of Object.entries(collections)) {
-            const { validator: _, ...rest } = coll;
-            strippedCollections[name] = rest;
-          }
-          strippedNamespaces[nsId] = { ...ns, collections: strippedCollections };
-        }
-        const { storageHash: _sh, ...restStorage } = storage;
-        return { ...parsed, storage: { ...restStorage, namespaces: strippedNamespaces } };
+        return { ...parsed, storage: stripMongoValidatorFieldsFromStorage(storage) };
       };
       expect(stripForComparison(emittedTs.contractJson)).toEqual(
         stripForComparison(emittedPsl.contractJson),

@@ -35,32 +35,30 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "user": {
-            "columns": {
-              "id": {
-                "codecId": "sql/char@1",
-                "nativeType": "character",
-                "nullable": false,
-                "typeParams": {
-                  "length": 36
-                }
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "user": {
+          "columns": {
+            "id": {
+              "codecId": "sql/char@1",
+              "nativeType": "character",
+              "nullable": false,
+              "typeParams": {
+                "length": 36
               }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
-            },
-            "uniques": []
-          }
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:bff81c374d48799d019e3c2df41af83fc62a216f65b60d6faebdf74144d9f2fd"
+    "storageHash": "sha256:db1ec0ede6b4d9962a41d451940de7e0609995bdc5efc3480f2df8905c770b62"
   },
   "execution": {
     "executionHash": "sha256:e0c5cd734cd6bc575e53aaaf0e795c063436683c2116da9836828f25b4704e37",

@@ -120,79 +120,77 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "collections": {
-          "posts": {
-            "kind": "mongo-collection",
-            "validator": {
-              "jsonSchema": {
-                "bsonType": "object",
-                "properties": {
-                  "_id": {
-                    "bsonType": "objectId"
-                  },
-                  "authorId": {
-                    "bsonType": "objectId"
-                  },
-                  "publishedAt": {
-                    "bsonType": [
-                      "null",
-                      "date"
-                    ]
-                  },
-                  "title": {
-                    "bsonType": "string"
-                  }
+    "__unbound__": {
+      "collections": {
+        "posts": {
+          "kind": "mongo-collection",
+          "validator": {
+            "jsonSchema": {
+              "bsonType": "object",
+              "properties": {
+                "_id": {
+                  "bsonType": "objectId"
                 },
-                "required": [
-                  "_id",
-                  "authorId",
-                  "title"
-                ]
-              },
-              "kind": "mongo-validator",
-              "validationAction": "error",
-              "validationLevel": "strict"
-            }
-          },
-          "users": {
-            "kind": "mongo-collection",
-            "validator": {
-              "jsonSchema": {
-                "bsonType": "object",
-                "properties": {
-                  "_id": {
-                    "bsonType": "objectId"
-                  },
-                  "bio": {
-                    "bsonType": [
-                      "null",
-                      "string"
-                    ]
-                  },
-                  "email": {
-                    "bsonType": "string"
-                  },
-                  "name": {
-                    "bsonType": "string"
-                  }
+                "authorId": {
+                  "bsonType": "objectId"
                 },
-                "required": [
-                  "_id",
-                  "email",
-                  "name"
-                ]
+                "publishedAt": {
+                  "bsonType": [
+                    "null",
+                    "date"
+                  ]
+                },
+                "title": {
+                  "bsonType": "string"
+                }
               },
-              "kind": "mongo-validator",
-              "validationAction": "error",
-              "validationLevel": "strict"
-            }
+              "required": [
+                "_id",
+                "authorId",
+                "title"
+              ]
+            },
+            "kind": "mongo-validator",
+            "validationAction": "error",
+            "validationLevel": "strict"
           }
         },
-        "id": "__unbound__",
-        "kind": "mongo-database"
-      }
+        "users": {
+          "kind": "mongo-collection",
+          "validator": {
+            "jsonSchema": {
+              "bsonType": "object",
+              "properties": {
+                "_id": {
+                  "bsonType": "objectId"
+                },
+                "bio": {
+                  "bsonType": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "email": {
+                  "bsonType": "string"
+                },
+                "name": {
+                  "bsonType": "string"
+                }
+              },
+              "required": [
+                "_id",
+                "email",
+                "name"
+              ]
+            },
+            "kind": "mongo-validator",
+            "validationAction": "error",
+            "validationLevel": "strict"
+          }
+        }
+      },
+      "id": "__unbound__",
+      "kind": "mongo-database"
     },
     "storageHash": "sha256:c01f9b67df3a1057686184f42e85b2d62e239a28c19458ce6e8d4bb404cfbf9c"
   },

@@ -234,39 +234,37 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "collections": {
-          "tasks": {
-            "kind": "mongo-collection"
-          },
-          "users": {
-            "indexes": [
-              {
-                "keys": [
-                  {
-                    "direction": 1,
-                    "field": "email"
-                  }
-                ],
-                "kind": "mongo-index",
-                "unique": true
-              }
-            ],
-            "kind": "mongo-collection",
-            "options": {
-              "collation": {
-                "kind": "mongo-collation-options",
-                "locale": "en",
-                "strength": 2
-              },
-              "kind": "mongo-collection-options"
-            }
-          }
+    "__unbound__": {
+      "collections": {
+        "tasks": {
+          "kind": "mongo-collection"
         },
-        "id": "__unbound__",
-        "kind": "mongo-database"
-      }
+        "users": {
+          "indexes": [
+            {
+              "keys": [
+                {
+                  "direction": 1,
+                  "field": "email"
+                }
+              ],
+              "kind": "mongo-index",
+              "unique": true
+            }
+          ],
+          "kind": "mongo-collection",
+          "options": {
+            "collation": {
+              "kind": "mongo-collation-options",
+              "locale": "en",
+              "strength": 2
+            },
+            "kind": "mongo-collection-options"
+          }
+        }
+      },
+      "id": "__unbound__",
+      "kind": "mongo-database"
     },
     "storageHash": "sha256:4308e5a7e618a3f83baa45a5ac81c13f611b667e2963f11d5aa444ce9d3c7175"
   },

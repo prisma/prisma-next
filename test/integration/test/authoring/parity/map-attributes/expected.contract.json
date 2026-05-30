@@ -78,75 +78,73 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "org_team": {
-            "columns": {
-              "team_id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["team_id"]
-            },
-            "uniques": []
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "org_team": {
+          "columns": {
+            "team_id": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            }
           },
-          "team_member": {
-            "columns": {
-              "member_id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["team_id"]
+          },
+          "uniques": []
+        },
+        "team_member": {
+          "columns": {
+            "member_id": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            },
+            "team_ref": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [
+            {
+              "constraint": true,
+              "index": true,
+              "name": "team_member_team_ref_fkey",
+              "onDelete": "cascade",
+              "onUpdate": "cascade",
+              "source": {
+                "columns": ["team_ref"],
+                "namespaceId": "__unbound__",
+                "tableName": "team_member"
               },
-              "team_ref": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
+              "target": {
+                "columns": ["team_id"],
+                "namespaceId": "__unbound__",
+                "tableName": "org_team"
               }
-            },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "name": "team_member_team_ref_fkey",
-                "onDelete": "cascade",
-                "onUpdate": "cascade",
-                "source": {
-                  "columns": ["team_ref"],
-                  "namespaceId": "__unbound__",
-                  "tableName": "team_member"
-                },
-                "target": {
-                  "columns": ["team_id"],
-                  "namespaceId": "__unbound__",
-                  "tableName": "org_team"
-                }
-              }
-            ],
-            "indexes": [
-              {
-                "columns": ["team_ref"]
-              }
-            ],
-            "primaryKey": {
-              "columns": ["member_id"]
-            },
-            "uniques": [
-              {
-                "columns": ["team_ref", "member_id"]
-              }
-            ]
-          }
+            }
+          ],
+          "indexes": [
+            {
+              "columns": ["team_ref"]
+            }
+          ],
+          "primaryKey": {
+            "columns": ["member_id"]
+          },
+          "uniques": [
+            {
+              "columns": ["team_ref", "member_id"]
+            }
+          ]
         }
       }
     },
-    "storageHash": "sha256:9732291f4b31310d455b987a854d21cb96db158ec1d29d3aa5ea09f5ae6c64a0"
+    "storageHash": "sha256:e79f296fc99f96b3336aa68e23abae9083bc2c3dcf7d8f890f04bd0631b7fc75"
   },
   "capabilities": {
     "postgres": {

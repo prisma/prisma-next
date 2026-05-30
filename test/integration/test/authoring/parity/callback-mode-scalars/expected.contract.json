@@ -182,132 +182,130 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "post": {
-            "columns": {
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "post": {
+          "columns": {
+            "id": {
+              "codecId": "pg/int4@1",
+              "default": {
+                "expression": "autoincrement()",
+                "kind": "function"
               },
-              "rating": {
-                "codecId": "pg/float8@1",
-                "nativeType": "float8",
-                "nullable": true
-              },
-              "title": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "userId": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              }
+              "nativeType": "int4",
+              "nullable": false
             },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "onDelete": "cascade",
-                "onUpdate": "cascade",
-                "source": {
-                  "columns": ["userId"],
-                  "namespaceId": "__unbound__",
-                  "tableName": "post"
-                },
-                "target": {
-                  "columns": ["id"],
-                  "namespaceId": "__unbound__",
-                  "tableName": "user"
-                }
-              }
-            ],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
+            "rating": {
+              "codecId": "pg/float8@1",
+              "nativeType": "float8",
+              "nullable": true
             },
-            "uniques": []
+            "title": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "userId": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            }
           },
-          "user": {
-            "columns": {
-              "age": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
+          "foreignKeys": [
+            {
+              "constraint": true,
+              "index": true,
+              "onDelete": "cascade",
+              "onUpdate": "cascade",
+              "source": {
+                "columns": ["userId"],
+                "namespaceId": "__unbound__",
+                "tableName": "post"
               },
-              "createdAt": {
-                "codecId": "pg/timestamptz@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
-                },
-                "nativeType": "timestamptz",
-                "nullable": false
-              },
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "embedding": {
-                "codecId": "pg/vector@1",
-                "nativeType": "vector",
-                "nullable": true,
-                "typeRef": "Embedding"
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "isActive": {
-                "codecId": "pg/bool@1",
-                "default": {
-                  "kind": "literal",
-                  "value": true
-                },
-                "nativeType": "bool",
-                "nullable": false
-              },
-              "profile": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": true
-              },
-              "score": {
-                "codecId": "pg/float8@1",
-                "nativeType": "float8",
-                "nullable": true
+              "target": {
+                "columns": ["id"],
+                "namespaceId": "__unbound__",
+                "tableName": "user"
               }
+            }
+          ],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
+        },
+        "user": {
+          "columns": {
+            "age": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
+            "createdAt": {
+              "codecId": "pg/timestamptz@1",
+              "default": {
+                "expression": "now()",
+                "kind": "function"
+              },
+              "nativeType": "timestamptz",
+              "nullable": false
             },
-            "uniques": [
-              {
-                "columns": ["email"]
-              }
-            ]
-          }
+            "email": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "embedding": {
+              "codecId": "pg/vector@1",
+              "nativeType": "vector",
+              "nullable": true,
+              "typeRef": "Embedding"
+            },
+            "id": {
+              "codecId": "pg/int4@1",
+              "default": {
+                "expression": "autoincrement()",
+                "kind": "function"
+              },
+              "nativeType": "int4",
+              "nullable": false
+            },
+            "isActive": {
+              "codecId": "pg/bool@1",
+              "default": {
+                "kind": "literal",
+                "value": true
+              },
+              "nativeType": "bool",
+              "nullable": false
+            },
+            "profile": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": true
+            },
+            "score": {
+              "codecId": "pg/float8@1",
+              "nativeType": "float8",
+              "nullable": true
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [
+            {
+              "columns": ["email"]
+            }
+          ]
         }
       }
     },
-    "storageHash": "sha256:8fa256466ba485fa9d52edc98e76680a9afd7042e65db1fcbb35b8518cf9fd28",
+    "storageHash": "sha256:759ded773797f219d64ee004c5bf28c0719f6d0414d5dbfec201e02189632bfa",
     "types": {
       "Embedding": {
         "codecId": "pg/vector@1",

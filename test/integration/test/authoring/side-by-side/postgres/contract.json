@@ -148,106 +148,104 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
-        "tables": {
-          "posts": {
-            "columns": {
-              "authorId": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "publishedAt": {
-                "codecId": "pg/timestamptz@1",
-                "nativeType": "timestamptz",
-                "nullable": true
-              },
-              "title": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+    "__unbound__": {
+      "id": "__unbound__",
+      "kind": "postgres-unbound-schema",
+      "tables": {
+        "posts": {
+          "columns": {
+            "authorId": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
             },
-            "foreignKeys": [
-              {
-                "constraint": true,
-                "index": true,
-                "source": {
-                  "columns": [
-                    "authorId"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "posts"
-                },
-                "target": {
-                  "columns": [
-                    "id"
-                  ],
-                  "namespaceId": "__unbound__",
-                  "tableName": "users"
-                }
-              }
-            ],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "id": {
+              "codecId": "pg/int4@1",
+              "default": {
+                "expression": "autoincrement()",
+                "kind": "function"
+              },
+              "nativeType": "int4",
+              "nullable": false
             },
-            "uniques": []
+            "publishedAt": {
+              "codecId": "pg/timestamptz@1",
+              "nativeType": "timestamptz",
+              "nullable": true
+            },
+            "title": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
           },
-          "users": {
-            "columns": {
-              "bio": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
+          "foreignKeys": [
+            {
+              "constraint": true,
+              "index": true,
+              "source": {
+                "columns": [
+                  "authorId"
+                ],
+                "namespaceId": "__unbound__",
+                "tableName": "posts"
               },
-              "email": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int4@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int4",
-                "nullable": false
-              },
-              "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
+              "target": {
+                "columns": [
+                  "id"
+                ],
+                "namespaceId": "__unbound__",
+                "tableName": "users"
               }
+            }
+          ],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        },
+        "users": {
+          "columns": {
+            "bio": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": true
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "email": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "uniques": []
-          }
+            "id": {
+              "codecId": "pg/int4@1",
+              "default": {
+                "expression": "autoincrement()",
+                "kind": "function"
+              },
+              "nativeType": "int4",
+              "nullable": false
+            },
+            "name": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:0dd598e2a231ab7b6d81a6d82aed7e54e2894e3f4036809a80e71191086834fa"
+    "storageHash": "sha256:f0261d3913b7d0e81b38faf45e17b036387630abaeb49e831397e983d6340a20"
   },
   "capabilities": {
     "postgres": {
