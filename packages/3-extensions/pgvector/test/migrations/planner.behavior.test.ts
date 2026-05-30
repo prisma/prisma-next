@@ -19,7 +19,6 @@ import {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
-import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
 
@@ -581,7 +580,7 @@ function createTestContract(
     },
   };
   const { storage: _s, ...rest } = overrides ?? {};
-  const namespaces = blindCast<SqlStorageInput['namespaces']>(
+  const namespaces = (
     storageInput.namespaces
       ? buildSqlNamespaceMap(storageInput.namespaces)
       : {
@@ -589,8 +588,8 @@ function createTestContract(
             id: UNBOUND_NAMESPACE_ID,
             tables: defaultTables,
           }),
-        },
-  );
+        }
+  ) as SqlStorageInput['namespaces'];
   return {
     target: 'postgres',
     targetFamily: 'sql',
