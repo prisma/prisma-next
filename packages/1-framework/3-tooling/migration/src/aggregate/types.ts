@@ -5,6 +5,27 @@ import type { OnDiskMigrationPackage } from '../package';
 import type { Refs } from '../refs';
 import type { ContractSpaceHeadRecord } from '../verify-contract-spaces';
 
+export interface ContractAtOptions {
+  readonly refName?: string;
+}
+
+export type ContractAtResult =
+  | {
+      readonly provenance: 'snapshot';
+      readonly hash: string;
+      readonly contractJson: unknown;
+      readonly contractDts: string;
+      readonly contract: Contract;
+    }
+  | {
+      readonly provenance: 'graph-node';
+      readonly sourceDir: string;
+      readonly hash: string;
+      readonly contractJson: unknown;
+      readonly contractDts: string;
+      readonly contract: Contract;
+    };
+
 /**
  * One contract space — app or extension — as a member of a
  * {@link ContractSpaceAggregate}. Every member has the same shape.
@@ -35,6 +56,11 @@ import type { ContractSpaceHeadRecord } from '../verify-contract-spaces';
  *   `deserializeContract`. Throws if the on-disk contract is missing or
  *   undeserializable (surfaced as `contractUnreadable` by `checkIntegrity`
  *   under `checkContracts`); callers gate before querying it.
+ * - `contractAt(hash, opts?)`: materializes the contract at an arbitrary
+ *   graph node — when `opts.refName` is set, prefer the ref's paired
+ *   snapshot; else find the package whose `metadata.to === hash` and read
+ *   its `end-contract.*`. Lazy per `(hash, refName?)` memoisation; throws
+ *   typed {@link MigrationToolsError} values compatible with CLI mappers.
  */
 export interface ContractSpaceMember {
   readonly spaceId: string;
@@ -43,6 +69,7 @@ export interface ContractSpaceMember {
   readonly headRef: ContractSpaceHeadRecord | null;
   graph(): MigrationGraph;
   contract(): Contract;
+  contractAt(hash: string, opts?: ContractAtOptions): Promise<ContractAtResult>;
 }
 
 /**

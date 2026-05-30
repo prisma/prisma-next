@@ -58,7 +58,7 @@ export async function loadContractSpaceAggregate(
   const { migrationsDir, deserializeContract, appContract } = input;
   const targetId = appContract.target;
 
-  const appState = await loadAppSpace(migrationsDir, appContract);
+  const appState = await loadAppSpace(migrationsDir, appContract, deserializeContract);
   const extensionStates = await loadExtensionSpaces(migrationsDir, deserializeContract);
 
   const spaces: readonly IntegritySpaceState[] = [appState, ...extensionStates];
@@ -74,6 +74,7 @@ export async function loadContractSpaceAggregate(
 async function loadAppSpace(
   migrationsDir: string,
   appContract: Contract,
+  deserializeContract: (raw: unknown) => Contract,
 ): Promise<IntegritySpaceState> {
   const spaceDir = spaceMigrationDirectory(migrationsDir, APP_SPACE_ID);
   const { packages, problems } = await readMigrationsDir(spaceDir);
@@ -84,7 +85,9 @@ async function loadAppSpace(
     packages,
     refs,
     headRef: { hash: appContract.storage.storageHash, invariants: [] },
+    refsDir: spaceRefsDirectory(spaceDir),
     resolveContract: () => appContract,
+    deserializeContract,
   });
 
   // The app head ref is synthesised from the live contract, so there is
@@ -126,7 +129,9 @@ async function loadExtensionSpace(
     packages,
     refs,
     headRef,
+    refsDir: spaceRefsDirectory(spaceDir),
     resolveContract: () => deserializeContract(rawContract()),
+    deserializeContract,
   });
 
   return { member, problems, refProblems, headRefProblem, isApp: false };

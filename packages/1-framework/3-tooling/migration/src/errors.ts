@@ -401,6 +401,47 @@ export function errorMigrationHashMismatch(
   });
 }
 
+export function errorSnapshotMissing(refName: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.SNAPSHOT_MISSING',
+    `Ref "${refName}" has no paired contract snapshot`,
+    {
+      why: `Ref "${refName}" exists but its paired snapshot files are missing.`,
+      fix: `Run "prisma-next db update --advance-ref ${refName}" to repopulate the snapshot, or "prisma-next ref delete ${refName}" to clear the orphan pointer.`,
+      details: { refName, identifier: refName, viaRef: true },
+    },
+  );
+}
+
+export function errorBundleNotFoundForGraphNode(
+  hash: string,
+  explicitLabel?: string,
+): MigrationToolsError {
+  const summary = explicitLabel
+    ? `No migration bundle found for reference "${explicitLabel}" (resolved hash: ${hash})`
+    : `No migration bundle found for graph node ${hash}`;
+  return new MigrationToolsError('MIGRATION.BUNDLE_NOT_FOUND_FOR_GRAPH_NODE', summary, {
+    why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
+    fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
+    details: { hash, ...(explicitLabel ? { explicitLabel } : {}) },
+  });
+}
+
+export function errorContractDeserializationFailed(
+  filePath: string,
+  message: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_DESERIALIZATION_FAILED',
+    'Contract failed to deserialize',
+    {
+      why: `Contract at "${filePath}" failed to deserialize: ${message}`,
+      fix: reemitHint(dirname(filePath), 'or restore the directory from version control.'),
+      details: { filePath, message },
+    },
+  );
+}
+
 export function errorHashNotInGraph(hash: string, graph: MigrationGraph): MigrationToolsError {
   const reachableHashes = [...graph.nodes].sort();
   const reachableList = reachableHashes.length > 0 ? reachableHashes.join(', ') : '(none)';

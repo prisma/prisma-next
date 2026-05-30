@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { ControlFamilyInstance } from '@prisma-next/framework-components/control';
+import type { ContractSpaceMember } from '@prisma-next/migration-tools/aggregate';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import {
@@ -7,20 +7,17 @@ import {
   findLatestMigration,
   isGraphNode,
 } from '@prisma-next/migration-tools/migration-graph';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import type { ContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { Refs } from '@prisma-next/migration-tools/refs';
-import { readRefSnapshot, readRefs } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
   CliStructuredError,
-  errorContractValidationFailed,
   errorPlanForgotTheFlag,
   errorSnapshotMissing,
-  errorUnexpected,
-  mapMigrationToolsError,
   mapRefResolutionError,
 } from './cli-errors';
+import { mapContractAtError } from './contract-at-errors';
 
 const FULL_HASH_PATTERN = /^sha256:([0-9a-f]{64}|empty)$/;
 
@@ -48,15 +45,11 @@ export type FromResolution =
 
 export interface ResolveFromForPlanInput {
   readonly optionsFrom?: string | undefined;
-  readonly refsDir: string;
-  readonly bundles: readonly OnDiskMigrationPackage[];
-  readonly graph: MigrationGraph;
-  readonly familyInstance: ControlFamilyInstance<string, unknown>;
-  readonly readBundleEndContract: (migrationDir: string) => Promise<Contract>;
+  readonly member: ContractSpaceMember;
 }
 
-function graphIsEmpty(bundles: readonly OnDiskMigrationPackage[]): boolean {
-  return bundles.length === 0;
+function graphIsEmpty(member: ContractSpaceMember): boolean {
+  return member.packages.length === 0;
 }
 
 function getReachableRefs(
@@ -86,158 +79,136 @@ export function assertFromIsGraphNode(
   }
 }
 
-async function deserializeSnapshotContract(
-  familyInstance: ControlFamilyInstance<string, unknown>,
-  contract: unknown,
-): Promise<Result<Contract, CliStructuredError>> {
-  try {
-    return ok(familyInstance.deserializeContract(contract));
-  } catch (error) {
-    if (CliStructuredError.is(error)) {
-      return notOk(error);
+type RefContractResolution =
+  | {
+      kind: 'snapshot';
+      hash: string;
+      contract: Contract;
+      contractJson: unknown;
+      contractDts: string;
     }
-    return notOk(
-      errorContractValidationFailed(
-        `Ref snapshot contract failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
-        { where: { path: 'ref-snapshot' } },
-      ),
-    );
-  }
-}
+  | {
+      kind: 'graph-node';
+      hash: string;
+      contract: Contract;
+      contractJson: unknown;
+      contractDts: string;
+      sourceDir: string;
+    };
 
-async function resolveGraphNodeFromBundle(
-  fromHash: string,
-  bundles: readonly OnDiskMigrationPackage[],
-  readBundleEndContract: (migrationDir: string) => Promise<Contract>,
-  explicitFromLabel?: string,
-): Promise<Result<Extract<FromResolution, { kind: 'graph-node' }>, CliStructuredError>> {
-  const matchingBundle = bundles.find((pkg) => pkg.metadata.to === fromHash);
-  if (!matchingBundle) {
-    return notOk(
-      errorUnexpected(
-        explicitFromLabel
-          ? `No migration bundle found for --from "${explicitFromLabel}" (resolved hash: ${fromHash})`
-          : `No migration bundle found for graph node ${fromHash}`,
-        {
-          why: `The hash ${fromHash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
-          fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
-        },
-      ),
-    );
-  }
+async function resolveContractRef(
+  parsed: ContractRef,
+  member: ContractSpaceMember,
+  options?: { readonly explicitLabel?: string; readonly artifactRole?: 'from' | 'to' },
+): Promise<Result<RefContractResolution, CliStructuredError>> {
+  const { hash, provenance } = parsed;
+  const refName = provenance.kind === 'ref' ? provenance.refName : undefined;
+
   try {
-    const fromContract = await readBundleEndContract(matchingBundle.dirPath);
+    const at = await member.contractAt(hash, refName !== undefined ? { refName } : undefined);
+
+    if (at.provenance === 'snapshot') {
+      return ok({
+        kind: 'snapshot',
+        hash: at.hash,
+        contract: at.contract,
+        contractJson: at.contractJson,
+        contractDts: at.contractDts,
+      });
+    }
+
     return ok({
       kind: 'graph-node',
-      fromHash,
-      fromContract,
-      sourceDir: matchingBundle.dirPath,
+      hash: at.hash,
+      contract: at.contract,
+      contractJson: at.contractJson,
+      contractDts: at.contractDts,
+      sourceDir: at.sourceDir,
     });
+  } catch (error) {
+    return mapContractAtError(
+      error,
+      options?.artifactRole !== undefined ? { artifactRole: options.artifactRole } : undefined,
+    );
+  }
+}
+
+async function resolveFromPolicy(
+  parsed: ContractRef,
+  input: ResolveFromForPlanInput,
+  refs: Refs,
+  explicitFromLabel?: string,
+): Promise<Result<FromResolution, CliStructuredError>> {
+  const resolution = await resolveContractRef(parsed, input.member, {
+    ...(explicitFromLabel !== undefined ? { explicitLabel: explicitFromLabel } : {}),
+    artifactRole: 'from',
+  });
+  if (!resolution.ok) {
+    return resolution;
+  }
+
+  if (resolution.value.kind === 'graph-node') {
+    return ok({
+      kind: 'graph-node',
+      fromHash: resolution.value.hash,
+      fromContract: resolution.value.contract,
+      sourceDir: resolution.value.sourceDir,
+    });
+  }
+
+  const { hash, contract, contractJson, contractDts } = resolution.value;
+  if (graphIsEmpty(input.member)) {
+    return ok({
+      kind: 'auto-baseline',
+      fromHash: hash,
+      fromContract: contract,
+      contractDts,
+      contractJson,
+    });
+  }
+
+  const graph = input.member.graph();
+  const graphTip = findLatestMigration(graph)?.to ?? null;
+  try {
+    assertFromIsGraphNode(hash, graph, refs, graphTip);
   } catch (error) {
     if (CliStructuredError.is(error)) {
       return notOk(error);
     }
     throw error;
   }
-}
-
-async function resolveFromRefName(
-  refName: string,
-  fromHash: string,
-  input: ResolveFromForPlanInput,
-  refs: Refs,
-): Promise<Result<FromResolution, CliStructuredError>> {
-  const { refsDir, bundles, graph, familyInstance, readBundleEndContract } = input;
-  const empty = graphIsEmpty(bundles);
-  const graphTip = findLatestMigration(graph)?.to ?? null;
-
-  let snapshot: Awaited<ReturnType<typeof readRefSnapshot>>;
-  try {
-    snapshot = await readRefSnapshot(refsDir, refName);
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    throw error;
-  }
-
-  if (snapshot) {
-    const contractResult = await deserializeSnapshotContract(familyInstance, snapshot.contract);
-    if (!contractResult.ok) {
-      return contractResult;
-    }
-    const fromContract = contractResult.value;
-    const { contractDts, contract: contractJson } = snapshot;
-    if (empty) {
-      return ok({ kind: 'auto-baseline', fromHash, fromContract, contractDts, contractJson });
-    }
-    try {
-      assertFromIsGraphNode(fromHash, graph, refs, graphTip);
-    } catch (error) {
-      if (CliStructuredError.is(error)) {
-        return notOk(error);
-      }
-      throw error;
-    }
-    return ok({ kind: 'snapshot', fromHash, fromContract, contractDts, contractJson });
-  }
-
-  if (isGraphNode(fromHash, graph)) {
-    return resolveGraphNodeFromBundle(fromHash, bundles, readBundleEndContract);
-  }
-
-  return notOk(errorSnapshotMissing(refName));
-}
-
-async function resolveFromHashProvenance(
-  fromHash: string,
-  input: ResolveFromForPlanInput,
-  _refs: Refs,
-  explicitFromLabel?: string,
-): Promise<Result<FromResolution, CliStructuredError>> {
-  const { bundles, graph } = input;
-
-  if (isGraphNode(fromHash, graph)) {
-    return resolveGraphNodeFromBundle(
-      fromHash,
-      bundles,
-      input.readBundleEndContract,
-      explicitFromLabel,
-    );
-  }
-
-  throw new Error(
-    `resolveFromHashProvenance: non-graph-node hash ${fromHash} should be refused via looksLikeFullHash before this helper is called`,
-  );
+  return ok({
+    kind: 'snapshot',
+    fromHash: hash,
+    fromContract: contract,
+    contractDts,
+    contractJson,
+  });
 }
 
 export async function resolveFromForPlan(
   input: ResolveFromForPlanInput,
 ): Promise<Result<FromResolution, CliStructuredError>> {
-  const { optionsFrom, refsDir, graph } = input;
-
-  let refs: Refs;
-  try {
-    refs = await readRefs(refsDir);
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    throw error;
-  }
+  const { optionsFrom, member } = input;
+  const graph = member.graph();
+  const refs = member.refs;
 
   if (optionsFrom === undefined) {
     const dbRef = refs['db'];
     if (!dbRef) {
       return ok({ kind: 'greenfield', fromHash: null, fromContract: null });
     }
-    return resolveFromRefName('db', dbRef.hash, input, refs);
+    return resolveFromPolicy(
+      { hash: dbRef.hash, provenance: { kind: 'ref', refName: 'db' } },
+      input,
+      refs,
+    );
   }
 
   const refResult = parseContractRef(optionsFrom, { graph, refs });
   if (!refResult.ok) {
     if (looksLikeFullHash(optionsFrom)) {
-      const empty = graphIsEmpty(input.bundles);
+      const empty = graphIsEmpty(member);
       const graphTip = findLatestMigration(graph)?.to ?? null;
       if (empty) {
         return notOk(errorSnapshotMissing(optionsFrom, { viaRef: false }));
@@ -247,11 +218,41 @@ export async function resolveFromForPlan(
     return notOk(mapRefResolutionError(refResult.failure));
   }
 
-  const { hash: fromHash, provenance } = refResult.value;
+  return resolveFromPolicy(refResult.value, input, refs, optionsFrom);
+}
 
-  if (provenance.kind === 'ref') {
-    return resolveFromRefName(provenance.refName, fromHash, input, refs);
+export interface ResolveToForPlanInput {
+  readonly member: ContractSpaceMember;
+}
+
+export interface ResolvedContractRef {
+  readonly hash: string;
+  readonly contract: Contract;
+  readonly contractJson: unknown;
+  readonly contractDts: string;
+}
+
+export async function resolveToForPlan(
+  optionsTo: string,
+  input: ResolveToForPlanInput,
+): Promise<Result<ResolvedContractRef, CliStructuredError>> {
+  const { member } = input;
+  const graph = member.graph();
+  const refs = member.refs;
+
+  const refResult = parseContractRef(optionsTo, { graph, refs });
+  if (!refResult.ok) {
+    return notOk(mapRefResolutionError(refResult.failure));
   }
 
-  return resolveFromHashProvenance(fromHash, input, refs, optionsFrom);
+  const resolution = await resolveContractRef(refResult.value, member, {
+    explicitLabel: optionsTo,
+    artifactRole: 'to',
+  });
+  if (!resolution.ok) {
+    return resolution;
+  }
+
+  const { hash, contract, contractJson, contractDts } = resolution.value;
+  return ok({ hash, contract, contractJson, contractDts });
 }

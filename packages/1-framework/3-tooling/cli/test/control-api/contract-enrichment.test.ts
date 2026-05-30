@@ -10,7 +10,7 @@ function makeIR(overrides?: Partial<Contract>): Contract {
     target: 'postgres',
     roots: {},
     models: {},
-    storage: { storageHash: coreHash('sha256:test') },
+    storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
     extensionPacks: {},
     capabilities: {},
     profileHash: profileHash('sha256:test'),

@@ -1,3 +1,4 @@
+import type { StorageBase } from '@prisma-next/contract/types';
 import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
@@ -36,7 +37,9 @@ export interface EntityCoordinate {
  * property whose value is a non-null object, yields one coordinate per
  * entry key in that map. No family-specific slot vocabulary is required.
  */
-export function* elementCoordinates(storage: Storage): Generator<EntityCoordinate> {
+export function* elementCoordinates(
+  storage: Pick<StorageBase, 'namespaces'>,
+): Generator<EntityCoordinate> {
   for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
     for (const [entityKind, slot] of Object.entries(ns)) {
       if (entityKind === 'id') continue;

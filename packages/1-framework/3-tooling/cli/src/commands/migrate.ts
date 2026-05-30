@@ -5,11 +5,9 @@ import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migrati
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
-import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type {
@@ -42,6 +40,7 @@ import {
   setCommandExamples,
   targetSupportsMigrations,
 } from '../utils/command-helpers';
+import { mapContractAtError } from '../utils/contract-at-errors';
 import {
   loadContractSpaceAggregateForCli,
   refuseContractSpaceIntegrity,
@@ -198,14 +197,16 @@ async function executeMigrateCommand(
   }
 
   let refEntry: RefEntry | undefined;
+  let refName: string | undefined;
   if (toArg) {
-    const refs = await readRefs(refsDir);
+    const refs = aggregate.app.refs;
     const refResult = parseContractRef(toArg, { graph: aggregate.app.graph(), refs });
     if (!refResult.ok) {
       return notOk(mapRefResolutionError(refResult.failure));
     }
     if (refResult.value.provenance.kind === 'ref') {
-      const resolved = refs[refResult.value.provenance.refName];
+      refName = refResult.value.provenance.refName;
+      const resolved = refs[refName];
       if (resolved) refEntry = resolved;
     } else {
       refEntry = { hash: refResult.value.hash, invariants: [] };
@@ -237,7 +238,6 @@ async function executeMigrateCommand(
   }
 
   const appGraph = aggregate.app.graph();
-  const appBundles = aggregate.app.packages;
 
   const client = createControlClient({
     family: config.family,
@@ -285,8 +285,35 @@ async function executeMigrateCommand(
       ui.step('Loading contract spaces…');
     }
 
+    // When `--to` resolves to an on-disk graph node with a matching bundle,
+    // verify and apply against THAT bundle's destination contract via
+    // `contractAt` — not the emitted `contract.json`. With `--to` omitted,
+    // or a target with no matching bundle, the emitted contract stays the
+    // apply contract (the only migrate-specific default). The same
+    // `contractAt` artifacts feed the optional ref-advancement snapshot.
+    let applyContract: Contract = contractRaw;
+    let snapshotContractJson: Record<string, unknown> = JSON.parse(contractContent);
+    let snapshotContractDts: string | undefined;
+    if (toArg && refEntry) {
+      const targetHash = refEntry.hash;
+      const matchingBundle = aggregate.app.packages.find((p) => p.metadata.to === targetHash);
+      if (matchingBundle) {
+        try {
+          const at = await aggregate.app.contractAt(
+            targetHash,
+            refName !== undefined ? { refName } : undefined,
+          );
+          applyContract = at.contract;
+          snapshotContractJson = at.contractJson as Record<string, unknown>;
+          snapshotContractDts = at.contractDts;
+        } catch (error) {
+          return mapContractAtError(error, { artifactRole: 'to' });
+        }
+      }
+    }
+
     const applyResult = await client.migrationApply({
-      contract: contractRaw,
+      contract: applyContract,
       migrationsDir,
       ...ifDefined('refHash', refEntry?.hash),
       ...(refEntry?.invariants ? { refInvariants: refEntry.invariants } : {}),
@@ -301,37 +328,11 @@ async function executeMigrateCommand(
 
     let advancedRef: { name: string; hash: string } | null = null;
     if (options.advanceRef !== undefined) {
-      let contractJsonPathForSnapshot = contractPathAbsolute;
-      let contractJsonForSnapshot: Record<string, unknown> = JSON.parse(contractContent) as Record<
-        string,
-        unknown
-      >;
-      if (toArg && refEntry) {
-        const matchingBundle = appBundles.find((p) => p.metadata.to === refEntry.hash);
-        if (matchingBundle) {
-          const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-          contractJsonPathForSnapshot = endContractPath;
-          try {
-            const raw = await readFile(endContractPath, 'utf-8');
-            contractJsonForSnapshot = JSON.parse(raw) as Record<string, unknown>;
-          } catch (error) {
-            if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-              return notOk(
-                errorFileNotFound(endContractPath, {
-                  why: `Bundle end-contract not found at ${endContractPath}`,
-                  fix: 'Re-emit the migration bundle or pick a different --to target.',
-                }),
-              );
-            }
-            throw error;
-          }
-        }
-      }
       try {
-        const contractIR = await readContractIR(
-          contractJsonForSnapshot,
-          contractJsonPathForSnapshot,
-        );
+        const contractIR =
+          snapshotContractDts !== undefined
+            ? { contract: snapshotContractJson, contractDts: snapshotContractDts }
+            : await readContractIR(snapshotContractJson, contractPathAbsolute);
         advancedRef = await executeRefAdvancement(
           refsDir,
           options.advanceRef,
