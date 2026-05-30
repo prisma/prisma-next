@@ -464,7 +464,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       expect(envelope.code).toBe('PN-MIG-5002');
       const violations = envelope.meta?.violations ?? [];
       expect(violations.length).toBeGreaterThan(0);
-      expect(violations.some((v) => v['kind'] === 'integrity' && v['spaceId'] === 'app')).toBe(
+      expect(violations.some((v) => v['kind'] === 'hashMismatch' && v['spaceId'] === 'app')).toBe(
         true,
       );
     },
