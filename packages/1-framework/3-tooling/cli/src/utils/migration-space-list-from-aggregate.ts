@@ -34,14 +34,9 @@ function listRefsByContractHash(
   const byHash = new Map(refsByContractHash(member.refs));
   if (member.spaceId !== APP_SPACE_ID && member.headRef !== null) {
     const hash = member.headRef.hash;
-    let bucket = byHash.get(hash);
-    if (bucket === undefined) {
-      bucket = [];
-      byHash.set(hash, bucket);
-    }
+    const bucket = byHash.get(hash) ?? [];
     if (!bucket.includes(HEAD_REF_NAME)) {
-      bucket.push(HEAD_REF_NAME);
-      bucket.sort();
+      byHash.set(hash, [...bucket, HEAD_REF_NAME].sort());
     }
   }
   return byHash;

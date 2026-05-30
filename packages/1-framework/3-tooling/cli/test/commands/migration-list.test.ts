@@ -796,7 +796,7 @@ describe('runMigrationList — per-space topology classification', () => {
       to: HASH_SHARED,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const flat = renderListed(result.value);
