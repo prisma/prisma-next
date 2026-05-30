@@ -1,4 +1,7 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  storageNamespaceEntries,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
@@ -12,13 +15,11 @@ function deserializedContract() {
     roots: { items: { namespace: UNBOUND_NAMESPACE_ID, model: 'Item' } },
     storage: {
       storageHash: 'sha256:test',
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          kind: 'mongo-database',
-          collections: {
-            items: {},
-          },
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        kind: 'mongo-database',
+        collections: {
+          items: {},
         },
       },
     },
@@ -42,12 +43,10 @@ describe('MongoTargetSchemaVerifier', () => {
       roots: {},
       storage: {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            kind: 'mongo-database',
-            collections: {},
-          },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          kind: 'mongo-database',
+          collections: {},
         },
       },
       models: {},
@@ -75,7 +74,11 @@ describe('MongoTargetSchemaVerifier', () => {
   it('uses the family-shared scaffolding: walks each namespace and aggregates issues', () => {
     const verifier = new MongoTargetSchemaVerifier();
     const contract = deserializedContract();
-    expect(Object.keys(contract.storage.namespaces)).toEqual(['__unbound__']);
+    expect(
+      [...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>)].map(
+        ([id]) => id,
+      ),
+    ).toEqual(['__unbound__']);
 
     const result = verifier.verifySchema({ contract, schema: new MongoSchemaIR([]) });
     expect(result).toBeDefined();
