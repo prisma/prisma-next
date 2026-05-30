@@ -37,7 +37,7 @@ So the consolidation has **two axes**, and the aggregate is load-bearing on both
 
 The payoff: "consolidate the graph model" and "stop re-deriving graphs from disk" become the *same* change. The aggregate is where the single model is anchored, so a second code path can't reintroduce the golden-path assumption — there is only one graph per space, built once, reasoned about one way.
 
-> **Caveat — the list views are not on the aggregate yet.** `migration list` / `list --graph` source their data from `enumerateMigrationSpaces`, and the tolerant classifier consumes `MigrationListEntry[]`, not a `MigrationGraph`. Putting those views on the aggregate is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand)'s scope (still backlog). This creates a genuine fork for slice 1 — see § Open questions.
+> **Prerequisite — [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) lands first.** Today `migration list` / `list --graph` source from `enumerateMigrationSpaces` and the classifier consumes `MigrationListEntry[]`, not a `MigrationGraph`. TML-2716 (in flight) moves those views onto the aggregate, deleting the hand-rolled I/O. This project starts only after it lands, so the list views are already aggregate-backed when slice 1 founds the single model — see § Open questions (resolved).
 
 ### What targeting becomes
 
@@ -87,13 +87,7 @@ All design-level forks are resolved (operator, 2026-05-30) and folded into § Th
 
 Residual implementation-level questions (the `∅` special-case in `isGraphNode`, the precise new error code/shape for the multi-tip case) are decided in the slice that touches them, not here.
 
-**Open (needs operator input) — the list-view / TML-2716 fork.** The reasoning model is a `MigrationGraph` consumer, but the shipped tolerant classifier consumes `MigrationListEntry[]`, and `migration list` / `list --graph` are not on the aggregate (they enumerate via `enumerateMigrationSpaces`). Putting those views on the aggregate is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) (backlog). Three ways to reconcile:
-
-1. **Depend on TML-2716.** Land it first (or fold it in), so the list views source from the aggregate too and the classifier is refounded on `MigrationGraph`. Cleanest end state; widens this project's scope.
-2. **Found the vocabulary on `MigrationGraph` now; adapt the list views later.** This project ships the canonical reasoning over `MigrationGraph`; the list views keep their `MigrationListEntry[]` classifier until TML-2716 migrates them. Risk: two tolerant implementations coexist transiently (the very duplication we're removing), with a tracked follow-up to converge.
-3. **Keep the entry-based classifier as the canonical input shape.** Reason over `MigrationListEntry[]` everywhere and derive entries from the aggregate's graph for the non-list consumers. Inverts the natural data flow (graph → entries) and is likely the wrong primitive.
-
-Recommendation: (1) if the operator is willing to couple the two tickets, else (2) with an explicit convergence follow-up. This decision sets slice 1's model-surface input type and possibly adds a dependency, so it is resolved before slice 1 starts.
+**Resolved (operator, 2026-05-30) — the list-view / TML-2716 fork.** [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) (adopt the aggregate in `list` / `graph` / `log`, deleting hand-rolled I/O) is **in flight and lands before this project starts**. So by the time slice 1 begins, every migration view — including the list views — already sources from the `ContractSpaceAggregate`. The decision is therefore **option (1)**: found the canonical reasoning on the aggregate-provided `MigrationGraph`, and have the (now aggregate-backed) list views consume that one model. The transient-duplication risk of deferring is avoided because TML-2716 has already moved the list views onto the aggregate; reconciling the classifier's `MigrationListEntry[]` shape against the `MigrationGraph` it now derives from is a slice-1 implementation detail, not a coexisting second model. TML-2716 is recorded as a hard prerequisite (not folded into this project's scope) — see [`plan.md`](./plan.md) § Dependencies.
 
 ## References
 

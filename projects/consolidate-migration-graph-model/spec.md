@@ -60,7 +60,7 @@ The end state: **one** model, founded on the tolerant view, with targeting made 
 
 **Consumers that bypass the aggregate and build their own graph** (the "wires its own logic" cases — re-read disk + call `reconstructGraph`): `utils/command-helpers.ts` (`loadMigrationPackages`), `compute-extension-space-apply-path.ts`, and `commands/migration-check.ts`. These are migrated to source their graph from the aggregate member.
 
-**Relationship to TML-2716.** `migration list` / `list --graph` / `log` source from `enumerateMigrationSpaces`, not the aggregate; moving them is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) (backlog). Because the tolerant classifier we generalise *from* lives on that not-yet-migrated path, there is a sequencing fork between this project and TML-2716 — see § Open Questions.
+**Prerequisite: TML-2716.** `migration list` / `list --graph` / `log` source from `enumerateMigrationSpaces`, not the aggregate; moving them is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) (in flight). It lands before this project starts, so every view — including the classifier we generalise *from* — is already aggregate-backed when slice 1 founds the single model. This project does not begin until TML-2716 has merged.
 
 **Sibling already-correct surface:** `migration list` / `migration list --graph` (tolerant classifier). This project promotes that view's model to be *the* model.
 
@@ -108,9 +108,9 @@ The initial design forks were resolved with the operator (2026-05-30); recorded 
 
 ## Open Questions
 
-**Open (needs operator input): the list-view / TML-2716 sequencing fork.** Founding the reasoning model on the aggregate-provided `MigrationGraph` is clean for every command *except* the list views, which aren't on the aggregate (they enumerate via `enumerateMigrationSpaces`, and the tolerant classifier we generalise from consumes `MigrationListEntry[]`, not a graph). Options: (1) depend on / fold in [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) so the list views move onto the aggregate too; (2) found the canonical vocabulary on `MigrationGraph` now and converge the list views later (transient duplication, tracked follow-up); (3) keep the entry-based classifier as the canonical input (likely wrong primitive). Recommendation (1), else (2). This sets slice 1's model input type and possibly adds a dependency, so it is resolved before slice 1 starts. Full analysis in [`design-notes.md`](./design-notes.md) § Open questions.
+_None at the design level._ The list-view / [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) sequencing fork is resolved: TML-2716 (adopt the aggregate in `list` / `graph` / `log`) is in flight and **lands before this project starts**, so the list views are already aggregate-backed when slice 1 founds the single model on the aggregate-provided `MigrationGraph`. TML-2716 is a hard prerequisite, not in-scope here — see [`plan.md`](./plan.md) § Dependencies and [`design-notes.md`](./design-notes.md) § Open questions.
 
-_The earlier design forks (delete golden-path helpers; no silent multi-tip default; explicit targeting; dagre roots at actual roots) are resolved — see § Settled design decisions. Residual implementation-level questions (exact disposition of `isGraphNode`'s `∅` special-case, precise new error code/shape for the multi-tip case) are settled in the slice that touches them._
+The earlier design forks (delete golden-path helpers; no silent multi-tip default; explicit targeting; dagre roots at actual roots) are resolved — see § Settled design decisions. Residual implementation-level questions (exact disposition of `isGraphNode`'s `∅` special-case, precise new error code/shape for the multi-tip case) are settled in the slice that touches them.
 
 ## References
 
