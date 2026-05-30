@@ -1,11 +1,7 @@
 import * as clack from '@clack/prompts';
 import { bold, cyan, dim, green, red, yellow } from 'colorette';
-import {
-  detectGlyphMode,
-  type GlyphMode,
-  type GlyphModeInput,
-} from './formatters/migration-list-graph-render';
 import type { GlobalFlags } from './global-flags';
+import { detectGlyphMode, type GlyphMode, type GlyphModeInput } from './glyph-mode';
 import { shutdownSignal } from './shutdown';
 
 export interface TerminalUIRuntime extends GlyphModeInput {}
