@@ -20,10 +20,10 @@ Two slices in a stack. Slice 1 is the keystone: it separates **build** from **ju
    - **Focus:** The model (`aggregate/`), `migration-graph.ts`, `io.ts`, and the *correctness-gating* consumers (check / apply / verify) plus the two existing aggregate readers (status / show). Cross-consumer integration tests pin a self-edge / hash-mismatch / orphan-space-dir project. **Out of scope:** list / graph / log (they aren't on the aggregate yet — slice 2).
 
 2. **Slice `adopt-read-commands`** — Linear: [TML-2716](https://linear.app/prisma-company/issue/TML-2716)
-   - **Outcome:** `migration list` / `graph` / `log` render against the unified model — `aggregate.spaces()` / `space.packages` / `space.refs` / `space.graph()` — with their hand-rolled `enumerateMigrationSpaces` / `loadMigrationPackages` / ad-hoc `readMigrationsDir` + `reconstructGraph` paths deleted. Each applies its own integrity policy via `checkIntegrity()`; none gate on load.
-   - **Builds on:** Slice 1's tolerant queryable aggregate + `checkIntegrity()`.
-   - **Hands to:** All migration read commands on one model — the project's success signal (no second read-model; net deletion at the call sites).
-   - **Focus:** The CLI command files for list / graph / log + removal of the now-unused CLI helper `loadMigrationPackages`. **Out of scope:** the model itself (frozen in slice 1).
+   - **Outcome:** **Every** CLI command that reads migration packages from disk — `migration list` / `graph` / `log` **and** the package-read path of `db-sign` / `db-update` / `migration-plan` / `ref` — builds the unified model once (via a shared `buildReadAggregate` helper) and reads `aggregate.spaces()` / `aggregate.app.graph()` / `.packages` / `.refs`. Both hand-rolled loaders (`enumerateMigrationSpaces` and `loadMigrationPackages`) are deleted. None gate on load (the substitution is behaviour-preserving; `loadMigrationPackages` never gated). For the writer/planner commands only the read seam moves; their write/apply/plan behaviour is untouched.
+   - **Builds on:** Slice 1's tolerant queryable aggregate + the offline shell-contract load pattern.
+   - **Hands to:** All migration package-reading commands on one model — the project's success signal (no second read-model; net deletion at the call sites; both loaders deleted).
+   - **Focus:** The seven CLI command files + the shared `buildReadAggregate` helper + deletion of both hand-rolled loaders. **Out of scope:** the model itself (frozen in slice 1); the write/apply/plan behaviour of db-sign / db-update / migration-plan (only their read seam moves). **Scope note (settled 2026-05-30):** grounding found `loadMigrationPackages` had six callers, not just list/graph/log, so all seven package-reading commands are folded in to make the helper genuinely deletable rather than leaving a half-migrated state.
 
 ## Dependencies (external)
 
