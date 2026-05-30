@@ -57,19 +57,20 @@ For PRs routed as **direct change** by `drive-start-workflow`:
 - This repo's preference: commits within a PR can stay separate (no squash) when each commit is a coherent step. Maintainers may squash on merge based on the PR's shape.
 - **Every commit on the branch must carry a `Signed-off-by` trailer (DCO).** Use `git commit -s` (or `git commit --signoff`) for every commit. When rebasing, use `git rebase --signoff` so re-played commits get re-signed.
 
-## Reviewer pre-merge check — Signed-off-by on every commit
+## Sign-off (DCO) is a pre-push responsibility, not a reviewer gate
 
-DCO is a required check; commits without `Signed-off-by` block the merge. The reviewer verifies sign-off as a pre-merge gate, regardless of CI status (CI catches it but failures land late and are expensive to fix after threads are anchored to SHAs).
+DCO is a required CI check; commits without `Signed-off-by` block the merge. CI is the authority on it — the **reviewer does not re-run it** (see [`drive/code/README.md § Reviewers don't run validation gates`](../code/README.md#reviewers-dont-run-validation-gates)).
 
-Reviewer command (run from the branch root):
+The catch is that unsigned commits are uniquely expensive to fix *late*: the repair (rebase + sign + force-push) rewrites SHAs and re-anchors every resolved review thread. So sign-off is caught **before push** by the implementer/orchestrator, not after by the reviewer:
+
+- Implementers commit with `git commit -s` (or `--signoff`) on every commit; when rebasing, `git rebase --signoff` so re-played commits stay signed (already stated under Commit-style rules).
+- Before pushing a branch for review, the orchestrator/implementer self-checks sign-off from the branch root:
 
 ```bash
 git log --format='%h %s%n  signed: %(trailers:key=Signed-off-by,valueonly,separator=%x20)' origin/main..HEAD
 ```
 
-Every commit must show a non-empty `signed:` line. If any commit lacks one, surface to the implementer **before** triggering CI re-run — the fix (rebase + sign + force-push) changes SHAs and re-anchoring review threads is costly. In practice the simplest recovery is `git rebase --signoff <merge-base>` then `git push --force-with-lease`.
-
-This check fires on every PR, regardless of authoring path. Cheap to run, expensive to skip — the cost of fixing unsigned commits *after* the review surface lands compounds with the number of resolved review threads anchored to SHAs that the rebase will rewrite.
+  Every commit must show a non-empty `signed:` line. Fixing it pre-push (before any review thread anchors to a SHA) is cheap; fixing it post-review compounds with the number of resolved threads the rebase will rewrite. If CI's DCO check ever does trip post-push, repair with `git rebase --signoff <merge-base>` then `git push --force-with-lease`.
 
 ## Walkthrough conventions
 

@@ -6,6 +6,16 @@ Project-context bootstrap used by the `drive-code-review` and `drive-pr-local-re
 
 `drive-code-review` and `drive-pr-local-review` both delegate to architect / principal-engineer / tech-lead personas. Each delegated subagent should read this file before starting its pass and surface any of the listed smells if they appear in the diff under review.
 
+## Reviewers don't run validation gates
+
+**CI is the authority on the validation gates** (`typecheck`, `lint:deps`, `lint:casts`, `test:*`, `fixtures:check`, DCO). A reviewer does **not** re-run them — re-running CI's gates on a reviewer's machine burns CI-equivalent compute a second time (acutely so when several reviews run in parallel) and tells the reviewer nothing CI hasn't already decided. If a gate is red, that's the implementer's to fix before the review even starts.
+
+The reviewer's job is **judgment** CI can't make: architectural soundness, the seam smells listed below, correctness reasoning, clarity, whether the change matches its spec. Read the diff and reason about it; trust the green check for the mechanical gates.
+
+The mirror of this rule sits on the implementer side: the implementer runs gates **selectively** while working (only what the change touches) and the **full suite once at the end** of a dispatch — not repeatedly. CI is the final word for everyone; local runs are for fast iteration, not for re-certifying what CI will certify.
+
+(Sign-off/DCO is also CI-owned and not a reviewer gate — see [`drive/pr/README.md § Sign-off (DCO) is a pre-push responsibility`](../pr/README.md#sign-off-dco-is-a-pre-push-responsibility-not-a-reviewer-gate).)
+
 ## Repo-specific smells to surface
 
 These are bypass-the-seam patterns that look fine in isolation but encode a class of bugs the codebase has already paid for. Cross-reference the linked rule files when flagging the smell so the comment has a permanent home for the rationale.
