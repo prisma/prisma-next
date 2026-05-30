@@ -99,14 +99,12 @@ export const decodeFixtureContractJson = {
   targetFamily: 'mongo' as const,
   roots: { users: crossRef('User'), posts: crossRef('Post') },
   storage: {
-    namespaces: {
-      __unbound__: {
-        id: '__unbound__' as const,
-        kind: 'mongo-namespace' as const,
-        collections: {
-          users: { kind: 'mongo-collection' as const },
-          posts: { kind: 'mongo-collection' as const },
-        },
+    __unbound__: {
+      id: '__unbound__' as const,
+      kind: 'mongo-namespace' as const,
+      collections: {
+        users: { kind: 'mongo-collection' as const },
+        posts: { kind: 'mongo-collection' as const },
       },
     },
     storageHash: 'decode-integration-test',

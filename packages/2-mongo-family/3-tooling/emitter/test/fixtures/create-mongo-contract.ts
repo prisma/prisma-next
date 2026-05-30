@@ -7,9 +7,7 @@ export function namespacedMongoStorageFromCollections(
 ) {
   return {
     storageHash,
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections },
-    },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections },
   } as Contract['storage'];
 }
 
