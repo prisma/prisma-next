@@ -1,11 +1,11 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { TraceEvent } from '../drive-record-traces/schema.ts';
 import { runAssertions } from './assertions/index.ts';
 import { loadTrace } from './load.ts';
 import { computeMetrics } from './metrics.ts';
 import { parseTranscript } from './posthoc.ts';
 import { renderReport } from './report.ts';
-import type { TraceEvent } from './schema.ts';
 
 function getProjectRunIds(events: TraceEvent[]): string[] {
   const ids = new Set<string>();

@@ -350,7 +350,7 @@ Payload-only fields below; merge with the common envelope at emit time.
 
 ## Machine-readable schema
 
-The TypeScript arktype definitions for all event types live in [`skills-contrib/drive-record-traces/schema.ts`](./schema.ts). That file is the single source of truth; `skills-contrib/drive-diagnose-run/schema.ts` is a vendored copy kept in sync by the `schema-parity` test in `skills-contrib/drive-diagnose-run/test/schema-parity.test.ts`.
+The TypeScript arktype definitions for all event types live in [`skills-contrib/drive-record-traces/schema.ts`](./schema.ts). That file is the single source of truth; consumers such as `drive-diagnose-run` import from it directly.
 
 ## JSONL examples
 

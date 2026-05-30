@@ -1,4 +1,4 @@
-// CANONICAL Drive trace-event schema — owned by drive-record-traces. Vendored into drive-diagnose-run/schema.ts; keep in sync (schema-parity test enforces).
+// Drive trace-event schema — canonical home. Import this from consumers (e.g. drive-diagnose-run) rather than duplicating.
 import { type } from 'arktype';
 
 /** UUID v4 string — emit-side assigns a fresh v4; read validator may tighten. */

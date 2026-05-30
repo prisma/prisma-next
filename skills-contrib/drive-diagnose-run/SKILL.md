@@ -12,7 +12,7 @@ A **deterministic, LLM-free tool** that reads an emitted Drive `trace.jsonl` and
 
 ## What it is
 
-- `schema.ts` — arktype schemas for all 17 trace-event types. This is a **vendored copy** of the canonical `skills-contrib/drive-record-traces/schema.ts`; the two are kept byte-identical by the `schema-parity` test (divergence fails CI).
+- arktype schemas — imported directly from the canonical `skills-contrib/drive-record-traces/schema.ts` (the single source of truth for the trace-event vocabulary).
 - `load.ts` — JSONL loader: parses + validates each line; collects errors with line numbers instead of throwing.
 - `metrics.ts` — diagnostic-metric functions over a `TraceEvent[]` (rework rate, brief reissues, spec amendments, plan amendments, I12 halts, tier mix, wall-clock, etc.). Metric names count instability: lower is better, `0` means the artefact held.
 - `assertions/` — one checker per Drive invariant (I1–I12), cascade-redesign rule, and brief-discipline anti-pattern; each returns `pass | fail | not-checkable` with evidence refs.
@@ -56,4 +56,4 @@ A zero-dependency validator is a possible future improvement; for now `arktype` 
 
 ## Relationship to the trace vocabulary
 
-`schema.ts` is a vendored copy of the canonical `skills-contrib/drive-record-traces/schema.ts`, which is the single source of truth for the trace-event vocabulary and emission protocol. Make schema changes in `drive-record-traces`; the `schema-parity` test keeps the two byte-identical and fails CI on divergence.
+`drive-diagnose-run` imports schemas directly from the canonical `skills-contrib/drive-record-traces/schema.ts`, which is the single source of truth for the trace-event vocabulary and emission protocol. Schema changes go in `drive-record-traces`.
