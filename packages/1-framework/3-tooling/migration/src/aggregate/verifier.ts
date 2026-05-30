@@ -1,9 +1,9 @@
+import { elementCoordinates } from '@prisma-next/framework-components/ir';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
 import { projectSchemaToSpace } from './project-schema-to-space';
-import { storageElementNames } from './storage-element-names';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
 
 /**
@@ -213,8 +213,9 @@ function detectOrphanElements(
 
   const claimedTables = new Set<string>();
   for (const member of members) {
-    for (const name of storageElementNames(member.contract())) {
-      claimedTables.add(name);
+    const contract = member.contract();
+    for (const { entityName } of elementCoordinates(contract.storage)) {
+      claimedTables.add(entityName);
     }
   }
 
