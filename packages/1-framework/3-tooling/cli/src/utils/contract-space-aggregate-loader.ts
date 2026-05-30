@@ -63,7 +63,7 @@ function describeIntegrityViolation(violation: IntegrityViolation): string {
     case 'packageUnloadable':
       return `Migration "${violation.dirName}" could not be loaded: ${violation.detail}`;
     case 'sameSourceAndTarget':
-      return `Migration "${violation.dirName}" has source equal to target (${violation.hash}) with no data operation.`;
+      return `Migration "${violation.dirName}" has source equal to target (${violation.hash}) with no data invariant — a true no-op self-edge.`;
     case 'headRefMissing':
       return `Head ref \`refs/head.json\` is missing for contract space "${violation.spaceId}".`;
     case 'headRefNotInGraph':
@@ -109,7 +109,7 @@ export function mapIntegrityViolations(
     return new CliStructuredError('5001', summary, {
       domain: 'MIG',
       why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
-      fix: 'Run `prisma-next migrate` to materialise on-disk artefacts for declared extensions, or remove the orphan directory.',
+      fix: 'Declare the extension in `extensionPacks` and re-emit its contract-space artefacts, or remove the orphan `migrations/<space>` directory.',
       docsUrl: CONTRACT_SPACES_DOCS_URL,
       meta: { violations: layout },
     });
@@ -142,7 +142,7 @@ export function mapIntegrityViolations(
       `Contract-space contract validation failed for "${contractUnreadable.spaceId}"`,
       {
         why: contractUnreadable.detail,
-        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or fix the extension descriptor producing the invalid contract.',
+        fix: 'Re-emit the extension contract with `prisma-next contract emit`, or fix the extension pack descriptor producing the invalid contract.',
         violations: [contractUnreadable],
       },
     );
@@ -155,7 +155,7 @@ export function mapIntegrityViolations(
   const spaceId = 'spaceId' in structural ? structural.spaceId : '*';
   return contractSpaceError5002(`Contract-space integrity failure for "${spaceId}"`, {
     why: describeIntegrityViolation(structural),
-    fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or restore the on-disk `migrations/` directory from version control.',
+    fix: 'Re-emit the affected migration package(s) or restore the on-disk `migrations/` directory from version control.',
     violations: [structural],
   });
 }
