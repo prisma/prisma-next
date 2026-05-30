@@ -13,9 +13,7 @@ import {
 
 function unboundTables(tables: Record<string, unknown>) {
   return {
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-    },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
   };
 }
 
@@ -35,11 +33,9 @@ describe('SQL contract validators', () => {
     it('throws on invalid storage structure', () => {
       const invalid = {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: 'not-an-object',
-          },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: 'not-an-object',
         },
       } as unknown;
       expect(() => validateStorage(invalid)).toThrow();
@@ -48,13 +44,11 @@ describe('SQL contract validators', () => {
     it('throws on invalid table structure', () => {
       const invalid = {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: 'not-an-object',
-              },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: 'not-an-object',
             },
           },
         },
@@ -65,14 +59,12 @@ describe('SQL contract validators', () => {
     it('throws on invalid nativeType', () => {
       const invalid = {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 123, codecId: 'pg/int4@1', nullable: false },
-                },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 123, codecId: 'pg/int4@1', nullable: false },
               },
             },
           },
@@ -84,14 +76,12 @@ describe('SQL contract validators', () => {
     it('throws on invalid nullable type', () => {
       const invalid = {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: 'yes' },
-                },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: 'yes' },
               },
             },
           },
@@ -103,24 +93,22 @@ describe('SQL contract validators', () => {
     it('throws when column declares both typeParams and typeRef', () => {
       const invalid = {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  embedding: {
-                    nativeType: 'vector',
-                    codecId: 'pg/vector@1',
-                    nullable: false,
-                    typeParams: { dimensions: 1536 },
-                    typeRef: 'vector_1536',
-                  },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: {
+                embedding: {
+                  nativeType: 'vector',
+                  codecId: 'pg/vector@1',
+                  nullable: false,
+                  typeParams: { dimensions: 1536 },
+                  typeRef: 'vector_1536',
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
           },
         },
@@ -503,35 +491,33 @@ describe('SQL contract validators', () => {
     it('throws on invalid referential action string', () => {
       const invalid = {
         storageHash: 'sha256:test',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              post: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: UNBOUND_NAMESPACE_ID,
-                      tableName: 'post',
-                      columns: ['userId'],
-                    },
-                    target: {
-                      namespaceId: UNBOUND_NAMESPACE_ID,
-                      tableName: 'user',
-                      columns: ['id'],
-                    },
-                    onDelete: 'invalidAction',
-                    constraint: true,
-                    index: true,
-                  },
-                ],
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            post: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'post',
+                    columns: ['userId'],
+                  },
+                  target: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    tableName: 'user',
+                    columns: ['id'],
+                  },
+                  onDelete: 'invalidAction',
+                  constraint: true,
+                  index: true,
+                },
+              ],
             },
           },
         },
@@ -594,58 +580,56 @@ describe('SQL contract validators', () => {
       const rawContract = createContract({
         storage: {
           storageHash: 'sha256:cross-ns',
-          namespaces: {
-            auth: {
-              id: 'auth',
-              tables: {
-                users: {
-                  columns: {
-                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
+          auth: {
+            id: 'auth',
+            tables: {
+              users: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
             },
-            analytics: {
-              id: 'analytics',
-              tables: {
-                users: {
-                  columns: {
-                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  },
-                  primaryKey: { columns: ['user_uuid'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
+          },
+          analytics: {
+            id: 'analytics',
+            tables: {
+              users: {
+                columns: {
+                  user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 },
-                events: {
-                  columns: {
-                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [
-                    {
-                      source: {
-                        namespaceId: 'analytics',
-                        tableName: 'events',
-                        columns: ['user_uuid'],
-                      },
-                      target: {
-                        namespaceId: 'analytics',
-                        tableName: 'users',
-                        columns: ['user_uuid'],
-                      },
-                      constraint: true,
-                      index: true,
+                primaryKey: { columns: ['user_uuid'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              events: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: 'analytics',
+                      tableName: 'events',
+                      columns: ['user_uuid'],
                     },
-                  ],
-                },
+                    target: {
+                      namespaceId: 'analytics',
+                      tableName: 'users',
+                      columns: ['user_uuid'],
+                    },
+                    constraint: true,
+                    index: true,
+                  },
+                ],
               },
             },
           },
@@ -663,58 +647,56 @@ describe('SQL contract validators', () => {
       const rawContract = createContract({
         storage: {
           storageHash: 'sha256:cross-ns-mismatch',
-          namespaces: {
-            auth: {
-              id: 'auth',
-              tables: {
-                users: {
-                  columns: {
-                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
+          auth: {
+            id: 'auth',
+            tables: {
+              users: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
             },
-            analytics: {
-              id: 'analytics',
-              tables: {
-                users: {
-                  columns: {
-                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  },
-                  primaryKey: { columns: ['user_uuid'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
+          },
+          analytics: {
+            id: 'analytics',
+            tables: {
+              users: {
+                columns: {
+                  user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 },
-                events: {
-                  columns: {
-                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                    user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [
-                    {
-                      source: {
-                        namespaceId: 'analytics',
-                        tableName: 'events',
-                        columns: ['user_uuid'],
-                      },
-                      target: {
-                        namespaceId: 'auth',
-                        tableName: 'users',
-                        columns: ['user_uuid'],
-                      },
-                      constraint: true,
-                      index: true,
+                primaryKey: { columns: ['user_uuid'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              events: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  user_uuid: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: 'analytics',
+                      tableName: 'events',
+                      columns: ['user_uuid'],
                     },
-                  ],
-                },
+                    target: {
+                      namespaceId: 'auth',
+                      tableName: 'users',
+                      columns: ['user_uuid'],
+                    },
+                    constraint: true,
+                    index: true,
+                  },
+                ],
               },
             },
           },

@@ -391,7 +391,7 @@ export function createMongoContractSchema(
     '_generated?': 'Record<string, unknown>',
     'domain?': 'unknown',
     storage: type({
-      '+': 'reject',
+      '+': 'ignore',
       storageHash: 'string',
     }).narrow((storage, ctx) => {
       if (typeof storage !== 'object' || storage === null) {

@@ -270,8 +270,13 @@ export function createSqlStorageSchema(
   fragments?: ReadonlyMap<string, Type<unknown>>,
 ): Type<unknown> {
   const namespaceEntry = createNamespaceEntrySchema(fragments);
+  // Namespace ids are dynamic keys directly under `storage` (ADR 221 flat
+  // shape), so the base object must allow undeclared keys (`'+': 'ignore'`);
+  // the narrow then validates every non-reserved key as a namespace entry.
+  // A `'+': 'reject'` base would reject the namespace ids themselves before
+  // the narrow runs.
   return type({
-    '+': 'reject',
+    '+': 'ignore',
     storageHash: 'string',
     'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
   }).narrow((storage, ctx) => {
