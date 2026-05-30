@@ -1,18 +1,19 @@
+import { Agent } from '@cursor/sdk';
 import type { CreateAgent, OrchestratorRun, RunOutcome, RunStreamEvent } from './run-one-brief.ts';
 import type { TurnUsage } from './usage.ts';
 
-// The ONLY module that touches `@cursor/sdk`, and it does so via a DYNAMIC
-// import that runs solely on the live execution path. Nothing here is imported
-// at module-eval time by the harness core or its tests, so typecheck / tests /
-// lint / CI never require `@cursor/sdk` to be installed.
+// The ONLY module that touches `@cursor/sdk`, loaded lazily by run-one-brief on
+// the live path, so typecheck / tests / lint / dry-run never require it.
 //
-// NOTE (operator-gated): adding `@cursor/sdk` to the lockfile currently trips
-// the repo's `trustPolicy: no-downgrade` guard on a transitive `undici@5.29.0`.
-// Live execution is therefore gated on the operator admitting the dependency
-// (a `trustPolicyExclude` entry) AND providing `CURSOR_API_KEY`. The mapping
-// below is best-effort against the documented SDK surface (`Agent.create`,
-// `run.stream()`, turn-ended `usage`) and should be confirmed on the first live
-// run, since the SDK's concrete message shapes are verified only at runtime.
+// We import `Agent` for its RUNTIME behaviour only — never the SDK's published
+// types. `@cursor/sdk@1.0.15` ships `.d.ts` that re-export from unpublished
+// `@anysphere/*` packages, so its own types (including `TurnEndedUpdate`, the
+// token-usage carrier) are unresolvable. We therefore call the documented
+// runtime API (`Agent.create` → `agent.send` → `run.stream()` / `run.wait()`)
+// and read the few fields we consume through runtime guards over `unknown`,
+// rather than fabricating a full mirror of the SDK's type surface. When upstream
+// ships self-contained declarations, replace these reads with the real types.
+// See ./KNOWN-ISSUES.md.
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -58,27 +59,6 @@ function toStreamEvent(message: unknown): RunStreamEvent {
   return { kind: 'other' };
 }
 
-type SdkRun = {
-  stream(): AsyncIterable<unknown>;
-  wait(): Promise<unknown>;
-};
-
-type SdkAgent = {
-  send(prompt: string): Promise<SdkRun>;
-};
-
-type SdkModule = {
-  Agent: {
-    create(opts: unknown): Promise<SdkAgent>;
-  };
-};
-
-function isSdkModule(mod: unknown): mod is SdkModule {
-  if (!isRecord(mod)) return false;
-  const agent = mod.Agent;
-  return isRecord(agent) && typeof agent.create === 'function';
-}
-
 function adaptOutcome(raw: unknown): RunOutcome {
   if (!isRecord(raw)) {
     return { status: 'error', runId: null, agentId: null };
@@ -87,7 +67,13 @@ function adaptOutcome(raw: unknown): RunOutcome {
   return { status, runId: asString(raw.id), agentId: asString(raw.agentId) };
 }
 
-function adaptRun(sdkRun: SdkRun): OrchestratorRun {
+/** Normalize a started SDK run into the harness's `OrchestratorRun`. Reads the
+ *  run's `stream()` / `wait()` (documented runtime API); the yielded messages
+ *  and the terminal result are validated structurally, not by SDK types. */
+function adaptRun(sdkRun: {
+  stream(): AsyncIterable<unknown>;
+  wait(): Promise<unknown>;
+}): OrchestratorRun {
   return {
     async *stream() {
       for await (const message of sdkRun.stream()) {
@@ -102,15 +88,11 @@ function adaptRun(sdkRun: SdkRun): OrchestratorRun {
 
 /** Live `CreateAgent` backed by `@cursor/sdk`. Reached only on the live path. */
 export const createCursorAgent: CreateAgent = async ({ model, prompt }) => {
-  const mod: unknown = await import('@cursor/sdk');
-  if (!isSdkModule(mod)) {
-    throw new Error('@cursor/sdk did not expose the expected Agent.create surface');
-  }
   const apiKey = process.env.CURSOR_API_KEY;
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new Error('CURSOR_API_KEY is required for a live run');
   }
-  const agent = await mod.Agent.create({
+  const agent = await Agent.create({
     apiKey,
     model: { id: model },
     local: { cwd: process.cwd() },

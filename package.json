@@ -59,10 +59,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
+    "@cursor/sdk": "^1.0.15",
     "@prisma-next/tsconfig": "workspace:0.11.0",
     "@types/node": "catalog:",
-    "arktype": "catalog:",
     "@vitest/coverage-v8": "^4.1.6",
+    "arktype": "catalog:",
     "dependency-cruiser": "^17.4.0",
     "gray-matter": "catalog:",
     "husky": "^9.1.7",
