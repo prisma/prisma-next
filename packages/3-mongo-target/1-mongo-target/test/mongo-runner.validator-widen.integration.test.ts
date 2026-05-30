@@ -73,12 +73,10 @@ function makeContractWithValidator(
     models: {},
     storage: {
       storageHash,
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          kind: 'mongo-namespace',
-          collections: { [collectionName]: collection },
-        },
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        collections: { [collectionName]: collection },
       },
     },
   } as unknown as MongoContract;

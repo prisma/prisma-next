@@ -77,12 +77,10 @@ function makeContract(
   return {
     storage: {
       storageHash,
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          kind: 'mongo-namespace',
-          collections: storageCollections,
-        },
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        collections: storageCollections,
       },
     },
   } as unknown as MongoContract;
@@ -96,9 +94,7 @@ function bareContract(storageHash: string): MongoContract {
   return {
     storage: {
       storageHash,
-      namespaces: {
-        __unbound__: { id: '__unbound__', kind: 'mongo-namespace', collections: {} },
-      },
+      __unbound__: { id: '__unbound__', kind: 'mongo-namespace', collections: {} },
     },
   } as unknown as MongoContract;
 }

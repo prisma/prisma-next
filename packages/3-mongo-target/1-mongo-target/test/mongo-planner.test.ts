@@ -65,12 +65,10 @@ function makeContract(
     models: {},
     storage: {
       storageHash,
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          kind: 'mongo-namespace',
-          collections: builtCollections,
-        },
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        collections: builtCollections,
       },
     },
   } as unknown as MongoContract;
