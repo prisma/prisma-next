@@ -5,8 +5,9 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { getStorageNamespace } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
@@ -536,9 +537,19 @@ model Post {
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
     const pslFks: readonly ForeignKey[] =
-      pslStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
+      (
+        getStorageNamespace(
+          pslStorage as unknown as unknown as Record<string, unknown>,
+          '__unbound__',
+        ) as SqlNamespace | undefined
+      )?.tables['post']?.foreignKeys ?? [];
     const tsFks: readonly ForeignKey[] =
-      tsStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
+      (
+        getStorageNamespace(
+          tsStorage as unknown as unknown as Record<string, unknown>,
+          '__unbound__',
+        ) as SqlNamespace | undefined
+      )?.tables['post']?.foreignKeys ?? [];
 
     expect(tsFks.length).toBe(1);
     expect(pslFks.length).toBe(1);

@@ -1,5 +1,6 @@
+import { getStorageNamespace } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -41,7 +42,11 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.tables['post'];
+    const postTable = (
+      getStorageNamespace(storage as unknown as Record<string, unknown>, 'public') as
+        | SqlNamespace
+        | undefined
+    )?.tables['post'];
     expect(postTable).toBeDefined();
 
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
@@ -77,7 +82,11 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = storage.namespaces['public']?.tables['post'];
+    const postTable = (
+      getStorageNamespace(storage as unknown as Record<string, unknown>, 'public') as
+        | SqlNamespace
+        | undefined
+    )?.tables['post'];
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({

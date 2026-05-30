@@ -37,8 +37,13 @@ describe('SqlStorage.namespaces population', () => {
       target: postgresTargetPack,
       models: [minimalModelArgs],
     });
-    expect(Object.keys(contract.storage.namespaces)).toEqual([UNBOUND_NAMESPACE_ID]);
-    const slot = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
+    expect(
+      [...storageNamespaceEntries(contract.storage as Record<string, unknown>)].map(([id]) => id),
+    ).toEqual([UNBOUND_NAMESPACE_ID]);
+    const slot = getStorageNamespace(
+      contract.storage as Record<string, unknown>,
+      UNBOUND_NAMESPACE_ID,
+    )!;
     expect(slot).not.toBe(SqlUnboundNamespace.instance);
     expect(slot.id).toBe(UNBOUND_NAMESPACE_ID);
     expect(slot.tables['app_user']).toBeDefined();
@@ -50,11 +55,22 @@ describe('SqlStorage.namespaces population', () => {
       namespaces: ['public', 'auth'],
       models: [minimalModelArgs],
     });
-    const namespaceIds = Object.keys(contract.storage.namespaces).sort();
+    const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
+      .map(([id]) => id)
+      .sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth', 'public']);
-    expect(Object.keys(contract.storage.namespaces['public']!.tables)).toHaveLength(0);
-    expect(Object.keys(contract.storage.namespaces['auth']!.tables)).toHaveLength(0);
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['app_user']).toBeDefined();
+    expect(
+      Object.keys(
+        getStorageNamespace(contract.storage as Record<string, unknown>, 'public')!.tables,
+      ),
+    ).toHaveLength(0);
+    expect(
+      Object.keys(getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')!.tables),
+    ).toHaveLength(0);
+    expect(
+      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
+        .tables['app_user'],
+    ).toBeDefined();
   });
 
   it('places tables in the namespace referenced by the model coordinate', () => {
@@ -65,10 +81,17 @@ describe('SqlStorage.namespaces population', () => {
         { ...minimalModelArgs, modelName: 'Post', tableName: 'blog_post' },
       ],
     });
-    const namespaceIds = Object.keys(contract.storage.namespaces).sort();
+    const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
+      .map(([id]) => id)
+      .sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth']);
-    expect(contract.storage.namespaces['auth']!.tables['app_user']).toBeDefined();
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['blog_post']).toBeDefined();
+    expect(
+      getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')!.tables['app_user'],
+    ).toBeDefined();
+    expect(
+      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
+        .tables['blog_post'],
+    ).toBeDefined();
   });
 
   it('keeps the unbound singleton only when the unbound coordinate has no tables and no namespace types', () => {
@@ -76,7 +99,9 @@ describe('SqlStorage.namespaces population', () => {
       target: postgresTargetPack,
       models: [],
     });
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(SqlUnboundNamespace.instance);
+    expect(
+      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID),
+    ).toBe(SqlUnboundNamespace.instance);
   });
 
   it('accepts declared namespaces without a createNamespace factory', () => {
@@ -95,8 +120,12 @@ describe('SqlStorage.namespaces population', () => {
       namespaces: ['auth'],
       models: [{ ...minimalModelArgs, namespaceId: 'auth' }],
     });
-    const namespaceIds = Object.keys(contract.storage.namespaces).sort();
+    const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
+      .map(([id]) => id)
+      .sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth']);
-    expect(contract.storage.namespaces['auth']!.tables['app_user']).toBeDefined();
+    expect(
+      getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')!.tables['app_user'],
+    ).toBeDefined();
   });
 });

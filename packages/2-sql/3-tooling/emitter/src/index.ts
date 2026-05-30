@@ -8,11 +8,18 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  getStorageNamespace,
+  type Namespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlModelStorage,
+  type SqlNamespace,
   type SqlStorage,
   type StorageTable,
   type StorageTypeInstance,
@@ -44,8 +51,10 @@ function findSqlTable(
   storage: SqlStorage,
   tableName: string,
 ): { readonly table: StorageTable; readonly namespaceId: string } | undefined {
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    const table = ns.tables[tableName] as StorageTable | undefined;
+  for (const [namespaceId, ns] of storageNamespaceEntries(
+    storage as unknown as Record<string, unknown>,
+  )) {
+    const table = (ns as SqlNamespace).tables[tableName] as StorageTable | undefined;
     if (table !== undefined) {
       return { table, namespaceId };
     }
@@ -55,8 +64,10 @@ function findSqlTable(
 
 function assertUniqueSqlTableNames(storage: SqlStorage): void {
   const seen = new Map<string, string>();
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-    for (const tableName of Object.keys(ns.tables)) {
+  for (const [namespaceId, ns] of storageNamespaceEntries(
+    storage as unknown as Record<string, unknown>,
+  )) {
+    for (const tableName of Object.keys((ns as SqlNamespace).tables)) {
       const existing = seen.get(tableName);
       if (existing !== undefined && existing !== namespaceId) {
         throw new Error(
@@ -73,14 +84,14 @@ export const sqlEmission = {
 
   validateTypes(contract: Contract, _ctx: ValidationContext): void {
     const storage = contract.storage as unknown as SqlStorage | undefined;
-    if (!storage?.namespaces) {
+    if (!storage?.storageHash) {
       return;
     }
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    for (const ns of Object.values(storage.namespaces)) {
-      for (const [tableName, tableUnknown] of Object.entries(ns.tables)) {
+    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+      for (const [tableName, tableUnknown] of Object.entries((ns as SqlNamespace).tables)) {
         const table = tableUnknown as StorageTable;
         for (const [colName, colUnknown] of Object.entries(table.columns)) {
           const col = colUnknown as { codecId?: string };
@@ -106,16 +117,16 @@ export const sqlEmission = {
     }
 
     const storage = contract.storage as unknown as SqlStorage | undefined;
-    if (!storage?.namespaces) {
-      throw new Error('SQL contract must have storage.namespaces');
+    if (!storage?.storageHash) {
+      throw new Error('SQL contract must have storage with storageHash');
     }
 
     assertUniqueSqlTableNames(storage);
 
     const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
     const tableNames = new Set<string>();
-    for (const ns of Object.values(storage.namespaces)) {
-      for (const t of Object.keys(ns.tables)) {
+    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+      for (const t of Object.keys((ns as SqlNamespace).tables)) {
         tableNames.add(t);
       }
     }
@@ -159,8 +170,8 @@ export const sqlEmission = {
       }
     }
 
-    for (const ns of Object.values(storage.namespaces)) {
-      for (const [tableName, tableUnknown] of Object.entries(ns.tables)) {
+    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+      for (const [tableName, tableUnknown] of Object.entries((ns as SqlNamespace).tables)) {
         const table = tableUnknown as StorageTable;
         const columnNames = new Set(Object.keys(table.columns));
 
@@ -219,9 +230,13 @@ export const sqlEmission = {
             }
           }
 
-          const referencedTable = storage.namespaces[fk.target.namespaceId]?.tables[
-            fk.target.tableName
-          ] as StorageTable | undefined;
+          const referencedNs = getStorageNamespace(
+            storage as unknown as Record<string, unknown>,
+            fk.target.namespaceId,
+          ) as SqlNamespace | undefined;
+          const referencedTable = referencedNs?.tables[fk.target.tableName] as
+            | StorageTable
+            | undefined;
           if (!referencedTable) {
             throw new Error(
               `Table "${tableName}" foreignKey references non-existent table "${fk.target.tableName}" in namespace "${fk.target.namespaceId}"`,
@@ -249,13 +264,13 @@ export const sqlEmission = {
 
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as unknown as SqlStorage;
-    const namespacesType = generateStorageNamespacesType(storage.namespaces);
+    const namespaceTypeEntries = generateFlatStorageNamespaceTypeEntries(storage);
     const domainTypes = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
       | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
       | undefined;
     const docTypes = generateDocumentScopedStorageTypesType(domainTypes ?? storage.types);
     const typesClause = docTypes === undefined ? '' : `; readonly types: ${docTypes}`;
-    return `{ readonly namespaces: ${namespacesType}${typesClause}; readonly storageHash: ${storageHashTypeName} }`;
+    return `{ readonly storageHash: ${storageHashTypeName}${namespaceTypeEntries}${typesClause} }`;
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {
@@ -298,7 +313,10 @@ export const sqlEmission = {
     if (!column) return undefined;
 
     if (column.typeRef) {
-      const ns = storage.namespaces[located.namespaceId];
+      const ns = getStorageNamespace(
+        storage as unknown as Record<string, unknown>,
+        located.namespaceId,
+      ) as SqlNamespace | undefined;
       const nsEnums =
         ns !== undefined && 'enum' in ns
           ? (
@@ -362,7 +380,7 @@ export const sqlEmission = {
     return [
       `export type Contract = ContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>;`,
       '',
-      "export type Namespaces = Contract['storage']['namespaces'];",
+      "export type Namespaces = Omit<Contract['storage'], 'storageHash' | 'types'>;",
       "export type Models = Contract['models'];",
     ].join('\n');
   },
@@ -377,7 +395,7 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
   for (const [typeName, typeInstance] of Object.entries(types)) {
     if (isPostgresEnumStorageEntry(typeInstance)) {
       throw new Error(
-        `Document-scoped storage.types entry "${typeName}" is a postgres-enum; enums belong under storage.namespaces[namespaceId].enum`,
+        `Document-scoped storage.types entry "${typeName}" is a postgres-enum; enums belong under storage.<namespaceId>.enum`,
       );
     }
     const codecInstanceShape = typeInstance as Partial<StorageTypeInstance>;
@@ -544,22 +562,26 @@ function generateTablesMapType(tables: Readonly<Record<string, StorageTable>>): 
   return `{ ${tableEntries.join('; ')} }`;
 }
 
-function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): string {
-  const entries = Object.entries(namespaces ?? {}).sort(([a], [b]) => a.localeCompare(b));
+function generateFlatStorageNamespaceTypeEntries(storage: SqlStorage): string {
+  const entries = [...storageNamespaceEntries(storage as unknown as Record<string, unknown>)].sort(
+    ([a], [b]) => a.localeCompare(b),
+  );
   if (entries.length === 0) {
-    return 'Record<string, never>';
+    return '';
   }
   const parts: string[] = [];
   for (const [name, ns] of entries) {
     const kindSuffix = `; ${namespaceSerializedKind(ns)}`;
-    const tablesType = generateTablesMapType(ns.tables as Readonly<Record<string, StorageTable>>);
+    const tablesType = generateTablesMapType(
+      (ns as SqlNamespace).tables as Readonly<Record<string, StorageTable>>,
+    );
     const isPg = isPostgresSchemaNamespace(ns);
     const enumClause = isPg
-      ? `; readonly enum: ${generatePostgresNamespaceTypesType(ns.enum)}`
+      ? `; readonly enum: ${generatePostgresNamespaceTypesType((ns as SqlNamespace & { enum: Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>> }).enum)}`
       : '';
     parts.push(
       `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}${kindSuffix}; readonly tables: ${tablesType}${enumClause} }`,
     );
   }
-  return `{ ${parts.join('; ')} }`;
+  return `; ${parts.join('; ')}`;
 }

@@ -1,7 +1,8 @@
 import { crossRef } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
@@ -809,7 +810,14 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      expect(storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables['doc']).toMatchObject({
+      expect(
+        (
+          getStorageNamespace(
+            storage as unknown as Record<string, unknown>,
+            UNBOUND_NAMESPACE_ID,
+          ) as SqlNamespace | undefined
+        )?.tables['doc'],
+      ).toMatchObject({
         indexes: [{ columns: ['body'] }],
       });
     });
@@ -877,7 +885,11 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const user = storage.namespaces['auth']?.tables['user'];
+      const user = (
+        getStorageNamespace(storage as unknown as Record<string, unknown>, 'auth') as
+          | SqlNamespace
+          | undefined
+      )?.tables['user'];
       expect(user).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
       const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
@@ -909,7 +921,12 @@ namespace tenant_a {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const enums = storage.namespaces['tenant_a']?.enum ?? {};
+      const enums =
+        (
+          getStorageNamespace(storage as unknown as Record<string, unknown>, 'tenant_a') as
+            | SqlNamespace
+            | undefined
+        )?.enum ?? {};
       expect(enums).toHaveProperty('Status');
       expect(enums).toHaveProperty('Tier');
     });
@@ -942,8 +959,20 @@ namespace logs {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['post']).toBeDefined();
-      expect(storage.namespaces['auth']?.tables['user']).toBeDefined();
-      expect(storage.namespaces['logs']?.tables['auditLog']).toBeDefined();
+      expect(
+        (
+          getStorageNamespace(storage as unknown as Record<string, unknown>, 'auth') as
+            | SqlNamespace
+            | undefined
+        )?.tables['user'],
+      ).toBeDefined();
+      expect(
+        (
+          getStorageNamespace(storage as unknown as Record<string, unknown>, 'logs') as
+            | SqlNamespace
+            | undefined
+        )?.tables['auditLog'],
+      ).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
     });
   });

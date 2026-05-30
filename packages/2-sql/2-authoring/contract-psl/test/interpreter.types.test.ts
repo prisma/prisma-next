@@ -343,7 +343,7 @@ model Account {
     expect(storageNs['auth']).toBeUndefined();
   });
 
-  it('lowers a namespace-scoped enum into storage.namespaces[nsId].enum', () => {
+  it('lowers a namespace-scoped enum into getStorageNamespace(storage as unknown as Record<string, unknown>, nsId).enum', () => {
     const document = parsePslDocument({
       schema: `namespace auth {
   enum user_type {

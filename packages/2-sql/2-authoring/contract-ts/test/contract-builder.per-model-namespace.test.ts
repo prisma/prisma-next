@@ -83,8 +83,12 @@ describe('per-model `namespace` field (TS builder)', () => {
     // `keyof` as `never` (preventing `Db<C>` from collapsing to a string
     // index signature). The runtime value is correct; cast to verify it.
     expect(
-      (contract.storage.namespaces as Record<string, { tables: Record<string, unknown> }>)['auth']
-        ?.tables['User'],
+      (
+        getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')?.tables as Record<
+          string,
+          unknown
+        >
+      )['User'],
     ).toBeDefined();
   });
 
@@ -100,9 +104,10 @@ describe('per-model `namespace` field (TS builder)', () => {
     });
 
     expect(
-      (contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables as Record<string, unknown>)[
-        'User'
-      ],
+      (
+        getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
+          ?.tables as Record<string, unknown>
+      )['User'],
     ).toBeDefined();
   });
 

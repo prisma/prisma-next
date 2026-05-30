@@ -63,7 +63,8 @@ function installNamespacedTableDeletionRace(ir: Contract, tableName: string): vo
     },
   });
 
-  delete originalStorage.namespaces[UNBOUND_NAMESPACE_ID].tables[tableName];
+  delete getStorageNamespace(originalStorage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
+    .tables[tableName];
   tableDeleted = true;
   (ir as { storage: unknown }).storage = proxiedStorage;
 }
@@ -178,7 +179,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('SQL contract must have storage.namespaces');
+    }).toThrow('SQL contract must have storage namespace entries');
   });
 
   it('validates structure with missing storage.tables', () => {
@@ -188,7 +189,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('SQL contract must have storage.namespaces');
+    }).toThrow('SQL contract must have storage namespace entries');
   });
 
   it('validates structure with model missing storage.table', () => {
