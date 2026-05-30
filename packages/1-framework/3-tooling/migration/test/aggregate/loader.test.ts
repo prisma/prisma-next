@@ -244,7 +244,26 @@ describe('loadContractSpaceAggregate', () => {
       ]);
     });
 
-    it('gates target / disjointness / contract checks behind requireContracts', async () => {
+    it('surfaces duplicateMigrationHash when two packages share a migrationHash', async () => {
+      const meta = { from: null, to: 'sha256:dup-to' };
+      await writePackage('app', '20260101T0000_first', meta);
+      await writePackage('app', '20260101T0000_second', meta);
+
+      const aggregate = await load();
+      expect(() => aggregate.app.graph()).not.toThrow();
+
+      const violations = aggregate.checkIntegrity();
+      expect(violationsOfKind(violations, 'duplicateMigrationHash')).toEqual([
+        {
+          kind: 'duplicateMigrationHash',
+          spaceId: 'app',
+          migrationHash: expect.stringMatching(/^sha256:/),
+          dirNames: ['20260101T0000_first', '20260101T0000_second'],
+        },
+      ]);
+    });
+
+    it('gates target / disjointness / contract checks behind checkContracts', async () => {
       // wrongtarget: a deserializable contract whose target differs.
       await writePackage('wrongtarget', '20260101T0000_init', { from: null, to: 'sha256:w1' });
       await writeHeadRef('wrongtarget', { hash: 'sha256:w1', invariants: [] });
@@ -267,7 +286,7 @@ describe('loadContractSpaceAggregate', () => {
       expect(violationsOfKind(bare, 'disjointness')).toHaveLength(0);
       expect(violationsOfKind(bare, 'contractUnreadable')).toHaveLength(0);
 
-      const gated = aggregate.checkIntegrity({ requireContracts: true });
+      const gated = aggregate.checkIntegrity({ checkContracts: true });
       expect(violationsOfKind(gated, 'targetMismatch').map((v) => v.spaceId)).toContain(
         'wrongtarget',
       );

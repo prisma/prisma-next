@@ -184,7 +184,7 @@ describe('reconstructGraph', () => {
     expect(edge?.invariants).toEqual(['X']);
   });
 
-  it('rejects duplicate migrationHash values', () => {
+  it('does not throw on duplicate migrationHash values (first edge wins in migrationByHash)', () => {
     const first = pkg(E, 'H1', 'm1');
     const secondBase = pkg('H1', 'H2', 'm2');
     const second = {
@@ -195,7 +195,9 @@ describe('reconstructGraph', () => {
       },
     };
 
-    expect(() => reconstructGraph([first, second])).toThrow('Duplicate migrationHash');
+    const graph = reconstructGraph([first, second]);
+    expect(graph.migrationByHash.get(first.metadata.migrationHash)?.dirName).toBe('m1');
+    expect(graph.migrationByHash.size).toBe(1);
   });
 });
 

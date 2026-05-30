@@ -8,7 +8,7 @@
  *   depending on the command).
  * - **Config/contract-dependent**: produced only when the matching
  *   `IntegrityQueryOptions` opt is set (declaredExtensions /
- *   requireContracts). The model is built without them; they surface
+ *   checkContracts). The model is built without them; they surface
  *   when the caller explicitly asks for the broader integrity view.
  * - **Unloadable**: the package is omitted from the model entirely
  *   (its on-disk content cannot be parsed into an `OnDiskMigrationPackage`).
@@ -38,6 +38,12 @@ export type IntegrityViolation =
     }
   | { readonly kind: 'headRefMissing'; readonly spaceId: string }
   | { readonly kind: 'headRefNotInGraph'; readonly spaceId: string; readonly hash: string }
+  | {
+      readonly kind: 'duplicateMigrationHash';
+      readonly spaceId: string;
+      readonly migrationHash: string;
+      readonly dirNames: readonly string[];
+    }
   | {
       readonly kind: 'refUnreadable';
       readonly spaceId: string;
@@ -104,5 +110,5 @@ export interface IntegrityQueryOptions {
    * When true, enables contract/disjointness/target checks:
    * `contractUnreadable`, `targetMismatch`, `disjointness`.
    */
-  readonly requireContracts?: boolean;
+  readonly checkContracts?: boolean;
 }

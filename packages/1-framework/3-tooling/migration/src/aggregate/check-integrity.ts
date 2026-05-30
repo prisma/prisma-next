@@ -6,6 +6,7 @@ import type {
   IntegrityViolation,
 } from '../integrity-violation';
 import type { PackageLoadProblem } from '../io';
+import type { OnDiskMigrationPackage } from '../package';
 import type { RefLoadProblem } from '../refs';
 import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractSpaceMember } from './types';
@@ -41,7 +42,7 @@ export interface IntegrityComputationInput {
  * bailing at the first. Structurally-derivable violations (load-time
  * problems, self-edges, missing / unreachable head refs) are always
  * produced; layout-drift checks require `declaredExtensions`, and
- * contract / target / disjointness checks require `requireContracts`.
+ * contract / target / disjointness checks require `checkContracts`.
  */
 export function computeIntegrityViolations(
   input: IntegrityComputationInput,
@@ -82,6 +83,8 @@ export function computeIntegrityViolations(
       }
     }
 
+    violations.push(...duplicateMigrationHashViolations(spaceId, member.packages));
+
     // The app head ref is synthesised from the live contract, so it is
     // always present and reachable; only extension spaces read their head
     // ref from disk and can be missing or point outside the graph. A head
@@ -100,7 +103,7 @@ export function computeIntegrityViolations(
     violations.push(...layoutViolations(input.spaces, opts.declaredExtensions));
   }
 
-  if (opts?.requireContracts === true) {
+  if (opts?.checkContracts === true) {
     violations.push(...contractViolations(input));
   }
 
@@ -129,20 +132,38 @@ function loadProblemToViolation(spaceId: string, problem: PackageLoadProblem): I
   }
 }
 
+function duplicateMigrationHashViolations(
+  spaceId: string,
+  packages: readonly OnDiskMigrationPackage[],
+): readonly IntegrityViolation[] {
+  const dirNamesByHash = new Map<string, string[]>();
+  for (const pkg of packages) {
+    const hash = pkg.metadata.migrationHash;
+    const dirNames = dirNamesByHash.get(hash);
+    if (dirNames) dirNames.push(pkg.dirName);
+    else dirNamesByHash.set(hash, [pkg.dirName]);
+  }
+
+  const out: IntegrityViolation[] = [];
+  for (const [migrationHash, dirNames] of dirNamesByHash) {
+    if (dirNames.length > 1) {
+      out.push({
+        kind: 'duplicateMigrationHash',
+        spaceId,
+        migrationHash,
+        dirNames: [...dirNames].sort(),
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Whether a space's head-ref hash is present in its reconstructed graph.
- * An empty graph is reachable only by the empty-contract sentinel. A
- * graph that cannot be reconstructed (e.g. a duplicate migration hash) is
- * treated as "present" so this check does not invent a spurious
- * `headRefNotInGraph` on top of a deeper structural corruption.
+ * An empty graph is reachable only by the empty-contract sentinel.
  */
 function headRefPresentInGraph(member: ContractSpaceMember, headHash: string): boolean {
-  let graph: ReturnType<ContractSpaceMember['graph']>;
-  try {
-    graph = member.graph();
-  } catch {
-    return true;
-  }
+  const graph = member.graph();
   if (graph.nodes.size === 0) {
     return headHash === EMPTY_CONTRACT_HASH;
   }
