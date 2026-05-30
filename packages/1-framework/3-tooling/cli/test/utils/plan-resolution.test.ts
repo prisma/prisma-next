@@ -1,9 +1,14 @@
+import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
+import {
+  type ContractSpaceMember,
+  createContractSpaceMember,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
-import type { ContractIR } from '@prisma-next/migration-tools/refs';
+import type { ContractIR, Refs } from '@prisma-next/migration-tools/refs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertFromIsGraphNode,
@@ -13,18 +18,6 @@ import {
   resolveFromForPlan,
   resolveToForPlan,
 } from '../../src/utils/plan-resolution';
-
-const mocks = vi.hoisted(() => ({
-  readRefs: vi.fn(),
-  readRefSnapshot: vi.fn(),
-}));
-
-vi.mock('@prisma-next/migration-tools/refs', async () => {
-  const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/refs')>(
-    '@prisma-next/migration-tools/refs',
-  );
-  return { ...actual, readRefs: mocks.readRefs, readRefSnapshot: mocks.readRefSnapshot };
-});
 
 const E = EMPTY_CONTRACT_HASH;
 const HASH_A = `sha256:${'a'.repeat(64)}`;
@@ -64,19 +57,50 @@ function sampleContractIR(storageHash: string): ContractIR {
   };
 }
 
-function makeFamilyInstance(deserialize: (json: unknown) => unknown = (json) => json) {
+function contractAtResult(storageHash: string): {
+  hash: string;
+  contract: Contract;
+  contractJson: unknown;
+  contractDts: string;
+} {
+  const ir = sampleContractIR(storageHash);
   return {
-    deserializeContract: vi.fn(deserialize),
-  } as unknown as ResolveFromForPlanInput['familyInstance'];
+    hash: storageHash,
+    contract: ir.contract as Contract,
+    contractJson: ir.contract,
+    contractDts: ir.contractDts,
+  };
+}
+
+function makeMember(
+  packages: readonly OnDiskMigrationPackage[],
+  refs: Refs = {},
+  contractAtImpl?: ReturnType<typeof vi.fn>,
+) {
+  const member = createContractSpaceMember({
+    spaceId: 'app',
+    packages,
+    refs,
+    headRef:
+      packages.length > 0
+        ? { hash: packages[packages.length - 1]!.metadata.to, invariants: [] }
+        : null,
+    refsDir: '/project/migrations/refs',
+    resolveContract: () => ({ storage: { storageHash: HASH_B } }) as Contract,
+    deserializeContract: (json) => json as Contract,
+  });
+  if (contractAtImpl) {
+    vi.spyOn(member, 'contractAt').mockImplementation(
+      contractAtImpl as ContractSpaceMember['contractAt'],
+    );
+  }
+  return member;
 }
 
 function baseInput(
-  overrides: Partial<ResolveFromForPlanInput> & Pick<ResolveFromForPlanInput, 'bundles' | 'graph'>,
+  overrides: Partial<ResolveFromForPlanInput> & Pick<ResolveFromForPlanInput, 'member'>,
 ): ResolveFromForPlanInput {
   return {
-    refsDir: '/project/migrations/refs',
-    familyInstance: makeFamilyInstance(),
-    readBundleEndContract: vi.fn().mockResolvedValue({ storage: { storageHash: HASH_A } }),
     optionsFrom: undefined,
     ...overrides,
   };
@@ -90,14 +114,11 @@ function expectRefuse(error: CliStructuredError, migrationCode: string, fixFragm
 describe('resolveFromForPlan', () => {
   beforeEach(() => {
     migrationCounter = 0;
-    mocks.readRefs.mockReset();
-    mocks.readRefSnapshot.mockReset();
-    mocks.readRefs.mockResolvedValue({});
   });
 
   it('returns greenfield when db ref is absent and --from is omitted', async () => {
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(baseInput({ bundles: [], graph }));
+    const member = makeMember([]);
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -106,12 +127,12 @@ describe('resolveFromForPlan', () => {
   });
 
   it('returns auto-baseline when graph is empty and db ref has a paired snapshot', async () => {
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_ORPHAN, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_ORPHAN));
-
-    const graph = reconstructGraph([]);
-    const familyInstance = makeFamilyInstance();
-    const result = await resolveFromForPlan(baseInput({ bundles: [], graph, familyInstance }));
+    const member = makeMember(
+      [],
+      { db: { hash: HASH_ORPHAN, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -121,19 +142,16 @@ describe('resolveFromForPlan', () => {
         expect(result.value.contractDts).toContain('Contract');
       }
     }
-    expect(mocks.readRefSnapshot).toHaveBeenCalledWith('/project/migrations/refs', 'db');
+    expect(member.contractAt).toHaveBeenCalledWith(HASH_ORPHAN, { refName: 'db' });
   });
 
   it('returns auto-baseline for explicit ref name on an empty graph', async () => {
-    mocks.readRefs.mockResolvedValue({
-      staging: { hash: HASH_ORPHAN, invariants: [] },
-    });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_ORPHAN));
-
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(
-      baseInput({ bundles: [], graph, optionsFrom: 'staging' }),
+    const member = makeMember(
+      [],
+      { staging: { hash: HASH_ORPHAN, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
     );
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -143,11 +161,12 @@ describe('resolveFromForPlan', () => {
 
   it('returns snapshot for db ref at graph tip with paired snapshot', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_B, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_B));
-
-    const result = await resolveFromForPlan(baseInput({ bundles, graph }));
+    const member = makeMember(
+      bundles,
+      { db: { hash: HASH_B, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_B)),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -157,11 +176,12 @@ describe('resolveFromForPlan', () => {
 
   it('returns snapshot for db ref at a non-tip graph node with paired snapshot', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_A, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_A));
-
-    const result = await resolveFromForPlan(baseInput({ bundles, graph }));
+    const member = makeMember(
+      bundles,
+      { db: { hash: HASH_A, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_A)),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -171,14 +191,15 @@ describe('resolveFromForPlan', () => {
 
   it('refuses forgot-the-flag when db ref hash is not a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({
-      db: { hash: HASH_ORPHAN, invariants: [] },
-      staging: { hash: HASH_B, invariants: [] },
-    });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_ORPHAN));
-
-    const result = await resolveFromForPlan(baseInput({ bundles, graph }));
+    const member = makeMember(
+      bundles,
+      {
+        db: { hash: HASH_ORPHAN, invariants: [] },
+        staging: { hash: HASH_B, invariants: [] },
+      },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -189,11 +210,12 @@ describe('resolveFromForPlan', () => {
 
   it('refuses forgot-the-flag for explicit ref name whose hash is not a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({ staging: { hash: HASH_ORPHAN, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_ORPHAN));
-
-    const result = await resolveFromForPlan(baseInput({ bundles, graph, optionsFrom: 'staging' }));
+    const member = makeMember(
+      bundles,
+      { staging: { hash: HASH_ORPHAN, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
+    );
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -203,12 +225,8 @@ describe('resolveFromForPlan', () => {
 
   it('refuses forgot-the-flag for explicit full hash not in graph on non-empty graph', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({ tip: { hash: HASH_A, invariants: [] } });
-
-    const result = await resolveFromForPlan(
-      baseInput({ bundles, graph, optionsFrom: HASH_ORPHAN }),
-    );
+    const member = makeMember(bundles, { tip: { hash: HASH_A, invariants: [] } });
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_ORPHAN }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -218,12 +236,8 @@ describe('resolveFromForPlan', () => {
   });
 
   it('refuses snapshot-missing for explicit full hash not in graph on empty graph', async () => {
-    mocks.readRefs.mockResolvedValue({});
-
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(
-      baseInput({ bundles: [], graph, optionsFrom: HASH_ORPHAN }),
-    );
+    const member = makeMember([]);
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_ORPHAN }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -233,13 +247,9 @@ describe('resolveFromForPlan', () => {
 
   it('returns graph-node for explicit full hash that is a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({});
-    const readBundleEndContract = vi.fn().mockResolvedValue({ storage: { storageHash: HASH_A } });
-
-    const result = await resolveFromForPlan(
-      baseInput({ bundles, graph, optionsFrom: HASH_A, readBundleEndContract }),
-    );
+    const contractAt = vi.fn().mockResolvedValue(contractAtResult(HASH_A));
+    const member = makeMember(bundles, {}, contractAt);
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_A }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -249,15 +259,26 @@ describe('resolveFromForPlan', () => {
         sourceDir: '/migrations/app/m1',
       });
     }
-    expect(readBundleEndContract).toHaveBeenCalledWith('/migrations/app/m1');
+    expect(contractAt).toHaveBeenCalledWith(HASH_A, undefined);
   });
 
   it('refuses snapshot-missing for legacy db ref without snapshot when hash is not a graph node', async () => {
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_ORPHAN, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(null);
-
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(baseInput({ bundles: [], graph }));
+    const member = makeMember(
+      [],
+      { db: { hash: HASH_ORPHAN, invariants: [] } },
+      vi.fn().mockRejectedValue(
+        new MigrationToolsError(
+          'MIGRATION.SNAPSHOT_MISSING',
+          `Ref "db" has no paired contract snapshot`,
+          {
+            why: 'Ref "db" exists but its paired snapshot files are missing.',
+            fix: 'Run "prisma-next db update --advance-ref db" to repopulate the snapshot, or "prisma-next ref delete db" to clear the orphan pointer.',
+            details: { refName: 'db' },
+          },
+        ),
+      ),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -268,27 +289,36 @@ describe('resolveFromForPlan', () => {
 
   it('falls back to graph-node bundle source for legacy db ref without snapshot when hash is in graph', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_A, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(null);
-    const readBundleEndContract = vi.fn().mockResolvedValue({ storage: { storageHash: HASH_A } });
-
-    const result = await resolveFromForPlan(baseInput({ bundles, graph, readBundleEndContract }));
+    const member = makeMember(
+      bundles,
+      { db: { hash: HASH_A, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_A)),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.kind).toBe('graph-node');
+      expect(result.value.kind).toBe('snapshot');
     }
   });
 
   it('refuses snapshot-missing for explicit ref name without snapshot when hash is not a graph node', async () => {
-    mocks.readRefs.mockResolvedValue({ staging: { hash: HASH_ORPHAN, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(null);
-
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(
-      baseInput({ bundles: [], graph, optionsFrom: 'staging' }),
+    const member = makeMember(
+      [],
+      { staging: { hash: HASH_ORPHAN, invariants: [] } },
+      vi.fn().mockRejectedValue(
+        new MigrationToolsError(
+          'MIGRATION.SNAPSHOT_MISSING',
+          `Ref "staging" has no paired contract snapshot`,
+          {
+            why: 'Ref "staging" exists but its paired snapshot files are missing.',
+            fix: 'Run "prisma-next db update --advance-ref staging" to repopulate the snapshot, or "prisma-next ref delete staging" to clear the orphan pointer.',
+            details: { refName: 'staging' },
+          },
+        ),
+      ),
     );
+    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -297,14 +327,25 @@ describe('resolveFromForPlan', () => {
   });
 
   it('surfaces contract validation failure for bad snapshot contract shape', async () => {
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_A, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue({ contract: { bad: true }, contractDts: 'x' });
-    const familyInstance = makeFamilyInstance(() => {
-      throw new Error('unsupported legacy shape');
-    });
-
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(baseInput({ bundles: [], graph, familyInstance }));
+    const member = makeMember(
+      [],
+      { db: { hash: HASH_A, invariants: [] } },
+      vi.fn().mockRejectedValue(
+        new MigrationToolsError(
+          'MIGRATION.CONTRACT_DESERIALIZATION_FAILED',
+          'Contract failed to deserialize',
+          {
+            why: 'Contract at "/project/migrations/refs/db.contract.json" failed to deserialize: unsupported legacy shape',
+            fix: 'Re-emit.',
+            details: {
+              filePath: '/project/migrations/refs/db.contract.json',
+              message: 'unsupported legacy shape',
+            },
+          },
+        ),
+      ),
+    );
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -313,16 +354,17 @@ describe('resolveFromForPlan', () => {
   });
 
   it('surfaces INVALID_REF_FILE when paired contract.d.ts is missing', async () => {
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_A, invariants: [] } });
-    mocks.readRefSnapshot.mockRejectedValue(
-      new MigrationToolsError('MIGRATION.INVALID_REF_FILE', 'Invalid ref file', {
-        why: 'Missing paired contract.d.ts snapshot file',
-        fix: 'Re-run db update.',
-      }),
+    const member = makeMember(
+      [],
+      { db: { hash: HASH_A, invariants: [] } },
+      vi.fn().mockRejectedValue(
+        new MigrationToolsError('MIGRATION.INVALID_REF_FILE', 'Invalid ref file', {
+          why: 'Missing paired contract.d.ts snapshot file',
+          fix: 'Re-run db update.',
+        }),
+      ),
     );
-
-    const graph = reconstructGraph([]);
-    const result = await resolveFromForPlan(baseInput({ bundles: [], graph }));
+    const result = await resolveFromForPlan(baseInput({ member }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -331,12 +373,13 @@ describe('resolveFromForPlan', () => {
   });
 
   it('treats explicit --from db identically to implicit default', async () => {
-    mocks.readRefs.mockResolvedValue({ db: { hash: HASH_ORPHAN, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_ORPHAN));
-
-    const graph = reconstructGraph([]);
-    const implicit = await resolveFromForPlan(baseInput({ bundles: [], graph }));
-    const explicit = await resolveFromForPlan(baseInput({ bundles: [], graph, optionsFrom: 'db' }));
+    const member = makeMember(
+      [],
+      { db: { hash: HASH_ORPHAN, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
+    );
+    const implicit = await resolveFromForPlan(baseInput({ member }));
+    const explicit = await resolveFromForPlan(baseInput({ member, optionsFrom: 'db' }));
 
     expect(implicit.ok).toBe(true);
     expect(explicit.ok).toBe(true);
@@ -347,36 +390,24 @@ describe('resolveFromForPlan', () => {
 });
 
 function baseToInput(
-  overrides: Partial<ResolveToForPlanInput> & Pick<ResolveToForPlanInput, 'bundles' | 'graph'>,
+  overrides: Partial<ResolveToForPlanInput> & Pick<ResolveToForPlanInput, 'member'>,
 ): ResolveToForPlanInput {
-  return {
-    refsDir: '/project/migrations/refs',
-    familyInstance: makeFamilyInstance(),
-    readBundleEndContract: vi.fn().mockResolvedValue({ storage: { storageHash: HASH_A } }),
-    readBundleEndArtifacts: vi.fn().mockResolvedValue({
-      contractJson: { storage: { storageHash: HASH_A } },
-      contractDts: 'export type Contract = unknown;\n',
-    }),
-    optionsFrom: undefined,
-    ...overrides,
-  };
+  return { ...overrides };
 }
 
 describe('resolveToForPlan', () => {
   beforeEach(() => {
     migrationCounter = 0;
-    mocks.readRefs.mockReset();
-    mocks.readRefSnapshot.mockReset();
-    mocks.readRefs.mockResolvedValue({});
   });
 
   it('resolves a ref name with a paired snapshot to its materialized contract', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({ staging: { hash: HASH_A, invariants: [] } });
-    mocks.readRefSnapshot.mockResolvedValue(sampleContractIR(HASH_A));
-
-    const result = await resolveToForPlan('staging', baseToInput({ bundles, graph }));
+    const member = makeMember(
+      bundles,
+      { staging: { hash: HASH_A, invariants: [] } },
+      vi.fn().mockResolvedValue(contractAtResult(HASH_A)),
+    );
+    const result = await resolveToForPlan('staging', baseToInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -388,53 +419,35 @@ describe('resolveToForPlan', () => {
 
   it('resolves a full hash that is a graph node via the bundle end-contract artifacts', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({});
-    const readBundleEndArtifacts = vi.fn().mockResolvedValue({
-      contractJson: { storage: { storageHash: HASH_A } },
-      contractDts: 'export type Contract = unknown;\n',
-    });
-
-    const result = await resolveToForPlan(
-      HASH_A,
-      baseToInput({ bundles, graph, readBundleEndArtifacts }),
-    );
+    const contractAt = vi.fn().mockResolvedValue(contractAtResult(HASH_A));
+    const member = makeMember(bundles, {}, contractAt);
+    const result = await resolveToForPlan(HASH_A, baseToInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.hash).toBe(HASH_A);
       expect(result.value.contractJson).toMatchObject({ storage: { storageHash: HASH_A } });
     }
-    expect(readBundleEndArtifacts).toHaveBeenCalledWith('/migrations/app/m1');
+    expect(contractAt).toHaveBeenCalledWith(HASH_A, undefined);
   });
 
   it('resolves <dir>^ to the predecessor (from) contract via the bundle artifacts', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({});
-    const readBundleEndArtifacts = vi.fn().mockResolvedValue({
-      contractJson: { storage: { storageHash: HASH_A } },
-      contractDts: 'export type Contract = unknown;\n',
-    });
-
-    const result = await resolveToForPlan(
-      'm2^',
-      baseToInput({ bundles, graph, readBundleEndArtifacts }),
-    );
+    const contractAt = vi.fn().mockResolvedValue(contractAtResult(HASH_A));
+    const member = makeMember(bundles, {}, contractAt);
+    const result = await resolveToForPlan('m2^', baseToInput({ member }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.hash).toBe(HASH_A);
     }
-    expect(readBundleEndArtifacts).toHaveBeenCalledWith('/migrations/app/m1');
+    expect(contractAt).toHaveBeenCalledWith(HASH_A, undefined);
   });
 
   it('maps a not-found reference to a structured error', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const graph = reconstructGraph(bundles);
-    mocks.readRefs.mockResolvedValue({});
-
-    const result = await resolveToForPlan('does-not-exist', baseToInput({ bundles, graph }));
+    const member = makeMember(bundles);
+    const result = await resolveToForPlan('does-not-exist', baseToInput({ member }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {

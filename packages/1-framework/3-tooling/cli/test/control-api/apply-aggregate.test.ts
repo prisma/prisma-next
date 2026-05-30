@@ -37,6 +37,7 @@ function makeAppMember(): ContractSpaceMember {
       migrationByHash: new Map(),
     }),
     contract: () => contract,
+    contractAt: vi.fn(),
   };
 }
 
