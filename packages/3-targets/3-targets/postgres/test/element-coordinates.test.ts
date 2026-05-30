@@ -1,8 +1,8 @@
 import { coreHash } from '@prisma-next/contract/types';
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import { elementCoordinates, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { PostgresSchema } from '../src/core/postgres-schema';
+import { PostgresSchema, PostgresUnboundSchema } from '../src/core/postgres-schema';
 
 const emptyTableInput = {
   columns: {},
@@ -21,7 +21,10 @@ describe('elementCoordinates with PostgresSchema', () => {
 
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:element-coordinates-test'),
-      namespaces: { public: schema },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+        public: schema,
+      },
     });
 
     const coordinates = [...elementCoordinates(storage)];

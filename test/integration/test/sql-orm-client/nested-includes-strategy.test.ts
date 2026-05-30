@@ -1,15 +1,15 @@
-// Integration coverage for nested includes (depth >= 2) across the
-// three dispatch strategies: lateral, correlated, multi-query.
+// Integration coverage for nested includes (depth >= 2) across both
+// single-query dispatch strategies: lateral and correlated.
 //
 // Split from `nested-includes.test.ts` for the reason documented in
 // `./nested-includes-helpers.ts` (per-file test-count threshold of the
 // prisma/dev PGlite infrastructure).
 //
-// These tests are the heart of the TML-2594 acceptance: they pin the
-// SQL-execution count per strategy, so a future regression flipping
-// the dispatch gate is caught at the contract level, not by downstream
-// benchmark drift. The cross-strategy equivalence tests then assert
-// that the three strategies produce byte-identical result trees over
+// These tests pin the SQL-execution count per strategy, so a future
+// regression flipping the dispatch gate is caught at the contract
+// level, not by downstream benchmark drift. The cross-strategy
+// equivalence tests then assert that both single-query strategies —
+// lateral and correlated — produce byte-identical result trees over
 // the same data.
 
 import { describe, expect, it } from 'vitest';
@@ -18,7 +18,6 @@ import {
   CORRELATED_CAPABILITIES,
   collectionWithCapabilities,
   LATERAL_CAPABILITIES,
-  MULTI_QUERY_CAPABILITIES,
 } from './nested-includes-helpers';
 import { type PgIntegrationRuntime, seedComments, seedPosts, seedUsers } from './runtime-helpers';
 
@@ -134,26 +133,6 @@ describe('integration/nested-includes/strategy', () => {
       },
       timeouts.spinUpPpgDev,
     );
-
-    it(
-      'depth-2 multi-query path produces the canonical result tree',
-      async () => {
-        await withCollectionRuntime(async (runtime) => {
-          await seedBlog(runtime);
-          const users = collectionWithCapabilities(runtime, 'User', MULTI_QUERY_CAPABILITIES);
-          const rows = await users
-            .orderBy((u) => u.id.asc())
-            .include('posts', (posts) =>
-              posts
-                .orderBy((p) => p.id.asc())
-                .include('comments', (c) => c.orderBy((cc) => cc.id.asc())),
-            )
-            .all();
-          expect(rows).toEqual(expectedRows);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
   });
 
   // ===========================================================================
@@ -211,31 +190,6 @@ describe('integration/nested-includes/strategy', () => {
     );
 
     it(
-      'depth-2 under empty capabilities runs 3 SQL executions (multi-query fallback)',
-      async () => {
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [
-            { id: 1, name: 'Alice', email: 'alice@example.com' },
-            { id: 2, name: 'Bob', email: 'bob@example.com' },
-          ]);
-          await seedPosts(runtime, [
-            { id: 10, title: 'A1', userId: 1, views: 1 },
-            { id: 11, title: 'B1', userId: 2, views: 2 },
-          ]);
-          await seedComments(runtime, [{ id: 100, body: 'c', postId: 10 }]);
-
-          const users = collectionWithCapabilities(runtime, 'User', MULTI_QUERY_CAPABILITIES);
-          runtime.resetExecutions();
-          await users.include('posts', (posts) => posts.include('comments')).all();
-          // 1 parent + 1 IN-batched posts + 1 IN-batched comments = 3.
-          // Independent of row count.
-          expect(runtime.executions).toHaveLength(3);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
       'depth-3 under lateral capabilities runs a single SQL execution',
       async () => {
         await withCollectionRuntime(async (runtime) => {
@@ -278,31 +232,6 @@ describe('integration/nested-includes/strategy', () => {
             )
             .all();
           expect(runtime.executions).toHaveLength(1);
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'depth-3 under empty capabilities runs 4 SQL executions (multi-query fallback)',
-      async () => {
-        await withCollectionRuntime(async (runtime) => {
-          await seedUsers(runtime, [
-            { id: 1, name: 'Root', email: 'root@example.com' },
-            { id: 2, name: 'Child', email: 'child@example.com', invitedById: 1 },
-          ]);
-          await seedPosts(runtime, [{ id: 10, title: 'P', userId: 2, views: 1 }]);
-          await seedComments(runtime, [{ id: 100, body: 'c', postId: 10 }]);
-
-          const users = collectionWithCapabilities(runtime, 'User', MULTI_QUERY_CAPABILITIES);
-          runtime.resetExecutions();
-          await users
-            .include('invitedUsers', (inv) =>
-              inv.include('posts', (posts) => posts.include('comments')),
-            )
-            .all();
-          // parent + invitedUsers + posts + comments = 4.
-          expect(runtime.executions).toHaveLength(4);
         });
       },
       timeouts.spinUpPpgDev,

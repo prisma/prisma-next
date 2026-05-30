@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { verifyPostgresNamespacePresence } from '../../src/core/migrations/verify-postgres-namespaces';
@@ -10,13 +10,18 @@ function makeContract(
   namespaceIds: readonly string[],
   options: { useUnbound?: boolean } = {},
 ): Contract<SqlStorage> {
-  const namespaces: Record<string, PostgresSchema> = {};
-  for (const id of namespaceIds) {
-    namespaces[id] =
-      options.useUnbound && id === UNBOUND_NAMESPACE_ID
-        ? PostgresUnboundSchema.instance
-        : new PostgresSchema({ id, tables: {} });
-  }
+  const unboundEntry =
+    options.useUnbound || !namespaceIds.includes(UNBOUND_NAMESPACE_ID)
+      ? PostgresUnboundSchema.instance
+      : new PostgresSchema({ id: UNBOUND_NAMESPACE_ID, tables: {} });
+  const namespaces: SqlStorageInput['namespaces'] = {
+    [UNBOUND_NAMESPACE_ID]: unboundEntry,
+    ...Object.fromEntries(
+      namespaceIds
+        .filter((id) => id !== UNBOUND_NAMESPACE_ID)
+        .map((id) => [id, new PostgresSchema({ id, tables: {} })]),
+    ),
+  };
   return {
     target: 'postgres',
     targetFamily: 'sql',

@@ -9,7 +9,6 @@ import {
   EqColJoinOn,
   JoinAst,
   JsonObjectExpr,
-  ListExpression,
   LiteralExpr,
   OperationExpr,
   OrderByItem,
@@ -21,11 +20,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import {
-  compileRelationSelect,
-  compileSelect,
-  compileSelectWithIncludeStrategy,
-} from '../src/query-plan-select';
+import { compileSelect, compileSelectWithIncludeStrategy } from '../src/query-plan-select';
 import { emptyState } from '../src/types';
 import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
@@ -288,36 +283,6 @@ describe('compileSelectWithIncludeStrategy', () => {
       [1, 2, 3],
       [4, 5, 6],
     ]);
-  });
-
-  it('prepends relation filters and clears nested paging for relation selects', () => {
-    const { collection } = createCollectionFor('Post');
-    const state = collection
-      .where((post) => post.title.eq('Hello'))
-      .take(2)
-      .skip(1).state;
-
-    const plan = compileRelationSelect(baseContract, 'posts', 'user_id', [1, 2], state);
-    expectSelectAst(plan.ast);
-    expect(plan.params).toEqual([1, 2, 'Hello']);
-    expect(paramCodecs(plan)).toEqual([
-      codecForColumn('posts', 'user_id'),
-      codecForColumn('posts', 'user_id'),
-      codecForColumn('posts', 'title'),
-    ]);
-
-    const inWhere = bindWhereExpr(
-      baseContract,
-      BinaryExpr.in(ColumnRef.of('posts', 'user_id'), ListExpression.fromValues([1, 2])),
-    );
-    const titleWhere = bindWhereExpr(
-      baseContract,
-      BinaryExpr.eq(ColumnRef.of('posts', 'title'), LiteralExpr.of('Hello')),
-    );
-
-    expect(plan.ast.where).toEqual(AndExpr.of([inWhere, titleWhere]));
-    expect(plan.ast.limit).toBeUndefined();
-    expect(plan.ast.offset).toBeUndefined();
   });
 
   it('builds lateral include joins with child distinctOn and offset', () => {

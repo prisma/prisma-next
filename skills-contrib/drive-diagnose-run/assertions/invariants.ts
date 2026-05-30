@@ -1,4 +1,4 @@
-import type { TraceEvent } from '../schema.ts';
+import type { TraceEvent } from '../../drive-record-traces/schema.ts';
 import type { AssertionResult, TraceRef } from './types.ts';
 
 function eventsOfType<T extends TraceEvent['event_type']>(

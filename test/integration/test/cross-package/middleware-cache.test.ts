@@ -206,7 +206,7 @@ describe('integration: middleware-cache against real Postgres', {
     it('serves a repeated annotated read from cache without hitting the driver', async () => {
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([cache]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
         db.users
@@ -234,7 +234,7 @@ describe('integration: middleware-cache against real Postgres', {
     it('still hits the driver for an un-annotated query (cache is opt-in)', async () => {
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([cache]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       driverExecuteSpy.mockClear();
 
@@ -249,7 +249,7 @@ describe('integration: middleware-cache against real Postgres', {
     it('does not cache a query when its cacheAnnotation has skip: true', async () => {
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([cache]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
         db.users
@@ -276,7 +276,7 @@ describe('integration: middleware-cache against real Postgres', {
       const rewriter = activeUsersOnly();
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([rewriter, cache]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
         db.users
@@ -315,7 +315,7 @@ describe('integration: middleware-cache against real Postgres', {
       const cacheWithRewrite = createCacheMiddleware({ store: sharedStore });
       const runtimeWithRewrite = buildRuntime([activeUsersOnly(), cacheWithRewrite]);
 
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
       const buildPlan = () =>
         db.users
           .select('id')
@@ -383,7 +383,7 @@ describe('integration: middleware-cache against real Postgres', {
       // both paths and observes the `source` field, which is the
       // canonical hit-vs-miss signal.
       const runtime = buildRuntime([cache, observer]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
         db.users
@@ -432,7 +432,7 @@ describe('integration: middleware-cache against real Postgres', {
       const observer = createObserver(events);
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([cache, observer]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
         db.users
@@ -458,7 +458,7 @@ describe('integration: middleware-cache against real Postgres', {
     it('two parallel executes of the same plan do not cross-talk via the per-exec buffer', async () => {
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([cache]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       const buildPlan = () =>
         db.users
@@ -491,7 +491,7 @@ describe('integration: middleware-cache against real Postgres', {
     it('parallel executes of two different plans land in distinct cache slots', async () => {
       const cache = createCacheMiddleware({ maxEntries: 100 });
       const runtime = buildRuntime([cache]);
-      const db = sql({ context });
+      const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });
 
       driverExecuteSpy.mockClear();
 

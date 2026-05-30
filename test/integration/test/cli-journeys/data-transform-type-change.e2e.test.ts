@@ -9,7 +9,7 @@
  * planner-emitted `migration.ts` therefore has two `placeholder("…")`
  * stubs the user must fill in. This test simulates the user editing
  * the file (string-patching the stubs and injecting a
- * `db = sql({ context })` setup), then runs `migration emit` +
+ * `db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } })` setup), then runs `migration emit` +
  * `migration apply` and asserts the post-apply column has switched
  * to `int4` with the expected integer values.
  *

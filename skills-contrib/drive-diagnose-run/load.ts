@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { type } from 'arktype';
-import type { TraceEvent } from './schema.ts';
-import { KNOWN_EVENT_TYPES, Slice1TraceEvent } from './schema.ts';
+import type { TraceEvent } from '../drive-record-traces/schema.ts';
+import { KNOWN_EVENT_TYPES, Slice1TraceEvent } from '../drive-record-traces/schema.ts';
 
 export type LoadError = { line: number; raw: string; problem: string };
 

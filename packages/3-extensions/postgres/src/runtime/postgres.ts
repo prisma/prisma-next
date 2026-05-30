@@ -6,7 +6,8 @@ import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
-import type { CodecTypesBase } from '@prisma-next/sql-relational-core/expression';
+import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
+import { createRawSql } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   BindSiteParams,
@@ -49,6 +50,7 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
+  readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
@@ -164,6 +166,9 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     stack,
   });
 
+  const rawCodecInferer = stack.adapter.rawCodecInferer;
+  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
+
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -248,11 +253,12 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     context,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context });
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
 
   return {
     sql,
     orm,
+    raw: rawSqlTag,
     context,
     stack,
 
@@ -301,7 +307,10 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract>({ context });
+        const txSql: Db<TContract> = sqlBuilder<TContract>({
+          context,
+          rawCodecInferer,
+        });
 
         const txOrm: OrmClient<TContract> = ormBuilder({
           runtime: {

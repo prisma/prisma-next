@@ -9,6 +9,7 @@ import {
   timeouts,
   withCollectionRuntime,
 } from './integration-helpers';
+import { seedPosts } from './runtime-helpers';
 
 function expectInsertBatchAst(
   ast: unknown,
@@ -117,6 +118,97 @@ describe('integration/create', () => {
         expect(rows).toEqual([
           { id: 10, name: 'Alice', email: 'alice@example.com' },
           { id: 11, name: 'Bob', email: 'bob@example.com' },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'createAll() with include() returns inserted rows with their relations via a single read-back',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        runtime.resetExecutions();
+        const created = await users
+          .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
+          .createAll([
+            { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+            { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
+          ]);
+
+        // Freshly inserted users own no posts yet; the read-back still
+        // resolves the relation to an empty array per row.
+        expect(created).toEqual([
+          {
+            id: 10,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [],
+          },
+          {
+            id: 11,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            address: null,
+            posts: [],
+          },
+        ]);
+        // One INSERT ... RETURNING plus one include read-back — no
+        // per-relation N+1.
+        expect(runtime.executions).toHaveLength(2);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'createAll() with include() resolves non-empty relations on the read-back',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        // posts.user_id has no FK, so relations can be seeded ahead of
+        // the parents they point at — the include read-back then resolves
+        // each inserted user to the posts that already reference it.
+        await seedPosts(runtime, [
+          { id: 10, title: 'Alice A', userId: 10, views: 100 },
+          { id: 11, title: 'Bob A', userId: 11, views: 200 },
+          { id: 12, title: 'Bob B', userId: 11, views: 300 },
+        ]);
+
+        const created = await users
+          .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
+          .createAll([
+            { id: 10, name: 'Alice', email: 'alice@example.com', invitedById: null },
+            { id: 11, name: 'Bob', email: 'bob@example.com', invitedById: null },
+          ]);
+
+        const sorted = [...created].sort((a, b) => a.id - b.id);
+        expect(sorted).toEqual([
+          {
+            id: 10,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [{ id: 10, title: 'Alice A', userId: 10, views: 100, embedding: null }],
+          },
+          {
+            id: 11,
+            name: 'Bob',
+            email: 'bob@example.com',
+            invitedById: null,
+            address: null,
+            posts: [
+              { id: 11, title: 'Bob A', userId: 11, views: 200, embedding: null },
+              { id: 12, title: 'Bob B', userId: 11, views: 300, embedding: null },
+            ],
+          },
         ]);
       });
     },

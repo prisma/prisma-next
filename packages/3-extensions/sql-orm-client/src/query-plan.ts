@@ -14,8 +14,4 @@ export {
   compileUpdateReturning,
   compileUpsertReturning,
 } from './query-plan-mutations';
-export {
-  compileRelationSelect,
-  compileSelect,
-  compileSelectWithIncludeStrategy,
-} from './query-plan-select';
+export { compileSelect, compileSelectWithIncludeStrategy } from './query-plan-select';

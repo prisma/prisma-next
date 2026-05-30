@@ -1,4 +1,4 @@
-import type { TraceEvent } from './schema.ts';
+import type { TraceEvent } from '../drive-record-traces/schema.ts';
 
 // Narrows the event union to the events of the requested type using a type
 // predicate, so no bare `as` cast is needed at call sites.

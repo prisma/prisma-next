@@ -9,7 +9,7 @@
  * stubs the user must fill in to backfill any existing NULL rows
  * before the constraint is tightened. This test simulates the user
  * editing the file (string-patching the stubs and injecting a
- * `db = sql({ context })` setup), then runs `migration emit` +
+ * `db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } })` setup), then runs `migration emit` +
  * `migration apply` and asserts the post-apply NULL row has been
  * backfilled and the column is NOT NULL.
  *

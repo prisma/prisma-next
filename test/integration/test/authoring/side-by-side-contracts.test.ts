@@ -130,11 +130,18 @@ describe('side-by-side contract examples', () => {
     expect(fixtureCases.map((fixtureCase) => fixtureCase.name)).toEqual(['postgres', 'mongo']);
   });
 
-  it('loads the side-by-side fixture files from disk', async () => {
-    const fixtures = await Promise.all(fixtureCases.map(loadFixture));
+  it(
+    'loads the side-by-side fixture files from disk',
+    async () => {
+      const fixtures = await Promise.all(fixtureCases.map(loadFixture));
 
-    expect(fixtures).toHaveLength(2);
-  });
+      expect(fixtures).toHaveLength(2);
+    },
+    // Reading + parsing the fixture files is local I/O; the 100ms package
+    // default flakes on cold CI workers. vitestPackageDefault is the
+    // documented baseline for exactly this case.
+    timeouts.vitestPackageDefault,
+  );
 
   it(
     'validates and emits the Postgres side-by-side contract from TS and PSL',

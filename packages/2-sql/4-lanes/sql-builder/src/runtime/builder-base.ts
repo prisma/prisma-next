@@ -15,6 +15,7 @@ import {
   type TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   AppliedMutationDefault,
@@ -95,6 +96,10 @@ export interface BuilderContext {
   readonly applyMutationDefaults: (
     options: MutationDefaultsOptions,
   ) => ReadonlyArray<AppliedMutationDefault>;
+  /**
+   * Codec inferer used inside `createBuiltinFunctions` to construct the raw-SQL tag — `fns.raw` dispatches through `inferCodec(value)` for bare-literal interpolations.
+   */
+  readonly rawCodecInferer: RawCodecInferer;
 }
 
 /**
@@ -294,7 +299,7 @@ export function resolveSelectArgs(
       f: FieldProxy<Scope>,
       fns: AggregateFunctions<QueryContext>,
     ) => Expression<ScopeField>;
-    const fns = createAggregateFunctions(ctx.queryOperationTypes);
+    const fns = createAggregateFunctions(ctx.queryOperationTypes, ctx.rawCodecInferer);
     const result = exprFn(createFieldProxy(scope), fns);
     const field = result.returnType;
     projections.push(ProjectionItem.of(alias, result.buildAst(), field.codec));
@@ -307,7 +312,7 @@ export function resolveSelectArgs(
       f: FieldProxy<Scope>,
       fns: AggregateFunctions<QueryContext>,
     ) => Record<string, Expression<ScopeField>>;
-    const fns = createAggregateFunctions(ctx.queryOperationTypes);
+    const fns = createAggregateFunctions(ctx.queryOperationTypes, ctx.rawCodecInferer);
     const record = callbackFn(createFieldProxy(scope), fns);
     for (const [key, expr] of Object.entries(record)) {
       const field = expr.returnType;
@@ -341,8 +346,8 @@ export function resolveOrderBy(
   if (typeof arg === 'function') {
     const combined = orderByScopeOf(scope, rowFields);
     const fns = useAggregateFns
-      ? createAggregateFunctions(ctx.queryOperationTypes)
-      : createFunctions(ctx.queryOperationTypes);
+      ? createAggregateFunctions(ctx.queryOperationTypes, ctx.rawCodecInferer)
+      : createFunctions(ctx.queryOperationTypes, ctx.rawCodecInferer);
     const result = (arg as ExprCallback)(createFieldProxy(combined), fns);
     return dir === 'asc' ? OrderByItem.asc(result.buildAst()) : OrderByItem.desc(result.buildAst());
   }
@@ -367,7 +372,7 @@ export function resolveGroupBy(
 
   if (typeof args[0] === 'function') {
     const combined = orderByScopeOf(scope, rowFields);
-    const fns = createFunctions(ctx.queryOperationTypes);
+    const fns = createFunctions(ctx.queryOperationTypes, ctx.rawCodecInferer);
     const result = (args[0] as ExprCallback)(createFieldProxy(combined), fns);
     return [result.buildAst()];
   }
@@ -383,7 +388,7 @@ export function resolveDistinctOn(
 ): AstExpression[] {
   if (args.length === 1 && typeof args[0] === 'function') {
     const combined = orderByScopeOf(scope, rowFields);
-    const fns = createFunctions(ctx.queryOperationTypes);
+    const fns = createFunctions(ctx.queryOperationTypes, ctx.rawCodecInferer);
     const result = (args[0] as ExprCallback)(createFieldProxy(combined), fns);
     return [result.buildAst()];
   }

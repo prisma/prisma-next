@@ -121,6 +121,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
         validateGroupedComparable(expr.right),
       );
     },
+    rawExpr: rejectHavingExpr,
   });
 }
 

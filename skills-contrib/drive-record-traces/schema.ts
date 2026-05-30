@@ -1,3 +1,4 @@
+// Drive trace-event schema — canonical home. Import this from consumers (e.g. drive-diagnose-run) rather than duplicating.
 import { type } from 'arktype';
 
 /** UUID v4 string — emit-side assigns a fresh v4; read validator may tighten. */
@@ -190,7 +191,6 @@ export const RetroLandedEvent = type({
   is_mandatory_final: 'boolean',
 });
 
-// OQ1 resolved: Slice1TraceEvent extended in place (lower-churn than introducing a separate TraceEvent alias).
 export const Slice1TraceEvent = DispatchStartEvent.or(DispatchEndEvent)
   .or(RoundStartEvent)
   .or(RoundEndEvent)

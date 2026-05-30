@@ -177,7 +177,7 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
         other.getJoinOuterScope() as Other[typeof JoinOuterScope],
       ),
     ) as FieldProxy<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>>;
-    const fns = createFunctions<QC>(this.ctx.queryOperationTypes);
+    const fns = createFunctions<QC>(this.ctx.queryOperationTypes, this.ctx.rawCodecInferer);
     const onResult = onExpr(fieldProxy, fns);
     const joinAst = new JoinAst(joinType, other.buildAst(), onResult.buildAst());
 

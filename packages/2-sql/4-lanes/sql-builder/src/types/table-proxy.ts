@@ -119,7 +119,7 @@ type ResolvedUpdateExpressions<Table extends StorageTable> = {
   }>;
 };
 
-type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
+export type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
   readonly codecTypes: ExtractCodecTypes<C>;
   readonly capabilities: C['capabilities'];
   readonly queryOperationTypes: ExtractQueryOperationTypes<C>;
@@ -137,7 +137,7 @@ export interface TableProxy<
     WithJoin<QC, AvailableScope, C['capabilities']> {
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>>;
+  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC>;
 
   insert(
     rows: ReadonlyArray<
