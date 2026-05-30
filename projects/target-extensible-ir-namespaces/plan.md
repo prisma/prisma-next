@@ -6,7 +6,7 @@
 
 ## At a glance
 
-Three units, single stack thread: **S1 (sub-project) → S2 (slice) → S3 (slice)**. S1 + S2 are pre-EA must-ship; S3 is post-EA additive. No parallelisation at the umbrella level — each unit gates the next on substrate, not just on convention. The umbrella plan delegates execution detail to S1's plan ([`projects/contract-ir-planes/plan.md`](../contract-ir-planes/plan.md), 6 slices) and to S2/S3 slice specs which will be authored via `drive-specify-slice` at pickup time.
+Three units, single stack thread: **S1 (sub-project) → S2 (slice) → S3 (slice)**. S1 + S2 are pre-EA must-ship; S3 is post-EA additive. No parallelisation at the umbrella level — each unit gates the next on substrate, not just on convention. The umbrella plan delegates execution detail to S1 (now closed; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)) and to S2/S3 slice specs which will be authored via `drive-specify-slice` at pickup time.
 
 ## Composition
 
@@ -14,11 +14,11 @@ Three units, single stack thread: **S1 (sub-project) → S2 (slice) → S3 (slic
 
 #### S1 — contract IR planes + pack-contributed entity-kind mechanism + Postgres enum migration
 
-**Unit type:** Sub-project (multi-slice; lives in its own folder under `projects/contract-ir-planes/`).
+**Unit type:** Sub-project (multi-slice; closed — durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)).
 
 **Purpose.** Restructure the contract IR around two planes (`domain`, `storage`) with uniform `<plane>.<ns>.<entityKind>.<entityName>` indexing and canonical entity coordinates. Add the pack-contributed entity-kind descriptor mechanism. Migrate Postgres enum off the framework-shared `types` slot as the substrate's load-bearing exemplar.
 
-**Scope.** ~50 source files across framework / SQL family / Postgres target / emitter + ~10 on-disk contracts. Six slices internally; see [`projects/contract-ir-planes/plan.md`](../contract-ir-planes/plan.md) for the slice composition + validation gates.
+**Scope.** ~50 source files across framework / SQL family / Postgres target / emitter + ~10 on-disk contracts. Delivered across five merged slices; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md).
 
 **Linear:** [TML-2584](https://linear.app/prisma-company/issue/TML-2584). Six internal-slice tickets need creating before slice pickup (folded into the Linear audit pass).
 
@@ -110,7 +110,7 @@ Within S1, S1's own plan defines parallelisation opportunities (Slices 4 + 5 are
 ## Risks + open questions
 
 1. **EA timeline slip.** A2 in the spec is the binding constraint. Honest budget for pre-EA scope is ~12-15 days (S1: 10-12 + S2: 2-3); "few days" framing was unrealistic. Working position is to slip pre-EA by 1-2 weeks rather than ship breaking IR changes into EA. If the slip is unacceptable to the team, the conversation re-opens at umbrella level — options are (a) ship without S1's IR reshape and accept breaking changes for EA users when S1 lands later, (b) compress S1 via aggressive parallelism (compression-sprint plan, previously discarded), or (c) defer S2's namespace-qualification too and ship EA on the unchanged surface with namespaces deferred to the next minor.
-2. **S1 internal slice falsifications cascade to umbrella.** S1's A1-A7 assumptions (see [`projects/contract-ir-planes/spec.md`](../contract-ir-planes/spec.md) § Constraints + Assumptions) — if any falsify during execution, S1's slice plan re-sequences and the umbrella's S2 / S3 timing shifts. Most likely falsifier: A6 (external consumers pinning shape) — if EA users start building tooling against the contract shape before S1 lands, S1's Slice 3 splits into deprecation-shim + hard-cut sub-slices.
+2. **S1 internal slice falsifications cascade to umbrella.** *(Resolved — S1 closed; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md).)* S1's assumptions held without forcing an umbrella-level re-sequencing of S2 / S3.
 3. **A4 default-namespace fallback sufficiency.** If EA users start writing multi-namespace contracts before S3 lands, the flat DSL surface becomes inadequate and S3's post-EA window compresses. Mitigation: EA release notes communicate the namespace-aware surface as "coming soon."
 4. **Linear audit surfaces unexpected scope.** The 21 Linear tickets currently in the project may include work that wasn't accounted for in this umbrella's three-unit composition. If audit surfaces real-scope work the umbrella missed, the plan re-opens.
 
@@ -142,7 +142,7 @@ Downstream: Supabase integration consumes this substrate
 - [ ] Archive / delete rolled-up project folders with long-lived contents migrated to `docs/`:
   - `projects/target-extensible-ir/` (substrate predecessor)
   - `projects/namespace-exemplar/` (TML-2520 / PR #534 — predecessor)
-  - `projects/contract-ir-planes/` (S1 sub-project — folder removed after its own close-out)
+  - S1 sub-project (closed; folder removed at its own close-out — durable decisions migrated to [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md))
 - [ ] Strip repo-wide references to `projects/target-extensible-ir-namespaces/**` and all rolled-up sibling folders (replace with canonical `docs/` links or remove)
 - [ ] Delete `projects/target-extensible-ir-namespaces/`
 - [ ] Linear Project "Target-Extensible IR + Namespaces" marked Completed (auto via PR-merge integration when the close-out PR lands)

@@ -53,7 +53,7 @@ EA users on a single-default-namespace contract write zero query-code changes ac
 
 ## In scope
 
-- **S1 — contract IR two-plane reshape + pack-contributed entity-kind mechanism + Postgres enum migration as exemplar.** Sub-project tracked at [`projects/contract-ir-planes/`](../contract-ir-planes/) with its own spec, plan, and ADR. Six slices internally. Tracking ticket [TML-2584](https://linear.app/prisma-company/issue/TML-2584).
+- **S1 — contract IR two-plane reshape + pack-contributed entity-kind mechanism + Postgres enum migration as exemplar.** Sub-project (closed; delivered across five merged slices). Durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md). Tracking ticket [TML-2584](https://linear.app/prisma-company/issue/TML-2584).
 - **S2 — runtime SQL qualification + default-namespace DSL/ORM fallback.** Runtime SQL emission qualifies every identifier by its namespace's family-specific DDL coordinate (Postgres: `"public"."user"`; SQLite: unqualified `"user"`; Mongo: collection key in correct namespace). DSL/ORM continues to expose flat-by-name surface (`db.sql.<table>`, `db.<Model>`); every lookup resolves through a per-family default namespace (`'public'` for Postgres; `'__unbound__'` for Mongo/SQLite) hardcoded in the family façade function. Single PR. Tracking ticket [TML-2605](https://linear.app/prisma-company/issue/TML-2605).
 - **S3 — explicit namespace-aware DSL/ORM surface.** Adds `db.sql.<ns>.<table>` and `db.<ns>.<Model>` for explicit multi-namespace navigation. Purely additive on S2 — default-namespace lookups keep working unchanged. Single PR. Tracking ticket [TML-2550](https://linear.app/prisma-company/issue/TML-2550).
 
@@ -73,7 +73,7 @@ EA users on a single-default-namespace contract write zero query-code changes ac
 
 Three units of work, sequenced as a stack:
 
-**S1 establishes the IR-shape substrate** that every other unit depends on. The two-plane reshape (`contract.{domain, storage}.<ns>.<entityKind>.<entityName>`) plus the pack-contributed entity-kind mechanism are what makes the rest of the umbrella ship. Postgres enum migrating off the framework-shared `types` slot is the proof the mechanism works — without an exemplar, the descriptor surface ships untested. S1's spec lives at [`projects/contract-ir-planes/spec.md`](../contract-ir-planes/spec.md); its plan decomposes the work into 6 slices.
+**S1 establishes the IR-shape substrate** that every other unit depends on. The two-plane reshape (`contract.{domain, storage}.<ns>.<entityKind>.<entityName>`) plus the pack-contributed entity-kind mechanism are what makes the rest of the umbrella ship. Postgres enum migrating off the framework-shared `types` slot is the proof the mechanism works — without an exemplar, the descriptor surface ships untested. S1's durable decisions live in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md); it was delivered across five merged slices.
 
 **S2 makes the namespace IR actually useful for runtime queries.** PR #534 shipped namespace-aware storage IR but the runtime kept emitting unqualified identifiers, and the DSL/ORM kept reading from a flat-by-name surface. S2 closes the loop on both: runtime SQL qualifies identifiers (no more `SELECT * FROM user` when the table is `auth.user`); DSL/ORM reads through a per-family default-namespace fallback (`db.sql.user` resolves to `'public'.user` for Postgres, `'__unbound__'.user` for Mongo/SQLite). The fallback is the **load-bearing EA-protection mechanism**: existing single-default-namespace consumers experience no query-API breakage from this umbrella's work.
 
@@ -121,7 +121,7 @@ The composition's two load-bearing properties:
 - **A2.** EA timeline is "a few days" with the umbrella's pre-EA scope (S1 + S2) blocking release. Estimated budget: ~10-12 days for S1's six slices + ~2-3 days for S2 = ~12-15 days total. **The honest implication: a slip vs. the "few days" framing.** Surfaces as the load-bearing scoping conversation; if the slip is unacceptable, options are (a) defer S1 entirely and ship without the IR reshape (large breaking-change risk for EA users when S1 lands later), or (b) compress S1 via aggressive parallelism (per the compression-sprint plan earlier discarded). Working position: **slip pre-EA by 1-2 weeks** rather than ship breaking IR changes into EA.
 - **A3.** The Supabase integration consumes this substrate post-EA. Specifically, the Supabase pack will register pack-contributed entity kinds for `policy` (RLS) and `role` through the S1-delivered descriptor mechanism. Verified by Supabase initiative's own project planning, not this umbrella.
 - **A4.** Default-namespace fallback (S2) is sufficient for EA users on default-namespace-only contracts. Falsified if EA users start writing multi-namespace contracts before S3 lands — would force a deprecation conversation about the flat DSL surface. Mitigation: communicate the namespace-aware surface as a "coming soon" feature in EA release notes.
-- **A5.** S1's slice plan holds without re-shaping. Falsified if any of S1's own A1-A7 assumptions falsify during execution (see [`projects/contract-ir-planes/spec.md`](../contract-ir-planes/spec.md) § Constraints + Assumptions). Each S1 falsification triggers an umbrella-level re-sequencing conversation.
+- **A5.** S1's slice plan holds without re-shaping. *(Resolved — S1 closed; durable decisions in [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md).)* S1's assumptions held without forcing an umbrella-level re-sequencing.
 
 # Open Questions
 
@@ -141,10 +141,8 @@ These are residual umbrella-level questions; sub-project / slice specs own their
   - [TML-2605](https://linear.app/prisma-company/issue/TML-2605) — runtime SQL qualification (S2)
   - [TML-2550](https://linear.app/prisma-company/issue/TML-2550) — explicit namespace-aware DSL surface (S3)
   - [TML-2537](https://linear.app/prisma-company/issue/TML-2537) — target-contributed PSL blocks (separate project; out of umbrella)
-- **Sub-project artifacts:**
-  - [`projects/contract-ir-planes/spec.md`](../contract-ir-planes/spec.md) — S1's project spec
-  - [`projects/contract-ir-planes/plan.md`](../contract-ir-planes/plan.md) — S1's slice composition
-  - [`projects/contract-ir-planes/adrs/0001-contract-planes.md`](../contract-ir-planes/adrs/0001-contract-planes.md) — durable ADR (migrates to `docs/` at close-out per PDoD6)
+- **S1 (closed) durable decisions:**
+  - [ADR 221 — Contract IR two planes with uniform entity coordinate and pack-contributed entity kinds](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md) (S1's spec/plan were transient and removed at S1's close-out)
 - **Downstream consumer (out of scope):** `projects/supabase-integration/` — the initiative this umbrella's substrate enables.
 - **Reference docs:**
   - [Architecture Overview](../../docs/Architecture%20Overview.md)
