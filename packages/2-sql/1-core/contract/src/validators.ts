@@ -7,6 +7,8 @@ import {
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
 import {
@@ -448,8 +450,11 @@ export function validateStorage(value: unknown): SqlStorage {
   };
   return new SqlStorage({
     storageHash: validated.storageHash,
-    ...(validated.types !== undefined ? { types: validated.types } : {}),
-    namespaces: buildSqlNamespaceMap(validated.namespaces ?? {}),
+    ...ifDefined('types', validated.types),
+    namespaces: blindCast<
+      SqlStorageInput['namespaces'],
+      'structural storage validation requires the __unbound__ namespace slot'
+    >(buildSqlNamespaceMap(validated.namespaces ?? {})),
   });
 }
 

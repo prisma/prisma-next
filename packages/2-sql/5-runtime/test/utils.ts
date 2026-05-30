@@ -422,9 +422,7 @@ export function createTestContract(
       ? new SqlStorage({
           ...rest['storage'],
           storageHash: storageHashValue,
-          namespaces:
-            rest['storage'].namespaces ??
-            ({ __unbound__: SqlUnboundNamespace.instance } as SqlStorageInput['namespaces']),
+          namespaces: rest['storage'].namespaces ?? { __unbound__: SqlUnboundNamespace.instance },
         })
       : new SqlStorage({
           storageHash: storageHashValue,

@@ -21,7 +21,7 @@ import {
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -35,6 +35,7 @@ import {
   type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   SqlStorage,
+  type SqlStorageInput,
   type StorageColumn,
   StorageTable,
   type StorageTableInput,
@@ -42,6 +43,7 @@ import {
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ContractDefinition,
@@ -544,16 +546,21 @@ export function buildSqlContractFromDefinition(
     namespaceCoordinateIds.add(id);
   }
   const { createNamespace } = definition;
-  const namespaces: Record<string, Namespace> = Object.fromEntries(
-    [...namespaceCoordinateIds].sort().map((id) => {
-      const enumTypes = namespaceEnumTypesById[id];
-      const nsInput: SqlNamespaceTablesInput = {
-        id,
-        tables: tablesByNamespace[id] ?? {},
-        ...ifDefined('enum', enumTypes),
-      };
-      return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
-    }),
+  const namespaces = blindCast<
+    SqlStorageInput['namespaces'],
+    'contract authoring always materialises the __unbound__ namespace coordinate'
+  >(
+    Object.fromEntries(
+      [...namespaceCoordinateIds].sort().map((id) => {
+        const enumTypes = namespaceEnumTypesById[id];
+        const nsInput: SqlNamespaceTablesInput = {
+          id,
+          tables: tablesByNamespace[id] ?? {},
+          ...ifDefined('enum', enumTypes),
+        };
+        return [id, createNamespace ? createNamespace(nsInput) : buildSqlNamespace(nsInput)];
+      }),
+    ),
   );
   const domainUnboundTypes =
     Object.keys(documentTypes).length > 0 ? { types: documentTypes } : undefined;

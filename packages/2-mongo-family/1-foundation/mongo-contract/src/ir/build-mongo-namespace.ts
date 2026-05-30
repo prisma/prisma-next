@@ -9,13 +9,36 @@ import { MongoCollection } from './mongo-collection';
 import type { MongoNamespace, MongoNamespaceCollectionsInput } from './mongo-storage';
 import { MongoUnboundNamespace } from './mongo-unbound-namespace';
 
-class MongoNamespaceFromCollectionsInput extends NamespaceBase {
+const MONGO_NAMESPACE_KIND = 'mongo-namespace' as const;
+
+function isMaterializedMongoNamespace(
+  ns: Namespace | MongoNamespaceCollectionsInput,
+): ns is MongoNamespace {
+  if (typeof ns !== 'object' || ns === null) {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(ns);
+  if (proto === Object.prototype || proto === null) {
+    return false;
+  }
+  return (ns as Namespace).kind === MONGO_NAMESPACE_KIND;
+}
+
+class MongoBoundNamespace extends NamespaceBase {
   declare readonly kind: string;
 
   readonly id: string;
   readonly collections: Readonly<Record<string, MongoCollection>>;
 
-  constructor(input: MongoNamespaceCollectionsInput) {
+  static fromCollectionsInput(input: MongoNamespaceCollectionsInput): MongoNamespace {
+    const collectionCount = Object.keys(input.collections ?? {}).length;
+    if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
+      return castAs<MongoNamespace>(MongoUnboundNamespace.instance);
+    }
+    return castAs<MongoNamespace>(new MongoBoundNamespace(input));
+  }
+
+  private constructor(input: MongoNamespaceCollectionsInput) {
     super();
     this.id = input.id;
     this.collections = Object.freeze(
@@ -27,7 +50,7 @@ class MongoNamespaceFromCollectionsInput extends NamespaceBase {
       ),
     );
     Object.defineProperty(this, 'kind', {
-      value: 'mongo-namespace',
+      value: MONGO_NAMESPACE_KIND,
       writable: false,
       enumerable: false,
       configurable: true,
@@ -37,11 +60,7 @@ class MongoNamespaceFromCollectionsInput extends NamespaceBase {
 }
 
 export function buildMongoNamespace(input: MongoNamespaceCollectionsInput): MongoNamespace {
-  const collectionCount = Object.keys(input.collections ?? {}).length;
-  if (input.id === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
-    return castAs<MongoNamespace>(MongoUnboundNamespace.instance);
-  }
-  return castAs<MongoNamespace>(new MongoNamespaceFromCollectionsInput(input));
+  return MongoBoundNamespace.fromCollectionsInput(input);
 }
 
 export function buildMongoNamespaceMap(
@@ -50,12 +69,12 @@ export function buildMongoNamespaceMap(
   return Object.fromEntries(
     Object.entries(namespaces).map(([nsKey, ns]) => [
       nsKey,
-      ns instanceof NamespaceBase
+      isMaterializedMongoNamespace(ns)
         ? blindCast<
             MongoNamespace,
-            'an already-built NamespaceBase in a Mongo-family namespace map is a MongoNamespace'
+            'a materialised Mongo-family namespace entry in a namespace map is a MongoNamespace'
           >(ns)
-        : buildMongoNamespace(ns),
+        : MongoBoundNamespace.fromCollectionsInput(ns),
     ]),
   );
 }

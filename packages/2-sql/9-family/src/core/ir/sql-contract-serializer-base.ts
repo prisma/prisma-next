@@ -6,6 +6,7 @@ import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
   SqlStorage,
+  type SqlStorageInput,
   type SqlStorageTypeEntry,
   StorageTable,
   type StorageTableInput,
@@ -14,6 +15,8 @@ import {
   createSqlContractSchema,
   validateSqlContractFully,
 } from '@prisma-next/sql-contract/validators';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type Type, type } from 'arktype';
 
@@ -115,8 +118,11 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       ...validated,
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
-        ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
-        namespaces: hydratedNamespaces,
+        ...ifDefined('types', hydratedTypes),
+        namespaces: blindCast<
+          SqlStorageInput['namespaces'],
+          'deserialized SQL contracts require the __unbound__ namespace slot'
+        >(hydratedNamespaces),
       }),
     };
   }
@@ -125,9 +131,14 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
   ): Readonly<Record<string, Namespace>> {
     return Object.fromEntries(
-      Object.entries(namespaces).map(([nsId, raw]) => {
-        const hydrated = this.hydrateSqlNamespaceEntry(nsId, raw);
-        return [nsId, hydrated instanceof NamespaceBase ? hydrated : buildSqlNamespace(hydrated)];
+      Object.entries(namespaces).map(([nsId, namespaceEntryRaw]) => {
+        // Raw entries passed structural validation; hydrate materialises family IR class instances.
+        const namespaceHydrated = this.hydrateSqlNamespaceEntry(nsId, namespaceEntryRaw);
+        const namespaceMaterialised =
+          namespaceHydrated instanceof NamespaceBase
+            ? namespaceHydrated
+            : buildSqlNamespace(namespaceHydrated);
+        return [nsId, namespaceMaterialised];
       }),
     );
   }

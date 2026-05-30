@@ -32,7 +32,9 @@ export interface SqlNamespaceTablesInput {
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
+    readonly __unbound__: SqlNamespace;
+  };
 }
 
 /**
@@ -81,9 +83,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   constructor(input: SqlStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.namespaces = Object.freeze(input.namespaces) as Readonly<Record<string, SqlNamespace>> & {
-      readonly __unbound__: SqlNamespace;
-    };
+    this.namespaces = Object.freeze(input.namespaces);
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(

@@ -4,6 +4,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type PostgresEnumStorageEntry,
   SqlStorage,
+  type SqlStorageInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -11,7 +12,11 @@ import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import type { CreateTableCall } from '../../src/core/migrations/op-factory-call';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
-import { PostgresSchema, postgresCreateNamespace } from '../../src/core/postgres-schema';
+import {
+  PostgresSchema,
+  PostgresUnboundSchema,
+  postgresCreateNamespace,
+} from '../../src/core/postgres-schema';
 import { PostgresEnumType } from '../../src/exports/types';
 
 function makeContract(
@@ -764,10 +769,15 @@ describe('planIssues', () => {
     function makeNamespacedContract(
       namespaces: Record<string, { tables: Record<string, StorageTableInput> }>,
     ): Contract<SqlStorage> {
-      const nsMap: Record<string, PostgresSchema> = {};
-      for (const [id, ns] of Object.entries(namespaces)) {
-        nsMap[id] = new PostgresSchema({ id, tables: ns.tables });
-      }
+      const nsMap: SqlStorageInput['namespaces'] = {
+        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
+        ...Object.fromEntries(
+          Object.entries(namespaces).map(([id, ns]) => [
+            id,
+            new PostgresSchema({ id, tables: ns.tables }),
+          ]),
+        ),
+      };
       return {
         target: 'postgres',
         targetFamily: 'sql',
@@ -877,6 +887,7 @@ describe('planIssues', () => {
         storage: new SqlStorage({
           storageHash: coreHash('sha256:multi-namespace-contract'),
           namespaces: {
+            [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
             tenant_a: new PostgresSchema({ id: 'tenant_a', tables: { users: userTable } }),
             tenant_b: new PostgresSchema({ id: 'tenant_b', tables: { users: userTable } }),
           },
