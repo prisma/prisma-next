@@ -49,6 +49,7 @@ function makeCollisionContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:enum-collision-contract'),
       namespaces: {
+        [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
         audit: new PostgresSchema({
           id: 'audit',
           tables: overrides.audit?.tables ?? {},
