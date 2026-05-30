@@ -193,6 +193,29 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-29 retro, project `dev-to-ship-migration-handoff`. The `ref-cmds-snapshot-integration` slice (declared parallel-safe against the `docs-and-adr` slice on "different command surface") had its single commit `70dfb715e` also rewrite ADR 218 (+253 lines) — a `docs-and-adr` deliverable. The Parallel A reviewer's verdict claimed the diff was "confined to `ref.ts`, `cli-errors.ts`, the two test files, and the four scoped test artefacts"; `git show --stat` showed the ADR. The rewrite was editorial (added code references, tightened Context, condensed prose), not a factual divergence, so it was accepted as-is — but the miss was a reviewer-discipline failure, not a benign coincidence, and a factual divergence on the same path would have shipped just as silently.
 
+### F11. Dispatch reports validation green but CI is red (dispatch gates didn't mirror CI)
+
+**Symptom.** An implementer (and the orchestrator-side post-dispatch walk) report end-of-dispatch validation green, but the PR's CI comes back red. The gaps are systematic, not one-offs:
+
+- **(a) biome `lint` / formatter never run locally.** The dispatch ran `pnpm typecheck` + `vitest`, but never the package's biome `lint` — which is a *separate CI job*. An unused import (biome `noUnusedImports`) or a formatter diff ships invisibly.
+- **(b) typecheck didn't cover the package's `test` project.** A package whose `typecheck` script compiles `src` only (or a single sub-project) misses a `TS6133`-class error in a `test/**` file. CI compiles tests, so it catches what the local gate didn't.
+- **(c) branch was behind base.** A sibling change already on `main` (e.g. a status row gaining a field, an output shape changing) red-fails a test that the local HEAD passes; merging `main` makes it green. The dispatch validated against a stale base.
+
+**Detection signal.**
+
+- Dispatch report asserts "lint passed" / "all green" but the transcript shows only `pnpm typecheck` + `vitest run` — no `biome` / `pnpm lint` invocation.
+- CI "Type Check" fails on a `test/**` file while the dispatch's typecheck was `src`-only or a single sub-project.
+- CI "Test" failures vanish after `git merge origin/main`; the failing assertions reference a shape changed on `main`, not by the branch.
+
+**Mitigation.**
+
+- **biome lint is a non-negotiable end-of-dispatch gate.** Run `pnpm --filter <pkg> lint` (i.e. `biome check --error-on-warnings`) for every touched package — it's the CI "Lint" job and catches unused imports + formatter diffs that typecheck/vitest do not. Now an always-run item in [`dod.md § Dispatch-DoD validation gates`](./dod.md#dispatch-dod-validation-gates).
+- **Typecheck must cover the `test` project.** For packages whose `typecheck` script is `src`-only, also compile the test tsconfig (`tsc -p tsconfig.test.json --noEmit`); CI compiles tests.
+- **Sync `main` before the final end-of-slice validation + push.** Merge/rebase `origin/main` so "behind base" drift surfaces locally, not in CI. (This is a *slice-close* discipline, not a per-dispatch one — see [`dod.md § Slice-close ritual`](./dod.md#slice-close-ritual-added-2026-05-21-retro).)
+- **Orchestrator DoD:** treat "implementer reports green" as a hypothesis. The gates in `dod.md` (now including biome lint + test-tsconfig + sync-main) are the evidence; the post-dispatch walk re-runs them, it doesn't trust the report.
+
+**Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715). The final dispatch reported all-green; PR #626 CI failed **Type Check** (unused `mkdir` import in `loader.catastrophic-io.test.ts`) + **Lint** (formatter diff in `loader.test.ts`) + **Test** (2 `migration-status-aggregate-spaces` failures that were pure behind-`main` drift, resolved by merging `main`). All three classes were caught by the babysit loop after the PR was open, not by the dispatch gates — exactly the work the gates exist to front-load.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

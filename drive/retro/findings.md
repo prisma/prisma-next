@@ -2,6 +2,18 @@
 
 > **Trial window:** 2026-05-19 → 2026-06-02. See [`drive/trial.md`](../trial.md) for the quality bar, tags, and format. Record only what meets the bar — `friction`, `gap`, `win`, `surprise`, `boundary`. One stanza per finding.
 
+## 2026-05-30 · drive-build-workflow · gap (dispatch gates didn't mirror CI — slice reported green, PR #626 CI came back red on three independent classes)
+
+Slice `tolerant-queryable-aggregate` (TML-2715) finished its dispatch loop all-green and pushed; PR #626's CI then failed on **three** jobs the dispatch gates never exercised: **Type Check** (an unused `mkdir` import in `loader.catastrophic-io.test.ts` — a `TS6133` in a `test/**` file), **Lint** (a biome formatter diff in `loader.test.ts`), and **Test** (two `migration-status-aggregate-spaces` failures that were pure behind-`main` drift, resolved by merging `origin/main`). Each was caught by the babysit loop *after* the PR was open — exactly the work the dispatch gates exist to front-load.
+
+The three classes share one root: **the dispatch validation didn't mirror CI's job matrix.** (a) biome `lint` is a *separate CI job*, not a side-effect of typecheck — `pnpm typecheck` + `vitest` pass with an unused import or formatter diff still on disk, because `noUnusedImports` + the formatter only fire under `pnpm lint`; the dispatch never ran it. (b) The package's local `typecheck` didn't compile its `test` project, so the `TS6133` in a test file was invisible locally but caught by CI (which compiles tests). (c) The branch validated against a stale base; a sibling change already on `main` had moved a status-row shape, so a green-on-HEAD test red-failed in CI and went green again once `main` was merged.
+
+**Lessons landed where.** [`drive/calibration/failure-modes.md § F11`](../calibration/failure-modes.md#f11-dispatch-reports-validation-green-but-ci-is-red-dispatch-gates-didnt-mirror-ci) (the failure mode, detection signals, mitigation). [`drive/calibration/dod.md § Dispatch-DoD validation gates`](../calibration/dod.md#dispatch-dod-validation-gates) now lists `pnpm --filter <pkg> lint` as an *always-run* gate alongside `pnpm typecheck`, with a callout that lint is a distinct CI job and that typecheck must cover the package's `test` tsconfig. [`§ Slice-close ritual`](../calibration/dod.md#slice-close-ritual-added-2026-05-21-retro) grew a "sync `origin/main` before final validation + push" checklist item.
+
+**Suggested action.** The highest-leverage durable fix is making the trap unreachable rather than relying on memory (cf. the 2026-05-22 stale-dist finding): a single `pnpm validate` (or per-package script) that runs typecheck + lint + the test-tsconfig in one shot, so a dispatch can't run a partial subset and report "green." Until that exists, the dod.md always-run list is the gate of record.
+
+**Upstream candidate?** Yes — "dispatch validation must mirror CI's job *matrix*, not just its typecheck" and "lint/format is a separate gate from typecheck" are general to any drive-* consumer whose CI splits typecheck and lint into distinct jobs (most do). The specific commands (`pnpm --filter`, biome) are harness-specific; the matrix-mirroring principle is not.
+
 ## 2026-05-29 · drive-instrumentation self-grade-report · gap (the report describes what happened but can't say whether the run was good, and several metrics read backwards)
 
 A principal-engineer-lens evaluation of the slice-3 `self-grade-report.md` (the read-out the diagnostics tool produces) surfaced three structural gaps beyond the hand-emitted-trace caveat below. All three are filed as concrete work items.

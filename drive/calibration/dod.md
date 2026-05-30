@@ -11,8 +11,13 @@ Overlays grow by retro accretion (per [`README.md § Maintenance discipline`](./
 ### Always-run
 
 ```bash
-pnpm typecheck    # catches the bulk of consumer-site issues
+pnpm typecheck                  # catches the bulk of consumer-site issues
+pnpm --filter <pkg> lint        # biome check --error-on-warnings, per touched package — CI's "Lint" job
 ```
+
+> **`lint` is a separate CI job, not a side-effect of typecheck.** `pnpm typecheck` + `vitest` will pass with an unused import or a formatter diff still on disk; biome's `noUnusedImports` + formatter only fire under `pnpm lint`. Skipping it is how a dispatch reports green and CI comes back red — see [`failure-modes.md § F11`](./failure-modes.md#f11-dispatch-reports-validation-green-but-ci-is-red-dispatch-gates-didnt-mirror-ci).
+>
+> **Typecheck must cover the package's `test` project too.** CI compiles tests; a package whose `typecheck` script is `src`-only will miss a `TS6133`-class error in `test/**`. For such packages also run `tsc -p tsconfig.test.json --noEmit`.
 
 ### Conditional
 
@@ -73,6 +78,8 @@ In addition to the canonical slice DoD:
 #### Slice-close ritual (added 2026-05-21 retro)
 
 The orchestrator MUST walk the slice spec's `## Slice Definition of Done` checklist verbatim before handing off to the PR-opening skill, marking each item ✓ / ✗ / N/A-with-rationale. A `READY FOR PR` reviewer verdict in `reviews/code-review.md` covers reviewer-scope items (typically SDoD1-SDoD3 + the validation-gate items) but **does not** cover items the reviewer cannot see — manual-QA (the QA-side items above), `projects/`-reference scrubs in long-lived files, or any other team-specific overlay item. Treating "reviewer SATISFIED" as proxy for "DoD satisfied" is a known orchestrator failure mode in this codebase; the explicit checklist walk is the calibration that prevents it.
+
+- [ ] **Sync `origin/main` before the final validation + push** (added 2026-05-30 retro). Merge/rebase `origin/main` into the branch, then re-run the always-run gates, *before* opening the PR. A branch that validated green against a stale base can still red-fail CI when a sibling change on `main` moved a shared shape (a status row gaining a field, an output envelope changing). Catching this locally costs one merge; catching it in CI costs a babysit round. See [`failure-modes.md § F11`](./failure-modes.md#f11-dispatch-reports-validation-green-but-ci-is-red-dispatch-gates-didnt-mirror-ci).
 
 ## Project-DoD overlay
 
