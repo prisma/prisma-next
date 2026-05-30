@@ -246,6 +246,88 @@ wording is a dispatch-time copy detail, not a design fork.
 > `db update --to`). This is the true closure of TML-2690; without it the slice
 > ships a relocated dead end.
 
+## Consolidation (operator review, post-merge with migration-store)
+
+PR #635 landed the feature but hand-rolled disk reads that the merged
+`ContractSpaceAggregate` now owns. Operator review (wmadden, PR #635) flagged:
+
+- `migrate.ts` — special-cases contract provenance (emitted vs bundle
+  `end-contract.json`); should consolidate onto the aggregate; the only
+  command-specific special case is the default `--to` (omitted → app head /
+  emitted contract).
+- `migration-plan.ts` — `readBundleEndArtifacts` / `readPredecessorEndContract`
+  duplicate what the aggregate should expose for graph-node contract materialization.
+
+**Consolidation design:** extend `ContractSpaceMember` with a lazy
+`contractAt(hash, { refName? })` facet that materializes the contract at an
+arbitrary graph node — ref paired snapshot first (when `refName` supplied),
+else the matching migration package's `end-contract.*` — mirroring today's
+`resolveContractRef` disk logic but owned by the aggregate, loaded once.
+Rewire `plan-resolution.ts`, `migration-plan.ts`, and `migrate.ts` to query
+the member instead of re-reading `refs/`, ref snapshots, or bundle bookends.
+Behaviour and diagnostics stay byte-identical; this is a structural realignment.
+
+## Dispatch plan (round 2 — aggregate consolidation)
+
+### Dispatch 5: `contractAt` facet on `ContractSpaceMember`
+
+- **Outcome:** `ContractSpaceMember` exposes `contractAt(hash, opts?)` returning
+  `{ hash, contractJson, contractDts, contract }` (deserialized via the member's
+  `deserializeContract` seam). Resolution order matches today's
+  `resolveContractRef`: when `opts.refName` is set, prefer the ref's paired
+  snapshot; else find the package whose `metadata.to === hash` and read its
+  `end-contract.*`. Lazy per-hash memoisation; throws typed
+  `MigrationToolsError` / preserves today's error shapes when surfaced through
+  CLI mappers. Unit tests in `@prisma-next/migration-tools` pin snapshot-first,
+  graph-node fallback, missing bundle, missing/corrupt bookend, and memoisation.
+- **Builds on:** merged `ContractSpaceAggregate` (migration-store); D1–D4 feature
+  behaviour (reference resolution semantics unchanged).
+- **Hands to:** a queryable node-contract facet CLI commands can consume without
+  hand-rolled disk reads.
+- **Focus:** `migration/src/aggregate/{types,aggregate,loader}.ts`, exports,
+  migration-tools tests. Not CLI rewiring (D6/D7).
+
+### Dispatch 6: rewire `plan-resolution` + `migration plan` onto the aggregate
+
+- **Outcome:** `resolveFromForPlan` / `resolveToForPlan` take a
+  `ContractSpaceMember` (refs, graph, packages, `contractAt`) instead of
+  `refsDir`, `bundles`, `graph`, and injected `readBundleEnd*` callbacks.
+  `readRefs`, `readRefSnapshot`, `readPredecessorEndContract`, and
+  `readBundleEndArtifacts` are removed from the plan path. `migration-plan.ts`
+  loads the tolerant aggregate once early (via `loadContractSpaceAggregateForCli`)
+  for from/to resolution, then builds the validating aggregate after seed as
+  today. All existing plan-resolution and migration-plan tests stay green;
+  no behavioural change.
+- **Builds on:** D5's `contractAt` facet.
+- **Hands to:** `migration plan --from/--to` resolution fully aggregate-backed.
+- **Focus:** `plan-resolution.ts`, `migration-plan.ts`, their tests. Not
+  `migrate.ts` (D7).
+
+### Dispatch 7: rewire `migrate` onto the aggregate
+
+- **Outcome:** `migrate.ts` stops re-reading `refs/` and bundle
+  `end-contract.json` for `--to` contract selection. `--to` resolution uses
+  `aggregate.app.refs` + `aggregate.app.graph()` + `parseContractRef` (as
+  today); apply contract = `aggregate.app.contractAt(hash, { refName })` when
+  `--to` resolves to a graph node with a matching bundle, else the emitted
+  contract when `--to` is omitted (the only command-specific default). Ref
+  advancement reuses the same `contractAt` artifacts for snapshots. Existing
+  `migrate-to-contract.test.ts` and `plan-to-rollback.e2e.test.ts` stay green.
+- **Builds on:** D5's `contractAt` facet; D6's plan-resolution aggregate wiring
+  (establishes the pattern).
+- **Hands to:** no hand-rolled contract provenance in migrate/plan; operator review
+  items addressed.
+- **Focus:** `migrate.ts`, `migrate-to-contract.test.ts`. Not docs (D8).
+
+### Dispatch 8: docs touch-up + push
+
+- **Outcome:** If consolidation shifted any user-visible wording, update
+  `@prisma-next/cli` README / subsystem doc minimally; `pnpm fixtures:check`
+  green; branch pushed to `bot` remote; PR #635 updated. Slice round-2 DoD met.
+- **Builds on:** D5–D7.
+- **Hands to:** slice fully consolidated; PR ready for re-review.
+- **Focus:** docs only if needed; fixture regen; push. No behavioural change.
+
 ## Open items
 
 - **Pre-existing CLI spawn-timeout flakes (not this slice).** Nine `@prisma-next/cli`
