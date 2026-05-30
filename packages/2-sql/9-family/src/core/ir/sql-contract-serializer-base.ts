@@ -6,6 +6,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
@@ -90,6 +91,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   serializeContract(contract: TContract): JsonObject {
     return contract as unknown as JsonObject;
   }
+
+  shouldPreserveEmpty = sqlContractCanonicalizationHooks.shouldPreserveEmpty;
+
+  sortStorage = sqlContractCanonicalizationHooks.sortStorage;
 
   protected parseSqlContractStructure(json: unknown): Contract<SqlStorage> {
     return validateSqlContractFully<Contract<SqlStorage>>(
