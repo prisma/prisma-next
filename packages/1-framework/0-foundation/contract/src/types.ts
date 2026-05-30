@@ -49,37 +49,33 @@ export function profileHash<const T extends string>(value: T): ProfileHashBase<T
 }
 
 /**
- * One entity-kind slot in a namespace topology — a map of entity name to entry.
+ * One entity-kind slot in a namespace — a map of entity name to entry.
  * Values are opaque at the foundation layer; family and target concretions
  * refine them to typed IR classes.
  */
 export type StorageEntitySlot = Readonly<Record<string, unknown>>;
 
 /**
- * Plain-data namespace entry in the storage topology. Every hydrated contract
+ * Plain-data namespace entry in a storage block. Every hydrated contract
  * carries at least `id` plus zero or more entity-kind slot maps (`tables`,
  * `collections`, …). Foundation declares only this shape — no IR machinery.
  */
-export interface StorageNamespaceTopology {
+export interface StorageNamespace {
   readonly id: string;
-}
-
-/**
- * Namespace map carried by every hydrated storage block. Serialized envelope
- * shape is target-owned; this types the in-memory contract after
- * `deserializeContract`.
- */
-export interface StorageTopology {
-  readonly namespaces: Readonly<Record<string, StorageNamespaceTopology>>;
 }
 
 /**
  * Base type for family-specific storage blocks.
  * Family storage types (SqlStorage, MongoStorage, etc.) extend this to carry the
  * storage hash alongside family-specific data (tables, collections, etc.).
+ *
+ * The `namespaces` map is carried by every hydrated storage block. Serialized
+ * envelope shape is target-owned; this types the in-memory contract after
+ * `deserializeContract`.
  */
-export interface StorageBase<THash extends string = string> extends StorageTopology {
+export interface StorageBase<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
+  readonly namespaces: Readonly<Record<string, StorageNamespace>>;
 }
 
 export interface FieldType {

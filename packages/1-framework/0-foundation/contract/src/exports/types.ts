@@ -47,8 +47,7 @@ export type {
   StorageBase,
   StorageEntitySlot,
   StorageHashBase,
-  StorageNamespaceTopology,
-  StorageTopology,
+  StorageNamespace,
 } from '../types';
 export {
   coreHash,

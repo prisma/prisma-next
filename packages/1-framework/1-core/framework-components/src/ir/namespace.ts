@@ -1,4 +1,4 @@
-import type { StorageNamespaceTopology } from '@prisma-next/contract/types';
+import type { StorageNamespace } from '@prisma-next/contract/types';
 import { type IRNode, IRNodeBase } from './ir-node';
 
 /**
@@ -58,7 +58,7 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
  * on this invariant to enumerate entities structurally without
  * family-specific knowledge.
  */
-export interface Namespace extends IRNode, StorageNamespaceTopology {
+export interface Namespace extends IRNode, StorageNamespace {
   readonly kind: string;
 }
 

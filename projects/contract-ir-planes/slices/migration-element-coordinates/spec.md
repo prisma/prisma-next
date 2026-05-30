@@ -65,6 +65,10 @@ Closing the seam structurally (the contract storage type carrying `namespaces` s
 
 The operator has pulled the structural fix **into this slice** (no longer deferred): lift the topology shape into foundation and refine it in core (see the updated `## Chosen design`). This supersedes Round 2's R1/R2 — there is no bridge to lean out; the bridge is deleted. The `## Scope` refusal trigger about "widening a public surface" is correspondingly retired (that change is now the point).
 
+## Round 4 — review action (PR #629)
+
+Dropped the emergent "Topology" naming from the foundation interfaces (topology is an emergent property of the shapes, not the shapes themselves): renamed `StorageNamespaceTopology → StorageNamespace`; folded `StorageTopology` into `StorageBase`.
+
 ## Dispatch plan
 
 Sequential; each hands a **green workspace** to the next. Lands on the existing slice branch / PR #629.
