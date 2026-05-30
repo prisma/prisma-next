@@ -117,9 +117,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
           )
         : undefined;
 
-    const rawNamespaceEntries = Object.fromEntries(
-      storageNamespaceEntries(validated.storage as unknown as Record<string, unknown>),
-    );
+    const rawNamespaceEntries = Object.fromEntries(storageNamespaceEntries(validated.storage));
     const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaceEntries);
     const unbound = hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
 

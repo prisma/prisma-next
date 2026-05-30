@@ -1,6 +1,7 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import { crossRef, documentScopedTypes } from './cross-ref-helpers';
@@ -361,7 +362,7 @@ describe('shared contract definition lowering', () => {
     );
   });
 
-  it('routes namespaceTypes enums to getStorageNamespace(storage as Record<string, unknown>, nsId).enum', () => {
+  it('routes namespaceTypes enums to getStorageNamespace(storage, nsId).enum', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       namespaceTypes: {
@@ -393,14 +394,9 @@ describe('shared contract definition lowering', () => {
       ],
     });
 
-    const nsStorage = contract.storage as unknown as {
-      namespaces: Record<string, { enum?: Record<string, unknown> }>;
-    };
-    expect(getStorageNamespace(nsStorage as Record<string, unknown>, 'auth')?.enum).toMatchObject({
+    expect(getStorageNamespace<SqlNamespace>(contract.storage, 'auth')?.enum).toMatchObject({
       user_type: { kind: 'postgres-enum', values: ['admin', 'user'] },
     });
-    expect(
-      getStorageNamespace(nsStorage as Record<string, unknown>, 'public')?.enum,
-    ).toBeUndefined();
+    expect(getStorageNamespace<SqlNamespace>(contract.storage, 'public')?.enum).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { SqlNamespace, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 
 // Framework `Namespace.tables` is widened to `Record<string, object>` so
@@ -12,9 +12,7 @@ import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/q
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
 
-  for (const ns of storageNamespaceValues(
-    contract.storage as unknown as Record<string, unknown>,
-  ) as SqlNamespace[]) {
+  for (const ns of storageNamespaceValues<SqlNamespace>(contract.storage)) {
     for (const table of Object.values(ns.tables)) {
       for (const column of Object.values(table.columns)) {
         const codecId = column.codecId;
@@ -29,9 +27,7 @@ export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
 function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string, string> {
   const codecIds = new Map<string, string>();
 
-  for (const ns of storageNamespaceValues(
-    contract.storage as unknown as Record<string, unknown>,
-  ) as SqlNamespace[]) {
+  for (const ns of storageNamespaceValues<SqlNamespace>(contract.storage)) {
     for (const [tableName, table] of Object.entries(ns.tables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         const codecId = column.codecId;

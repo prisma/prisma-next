@@ -1,12 +1,13 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import {
   freezeNode,
+  getStorageNamespace,
   type IRNode,
   type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, SqlNamespaceTablesInput } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -84,7 +85,7 @@ describe('per-model `namespace` field (TS builder)', () => {
     // index signature). The runtime value is correct; cast to verify it.
     expect(
       (
-        getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')?.tables as Record<
+        getStorageNamespace<SqlNamespace>(contract.storage, 'auth')?.tables as Record<
           string,
           unknown
         >
@@ -105,8 +106,10 @@ describe('per-model `namespace` field (TS builder)', () => {
 
     expect(
       (
-        getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
-          ?.tables as Record<string, unknown>
+        getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)?.tables as Record<
+          string,
+          unknown
+        >
       )['User'],
     ).toBeDefined();
   });

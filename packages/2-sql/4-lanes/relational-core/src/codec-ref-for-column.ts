@@ -26,7 +26,7 @@ export function codecRefForStorageColumn(
   columnName: string,
 ): CodecRef | undefined {
   let tableDef: StorageTable | undefined;
-  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+  for (const ns of storageNamespaceValues(storage)) {
     const candidate = (ns as SqlNamespace).tables[tableName] as StorageTable | undefined;
     if (candidate !== undefined) {
       tableDef = candidate;
@@ -39,7 +39,7 @@ export function codecRefForStorageColumn(
   if (columnDef.typeRef !== undefined) {
     let instance: unknown = storage.types?.[columnDef.typeRef];
     if (!instance) {
-      for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+      for (const ns of storageNamespaceValues(storage)) {
         const nsEnums = (ns as { enum?: Record<string, unknown> }).enum;
         if (nsEnums) {
           const nsEntry = nsEnums[columnDef.typeRef];

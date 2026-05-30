@@ -51,9 +51,7 @@ function findSqlTable(
   storage: SqlStorage,
   tableName: string,
 ): { readonly table: StorageTable; readonly namespaceId: string } | undefined {
-  for (const [namespaceId, ns] of storageNamespaceEntries(
-    storage as unknown as Record<string, unknown>,
-  )) {
+  for (const [namespaceId, ns] of storageNamespaceEntries(storage)) {
     const table = (ns as SqlNamespace).tables[tableName] as StorageTable | undefined;
     if (table !== undefined) {
       return { table, namespaceId };
@@ -64,9 +62,7 @@ function findSqlTable(
 
 function assertUniqueSqlTableNames(storage: SqlStorage): void {
   const seen = new Map<string, string>();
-  for (const [namespaceId, ns] of storageNamespaceEntries(
-    storage as unknown as Record<string, unknown>,
-  )) {
+  for (const [namespaceId, ns] of storageNamespaceEntries(storage)) {
     for (const tableName of Object.keys((ns as SqlNamespace).tables)) {
       const existing = seen.get(tableName);
       if (existing !== undefined && existing !== namespaceId) {
@@ -90,7 +86,7 @@ export const sqlEmission = {
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+    for (const ns of storageNamespaceValues(storage)) {
       for (const [tableName, tableUnknown] of Object.entries((ns as SqlNamespace).tables)) {
         const table = tableUnknown as StorageTable;
         for (const [colName, colUnknown] of Object.entries(table.columns)) {
@@ -125,7 +121,7 @@ export const sqlEmission = {
 
     const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
     const tableNames = new Set<string>();
-    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+    for (const ns of storageNamespaceValues(storage)) {
       for (const t of Object.keys((ns as SqlNamespace).tables)) {
         tableNames.add(t);
       }
@@ -170,7 +166,7 @@ export const sqlEmission = {
       }
     }
 
-    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+    for (const ns of storageNamespaceValues(storage)) {
       for (const [tableName, tableUnknown] of Object.entries((ns as SqlNamespace).tables)) {
         const table = tableUnknown as StorageTable;
         const columnNames = new Set(Object.keys(table.columns));
@@ -230,10 +226,9 @@ export const sqlEmission = {
             }
           }
 
-          const referencedNs = getStorageNamespace(
-            storage as unknown as Record<string, unknown>,
-            fk.target.namespaceId,
-          ) as SqlNamespace | undefined;
+          const referencedNs = getStorageNamespace(storage, fk.target.namespaceId) as
+            | SqlNamespace
+            | undefined;
           const referencedTable = referencedNs?.tables[fk.target.tableName] as
             | StorageTable
             | undefined;
@@ -313,10 +308,7 @@ export const sqlEmission = {
     if (!column) return undefined;
 
     if (column.typeRef) {
-      const ns = getStorageNamespace(
-        storage as unknown as Record<string, unknown>,
-        located.namespaceId,
-      ) as SqlNamespace | undefined;
+      const ns = getStorageNamespace(storage, located.namespaceId) as SqlNamespace | undefined;
       const nsEnums =
         ns !== undefined && 'enum' in ns
           ? (
@@ -563,9 +555,7 @@ function generateTablesMapType(tables: Readonly<Record<string, StorageTable>>): 
 }
 
 function generateFlatStorageNamespaceTypeEntries(storage: SqlStorage): string {
-  const entries = [...storageNamespaceEntries(storage as unknown as Record<string, unknown>)].sort(
-    ([a], [b]) => a.localeCompare(b),
-  );
+  const entries = [...storageNamespaceEntries(storage)].sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) {
     return '';
   }

@@ -19,7 +19,6 @@ import {
   buildSqlNamespace,
   buildSqlStorageInput,
   SqlStorage,
-  type SqlStorageInput,
   type SqlStorageNamespacesInput,
   SqlUnboundNamespace,
   type StorageTableInput,

@@ -1,5 +1,9 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,

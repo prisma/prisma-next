@@ -22,7 +22,7 @@ export interface SqlOptions<C extends Contract<SqlStorage> & TableProxyContract>
 // at the DSL call site; landing the namespace-aware DSL is tracked
 // separately.
 function findTableAcrossNamespaces(storage: SqlStorage, name: string): StorageTable | undefined {
-  for (const ns of storageNamespaceValues(storage as Record<string, unknown>)) {
+  for (const ns of storageNamespaceValues(storage)) {
     const tables = (ns as { tables?: Readonly<Record<string, StorageTable>> }).tables ?? {};
     if (Object.hasOwn(tables, name)) {
       return tables[name];

@@ -1,6 +1,10 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
+import { type SqlNamespace, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
@@ -37,13 +41,10 @@ describe('SqlStorage.namespaces population', () => {
       target: postgresTargetPack,
       models: [minimalModelArgs],
     });
-    expect(
-      [...storageNamespaceEntries(contract.storage as Record<string, unknown>)].map(([id]) => id),
-    ).toEqual([UNBOUND_NAMESPACE_ID]);
-    const slot = getStorageNamespace(
-      contract.storage as Record<string, unknown>,
+    expect([...storageNamespaceEntries(contract.storage)].map(([id]) => id)).toEqual([
       UNBOUND_NAMESPACE_ID,
-    )!;
+    ]);
+    const slot = getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)!;
     expect(slot).not.toBe(SqlUnboundNamespace.instance);
     expect(slot.id).toBe(UNBOUND_NAMESPACE_ID);
     expect(slot.tables['app_user']).toBeDefined();
@@ -55,21 +56,16 @@ describe('SqlStorage.namespaces population', () => {
       namespaces: ['public', 'auth'],
       models: [minimalModelArgs],
     });
-    const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
-      .map(([id]) => id)
-      .sort();
+    const namespaceIds = [...storageNamespaceEntries(contract.storage)].map(([id]) => id).sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth', 'public']);
     expect(
-      Object.keys(
-        getStorageNamespace(contract.storage as Record<string, unknown>, 'public')!.tables,
-      ),
+      Object.keys(getStorageNamespace<SqlNamespace>(contract.storage, 'public')!.tables),
     ).toHaveLength(0);
     expect(
-      Object.keys(getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')!.tables),
+      Object.keys(getStorageNamespace<SqlNamespace>(contract.storage, 'auth')!.tables),
     ).toHaveLength(0);
     expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
-        .tables['app_user'],
+      getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)!.tables['app_user'],
     ).toBeDefined();
   });
 
@@ -81,16 +77,15 @@ describe('SqlStorage.namespaces population', () => {
         { ...minimalModelArgs, modelName: 'Post', tableName: 'blog_post' },
       ],
     });
-    const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
-      .map(([id]) => id)
-      .sort();
+    const namespaceIds = [...storageNamespaceEntries(contract.storage)].map(([id]) => id).sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth']);
     expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')!.tables['app_user'],
+      getStorageNamespace<SqlNamespace>(contract.storage, 'auth')!.tables['app_user'],
     ).toBeDefined();
     expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
-        .tables['blog_post'],
+      getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)!.tables[
+        'blog_post'
+      ],
     ).toBeDefined();
   });
 
@@ -99,9 +94,9 @@ describe('SqlStorage.namespaces population', () => {
       target: postgresTargetPack,
       models: [],
     });
-    expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID),
-    ).toBe(SqlUnboundNamespace.instance);
+    expect(getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)).toBe(
+      SqlUnboundNamespace.instance,
+    );
   });
 
   it('accepts declared namespaces without a createNamespace factory', () => {
@@ -120,12 +115,10 @@ describe('SqlStorage.namespaces population', () => {
       namespaces: ['auth'],
       models: [{ ...minimalModelArgs, namespaceId: 'auth' }],
     });
-    const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
-      .map(([id]) => id)
-      .sort();
+    const namespaceIds = [...storageNamespaceEntries(contract.storage)].map(([id]) => id).sort();
     expect(namespaceIds).toEqual(['__unbound__', 'auth']);
     expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, 'auth')!.tables['app_user'],
+      getStorageNamespace<SqlNamespace>(contract.storage, 'auth')!.tables['app_user'],
     ).toBeDefined();
   });
 });

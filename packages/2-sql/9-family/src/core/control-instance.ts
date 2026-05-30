@@ -67,11 +67,12 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
     'storage' in contract &&
     typeof contract.storage === 'object' &&
     contract.storage !== null &&
-    storageNamespaceValues(contract.storage as unknown as Record<string, unknown>).length > 0
+    storageNamespaceValues(contract.storage).length > 0
   ) {
-    const namespaces = Object.fromEntries(
-      storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
-    ) as Record<string, { readonly tables?: Readonly<Record<string, unknown>> }>;
+    const namespaces = Object.fromEntries(storageNamespaceEntries(contract.storage)) as Record<
+      string,
+      { readonly tables?: Readonly<Record<string, unknown>> }
+    >;
     for (const ns of Object.values(namespaces)) {
       const tbls = ns.tables;
       if (typeof tbls !== 'object' || tbls === null) continue;

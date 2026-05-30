@@ -31,7 +31,7 @@ type MongoStorageLike = StorageBase &
 describe('projectSchemaToSpace', () => {
   /**
    * Build a synthetic member with only the fields `projectSchemaToSpace`
-   * inspects (`spaceId`, `getStorageNamespace(contract.storage as Record<string, unknown>, …).tables`). The rest is filled
+   * inspects (`spaceId`, `getStorageNamespace(contract.storage, …).tables`). The rest is filled
    * with empty / sentinel values to satisfy the type without committing
    * to a particular family.
    */

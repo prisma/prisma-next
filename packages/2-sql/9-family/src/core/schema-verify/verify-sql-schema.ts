@@ -145,9 +145,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       PostgresEnumStorageEntry | StorageTypeInstance
     >),
   };
-  for (const ns of storageNamespaceValues(
-    contract.storage as unknown as Record<string, unknown>,
-  ) as SqlNamespace[]) {
+  for (const ns of storageNamespaceValues(contract.storage) as SqlNamespace[]) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
@@ -229,12 +227,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   }
 
   // Namespace-scoped enums, verified per `(namespaceId, typeName)`.
-  for (const nsId of [
-    ...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
-  ].map(([id]) => id)) {
-    const ns = getStorageNamespace(contract.storage as unknown as Record<string, unknown>, nsId) as
-      | SqlNamespace
-      | undefined;
+  for (const nsId of [...storageNamespaceEntries(contract.storage)].map(([id]) => id)) {
+    const ns = getStorageNamespace(contract.storage, nsId) as SqlNamespace | undefined;
     if (!ns) continue;
     const nsEnums = ns.enum;
     if (!nsEnums) continue;
@@ -412,17 +406,12 @@ function verifySchemaTables(options: {
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const schemaTables = schema.tables;
-  const namespaceIds = [
-    ...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
-  ]
+  const namespaceIds = [...storageNamespaceEntries(contract.storage)]
     .map(([id]) => id)
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   for (const namespaceId of namespaceIds) {
-    const ns = getStorageNamespace(
-      contract.storage as unknown as Record<string, unknown>,
-      namespaceId,
-    ) as SqlNamespace | undefined;
+    const ns = getStorageNamespace(contract.storage, namespaceId) as SqlNamespace | undefined;
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
       if (!(contractTableRaw instanceof StorageTable)) {
@@ -477,12 +466,9 @@ function verifySchemaTables(options: {
     for (const tableName of Object.keys(schemaTables)) {
       const claimed = namespaceIds.some(
         (namespaceId) =>
-          (
-            getStorageNamespace(
-              contract.storage as unknown as Record<string, unknown>,
-              namespaceId,
-            ) as SqlNamespace | undefined
-          )?.tables[tableName] !== undefined,
+          (getStorageNamespace(contract.storage, namespaceId) as SqlNamespace | undefined)?.tables[
+            tableName
+          ] !== undefined,
       );
       if (!claimed) {
         // `namespaceId` is intentionally absent: an extra table exists in the

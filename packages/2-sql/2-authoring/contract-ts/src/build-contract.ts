@@ -32,11 +32,12 @@ import {
 import {
   applyFkDefaults,
   buildSqlNamespace,
+  buildSqlStorageInput,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlNamespaceTablesInput,
   SqlStorage,
-  type SqlStorageInput,
+  type SqlStorageNamespacesInput,
   type StorageColumn,
   StorageTable,
   type StorageTableInput,
@@ -548,7 +549,7 @@ export function buildSqlContractFromDefinition(
   }
   const { createNamespace } = definition;
   const namespaces = blindCast<
-    SqlStorageInput['namespaces'],
+    SqlStorageNamespacesInput['namespaces'],
     'contract authoring always materialises the __unbound__ namespace coordinate'
   >(
     Object.fromEntries(
@@ -567,9 +568,10 @@ export function buildSqlContractFromDefinition(
     Object.keys(documentTypes).length > 0 ? { types: documentTypes } : undefined;
   const domain =
     domainUnboundTypes !== undefined ? { [UNBOUND_NAMESPACE_ID]: domainUnboundTypes } : undefined;
+  const hasDocumentTypes = Object.keys(documentTypes).length > 0;
   const storageWithoutHash = {
-    ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
-    namespaces,
+    ...(hasDocumentTypes ? { types: documentTypes } : {}),
+    ...namespaces,
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
@@ -579,7 +581,13 @@ export function buildSqlContractFromDefinition(
         storage: storageWithoutHash as Record<string, unknown>,
         ...sqlContractCanonicalizationHooks,
       });
-  const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
+  const storage = new SqlStorage(
+    buildSqlStorageInput({
+      storageHash,
+      ...(hasDocumentTypes ? { types: documentTypes } : {}),
+      namespaces,
+    }),
+  );
 
   const executionSection =
     executionDefaults.length > 0

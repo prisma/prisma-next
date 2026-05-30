@@ -115,7 +115,7 @@ const StorageTypeInstanceSchema = type
   });
 
 /**
- * Postgres native enum entry under `getStorageNamespace(storage as Record<string, unknown>, namespaceId).enum[name]`.
+ * Postgres native enum entry under `getStorageNamespace(storage, namespaceId).enum[name]`.
  * Document-scoped `storage.types` carries codec aliases only
  * (`DocumentScopedStorageTypeSchema`).
  */
@@ -291,21 +291,20 @@ export function createSqlStorageSchema(
 
 const StorageSchema = createSqlStorageSchema();
 
-function eachStorageTable(storage: unknown) {
-  return [...storageNamespaceEntries(storage as Record<string, unknown>)].flatMap(
-    ([namespaceId, ns]) =>
-      Object.entries(
-        (ns as Namespace & { readonly tables?: Readonly<Record<string, object>> }).tables ?? {},
-      ).map(([tableName, table]) => ({
-        namespaceId,
-        tableName,
-        table,
-      })),
+function eachStorageTable(storage: object) {
+  return [...storageNamespaceEntries(storage)].flatMap(([namespaceId, ns]) =>
+    Object.entries(
+      (ns as Namespace & { readonly tables?: Readonly<Record<string, object>> }).tables ?? {},
+    ).map(([tableName, table]) => ({
+      namespaceId,
+      tableName,
+      table,
+    })),
   );
 }
 
-function findStorageTableByTableName(storage: unknown, tableName: string): unknown {
-  for (const [, ns] of storageNamespaceEntries(storage as Record<string, unknown>)) {
+function findStorageTableByTableName(storage: object, tableName: string): unknown {
+  for (const [, ns] of storageNamespaceEntries(storage)) {
     const t = (ns as Namespace & { readonly tables?: Readonly<Record<string, unknown>> }).tables?.[
       tableName
     ];
@@ -807,10 +806,9 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      const targetNamespace = getStorageNamespace(
-        contract.storage as unknown as Record<string, unknown>,
-        fk.target.namespaceId,
-      ) as SqlNamespace | undefined;
+      const targetNamespace = getStorageNamespace(contract.storage, fk.target.namespaceId) as
+        | SqlNamespace
+        | undefined;
       const referencedRaw = targetNamespace?.tables[fk.target.tableName];
       if (referencedRaw === undefined) {
         throw new ContractValidationError(

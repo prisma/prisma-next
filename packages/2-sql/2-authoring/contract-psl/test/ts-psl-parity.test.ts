@@ -537,19 +537,11 @@ model Post {
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
     const pslFks: readonly ForeignKey[] =
-      (
-        getStorageNamespace(
-          pslStorage as unknown as unknown as Record<string, unknown>,
-          '__unbound__',
-        ) as SqlNamespace | undefined
-      )?.tables['post']?.foreignKeys ?? [];
+      getStorageNamespace<SqlNamespace>(pslStorage, '__unbound__')?.tables['post']?.foreignKeys ??
+      [];
     const tsFks: readonly ForeignKey[] =
-      (
-        getStorageNamespace(
-          tsStorage as unknown as unknown as Record<string, unknown>,
-          '__unbound__',
-        ) as SqlNamespace | undefined
-      )?.tables['post']?.foreignKeys ?? [];
+      getStorageNamespace<SqlNamespace>(tsStorage, '__unbound__')?.tables['post']?.foreignKeys ??
+      [];
 
     expect(tsFks.length).toBe(1);
     expect(pslFks.length).toBe(1);

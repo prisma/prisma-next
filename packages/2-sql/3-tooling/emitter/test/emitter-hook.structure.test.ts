@@ -63,8 +63,7 @@ function installNamespacedTableDeletionRace(ir: Contract, tableName: string): vo
     },
   });
 
-  delete getStorageNamespace(originalStorage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
-    .tables[tableName];
+  delete getStorageNamespace(originalStorage, UNBOUND_NAMESPACE_ID).tables[tableName];
   tableDeleted = true;
   (ir as { storage: unknown }).storage = proxiedStorage;
 }

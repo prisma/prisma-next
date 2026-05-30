@@ -26,31 +26,48 @@ function isNamespaceEntry(value: unknown): value is Namespace {
 /**
  * Enumerate namespace-id → namespace pairs on a storage-shaped value.
  * Skips {@link STORAGE_PLANE_RESERVED_KEYS} and non-namespace entries.
+ *
+ * Accepts `object` so both the family storage class instances
+ * (`SqlStorage` / `MongoStorage`, whose namespace ids are own-enumerable
+ * keys) and plain validated JSON records flow in without a cast.
  */
-export function* storageNamespaceEntries(
-  storage: Record<string, unknown>,
-): Generator<readonly [string, Namespace]> {
+export function* storageNamespaceEntries<T extends Namespace = Namespace>(
+  storage: object,
+): Generator<readonly [string, T]> {
   for (const [key, value] of Object.entries(storage)) {
     if (isStoragePlaneReservedKey(key)) continue;
     if (isNamespaceEntry(value)) {
-      yield [key, value];
+      yield [
+        key,
+        blindCast<T, 'caller selects the family namespace concretion via the type parameter'>(
+          value,
+        ),
+      ];
     }
   }
 }
 
-export function storageNamespaceValues(storage: Record<string, unknown>): Namespace[] {
-  return [...storageNamespaceEntries(storage)].map(([, ns]) => ns);
+export function storageNamespaceValues<T extends Namespace = Namespace>(storage: object): T[] {
+  return [...storageNamespaceEntries<T>(storage)].map(([, ns]) => ns);
 }
 
-export function getStorageNamespace(
-  storage: Record<string, unknown>,
+/**
+ * Look up one namespace entry by id, skipping reserved keys. The type
+ * parameter lets callers select the family namespace concretion
+ * (`SqlNamespace` / `MongoNamespace`) they know the storage carries;
+ * it defaults to the framework `Namespace`.
+ */
+export function getStorageNamespace<T extends Namespace = Namespace>(
+  storage: object,
   namespaceId: string,
-): Namespace | undefined {
+): T | undefined {
   if (isStoragePlaneReservedKey(namespaceId)) {
     return undefined;
   }
-  const value = storage[namespaceId];
-  return isNamespaceEntry(value) ? value : undefined;
+  const value = (storage as Record<string, unknown>)[namespaceId];
+  return isNamespaceEntry(value)
+    ? blindCast<T, 'caller selects the family namespace concretion via the type parameter'>(value)
+    : undefined;
 }
 
 export type FlatStorageInput<TNamespace> = {

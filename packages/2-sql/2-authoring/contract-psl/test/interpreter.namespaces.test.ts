@@ -42,11 +42,9 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = (
-      getStorageNamespace(storage as unknown as Record<string, unknown>, 'public') as
-        | SqlNamespace
-        | undefined
-    )?.tables['post'];
+    const postTable = (getStorageNamespace(storage, 'public') as SqlNamespace | undefined)?.tables[
+      'post'
+    ];
     expect(postTable).toBeDefined();
 
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
@@ -82,11 +80,9 @@ namespace auth {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    const postTable = (
-      getStorageNamespace(storage as unknown as Record<string, unknown>, 'public') as
-        | SqlNamespace
-        | undefined
-    )?.tables['post'];
+    const postTable = (getStorageNamespace(storage, 'public') as SqlNamespace | undefined)?.tables[
+      'post'
+    ];
     const fks: readonly ForeignKey[] = postTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({

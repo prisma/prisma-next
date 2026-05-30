@@ -10,9 +10,7 @@ export function validateIndexTypes(
   contract: Contract<SqlStorage>,
   indexTypeRegistry: IndexTypeRegistry,
 ): void {
-  for (const [namespaceId, ns] of [
-    ...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
-  ]) {
+  for (const [namespaceId, ns] of [...storageNamespaceEntries(contract.storage)]) {
     for (const [tableName, rawTable] of Object.entries((ns as SqlNamespace).tables)) {
       const table = rawTable as StorageTable;
       for (const index of table.indexes) {

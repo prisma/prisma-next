@@ -79,58 +79,31 @@ namespace public {
     const tsStorage = tsContract.storage as unknown as SqlStorage;
 
     // Same namespace keys
-    expect(
-      [...storageNamespaceEntries(pslStorage as unknown as Record<string, unknown>)]
-        .map(([id]) => id)
-        .sort(),
-    ).toEqual(
-      [...storageNamespaceEntries(tsStorage as unknown as Record<string, unknown>)]
-        .map(([id]) => id)
-        .sort(),
+    expect([...storageNamespaceEntries(pslStorage)].map(([id]) => id).sort()).toEqual(
+      [...storageNamespaceEntries(tsStorage)].map(([id]) => id).sort(),
     );
 
     // Same per-namespace table keys
-    for (const nsId of [
-      ...storageNamespaceEntries(pslStorage as unknown as Record<string, unknown>),
-    ].map(([id]) => id)) {
+    for (const nsId of [...storageNamespaceEntries(pslStorage)].map(([id]) => id)) {
       const pslTables =
-        (
-          getStorageNamespace(pslStorage as unknown as Record<string, unknown>, nsId) as
-            | SqlNamespace
-            | undefined
-        )?.tables ?? {};
+        (getStorageNamespace(pslStorage, nsId) as SqlNamespace | undefined)?.tables ?? {};
       const tsTables =
-        (
-          getStorageNamespace(tsStorage as unknown as Record<string, unknown>, nsId) as
-            | SqlNamespace
-            | undefined
-        )?.tables ?? {};
+        (getStorageNamespace(tsStorage, nsId) as SqlNamespace | undefined)?.tables ?? {};
       expect(Object.keys(pslTables).sort()).toEqual(Object.keys(tsTables).sort());
     }
 
     // Same per-table column shapes
-    const pslAuthUser = (
-      getStorageNamespace(pslStorage as unknown as Record<string, unknown>, 'auth') as
-        | SqlNamespace
-        | undefined
-    )?.tables['user'];
-    const tsAuthUser = (
-      getStorageNamespace(tsStorage as unknown as Record<string, unknown>, 'auth') as
-        | SqlNamespace
-        | undefined
-    )?.tables['user'];
+    const pslAuthUser = (getStorageNamespace(pslStorage, 'auth') as SqlNamespace | undefined)
+      ?.tables['user'];
+    const tsAuthUser = (getStorageNamespace(tsStorage, 'auth') as SqlNamespace | undefined)?.tables[
+      'user'
+    ];
     expect(pslAuthUser?.columns).toEqual(tsAuthUser?.columns);
 
-    const pslPublicPost = (
-      getStorageNamespace(pslStorage as unknown as Record<string, unknown>, 'public') as
-        | SqlNamespace
-        | undefined
-    )?.tables['post'];
-    const tsPublicPost = (
-      getStorageNamespace(tsStorage as unknown as Record<string, unknown>, 'public') as
-        | SqlNamespace
-        | undefined
-    )?.tables['post'];
+    const pslPublicPost = (getStorageNamespace(pslStorage, 'public') as SqlNamespace | undefined)
+      ?.tables['post'];
+    const tsPublicPost = (getStorageNamespace(tsStorage, 'public') as SqlNamespace | undefined)
+      ?.tables['post'];
     expect(pslPublicPost?.columns).toEqual(tsPublicPost?.columns);
 
     // Same FK source/target

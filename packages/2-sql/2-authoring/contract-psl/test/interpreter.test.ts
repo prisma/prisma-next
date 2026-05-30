@@ -811,12 +811,9 @@ model OrderItem {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(
-        (
-          getStorageNamespace(
-            storage as unknown as Record<string, unknown>,
-            UNBOUND_NAMESPACE_ID,
-          ) as SqlNamespace | undefined
-        )?.tables['doc'],
+        (getStorageNamespace(storage, UNBOUND_NAMESPACE_ID) as SqlNamespace | undefined)?.tables[
+          'doc'
+        ],
       ).toMatchObject({
         indexes: [{ columns: ['body'] }],
       });
@@ -885,11 +882,9 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
-      const user = (
-        getStorageNamespace(storage as unknown as Record<string, unknown>, 'auth') as
-          | SqlNamespace
-          | undefined
-      )?.tables['user'];
+      const user = (getStorageNamespace(storage, 'auth') as SqlNamespace | undefined)?.tables[
+        'user'
+      ];
       expect(user).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
       const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
@@ -922,11 +917,7 @@ namespace tenant_a {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       const enums =
-        (
-          getStorageNamespace(storage as unknown as Record<string, unknown>, 'tenant_a') as
-            | SqlNamespace
-            | undefined
-        )?.enum ?? {};
+        (getStorageNamespace(storage, 'tenant_a') as SqlNamespace | undefined)?.enum ?? {};
       expect(enums).toHaveProperty('Status');
       expect(enums).toHaveProperty('Tier');
     });
@@ -960,18 +951,10 @@ namespace logs {
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['post']).toBeDefined();
       expect(
-        (
-          getStorageNamespace(storage as unknown as Record<string, unknown>, 'auth') as
-            | SqlNamespace
-            | undefined
-        )?.tables['user'],
+        (getStorageNamespace(storage, 'auth') as SqlNamespace | undefined)?.tables['user'],
       ).toBeDefined();
       expect(
-        (
-          getStorageNamespace(storage as unknown as Record<string, unknown>, 'logs') as
-            | SqlNamespace
-            | undefined
-        )?.tables['auditLog'],
+        (getStorageNamespace(storage, 'logs') as SqlNamespace | undefined)?.tables['auditLog'],
       ).toBeDefined();
       expect(unboundTables(storage)['user']).toBeUndefined();
     });
