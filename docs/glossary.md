@@ -288,7 +288,7 @@ A read-only filesystem operation that verifies on-disk migration packages are in
 | `PN-MIG-CHECK-004 DANGLING_REF` | Ref points at a contract hash absent from the graph |
 | `PN-MIG-CHECK-005 EDGE_MISMATCH` | Migration's `metadata.to` disagrees with its `end-contract.json` snapshot |
 | `PN-MIG-CHECK-006 SNAPSHOT_UNREADABLE` | Migration's `end-contract.json` snapshot exists but cannot be parsed |
-| `PN-MIG-CHECK-007 SELF_EDGE` | Migration's source equals its target (`from === to`) with no data operation — a self-edge that applies nothing |
+| `PN-MIG-CHECK-007 SELF_EDGE` | Migration's source equals its target (`from === to`) with no data invariant — a true no-op self-edge |
 | `PN-MIG-CHECK-008 ORPHAN_SPACE_DIR` | A contract-space directory exists on disk but no extension declares it |
 | `PN-MIG-CHECK-009 UNMATERIALISED_EXTENSION` | An extension is declared in `extensionPacks` but has no on-disk migrations directory |
 | `PN-MIG-CHECK-010 HEAD_REF_MISSING` | A contract space is missing its `refs/head.json` head ref |

@@ -60,8 +60,8 @@ export function integrityViolationToCheckFailure(
       return {
         pnCode: 'PN-MIG-CHECK-007',
         where: packageRelative(violation.spaceId, violation.dirName),
-        why: `Migration "${violation.dirName}" in space "${violation.spaceId}" has source equal to target (${violation.hash}) with no data operation — a self-edge that applies nothing.`,
-        fix: 'Delete the no-op self-edge migration, or add the data operation it was intended to carry.',
+        why: `Migration "${violation.dirName}" in space "${violation.spaceId}" has source equal to target (${violation.hash}) with no data invariant — a true no-op self-edge.`,
+        fix: 'Add a data operation if this self-edge was meant to carry a data invariant, or delete the migration if it is a true no-op.',
       };
     case 'orphanSpaceDir':
       return {
@@ -75,14 +75,14 @@ export function integrityViolationToCheckFailure(
         pnCode: 'PN-MIG-CHECK-009',
         where: spaceRelative(violation.spaceId),
         why: `Extension "${violation.spaceId}" is declared in \`extensionPacks\` but has no on-disk migrations directory.`,
-        fix: 'Run `prisma-next migrate` to materialise the declared extension on disk.',
+        fix: 'Re-emit the extension contract-space artefacts with `prisma-next contract emit` and migration planning, or remove the extension from `extensionPacks` if it is unused.',
       };
     case 'headRefMissing':
       return {
         pnCode: 'PN-MIG-CHECK-010',
         where: refRelative(violation.spaceId, 'head'),
         why: `Head ref \`refs/head.json\` is missing for contract space "${violation.spaceId}".`,
-        fix: 'Run `prisma-next migrate` to write the contract space head ref.',
+        fix: 'Re-emit the contract-space migrations and head ref artefacts, or restore `refs/head.json` from version control.',
       };
     case 'headRefNotInGraph':
       return {

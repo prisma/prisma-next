@@ -164,7 +164,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
  * `ok` result so the verifier still runs the (cheap) schemaCheck loop
  * without invoking the family's verification path.
  */
-function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
+export function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
 ): (
   projectedSchema: unknown,

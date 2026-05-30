@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { MigrationToolsError } from '../errors';
 import { readMigrationsDir } from '../io';
 import { readContractSpaceContract } from '../read-contract-space-contract';
 import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
@@ -150,6 +151,13 @@ interface HeadRefReadResult {
  * throws for unparseable / schema-invalid content, so the throw is the
  * corruption signal. Construction never throws on disk content.
  */
+function isToleratedRefHeadReadError(error: unknown): boolean {
+  if (MigrationToolsError.is(error)) return true;
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'ENOENT' || code === 'EISDIR';
+}
+
 async function readHeadRefTolerant(
   migrationsDir: string,
   spaceId: string,
@@ -158,6 +166,9 @@ async function readHeadRefTolerant(
     const headRef = await readContractSpaceHeadRef(migrationsDir, spaceId);
     return { headRef, problem: null };
   } catch (error) {
+    if (!isToleratedRefHeadReadError(error)) {
+      throw error;
+    }
     return { headRef: null, problem: { refName: HEAD_REF_NAME, detail: detailOf(error) } };
   }
 }

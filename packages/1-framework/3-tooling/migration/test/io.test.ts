@@ -674,7 +674,7 @@ describe('readMigrationsDir', () => {
     expect(problem.dirName).toBe('20260225T1400_invariants_mismatch');
   });
 
-  it('returns a packageUnloadable problem and omits the package when migration.json is missing', async () => {
+  it('returns a packageUnloadable problem and omits the package when migration.json is invalid JSON', async () => {
     const validDir = join(tmpDir, '20260225T1400_valid');
     const brokenDir = join(tmpDir, '20260225T1500_broken');
 
