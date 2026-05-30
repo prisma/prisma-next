@@ -85,8 +85,6 @@ async function writePackage(migrationsRoot: string, spec: PackageSpec): Promise<
   const baseMetadata = {
     from: spec.from,
     to: spec.to,
-    hints: { used: [], applied: [], plannerVersion: '2.0.0' },
-    labels: [],
     providedInvariants:
       spec.providedInvariants ??
       ops

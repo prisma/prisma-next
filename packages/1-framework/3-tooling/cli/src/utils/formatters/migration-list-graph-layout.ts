@@ -93,8 +93,8 @@ function hasLaterForwardDepartingFrom(
 
 export function computeMigrationListGraphLayout(
   entries: readonly MigrationListEntry[],
+  topology: MigrationListGraphTopology = classifyMigrationListGraphTopology(entries),
 ): MigrationListGraphLayout {
-  const topology = classifyMigrationListGraphTopology(entries);
   const { kindByMigrationHash } = topology;
   const forwardProducersByTo = buildForwardProducersByTo(entries, kindByMigrationHash);
   const convergencesEmitted = new Set<string>();
