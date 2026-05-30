@@ -77,7 +77,10 @@ describe('PostgresContractSerializer', () => {
     const serializer = new PostgresContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables).toEqual({});
+    expect(
+      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
+        .tables,
+    ).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -85,7 +88,10 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const tables = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables;
+    const tables = getStorageNamespace(
+      contract.storage as Record<string, unknown>,
+      UNBOUND_NAMESPACE_ID,
+    )!.tables;
     const userTable = tables['user'] as StorageTable | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
@@ -124,11 +130,13 @@ describe('PostgresContractSerializer', () => {
       },
     });
     expect(reparsed.storage).not.toHaveProperty('kind');
-    expect(reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user).not.toHaveProperty(
-      'kind',
-    );
     expect(
-      reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.user.columns.id,
+      getStorageNamespace(reparsed.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables
+        .user,
+    ).not.toHaveProperty('kind');
+    expect(
+      getStorageNamespace(reparsed.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables
+        .user.columns.id,
     ).not.toHaveProperty('kind');
   });
 

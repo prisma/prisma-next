@@ -113,7 +113,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   override serializeContract(contract: Contract<SqlStorage>): JsonObject {
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
-    for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+    for (const [nsId, ns] of [...storageNamespaceEntries(storage as Record<string, unknown>)]) {
       if (isPostgresSchema(ns)) {
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
       } else {

@@ -15,7 +15,7 @@ import { isPostgresSchema } from '../postgres-schema';
  * itself.
  */
 function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string {
-  const namespace = storage.namespaces[namespaceId];
+  const namespace = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
   if (isPostgresSchema(namespace)) {
     return namespace.ddlSchemaName(storage);
   }
@@ -71,7 +71,9 @@ export function verifyPostgresNamespacePresence(input: {
   const { contract, schema } = input;
   const existing = new Set(existingSchemasFromSchema(schema));
   const issues: SchemaIssue[] = [];
-  const namespaceIds = Object.keys(contract.storage.namespaces).sort();
+  const namespaceIds = [...storageNamespaceEntries(contract.storage as Record<string, unknown>)]
+    .map(([id]) => id)
+    .sort();
   for (const namespaceId of namespaceIds) {
     if (namespaceId === UNBOUND_NAMESPACE_ID) continue;
     const ddlName = resolveDdlSchemaName(contract.storage, namespaceId);

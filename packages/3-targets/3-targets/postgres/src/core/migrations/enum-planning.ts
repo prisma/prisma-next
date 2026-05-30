@@ -115,7 +115,7 @@ export function resolveDdlSchemaForNamespaceStorage(
   if (namespaceId === UNBOUND_NAMESPACE_ID) {
     return (schemaIr ? readPostgresSchemaIrAnnotations(schemaIr).schema : undefined) ?? 'public';
   }
-  const namespace = storage.namespaces[namespaceId];
+  const namespace = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
   if (namespace && isPostgresSchema(namespace)) {
     return namespace.ddlSchemaName(storage);
   }

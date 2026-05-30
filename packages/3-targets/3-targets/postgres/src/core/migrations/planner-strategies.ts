@@ -93,7 +93,9 @@ export function tableAt(
 ): StorageTable | undefined {
   // Namespace.tables is typed as Record<string, IRNode> at the interface level;
   // SQL family namespaces always hold StorageTable instances.
-  return storage.namespaces[namespaceId]?.tables[tableName] as StorageTable | undefined;
+  return getStorageNamespace(storage as Record<string, unknown>, namespaceId)?.tables[tableName] as
+    | StorageTable
+    | undefined;
 }
 
 /**
@@ -120,7 +122,10 @@ export function resolveNamespaceIdForIssue(issue: { readonly namespaceId?: strin
  * unchanged so downstream `qualifyTableName` resolves polymorphically.
  */
 export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: string): string {
-  const namespace = ctx.toContract.storage.namespaces[namespaceId];
+  const namespace = ctx.getStorageNamespace(
+    toContract.storage as Record<string, unknown>,
+    namespaceId,
+  );
   if (isPostgresSchema(namespace)) {
     return namespace.ddlSchemaName(ctx.toContract.storage);
   }
@@ -133,7 +138,7 @@ export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: 
 const DEFAULT_ENUM_NAMESPACE_ID = 'public';
 
 function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
-  const ns = storage.namespaces[namespaceId];
+  const ns = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
   if (!ns || !('enum' in ns) || ns.enum == null) return false;
   return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName] !== undefined;
 }
@@ -156,9 +161,9 @@ function resolveColumnEnumNamespace(
   typeName: string,
 ): string | undefined {
   if (namespaceHasEnum(storage, columnNamespaceId, typeName)) return columnNamespaceId;
-  const owners = Object.keys(storage.namespaces).filter((nsId) =>
-    namespaceHasEnum(storage, nsId, typeName),
-  );
+  const owners = [...storageNamespaceEntries(storage as Record<string, unknown>)]
+    .map(([id]) => id)
+    .filter((nsId) => namespaceHasEnum(storage, nsId, typeName));
   if (owners.length === 1) return owners[0];
   if (owners.includes(DEFAULT_ENUM_NAMESPACE_ID)) return DEFAULT_ENUM_NAMESPACE_ID;
   return owners[0];
@@ -166,7 +171,7 @@ function resolveColumnEnumNamespace(
 
 /**
  * Finds a type entry by explicit namespace coordinate. Namespace types (e.g.
- * Postgres enums) live under `storage.namespaces[nsId].enum`. Returns the
+ * Postgres enums) live under `getStorageNamespace(storage as Record<string, unknown>, nsId).enum`. Returns the
  * entry from the named namespace only — never scans other namespaces, so two
  * namespaces that hold an enum with the same name resolve independently.
  */
@@ -175,7 +180,7 @@ function locateNamespaceType(
   namespaceId: string,
   typeName: string,
 ): PostgresEnumStorageEntry | undefined {
-  const ns = storage.namespaces[namespaceId];
+  const ns = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
   if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
   return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
 }
@@ -435,7 +440,7 @@ function enumRebuildCallRecipe(
   // namespace correctly binds to a `public`-namespace enum, while two
   // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
-  for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
+  for (const [nsId, ns] of Object.entries(ctx.toContract.storage as Record<string, unknown>)) {
     for (const [tableName, tableNode] of Object.entries(ns.tables)) {
       const table = tableNode as StorageTable;
       for (const [columnName, column] of Object.entries(table.columns)) {
@@ -638,7 +643,7 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
  */
 function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
-  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
+  for (const [nsId, ns] of [...storageNamespaceEntries(storage as Record<string, unknown>)]) {
     if (!('enum' in ns) || ns.enum == null) continue;
     const nsEnums = ns.enum as Record<string, unknown>;
     for (const [name, instance] of Object.entries(nsEnums).sort(([a], [b]) => a.localeCompare(b))) {

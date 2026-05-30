@@ -173,7 +173,7 @@ export class PostgresUnboundSchema extends PostgresSchema {
    * (e.g. emit a conflict instead of silently picking a schema).
    */
   override ddlSchemaName(storage: SqlStorage): string {
-    if (storage.namespaces['public'] !== undefined) {
+    if (getStorageNamespace(storage as Record<string, unknown>, 'public') !== undefined) {
       return 'public';
     }
     return UNBOUND_NAMESPACE_ID;
