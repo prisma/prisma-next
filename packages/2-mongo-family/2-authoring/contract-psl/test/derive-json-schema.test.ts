@@ -202,12 +202,12 @@ describe('deriveJsonSchema', () => {
     });
   });
 
-  it('derives minimal closed schema from empty model, with an injected _id', () => {
+  it('derives a minimal closed schema from an empty field set', () => {
     const result = deriveJsonSchema({}, undefined, mongoCodecLookup);
 
     expect(result.jsonSchema).toEqual({
       bsonType: 'object',
-      properties: { _id: {} },
+      properties: {},
       additionalProperties: false,
     });
   });
@@ -326,7 +326,7 @@ describe('deriveJsonSchema', () => {
     });
   });
 
-  it('does not inject _id into nested value-object schemas', () => {
+  it('does not add _id to nested value-object schemas', () => {
     const valueObjects: Record<string, ContractValueObject> = {
       Address: {
         fields: { city: scalarField('mongo/string@1') },
@@ -346,7 +346,7 @@ describe('deriveJsonSchema', () => {
     expect(nested['additionalProperties']).toBe(false);
   });
 
-  it('keeps an explicitly mapped _id without injecting a duplicate', () => {
+  it('emits the _id property from the declared field', () => {
     const result = deriveJsonSchema(
       { _id: scalarField('mongo/objectId@1'), name: scalarField('mongo/string@1') },
       undefined,
@@ -439,9 +439,9 @@ describe('derivePolymorphicJsonSchema', () => {
     expect(result.jsonSchema).toHaveProperty('properties._id');
   });
 
-  it('guarantees _id in branches even when the discriminated base omits a mapped _id', () => {
+  it('repeats the base _id into every branch', () => {
     const result = derivePolymorphicJsonSchema(
-      { name: scalarField('mongo/string@1'), kind: scalarField('mongo/string@1') },
+      { _id: scalarField('mongo/objectId@1'), name: scalarField('mongo/string@1') },
       'kind',
       [{ discriminatorValue: 'a', fields: { extra: scalarField('mongo/string@1') } }],
       undefined,
@@ -451,6 +451,6 @@ describe('derivePolymorphicJsonSchema', () => {
     expect(result.jsonSchema).toHaveProperty('properties._id');
     const oneOf = result.jsonSchema['oneOf'] as Record<string, Record<string, unknown>>[];
     const branchProps = oneOf[0]!['properties'] as Record<string, unknown>;
-    expect(branchProps).toHaveProperty('_id');
+    expect(branchProps['_id']).toEqual({ bsonType: 'objectId' });
   });
 });

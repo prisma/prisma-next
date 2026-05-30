@@ -111,6 +111,12 @@ function makeRunner() {
   );
 }
 
+// These CLOSED_* schemas are hand-mirrored to exercise live-Mongo behaviour of
+// closed validators; they are not asserted against emitter output here. The
+// emitter shape itself (incl. closed polymorphic `oneOf` branches) is covered
+// end-to-end in `mongo-runner.polymorphism.integration.test.ts`, which derives
+// the validator from PSL via the interpreter.
+//
 // Mirrors the emitter's closed top-level collection schema: `_id` plus the
 // declared fields, with `additionalProperties: false`.
 const CLOSED_USERS = {

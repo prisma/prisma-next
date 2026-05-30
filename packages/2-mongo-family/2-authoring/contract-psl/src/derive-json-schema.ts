@@ -80,30 +80,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * A closed top-level collection schema that omits `_id` would reject every
- * document, because MongoDB stamps an `_id` onto every document. The normal
- * authoring path maps the `@id` field to `_id`, but a model whose `@id` field is
- * not mapped to `_id` would otherwise produce a top-level schema lacking it.
- * Only top-level collection schemas get this guarantee — nested value objects
- * never carry an `_id`.
- */
-function ensureTopLevelIdProperty(schema: Record<string, unknown>): void {
-  const properties = schema['properties'];
-  if (isRecord(properties) && !('_id' in properties)) {
-    properties['_id'] = {};
-  }
-}
-
 export function deriveJsonSchema(
   fields: Record<string, ContractField>,
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
 ): MongoValidator {
-  const jsonSchema = deriveObjectSchema(fields, valueObjects, codecLookup);
-  ensureTopLevelIdProperty(jsonSchema);
   return new MongoValidator({
-    jsonSchema,
+    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup),
     validationLevel: 'strict',
     validationAction: 'error',
   });
@@ -122,7 +105,6 @@ export function derivePolymorphicJsonSchema(
   codecLookup?: CodecLookup,
 ): MongoValidator {
   const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup);
-  ensureTopLevelIdProperty(baseSchema);
   const baseProperties = isRecord(baseSchema['properties']) ? baseSchema['properties'] : {};
 
   const oneOf: Record<string, unknown>[] = [];
