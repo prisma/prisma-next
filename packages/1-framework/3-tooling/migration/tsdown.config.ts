@@ -21,7 +21,6 @@ export default defineConfig({
     'exports/migration': 'src/exports/migration.ts',
     'exports/spaces': 'src/exports/spaces.ts',
     'exports/aggregate': 'src/exports/aggregate.ts',
-    'exports/integrity-violation': 'src/exports/integrity-violation.ts',
   },
   exports: { enabled: false },
 });

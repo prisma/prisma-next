@@ -8,11 +8,7 @@ export {
   type IntegrityComputationInput,
   type IntegritySpaceState,
 } from '../aggregate/check-integrity';
-export {
-  type DeclaredExtensionEntry,
-  type LoadAggregateInput,
-  loadContractSpaceAggregate,
-} from '../aggregate/loader';
+export { type LoadAggregateInput, loadContractSpaceAggregate } from '../aggregate/loader';
 export type { ContractMarkerRecordLike } from '../aggregate/marker-types';
 export {
   type AggregateCurrentDBState,
@@ -43,3 +39,8 @@ export {
   type SchemaCheckSection,
   verifyAggregate,
 } from '../aggregate/verifier';
+export type {
+  DeclaredExtensionEntry,
+  IntegrityQueryOptions,
+  IntegrityViolation,
+} from '../integrity-violation';

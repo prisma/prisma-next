@@ -1,11 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import type { IntegrityViolation } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
-import type { IntegrityViolation } from '@prisma-next/migration-tools/integrity-violation';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
@@ -161,6 +161,7 @@ function isAppSpaceLegacyCovered(violation: IntegrityViolation): boolean {
  *   013 targetMismatch        — a space targeting a different database
  *   014 disjointness          — a storage element claimed by >1 space
  *   015 contractUnreadable    — a space's on-disk contract cannot be read
+ *   016 duplicateMigrationHash — two packages in one space share a migrationHash
  */
 function integrityViolationToCheckFailure(
   violation: IntegrityViolation,
@@ -261,6 +262,13 @@ function integrityViolationToCheckFailure(
         why: `Contract for space "${violation.spaceId}" is unreadable: ${violation.detail}`,
         fix: 'Re-emit the extension contract artefacts, or fix the descriptor producing the invalid contract.',
       };
+    case 'duplicateMigrationHash':
+      return {
+        pnCode: 'PN-MIG-CHECK-016',
+        where: spaceRelative(violation.spaceId),
+        why: `Multiple migrations in space "${violation.spaceId}" share migrationHash "${violation.migrationHash}" (${violation.dirNames.join(', ')}).`,
+        fix: 'Re-emit one of the conflicting packages so each migrationHash is unique.',
+      };
   }
 }
 
@@ -292,7 +300,7 @@ async function loadAggregateIntegrityViolations(
       deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
       appContract: familyInstance.deserializeContract(parsedAppContract),
     });
-    return aggregate.checkIntegrity({ declaredExtensions, requireContracts: true });
+    return aggregate.checkIntegrity({ declaredExtensions, checkContracts: true });
   } catch {
     return [];
   }
