@@ -1,12 +1,17 @@
-import { createContract } from '@prisma-next/contract/testing';
-import type { Contract, StorageBase } from '@prisma-next/contract/types';
+import { createContract, createSqlContract } from '@prisma-next/contract/testing';
+import type { StorageBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-space';
 import type { ContractSpaceMember } from '../../src/aggregate/types';
 import { makeContractSpaceMember } from '../fixtures';
 
-type MongoStorageLike = StorageBase & { readonly collections: Record<string, unknown> };
+type MongoStorageLike = StorageBase & {
+  readonly namespaces: Record<
+    string,
+    { readonly id: string; readonly kind: string; readonly collections: Record<string, unknown> }
+  >;
+};
 
 /**
  * Unit tests for the duck-typed schema projector used by the aggregate
@@ -32,7 +37,7 @@ describe('projectSchemaToSpace', () => {
   function memberWithTables(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
     return makeContractSpaceMember({
       spaceId,
-      contract: createContract({
+      contract: createSqlContract({
         storage: {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
@@ -44,9 +49,8 @@ describe('projectSchemaToSpace', () => {
 
   /**
    * Build a synthetic member whose contract storage is Mongo-shaped
-   * (`collections: Record<string, _>`). The projector duck-types both
-   * SQL (`tables`) and Mongo (`collections`) record-shaped storage on
-   * the *other-member* side; this helper exercises the Mongo branch.
+   * (`collections: Record<string, _>`). This helper exercises the Mongo
+   * branch of other-member name collection.
    */
   function memberWithCollections(
     spaceId: string,
@@ -57,28 +61,16 @@ describe('projectSchemaToSpace', () => {
       contract: createContract<MongoStorageLike>({
         target: 'mongo',
         targetFamily: 'mongo',
-        storage: { collections },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              kind: 'mongo-namespace',
+              collections,
+            },
+          },
+        },
       }),
-    });
-  }
-
-  /**
-   * Build a synthetic member whose contract's storage shape doesn't
-   * match the duck-typed expectation. Used to verify the helper falls
-   * through structurally (other members with malformed contracts
-   * contribute zero owned tables).
-   *
-   * `unknown` cast: `projectSchemaToSpace` is duck-typed by design and
-   * tolerates malformed `contract.storage`. The cast here lets us inject
-   * intentionally-malformed shapes without bypassing the function's
-   * typing in production callers (the rest of the codebase only ever
-   * sees fully-validated `Contract` values).
-   */
-  function memberWithMalformedStorage(spaceId: string, storage: unknown): ContractSpaceMember {
-    const baseContract = createContract();
-    return makeContractSpaceMember({
-      spaceId,
-      contract: { ...baseContract, storage } as unknown as Contract,
     });
   }
 
@@ -102,18 +94,6 @@ describe('projectSchemaToSpace', () => {
       const schema = { tables: 'not-an-object' };
       const member = memberWithTables('app', {});
       const others = [memberWithTables('ext', { x: {} })];
-      expect(projectSchemaToSpace(schema, member, others)).toBe(schema);
-    });
-
-    it('skips other-space members whose contracts do not match the duck-typed shape', () => {
-      const schema = { tables: { app_users: { columns: {} }, ext_table: { columns: {} } } };
-      const member = memberWithTables('app', {});
-      const others: ReadonlyArray<ContractSpaceMember> = [
-        memberWithMalformedStorage('ext-1', null),
-        memberWithMalformedStorage('ext-2', 'not-an-object'),
-        memberWithMalformedStorage('ext-3', { tables: null }),
-        memberWithMalformedStorage('ext-4', { tables: 'not-a-record' }),
-      ];
       expect(projectSchemaToSpace(schema, member, others)).toBe(schema);
     });
   });

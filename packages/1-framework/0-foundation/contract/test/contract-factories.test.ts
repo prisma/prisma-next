@@ -49,7 +49,7 @@ describe('createContract', () => {
 
   it('computes different storageHash for different storage', () => {
     const c1 = createContract({ storage: { namespaces: {} } });
-    const c2 = createContract({
+    const c2 = createSqlContract({
       storage: {
         namespaces: {
           public: { id: 'public', tables: { user: { columns: {} } } },

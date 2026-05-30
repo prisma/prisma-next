@@ -47,6 +47,7 @@ type ExampleModels = {
 };
 
 type ExampleStorage = StorageBase<'sha256:abc123'> & {
+  readonly namespaces: Record<string, never>;
   readonly tables: {
     readonly user: {
       readonly columns: {

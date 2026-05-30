@@ -1,4 +1,4 @@
-import { extractStorageElementNames } from './extract-storage-element-names';
+import { elementCoordinates } from '@prisma-next/framework-components/ir';
 import type { ContractSpaceMember } from './types';
 
 /**
@@ -90,11 +90,6 @@ export function projectSchemaToSpace(
   return schema;
 }
 
-/**
- * Collect the set of storage element names claimed by other members.
- * Reuses the loader's `extractStorageElementNames` helper so the
- * tables/collections walk lives in exactly one place.
- */
 function collectOwnedNames(
   member: ContractSpaceMember,
   otherMembers: ReadonlyArray<ContractSpaceMember>,
@@ -102,8 +97,8 @@ function collectOwnedNames(
   const owned = new Set<string>();
   for (const other of otherMembers) {
     if (other.spaceId === member.spaceId) continue;
-    for (const name of extractStorageElementNames(other.contract())) {
-      owned.add(name);
+    for (const { entityName } of elementCoordinates(other.contract().storage)) {
+      owned.add(entityName);
     }
   }
   return owned;

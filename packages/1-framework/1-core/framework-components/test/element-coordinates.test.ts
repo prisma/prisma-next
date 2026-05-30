@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type EntityCoordinate, elementCoordinates, type Storage } from '../src/ir/storage';
+import { type EntityCoordinate, elementCoordinates } from '../src/ir/storage';
 
 function assertStoragePlaneCoordinates(coordinates: EntityCoordinate[]): void {
   expect(coordinates.length).toBeGreaterThan(0);
@@ -32,7 +32,7 @@ describe('elementCoordinates', () => {
           tables: { users: {}, posts: {}, comments: {} },
         },
       },
-    } as Storage;
+    };
 
     const coordinates = [...elementCoordinates(storage)];
     assertStoragePlaneCoordinates(coordinates);
