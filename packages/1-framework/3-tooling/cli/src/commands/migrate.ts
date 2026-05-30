@@ -274,8 +274,55 @@ async function executeMigrateCommand(
       ui.step('Loading contract spaces…');
     }
 
+    // When `--to` resolves to an on-disk graph node, verify and apply against
+    // THAT bundle's destination contract — not the emitted `contract.json` — so
+    // a rollback or arbitrary-target migrate checks the path's true destination
+    // rather than the (newer) emitted contract. With `--to` omitted, or a
+    // target with no matching bundle, the emitted contract stays the apply
+    // contract (byte-identical to prior behaviour). The same read feeds the
+    // optional ref-advancement snapshot below, so the apply contract and the
+    // snapshot contract are always sourced identically. This runs after the
+    // marker / invariant pre-checks so those diagnostics fire first.
+    let applyContract: Contract = contractRaw;
+    let snapshotContractJson: Record<string, unknown> = JSON.parse(contractContent);
+    let snapshotContractPath = contractPathAbsolute;
+    if (toArg && refEntry) {
+      const targetHash = refEntry.hash;
+      const matchingBundle = appPackages.bundles.find((p) => p.metadata.to === targetHash);
+      if (matchingBundle) {
+        const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
+        let endContractRaw: string;
+        try {
+          endContractRaw = await readFile(endContractPath, 'utf-8');
+        } catch (error) {
+          if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+            return notOk(
+              errorFileNotFound(endContractPath, {
+                why: `Target migration bundle is missing its destination contract snapshot at ${endContractPath}`,
+                fix: 'Re-emit the target migration so its sibling `end-contract.json` is restored, or pick a different --to target.',
+              }),
+            );
+          }
+          throw error;
+        }
+        const parsed: Record<string, unknown> = JSON.parse(endContractRaw);
+        try {
+          applyContract = familyInstance.deserializeContract(parsed);
+        } catch (error) {
+          return notOk(
+            errorContractValidationFailed(
+              `Target contract at ${endContractPath} failed to deserialize: ${error instanceof Error ? error.message : String(error)}`,
+              { where: { path: endContractPath } },
+            ),
+          );
+        }
+        snapshotContractJson = parsed;
+        snapshotContractPath = endContractPath;
+      }
+    }
+
     const applyResult = await client.migrationApply({
-      contract: contractRaw,
+      contract: applyContract,
       migrationsDir,
       appMigrationPackages: appPackages.bundles,
       ...ifDefined('refHash', refEntry?.hash),
@@ -291,37 +338,8 @@ async function executeMigrateCommand(
 
     let advancedRef: { name: string; hash: string } | null = null;
     if (options.advanceRef !== undefined) {
-      let contractJsonPathForSnapshot = contractPathAbsolute;
-      let contractJsonForSnapshot: Record<string, unknown> = JSON.parse(contractContent) as Record<
-        string,
-        unknown
-      >;
-      if (toArg && refEntry) {
-        const matchingBundle = appPackages.bundles.find((p) => p.metadata.to === refEntry.hash);
-        if (matchingBundle) {
-          const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-          contractJsonPathForSnapshot = endContractPath;
-          try {
-            const raw = await readFile(endContractPath, 'utf-8');
-            contractJsonForSnapshot = JSON.parse(raw) as Record<string, unknown>;
-          } catch (error) {
-            if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-              return notOk(
-                errorFileNotFound(endContractPath, {
-                  why: `Bundle end-contract not found at ${endContractPath}`,
-                  fix: 'Re-emit the migration bundle or pick a different --to target.',
-                }),
-              );
-            }
-            throw error;
-          }
-        }
-      }
       try {
-        const contractIR = await readContractIR(
-          contractJsonForSnapshot,
-          contractJsonPathForSnapshot,
-        );
+        const contractIR = await readContractIR(snapshotContractJson, snapshotContractPath);
         advancedRef = await executeRefAdvancement(
           refsDir,
           options.advanceRef,
