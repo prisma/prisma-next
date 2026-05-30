@@ -1,21 +1,24 @@
 import type { PreserveEmptyPredicate, StorageSort } from '@prisma-next/contract/hashing';
 import { computeStorageHash } from '@prisma-next/contract/hashing';
+import { isStoragePlaneReservedKey } from '@prisma-next/framework-components/ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { errorDescriptorHeadHashMismatch } from './errors';
 
 function stripNamespaceKinds(storage: Record<string, unknown>): Record<string, unknown> {
-  const namespaces = storage['namespaces'] as Record<string, Record<string, unknown>> | undefined;
-  if (!namespaces) return storage;
-  const stripped: Record<string, Record<string, unknown>> = {};
-  for (const [nsId, ns] of Object.entries(namespaces)) {
-    if (ns && typeof ns === 'object') {
-      const { kind: _kind, ...rest } = ns as Record<string, unknown>;
-      stripped[nsId] = rest as Record<string, unknown>;
+  const stripped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(storage)) {
+    if (isStoragePlaneReservedKey(key)) {
+      stripped[key] = value;
+      continue;
+    }
+    if (value && typeof value === 'object' && 'id' in value) {
+      const { kind: _kind, ...rest } = value as Record<string, unknown>;
+      stripped[key] = rest;
     } else {
-      stripped[nsId] = ns;
+      stripped[key] = value;
     }
   }
-  return { ...storage, namespaces: stripped };
+  return stripped;
 }
 
 /**

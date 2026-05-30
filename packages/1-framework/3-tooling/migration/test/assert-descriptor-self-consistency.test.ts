@@ -25,9 +25,9 @@ const TARGET = 'postgres';
 const FAMILY = 'sql';
 
 const sqlPreserveEmptyPatterns = [
-  ['storage', 'namespaces', '*', 'tables'],
-  ['storage', 'namespaces', '*', 'tables', '*'],
-  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', '*', 'tables'],
+  ['storage', '*', 'tables', '*'],
+  ['storage', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
 ] as const satisfies readonly PathPattern[];
 
 const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
