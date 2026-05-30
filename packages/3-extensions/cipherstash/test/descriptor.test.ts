@@ -23,6 +23,7 @@
  */
 
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { describe, expect, it } from 'vitest';
 import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
@@ -101,6 +102,7 @@ describe('cipherstash extension descriptor (contract-space package layout)', () 
         targetFamily: space.contractJson.targetFamily,
         storage: space.contractJson.storage as unknown as Record<string, unknown>,
         headRefHash: space.headRef.hash,
+        ...sqlContractCanonicalizationHooks,
       }),
     ).not.toThrow();
   });

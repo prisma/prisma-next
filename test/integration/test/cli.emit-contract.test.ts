@@ -4,6 +4,7 @@ import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -81,6 +82,7 @@ describe('emitContract API', () => {
 
       const result = await emit(contractRaw, stack, sqlEmission, {
         serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+        ...sqlContractCanonicalizationHooks,
       });
 
       expect(result).toBeDefined();
@@ -129,6 +131,7 @@ describe('emitContract API', () => {
 
       const result = await emit(contractRaw, stack, sqlEmission, {
         serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+        ...sqlContractCanonicalizationHooks,
       });
 
       const contractJsonPath = resolve(testDir, contractConfig.output);
@@ -171,6 +174,7 @@ describe('emitContract API', () => {
 
         const result = await emit(contractRaw, stack, sqlEmission, {
           serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+          ...sqlContractCanonicalizationHooks,
         });
 
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
@@ -206,6 +210,7 @@ describe('emitContract API', () => {
 
       const result = await emit(contractRaw, stack, sqlEmission, {
         serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+        ...sqlContractCanonicalizationHooks,
       });
 
       expect(typeof result.profileHash).toBe('string');
@@ -232,6 +237,7 @@ describe('emitContract API', () => {
 
       const result = await emit(contractRaw, stack, sqlEmission, {
         serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+        ...sqlContractCanonicalizationHooks,
       });
 
       expect(result.storageHash).toBeDefined();

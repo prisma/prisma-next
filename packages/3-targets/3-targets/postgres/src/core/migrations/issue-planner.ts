@@ -63,13 +63,18 @@ import {
 
 export type { CallMigrationStrategy, StrategyContext };
 
-function locateNamespaceTypeInStorage(storage: SqlStorage, typeName: string): unknown {
-  for (const ns of Object.values(storage.namespaces)) {
-    if (!('enum' in ns) || ns.enum == null) continue;
-    const entry = (ns.enum as Record<string, unknown>)[typeName];
-    if (entry !== undefined) return entry;
-  }
-  return undefined;
+/**
+ * Finds a type entry by explicit namespace coordinate. Reads the named
+ * namespace's `enum` slot directly — never scans other namespaces.
+ */
+function locateNamespaceTypeInStorage(
+  storage: SqlStorage,
+  namespaceId: string,
+  typeName: string,
+): unknown {
+  const ns = storage.namespaces[namespaceId];
+  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
+  return (ns.enum as Record<string, unknown>)[typeName];
 }
 
 // ============================================================================
@@ -596,11 +601,14 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      // Enum types live in namespace.enum; codec aliases live in storage.types.
-      // Check both so the planner handles whichever slot the type is in.
+      // Codec aliases live in storage.types; enum types live in namespace.enum.
+      // Check types first; fall back to the namespace-keyed enum slot using the
+      // issue's namespace coordinate (populated by the verifier for enum-related
+      // issues per the BaseSchemaIssue.namespaceId contract).
+      const namespaceId = resolveNamespaceIdForIssue(issue);
       const typeInstance: unknown =
         ctx.toContract.storage.types?.[issue.typeName] ??
-        locateNamespaceTypeInStorage(ctx.toContract.storage, issue.typeName);
+        locateNamespaceTypeInStorage(ctx.toContract.storage, namespaceId, issue.typeName);
       if (!typeInstance) {
         return notOk(
           issueConflict(
@@ -610,9 +618,10 @@ function mapIssueToCall(
         );
       }
       if (typeInstance instanceof PostgresEnumType) {
+        const ddlSchema = resolveDdlSchemaForNamespace(ctx, namespaceId);
         return ok([
           new CreateEnumTypeCall(
-            schemaName,
+            ddlSchema,
             issue.typeName,
             typeInstance.values,
             typeInstance.nativeType,

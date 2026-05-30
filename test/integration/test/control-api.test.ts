@@ -8,6 +8,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/target-postgres/control';
@@ -57,6 +58,7 @@ async function emitContract(
       postgres.contractSerializer.serializeContract(
         c as Parameters<typeof postgres.contractSerializer.serializeContract>[0],
       ),
+    ...sqlContractCanonicalizationHooks,
   });
 
   // Write contract files

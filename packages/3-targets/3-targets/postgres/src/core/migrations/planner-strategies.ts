@@ -37,7 +37,11 @@ import {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
-import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
+import {
+  determineEnumDiff,
+  readExistingEnumValues,
+  resolveDdlSchemaForNamespaceStorage,
+} from './enum-planning';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -123,21 +127,57 @@ export function resolveDdlSchemaForNamespace(ctx: StrategyContext, namespaceId: 
   return namespaceId;
 }
 
+/** Default Postgres enum landing namespace — where contract-level (`types:`)
+ * enums are placed by the authoring builder when no explicit namespace is
+ * given. Mirrors `POSTGRES_ENUM_NAMESPACE_ID` in the contract-ts builder. */
+const DEFAULT_ENUM_NAMESPACE_ID = 'public';
+
+function namespaceHasEnum(storage: SqlStorage, namespaceId: string, typeName: string): boolean {
+  const ns = storage.namespaces[namespaceId];
+  if (!ns || !('enum' in ns) || ns.enum == null) return false;
+  return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName] !== undefined;
+}
+
 /**
- * Finds a type entry by name across all namespace type registries.
- * Namespace types (e.g. Postgres enums) live under
- * `storage.namespaces[nsId].enum`, not under `storage.types`.
+ * Resolves which namespace's enum a column's bare `typeRef` binds to.
+ *
+ * Columns carry a bare (non-namespace-qualified) `typeRef`; the enum it names
+ * may live in a different namespace than the column's own (the authoring
+ * builder places contract-level `types:` enums in the default `public`
+ * namespace while a model's table may sit in the unbound namespace). The
+ * binding rule: an enum declared in the column's *own* namespace shadows
+ * everything; otherwise the column references the ambient enum — the sole
+ * namespace that defines `typeName`, preferring the default `public`
+ * namespace when several do. Returns `undefined` when no namespace defines it.
+ */
+function resolveColumnEnumNamespace(
+  storage: SqlStorage,
+  columnNamespaceId: string,
+  typeName: string,
+): string | undefined {
+  if (namespaceHasEnum(storage, columnNamespaceId, typeName)) return columnNamespaceId;
+  const owners = Object.keys(storage.namespaces).filter((nsId) =>
+    namespaceHasEnum(storage, nsId, typeName),
+  );
+  if (owners.length === 1) return owners[0];
+  if (owners.includes(DEFAULT_ENUM_NAMESPACE_ID)) return DEFAULT_ENUM_NAMESPACE_ID;
+  return owners[0];
+}
+
+/**
+ * Finds a type entry by explicit namespace coordinate. Namespace types (e.g.
+ * Postgres enums) live under `storage.namespaces[nsId].enum`. Returns the
+ * entry from the named namespace only — never scans other namespaces, so two
+ * namespaces that hold an enum with the same name resolve independently.
  */
 function locateNamespaceType(
   storage: SqlStorage,
+  namespaceId: string,
   typeName: string,
 ): PostgresEnumStorageEntry | undefined {
-  for (const ns of Object.values(storage.namespaces)) {
-    if (!('enum' in ns) || ns.enum == null) continue;
-    const entry = (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
-    if (entry !== undefined) return entry;
-  }
-  return undefined;
+  const ns = storage.namespaces[namespaceId];
+  if (!ns || !('enum' in ns) || ns.enum == null) return undefined;
+  return (ns.enum as Record<string, PostgresEnumStorageEntry>)[typeName];
 }
 
 // ============================================================================
@@ -369,10 +409,11 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
 };
 
 function enumRebuildCallRecipe(
+  namespaceId: string,
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toType = locateNamespaceType(ctx.toContract.storage, typeName);
+  const toType = locateNamespaceType(ctx.toContract.storage, namespaceId, typeName);
   if (!toType) return [];
   const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
@@ -380,13 +421,28 @@ function enumRebuildCallRecipe(
     ? toType.values
     : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
+  // Type DDL targets the enum's real schema — the unbound coordinate resolves
+  // to the introspected `current_schema()`, never the `__unbound__` sentinel.
+  const ddlSchema = resolveDdlSchemaForNamespaceStorage(
+    ctx.toContract.storage,
+    namespaceId,
+    ctx.schema,
+  );
 
+  // Migrate every column whose `typeRef` binds to *this* enum. The column's
+  // bare `typeRef` resolves to an enum namespace (own-namespace shadows;
+  // otherwise the ambient/default `public` enum), so a column in the unbound
+  // namespace correctly binds to a `public`-namespace enum, while two
+  // same-named enums in distinct namespaces keep their columns disjoint.
   const columnRefs: { namespaceId: string; table: string; column: string }[] = [];
   for (const [nsId, ns] of Object.entries(ctx.toContract.storage.namespaces)) {
     for (const [tableName, tableNode] of Object.entries(ns.tables)) {
       const table = tableNode as StorageTable;
       for (const [columnName, column] of Object.entries(table.columns)) {
-        if (column.typeRef === typeName) {
+        if (
+          column.typeRef === typeName &&
+          resolveColumnEnumNamespace(ctx.toContract.storage, nsId, typeName) === namespaceId
+        ) {
           columnRefs.push({ namespaceId: nsId, table: tableName, column: columnName });
         }
       }
@@ -394,7 +450,7 @@ function enumRebuildCallRecipe(
   }
 
   return [
-    new CreateEnumTypeCall(ctx.schemaName, tempName, desiredValues),
+    new CreateEnumTypeCall(ddlSchema, tempName, desiredValues),
     ...columnRefs.map((ref) => {
       const using = `${ref.column}::text::${tempName}`;
       return new AlterColumnTypeCall(
@@ -409,8 +465,8 @@ function enumRebuildCallRecipe(
         },
       );
     }),
-    new DropEnumTypeCall(ctx.schemaName, nativeType),
-    new RenameTypeCall(ctx.schemaName, tempName, nativeType),
+    new DropEnumTypeCall(ddlSchema, nativeType),
+    new RenameTypeCall(ddlSchema, tempName, nativeType),
   ];
 }
 
@@ -450,6 +506,18 @@ function enumRebuildCallRecipe(
  * into the `dep` bucket — i.e. `CREATE TYPE` runs before any
  * `CreateTableCall` that references the new enum.
  */
+/**
+ * Separator character for compound enum map keys (`namespaceId\u0000typeName`).
+ * NUL (`\u0000`) is invalid in both Postgres identifiers and TypeScript symbol
+ * names so it cannot appear in either component — unambiguous separator.
+ */
+const COMPOUND_KEY_SEP = '\u0000';
+
+/** Builds the compound map key for a namespace-qualified enum entry. */
+function enumCompoundKey(namespaceId: string, typeName: string): string {
+  return `${namespaceId}${COMPOUND_KEY_SEP}${typeName}`;
+}
+
 export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage);
   if (enumTypes.size === 0) return { kind: 'no_match' };
@@ -457,28 +525,42 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
 
   const calls: PostgresOpFactoryCall[] = [];
-  const handledTypeNames = new Set<string>();
-  const introducedTypeNames = new Set<string>();
-  const rebuiltTypeNames = new Set<string>();
+  const handledKeys = new Set<string>();
+  const introducedKeys = new Set<string>();
+  const rebuiltKeys = new Set<string>();
   let emittedRebuildRecipe = false;
 
-  for (const [typeName, enumType] of enumTypes) {
+  for (const [key, enumType] of enumTypes) {
+    const sepIdx = key.indexOf(COMPOUND_KEY_SEP);
+    const enumNamespaceId = key.slice(0, sepIdx);
+    const typeName = key.slice(sepIdx + 1);
+
     const desired = enumType.values;
-    const existing = readExistingEnumValues(ctx.schema, enumType.nativeType);
+    // The enum's live schema: for the unbound coordinate this resolves to the
+    // introspected `current_schema()` (e.g. `public`), never the `__unbound__`
+    // DDL-emit sentinel — so both the existing-values lookup key and the
+    // emitted `CREATE TYPE` / `ALTER TYPE` target the real schema the type
+    // lives in. Named namespaces resolve to their own DDL schema.
+    const ddlSchema = resolveDdlSchemaForNamespaceStorage(
+      ctx.toContract.storage,
+      enumNamespaceId,
+      ctx.schema,
+    );
+    const existing = readExistingEnumValues(ctx.schema, ddlSchema, enumType.nativeType);
     if (!existing) {
-      calls.push(new CreateEnumTypeCall(ctx.schemaName, typeName, desired, enumType.nativeType));
-      handledTypeNames.add(typeName);
-      introducedTypeNames.add(typeName);
+      calls.push(new CreateEnumTypeCall(ddlSchema, typeName, desired, enumType.nativeType));
+      handledKeys.add(key);
+      introducedKeys.add(key);
       continue;
     }
     const diff = determineEnumDiff(existing, desired);
     if (diff.kind === 'unchanged') {
-      handledTypeNames.add(typeName);
+      handledKeys.add(key);
       continue;
     }
     if (diff.kind === 'add_values') {
-      calls.push(new AddEnumValuesCall(ctx.schemaName, typeName, enumType.nativeType, diff.values));
-      handledTypeNames.add(typeName);
+      calls.push(new AddEnumValuesCall(ddlSchema, typeName, enumType.nativeType, diff.values));
+      handledKeys.add(key);
       continue;
     }
     if (dataAllowed && diff.removedValues.length > 0) {
@@ -490,10 +572,10 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
         ),
       );
     }
-    calls.push(...enumRebuildCallRecipe(typeName, ctx));
+    calls.push(...enumRebuildCallRecipe(enumNamespaceId, typeName, ctx));
     emittedRebuildRecipe = true;
-    handledTypeNames.add(typeName);
-    rebuiltTypeNames.add(typeName);
+    handledKeys.add(key);
+    rebuiltKeys.add(key);
   }
 
   // The strategy emits a single `recipe` flag for the entire pass,
@@ -505,9 +587,17 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   // enum would fail at runtime with a confusing `type "X" does not
   // exist` error. Surface the unrepresentable case here as a
   // planner-time error so the failure mode is loud, not silent.
-  if (introducedTypeNames.size > 0 && rebuiltTypeNames.size > 0) {
+  if (introducedKeys.size > 0 && rebuiltKeys.size > 0) {
+    const introducedDisplay = [...introducedKeys]
+      .sort()
+      .map((k) => k.replace(COMPOUND_KEY_SEP, '.'))
+      .join(', ');
+    const rebuiltDisplay = [...rebuiltKeys]
+      .sort()
+      .map((k) => k.replace(COMPOUND_KEY_SEP, '.'))
+      .join(', ');
     throw new Error(
-      `nativeEnumPlanCallStrategy: cannot emit both a brand-new enum and a rebuild on a different enum in the same plan; the single recipe flag cannot route them to different buckets. Introduced: [${[...introducedTypeNames].sort().join(', ')}]; rebuilt: [${[...rebuiltTypeNames].sort().join(', ')}]. Split the strategy or grow the \`match\` return type before this case lands.`,
+      `nativeEnumPlanCallStrategy: cannot emit both a brand-new enum and a rebuild on a different enum in the same plan; the single recipe flag cannot route them to different buckets. Introduced: [${introducedDisplay}]; rebuilt: [${rebuiltDisplay}]. Split the strategy or grow the \`match\` return type before this case lands.`,
     );
   }
 
@@ -516,7 +606,7 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
       !(
         (issue.kind === 'type_missing' || issue.kind === 'enum_values_changed') &&
         issue.typeName &&
-        handledTypeNames.has(issue.typeName)
+        handledKeys.has(enumCompoundKey(resolveNamespaceIdForIssue(issue), issue.typeName))
       ),
   );
 
@@ -538,14 +628,22 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   return { kind: 'match', issues: remaining, calls, recipe: emittedRebuildRecipe };
 };
 
+/**
+ * Collects every `PostgresEnumType` instance across all declared namespaces,
+ * returning a compound-keyed map (`${namespaceId}\u0000${typeName}`). Two
+ * namespaces that declare an enum with the same name produce two distinct
+ * entries — no name collision, no last-write-wins.
+ *
+ * Entries within each namespace are sorted by name for deterministic ordering.
+ */
 function collectPostgresEnumTypes(storage: SqlStorage): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const [nsId, ns] of Object.entries(storage.namespaces)) {
     if (!('enum' in ns) || ns.enum == null) continue;
     const nsEnums = ns.enum as Record<string, unknown>;
     for (const [name, instance] of Object.entries(nsEnums).sort(([a], [b]) => a.localeCompare(b))) {
       if (instance instanceof PostgresEnumType) {
-        result.set(name, instance);
+        result.set(enumCompoundKey(nsId, name), instance);
       }
     }
   }

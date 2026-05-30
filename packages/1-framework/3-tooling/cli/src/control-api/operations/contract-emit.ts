@@ -253,13 +253,18 @@ export async function executeContractEmit(
       // on-disk JSON envelope is constructed by target-owned code
       // rather than by walking the in-memory contract with
       // `Object.entries` (which would leak runtime-only class API
-      // fields into the persisted shape).
+      // fields into the persisted shape). The optional `shouldPreserveEmpty`
+      // and `sortStorage` hooks let the family contribute storage-specific
+      // canonicalization rules without the framework importing family code.
+      const { contractSerializer } = config.target;
       const serializeContract = (c: Contract): JsonObject =>
-        config.target.contractSerializer.serializeContract(c);
+        contractSerializer.serializeContract(c);
       emitResult = await unlessAborted(
         emit(enrichedIR, stack, config.family.emission, {
           outputJsonPath,
           serializeContract,
+          ...ifDefined('shouldPreserveEmpty', contractSerializer.shouldPreserveEmpty),
+          ...ifDefined('sortStorage', contractSerializer.sortStorage),
         }),
       );
     } catch (error) {

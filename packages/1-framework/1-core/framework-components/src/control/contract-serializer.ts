@@ -1,3 +1,4 @@
+import type { PreserveEmptyPredicate, StorageSort } from '@prisma-next/contract/hashing';
 import type { JsonObject } from '@prisma-next/utils/json';
 
 /**
@@ -40,4 +41,22 @@ export interface ContractSerializer<TContract> {
    * fields, normalizing numeric encodings) do that work here.
    */
   serializeContract(contract: TContract): JsonObject;
+
+  /**
+   * Optional family-contributed preserve-empty predicate for the
+   * framework canonicalizer. When present, the canonicalizer calls this
+   * inside its default-omission walk to let the family veto the stripping
+   * of empty objects/arrays/`false` values at family-specific storage paths.
+   * Families whose storage has no such special-case paths omit this hook.
+   */
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+
+  /**
+   * Optional family-contributed storage sort hook for the framework
+   * canonicalizer. When present, the canonicalizer applies this to the
+   * serialized `storage` subtree after the omission walk and before the
+   * final key sort. Families that need deterministic ordering of storage
+   * arrays (e.g. SQL `indexes`/`uniques`) supply this hook.
+   */
+  readonly sortStorage?: StorageSort;
 }

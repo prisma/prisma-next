@@ -1,10 +1,10 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
   ControlStack,
 } from '@prisma-next/framework-components/control';
-import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
+import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -95,6 +95,20 @@ export interface SqlControlAdapter<TTarget extends string = string>
   readonly resolveExistingEnumValues?: (
     schema: SqlSchemaIR,
     enumType: PostgresEnumStorageEntry,
+    namespaceId: string,
+  ) => readonly string[] | null;
+  /**
+   * Optional contract-scoped factory for {@link resolveExistingEnumValues}.
+   * Targets that need the contract storage to resolve namespace → DDL schema
+   * supply this; the family control instance prefers it over the bare adapter
+   * hook when present.
+   */
+  readonly resolveExistingEnumValuesForContract?: (
+    contract: Contract<SqlStorage>,
+  ) => (
+    schema: SqlSchemaIR,
+    enumType: PostgresEnumStorageEntry,
+    namespaceId: string,
   ) => readonly string[] | null;
 
   /**
