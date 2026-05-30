@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import {
-  detectGlyphMode,
-  renderMigrationListGraph,
-} from '../../../src/utils/formatters/migration-list-graph-render';
+import { renderMigrationListGraph } from '../../../src/utils/formatters/migration-list-graph-render';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
   type MigrationListStyler,
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/migration-list-styler';
+import { detectGlyphMode } from '../../../src/utils/glyph-mode';
 import { HASH, layoutFor, migrationEntry } from './migration-list-graph-fixtures';
 
 function renderGraph(
