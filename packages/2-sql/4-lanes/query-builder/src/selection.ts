@@ -8,7 +8,7 @@ import type { DrainOuterGeneric } from './type-atoms';
  * the unbound namespace is the slot the target resolves at connection time.
  */
 export type UnboundTables<TContract extends Contract<SqlStorage>> =
-  TContract['storage']['namespaces']['__unbound__']['tables'];
+  TContract['storage']['__unbound__']['tables'];
 
 /**
  * A utility type to extract the output type of a referenced column from a contract.

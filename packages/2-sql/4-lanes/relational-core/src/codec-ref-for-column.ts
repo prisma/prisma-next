@@ -1,8 +1,10 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
+  type SqlNamespace,
   type SqlStorage,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
@@ -24,8 +26,8 @@ export function codecRefForStorageColumn(
   columnName: string,
 ): CodecRef | undefined {
   let tableDef: StorageTable | undefined;
-  for (const ns of Object.values(storage.namespaces)) {
-    const candidate = ns.tables[tableName] as StorageTable | undefined;
+  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+    const candidate = (ns as SqlNamespace).tables[tableName] as StorageTable | undefined;
     if (candidate !== undefined) {
       tableDef = candidate;
       break;
@@ -37,7 +39,7 @@ export function codecRefForStorageColumn(
   if (columnDef.typeRef !== undefined) {
     let instance: unknown = storage.types?.[columnDef.typeRef];
     if (!instance) {
-      for (const ns of Object.values(storage.namespaces)) {
+      for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
         const nsEnums = (ns as { enum?: Record<string, unknown> }).enum;
         if (nsEnums) {
           const nsEntry = nsEnums[columnDef.typeRef];

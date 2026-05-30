@@ -2,6 +2,7 @@ import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   type SqlStorageTypeEntry,
   type StorageTableInput,
@@ -75,16 +76,18 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     tables: Record<string, StorageTableInput>;
     types?: Record<string, SqlStorageTypeEntry>;
   }): SqlStorage {
-    return new SqlStorage({
-      storageHash: 'sha256:test' as SqlStorage['storageHash'],
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: parts.tables,
-        }),
-      },
-      ...ifDefined('types', parts.types),
-    });
+    return new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: 'sha256:test' as SqlStorage['storageHash'],
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: parts.tables,
+          }),
+        },
+        ...ifDefined('types', parts.types),
+      }),
+    );
   }
 
   const descriptors = [stub('pg/vector@1', ['vector']), stub('pg/text@1', ['text'])];
