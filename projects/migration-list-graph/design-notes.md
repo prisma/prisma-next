@@ -71,21 +71,14 @@ Concretely:
 The view never re-derives graph structure ad hoc. Convergence (forward in-degree
 ≥ 2), divergence (forward out-degree ≥ 2), and edge kind (forward / rollback /
 self) are all
-**topology facts**, and `migration-tools` already owns the migration topology:
-the `MigrationGraph` model (`forwardChain` / `reverseChain` adjacency) plus
-reachability helpers. So:
-
-- The pure layout/classification logic lives in **`migration-tools`** (the
-  package that owns both `MigrationListEntry` and `MigrationGraph`), reusing the
-  `MigrationGraph` adjacency idiom.
-- It does **not** call `reconstructGraph` directly: that constructor *throws*
-  (self-edge-without-data-op, duplicate migration hash) to enforce a valid graph
-  for path-resolution. The list views must stay **tolerant** — show every
-  on-disk migration, offline, never fail — so the topology helper for this view
-  is a tolerant adjacency/degree/classification pass over the enumerator's
-  `MigrationListEntry[]`, placed beside `MigrationGraph` and sharing its
-  conventions. (Why a second, tolerant builder exists is recorded here so it
-  isn't mistaken for an oversight.)
+**topology facts**, and `migration-tools` owns a dedicated tolerant classifier for
+this view. It does **not** call `reconstructGraph` or reuse `MigrationGraph`'s
+`detectCycles` — those paths throw on invalid graphs and assume a strict genesis
+model. Instead the classifier **re-implements** an independent adjacency build +
+3-colour DFS over the enumerator's `MigrationListEntry[]`, placed beside
+`MigrationGraph` and sharing only naming conventions (`EMPTY_CONTRACT_HASH`,
+hash canonicalization). The second pass exists because the list views must stay
+**tolerant** — show every on-disk migration, offline, never fail.
 - **No single-root / genesis assumption.** The strict `MigrationGraph` path
   (`findLeaf`, `reconstructGraph`) anchors traversal at `EMPTY_CONTRACT_HASH` and
   throws `NO_INITIAL_MIGRATION` when no edge departs it — but **many on-disk
@@ -167,8 +160,10 @@ single hash (`⟲  <dirName>  <hash>`).
 >   currently on the DFS stack (i.e. an ancestor on the active path). Defining it
 >   as a back-edge (rather than "`to` can reach `from`") is what makes the
 >   forward/back partition well-defined under cycles: in an `A→B`/`B→A` pair
->   exactly one edge is the back-edge, decided by the pinned neighbour order. This
->   mirrors the existing 3-colour DFS in `migration-graph.ts` `detectCycles`;
+>   exactly one edge is the back-edge, decided by the pinned neighbour order. It
+>   applies the same 3-colour back-edge idiom as `migration-graph.ts`'s
+>   `detectCycles`, implemented independently in the tolerant pass — it does not
+>   call `detectCycles`;
 > - **forward** (`*`) otherwise.
 >
 > The DFS seeds from forward-in-degree-0 nodes (`EMPTY_CONTRACT_HASH` first, then
@@ -387,9 +382,11 @@ the flat list for linear history). Routing through dagre would not produce that
 flat-list-compatible output, and the two views answer different questions
 (`graph` = "what is the whole topology", `list --graph` = "show me the list,
 but make divergence visible"). So this view does **not** reuse the dagre
-renderer. It **does** reuse the topology model (`MigrationGraph` from
-`migration-tools`) — see § Topology source — so the two views share one source
-of truth for adjacency/reachability even though their *drawing* differs.
+renderer. It also does **not** reuse `MigrationGraph` / `reconstructGraph`: those
+are strict (they throw on invalid graphs and assume a genesis root), whereas the
+list view must stay offline and never fail. Instead it runs an independent
+*tolerant* classification pass over the same `MigrationListEntry` edges — see
+§ Topology source — sharing the edge model and the back-edge idiom, not the code.
 
 **Glyph divergence with `migration graph` (intentional, noted).** The shipped
 `graph-render.ts` uses `○ ◆ ◇` for its node markers; this view uses ASCII `o`
@@ -425,17 +422,18 @@ convergences — to stay close to the flat-list spirit.
 - Structure in width-safe box-drawing; node glyph `o` (intentionally diverges
   from `migration graph`'s `○`; see § Relationship to the other views).
 - **Topology lives in `migration-tools`, glyphs in the CLI.** Edge-kind
-  classification (forward/rollback/self) and convergence/divergence detection
-  reuse the `MigrationGraph` model via a *tolerant* adjacency pass (not
-  `reconstructGraph`, which throws, and with no single-root/genesis assumption —
-  roots are forward-in-degree-0 nodes; `EMPTY_CONTRACT_HASH` is only one possible root).
-  Both
-  the flat list and `--graph` consume the same classifier. Lane assignment +
-  node-line placement + glyph rendering stay in the CLI formatter.
+  classification (forward/rollback/self) and convergence/divergence detection run
+  an independent *tolerant* adjacency pass over the `MigrationListEntry` edges —
+  it does not reuse `MigrationGraph` / `reconstructGraph` (those throw and assume
+  a single-root/genesis), and there is no single-root/genesis assumption here:
+  roots are forward-in-degree-0 nodes; `EMPTY_CONTRACT_HASH` is only one possible
+  root. Both the flat list and `--graph` consume the same classifier. Lane
+  assignment + node-line placement + glyph rendering stay in the CLI formatter.
 - **`migration graph` is shipped, not a future redesign**, and is a different
-  (node-per-row, dagre) drawing contract; this view does not reuse its renderer
-  but does reuse its topology model. New CLI files are named `migration-list-
-  graph-*` to avoid colliding with the existing `graph-*` files.
+  (node-per-row, dagre) drawing contract; this view reuses neither its renderer
+  nor its topology code — it computes its own tolerant topology over the same
+  edge model. New CLI files are named `migration-list-graph-*` to avoid colliding
+  with the existing `graph-*` files.
 - The **kind column** carries the edge *kind*: `*` forward, `↩` rollback,
   `⟲` self. The data column stays `from → to` (plain `→`) — the kind glyph, not
   the arrow, signals direction. No bare `←` between hashes. ("Kind glyph", not

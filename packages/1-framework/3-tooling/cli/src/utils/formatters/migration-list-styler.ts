@@ -24,6 +24,7 @@ function styleRefName(name: string): string {
  * - `dirName`: bold
  * - `sourceHash`: dim cyan
  * - `destHash`: bright cyan
+ * - `kind` (`*` / `↩` / `⟲`): bright — the signal; lanes and arrows dim
  * - `glyph` (`→` / `⟲` / `∅`): dim
  * - `lane` (graph gutter lines `│` and fan/join connectors `├─┐` / `├─┘`): dim
  * - `invariants` (`{...}`): yellow
@@ -39,7 +40,8 @@ export function createAnsiMigrationListStyler(opts: {
     return IDENTITY_MIGRATION_LIST_STYLER;
   }
   return {
-    kind: (text) => dim(text),
+    // Kind glyphs stay bright in both flat and graph views; lanes carry the dim gutter.
+    kind: (text) => text,
     dirName: (text) => bold(text),
     sourceHash: (text) => dim(cyan(text)),
     destHash: (text) => cyanBright(text),

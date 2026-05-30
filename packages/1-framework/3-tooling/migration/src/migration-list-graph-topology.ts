@@ -1,10 +1,10 @@
 import { EMPTY_CONTRACT_HASH } from './constants';
 import type { MigrationListEntry } from './migration-list-types';
 
-export type EdgeKind = 'forward' | 'rollback' | 'self';
+export type MigrationEdgeKind = 'forward' | 'rollback' | 'self';
 
-export interface MigrationGraphTopology {
-  readonly kindByMigrationHash: ReadonlyMap<string, EdgeKind>;
+export interface MigrationListGraphTopology {
+  readonly kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>;
   readonly forwardInDegree: ReadonlyMap<string, number>;
   readonly forwardOutDegree: ReadonlyMap<string, number>;
 }
@@ -29,9 +29,9 @@ function bumpDegree(map: Map<string, number>, key: string): void {
 
 export function classifyMigrationListGraphTopology(
   entries: readonly MigrationListEntry[],
-): MigrationGraphTopology {
+): MigrationListGraphTopology {
   const nodes = new Set<string>();
-  const kindByMigrationHash = new Map<string, EdgeKind>();
+  const kindByMigrationHash = new Map<string, MigrationEdgeKind>();
   const outgoingByFrom = new Map<string, NonSelfEdge[]>();
 
   for (const entry of entries) {
@@ -133,7 +133,9 @@ export function classifyMigrationListGraphTopology(
   for (const root of dfsRoots) {
     runDfsFrom(root);
   }
-  for (const root of nodes) {
+  const remainingWhite = [...nodes].filter((node) => color.get(node) === WHITE);
+  remainingWhite.sort((a, b) => a.localeCompare(b));
+  for (const root of remainingWhite) {
     runDfsFrom(root);
   }
 
