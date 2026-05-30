@@ -1,0 +1,7 @@
+{
+  "slug": "project-retry-policy",
+  "title": "Add a configurable retry policy to the adapter runtime",
+  "shape": "project",
+  "recommended_model": "claude-4.6-sonnet-high-thinking",
+  "summary": "Introduce a configurable retry policy for transient adapter-runtime failures: a retry-policy contract, the runtime wiring that honours it, and an adapter opt-in. Multi-slice — exercises project spec/plan, slice sequencing, and stacking."
+}

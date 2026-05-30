@@ -1,0 +1,7 @@
+{
+  "slug": "direct-change-diagnostic-wording",
+  "title": "Reword the unrecognized-namespace diagnostic",
+  "shape": "direct-change",
+  "recommended_model": "claude-4.6-sonnet-high-thinking",
+  "summary": "Improve one user-facing diagnostic string for an unrecognized PSL namespace so it names the namespace and tells the user how to fix it. ~30-second-verifiable; no spec/plan ceremony."
+}
