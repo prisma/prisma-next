@@ -6,12 +6,13 @@ import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-spac
 import type { ContractSpaceMember } from '../../src/aggregate/types';
 import { makeContractSpaceMember } from '../fixtures';
 
-type MongoStorageLike = StorageBase & {
-  readonly namespaces: Record<
-    string,
-    { readonly id: string; readonly kind: string; readonly collections: Record<string, unknown> }
+type MongoStorageLike = StorageBase &
+  Readonly<
+    Record<
+      string,
+      { readonly id: string; readonly kind: string; readonly collections: Record<string, unknown> }
+    >
   >;
-};
 
 /**
  * Unit tests for the duck-typed schema projector used by the aggregate
@@ -30,7 +31,7 @@ type MongoStorageLike = StorageBase & {
 describe('projectSchemaToSpace', () => {
   /**
    * Build a synthetic member with only the fields `projectSchemaToSpace`
-   * inspects (`spaceId`, `contract.storage.namespaces[…].tables`). The rest is filled
+   * inspects (`spaceId`, `getStorageNamespace(contract.storage as Record<string, unknown>, …).tables`). The rest is filled
    * with empty / sentinel values to satisfy the type without committing
    * to a particular family.
    */
@@ -39,9 +40,7 @@ describe('projectSchemaToSpace', () => {
       spaceId,
       contract: createSqlContract({
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-          },
+          [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
         },
       }),
     });
@@ -62,12 +61,10 @@ describe('projectSchemaToSpace', () => {
         target: 'mongo',
         targetFamily: 'mongo',
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              kind: 'mongo-namespace',
-              collections,
-            },
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            kind: 'mongo-namespace',
+            collections,
           },
         },
       }),

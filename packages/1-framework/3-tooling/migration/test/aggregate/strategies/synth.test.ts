@@ -27,9 +27,7 @@ function makeMember(spaceId: string, tables: Record<string, unknown>): ContractS
     contract: createSqlContract({
       target: 'postgres',
       storage: {
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-        },
+        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
       },
     }),
   });

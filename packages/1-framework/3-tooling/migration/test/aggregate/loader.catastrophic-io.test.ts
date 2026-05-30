@@ -20,7 +20,7 @@ vi.mock('../../src/read-contract-space-head-ref', async (importOriginal) => {
 const APP_CONTRACT = createSqlContract({
   target: 'postgres',
   storage: {
-    namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { user: {} } } },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { user: {} } },
   },
 });
 

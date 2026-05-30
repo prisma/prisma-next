@@ -146,11 +146,9 @@ describe('assertDescriptorSelfConsistency', () => {
     // recomputing against on-disk JSON that *does* carry `kind` must
     // still match the authoring-time hash.
     const namespacedBody = {
-      namespaces: {
-        public: {
-          id: 'public',
-          tables: STORAGE_BODY.tables,
-        },
+      public: {
+        id: 'public',
+        tables: STORAGE_BODY.tables,
       },
     };
     const namespacedHash = computeStorageHash({
@@ -160,12 +158,10 @@ describe('assertDescriptorSelfConsistency', () => {
       ...SQL_HOOKS,
     });
     const onDiskStorage = {
-      namespaces: {
-        public: {
-          id: 'public',
-          kind: 'postgres-schema',
-          tables: STORAGE_BODY.tables,
-        },
+      public: {
+        id: 'public',
+        kind: 'postgres-schema',
+        tables: STORAGE_BODY.tables,
       },
       storageHash: namespacedHash,
     };

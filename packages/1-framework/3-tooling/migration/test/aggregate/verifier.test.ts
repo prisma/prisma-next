@@ -22,9 +22,7 @@ function makeMember(args: {
   const contract = createSqlContract({
     target: 'postgres',
     storage: {
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-      },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
     },
   });
   return makeContractSpaceMember({

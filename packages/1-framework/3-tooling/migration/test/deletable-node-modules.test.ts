@@ -220,11 +220,9 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     const spaceContract = createSqlContract({
       target: 'postgres',
       storage: {
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: { test_box: { columns: { x: {}, y: {} } } },
-          },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: { test_box: { columns: { x: {}, y: {} } } },
         },
       },
     });
@@ -254,11 +252,9 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     const appContract = createSqlContract({
       target: 'postgres',
       storage: {
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: { user: { columns: { id: {} } } },
-          },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: { user: { columns: { id: {} } } },
         },
       },
     });
