@@ -16,7 +16,7 @@ describe('emitter + postgres adapter descriptor', () => {
       models: {},
       storage: {
         storageHash: 'storage:sha256:test' as never,
-        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+        [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
       },
       capabilities: {},
       extensionPacks: {},

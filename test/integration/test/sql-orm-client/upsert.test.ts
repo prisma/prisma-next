@@ -101,7 +101,7 @@ describe('integration/upsert', () => {
       await withCollectionRuntime(async (runtime) => {
         const contract = withReturningCapability(getTestContract());
         delete (
-          contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables.users as {
+          contract.storage[UNBOUND_NAMESPACE_ID].tables.users as {
             primaryKey?: unknown;
           }
         ).primaryKey;

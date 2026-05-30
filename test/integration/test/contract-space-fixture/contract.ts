@@ -2,26 +2,28 @@ import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { TEST_BOX_TABLE } from './constants';
 
 const TARGET = 'postgres' as const;
 const TARGET_FAMILY = 'sql' as const;
 
 const storageBody = {
-  namespaces: {
-    [UNBOUND_NAMESPACE_ID]: {
-      id: UNBOUND_NAMESPACE_ID,
-      tables: {
-        [TEST_BOX_TABLE]: {
-          columns: {
-            x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+  [UNBOUND_NAMESPACE_ID]: {
+    id: UNBOUND_NAMESPACE_ID,
+    tables: {
+      [TEST_BOX_TABLE]: {
+        columns: {
+          x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
@@ -57,10 +59,12 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
   extensionPacks: {},
   meta: {},
   profileHash: profileHash('synthetic-test-contract-space-profile-v1'),
-  storage: new SqlStorage({
-    storageHash: coreHash(TEST_HEAD_HASH),
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace(storageBody.namespaces[UNBOUND_NAMESPACE_ID]),
-    },
-  }),
+  storage: new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash(TEST_HEAD_HASH),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace(storageBody[UNBOUND_NAMESPACE_ID]),
+      },
+    }),
+  ),
 };

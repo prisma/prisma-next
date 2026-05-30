@@ -143,21 +143,19 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
     profileHash: APP_PROFILE_HASH,
     storage: {
       storageHash: APP_CONTRACT_HASH,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          kind: 'sql-namespace',
-          tables: {
-            [APP_TABLE]: {
-              columns: {
-                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                [APP_FIELD]: embeddingColumn,
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        kind: 'sql-namespace',
+        tables: {
+          [APP_TABLE]: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              [APP_FIELD]: embeddingColumn,
             },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       },

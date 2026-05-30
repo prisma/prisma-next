@@ -70,31 +70,29 @@ function buildAppContract(): MongoContract {
       },
     },
     storage: {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__' as const,
-          kind: 'mongo-namespace' as const,
-          collections: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
-            },
-            posts: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'slug', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
-            },
+      __unbound__: {
+        id: '__unbound__' as const,
+        kind: 'mongo-namespace' as const,
+        collections: {
+          users: {
+            kind: 'mongo-collection' as const,
+            indexes: [
+              {
+                kind: 'mongo-index' as const,
+                keys: [{ field: 'email', direction: 1 as const }],
+                unique: true,
+              },
+            ],
+          },
+          posts: {
+            kind: 'mongo-collection' as const,
+            indexes: [
+              {
+                kind: 'mongo-index' as const,
+                keys: [{ field: 'slug', direction: 1 as const }],
+                unique: true,
+              },
+            ],
           },
         },
       },
@@ -131,21 +129,19 @@ function buildAppContractMissingPosts(): MongoContract {
       },
     },
     storage: {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__' as const,
-          kind: 'mongo-namespace' as const,
-          collections: {
-            users: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'email', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
-            },
+      __unbound__: {
+        id: '__unbound__' as const,
+        kind: 'mongo-namespace' as const,
+        collections: {
+          users: {
+            kind: 'mongo-collection' as const,
+            indexes: [
+              {
+                kind: 'mongo-index' as const,
+                keys: [{ field: 'email', direction: 1 as const }],
+                unique: true,
+              },
+            ],
           },
         },
       },
@@ -165,21 +161,19 @@ function buildExtContract(): MongoContract {
     roots: {},
     models: {},
     storage: {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__' as const,
-          kind: 'mongo-namespace' as const,
-          collections: {
-            cipherstash_state: {
-              kind: 'mongo-collection' as const,
-              indexes: [
-                {
-                  kind: 'mongo-index' as const,
-                  keys: [{ field: 'tenantId', direction: 1 as const }],
-                  unique: true,
-                },
-              ],
-            },
+      __unbound__: {
+        id: '__unbound__' as const,
+        kind: 'mongo-namespace' as const,
+        collections: {
+          cipherstash_state: {
+            kind: 'mongo-collection' as const,
+            indexes: [
+              {
+                kind: 'mongo-index' as const,
+                keys: [{ field: 'tenantId', direction: 1 as const }],
+                unique: true,
+              },
+            ],
           },
         },
       },

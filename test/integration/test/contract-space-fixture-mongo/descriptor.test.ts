@@ -1,4 +1,6 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { MongoNamespaceShape } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import {
   MONGO_TEST_BASELINE_INVARIANT_ID,
@@ -22,15 +24,18 @@ describe('test-mongo-contract-space fixture descriptor', () => {
   it('exposes a contractSpace whose contract declares the test_audit_event collection', () => {
     const space = mongoTestContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    const ns = space!.contractJson.storage.namespaces['__unbound__'];
+    const ns = getStorageNamespace<MongoNamespaceShape>(
+      space!.contractJson.storage,
+      UNBOUND_NAMESPACE_ID,
+    );
     expect(Object.keys(ns!.collections)).toEqual([MONGO_TEST_COLLECTION]);
   });
 
   it('declares one unique index and one strict validator on the test collection', () => {
-    const ns =
-      mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson.storage.namespaces[
-        '__unbound__'
-      ];
+    const ns = getStorageNamespace<MongoNamespaceShape>(
+      mongoTestContractSpaceExtensionDescriptor.contractSpace!.contractJson.storage,
+      UNBOUND_NAMESPACE_ID,
+    );
     const collection = ns!.collections[MONGO_TEST_COLLECTION];
     expect(collection).toBeDefined();
     expect(collection!.indexes).toHaveLength(1);

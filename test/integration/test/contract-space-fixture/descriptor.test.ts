@@ -1,5 +1,6 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   TEST_BASELINE_INVARIANT_ID,
@@ -24,7 +25,10 @@ describe('test-contract-space fixture descriptor', () => {
     const space = testContractSpaceExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
     expect(
-      Object.keys(space!.contractJson.storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables),
+      Object.keys(
+        getStorageNamespace<SqlNamespace>(space!.contractJson.storage, UNBOUND_NAMESPACE_ID)!
+          .tables,
+      ),
     ).toEqual([TEST_BOX_TABLE]);
   });
 
