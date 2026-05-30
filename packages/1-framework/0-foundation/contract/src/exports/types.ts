@@ -45,7 +45,10 @@ export type {
   ProfileHashBase,
   Source,
   StorageBase,
+  StorageEntitySlot,
   StorageHashBase,
+  StorageNamespaceTopology,
+  StorageTopology,
 } from '../types';
 export {
   coreHash,

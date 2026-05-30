@@ -1,4 +1,4 @@
-import { createContract } from '@prisma-next/contract/testing';
+import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { StorageBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
@@ -48,7 +48,7 @@ describe('projectSchemaToSpace', () => {
   function memberWithTables(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
     return {
       spaceId,
-      contract: createContract({
+      contract: createSqlContract({
         storage: {
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
