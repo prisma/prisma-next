@@ -4,7 +4,16 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
+// Mutable namespace view for assembling raw test contracts in place. The
+// runtime fixtures key namespaces directly under `storage` (ADR 221 flat
+// shape); this loose shape lets the helpers populate `tables` without the
+// readonly SQL IR types fighting the in-place mutation.
+type MutableNamespace = {
+  tables: Record<string, { columns: Record<string, unknown>; [key: string]: unknown }>;
+};
+
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { Codec, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -154,7 +163,7 @@ export function buildMixedPolyContract(): TestContract {
     base: 'Task',
   };
 
-  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.tasks = {
+  (getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID) as MutableNamespace).tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -167,7 +176,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.features = {
+  (getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID) as MutableNamespace).tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -215,17 +224,23 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.users.columns.kind = {
+  (
+    getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID) as MutableNamespace
+  ).tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.users.columns.role = {
+  (
+    getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID) as MutableNamespace
+  ).tables.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.users.columns.plan = {
+  (
+    getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID) as MutableNamespace
+  ).tables.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

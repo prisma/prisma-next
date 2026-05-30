@@ -1,4 +1,4 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 
 type StorageLike = {

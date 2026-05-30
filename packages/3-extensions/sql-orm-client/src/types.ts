@@ -577,15 +577,21 @@ type FieldColumnName<
     : FieldName) &
   string;
 
+// Namespace ids are direct keys under the flat `storage` plane (ADR 221);
+// `storageHash` / `types` are reserved sibling keys, not namespaces, so the
+// walk excludes them before pulling each namespace's `tables` map.
 type NamespaceTableDef<TContract extends Contract<SqlStorage>, TableName extends string> = {
-  [K in keyof TContract['storage']['namespaces']]: TContract['storage']['namespaces'][K] extends {
+  [K in Exclude<
+    keyof TContract['storage'],
+    'storageHash' | 'types'
+  >]: TContract['storage'][K] extends {
     readonly tables: infer Tables;
   }
     ? TableName extends keyof Tables
       ? Tables[TableName]
       : never
     : never;
-}[keyof TContract['storage']['namespaces']];
+}[Exclude<keyof TContract['storage'], 'storageHash' | 'types'>];
 
 type ResolvedStorageColumn<
   TContract extends Contract<SqlStorage>,
