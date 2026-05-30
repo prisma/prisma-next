@@ -108,6 +108,11 @@ async function isMongoContract(contractPath: string): Promise<boolean> {
  * A substring scan is unsafe here: a single closed branch would mask a sibling
  * that still needs re-emitting.
  */
+/** Narrows an arbitrary JSON-parsed value to a plain object (non-null, non-array). */
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function contractLooksClosed(raw: string): boolean {
   let parsed: unknown;
   try {
@@ -117,17 +122,16 @@ function contractLooksClosed(raw: string): boolean {
   }
 
   function isClosed(node: unknown): boolean {
-    if (node === null || typeof node !== 'object') return true;
     if (Array.isArray(node)) return node.every(isClosed);
+    if (!isJsonObject(node)) return true;
 
-    const obj = node as Record<string, unknown>;
-    const hasProperties = typeof obj['properties'] === 'object' && obj['properties'] !== null;
-    const isPolymorphicTopLevel = Array.isArray(obj['oneOf']);
-    if (hasProperties && !isPolymorphicTopLevel && obj['additionalProperties'] !== false) {
+    const hasProperties = isJsonObject(node['properties']);
+    const isPolymorphicTopLevel = Array.isArray(node['oneOf']);
+    if (hasProperties && !isPolymorphicTopLevel && node['additionalProperties'] !== false) {
       return false;
     }
 
-    return Object.values(obj).every(isClosed);
+    return Object.values(node).every(isClosed);
   }
 
   return isClosed(parsed);
@@ -138,8 +142,11 @@ async function packageJsonHasEmitScript(configDir: string): Promise<boolean> {
   if (!(await pathExists(pkgPath))) return false;
   const raw = await readFile(pkgPath, 'utf-8');
   try {
-    const parsed = JSON.parse(raw) as { scripts?: Record<string, string> };
-    return typeof parsed.scripts?.emit === 'string' && parsed.scripts.emit.length > 0;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isJsonObject(parsed)) return false;
+    const scripts = parsed['scripts'];
+    if (!isJsonObject(scripts)) return false;
+    return typeof scripts['emit'] === 'string' && scripts['emit'].length > 0;
   } catch {
     return false;
   }
