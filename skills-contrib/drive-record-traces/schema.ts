@@ -191,6 +191,37 @@ export const RetroLandedEvent = type({
   is_mandatory_final: 'boolean',
 });
 
+/**
+ * Per-run token usage accumulated from the Cursor SDK's `TurnEndedUpdate.usage`.
+ * Emitted once per `project_run_id` by the live-experiment harness. Hand-runs
+ * never emit it; their absence renders `n/a (no signal)` in the scorecard.
+ * Each component is nullable because the SDK may not report every figure.
+ * Field names mirror `usage.{inputTokens,outputTokens,cacheReadTokens,cacheWriteTokens}`.
+ */
+export const TokensRecordedEvent = type({
+  ...envelopeFields,
+  event_type: '"tokens-recorded"',
+  input_tokens: 'number.integer>=0 | null',
+  output_tokens: 'number.integer>=0 | null',
+  cache_read_tokens: 'number.integer>=0 | null',
+  cache_write_tokens: 'number.integer>=0 | null',
+});
+
+/**
+ * External Tier-1 correctness feed, sourced from outside the run and populated
+ * by the judge slice. Emitted once per `project_run_id`. Each component is
+ * `"pass" | "fail" | null`; `null` means the input has not been recorded yet.
+ * CORRECT requires all three to be `"pass"`; any `null` leaves the run's
+ * correctness `not computable` (the scorecard names the missing component).
+ */
+export const CorrectnessRecordedEvent = type({
+  ...envelopeFields,
+  event_type: '"correctness-recorded"',
+  mechanical: '"pass" | "fail" | null',
+  qa: '"pass" | "fail" | null',
+  intent: '"pass" | "fail" | null',
+});
+
 export const Slice1TraceEvent = DispatchStartEvent.or(DispatchEndEvent)
   .or(RoundStartEvent)
   .or(RoundEndEvent)
@@ -206,7 +237,9 @@ export const Slice1TraceEvent = DispatchStartEvent.or(DispatchEndEvent)
   .or(SliceStartedEvent)
   .or(SliceCompletedEvent)
   .or(HealthCheckFiredEvent)
-  .or(RetroLandedEvent);
+  .or(RetroLandedEvent)
+  .or(TokensRecordedEvent)
+  .or(CorrectnessRecordedEvent);
 
 export const TraceEvent = Slice1TraceEvent;
 export type TraceEvent = typeof Slice1TraceEvent.infer;
@@ -229,6 +262,8 @@ export const KNOWN_EVENT_TYPES = [
   'slice-completed',
   'health-check-fired',
   'retro-landed',
+  'tokens-recorded',
+  'correctness-recorded',
 ] as const;
 
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];

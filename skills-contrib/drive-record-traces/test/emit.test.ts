@@ -166,3 +166,134 @@ describe('emitEvent', () => {
     assert.equal(readFileSync(traceFile, 'utf8'), before);
   });
 });
+
+describe('emitEvent — tokens-recorded', () => {
+  it('accepts a fully-populated token usage event', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'tokens-recorded',
+      payload: {
+        input_tokens: 1_900_000,
+        output_tokens: 42_000,
+        cache_read_tokens: 800_000,
+        cache_write_tokens: 12_000,
+      },
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    const validated = Slice1TraceEvent(JSON.parse(result.line));
+    assert.ok(!(validated instanceof type.errors));
+  });
+
+  it('accepts null for every token component (partial SDK report)', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'tokens-recorded',
+      payload: {
+        input_tokens: null,
+        output_tokens: null,
+        cache_read_tokens: null,
+        cache_write_tokens: null,
+      },
+    });
+    assert.equal(result.ok, true);
+  });
+
+  it('rejects a negative token count and writes nothing', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'tokens-recorded',
+      payload: {
+        input_tokens: -1,
+        output_tokens: null,
+        cache_read_tokens: null,
+        cache_write_tokens: null,
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(existsSync(traceFile), false);
+  });
+
+  it('rejects a non-integer token count', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'tokens-recorded',
+      payload: {
+        input_tokens: 1.5,
+        output_tokens: null,
+        cache_read_tokens: null,
+        cache_write_tokens: null,
+      },
+    });
+    assert.equal(result.ok, false);
+  });
+
+  it('rejects a missing token component', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'tokens-recorded',
+      payload: { input_tokens: 1, output_tokens: 1, cache_read_tokens: 1 },
+    });
+    assert.equal(result.ok, false);
+  });
+});
+
+describe('emitEvent — correctness-recorded', () => {
+  it('accepts an all-pass correctness verdict', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'correctness-recorded',
+      payload: { mechanical: 'pass', qa: 'pass', intent: 'pass' },
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    const validated = Slice1TraceEvent(JSON.parse(result.line));
+    assert.ok(!(validated instanceof type.errors));
+  });
+
+  it('accepts null components (feed not yet populated)', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'correctness-recorded',
+      payload: { mechanical: 'pass', qa: null, intent: null },
+    });
+    assert.equal(result.ok, true);
+  });
+
+  it('rejects an unknown verdict value and writes nothing', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'correctness-recorded',
+      payload: { mechanical: 'maybe', qa: 'pass', intent: 'pass' },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(existsSync(traceFile), false);
+  });
+
+  it('rejects a missing component', () => {
+    const traceFile = join(dir, 'trace.jsonl');
+    const result = emitEvent({
+      traceFile,
+      projectRunId: 'sample-project',
+      event: 'correctness-recorded',
+      payload: { mechanical: 'pass', qa: 'pass' },
+    });
+    assert.equal(result.ok, false);
+  });
+});
