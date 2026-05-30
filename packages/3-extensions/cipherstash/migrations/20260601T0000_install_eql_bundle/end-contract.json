@@ -4,7 +4,10 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "eql_v2_configuration": "EqlV2Configuration"
+    "eql_v2_configuration": {
+      "model": "EqlV2Configuration",
+      "namespace": "__unbound__"
+    }
   },
   "models": {
     "EqlV2Configuration": {
@@ -49,42 +52,42 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "eql_v2_configuration": {
-            "columns": {
-              "data": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "state": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+    "__unbound__": {
+      "id": "__unbound__",
+      "kind": "postgres-unbound-schema",
+      "tables": {
+        "eql_v2_configuration": {
+          "columns": {
+            "data": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": false
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": ["id"]
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "uniques": []
-          }
+            "state": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:5fde95fc595b8f1a040f5e6dd986cd913d07c018319d6fa18fdbeb6d507489ec"
+    "storageHash": "sha256:1d80ee12f4dcc582393f331c89a7a691866d5071348009e7caff9c6c5b1880f2"
   },
   "capabilities": {
     "postgres": {
+      "distinctOn": true,
       "jsonAgg": true,
       "lateral": true,
       "limit": true,
@@ -94,6 +97,7 @@
     "sql": {
       "defaultInInsert": true,
       "enums": true,
+      "lateral": true,
       "returning": true
     }
   },

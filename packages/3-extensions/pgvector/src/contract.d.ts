@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:06733db8971afcf2fb373dcd1278e801e9e1e083d6f07d07bc7479e143c938e3'>;
+  StorageHashBase<'sha256:115db76021324eb08a3febda023639a9825fc2ccdad424a43bd40e90fb0c72a2'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -54,12 +54,11 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<
     {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly tables: {};
-        };
+      readonly storageHash: StorageHash;
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {};
       };
       readonly types: {
         readonly vector: {
@@ -69,7 +68,6 @@ type ContractBase = Omit<
           readonly typeParams: Record<string, never>;
         };
       };
-      readonly storageHash: StorageHash;
     },
     Record<string, never>
   >,
@@ -102,5 +100,5 @@ type ContractBase = Omit<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Namespaces = Contract['storage']['namespaces'];
+export type Namespaces = Omit<Contract['storage'], 'storageHash' | 'types'>;
 export type Models = Contract['models'];
