@@ -155,7 +155,7 @@ async function setupTamperFixture(): Promise<TamperFixture> {
   await writeFile(join(packageDir, 'ops.json'), JSON.stringify(TAMPERED_OPS, null, 2));
 
   // contract.json at the default location so commands that read the contract
-  // (apply, plan, status) reach `loadMigrationPackages` without erroring earlier.
+  // (apply, plan, status) reach the tolerant aggregate read without erroring earlier.
   const contractDir = join(cwd, 'src', 'prisma');
   await mkdir(contractDir, { recursive: true });
   await writeFile(

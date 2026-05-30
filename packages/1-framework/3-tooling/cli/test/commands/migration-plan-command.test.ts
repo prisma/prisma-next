@@ -5,6 +5,7 @@ import {
   createContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { timeouts } from '@prisma-next/test-utils';
@@ -21,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   readFile: vi.fn(),
   mkdir: vi.fn(),
   writeFile: vi.fn(),
-  loadMigrationPackages: vi.fn(),
+  buildReadAggregate: vi.fn(),
   readRefs: vi.fn(),
   readRefSnapshot: vi.fn(),
   writeMigrationPackage: vi.fn(),
@@ -50,21 +51,12 @@ vi.mock('../../src/utils/contract-space-seed-phase', () => ({
 
 vi.mock('../../src/utils/contract-space-aggregate-loader', () => ({
   buildContractSpaceAggregate: mocks.buildContractSpaceAggregate,
+  buildReadAggregate: mocks.buildReadAggregate,
 }));
 
 vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
-
-vi.mock('../../src/utils/command-helpers', async () => {
-  const actual = await vi.importActual<typeof import('../../src/utils/command-helpers')>(
-    '../../src/utils/command-helpers',
-  );
-  return {
-    ...actual,
-    loadMigrationPackages: mocks.loadMigrationPackages,
-  };
-});
 
 vi.mock('@prisma-next/migration-tools/refs', async () => {
   const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/refs')>(
@@ -144,10 +136,34 @@ function makeBundle(from: string, to: string, dirName: string): OnDiskMigrationP
 
 function graphWithPriorMigration(fromHash: string): {
   bundles: OnDiskMigrationPackage[];
-  graph: ReturnType<typeof reconstructGraph>;
+  graph: MigrationGraph;
 } {
   const bundles = [makeBundle(EMPTY_CONTRACT_HASH, fromHash, '20260301T0900_prev')];
   return { bundles, graph: reconstructGraph(bundles) };
+}
+
+function mockReadAggregateFromPackages(
+  bundles: readonly OnDiskMigrationPackage[],
+  contractHash = SAME_HASH,
+): void {
+  const app = createContractSpaceMember({
+    spaceId: 'app',
+    packages: bundles,
+    refs: {},
+    headRef: { hash: contractHash, invariants: [] },
+    resolveContract: () => JSON.parse(makeContractJson(contractHash)) as Contract,
+  });
+  mocks.buildReadAggregate.mockResolvedValue(
+    ok({
+      aggregate: createContractSpaceAggregate({
+        targetId: 'mongo',
+        app,
+        extensions: [],
+        checkIntegrity: () => [],
+      }),
+      contractHash,
+    }),
+  );
 }
 
 function defaultPlannerSuccess(
@@ -211,7 +227,7 @@ function setupAutoBaselineEmptyGraph(fromHash = OLD_HASH, toHash = NEW_HASH): vo
     );
   setupBaseConfig(planMock);
   mocks.readFile.mockResolvedValue(makeContractJson(toHash));
-  mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+  mockReadAggregateFromPackages([]);
   setupDbRefFromHash(fromHash);
   mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
   mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -256,7 +272,7 @@ describe('migration plan command', () => {
   // The repo-wide vitest config uses `isolate: false`, so every `vi.mock(...)`
   // registered above leaks into the next test file in the same worker (which
   // breaks anything that does real fs I/O against `node:fs/promises.readFile`,
-  // `command-helpers.loadMigrationPackages`, or `migration-tools/io.writeMigrationPackage`).
+  // `buildReadAggregate`, or `migration-tools/io.writeMigrationPackage`).
   // Use `doUnmock` (non-hoisted) here so subsequent files see the real modules.
   afterAll(() => {
     vi.doUnmock('node:fs/promises');
@@ -313,7 +329,7 @@ describe('migration plan command', () => {
         );
       setupBaseConfig(planMock);
       mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      mockReadAggregateFromPackages([]);
       setupDbRefFromHash(SAME_HASH);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -343,6 +359,65 @@ describe('migration plan command', () => {
       expect(result.summary).toContain('Planned baseline');
     });
 
+    it('pins --json output for baseline-only on empty graph', async () => {
+      const planMock = vi
+        .fn()
+        .mockReturnValueOnce(
+          defaultPlannerSuccess([
+            { id: 'baseline.table', label: 'Create baseline table', operationClass: 'additive' },
+          ]),
+        );
+      setupBaseConfig(planMock);
+      mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
+      mockReadAggregateFromPackages([]);
+      setupDbRefFromHash(SAME_HASH);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json']);
+      expect(exitCode).toBe(0);
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const parsed = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(parsed.baselineDir).toMatch(/\/\d{8}T\d{4}_baseline$/);
+      expect(
+        JSON.stringify(
+          {
+            ok: parsed.ok,
+            noOp: parsed.noOp,
+            from: parsed.from,
+            to: parsed.to,
+            emittedExtensionDirs: parsed.emittedExtensionDirs,
+            operations: parsed.operations,
+            summary: parsed.summary,
+          },
+          null,
+          2,
+        ),
+      ).toBe(
+        [
+          '{',
+          '  "ok": true,',
+          '  "noOp": false,',
+          `  "from": "${SAME_HASH}",`,
+          `  "to": "${SAME_HASH}",`,
+          '  "emittedExtensionDirs": [],',
+          '  "operations": [',
+          '    {',
+          '      "id": "baseline.table",',
+          '      "label": "Create baseline table",',
+          '      "operationClass": "additive"',
+          '    }',
+          '  ],',
+          '  "summary": "Planned baseline + 0 operation(s)"',
+          '}',
+        ].join('\n'),
+      );
+    });
+
     it('refuses without writing when baseline planner fails', async () => {
       const planMock = vi.fn().mockReturnValueOnce({
         kind: 'failure',
@@ -350,7 +425,7 @@ describe('migration plan command', () => {
       });
       setupBaseConfig(planMock);
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      mockReadAggregateFromPackages([]);
       setupDbRefFromHash(OLD_HASH);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
 
@@ -375,7 +450,7 @@ describe('migration plan command', () => {
         });
       setupBaseConfig(planMock);
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      mockReadAggregateFromPackages([]);
       setupDbRefFromHash(OLD_HASH);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -470,7 +545,7 @@ describe('migration plan command', () => {
         ),
       );
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles: [], graph: reconstructGraph([]) });
+      mockReadAggregateFromPackages([]);
       setupDbRefFromHash(OLD_HASH);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -494,8 +569,8 @@ describe('migration plan command', () => {
     it('returns noOp envelope without dir when hashes match', async () => {
       setupBaseConfig();
       mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
-      const { bundles, graph } = graphWithPriorMigration(SAME_HASH);
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      const { bundles } = graphWithPriorMigration(SAME_HASH);
+      mockReadAggregateFromPackages(bundles);
       setupDbRefFromHash(SAME_HASH);
 
       const command = createMigrationPlanCommand();
@@ -523,8 +598,8 @@ describe('migration plan command', () => {
     it('scaffolds migration.ts from the planner result and reports operations', async () => {
       setupBaseConfig();
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      const { bundles, graph } = graphWithPriorMigration(OLD_HASH);
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      const { bundles } = graphWithPriorMigration(OLD_HASH);
+      mockReadAggregateFromPackages(bundles);
       setupDbRefFromHash(OLD_HASH);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -601,8 +676,8 @@ describe('migration plan command', () => {
       const NEW_HASH = `sha256:${'n'.repeat(64)}`;
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH, 'postgres'));
-      const { bundles, graph } = graphWithPriorMigration(OLD_HASH);
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      const { bundles } = graphWithPriorMigration(OLD_HASH);
+      mockReadAggregateFromPackages(bundles);
       setupDbRefFromHash(OLD_HASH);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -633,8 +708,8 @@ describe('migration plan command', () => {
       });
 
       mocks.readFile.mockResolvedValue(makeContractJson(`sha256:${'c'.repeat(64)}`, 'postgres'));
-      const { bundles, graph } = graphWithPriorMigration(`sha256:${'b'.repeat(64)}`);
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      const { bundles } = graphWithPriorMigration(`sha256:${'b'.repeat(64)}`);
+      mockReadAggregateFromPackages(bundles);
       setupDbRefFromHash(`sha256:${'b'.repeat(64)}`);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -653,10 +728,7 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadMigrationPackages.mockResolvedValue({
-        bundles: [],
-        graph: new Map(),
-      });
+      mockReadAggregateFromPackages([]);
       setupGreenfieldRefs();
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -682,8 +754,8 @@ describe('migration plan command', () => {
         }
         return makeContractJson(NEW_HASH);
       });
-      const { bundles, graph } = graphWithPriorMigration(OLD_HASH);
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      const { bundles } = graphWithPriorMigration(OLD_HASH);
+      mockReadAggregateFromPackages(bundles);
       mocks.readRefs.mockResolvedValue({});
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -732,8 +804,8 @@ describe('migration plan command', () => {
         }
         return makeContractJson(NEW_HASH);
       });
-      const { bundles, graph } = graphWithPriorMigration(OLD_HASH);
-      mocks.loadMigrationPackages.mockResolvedValue({ bundles, graph });
+      const { bundles } = graphWithPriorMigration(OLD_HASH);
+      mockReadAggregateFromPackages(bundles);
       mocks.readRefs.mockResolvedValue({});
 
       const command = createMigrationPlanCommand();
