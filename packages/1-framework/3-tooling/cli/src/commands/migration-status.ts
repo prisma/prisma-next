@@ -26,7 +26,6 @@ import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/packag
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { cyan, dim, magenta, yellow } from 'colorette';
@@ -54,6 +53,8 @@ import {
   toStructuralEdge,
 } from '../utils/command-helpers';
 import {
+  appContractStandInFromIdentity,
+  loadContractRawSafely,
   refuseContractSpaceIntegrity,
   refusePackageCorruptionOnAggregate,
 } from '../utils/contract-space-aggregate-loader';
@@ -531,33 +532,6 @@ export async function loadAggregateStatusSpaces(args: {
  * problem via a status diagnostic, no need to double-surface.
  */
 
-function appContractShellForAggregateLoad(args: {
-  readonly contractHash: string;
-  readonly targetId: string;
-  readonly targetFamily: string;
-}): Contract {
-  return blindCast<Contract, 'status aggregate load without contract.json'>({
-    storage: { storageHash: args.contractHash },
-    schemaVersion: '0.0.0',
-    target: args.targetId,
-    targetFamily: args.targetFamily,
-    models: {},
-    profileHash: EMPTY_CONTRACT_HASH,
-  });
-}
-
-async function loadContractRawSafely(config: {
-  contract?: { output?: string };
-}): Promise<unknown | null> {
-  try {
-    const path = (await import('../utils/command-helpers')).resolveContractPath(config);
-    const raw = await (await import('node:fs/promises')).readFile(path, 'utf-8');
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 async function validateOnlineMarkerRead(
   config: Awaited<ReturnType<typeof loadConfig>>,
   dbConnection: unknown,
@@ -637,12 +611,12 @@ async function executeMigrationStatusCommand(
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
   const deserializeContract = (json: unknown): Contract => familyInstance.deserializeContract(json);
-  const appContractShell = appContractShellForAggregateLoad({
+  const appContractStandIn = appContractStandInFromIdentity({
     contractHash,
     targetId: config.target.id,
     targetFamily: config.target.familyId,
   });
-  let appContractForLoad: Contract = appContractShell;
+  let appContractForLoad: Contract = appContractStandIn;
   if (contractRawForAggregate !== null) {
     try {
       appContractForLoad = deserializeContract(contractRawForAggregate);

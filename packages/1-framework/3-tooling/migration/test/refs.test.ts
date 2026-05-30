@@ -1,6 +1,6 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'pathe';
+import { dirname, join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
 import type { RefEntry, Refs } from '../src/refs';
@@ -9,6 +9,7 @@ import {
   readRef,
   readRefs,
   resolveRef,
+  resolveRefsByContractHash,
   validateRefName,
   validateRefValue,
   writeRef,
@@ -513,5 +514,37 @@ describe('round-trip', () => {
     await deleteRef(refsDir, 'staging');
     const refs = await readRefs(refsDir);
     expect(refs).toEqual({ production: ENTRY_B });
+  });
+});
+
+const HASH_BRANCH_A = `sha256:${'c'.repeat(64)}`;
+const HASH_POSTGIS = `sha256:${'f'.repeat(64)}`;
+
+describe('resolveRefsByContractHash', () => {
+  let refsDir: string;
+
+  beforeEach(async () => {
+    refsDir = join(await mkdtemp(join(tmpdir(), 'resolve-refs-')), 'refs');
+    await mkdir(refsDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(dirname(refsDir), { recursive: true, force: true });
+  });
+
+  it('returns an empty map when the refs directory does not exist', async () => {
+    const map = await resolveRefsByContractHash(join(refsDir, 'nope'));
+    expect(map.size).toBe(0);
+  });
+
+  it('groups multiple refs that share a hash into a single sorted bucket', async () => {
+    await writeRef(refsDir, 'staging', { hash: HASH_BRANCH_A, invariants: [] });
+    await writeRef(refsDir, 'production', { hash: HASH_BRANCH_A, invariants: [] });
+    await writeRef(refsDir, 'db', { hash: HASH_POSTGIS, invariants: [] });
+
+    const map = await resolveRefsByContractHash(refsDir);
+
+    expect(map.get(HASH_BRANCH_A)).toEqual(['production', 'staging']);
+    expect(map.get(HASH_POSTGIS)).toEqual(['db']);
   });
 });

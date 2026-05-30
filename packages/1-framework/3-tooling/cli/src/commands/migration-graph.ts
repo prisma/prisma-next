@@ -1,24 +1,17 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
-import { readRefs } from '@prisma-next/migration-tools/refs';
-import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import {
-  type CliStructuredError,
-  errorUnexpected,
-  mapMigrationToolsError,
-} from '../utils/cli-errors';
+import type { CliStructuredError } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadMigrationPackages,
-  readContractEnvelope,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
   setCommandSeeAlso,
 } from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { migrationGraphToRenderInput } from '../utils/formatters/graph-migration-mapper';
 import { graphRenderer } from '../utils/formatters/graph-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -41,13 +34,13 @@ export interface MigrationGraphResult {
   readonly summary: string;
 }
 
-async function executeMigrationGraphCommand(
+export async function executeMigrationGraphCommand(
   options: MigrationGraphOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
 ): Promise<Result<MigrationGraphResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, appMigrationsDir, appMigrationsRelative, refsDir } = resolveMigrationPaths(
+  const { configPath, appMigrationsRelative, migrationsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -65,37 +58,18 @@ async function executeMigrationGraphCommand(
     ui.stderr(header);
   }
 
-  let graph: MigrationGraph;
-  try {
-    ({ graph } = await loadMigrationPackages(appMigrationsDir));
-  } catch (error) {
-    if (MigrationToolsError.is(error)) return notOk(mapMigrationToolsError(error));
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read migrations: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
+  const loaded = await buildReadAggregate(config, { migrationsDir });
+  if (!loaded.ok) {
+    return loaded;
   }
 
-  let contractHash: string | null = null;
-  try {
-    const envelope = await readContractEnvelope(config);
-    contractHash = envelope.storageHash;
-  } catch {
-    // Contract unreadable — render graph without contract marker
-  }
-
-  let refs: readonly StatusRef[] = [];
-  try {
-    const allRefs = await readRefs(refsDir);
-    refs = Object.entries(allRefs).map(([name, entry]) => ({
-      name,
-      hash: entry.hash,
-      active: false,
-    }));
-  } catch {
-    // Refs unreadable — render graph without ref markers
-  }
+  const { aggregate, contractHash } = loaded.value;
+  const graph = aggregate.app.graph();
+  const refs: readonly StatusRef[] = Object.entries(aggregate.app.refs).map(([name, entry]) => ({
+    name,
+    hash: entry.hash,
+    active: false,
+  }));
 
   return ok({
     ok: true,

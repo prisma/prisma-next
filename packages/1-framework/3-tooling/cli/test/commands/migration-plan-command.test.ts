@@ -24,7 +24,6 @@ const mocks = vi.hoisted(() => ({
   readFile: vi.fn(),
   mkdir: vi.fn(),
   writeFile: vi.fn(),
-  loadMigrationPackages: vi.fn(),
   readRefs: vi.fn(),
   readRefSnapshot: vi.fn(),
   writeMigrationPackage: vi.fn(),
@@ -60,16 +59,6 @@ vi.mock('../../src/utils/contract-space-aggregate-loader', () => ({
 vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
-
-vi.mock('../../src/utils/command-helpers', async () => {
-  const actual = await vi.importActual<typeof import('../../src/utils/command-helpers')>(
-    '../../src/utils/command-helpers',
-  );
-  return {
-    ...actual,
-    loadMigrationPackages: mocks.loadMigrationPackages,
-  };
-});
 
 vi.mock('@prisma-next/migration-tools/refs', async () => {
   const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/refs')>(
