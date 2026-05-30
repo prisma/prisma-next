@@ -1,4 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { MigrationListEntry } from './migration-list-types';
 
 export type MigrationEdgeKind = 'forward' | 'rollback' | 'self';
@@ -9,17 +10,19 @@ export interface MigrationListGraphTopology {
   readonly forwardOutDegree: ReadonlyMap<string, number>;
 }
 
-interface NonSelfEdge {
-  readonly entry: MigrationListEntry;
+// ---------------------------------------------------------------------------
+// Shared DFS classifier — operates on a normalized edge shape common to both
+// MigrationListEntry (Tier-2) and MigrationEdge / MigrationGraph (Tier-3).
+// ---------------------------------------------------------------------------
+
+interface NormalizedEdge {
+  readonly hash: string;
   readonly from: string;
   readonly to: string;
+  readonly dirName: string;
 }
 
-function canonicalFrom(from: string | null): string {
-  return from ?? EMPTY_CONTRACT_HASH;
-}
-
-function compareDirNameDesc(a: MigrationListEntry, b: MigrationListEntry): number {
+function compareDirNameDesc(a: NormalizedEdge, b: NormalizedEdge): number {
   return b.dirName.localeCompare(a.dirName);
 }
 
@@ -27,32 +30,37 @@ function bumpDegree(map: Map<string, number>, key: string): void {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
-export function classifyMigrationListGraphTopology(
-  entries: readonly MigrationListEntry[],
-): MigrationListGraphTopology {
+/**
+ * Core DFS classifier. Accepts a normalized edge set and produces the full
+ * topology: kind per migration hash, plus forward in/out degrees per node.
+ *
+ * Both Tier-2 (classifyMigrationListGraphTopology) and Tier-3
+ * (classifyMigrationGraphTopology) delegate here after normalizing their
+ * respective input types. The DFS algorithm — back-edge detection, dirName-
+ * descending neighbour order, root-seeding, cycle fallback — lives in exactly
+ * one place so both tiers agree on forward/rollback/self classification.
+ */
+function classifyNormalizedEdges(edges: readonly NormalizedEdge[]): MigrationListGraphTopology {
   const nodes = new Set<string>();
   const kindByMigrationHash = new Map<string, MigrationEdgeKind>();
-  const outgoingByFrom = new Map<string, NonSelfEdge[]>();
+  const outgoingByFrom = new Map<string, NormalizedEdge[]>();
 
-  for (const entry of entries) {
-    const from = canonicalFrom(entry.from);
-    const to = entry.to;
-    nodes.add(from);
-    nodes.add(to);
+  for (const edge of edges) {
+    nodes.add(edge.from);
+    nodes.add(edge.to);
 
-    if (from === to) {
-      kindByMigrationHash.set(entry.migrationHash, 'self');
+    if (edge.from === edge.to) {
+      kindByMigrationHash.set(edge.hash, 'self');
       continue;
     }
 
-    const bucket = outgoingByFrom.get(from);
-    const edge: NonSelfEdge = { entry, from, to };
+    const bucket = outgoingByFrom.get(edge.from);
     if (bucket) bucket.push(edge);
-    else outgoingByFrom.set(from, [edge]);
+    else outgoingByFrom.set(edge.from, [edge]);
   }
 
   for (const bucket of outgoingByFrom.values()) {
-    bucket.sort((a, b) => compareDirNameDesc(a.entry, b.entry));
+    bucket.sort(compareDirNameDesc);
   }
 
   const nonSelfInDegree = new Map<string, number>();
@@ -90,7 +98,7 @@ export function classifyMigrationListGraphTopology(
 
   interface Frame {
     node: string;
-    outgoing: readonly NonSelfEdge[];
+    outgoing: readonly NormalizedEdge[];
     index: number;
   }
   const stack: Frame[] = [];
@@ -120,9 +128,9 @@ export function classifyMigrationListGraphTopology(
       const v = edge.to;
       const vColor = color.get(v);
       if (vColor === GRAY) {
-        kindByMigrationHash.set(edge.entry.migrationHash, 'rollback');
+        kindByMigrationHash.set(edge.hash, 'rollback');
       } else {
-        kindByMigrationHash.set(edge.entry.migrationHash, 'forward');
+        kindByMigrationHash.set(edge.hash, 'forward');
         if (vColor === WHITE) {
           pushFrame(v);
         }
@@ -142,12 +150,10 @@ export function classifyMigrationListGraphTopology(
   const forwardInDegree = new Map<string, number>();
   const forwardOutDegree = new Map<string, number>();
 
-  for (const entry of entries) {
-    if (kindByMigrationHash.get(entry.migrationHash) !== 'forward') continue;
-    const from = canonicalFrom(entry.from);
-    const to = entry.to;
-    bumpDegree(forwardOutDegree, from);
-    bumpDegree(forwardInDegree, to);
+  for (const edge of edges) {
+    if (kindByMigrationHash.get(edge.hash) !== 'forward') continue;
+    bumpDegree(forwardOutDegree, edge.from);
+    bumpDegree(forwardInDegree, edge.to);
   }
 
   return {
@@ -155,4 +161,46 @@ export function classifyMigrationListGraphTopology(
     forwardInDegree,
     forwardOutDegree,
   };
+}
+
+function canonicalFrom(from: string | null): string {
+  return from ?? EMPTY_CONTRACT_HASH;
+}
+
+/**
+ * Classify forward/rollback/self for a Tier-2 `MigrationListEntry[]` edge set.
+ * Returns the kind of each migration plus the forward in/out degree of each
+ * contract node. This is the established Tier-2 surface; its behaviour is
+ * unchanged — only its implementation now delegates to the shared DFS core.
+ */
+export function classifyMigrationListGraphTopology(
+  entries: readonly MigrationListEntry[],
+): MigrationListGraphTopology {
+  const normalized: NormalizedEdge[] = entries.map((entry) => ({
+    hash: entry.migrationHash,
+    from: canonicalFrom(entry.from),
+    to: entry.to,
+    dirName: entry.dirName,
+  }));
+  return classifyNormalizedEdges(normalized);
+}
+
+/**
+ * Classify forward/rollback/self for a `MigrationGraph` edge set (Tier-3).
+ * Delegates to the same shared DFS core as `classifyMigrationListGraphTopology`
+ * so both tiers agree on classification without duplicating the DFS algorithm.
+ */
+export function classifyMigrationGraphTopology(graph: MigrationGraph): MigrationListGraphTopology {
+  const normalized: NormalizedEdge[] = [];
+  for (const edges of graph.forwardChain.values()) {
+    for (const edge of edges) {
+      normalized.push({
+        hash: edge.migrationHash,
+        from: edge.from,
+        to: edge.to,
+        dirName: edge.dirName,
+      });
+    }
+  }
+  return classifyNormalizedEdges(normalized);
 }
