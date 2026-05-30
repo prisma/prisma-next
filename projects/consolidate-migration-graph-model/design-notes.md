@@ -17,13 +17,27 @@
 
 ### Entities and vocabulary
 
-The graph is built by `reconstructGraph` (kept, it is already neutral): nodes are the contract hashes appearing as any edge's `from`/`to` (with `from: null` canonicalised to `EMPTY_CONTRACT_HASH`), edges are migrations. On top of that the consolidated model defines, in one place, the tolerant vocabulary currently living only in `migration-list-graph-topology.ts`:
+The graph itself — nodes are the contract hashes appearing as any edge's `from`/`to` (with `from: null` canonicalised to `EMPTY_CONTRACT_HASH`), edges are migrations — is produced by `reconstructGraph`, which stays as-is (it is already neutral). But **consumers never call `reconstructGraph` directly**: the graph is obtained from the `ContractSpaceAggregate` (see § Where the graph comes from). On top of the aggregate-provided graph the consolidated model defines, in one place, the tolerant vocabulary currently living only in `migration-list-graph-topology.ts`:
 
 - **Root** — a node with forward-in-degree 0. There may be zero, one, or many. `EMPTY_CONTRACT_HASH` is *one possible* root, never assumed present.
 - **Tip** — a node with forward-out-degree 0. There may be zero, one, or many. "The latest migration" is not a well-defined singular concept; "the set of tips" is.
 - **Edge kind** — `forward` / `rollback` (DFS back-edge) / `self`, partitioned by a single deterministic 3-colour DFS with neighbour order pinned to `dirName`-descending, seeded from roots first then any unvisited remainder. This is exactly the tolerant classifier's algorithm.
 - **Forward subgraph** — edges classified `forward`; reachability, root/tip degree, and convergence/divergence are all computed over this subgraph.
 - **Dangling parent** — a `from` with no producing edge present (pruned ancestor). The model treats it as a root, not an error.
+
+### Where the graph comes from: the `ContractSpaceAggregate`
+
+The consolidated model is graph *reasoning*; it does **not** own graph *sourcing*. Sourcing already has a home: `ContractSpaceAggregate` (`aggregate/types.ts`, `aggregate/aggregate.ts`) is the tolerant, queryable snapshot of a project's on-disk migration state, built once per CLI invocation by `loadContractSpaceAggregate`. Each `ContractSpaceMember` exposes a memoised `graph()` that lazily calls `reconstructGraph(packages)` and caches it. The aggregate's documented contract is explicit: *"every consumer obtains spaces / packages / refs / graphs from this one value rather than re-deriving them from disk."*
+
+So the consolidation has **two axes**, and the aggregate is load-bearing on both:
+
+1. **Graph sourcing — always via the aggregate.** A consumer that needs a graph calls `member.graph()`. It never calls `reconstructGraph` itself and never re-reads the migrations directory. Most commands already comply (`migrate`, `status`, `show`, `new`, `migration-apply`, aggregate `graph-walk`, `planner`, `check-integrity`). Three surfaces still bypass it and re-derive from disk — `command-helpers.ts` (`loadMigrationPackages`), `compute-extension-space-apply-path.ts`, and `migration-check.ts` — and are migrated onto the aggregate as part of this work (see § Disposition).
+
+2. **Graph reasoning — one model, ideally hung off the aggregate member.** The tolerant root/tip/edge-kind/reachability vocabulary is a small set of pure functions over a `MigrationGraph` in `migration-tools`. To make "one model, one place" literal (and to avoid every caller re-running a DFS), the recommended shape is to expose the derived topology as an additional **memoised facet on `ContractSpaceMember`** — e.g. `member.topology()` returning `{ roots, tips, edgeKinds, … }` — sitting beside the existing `graph()` / `contract()` facets. Whether the vocabulary ships as free functions, member facets, or both is a slice-1 model-surface decision; the invariant is that there is exactly one implementation and consumers reach it through the aggregate.
+
+The payoff: "consolidate the graph model" and "stop re-deriving graphs from disk" become the *same* change. The aggregate is where the single model is anchored, so a second code path can't reintroduce the golden-path assumption — there is only one graph per space, built once, reasoned about one way.
+
+> **Caveat — the list views are not on the aggregate yet.** `migration list` / `list --graph` source their data from `enumerateMigrationSpaces`, and the tolerant classifier consumes `MigrationListEntry[]`, not a `MigrationGraph`. Putting those views on the aggregate is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand)'s scope (still backlog). This creates a genuine fork for slice 1 — see § Open questions.
 
 ### What targeting becomes
 
@@ -40,9 +54,15 @@ The graph still answers **structural** questions — *is X reachable from Y?* (`
 
 ### Disposition of the existing surface
 
-- **Keep, already neutral:** `reconstructGraph`, `findPath`, `findPathWithInvariants`, `findPathWithDecision`, `findReachableLeaves` (takes an explicit origin), `detectCycles`.
+- **Keep, already neutral:** `reconstructGraph` (stays the aggregate's internal builder — not called by consumers), `findPath`, `findPathWithInvariants`, `findPathWithDecision`, `findReachableLeaves` (takes an explicit origin), `detectCycles`.
 - **Refound or remove (golden-path semantics):** `findLeaf` (throws on missing `∅`, throws on >1 tip), `findLatestMigration` (walks `∅ → the leaf`), and the `NO_INITIAL_MIGRATION` / `AMBIGUOUS_TARGET` / `NO_TARGET` error paths. Replace "the tip" with "the set of tips"; replace the throws with actionable "name your target" errors at the command boundary.
-- **Promote to canonical:** the tolerant classifier's root/tip/edge-kind vocabulary becomes the shared model API, consumed by both the list views and the rest of the commands.
+- **Promote to canonical:** the tolerant classifier's root/tip/edge-kind vocabulary becomes the shared model API (free functions over `MigrationGraph`, and/or a memoised `member.topology()` facet on `ContractSpaceMember`), consumed by both the list views and the rest of the commands.
+- **Route through the aggregate (stop re-deriving from disk):** three surfaces currently read the migrations directory and call `reconstructGraph` themselves, bypassing the aggregate's single-snapshot contract:
+  - `cli/utils/command-helpers.ts` `loadMigrationPackages` (`readMigrationsDir` + `reconstructGraph`).
+  - `migration-tools/compute-extension-space-apply-path.ts` (`readMigrationsDir` + `reconstructGraph`, then `findPathWithDecision`).
+  - `cli/commands/migration-check.ts` (`reconstructGraph(bundles)`).
+
+  Each is migrated to obtain its graph from the relevant `ContractSpaceMember.graph()`. Where a command genuinely runs before an aggregate exists (e.g. a pre-load health check), that is called out explicitly rather than left as an ad-hoc `reconstructGraph` call.
 - **`isGraphNode`/`assertHashIsGraphNode`:** revisit the `EMPTY_CONTRACT_HASH`-is-always-a-node special-case — under init-anywhere, `∅` is only a node if an edge actually references it.
 
 ### Consumer migration shape
@@ -66,6 +86,14 @@ All design-level forks are resolved (operator, 2026-05-30) and folded into § Th
 - **Dagre spine:** roots at actual forward-in-degree-0 nodes; hardcoded `∅` removed.
 
 Residual implementation-level questions (the `∅` special-case in `isGraphNode`, the precise new error code/shape for the multi-tip case) are decided in the slice that touches them, not here.
+
+**Open (needs operator input) — the list-view / TML-2716 fork.** The reasoning model is a `MigrationGraph` consumer, but the shipped tolerant classifier consumes `MigrationListEntry[]`, and `migration list` / `list --graph` are not on the aggregate (they enumerate via `enumerateMigrationSpaces`). Putting those views on the aggregate is [TML-2716](https://linear.app/prisma-company/issue/TML-2716/adopt-contractspaceaggregate-in-migration-list-graph-log-delete-hand) (backlog). Three ways to reconcile:
+
+1. **Depend on TML-2716.** Land it first (or fold it in), so the list views source from the aggregate too and the classifier is refounded on `MigrationGraph`. Cleanest end state; widens this project's scope.
+2. **Found the vocabulary on `MigrationGraph` now; adapt the list views later.** This project ships the canonical reasoning over `MigrationGraph`; the list views keep their `MigrationListEntry[]` classifier until TML-2716 migrates them. Risk: two tolerant implementations coexist transiently (the very duplication we're removing), with a tracked follow-up to converge.
+3. **Keep the entry-based classifier as the canonical input shape.** Reason over `MigrationListEntry[]` everywhere and derive entries from the aggregate's graph for the non-list consumers. Inverts the natural data flow (graph → entries) and is likely the wrong primitive.
+
+Recommendation: (1) if the operator is willing to couple the two tickets, else (2) with an explicit convergence follow-up. This decision sets slice 1's model-surface input type and possibly adds a dependency, so it is resolved before slice 1 starts.
 
 ## References
 
