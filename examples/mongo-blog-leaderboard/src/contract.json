@@ -261,13 +261,29 @@
                 "bsonType": "object",
                 "oneOf": [
                   {
+                    "additionalProperties": false,
                     "properties": {
+                      "_id": {
+                        "bsonType": "objectId"
+                      },
+                      "authorId": {
+                        "bsonType": "objectId"
+                      },
+                      "content": {
+                        "bsonType": "string"
+                      },
+                      "createdAt": {
+                        "bsonType": "date"
+                      },
                       "kind": {
                         "enum": [
                           "article"
                         ]
                       },
                       "summary": {
+                        "bsonType": "string"
+                      },
+                      "title": {
                         "bsonType": "string"
                       }
                     },
@@ -277,7 +293,20 @@
                     ]
                   },
                   {
+                    "additionalProperties": false,
                     "properties": {
+                      "_id": {
+                        "bsonType": "objectId"
+                      },
+                      "authorId": {
+                        "bsonType": "objectId"
+                      },
+                      "content": {
+                        "bsonType": "string"
+                      },
+                      "createdAt": {
+                        "bsonType": "date"
+                      },
                       "difficulty": {
                         "bsonType": "string"
                       },
@@ -288,6 +317,9 @@
                         "enum": [
                           "tutorial"
                         ]
+                      },
+                      "title": {
+                        "bsonType": "string"
                       }
                     },
                     "required": [
@@ -335,6 +367,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -346,6 +379,7 @@
                         "bsonType": "null"
                       },
                       {
+                        "additionalProperties": false,
                         "bsonType": "object",
                         "properties": {
                           "city": {
@@ -401,7 +435,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:fc34f27d1ebaa3b0d068907c7c075313703197dd48846d33f9d24631868d0ea1"
+    "storageHash": "sha256:d9419a557f554b9ab4c91b7df99c66881d77e199ecd0066f003262bda1c397a8"
   },
   "capabilities": {},
   "extensionPacks": {},

@@ -815,6 +815,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -823,6 +824,7 @@
                   "items": {
                     "bsonType": "array",
                     "items": {
+                      "additionalProperties": false,
                       "bsonType": "object",
                       "properties": {
                         "amount": {
@@ -832,6 +834,7 @@
                           "bsonType": "string"
                         },
                         "image": {
+                          "additionalProperties": false,
                           "bsonType": "object",
                           "properties": {
                             "url": {
@@ -846,6 +849,7 @@
                           "bsonType": "string"
                         },
                         "price": {
+                          "additionalProperties": false,
                           "bsonType": "object",
                           "properties": {
                             "amount": {
@@ -921,7 +925,11 @@
                 "bsonType": "object",
                 "oneOf": [
                   {
+                    "additionalProperties": false,
                     "properties": {
+                      "_id": {
+                        "bsonType": "objectId"
+                      },
                       "brand": {
                         "bsonType": "string"
                       },
@@ -934,13 +942,22 @@
                       "productId": {
                         "bsonType": "string"
                       },
+                      "sessionId": {
+                        "bsonType": "string"
+                      },
                       "subCategory": {
                         "bsonType": "string"
+                      },
+                      "timestamp": {
+                        "bsonType": "date"
                       },
                       "type": {
                         "enum": [
                           "view-product"
                         ]
+                      },
+                      "userId": {
+                        "bsonType": "string"
                       }
                     },
                     "required": [
@@ -951,14 +968,27 @@
                     ]
                   },
                   {
+                    "additionalProperties": false,
                     "properties": {
+                      "_id": {
+                        "bsonType": "objectId"
+                      },
                       "query": {
                         "bsonType": "string"
+                      },
+                      "sessionId": {
+                        "bsonType": "string"
+                      },
+                      "timestamp": {
+                        "bsonType": "date"
                       },
                       "type": {
                         "enum": [
                           "search"
                         ]
+                      },
+                      "userId": {
+                        "bsonType": "string"
                       }
                     },
                     "required": [
@@ -967,17 +997,30 @@
                     ]
                   },
                   {
+                    "additionalProperties": false,
                     "properties": {
+                      "_id": {
+                        "bsonType": "objectId"
+                      },
                       "brand": {
                         "bsonType": "string"
                       },
                       "productId": {
                         "bsonType": "string"
                       },
+                      "sessionId": {
+                        "bsonType": "string"
+                      },
+                      "timestamp": {
+                        "bsonType": "date"
+                      },
                       "type": {
                         "enum": [
                           "add-to-cart"
                         ]
+                      },
+                      "userId": {
+                        "bsonType": "string"
                       }
                     },
                     "required": [
@@ -1042,6 +1085,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -1053,6 +1097,7 @@
                   "items": {
                     "bsonType": "array",
                     "items": {
+                      "additionalProperties": false,
                       "bsonType": "object",
                       "properties": {
                         "amount": {
@@ -1127,6 +1172,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -1177,6 +1223,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -1185,6 +1232,7 @@
                   "items": {
                     "bsonType": "array",
                     "items": {
+                      "additionalProperties": false,
                       "bsonType": "object",
                       "properties": {
                         "amount": {
@@ -1194,6 +1242,7 @@
                           "bsonType": "string"
                         },
                         "image": {
+                          "additionalProperties": false,
                           "bsonType": "object",
                           "properties": {
                             "url": {
@@ -1208,6 +1257,7 @@
                           "bsonType": "string"
                         },
                         "price": {
+                          "additionalProperties": false,
                           "bsonType": "object",
                           "properties": {
                             "amount": {
@@ -1242,6 +1292,7 @@
                   "statusHistory": {
                     "bsonType": "array",
                     "items": {
+                      "additionalProperties": false,
                       "bsonType": "object",
                       "properties": {
                         "status": {
@@ -1336,6 +1387,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -1360,6 +1412,7 @@
                     }
                   },
                   "image": {
+                    "additionalProperties": false,
                     "bsonType": "object",
                     "properties": {
                       "url": {
@@ -1374,6 +1427,7 @@
                     "bsonType": "string"
                   },
                   "price": {
+                    "additionalProperties": false,
                     "bsonType": "object",
                     "properties": {
                       "amount": {
@@ -1433,6 +1487,7 @@
             "kind": "mongo-collection",
             "validator": {
               "jsonSchema": {
+                "additionalProperties": false,
                 "bsonType": "object",
                 "properties": {
                   "_id": {
@@ -1444,6 +1499,7 @@
                         "bsonType": "null"
                       },
                       {
+                        "additionalProperties": false,
                         "bsonType": "object",
                         "properties": {
                           "city": {
@@ -1491,7 +1547,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:2ee73b7cea5db2a81d60ae425b9af74456292ede4a408008cc2278d2c455ca90"
+    "storageHash": "sha256:91e5141e1b79b8c0b5e8a9de8b9e0e4dfaaa987c52f06fda7506edb6a9710afd"
   },
   "capabilities": {},
   "extensionPacks": {},
