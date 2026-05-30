@@ -140,12 +140,15 @@ Hard chain: **D5 → D6 → D7 / D8 → D9 / D10**. D11 (tail) runs last on the 
 - **Hands to:** `migration new` refusing on the right (narrower) set, reading disk once.
 - **Focus:** `migration-new.ts`; closes F01, W6, W7. **Out:** other consumers.
 
-#### Dispatch 10: re-point `migration show` onto the aggregate
+#### Dispatch 10: narrow `migration show` to a required single-migration inspect, routed through the aggregate
 
-- **Outcome:** `migration show` loads the aggregate once and queries `space(id)` → `.packages` / `.graph()` / `.contract()` / `.refs`, replacing all three `readMigrationsDir` call sites; the "skip the aggregate, read the dir directly" deferral (which contradicted the slice spec) is removed; `problems` are no longer silently dropped — `show` renders regardless per the per-command policy, with partial-omission handled explicitly. Closes AC7's `show` gap.
+`migration show` with no target meant "enumerate the latest migration for every loaded space". The operator's call: that behaviour is **dropped** — `show` means nothing without a referent. So `show` now **requires** a `<target>`, and the no-target enumeration path (the multi-space loop, `resolveLatestFromDir`, the `present` / `missing` space union, the multi-entry result shape) is deleted. What survives — the single-app-migration inspect (hash-prefix / ref / dir-path) — is routed **through the aggregate** like every other consumer.
+
+- **Outcome:** `show <target>` loads the aggregate **once** (tolerant, no integrity gate) and resolves the target via `aggregate.app.packages` / `.graph()` / `.refs` — the in-file `readMigrationsDir` / `reconstructGraph` / `readRefs` calls are gone. The no-target path is removed and the result collapses to one app-space migration (`MigrationShowSpaceMissing` + the multi-space formatter branch deleted). Two intended behaviour changes, both operator-confirmed, carried in the PR description: (a) `show` with no argument now errors (target required); (b) `show <ref>` now requires a **readable app contract** (building the aggregate deserializes it) where it was previously contract-free. The extra load over a single targeted read is an accepted cost; making the loader tolerant of an absent contract / splitting the migration representation out of the aggregate is a deferred future optimization. Dead `resolveByHashPrefix` (no production caller) is removed with its tests.
+- **Why no gate.** `show` is a read-only inspect. The reachability e2e pins that `show <ref>` works even when an extension is declared but not yet materialised (`declaredButUnmigrated` / `orphanSpaceDir` layout drift); a full `buildContractSpaceAggregate` gate would refuse on exactly that, so `show` uses a plain tolerant `loadContractSpaceAggregate` (no precheck, no refusal) and lets target resolution surface a clean "not found" for a corrupt/absent requested package.
 - **Builds on:** D5 + D6 + D8's load-once pattern.
 - **Hands to:** `migration show` reading through the one model — the last slice-1 reader on the aggregate.
-- **Focus:** `migration-show.ts`; closes F09, W8, AC7. **Out:** `list`/`graph`/`log` (slice 2).
+- **Focus:** `migration-show.ts`, `utils/formatters/migrations.ts`, `migration-show.test.ts`, `migration-show-reachability.e2e.test.ts` (reframed — its "target bypasses the aggregate / no-target enumerates" premise inverts, its reachability-without-materialised-extensions invariant is preserved); closes F09, W8, AC7. **Out:** `list` / `graph` / `log` (slice 2).
 
 #### Dispatch 11: correctness / vocabulary / test / doc tail
 
