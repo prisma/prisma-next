@@ -1,12 +1,6 @@
 import { ifDefined } from '@prisma-next/utils/defined';
 import { EMPTY_CONTRACT_HASH } from './constants';
-import {
-  errorAmbiguousTarget,
-  errorDuplicateMigrationHash,
-  errorNoInitialMigration,
-  errorNoTarget,
-  errorSameSourceAndTarget,
-} from './errors';
+import { errorAmbiguousTarget, errorNoInitialMigration, errorNoTarget } from './errors';
 import type { MigrationEdge, MigrationGraph } from './graph';
 import { bfs } from './graph-ops';
 import type { OnDiskMigrationPackage } from './package';
@@ -50,13 +44,6 @@ export function reconstructGraph(packages: readonly OnDiskMigrationPackage[]): M
     const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
     const { to } = pkg.metadata;
 
-    if (from === to) {
-      const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
-      if (!hasDataOp) {
-        throw errorSameSourceAndTarget(pkg.dirPath, from);
-      }
-    }
-
     nodes.add(from);
     nodes.add(to);
 
@@ -69,10 +56,9 @@ export function reconstructGraph(packages: readonly OnDiskMigrationPackage[]): M
       invariants: pkg.metadata.providedInvariants,
     };
 
-    if (migrationByHash.has(migration.migrationHash)) {
-      throw errorDuplicateMigrationHash(migration.migrationHash);
+    if (!migrationByHash.has(migration.migrationHash)) {
+      migrationByHash.set(migration.migrationHash, migration);
     }
-    migrationByHash.set(migration.migrationHash, migration);
 
     appendEdge(forwardChain, from, migration);
     appendEdge(reverseChain, to, migration);

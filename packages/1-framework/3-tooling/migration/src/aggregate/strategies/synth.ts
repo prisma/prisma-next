@@ -73,7 +73,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
 
   const planner = input.migrations.createPlanner(input.familyInstance);
   const plannerResult: MigrationPlannerResult = await (planner.plan({
-    contract: input.member.contract,
+    contract: input.member.contract(),
     schema: projectedSchema,
     policy: input.operationPolicy,
     fromContract: null,
@@ -114,7 +114,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     result: {
       plan,
       displayOps: synthedPlan.operations,
-      destinationContract: input.member.contract,
+      destinationContract: input.member.contract(),
       strategy: 'synth',
     },
   };

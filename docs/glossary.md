@@ -287,8 +287,18 @@ A read-only filesystem operation that verifies on-disk migration packages are in
 | `PN-MIG-CHECK-003 ORPHAN_MIGRATION` | Migration has no graph-connecting predecessor |
 | `PN-MIG-CHECK-004 DANGLING_REF` | Ref points at a contract hash absent from the graph |
 | `PN-MIG-CHECK-005 EDGE_MISMATCH` | Migration's `metadata.to` disagrees with its `end-contract.json` snapshot |
+| `PN-MIG-CHECK-006 SNAPSHOT_UNREADABLE` | Migration's `end-contract.json` snapshot exists but cannot be parsed |
+| `PN-MIG-CHECK-007 SELF_EDGE` | Migration's source equals its target (`from === to`) with no data invariant — a true no-op self-edge |
+| `PN-MIG-CHECK-008 ORPHAN_SPACE_DIR` | A contract-space directory exists on disk but no extension declares it |
+| `PN-MIG-CHECK-009 UNMATERIALISED_EXTENSION` | An extension is declared in `extensionPacks` but has no on-disk migrations directory |
+| `PN-MIG-CHECK-010 HEAD_REF_MISSING` | A contract space is missing its `refs/head.json` head ref |
+| `PN-MIG-CHECK-011 HEAD_REF_NOT_IN_GRAPH` | A contract space's head ref points at a hash absent from its migration graph |
+| `PN-MIG-CHECK-012 REF_UNREADABLE` | A contract space's ref file is corrupt or unparseable |
+| `PN-MIG-CHECK-013 TARGET_MISMATCH` | A contract space targets a different database than the project |
+| `PN-MIG-CHECK-014 STORAGE_ELEMENT_CONFLICT` | A storage element is claimed by more than one contract space |
+| `PN-MIG-CHECK-015 CONTRACT_UNREADABLE` | A contract space's on-disk contract cannot be read or deserialized |
 
-Does not consult the database.
+Codes `001`/`002` are reported per package across every contract space (the app space plus extensions); `007`–`015` are aggregate, cross-space checks (self-edge plus layout / head-ref / contract / disjointness drift) that run in the graph-wide form. Does not consult the database.
 
 ---
 
