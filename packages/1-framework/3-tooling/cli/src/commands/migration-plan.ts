@@ -81,8 +81,10 @@ async function readBundleEndArtifacts(
     return { contractJson, contractDts };
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      throw errorFileNotFound(migrationDir, {
-        why: `Target migration is missing its destination contract snapshot under ${migrationDir}`,
+      const missingPath =
+        'path' in error && typeof error.path === 'string' ? error.path : migrationDir;
+      throw errorFileNotFound(missingPath, {
+        why: `Target migration is missing its destination contract snapshot at ${missingPath}`,
         fix: 'Re-emit the target migration so its sibling `end-contract.json` / `end-contract.d.ts` are restored, then re-run this command.',
       });
     }

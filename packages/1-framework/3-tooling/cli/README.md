@@ -1043,7 +1043,7 @@ prisma-next migrate [--db <url>] [--to <contract>] [--config <path>] [--json] [-
 5. Finds the shortest path from the marker hash to the destination using graph pathfinding
 6. Executes each pending migration in order using the target's `MigrationRunner`
 7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
-8. After each migration, the runner verifies the schema against the target contract and updates the marker/ledger
+8. After each migration, the runner runs the migration's post-checks and verifies the resulting state matches the target contract's storage hash, then updates the marker/ledger
 
 **Rollback workflow:** When no on-disk edge reaches the target (for example `migrate --to <migration-dir>^`), the command refuses with `MIGRATION.PATH_UNREACHABLE` and suggests planning the missing edge with `migration plan --from <current> --to <target> --name <slug>`, then re-running `migrate --to <target>`. No contract-source edit is required.
 

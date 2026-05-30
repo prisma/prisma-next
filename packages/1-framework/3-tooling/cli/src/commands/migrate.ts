@@ -305,8 +305,9 @@ async function executeMigrateCommand(
           }
           throw error;
         }
-        const parsed: Record<string, unknown> = JSON.parse(endContractRaw);
+        let parsed: Record<string, unknown>;
         try {
+          parsed = JSON.parse(endContractRaw);
           applyContract = familyInstance.deserializeContract(parsed);
         } catch (error) {
           return notOk(

@@ -252,7 +252,9 @@ export function errorMarkerMismatch(
 
 export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructuredError {
   const meta = failure.meta ?? {};
-  const fromHash = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : null;
+  const fromHashMeta = typeof meta['fromHash'] === 'string' ? meta['fromHash'] : null;
+  // `buildPathNotFoundFailure` uses this sentinel in meta when the live marker is null.
+  const planFromHash = fromHashMeta === '<empty>' ? null : fromHashMeta;
   const targetHash =
     typeof meta['targetHash'] === 'string'
       ? meta['targetHash']
@@ -268,14 +270,14 @@ export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructu
   // target; `migration plan --to` (built for arbitrary targets) makes this a
   // real command, so the diagnostic that sends you here is now honest.
   const planCommand = (() => {
-    if (fromHash !== null && targetHash !== null) {
-      return `prisma-next migration plan --from ${fromHash} --to ${targetHash} --name <slug>`;
+    if (planFromHash !== null && targetHash !== null) {
+      return `prisma-next migration plan --from ${planFromHash} --to ${targetHash} --name <slug>`;
     }
     if (targetHash !== null) {
       return `prisma-next migration plan --to ${targetHash} --name <slug>`;
     }
-    if (fromHash !== null) {
-      return `prisma-next migration plan --from ${fromHash} --name <slug>`;
+    if (planFromHash !== null) {
+      return `prisma-next migration plan --from ${planFromHash} --name <slug>`;
     }
     return 'prisma-next migration plan';
   })();
@@ -284,7 +286,7 @@ export function errorPathUnreachable(failure: MigrationApplyFailure): CliStructu
   return errorRuntime(failure.summary, {
     why:
       failure.why ??
-      `Cannot reach target "${targetHash ?? '<unknown>'}" from current marker "${fromHash ?? '<unknown>'}".${deadEndsSuffix}`,
+      `Cannot reach target "${targetHash ?? '<unknown>'}" from current marker "${fromHashMeta ?? '<unknown>'}".${deadEndsSuffix}`,
     fix: [
       'Plan the missing edge, then apply it:',
       `  1. ${planCommand}`,

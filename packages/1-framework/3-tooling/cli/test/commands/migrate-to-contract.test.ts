@@ -6,7 +6,12 @@ import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { join } from 'pathe';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
+import {
+  executeCommand,
+  getExitCode,
+  parseJsonObjectFromCliCapture,
+  setupCommandMocks,
+} from '../utils/test-helpers';
 
 /**
  * `migrate --to <node>` verifies/applies against the TARGET bundle's
@@ -125,12 +130,14 @@ async function runAndCaptureExit(invoke: () => Promise<number>): Promise<number>
 
 describe('migrate --to verifies against the target bundle contract', () => {
   let cleanupMocks: () => void;
+  let consoleOutput: string[];
   const originalCwd = process.cwd();
   let tempDirs: string[];
 
   beforeEach(() => {
     vi.resetModules();
     const commandMocks = setupCommandMocks();
+    consoleOutput = commandMocks.consoleOutput;
     cleanupMocks = commandMocks.cleanup;
     tempDirs = [];
 
@@ -194,5 +201,31 @@ describe('migrate --to verifies against the target bundle contract', () => {
 
     expect(exitCode).toBe(0);
     expect(capturedApplyContractHash()).toBe(C2);
+  });
+
+  it('reports contract validation failure naming corrupt target end-contract.json', async () => {
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
+    const cwd = await setupAppliedState();
+    tempDirs.push(cwd);
+    const endContractRel = join('migrations', 'app', '00001_init', 'end-contract.json');
+    await writeFile(join(cwd, endContractRel), '{ not json');
+    process.chdir(cwd);
+
+    const exitCode = await runAndCaptureExit(() =>
+      executeCommand(createMigrateCommand(), ['--to', C1, '--json']),
+    );
+
+    expect(exitCode).not.toBe(0);
+    const envelope = parseJsonObjectFromCliCapture(consoleOutput) as {
+      code?: string;
+      summary?: string;
+      why?: string;
+      where?: { path?: string };
+    };
+    expect(envelope.code).toBe('PN-CLI-4003');
+    expect(envelope.summary).toContain('Contract validation failed');
+    expect(envelope.where?.path).toContain(endContractRel);
+    expect(envelope.why).toContain(endContractRel);
+    expect(mocks.migrationApply).not.toHaveBeenCalled();
   });
 });

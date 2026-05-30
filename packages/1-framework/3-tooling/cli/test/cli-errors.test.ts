@@ -117,6 +117,16 @@ describe('errorPathUnreachable', () => {
     expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });
 
+  it('omits --from in the fix when buildPathNotFoundFailure uses the empty-marker sentinel', () => {
+    const failure = buildPathNotFoundFailure('app', null, targetHash);
+    const envelope = errorPathUnreachable(failure).toEnvelope();
+
+    expect(envelope.why).toContain('<empty>');
+    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
+    expect(envelope.fix).not.toContain('--from <empty>');
+    expect(envelope.fix).not.toMatch(/--from\s/);
+  });
+
   it('composes buildNeverPlannedFailure why with the fix into one plan-then-apply sequence', () => {
     const failure = buildNeverPlannedFailure('app', targetHash);
     const envelope = errorPathUnreachable(failure).toEnvelope();
