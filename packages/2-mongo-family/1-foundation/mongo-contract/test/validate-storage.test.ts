@@ -9,7 +9,7 @@ function crossRef(model: string, namespace = 'default') {
 import type { MongoContract } from '../src/contract-types';
 import { buildMongoNamespace } from '../src/ir/build-mongo-namespace';
 import { MongoCollection } from '../src/ir/mongo-collection';
-import { MongoStorage } from '../src/ir/mongo-storage';
+import { buildMongoStorageInput, MongoStorage } from '../src/ir/mongo-storage';
 import { validateMongoStorage } from '../src/validate-storage';
 
 const DUMMY_HASH = coreHash('sha256:test');
@@ -17,15 +17,17 @@ const DUMMY_HASH = coreHash('sha256:test');
 function storageWithItemsCollections(
   collections: Record<string, MongoCollection>,
 ): MongoContract['storage'] {
-  return new MongoStorage({
-    storageHash: DUMMY_HASH,
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        collections,
-      }),
-    },
-  });
+  return new MongoStorage(
+    buildMongoStorageInput({
+      storageHash: DUMMY_HASH,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          collections,
+        }),
+      },
+    }),
+  ) as unknown as MongoContract['storage'];
 }
 
 function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContract {

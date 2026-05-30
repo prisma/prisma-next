@@ -1,4 +1,6 @@
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from './contract-types';
+import type { MongoNamespace } from './ir/mongo-storage';
 
 function formatCrossRef(crossRef: { readonly namespace: string; readonly model: string }): string {
   return `${crossRef.namespace}.${crossRef.model}`;
@@ -8,8 +10,8 @@ function storageDeclaresCollection(
   storage: MongoContract['storage'],
   collectionName: string,
 ): boolean {
-  for (const ns of Object.values(storage.namespaces)) {
-    if (Object.hasOwn(ns.collections, collectionName)) {
+  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+    if (Object.hasOwn((ns as MongoNamespace).collections, collectionName)) {
       return true;
     }
   }

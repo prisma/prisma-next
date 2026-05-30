@@ -5,8 +5,8 @@ import {
 } from '@prisma-next/contract/hashing-utils';
 
 const preserveEmptyPatterns = [
-  ['storage', 'namespaces', '*', 'collections'],
-  ['storage', 'namespaces', '*', 'collections', '*'],
+  ['storage', '*', 'collections'],
+  ['storage', '*', 'collections', '*'],
 ] as const satisfies readonly PathPattern[];
 
 const shouldPreserveEmpty: PreserveEmptyPredicate =

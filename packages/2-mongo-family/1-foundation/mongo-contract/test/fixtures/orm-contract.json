@@ -12,13 +12,12 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "collections": {
-          "tasks": {},
-          "users": {}
-        }
+    "storageHash": "fixture-hash",
+    "__unbound__": {
+      "id": "__unbound__",
+      "collections": {
+        "tasks": {},
+        "users": {}
       }
     }
   },

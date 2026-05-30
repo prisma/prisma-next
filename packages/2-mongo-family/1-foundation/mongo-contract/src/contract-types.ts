@@ -4,6 +4,7 @@ import type {
   ContractModel,
   ContractValueObject,
   StorageBase,
+  StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { MongoCollection } from './ir/mongo-collection';
@@ -53,17 +54,16 @@ export type MongoModelDefinition = ContractModel<MongoModelStorage>;
  * runtime in-memory representation is the concrete {@link MongoStorage}
  * class from `./ir/mongo-storage`; this type is the structural superset
  * used as the generic-parameter constraint so consumers can name
- * `MongoContract<...>` over either the raw JSON envelope (no
- * `namespaces` field) or a fully-constructed class instance (with
- * `namespaces`). The class structurally satisfies this shape.
+ * `MongoContract<...>` over either the raw JSON envelope or a fully-
+ * constructed class instance. Namespace ids are direct keys on the
+ * storage object (ADR 221 — no `namespaces` wrapper).
  */
+export type MongoNamespaceShape = Namespace & {
+  readonly collections: Readonly<Record<string, MongoCollection>>;
+};
+
 export type MongoStorageShape<THash extends string = string> = StorageBase<THash> & {
-  readonly namespaces: Record<
-    string,
-    Namespace & {
-      readonly collections: Readonly<Record<string, MongoCollection>>;
-    }
-  >;
+  readonly [namespaceId: string]: MongoNamespaceShape | StorageHashBase<THash>;
 };
 
 export type MongoContract<

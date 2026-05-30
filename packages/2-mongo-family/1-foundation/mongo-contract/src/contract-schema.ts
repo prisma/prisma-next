@@ -392,8 +392,19 @@ export function createMongoContractSchema(
     'domain?': 'unknown',
     storage: type({
       '+': 'reject',
-      namespaces: type({ '[string]': namespaceEnvelope }),
-      'storageHash?': 'string',
+      storageHash: 'string',
+    }).narrow((storage, ctx) => {
+      if (typeof storage !== 'object' || storage === null) {
+        return ctx.mustBe('an object');
+      }
+      for (const [key, value] of Object.entries(storage)) {
+        if (key === 'storageHash') continue;
+        const parsed = namespaceEnvelope(value);
+        if (parsed instanceof type.errors) {
+          return ctx.reject({ expected: `storage.${key}: ${parsed.summary}` });
+        }
+      }
+      return true;
     }),
     models: type({ '[string]': ModelDefinitionSchema }),
     'valueObjects?': type({
