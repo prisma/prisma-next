@@ -264,6 +264,23 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 - **Orchestrator DoD:** treat "implementer reports green" as a hypothesis. The gates in `dod.md` (now including biome lint + test-tsconfig + sync-main) are the evidence; the post-dispatch walk re-runs them, it doesn't trust the report.
 
 **Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715). The final dispatch reported all-green; PR #626 CI failed **Type Check** (unused `mkdir` import in `loader.catastrophic-io.test.ts`) + **Lint** (formatter diff in `loader.test.ts`) + **Test** (2 `migration-status-aggregate-spaces` failures that were pure behind-`main` drift, resolved by merging `main`). All three classes were caught by the babysit loop after the PR was open, not by the dispatch gates — exactly the work the gates exist to front-load.
+### F15. Consolidation onto a shared facet re-infers result-kind from the input instead of carrying provenance
+
+**Symptom.** Hand-rolled resolution logic (which branched on *where* it found a value) is consolidated onto a shared abstraction. The call site keeps its old "which kind is this?" branch — but now infers the kind from the *input* it passed (e.g. "I supplied a ref name, therefore this is a snapshot") rather than from *how the shared facet actually resolved*. The shared facet can reach the value by a different path than the input implies (a ref whose snapshot is missing falls back to the bundle's bookend contract), so the inferred kind is wrong on the fallback branch — and any state keyed off that kind (a `sourceDir`, a classification label) is silently dropped or mislabelled.
+
+**Detection signal.**
+
+- A behaviour-preserving rewire whose existing tests stay green — because the tests were written against the *old* branching and never exercised the path where input-implied-kind and actual-resolution-path diverge.
+- A call site that classifies a shared facet's result by re-examining the *arguments it passed in* (`if (refName !== undefined) → snapshot`) rather than a discriminator the facet *returns*.
+- A non-null assertion (`result.sourceDir!`) on a field that's only populated on one of the facet's resolution paths — the smell that the caller knows more than the type does.
+
+**Mitigation.**
+
+- A shared resolution facet must **return the provenance of its result** (a discriminator: `'snapshot' | 'graph-node'`), and callers must classify off the returned discriminator, never off the input they supplied. Model it as a discriminated union so path-specific fields (`sourceDir`) are statically guaranteed present on the path that owns them — this also retires the non-null assertion.
+- A consolidation/rewire dispatch that replaces branching logic needs a reviewer/intent pass *even when tests are green*: green proves nothing here, because the existing tests pass by construction (they predate the divergent branch). The review question is "does the new path preserve every distinction the old branches drew?" — which no pre-existing test asserts.
+- **Canonical candidate** (generalises to any system): land in canonical via `drive-update-skills` if a second occurrence confirms the pattern.
+
+**Reference incident.** 2026-05-30, project `migrate-to-rollback-plannable` (TML-2690). The round-2 consolidation rewired `plan-resolution.ts` onto the contract-space aggregate's new `contractAt(hash)` facet. The rewire classified the result as a "snapshot" whenever a ref name was supplied — but `contractAt` falls back to the graph node's `end-contract.*` bundle when a ref's snapshot is absent, so a snapshot-missing ref was mislabelled and its `sourceDir` lost. Tests stayed green (none straddled the snapshot-miss → bundle-fallback boundary). Caught by CodeRabbit on PR #635, not by the rewire dispatches' own verification; fixed by adding a `provenance` discriminator + `sourceDir` to `ContractAtResult` (discriminated union) and classifying off it.
 
 ## Slice-shape scope traps
 
