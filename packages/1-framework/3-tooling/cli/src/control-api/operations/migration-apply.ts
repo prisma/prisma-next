@@ -458,11 +458,22 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
   };
 }
 
-function buildNeverPlannedFailure(spaceId: string, targetHash: string): MigrationApplyFailure {
+/**
+ * Build the `neverPlanned` failure raised when a contract space has no on-disk
+ * migration graph but migrate was asked to reach a target hash. The `why`
+ * states only the condition; the recovery sequence is composed by
+ * `errorPathUnreachable`'s `fix`.
+ *
+ * @internal Exported for testing only.
+ */
+export function buildNeverPlannedFailure(
+  spaceId: string,
+  targetHash: string,
+): MigrationApplyFailure {
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary: `No on-disk migrations for contract space "${spaceId}"`,
-    why: `migrate is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}". Run \`prisma-next migration plan\` first to materialise the path.`,
+    why: `migrate is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}".`,
     meta: { spaceId, target: targetHash, kind: 'neverPlanned' },
   };
 }

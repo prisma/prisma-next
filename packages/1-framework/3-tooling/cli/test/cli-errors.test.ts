@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildPathNotFoundFailure } from '../src/control-api/operations/migration-apply';
+import {
+  buildNeverPlannedFailure,
+  buildPathNotFoundFailure,
+} from '../src/control-api/operations/migration-apply';
 import type { MigrationApplyFailure } from '../src/control-api/types';
 import {
   errorDriverRequired,
@@ -109,6 +112,20 @@ describe('errorPathUnreachable', () => {
     expect(envelope.fix).toContain(
       `prisma-next migration plan --from ${fromHash} --to ${targetHash} --name <slug>`,
     );
+    expect(envelope.fix).toContain(`prisma-next migrate --to ${targetHash}`);
+    expect((envelope.fix ?? '').toLowerCase()).toContain('destructive');
+    expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
+  });
+
+  it('composes buildNeverPlannedFailure why with the fix into one plan-then-apply sequence', () => {
+    const failure = buildNeverPlannedFailure('app', targetHash);
+    const envelope = errorPathUnreachable(failure).toEnvelope();
+
+    expect(envelope.why).toContain(targetHash);
+    expect(envelope.why?.toLowerCase()).toContain('no migrations');
+    expect(envelope.why).not.toContain('migration plan');
+
+    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
     expect(envelope.fix).toContain(`prisma-next migrate --to ${targetHash}`);
     expect((envelope.fix ?? '').toLowerCase()).toContain('destructive');
     expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
