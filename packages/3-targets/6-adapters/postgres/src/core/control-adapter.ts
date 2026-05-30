@@ -29,6 +29,7 @@ import {
   createResolveExistingEnumValues,
   enumStorageCompoundKey,
   readExistingEnumValues,
+  readPostgresSchemaIrAnnotations,
 } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -88,11 +89,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     enumType: PostgresEnumStorageEntry,
     namespaceId: string,
   ): readonly string[] | null => {
-    const pgSchema =
-      blindCast<{ schema?: string } | undefined, 'pg annotation envelope index slot'>(
-        schema.annotations?.['pg'],
-      )?.schema ?? 'public';
-    const schemaName = namespaceId === UNBOUND_NAMESPACE_ID ? pgSchema : namespaceId;
+    const schemaName =
+      namespaceId === UNBOUND_NAMESPACE_ID
+        ? (readPostgresSchemaIrAnnotations(schema).schema ?? 'public')
+        : namespaceId;
     return readExistingEnumValues(schema, schemaName, enumType.nativeType);
   };
 

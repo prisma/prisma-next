@@ -221,8 +221,10 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   }
 
   // Namespace-scoped enums, verified per `(namespaceId, typeName)`.
-  for (const [nsId, ns] of Object.entries(contract.storage.namespaces)) {
-    const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
+  for (const nsId of Object.keys(contract.storage.namespaces)) {
+    const ns = contract.storage.namespaces[nsId];
+    if (!ns) continue;
+    const nsEnums = ns.enum;
     if (!nsEnums) continue;
     for (const [typeName, entry] of Object.entries(nsEnums)) {
       if (!isPostgresEnumStorageEntry(entry)) continue;
