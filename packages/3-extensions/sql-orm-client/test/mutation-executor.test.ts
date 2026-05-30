@@ -1,4 +1,5 @@
 import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   BinaryExpr,
@@ -144,7 +145,7 @@ describe('mutation-executor', () => {
   it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
     const contract = getTestContract();
 
-    const unboundNs = getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID)!;
+    const unboundNs = getStorageNamespace<SqlNamespace>(contract.storage, UNBOUND_NAMESPACE_ID)!;
     const withCustomPk = {
       ...contract,
       storage: {
@@ -154,7 +155,7 @@ describe('mutation-executor', () => {
           tables: {
             ...unboundNs.tables,
             users: {
-              ...unboundNs.tables.users,
+              ...unboundNs.tables['users'],
               primaryKey: { columns: ['pk_id'] },
             },
           },

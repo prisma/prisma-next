@@ -1079,12 +1079,7 @@ describe('compileSelectWithIncludeStrategy', () => {
 
 describe('compileSelect MTI JOINs', () => {
   type AnyContract = {
-    storage: {
-      namespaces: Record<
-        string,
-        { tables?: Record<string, { columns: Record<string, { codecId: string }> }> }
-      >;
-    };
+    storage: object;
   };
   function codecRefForColumn(
     contract: AnyContract,
