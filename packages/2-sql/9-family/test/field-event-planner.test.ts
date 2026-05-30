@@ -4,6 +4,7 @@ import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   type StorageColumn,
   type StorageTable,
@@ -36,12 +37,14 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
 }
 
 function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
-  const storage = new SqlStorage({
-    storageHash: 'sha256:test' as StorageHashBase<string>,
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
-    },
-  });
+  const storage = new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      },
+    }),
+  );
   return {
     target: 'postgres',
     targetFamily: 'sql',

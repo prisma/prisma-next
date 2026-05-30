@@ -14,11 +14,17 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
   type PostgresEnumStorageEntry,
+  type SqlNamespace,
   type SqlStorage,
   type StorageColumn,
   StorageTable,
@@ -139,7 +145,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       PostgresEnumStorageEntry | StorageTypeInstance
     >),
   };
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  for (const ns of storageNamespaceValues(
+    contract.storage as unknown as Record<string, unknown>,
+  ) as SqlNamespace[]) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
@@ -221,8 +229,12 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   }
 
   // Namespace-scoped enums, verified per `(namespaceId, typeName)`.
-  for (const nsId of Object.keys(contract.storage.namespaces)) {
-    const ns = contract.storage.namespaces[nsId];
+  for (const nsId of [
+    ...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
+  ].map(([id]) => id)) {
+    const ns = getStorageNamespace(contract.storage as unknown as Record<string, unknown>, nsId) as
+      | SqlNamespace
+      | undefined;
     if (!ns) continue;
     const nsEnums = ns.enum;
     if (!nsEnums) continue;
@@ -230,7 +242,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       if (!isPostgresEnumStorageEntry(entry)) continue;
       pushTypeNode(
         typeName,
-        `storage.namespaces.${nsId}.enum.${typeName}`,
+        `storage.${nsId}.enum.${typeName}`,
         verifyEnumType({
           typeName,
           typeInstance: entry,
@@ -400,22 +412,27 @@ function verifySchemaTables(options: {
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const schemaTables = schema.tables;
-  const namespaceIds = Object.keys(contract.storage.namespaces).sort((a, b) =>
-    a < b ? -1 : a > b ? 1 : 0,
-  );
+  const namespaceIds = [
+    ...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
+  ]
+    .map(([id]) => id)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   for (const namespaceId of namespaceIds) {
-    const ns = contract.storage.namespaces[namespaceId];
+    const ns = getStorageNamespace(
+      contract.storage as unknown as Record<string, unknown>,
+      namespaceId,
+    ) as SqlNamespace | undefined;
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
       if (!(contractTableRaw instanceof StorageTable)) {
         throw new Error(
-          `verifySqlSchema: expected StorageTable at storage.namespaces.${namespaceId}.tables.${tableName}`,
+          `verifySqlSchema: expected StorageTable at storage.${namespaceId}.tables.${tableName}`,
         );
       }
       const contractTable = contractTableRaw;
       const schemaTable = schemaTables[tableName];
-      const tablePath = `storage.namespaces.${namespaceId}.tables.${tableName}`;
+      const tablePath = `storage.${namespaceId}.tables.${tableName}`;
 
       if (!schemaTable) {
         issues.push({
@@ -459,7 +476,13 @@ function verifySchemaTables(options: {
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
       const claimed = namespaceIds.some(
-        (namespaceId) => contract.storage.namespaces[namespaceId]?.tables[tableName] !== undefined,
+        (namespaceId) =>
+          (
+            getStorageNamespace(
+              contract.storage as unknown as Record<string, unknown>,
+              namespaceId,
+            ) as SqlNamespace | undefined
+          )?.tables[tableName] !== undefined,
       );
       if (!claimed) {
         // `namespaceId` is intentionally absent: an extra table exists in the
@@ -475,7 +498,7 @@ function verifySchemaTables(options: {
           status: 'fail',
           kind: 'table',
           name: `table ${tableName}`,
-          contractPath: `storage.namespaces.*.tables.${tableName}`,
+          contractPath: `storage.*.tables.${tableName}`,
           code: 'extra_table',
           message: `Extra table "${tableName}" found`,
           expected: undefined,
@@ -1183,7 +1206,7 @@ function resolveContractColumnTypeMetadata(
     return {
       codecId: referencedType.codecId,
       nativeType: referencedType.nativeType,
-      typeParams: { values: referencedType.values } as Record<string, unknown>,
+      typeParams: { values: referencedType.values } as unknown as Record<string, unknown>,
     };
   }
   if (isStorageTypeInstance(referencedType)) {

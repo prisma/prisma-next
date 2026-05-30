@@ -24,7 +24,13 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
-import { type SqlStorage, type StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { getStorageNamespace, storageNamespaceEntries } from '@prisma-next/framework-components/ir';
+import {
+  type SqlNamespace,
+  type SqlStorage,
+  type StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
@@ -69,14 +75,19 @@ export function planFieldEventOperations(
   const dropped: FieldEntry[] = [];
   const altered: FieldEntry[] = [];
 
+  const priorStorage = priorContract?.storage as unknown as Record<string, unknown> | undefined;
+  const newStorage = newContract.storage as unknown as Record<string, unknown>;
+
   const namespaceIds = unionSorted(
-    priorContract ? Object.keys(priorContract.storage.namespaces) : [],
-    Object.keys(newContract.storage.namespaces),
+    priorStorage ? [...storageNamespaceEntries(priorStorage)].map(([id]) => id) : [],
+    [...storageNamespaceEntries(newStorage)].map(([id]) => id),
   );
 
   for (const namespaceId of namespaceIds) {
-    const priorNs = priorContract?.storage.namespaces[namespaceId];
-    const newNs = newContract.storage.namespaces[namespaceId];
+    const priorNs = getStorageNamespace(priorStorage ?? {}, namespaceId) as
+      | SqlNamespace
+      | undefined;
+    const newNs = getStorageNamespace(newStorage, namespaceId) as SqlNamespace | undefined;
     const priorTables = priorNs?.tables;
     const newTables = newNs?.tables;
 

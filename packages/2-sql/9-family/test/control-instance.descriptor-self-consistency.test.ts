@@ -9,7 +9,11 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
@@ -30,9 +34,7 @@ const fixtureTables = {
 };
 
 const fixtureHashBody = {
-  namespaces: {
-    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: fixtureTables },
-  },
+  [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: fixtureTables },
 };
 
 const fixtureStorageBody = {
@@ -61,10 +63,12 @@ function buildContract(): Contract<SqlStorage> {
     extensionPacks: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
-    storage: new SqlStorage({
-      ...fixtureStorageBody,
-      storageHash: coreHash(FIXTURE_HEAD_HASH),
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        ...fixtureStorageBody,
+        storageHash: coreHash(FIXTURE_HEAD_HASH),
+      }),
+    ),
   };
 }
 

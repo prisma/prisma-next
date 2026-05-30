@@ -25,6 +25,10 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import {
+  storageNamespaceEntries,
+  storageNamespaceValues,
+} from '@prisma-next/framework-components/ir';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
@@ -63,14 +67,11 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
     'storage' in contract &&
     typeof contract.storage === 'object' &&
     contract.storage !== null &&
-    'namespaces' in contract.storage &&
-    typeof contract.storage.namespaces === 'object' &&
-    contract.storage.namespaces !== null
+    storageNamespaceValues(contract.storage as unknown as Record<string, unknown>).length > 0
   ) {
-    const namespaces = contract.storage.namespaces as Record<
-      string,
-      { readonly tables?: Readonly<Record<string, unknown>> }
-    >;
+    const namespaces = Object.fromEntries(
+      storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>),
+    ) as Record<string, { readonly tables?: Readonly<Record<string, unknown>> }>;
     for (const ns of Object.values(namespaces)) {
       const tbls = ns.tables;
       if (typeof tbls !== 'object' || tbls === null) continue;

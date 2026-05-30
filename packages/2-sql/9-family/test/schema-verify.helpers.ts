@@ -14,6 +14,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   buildSqlNamespace,
+  buildSqlStorageInput,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
@@ -45,13 +46,15 @@ export function createTestContract(
     targetFamily: 'sql',
     roots: {},
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
-      },
-      ...ifDefined('types', storageTypes),
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: 'sha256:test' as StorageHashBase<string>,
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        },
+        ...ifDefined('types', storageTypes),
+      }),
+    ),
     models: {},
     capabilities: {},
     meta: {},

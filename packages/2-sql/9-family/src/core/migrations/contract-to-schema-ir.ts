@@ -1,12 +1,18 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   type ForeignKey,
   type Index,
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
   type PostgresEnumStorageEntry,
+  type SqlNamespace,
   type SqlStorage,
   type StorageColumn,
   StorageTable,
@@ -244,12 +250,19 @@ export function detectDestructiveChanges(
   const conflicts: MigrationPlannerConflict[] = [];
 
   const namespaceIds = [
-    ...new Set([...Object.keys(from.namespaces), ...Object.keys(to.namespaces)]),
+    ...new Set([
+      ...[...storageNamespaceEntries(from as unknown as Record<string, unknown>)].map(([id]) => id),
+      ...[...storageNamespaceEntries(to as unknown as Record<string, unknown>)].map(([id]) => id),
+    ]),
   ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   for (const namespaceId of namespaceIds) {
-    const fromNs = from.namespaces[namespaceId];
-    const toNs = to.namespaces[namespaceId];
+    const fromNs = getStorageNamespace(from as unknown as Record<string, unknown>, namespaceId) as
+      | SqlNamespace
+      | undefined;
+    const toNs = getStorageNamespace(to as unknown as Record<string, unknown>, namespaceId) as
+      | SqlNamespace
+      | undefined;
     const fromTables = fromNs?.tables;
     if (!fromTables) continue;
 
@@ -326,7 +339,9 @@ export function contractToSchemaIR(
   const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const ns of storageNamespaceValues(
+    storage as unknown as Record<string, unknown>,
+  ) as SqlNamespace[]) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
@@ -336,7 +351,9 @@ export function contractToSchemaIR(
   }
   const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const ns of storageNamespaceValues(
+    storage as unknown as Record<string, unknown>,
+  ) as SqlNamespace[]) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.tables)) {
       if (!(tableDefRaw instanceof StorageTable)) {
         throw new Error(
@@ -414,7 +431,9 @@ function deriveAnnotations(
   // Namespace-scoped enums: schema-qualified compound key matching the target's
   // `readExistingEnumValues` read side, so two namespaces sharing an enum name
   // (or native type) resolve to distinct live-database types.
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+  for (const [namespaceId, ns] of [
+    ...storageNamespaceEntries(storage as unknown as Record<string, unknown>),
+  ]) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (!nsEnums) continue;
     for (const entry of Object.values(nsEnums)) {
