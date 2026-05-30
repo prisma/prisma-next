@@ -28,10 +28,10 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadMigrationPackages,
   resolveMigrationPaths,
   setCommandDescriptions,
 } from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
 import { readContractIR } from '../utils/ref-advancement';
@@ -81,9 +81,14 @@ export async function executeRefSetCommand(
 
   try {
     const config = await loadConfig(options.config);
-    const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
-    const { graph, bundles } = await loadMigrationPackages(appMigrationsDir);
-    const refs = await readRefs(refsDir);
+    const { migrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
+    const loaded = await buildReadAggregate(config, { migrationsDir });
+    if (!loaded.ok) {
+      return notOk(loaded.failure);
+    }
+    const graph = loaded.value.aggregate.app.graph();
+    const bundles = loaded.value.aggregate.app.packages;
+    const refs = loaded.value.aggregate.app.refs;
 
     let resolvedHash: string;
     if (validateRefValue(contractInput)) {

@@ -36,13 +36,15 @@ import {
 import {
   addGlobalOptions,
   getTargetMigrations,
-  loadMigrationPackages,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
+import {
+  buildContractSpaceAggregate,
+  buildReadAggregate,
+} from '../utils/contract-space-aggregate-loader';
 import { runContractSpaceSeedPhase } from '../utils/contract-space-seed-phase';
 import { toExtensionInputs } from '../utils/extension-pack-inputs';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -353,7 +355,12 @@ async function executeMigrationPlanCommand(
   let isAutoBaseline = false;
 
   try {
-    const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
+    const loaded = await buildReadAggregate(config, { migrationsDir });
+    if (!loaded.ok) {
+      return notOk(loaded.failure);
+    }
+    const bundles = loaded.value.aggregate.app.packages;
+    const graph = loaded.value.aggregate.app.graph();
 
     const resolutionResult = await resolveFromForPlan({
       optionsFrom: options.from,

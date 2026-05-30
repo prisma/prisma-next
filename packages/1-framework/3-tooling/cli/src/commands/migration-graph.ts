@@ -34,7 +34,7 @@ export interface MigrationGraphResult {
   readonly summary: string;
 }
 
-async function executeMigrationGraphCommand(
+export async function executeMigrationGraphCommand(
   options: MigrationGraphOptions,
   flags: GlobalFlags,
   ui: TerminalUI,

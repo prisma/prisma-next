@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
-import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -21,12 +20,12 @@ import {
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
 import {
-  loadMigrationPackages,
   resolveMigrationPaths,
   sanitizeErrorMessage,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
@@ -109,15 +108,17 @@ async function executeDbUpdateCommand(
   const { client, config, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
   let { contractJson } = ctxResult.value;
   let contractJsonPathForSnapshot = contractPathAbsolute;
-  const { migrationsDir, appMigrationsDir, refsDir } = resolveMigrationPaths(
-    options.config,
-    config,
-  );
+  const { migrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
 
   if (options.to) {
     try {
-      const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
-      const refs = await readRefs(refsDir);
+      const loaded = await buildReadAggregate(config, { migrationsDir });
+      if (!loaded.ok) {
+        return notOk(loaded.failure);
+      }
+      const graph = loaded.value.aggregate.app.graph();
+      const bundles = loaded.value.aggregate.app.packages;
+      const refs = loaded.value.aggregate.app.refs;
       const refResult = parseContractRef(options.to, { graph, refs });
       if (!refResult.ok) {
         return notOk(mapRefResolutionError(refResult.failure));
