@@ -12,11 +12,6 @@ export interface MongoNamespaceCollectionsInput {
   readonly collections?: Record<string, MongoCollection | MongoCollectionInput>;
 }
 
-export interface MongoStorageInput<THash extends string = string> {
-  readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
-}
-
 // Mongo concretions always store `MongoCollection` instances in
 // `collections` (Mongo idiom — distinct from the SQL family's `tables`).
 // Narrowing the namespace map here lets target/family-level consumers
@@ -26,6 +21,11 @@ export interface MongoStorageInput<THash extends string = string> {
 export type MongoNamespace = Namespace & {
   readonly collections: Readonly<Record<string, MongoCollection>>;
 };
+
+export interface MongoStorageInput<THash extends string = string> {
+  readonly storageHash: StorageHashBase<THash>;
+  readonly namespaces: Readonly<Record<string, MongoNamespace>>;
+}
 
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {
   declare readonly kind: 'mongo-storage';
@@ -41,7 +41,7 @@ export class MongoStorage<THash extends string = string> extends IRNodeBase impl
       configurable: true,
     });
     this.storageHash = input.storageHash;
-    this.namespaces = Object.freeze(input.namespaces) as Readonly<Record<string, MongoNamespace>>;
+    this.namespaces = Object.freeze(input.namespaces);
     freezeNode(this);
   }
 }

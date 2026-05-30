@@ -1,13 +1,18 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import { type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import {
+  type Namespace,
+  NamespaceBase,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
   type SqlNamespaceTablesInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
+  SqlUnboundNamespace,
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
@@ -113,16 +118,24 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       );
     }
     const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
+    // Keep the `__unbound__` brand sound: a deserialized contract may declare
+    // only named namespaces (cross-namespace contracts omit the late-bound
+    // slot), so inject the family unbound singleton when absent rather than
+    // asserting a shape that isn't present.
+    const unbound = hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
 
     return {
       ...validated,
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
         ...ifDefined('types', hydratedTypes),
+        // `__unbound__` is guaranteed present above; the residual narrowing is
+        // the family invariant that hydrated SQL namespaces are `SqlNamespace`
+        // instances (target/family classes, not the wider framework `Namespace`).
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
-          'deserialized SQL contracts require the __unbound__ namespace slot'
-        >(hydratedNamespaces),
+          'hydrated SQL namespaces are SqlNamespace instances; __unbound__ guaranteed present (injected above)'
+        >({ ...hydratedNamespaces, [UNBOUND_NAMESPACE_ID]: unbound }),
       }),
     };
   }
