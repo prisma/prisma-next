@@ -1,12 +1,3 @@
-import {
-  classifyMigrationListGraphTopology,
-  type MigrationEdgeKind,
-  type MigrationListGraphTopology,
-} from '@prisma-next/migration-tools/migration-list-graph-topology';
-import type {
-  MigrationListEntry,
-  MigrationListResult,
-} from '@prisma-next/migration-tools/migration-list-types';
 import type { GlyphMode } from '../glyph-mode';
 import {
   computeMigrationDirNameWidth,
@@ -15,14 +6,20 @@ import {
   migrationListForwardArrow,
   migrationListKindGlyph,
 } from './migration-list-data-column';
+import {
+  classifyMigrationListGraphTopology,
+  type MigrationEdgeKind,
+  type MigrationListGraphTopology,
+} from './migration-list-graph-topology';
+import type { MigrationListEntry, MigrationListResult } from './migration-list-types';
 
-export type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
+export type { GlyphMode } from '../glyph-mode';
+export type { MigrationEdgeKind } from './migration-list-graph-topology';
 export type {
   MigrationListEntry,
   MigrationListResult,
   MigrationSpaceListEntry,
-} from '@prisma-next/migration-tools/migration-list-types';
-export type { GlyphMode } from '../glyph-mode';
+} from './migration-list-types';
 
 /**
  * Semantic styler for `migration list` output tokens. Token-typed so

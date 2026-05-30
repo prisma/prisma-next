@@ -287,12 +287,26 @@ export async function buildContractSpaceAggregate<
   return ok(loaded.value);
 }
 
-export function appContractShellForAggregateLoad(args: {
+/**
+ * Build a minimal app {@link Contract} carrying only the project's
+ * contract-identity (`storage.storageHash` + `target` / `targetFamily`)
+ * when the real `contract.json` is absent or undeserializable.
+ *
+ * `loadContractSpaceAggregate` requires an `appContract` to synthesise the
+ * app space's head ref from its storage hash. Read commands query only that
+ * hash and the target — never `models` — so an empty-`models` stand-in is
+ * sufficient for them. It is *not* a valid contract for any consumer that
+ * reads schema, which is why this is confined to the read-aggregate path.
+ */
+export function appContractStandInFromIdentity(args: {
   readonly contractHash: string;
   readonly targetId: string;
   readonly targetFamily: string;
 }): Contract {
-  return blindCast<Contract, 'offline read aggregate without contract.json'>({
+  return blindCast<
+    Contract,
+    'read-aggregate consumers query only storage.storageHash and target; empty models stand in for an unreadable contract.json'
+  >({
     storage: { storageHash: args.contractHash },
     schemaVersion: '0.0.0',
     target: args.targetId,
@@ -315,9 +329,12 @@ export async function loadContractRawSafely(config: {
 }
 
 /**
- * Offline tolerant {@link ContractSpaceAggregate} assembly for read-only
- * CLI commands. No integrity gate — callers query `aggregate.app` (or
- * other facets) without re-reading `migrations/`.
+ * Tolerant {@link ContractSpaceAggregate} assembly for read-only CLI
+ * commands. No integrity gate — callers query `aggregate.app` (or other
+ * facets) without re-reading `migrations/`. When `contract.json` is absent
+ * or undeserializable, the app contract falls back to an identity-only
+ * stand-in ({@link appContractStandInFromIdentity}), so these commands
+ * load without requiring a readable contract.
  */
 export async function buildReadAggregate(
   config: PrismaNextConfig,
@@ -336,25 +353,25 @@ export async function buildReadAggregate(
     // Contract unreadable — marker uses EMPTY_CONTRACT_HASH
   }
 
-  const contractRawForAggregate = await loadContractRawSafely(config);
-  const stack = createControlStack(config);
-  const familyInstance = config.family.create(stack);
-  const deserializeContract = (json: unknown): Contract => familyInstance.deserializeContract(json);
-  const appContractShell = appContractShellForAggregateLoad({
-    contractHash,
-    targetId: config.target.id,
-    targetFamily: config.target.familyId,
-  });
-  let appContractForLoad: Contract = appContractShell;
-  if (contractRawForAggregate !== null) {
-    try {
-      appContractForLoad = deserializeContract(contractRawForAggregate);
-    } catch {
-      // Deserialization failed — shell fallback
-    }
-  }
-
   try {
+    const contractRawForAggregate = await loadContractRawSafely(config);
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    const deserializeContract = (json: unknown): Contract =>
+      familyInstance.deserializeContract(json);
+    let appContractForLoad: Contract = appContractStandInFromIdentity({
+      contractHash,
+      targetId: config.target.id,
+      targetFamily: config.target.familyId,
+    });
+    if (contractRawForAggregate !== null) {
+      try {
+        appContractForLoad = deserializeContract(contractRawForAggregate);
+      } catch {
+        // Deserialization failed — identity-only stand-in fallback
+      }
+    }
+
     const loaded = await loadContractSpaceAggregateForCli({
       targetId: config.target.id,
       migrationsDir: options.migrationsDir,

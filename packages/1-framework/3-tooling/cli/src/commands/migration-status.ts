@@ -53,7 +53,7 @@ import {
   toStructuralEdge,
 } from '../utils/command-helpers';
 import {
-  appContractShellForAggregateLoad,
+  appContractStandInFromIdentity,
   loadContractRawSafely,
   refuseContractSpaceIntegrity,
   refusePackageCorruptionOnAggregate,
@@ -611,12 +611,12 @@ async function executeMigrationStatusCommand(
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
   const deserializeContract = (json: unknown): Contract => familyInstance.deserializeContract(json);
-  const appContractShell = appContractShellForAggregateLoad({
+  const appContractStandIn = appContractStandInFromIdentity({
     contractHash,
     targetId: config.target.id,
     targetFamily: config.target.familyId,
   });
-  let appContractForLoad: Contract = appContractShell;
+  let appContractForLoad: Contract = appContractStandIn;
   if (contractRawForAggregate !== null) {
     try {
       appContractForLoad = deserializeContract(contractRawForAggregate);

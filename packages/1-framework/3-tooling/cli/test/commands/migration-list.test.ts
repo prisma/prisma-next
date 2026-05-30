@@ -8,19 +8,19 @@ import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggrega
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationListResult } from '@prisma-next/migration-tools/migration-list-types';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  migrationSpaceListEntriesFromAggregate,
   type RunMigrationListInputs,
   renderMigrationListHumanOutput,
   runMigrationList,
 } from '../../src/commands/migration-list';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
+import type { MigrationListResult } from '../../src/utils/formatters/migration-list-types';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { detectGlyphMode } from '../../src/utils/glyph-mode';
-import { migrationSpaceListEntriesFromAggregate } from '../../src/utils/migration-space-list-from-aggregate';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
 
 /**

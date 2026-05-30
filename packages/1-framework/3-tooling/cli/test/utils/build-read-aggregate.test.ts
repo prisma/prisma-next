@@ -10,7 +10,7 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  appContractShellForAggregateLoad,
+  appContractStandInFromIdentity,
   buildReadAggregate,
 } from '../../src/utils/contract-space-aggregate-loader';
 
@@ -101,7 +101,7 @@ describe('buildReadAggregate', () => {
     expect(result.value.aggregate.app.contract().storage.storageHash).toBe(CONTRACT_HASH);
   });
 
-  it('falls back to the shell contract when contract.json is missing', async () => {
+  it('falls back to the identity-only stand-in contract when contract.json is missing', async () => {
     await writeAppMigration(migrationsDir);
 
     const result = await buildReadAggregate(makeConfig(contractPath), { migrationsDir });
@@ -109,13 +109,13 @@ describe('buildReadAggregate', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.contractHash).toBe(EMPTY_CONTRACT_HASH);
-    const shell = appContractShellForAggregateLoad({
+    const standIn = appContractStandInFromIdentity({
       contractHash: EMPTY_CONTRACT_HASH,
       targetId: TARGET,
       targetFamily: TARGET_FAMILY,
     });
     expect(result.value.aggregate.app.contract().storage.storageHash).toBe(
-      shell.storage.storageHash,
+      standIn.storage.storageHash,
     );
     expect(result.value.aggregate.app.graph().migrationByHash.size).toBe(1);
   });

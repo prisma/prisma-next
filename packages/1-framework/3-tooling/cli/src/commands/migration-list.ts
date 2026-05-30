@@ -1,8 +1,14 @@
 import type {
-  MigrationListResult,
-  MigrationSpaceListEntry,
-} from '@prisma-next/migration-tools/migration-list-types';
-import { APP_SPACE_ID, isValidSpaceId } from '@prisma-next/migration-tools/spaces';
+  ContractSpaceAggregate,
+  ContractSpaceMember,
+} from '@prisma-next/migration-tools/aggregate';
+import { HEAD_REF_NAME, refsByContractHash } from '@prisma-next/migration-tools/refs';
+import {
+  APP_SPACE_ID,
+  isValidSpaceId,
+  listContractSpaceDirectories,
+  RESERVED_SPACE_SUBDIR_NAMES,
+} from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -29,12 +35,100 @@ import {
   renderMigrationListWithStyle,
 } from '../utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+  MigrationSpaceListEntry,
+} from '../utils/formatters/migration-list-types';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
-import { migrationSpaceListEntriesFromAggregate } from '../utils/migration-space-list-from-aggregate';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+
+function compareSpaceIds(a: string, b: string): number {
+  if (a === APP_SPACE_ID) return b === APP_SPACE_ID ? 0 : -1;
+  if (b === APP_SPACE_ID) return 1;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry): number {
+  if (a.dirName < b.dirName) return 1;
+  if (a.dirName > b.dirName) return -1;
+  return 0;
+}
+
+/**
+ * Ref names decorating a space's destination contract hashes. The
+ * tolerant `member.refs` deliberately omits the structural `head.json`;
+ * for extension spaces the old enumerator surfaced it as a `head`
+ * decoration on the tip migration, so fold `member.headRef` back in to
+ * keep that output. The app space synthesises its head, so it carries
+ * no on-disk `head` ref to restore.
+ */
+function listRefsByContractHash(
+  member: ContractSpaceMember,
+): ReadonlyMap<string, readonly string[]> {
+  const byHash = new Map(refsByContractHash(member.refs));
+  if (member.spaceId !== APP_SPACE_ID && member.headRef !== null) {
+    const hash = member.headRef.hash;
+    const bucket = byHash.get(hash) ?? [];
+    if (!bucket.includes(HEAD_REF_NAME)) {
+      byHash.set(hash, [...bucket, HEAD_REF_NAME].sort());
+    }
+  }
+  return byHash;
+}
+
+async function orderedOnDiskSpaceIds(projectMigrationsDir: string): Promise<readonly string[]> {
+  const candidateDirs = await listContractSpaceDirectories(projectMigrationsDir);
+  return candidateDirs
+    .filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name))
+    .filter(isValidSpaceId)
+    .sort(compareSpaceIds);
+}
+
+/**
+ * Project the loaded {@link ContractSpaceAggregate} into the render-ready
+ * {@link MigrationSpaceListEntry} rows `migration list` displays.
+ *
+ * Space membership matches the on-disk contract-space directories (not the
+ * aggregate's always-present synthesized app member when `migrations/app/`
+ * is absent); package and ref data come from `aggregate.space(id)`.
+ */
+export async function migrationSpaceListEntriesFromAggregate(
+  aggregate: ContractSpaceAggregate,
+  projectMigrationsDir: string,
+): Promise<readonly MigrationSpaceListEntry[]> {
+  const spaceIds = await orderedOnDiskSpaceIds(projectMigrationsDir);
+  const spaces: MigrationSpaceListEntry[] = [];
+
+  for (const spaceId of spaceIds) {
+    const member = aggregate.space(spaceId);
+    if (member === undefined) {
+      continue;
+    }
+    const refsByHash = listRefsByContractHash(member);
+    const migrations: MigrationListEntry[] = member.packages
+      .map((pkg) => ({
+        dirName: pkg.dirName,
+        from: pkg.metadata.from,
+        to: pkg.metadata.to,
+        migrationHash: pkg.metadata.migrationHash,
+        operationCount: pkg.ops.length,
+        createdAt: pkg.metadata.createdAt,
+        refs: refsByHash.get(pkg.metadata.to) ?? [],
+        providedInvariants: pkg.metadata.providedInvariants,
+      }))
+      .sort(compareDirNamesDescending);
+
+    spaces.push({ spaceId, migrations });
+  }
+
+  return spaces;
+}
 
 interface MigrationListOptions extends CommonCommandOptions {
   readonly config?: string;
