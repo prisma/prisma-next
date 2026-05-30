@@ -117,10 +117,9 @@ function resolveColumn(
   tableName: string,
   columnName: string,
 ): { readonly codecId: string; readonly nullable: boolean } | undefined {
-  const table = getStorageNamespace(
-    contract.storage as Record<string, unknown>,
-    UNBOUND_NAMESPACE_ID,
-  )?.tables[tableName] as StorageTable | undefined;
+  const table = getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID)?.tables[tableName] as
+    | StorageTable
+    | undefined;
   const column = table?.columns?.[columnName];
   if (!column) return undefined;
   return { codecId: column.codecId, nullable: column.nullable };

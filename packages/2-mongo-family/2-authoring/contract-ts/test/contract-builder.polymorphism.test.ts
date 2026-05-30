@@ -63,10 +63,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = (
-      getStorageNamespace(
-        contract.storage as Record<string, unknown>,
-        UNBOUND_NAMESPACE_ID,
-      ) as MongoNamespaceShape
+      getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape
     ).collections as unknown as Record<
       string,
       {
@@ -131,10 +128,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = (
-      getStorageNamespace(
-        contract.storage as Record<string, unknown>,
-        UNBOUND_NAMESPACE_ID,
-      ) as MongoNamespaceShape
+      getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape
     ).collections as unknown as Record<
       string,
       {
@@ -193,10 +187,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = (
-      getStorageNamespace(
-        contract.storage as Record<string, unknown>,
-        UNBOUND_NAMESPACE_ID,
-      ) as MongoNamespaceShape
+      getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape
     ).collections as unknown as Record<
       string,
       {
@@ -246,10 +237,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = (
-      getStorageNamespace(
-        contract.storage as Record<string, unknown>,
-        UNBOUND_NAMESPACE_ID,
-      ) as MongoNamespaceShape
+      getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape
     ).collections as unknown as Record<
       string,
       {
@@ -293,10 +281,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     });
 
     const collections = (
-      getStorageNamespace(
-        contract.storage as Record<string, unknown>,
-        UNBOUND_NAMESPACE_ID,
-      ) as MongoNamespaceShape
+      getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape
     ).collections as unknown as Record<
       string,
       {

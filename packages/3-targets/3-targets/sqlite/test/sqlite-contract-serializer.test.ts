@@ -45,10 +45,7 @@ describe('SqliteContractSerializer', () => {
     const serializer = new SqliteContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
     expect(contract.targetFamily).toBe('sql');
-    expect(
-      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)!
-        .tables,
-    ).toEqual({});
+    expect(getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID)!.tables).toEqual({});
   });
 
   it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
@@ -56,10 +53,9 @@ describe('SqliteContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const userTable = getStorageNamespace(
-      contract.storage as Record<string, unknown>,
-      UNBOUND_NAMESPACE_ID,
-    )!.tables['user'] as StorageTable | undefined;
+    const userTable = getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID)!.tables['user'] as
+      | StorageTable
+      | undefined;
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
   });
@@ -77,12 +73,10 @@ describe('SqliteContractSerializer', () => {
     const reparsed = JSON.parse(JSON.stringify(json));
     expect(reparsed.storage).not.toHaveProperty('kind');
     expect(
-      getStorageNamespace(reparsed.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables
-        .user,
+      getStorageNamespace(reparsed.storage, UNBOUND_NAMESPACE_ID).tables.user,
     ).not.toHaveProperty('kind');
     expect(
-      getStorageNamespace(reparsed.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables
-        .user.columns.id,
+      getStorageNamespace(reparsed.storage, UNBOUND_NAMESPACE_ID).tables.user.columns.id,
     ).not.toHaveProperty('kind');
   });
 });

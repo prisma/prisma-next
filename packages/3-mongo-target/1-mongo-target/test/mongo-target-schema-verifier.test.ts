@@ -74,11 +74,9 @@ describe('MongoTargetSchemaVerifier', () => {
   it('uses the family-shared scaffolding: walks each namespace and aggregates issues', () => {
     const verifier = new MongoTargetSchemaVerifier();
     const contract = deserializedContract();
-    expect(
-      [...storageNamespaceEntries(contract.storage as unknown as Record<string, unknown>)].map(
-        ([id]) => id,
-      ),
-    ).toEqual(['__unbound__']);
+    expect([...storageNamespaceEntries(contract.storage)].map(([id]) => id)).toEqual([
+      '__unbound__',
+    ]);
 
     const result = verifier.verifySchema({ contract, schema: new MongoSchemaIR([]) });
     expect(result).toBeDefined();

@@ -60,12 +60,8 @@ describe('mongo contract builder', () => {
       posts: crossRef('Post'),
     });
     expect(
-      (
-        getStorageNamespace(
-          contract.storage as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape
-      ).collections,
+      (getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape)
+        .collections,
     ).toEqual({
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
@@ -151,12 +147,8 @@ describe('mongo contract builder', () => {
       tasks: crossRef('Task'),
     });
     expect(
-      (
-        getStorageNamespace(
-          contract.storage as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape
-      ).collections,
+      (getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape)
+        .collections,
     ).toEqual({
       tasks: { kind: 'mongo-collection' },
     });
@@ -205,12 +197,8 @@ describe('mongo contract builder', () => {
     });
 
     expect(
-      (
-        getStorageNamespace(
-          contract.storage as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape
-      ).collections,
+      (getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape)
+        .collections,
     ).toEqual({
       users: {
         kind: 'mongo-collection',
@@ -281,12 +269,8 @@ describe('mongo contract builder', () => {
     });
 
     expect(
-      (
-        getStorageNamespace(
-          contract.storage as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape
-      ).collections,
+      (getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape)
+        .collections,
     ).toEqual({
       tasks: {
         kind: 'mongo-collection',
@@ -425,12 +409,8 @@ describe('mongo contract builder', () => {
     });
 
     expect(
-      (
-        getStorageNamespace(
-          contract.storage as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape
-      ).collections,
+      (getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape)
+        .collections,
     ).toEqual({
       users: {
         kind: 'mongo-collection',

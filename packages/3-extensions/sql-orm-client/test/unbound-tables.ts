@@ -10,6 +10,7 @@ type StorageLike = {
 export function unboundTables(
   storage: StorageLike | SqlStorage,
 ): Readonly<Record<string, StorageTable>> {
-  return (getStorageNamespace(storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)?.tables ??
-    {}) as Readonly<Record<string, StorageTable>>;
+  return (getStorageNamespace(storage, UNBOUND_NAMESPACE_ID)?.tables ?? {}) as Readonly<
+    Record<string, StorageTable>
+  >;
 }

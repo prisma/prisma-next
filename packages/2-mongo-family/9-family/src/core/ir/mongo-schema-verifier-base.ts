@@ -45,9 +45,9 @@ export abstract class MongoSchemaVerifierBase<
     options: SchemaVerifyOptions<TContract, TSchema>,
   ): readonly SchemaIssue[] {
     const issues: SchemaIssue[] = [];
-    const namespaceEntries = [
-      ...storageNamespaceEntries(options.contract.storage as unknown as Record<string, unknown>),
-    ].sort(([a], [b]) => a.localeCompare(b));
+    const namespaceEntries = [...storageNamespaceEntries(options.contract.storage)].sort(
+      ([a], [b]) => a.localeCompare(b),
+    );
     for (const [namespaceId, namespace] of namespaceEntries) {
       if (!namespace) continue;
       issues.push(

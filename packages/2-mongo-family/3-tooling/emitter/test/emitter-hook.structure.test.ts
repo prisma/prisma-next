@@ -60,7 +60,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: namespacedMongoStorageFromCollections({}),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'references collection "users" which is not in getStorageNamespace(storage as Record<string, unknown>, ..).collections',
+      'references collection "users" which is not in getStorageNamespace(storage, ..).collections',
     );
   });
 

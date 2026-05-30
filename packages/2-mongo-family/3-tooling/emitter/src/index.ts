@@ -25,9 +25,7 @@ function mongoNamespaceSerializedKind(ns: Namespace): string {
 
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
-  for (const [namespaceId, ns] of [
-    ...storageNamespaceEntries(storage as unknown as Record<string, unknown>),
-  ]) {
+  for (const [namespaceId, ns] of [...storageNamespaceEntries(storage)]) {
     for (const coll of Object.keys((ns as MongoNamespaceShape).collections)) {
       const existing = seen.get(coll);
       if (existing !== undefined && existing !== namespaceId) {
@@ -66,9 +64,7 @@ function generateMongoNamespaceCollectionsType(
 }
 
 function generateMongoFlatStorageType(storage: MongoStorage): string {
-  const sorted = [...storageNamespaceEntries(storage as unknown as Record<string, unknown>)].sort(
-    ([a], [b]) => a.localeCompare(b),
-  );
+  const sorted = [...storageNamespaceEntries(storage)].sort(([a], [b]) => a.localeCompare(b));
   if (sorted.length === 0) {
     return '';
   }
@@ -136,8 +132,8 @@ export const mongoEmission = {
       throw new Error('Mongo contract must have storage');
     }
     if (
-      storageNamespaceValues(storage as unknown as Record<string, unknown>).length === 0 &&
-      !getStorageNamespace(storage as unknown as Record<string, unknown>, '__unbound__')
+      storageNamespaceValues(storage).length === 0 &&
+      !getStorageNamespace(storage, '__unbound__')
     ) {
       throw new Error('Mongo contract must have at least one storage namespace entry');
     }
@@ -145,7 +141,7 @@ export const mongoEmission = {
     assertUniqueMongoCollectionNames(storage);
 
     const collectionNames = new Set<string>();
-    for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+    for (const ns of storageNamespaceValues(storage)) {
       for (const c of Object.keys((ns as MongoNamespaceShape).collections)) {
         collectionNames.add(c);
       }
@@ -186,7 +182,7 @@ export const mongoEmission = {
       } else if (collection) {
         if (!collectionNames.has(collection)) {
           throw new Error(
-            `Model "${modelName}" references collection "${collection}" which is not in getStorageNamespace(storage as unknown as Record<string, unknown>, ..).collections`,
+            `Model "${modelName}" references collection "${collection}" which is not in getStorageNamespace(storage, ..).collections`,
           );
         }
       }

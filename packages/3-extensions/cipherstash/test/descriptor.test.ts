@@ -53,8 +53,7 @@ describe('cipherstash extension descriptor (contract-space package layout)', () 
     const space = cipherstashExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
     const unboundTables =
-      space!.getStorageNamespace(contractJson.storage as Record<string, unknown>, '__unbound__')
-        ?.tables ?? {};
+      space!.getStorageNamespace(contractJson.storage, '__unbound__')?.tables ?? {};
     expect(Object.keys(unboundTables)).toEqual([EQL_V2_CONFIGURATION_TABLE]);
   });
 

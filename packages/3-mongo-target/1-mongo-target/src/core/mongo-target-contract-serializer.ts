@@ -17,23 +17,21 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
   protected constructTargetContract(validated: MongoContract): MongoTargetContract {
     const { storage, ...rest } = validated;
     const namespaces = Object.fromEntries(
-      [...storageNamespaceEntries(storage as unknown as Record<string, unknown>)].map(
-        ([nsId, nsData]) => {
-          const ns = nsData as MongoNamespaceShape;
-          const collections = ns.collections;
-          const collectionCount = Object.keys(collections).length;
-          if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
-            return [nsId, MongoTargetUnboundDatabase.instance];
-          }
-          return [
-            nsId,
-            new MongoTargetDatabase({
-              id: ns.id,
-              collections,
-            }),
-          ];
-        },
-      ),
+      [...storageNamespaceEntries(storage)].map(([nsId, nsData]) => {
+        const ns = nsData as MongoNamespaceShape;
+        const collections = ns.collections;
+        const collectionCount = Object.keys(collections).length;
+        if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
+          return [nsId, MongoTargetUnboundDatabase.instance];
+        }
+        return [
+          nsId,
+          new MongoTargetDatabase({
+            id: ns.id,
+            collections,
+          }),
+        ];
+      }),
     );
     const targetStorage = new MongoStorage(
       buildMongoStorageInput({
@@ -49,9 +47,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const storageOut: Record<string, JsonObject | string> = {
       storageHash: String(storage.storageHash),
     };
-    for (const [nsId, ns] of [
-      ...storageNamespaceEntries(storage as unknown as Record<string, unknown>),
-    ]) {
+    for (const [nsId, ns] of [...storageNamespaceEntries(storage)]) {
       const mongoNs = ns as MongoNamespaceShape;
       const collectionsOut: Record<string, JsonObject> = {};
       for (const [collName, coll] of Object.entries(mongoNs.collections)) {

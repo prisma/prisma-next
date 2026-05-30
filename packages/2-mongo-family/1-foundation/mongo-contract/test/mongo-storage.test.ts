@@ -57,10 +57,7 @@ describe('MongoStorage', () => {
       }),
     );
     expect(
-      (getStorageNamespace(
-        storage as unknown as Record<string, unknown>,
-        'default',
-      ) as MongoNamespace)!.collections['events'],
+      (getStorageNamespace(storage, 'default') as MongoNamespace)!.collections['events'],
     ).toBeInstanceOf(MongoCollection);
   });
 
@@ -72,10 +69,8 @@ describe('MongoStorage', () => {
         namespaces: { default: defaultNamespace, auth },
       }),
     );
-    expect(getStorageNamespace(storage as unknown as Record<string, unknown>, 'default')).toBe(
-      defaultNamespace,
-    );
-    expect(getStorageNamespace(storage as unknown as Record<string, unknown>, 'auth')).toBe(auth);
+    expect(getStorageNamespace(storage, 'default')).toBe(defaultNamespace);
+    expect(getStorageNamespace(storage, 'auth')).toBe(auth);
   });
 
   it('is frozen after construction', () => {
@@ -95,8 +90,6 @@ describe('MongoStorage', () => {
         namespaces: { [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance },
       }),
     );
-    expect(
-      getStorageNamespace(storage as unknown as Record<string, unknown>, UNBOUND_NAMESPACE_ID),
-    ).toBe(MongoUnboundNamespace.instance);
+    expect(getStorageNamespace(storage, UNBOUND_NAMESPACE_ID)).toBe(MongoUnboundNamespace.instance);
   });
 });

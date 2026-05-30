@@ -10,7 +10,7 @@ function storageDeclaresCollection(
   storage: MongoContract['storage'],
   collectionName: string,
 ): boolean {
-  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
+  for (const ns of storageNamespaceValues(storage)) {
     if (Object.hasOwn((ns as MongoNamespace).collections, collectionName)) {
       return true;
     }

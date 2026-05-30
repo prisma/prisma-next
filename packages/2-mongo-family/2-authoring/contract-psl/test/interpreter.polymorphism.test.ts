@@ -42,12 +42,8 @@ const mongoCodecLookup: CodecLookup = {
 };
 
 function mongoCollectionsOf(ir: { readonly storage: unknown }): Record<string, unknown> {
-  return (
-    getStorageNamespace(
-      ir.storage as Record<string, unknown>,
-      UNBOUND_NAMESPACE_ID,
-    ) as MongoNamespaceShape
-  ).collections as Record<string, unknown>;
+  return (getStorageNamespace(ir.storage as object, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape)
+    .collections as Record<string, unknown>;
 }
 
 function interpret(schema: string) {

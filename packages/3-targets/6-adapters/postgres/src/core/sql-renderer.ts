@@ -684,7 +684,7 @@ function getInsertColumnOrder(
   }
 
   let table: { columns: Record<string, unknown> } | undefined;
-  for (const ns of storageNamespaceValues(contract.storage as Record<string, unknown>)) {
+  for (const ns of storageNamespaceValues(contract.storage)) {
     // Namespace.tables is Record<string, IRNode> at the interface level;
     // SQL family namespaces hold StorageTable instances which have .columns.
     const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;

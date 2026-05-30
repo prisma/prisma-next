@@ -15,10 +15,9 @@ export function deriveParamsFromAst(ast: AnyQueryAst): {
 }
 
 export function resolveTableColumns(contract: Contract<SqlStorage>, tableName: string): string[] {
-  const table = getStorageNamespace(
-    contract.storage as Record<string, unknown>,
-    UNBOUND_NAMESPACE_ID,
-  )?.tables[tableName] as StorageTable | undefined;
+  const table = getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID)?.tables[tableName] as
+    | StorageTable
+    | undefined;
   if (!table) {
     throw new Error(`Unknown table "${tableName}" in SQL ORM query planner`);
   }

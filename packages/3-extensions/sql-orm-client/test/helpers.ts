@@ -154,7 +154,7 @@ export function buildMixedPolyContract(): TestContract {
     base: 'Task',
   };
 
-  getStorageNamespace(raw.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID).tables.tasks = {
+  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -167,10 +167,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  getStorageNamespace(
-    raw.storage as Record<string, unknown>,
-    UNBOUND_NAMESPACE_ID,
-  ).tables.features = {
+  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -218,26 +215,17 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  getStorageNamespace(
-    raw.storage as Record<string, unknown>,
-    UNBOUND_NAMESPACE_ID,
-  ).tables.users.columns.kind = {
+  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  getStorageNamespace(
-    raw.storage as Record<string, unknown>,
-    UNBOUND_NAMESPACE_ID,
-  ).tables.users.columns.role = {
+  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  getStorageNamespace(
-    raw.storage as Record<string, unknown>,
-    UNBOUND_NAMESPACE_ID,
-  ).tables.users.columns.plan = {
+  getStorageNamespace(raw.storage, UNBOUND_NAMESPACE_ID).tables.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

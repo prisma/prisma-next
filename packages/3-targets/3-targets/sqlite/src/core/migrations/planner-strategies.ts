@@ -61,9 +61,7 @@ export function tableAt(
   namespaceId: string,
   tableName: string,
 ): StorageTable | undefined {
-  return getStorageNamespace(storage as Record<string, unknown>, namespaceId)?.tables[tableName] as
-    | StorageTable
-    | undefined;
+  return getStorageNamespace(storage, namespaceId)?.tables[tableName] as StorageTable | undefined;
 }
 
 /**

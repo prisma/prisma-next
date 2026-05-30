@@ -20,8 +20,9 @@ import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './q
 import { combineWhereExprs } from './where-utils';
 
 function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
-  return getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
-    ?.tables[tableName] as StorageTable | undefined;
+  return getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID)?.tables[tableName] as
+    | StorageTable
+    | undefined;
 }
 
 function buildReturningColumns(

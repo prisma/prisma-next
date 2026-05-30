@@ -68,9 +68,9 @@ describe('MongoTargetContractSerializer', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeSingletonUnboundContractJson());
 
-    expect(
-      getStorageNamespace(contract.storage as unknown as Record<string, unknown>, '__unbound__'),
-    ).toBe(MongoTargetUnboundDatabase.instance);
+    expect(getStorageNamespace(contract.storage, '__unbound__')).toBe(
+      MongoTargetUnboundDatabase.instance,
+    );
   });
 
   it('hydrates collections into MongoCollection IR-class instances', () => {
@@ -78,10 +78,7 @@ describe('MongoTargetContractSerializer', () => {
     const contract = serializer.deserializeContract(makeValidContractJson());
 
     const items = (
-      getStorageNamespace(
-        contract.storage as unknown as Record<string, unknown>,
-        UNBOUND_NAMESPACE_ID,
-      ) as MongoNamespaceShape | undefined
+      getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape | undefined
     )?.collections['items'];
     expect(items).toBeInstanceOf(MongoCollection);
     expect(items?.kind).toBe('mongo-collection');
@@ -160,10 +157,9 @@ describe('MongoTargetContractSerializer', () => {
       const contract = serializer.deserializeContract(makeFullyPopulatedJson());
 
       const items = (
-        getStorageNamespace(
-          contract.storage as unknown as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape | undefined
+        getStorageNamespace(contract.storage, UNBOUND_NAMESPACE_ID) as
+          | MongoNamespaceShape
+          | undefined
       )?.collections['items'];
       expect(items).toBeInstanceOf(MongoCollection);
       expect(items?.indexes?.[0]).toBeInstanceOf(MongoIndex);
@@ -180,10 +176,7 @@ describe('MongoTargetContractSerializer', () => {
 
       const reparsed = JSON.parse(JSON.stringify(out));
       const items = (
-        getStorageNamespace(
-          reparsed.storage as unknown as Record<string, unknown>,
-          UNBOUND_NAMESPACE_ID,
-        ) as MongoNamespaceShape
+        getStorageNamespace(reparsed.storage, UNBOUND_NAMESPACE_ID) as MongoNamespaceShape
       ).collections['items'];
       expect(items).toBeDefined();
       expect(items!.kind).toBe('mongo-collection');
@@ -195,10 +188,9 @@ describe('MongoTargetContractSerializer', () => {
       const roundtripped = serializer.deserializeContract(reparsed);
       expect(
         (
-          getStorageNamespace(
-            roundtripped.storage as unknown as Record<string, unknown>,
-            UNBOUND_NAMESPACE_ID,
-          ) as MongoNamespaceShape | undefined
+          getStorageNamespace(roundtripped.storage, UNBOUND_NAMESPACE_ID) as
+            | MongoNamespaceShape
+            | undefined
         )?.collections['items'],
       ).toBeInstanceOf(MongoCollection);
     });
