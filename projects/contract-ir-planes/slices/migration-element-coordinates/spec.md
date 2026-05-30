@@ -34,6 +34,16 @@ One reviewable unit: migrate every reader of `extractStorageElementNames` to `el
 
 None. Working position: the migration consumers need the coordinate's name component, which `elementCoordinates` yields; the type gap closes by adjusting the migration-internal hold, not a public type.
 
+## Round 2 — review actions (PR #629)
+
+Reviewer questioned the defensiveness in `storage-element-names.ts`. Both stand; the seam stays but loses its over-defensive dressing.
+
+- **R1 — Drop the per-entry null sweep.** The `Object.values(namespaces).every(ns => non-null object)` loop defends against impossible input: the parameter is a typed `Contract` (not `unknown`, as it was when that guard was first written), and `elementCoordinates` already skips null slots internally. A validated contract never carries a null namespace value. Remove the sweep; `hasNamespaceMap` narrows to `object` + has-a-`namespaces`-map only.
+- **R2 — Reframe the guard as a layering type-bridge, not malformed-input defence.** The guard exists because `Contract.storage` resolves to `StorageBase` (foundation, hash-only) while `namespaces` lives on the framework `Storage` interface (core); foundation can't reference `Namespace`, so the migration layer narrows `StorageBase → Storage` at runtime in lieu of a banned bare `as`. Rewrite the function doc-comment and the inline comment to say that — drop the "malformed or partially-constructed" framing.
+- **Refusal trigger** — if leaning the guard out forces a bare `as` cast or a `blindCast` to satisfy `elementCoordinates`'s `Storage` parameter, **HALT and report**: the lean predicate must remain a real runtime type-guard, not a cast.
+
+Closing the seam structurally (the contract storage type carrying `namespaces` so no narrowing is needed) ripples through `ContractSpaceMember` and every caller — out of scope here; deferred-item candidate.
+
 ## References
 
 - Parent project: [`projects/contract-ir-planes/spec.md`](../../spec.md) — PDoD6
