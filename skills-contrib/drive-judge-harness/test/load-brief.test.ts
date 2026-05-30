@@ -11,24 +11,24 @@ const GOLDEN_DIR = fileURLToPath(
 );
 
 describe('loadCase — real golden case', () => {
-  const golden = loadCase(join(GOLDEN_DIR, 'slice-cli-list-flag'));
+  const golden = loadCase(join(GOLDEN_DIR, 'slice-dedupe-generated-imports'));
 
   it('parses the case metadata', () => {
-    assert.equal(golden.meta.slug, 'slice-cli-list-flag');
+    assert.equal(golden.meta.slug, 'slice-dedupe-generated-imports');
     assert.equal(golden.meta.shape, 'slice');
     assert.ok(golden.meta.recommended_model.length > 0);
   });
 
   it('reads the brief text', () => {
-    assert.ok(golden.briefText.includes('--json'));
+    assert.ok(golden.briefText.includes('deduped'));
   });
 });
 
 describe('loadCase — every shipped golden case loads', () => {
   const slugs = [
-    'direct-change-diagnostic-wording',
-    'slice-cli-list-flag',
-    'project-retry-policy',
+    'direct-change-example-emit-outputpath',
+    'slice-dedupe-generated-imports',
+    'project-reap-subsumed-ir-surfaces',
     'i12-halt-storage-assumption',
     'spike-first-flaky-test',
   ];

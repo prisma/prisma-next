@@ -51,10 +51,10 @@ Dry-run (safe; the default — proves the wiring without a live call):
 
 ```bash
 node skills-contrib/drive-judge-harness/run-one-brief.ts \
-  --case projects/drive-judge-harness/assets/golden/slice-cli-list-flag \
+  --case projects/drive-judge-harness/assets/golden/slice-dedupe-generated-imports \
   --model claude-4.6-sonnet-high-thinking \
-  --trace-file wip/drive-trace/golden-slice-cli-list-flag.jsonl \
-  --manifest-file wip/drive-trace/golden-slice-cli-list-flag.run.json
+  --trace-file wip/drive-trace/golden-slice-dedupe-generated-imports.jsonl \
+  --manifest-file wip/drive-trace/golden-slice-dedupe-generated-imports.run.json
 ```
 
 In this repo, `pnpm drive:run-brief -- <args>` is the shortcut.
@@ -63,7 +63,7 @@ Live run (operator-gated — see "Live execution prerequisites"):
 
 ```bash
 CURSOR_API_KEY=cursor_... node skills-contrib/drive-judge-harness/run-one-brief.ts \
-  --case projects/drive-judge-harness/assets/golden/slice-cli-list-flag \
+  --case projects/drive-judge-harness/assets/golden/slice-dedupe-generated-imports \
   --model claude-4.6-sonnet-high-thinking --live \
   --trace-file ... --manifest-file ...
 ```

@@ -16,7 +16,7 @@ import {
 const GOLDEN_DIR = fileURLToPath(
   new URL('../../../projects/drive-judge-harness/assets/golden/', import.meta.url),
 );
-const CASE_DIR = join(GOLDEN_DIR, 'slice-cli-list-flag');
+const CASE_DIR = join(GOLDEN_DIR, 'slice-dedupe-generated-imports');
 
 let dir: string;
 beforeEach(() => {
@@ -104,7 +104,7 @@ describe('runOneBrief — dry-run gate', () => {
     );
     const parsed = JSON.parse(readFileSync(manifestFile, 'utf8'));
     assert.equal(parsed.status, 'dry-run');
-    assert.equal(parsed.case_slug, 'slice-cli-list-flag');
+    assert.equal(parsed.case_slug, 'slice-dedupe-generated-imports');
     assert.equal(parsed.model, 'pinned-model');
     assert.equal(parsed.tokens, null);
   });
@@ -197,6 +197,6 @@ describe('assemblePrompt', () => {
     const prompt = assemblePrompt(golden);
     assert.match(prompt, /Drive orchestrator/);
     assert.ok(prompt.includes(golden.briefText));
-    assert.match(prompt, /slice-cli-list-flag/);
+    assert.match(prompt, /slice-dedupe-generated-imports/);
   });
 });

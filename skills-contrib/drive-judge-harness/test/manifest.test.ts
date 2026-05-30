@@ -17,7 +17,7 @@ afterEach(() => {
 
 const dryRunManifest: RunManifest = {
   schema_version: '1',
-  case_slug: 'slice-cli-list-flag',
+  case_slug: 'slice-dedupe-generated-imports',
   model: 'claude-4.6-sonnet-high-thinking',
   status: 'dry-run',
   run_id: null,
@@ -49,7 +49,7 @@ describe('writeManifest', () => {
     const path = join(dir, 'nested', 'deeper', 'run.json');
     writeManifest(path, dryRunManifest);
     const parsed = JSON.parse(readFileSync(path, 'utf8'));
-    assert.equal(parsed.case_slug, 'slice-cli-list-flag');
+    assert.equal(parsed.case_slug, 'slice-dedupe-generated-imports');
   });
 
   it('preserves accumulated tokens when present', () => {

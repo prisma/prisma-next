@@ -1,7 +1,0 @@
-{
-  "slug": "slice-cli-list-flag",
-  "title": "Add a --json flag to the migration-list CLI command",
-  "shape": "slice",
-  "recommended_model": "claude-4.6-sonnet-high-thinking",
-  "summary": "Add a --json output mode to the existing migration-list CLI command so its output can be consumed by tooling, alongside the human-readable default. One coherent PR: spec + plan + one build loop."
-}
