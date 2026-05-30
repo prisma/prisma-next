@@ -7,6 +7,8 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
@@ -22,7 +24,7 @@ describe('demo contract visualization DX', () => {
     expect(contract.models).toBeDefined();
     expect(typeof contract.models).toBe('object');
     expect(contract.storage).toBeDefined();
-    expect(contract.storage.namespaces).toBeDefined();
+    expect(contract.storage.__unbound__).toBeDefined();
     expect(contract.capabilities).toBeDefined();
     expect(typeof contract.capabilities).toBe('object');
     expect(contract.extensionPacks).toBeDefined();
@@ -61,7 +63,7 @@ describe('demo contract visualization DX', () => {
       expect(typeof m['relations']).toBe('object');
     }
 
-    for (const [, ns] of Object.entries(contract.storage.namespaces)) {
+    for (const ns of storageNamespaceValues<SqlNamespace>(contract.storage)) {
       for (const [, table] of Object.entries(ns.tables)) {
         expect(table.columns).toBeDefined();
       }

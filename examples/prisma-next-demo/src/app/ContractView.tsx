@@ -1,4 +1,5 @@
-import type { StorageTable } from '@prisma-next/sql-contract/types';
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
+import type { SqlNamespace, StorageTable } from '@prisma-next/sql-contract/types';
 import type { Contract } from '../prisma/contract.d';
 
 type ContractModel = Contract['models'][keyof Contract['models']];
@@ -139,7 +140,7 @@ export function ContractView({ contract }: { contract: Contract }) {
       </Section>
 
       <Section title="Tables">
-        {Object.values(contract.storage.namespaces).flatMap((ns) =>
+        {storageNamespaceValues<SqlNamespace>(contract.storage).flatMap((ns) =>
           Object.entries(ns.tables as Record<string, StorageTable>).map(([tableName, table]) => (
             <TableCard key={`${ns.id}.${tableName}`} tableName={tableName} table={table} />
           )),

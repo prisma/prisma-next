@@ -33,28 +33,28 @@ type FlatMongoStorage = {
 
 function namespacedMongoContract(contract: MongoContract): MongoContract {
   const storage = contract.storage;
-  if ('namespaces' in storage && storage.namespaces != null) {
+  if (UNBOUND_NAMESPACE_ID in storage) {
     return contract;
   }
   if (!('collections' in storage)) {
     return contract;
   }
-  const { collections, storageHash, ...rest } = storage as FlatMongoStorage;
-  // Test-only rewrap of a legacy on-disk end-contract.json whose storageHash
-  // is a plain string. MongoContract's storage carries a branded StorageHash;
-  // the brand is purely a type-level marker and the runtime payload is
+  const { collections, storageHash, ...rest } = storage as unknown as FlatMongoStorage;
+  // Test-only rewrap of a legacy on-disk end-contract.json whose top-level
+  // `collections` predate the per-namespace storage plane and whose
+  // storageHash is a plain string. MongoContract's storage carries a branded
+  // StorageHash and keys namespaces directly under `storage` (ADR 221 flat
+  // shape); the brand is purely a type-level marker and the runtime payload is
   // identical, so a structural rewrap is safe here.
   return {
     ...contract,
     storage: {
       ...rest,
       storageHash,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          kind: 'mongo-namespace' as const,
-          collections,
-        },
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        kind: 'mongo-namespace' as const,
+        collections,
       },
     },
   } as unknown as MongoContract;
