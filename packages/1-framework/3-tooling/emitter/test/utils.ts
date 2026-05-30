@@ -1,8 +1,13 @@
 import type {
   CanonicalizeContractOptions,
   PreserveEmptyPredicate,
-  StorageSort,
 } from '@prisma-next/contract/hashing';
+import {
+  createPreserveEmptyPredicate,
+  createStorageSort,
+  type NamedArraySortTarget,
+  type PathPattern,
+} from '@prisma-next/contract/hashing-utils';
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
@@ -12,76 +17,20 @@ import { emit as emitImpl } from '../src/exports';
 
 const identitySerialize = (c: Contract): JsonObject => c as unknown as JsonObject;
 
-function sqlPreserveEmpty(path: readonly string[]): boolean {
-  const len = path.length;
-  if (len < 2 || path[0] !== 'storage') return false;
-  if (path[1] === 'namespaces') {
-    if (len === 4 && path[3] === 'tables') return true;
-    if (len === 5 && path[3] === 'tables') return true;
-    if (
-      len === 6 &&
-      path[3] === 'tables' &&
-      (path[5] === 'uniques' || path[5] === 'indexes' || path[5] === 'foreignKeys')
-    )
-      return true;
-    if (
-      len === 7 &&
-      path[3] === 'tables' &&
-      path[5] === 'foreignKeys' &&
-      (path[6] === 'constraint' || path[6] === 'index')
-    )
-      return true;
-  }
-  if (path[1] === 'types' && len === 4 && path[3] === 'typeParams') return true;
-  return false;
-}
+const sqlPreserveEmptyPatterns = [
+  ['storage', 'namespaces', '*', 'tables'],
+  ['storage', 'namespaces', '*', 'tables', '*'],
+  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'types', '*', 'typeParams'],
+] as const satisfies readonly PathPattern[];
 
-const sqlSortStorage: StorageSort = (storage) => {
-  if (!storage || typeof storage !== 'object' || Array.isArray(storage)) return storage;
-  const s = storage as Record<string, unknown>;
-  const namespaces = s['namespaces'];
-  if (!namespaces || typeof namespaces !== 'object' || Array.isArray(namespaces)) return storage;
-  const ns = namespaces as Record<string, unknown>;
-  const sortedNs: Record<string, unknown> = {};
-  for (const nsId of Object.keys(ns)) {
-    const nsEntry = ns[nsId];
-    if (!nsEntry || typeof nsEntry !== 'object' || Array.isArray(nsEntry)) {
-      sortedNs[nsId] = nsEntry;
-      continue;
-    }
-    const tables = (nsEntry as Record<string, unknown>)['tables'];
-    if (!tables || typeof tables !== 'object' || Array.isArray(tables)) {
-      sortedNs[nsId] = nsEntry;
-      continue;
-    }
-    const sortedTables: Record<string, unknown> = {};
-    for (const tname of Object.keys(tables as Record<string, unknown>)) {
-      const t = (tables as Record<string, unknown>)[tname];
-      if (!t || typeof t !== 'object' || Array.isArray(t)) {
-        sortedTables[tname] = t;
-        continue;
-      }
-      const tableObj = t as Record<string, unknown>;
-      const sorted: Record<string, unknown> = { ...tableObj };
-      const byName = (a: unknown, b: unknown): number => {
-        const na =
-          a && typeof a === 'object' && 'name' in a && typeof a.name === 'string' ? a.name : '';
-        const nb =
-          b && typeof b === 'object' && 'name' in b && typeof b.name === 'string' ? b.name : '';
-        return na.localeCompare(nb);
-      };
-      if (Array.isArray(tableObj['indexes'])) {
-        sorted['indexes'] = [...tableObj['indexes']].sort(byName);
-      }
-      if (Array.isArray(tableObj['uniques'])) {
-        sorted['uniques'] = [...tableObj['uniques']].sort(byName);
-      }
-      sortedTables[tname] = sorted;
-    }
-    sortedNs[nsId] = { ...(nsEntry as Record<string, unknown>), tables: sortedTables };
-  }
-  return { ...s, namespaces: sortedNs };
-};
+const sqlSortTargets = [
+  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+] as const satisfies readonly NamedArraySortTarget[];
+
+const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
+const sqlSortStorage = createStorageSort(sqlSortTargets);
 
 const SQL_EMIT_HOOKS = {
   shouldPreserveEmpty: sqlPreserveEmpty satisfies PreserveEmptyPredicate,

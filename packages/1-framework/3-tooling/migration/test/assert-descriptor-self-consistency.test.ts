@@ -1,5 +1,8 @@
-import type { PreserveEmptyPredicate } from '@prisma-next/contract/hashing';
 import { computeStorageHash } from '@prisma-next/contract/hashing';
+import {
+  createPreserveEmptyPredicate,
+  type PathPattern,
+} from '@prisma-next/contract/hashing-utils';
 import { describe, expect, it } from 'vitest';
 import { assertDescriptorSelfConsistency } from '../src/assert-descriptor-self-consistency';
 import { MigrationToolsError } from '../src/errors';
@@ -21,21 +24,13 @@ const STORAGE_BODY = {
 const TARGET = 'postgres';
 const FAMILY = 'sql';
 
-const sqlPreserveEmpty: PreserveEmptyPredicate = (path) => {
-  const len = path.length;
-  if (len < 2 || path[0] !== 'storage') return false;
-  if (path[1] === 'namespaces') {
-    if (len === 4 && path[3] === 'tables') return true;
-    if (len === 5 && path[3] === 'tables') return true;
-    if (
-      len === 6 &&
-      path[3] === 'tables' &&
-      (path[5] === 'uniques' || path[5] === 'indexes' || path[5] === 'foreignKeys')
-    )
-      return true;
-  }
-  return false;
-};
+const sqlPreserveEmptyPatterns = [
+  ['storage', 'namespaces', '*', 'tables'],
+  ['storage', 'namespaces', '*', 'tables', '*'],
+  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+] as const satisfies readonly PathPattern[];
+
+const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
 
 const SQL_HOOKS = { shouldPreserveEmpty: sqlPreserveEmpty };
 const REAL_HASH = computeStorageHash({
