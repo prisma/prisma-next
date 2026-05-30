@@ -22,6 +22,11 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+} from '@prisma-next/framework-components/ir';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { describe, expect, it } from 'vitest';
@@ -47,7 +52,9 @@ describe('cipherstash extension descriptor (contract-space package layout)', () 
   it('exposes a contractSpace declaring the eql_v2_configuration table', () => {
     const space = cipherstashExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    const unboundTables = space!.contractJson.storage.namespaces['__unbound__']?.tables ?? {};
+    const unboundTables =
+      space!.getStorageNamespace(contractJson.storage as Record<string, unknown>, '__unbound__')
+        ?.tables ?? {};
     expect(Object.keys(unboundTables)).toEqual([EQL_V2_CONFIGURATION_TABLE]);
   });
 

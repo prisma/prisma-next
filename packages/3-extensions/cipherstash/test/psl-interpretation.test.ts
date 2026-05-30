@@ -72,7 +72,8 @@ type StorageView = {
   readonly types?: Record<string, Record<string, unknown>>;
 };
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
-const unboundTables = (s: StorageView) => s.namespaces[UNBOUND_NAMESPACE_ID]?.tables ?? {};
+const unboundTables = (s: StorageView) =>
+  getStorageNamespace(s as Record<string, unknown>, UNBOUND_NAMESPACE_ID)?.tables ?? {};
 
 describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
   it('lowers full args to a column with codecId, nativeType, typeParams', () => {

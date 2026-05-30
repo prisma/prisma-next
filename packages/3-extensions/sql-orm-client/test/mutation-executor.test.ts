@@ -144,21 +144,21 @@ describe('mutation-executor', () => {
   it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
     const contract = getTestContract();
 
-    const unboundNs = contract.storage.namespaces[UNBOUND_NAMESPACE_ID]!;
+    const unboundNs = getStorageNamespace(
+      contract.storage as Record<string, unknown>,
+      UNBOUND_NAMESPACE_ID,
+    )!;
     const withCustomPk = {
       ...contract,
       storage: {
         ...contract.storage,
-        namespaces: {
-          ...contract.storage.namespaces,
-          [UNBOUND_NAMESPACE_ID]: {
-            ...unboundNs,
-            tables: {
-              ...unboundNs.tables,
-              users: {
-                ...unboundNs.tables.users,
-                primaryKey: { columns: ['pk_id'] },
-              },
+        [UNBOUND_NAMESPACE_ID]: {
+          ...unboundNs,
+          tables: {
+            ...unboundNs.tables,
+            users: {
+              ...unboundNs.tables.users,
+              primaryKey: { columns: ['pk_id'] },
             },
           },
         },

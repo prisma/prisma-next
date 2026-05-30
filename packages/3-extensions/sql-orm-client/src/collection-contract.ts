@@ -31,9 +31,8 @@ export interface PolymorphismInfo {
 }
 
 function unboundTable(contract: Contract<SqlStorage>, tableName: string): StorageTable | undefined {
-  return contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[tableName] as
-    | StorageTable
-    | undefined;
+  return getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
+    ?.tables[tableName] as StorageTable | undefined;
 }
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {

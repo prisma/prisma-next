@@ -131,9 +131,8 @@ function createParamRef(
 ): ParamRef {
   if (
     !(
-      contract.storage.namespaces[UNBOUND_NAMESPACE_ID]?.tables[columnRef.table] as
-        | StorageTable
-        | undefined
+      getStorageNamespace(contract.storage as Record<string, unknown>, UNBOUND_NAMESPACE_ID)
+        ?.tables[columnRef.table] as StorageTable | undefined
     )?.columns[columnRef.column]
   ) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);

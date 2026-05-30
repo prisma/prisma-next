@@ -48,7 +48,7 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
   it('exposes a contractSpace declaring the vector parameterised native type', () => {
     const space = pgvectorExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    const namespaces = space!.contractJson.storage.namespaces as Record<
+    const namespaces = space!.contractJson.storage as Record<string, unknown> as Record<
       string,
       { readonly tables?: Record<string, unknown> }
     >;
