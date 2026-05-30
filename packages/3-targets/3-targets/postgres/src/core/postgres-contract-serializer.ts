@@ -146,9 +146,11 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         };
       }
     }
+    // Namespace ids are keyed directly under `storage` alongside the
+    // reserved `storageHash` (and optional `types`) — ADR 221 flat shape.
     const storageOut: Record<string, unknown> = {
       storageHash: String(storage.storageHash),
-      namespaces: namespacesJson,
+      ...namespacesJson,
     };
     if (storage.types !== undefined) {
       const typesOut: Record<string, JsonObject> = {};
