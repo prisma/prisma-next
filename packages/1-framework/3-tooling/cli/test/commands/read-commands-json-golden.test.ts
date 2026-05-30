@@ -6,7 +6,7 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbSignCommand } from '../../src/commands/db-sign';
 import { executeMigrationGraphCommand } from '../../src/commands/migration-graph';
 import { executeMigrationLogCommand } from '../../src/commands/migration-log';
@@ -177,6 +177,12 @@ function migrationLogJson(result: {
 }
 
 describe('read commands --json golden', () => {
+  afterAll(() => {
+    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('@prisma-next/migration-tools/refs');
+    vi.doUnmock('../../src/control-api/client');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.connect.mockResolvedValue(undefined);

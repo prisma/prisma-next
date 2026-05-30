@@ -12,7 +12,6 @@ export default defineConfig({
     'exports/migration-graph': 'src/exports/migration-graph.ts',
     'exports/migration-list-types': 'src/exports/migration-list-types.ts',
     'exports/migration-list-graph-topology': 'src/exports/migration-list-graph-topology.ts',
-    'exports/migration-list-graph-layout': 'src/exports/migration-list-graph-layout.ts',
     'exports/refs': 'src/exports/refs.ts',
     'exports/ref-resolution': 'src/exports/ref-resolution.ts',
     'exports/constants': 'src/exports/constants.ts',

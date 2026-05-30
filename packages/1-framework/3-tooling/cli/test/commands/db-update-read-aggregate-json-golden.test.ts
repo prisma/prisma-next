@@ -5,7 +5,7 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDbUpdateCommand } from '../../src/commands/db-update';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
@@ -86,6 +86,11 @@ async function setupFixture(): Promise<{
 }
 
 describe('db update read aggregate --json golden', () => {
+  afterAll(() => {
+    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('../../src/control-api/client');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.connect.mockResolvedValue(undefined);

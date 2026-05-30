@@ -5,6 +5,7 @@ import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -139,10 +140,30 @@ describe('emit parity fixtures', () => {
         const normalizedPsl = familyInstance.deserializeContract(enrichedPsl);
         expect(normalizedTs).toEqual(normalizedPsl);
 
-        const tsEmitFirst = await emit(normalizedTs, stack, sqlEmission);
-        const tsEmitSecond = await emit(normalizedTs, stack, sqlEmission);
-        const pslEmitFirst = await emit(normalizedPsl, stack, sqlEmission);
-        const pslEmitSecond = await emit(normalizedPsl, stack, sqlEmission);
+        const tsEmitFirst = await emit(
+          normalizedTs,
+          stack,
+          sqlEmission,
+          sqlContractCanonicalizationHooks,
+        );
+        const tsEmitSecond = await emit(
+          normalizedTs,
+          stack,
+          sqlEmission,
+          sqlContractCanonicalizationHooks,
+        );
+        const pslEmitFirst = await emit(
+          normalizedPsl,
+          stack,
+          sqlEmission,
+          sqlContractCanonicalizationHooks,
+        );
+        const pslEmitSecond = await emit(
+          normalizedPsl,
+          stack,
+          sqlEmission,
+          sqlContractCanonicalizationHooks,
+        );
 
         expect(tsEmitFirst).toMatchObject({
           contractJson: tsEmitSecond.contractJson,

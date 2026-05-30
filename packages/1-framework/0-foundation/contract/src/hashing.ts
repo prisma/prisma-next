@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
-import { canonicalizeContract } from './canonicalization';
+import {
+  canonicalizeContract,
+  type PreserveEmptyPredicate,
+  type StorageSort,
+} from './canonicalization';
 import type { Contract } from './contract-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from './types';
 
@@ -12,7 +17,13 @@ function sha256(content: string): string {
   return `sha256:${hash.digest('hex')}`;
 }
 
-function hashContract(section: Record<string, unknown>): string {
+type HashContractSection = Record<string, unknown> & {
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+  readonly sortStorage?: StorageSort;
+};
+
+function hashContract(section: HashContractSection): string {
+  const { shouldPreserveEmpty, sortStorage, ...sectionData } = section;
   // Blind cast: the synthesised object is a hash-only stand-in
   // — never returned to callers, never executed as a Contract.
   // `canonicalizeContract` only walks the storage / execution /
@@ -20,29 +31,35 @@ function hashContract(section: Record<string, unknown>): string {
   // missing precise Contract typing on the other slots is
   // immaterial for the hash result.
   const contract = {
-    targetFamily: section['targetFamily'],
-    target: section['target'],
+    targetFamily: sectionData['targetFamily'],
+    target: sectionData['target'],
     roots: {},
     models: {},
-    storage: section['storage'] ?? {},
-    execution: section['execution'],
+    storage: sectionData['storage'] ?? {},
+    execution: sectionData['execution'],
     extensionPacks: {},
-    capabilities: section['capabilities'] ?? {},
+    capabilities: sectionData['capabilities'] ?? {},
     meta: {},
     profileHash: '',
-    ...section,
+    ...sectionData,
   } as unknown as Contract;
   return canonicalizeContract(contract, {
     schemaVersion: SCHEMA_VERSION,
     serializeContract: (c) => JSON.parse(JSON.stringify(c)) as JsonObject,
+    ...ifDefined('shouldPreserveEmpty', shouldPreserveEmpty),
+    ...ifDefined('sortStorage', sortStorage),
   });
 }
 
-export function computeStorageHash(args: {
+export type ComputeStorageHashArgs = {
   target: string;
   targetFamily: string;
   storage: Record<string, unknown>;
-}): StorageHashBase<string> {
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+  readonly sortStorage?: StorageSort;
+};
+
+export function computeStorageHash(args: ComputeStorageHashArgs): StorageHashBase<string> {
   return sha256(hashContract(args)) as StorageHashBase<string>;
 }
 

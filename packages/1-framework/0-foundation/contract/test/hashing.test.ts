@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import type { PreserveEmptyPredicate, StorageSort } from '../src/canonicalization';
 
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from '../src/hashing';
+
+const sqlPreserveEmpty: PreserveEmptyPredicate = (path) => {
+  const len = path.length;
+  if (len < 2 || path[0] !== 'storage') return false;
+  if (path[1] === 'namespaces') {
+    if (len === 4 && path[3] === 'tables') return true;
+    if (len === 5 && path[3] === 'tables') return true;
+  }
+  return false;
+};
+
+const sqlSortStorage: StorageSort = (storage) => storage;
+
+const SQL_HOOKS = { shouldPreserveEmpty: sqlPreserveEmpty, sortStorage: sqlSortStorage };
 
 const emptyNamespacedStorage = () => ({
   namespaces: {
@@ -14,18 +29,24 @@ describe('computeStorageHash', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storage: emptyNamespacedStorage(),
+      ...SQL_HOOKS,
     });
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
   it('produces stable hashes for identical input', () => {
-    const args = { target: 'postgres', targetFamily: 'sql', storage: emptyNamespacedStorage() };
+    const args = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      storage: emptyNamespacedStorage(),
+      ...SQL_HOOKS,
+    };
     expect(computeStorageHash(args)).toBe(computeStorageHash(args));
   });
 
   it('produces different hashes for different storage', () => {
     const base = { target: 'postgres', targetFamily: 'sql' };
-    const hash1 = computeStorageHash({ ...base, storage: emptyNamespacedStorage() });
+    const hash1 = computeStorageHash({ ...base, storage: emptyNamespacedStorage(), ...SQL_HOOKS });
     const hash2 = computeStorageHash({
       ...base,
       storage: {
@@ -40,14 +61,25 @@ describe('computeStorageHash', () => {
           },
         },
       },
+      ...SQL_HOOKS,
     });
     expect(hash1).not.toBe(hash2);
   });
 
   it('produces different hashes for different targets', () => {
     const storage = emptyNamespacedStorage();
-    const hash1 = computeStorageHash({ target: 'postgres', targetFamily: 'sql', storage });
-    const hash2 = computeStorageHash({ target: 'mysql', targetFamily: 'sql', storage });
+    const hash1 = computeStorageHash({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storage,
+      ...SQL_HOOKS,
+    });
+    const hash2 = computeStorageHash({
+      target: 'mysql',
+      targetFamily: 'sql',
+      storage,
+      ...SQL_HOOKS,
+    });
     expect(hash1).not.toBe(hash2);
   });
 
@@ -66,6 +98,7 @@ describe('computeStorageHash', () => {
           },
         },
       },
+      ...SQL_HOOKS,
     });
     const hash2 = computeStorageHash({
       ...base,
@@ -80,6 +113,7 @@ describe('computeStorageHash', () => {
           },
         },
       },
+      ...SQL_HOOKS,
     });
     expect(hash1).toBe(hash2);
   });

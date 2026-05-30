@@ -1,3 +1,13 @@
+import type {
+  CanonicalizeContractOptions,
+  PreserveEmptyPredicate,
+} from '@prisma-next/contract/hashing';
+import {
+  createPreserveEmptyPredicate,
+  createStorageSort,
+  type NamedArraySortTarget,
+  type PathPattern,
+} from '@prisma-next/contract/hashing-utils';
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
@@ -6,6 +16,26 @@ import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
 import { emit as emitImpl } from '../src/exports';
 
 const identitySerialize = (c: Contract): JsonObject => c as unknown as JsonObject;
+
+const sqlPreserveEmptyPatterns = [
+  ['storage', 'namespaces', '*', 'tables'],
+  ['storage', 'namespaces', '*', 'tables', '*'],
+  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'types', '*', 'typeParams'],
+] as const satisfies readonly PathPattern[];
+
+const sqlSortTargets = [
+  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+] as const satisfies readonly NamedArraySortTarget[];
+
+const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
+const sqlSortStorage = createStorageSort(sqlSortTargets);
+
+const SQL_EMIT_HOOKS = {
+  shouldPreserveEmpty: sqlPreserveEmpty satisfies PreserveEmptyPredicate,
+  sortStorage: sqlSortStorage,
+} satisfies Pick<CanonicalizeContractOptions, 'shouldPreserveEmpty' | 'sortStorage'>;
 
 /**
  * Tests author JSON-clean contracts directly, so the canonicalisation
@@ -19,6 +49,7 @@ export function emit(
   options?: Omit<EmitOptions, 'serializeContract'>,
 ): Promise<EmitResult> {
   return emitImpl(contract, stack, family, {
+    ...SQL_EMIT_HOOKS,
     ...options,
     serializeContract: identitySerialize,
   });

@@ -8,6 +8,7 @@ import type {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
@@ -47,6 +48,7 @@ const FIXTURE_HEAD_HASH = computeStorageHash({
   target: TARGET,
   targetFamily: TARGET_FAMILY,
   storage: fixtureHashBody,
+  ...sqlContractCanonicalizationHooks,
 });
 
 function buildContract(): Contract<SqlStorage> {

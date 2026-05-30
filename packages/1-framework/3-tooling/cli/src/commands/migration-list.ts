@@ -24,7 +24,10 @@ import {
   type GlyphMode,
   renderMigrationListGraphResult,
 } from '../utils/formatters/migration-list-graph-render';
-import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
+import {
+  buildMigrationListTopologyBySpace,
+  renderMigrationListWithStyle,
+} from '../utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -51,10 +54,11 @@ export function renderMigrationListHumanOutput(
   options: MigrationListHumanRenderOptions,
 ): string {
   const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
+  const topologyBySpaceId = buildMigrationListTopologyBySpace(result);
   if (options.graph) {
-    return renderMigrationListGraphResult(result, styler, options.glyphMode);
+    return renderMigrationListGraphResult(result, styler, options.glyphMode, topologyBySpaceId);
   }
-  return renderMigrationListWithStyle(result, styler);
+  return renderMigrationListWithStyle(result, styler, options.glyphMode, topologyBySpaceId);
 }
 
 /**

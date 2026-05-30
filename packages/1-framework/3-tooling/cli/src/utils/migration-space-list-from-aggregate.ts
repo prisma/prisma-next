@@ -1,9 +1,12 @@
-import type { ContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import type {
+  ContractSpaceAggregate,
+  ContractSpaceMember,
+} from '@prisma-next/migration-tools/aggregate';
 import type {
   MigrationListEntry,
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
-import { refsByContractHash } from '@prisma-next/migration-tools/refs';
+import { HEAD_REF_NAME, refsByContractHash } from '@prisma-next/migration-tools/refs';
 import {
   APP_SPACE_ID,
   isValidSpaceId,
@@ -23,6 +26,25 @@ function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry)
   if (a.dirName < b.dirName) return 1;
   if (a.dirName > b.dirName) return -1;
   return 0;
+}
+
+function listRefsByContractHash(
+  member: ContractSpaceMember,
+): ReadonlyMap<string, readonly string[]> {
+  const byHash = new Map(refsByContractHash(member.refs));
+  if (member.spaceId !== APP_SPACE_ID && member.headRef !== null) {
+    const hash = member.headRef.hash;
+    let bucket = byHash.get(hash);
+    if (bucket === undefined) {
+      bucket = [];
+      byHash.set(hash, bucket);
+    }
+    if (!bucket.includes(HEAD_REF_NAME)) {
+      bucket.push(HEAD_REF_NAME);
+      bucket.sort();
+    }
+  }
+  return byHash;
 }
 
 async function orderedOnDiskSpaceIds(projectMigrationsDir: string): Promise<readonly string[]> {
@@ -54,7 +76,7 @@ export async function migrationSpaceListEntriesFromAggregate(
     if (member === undefined) {
       continue;
     }
-    const refsByHash = refsByContractHash(member.refs);
+    const refsByHash = listRefsByContractHash(member);
     const migrations: MigrationListEntry[] = member.packages
       .map((pkg) => ({
         dirName: pkg.dirName,

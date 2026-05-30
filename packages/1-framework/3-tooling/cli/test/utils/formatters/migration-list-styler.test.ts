@@ -85,9 +85,9 @@ describe('createAnsiMigrationListStyler', () => {
 
   it('wraps each token with the expected SGR style when useColor is true', () => {
     const styler = createAnsiMigrationListStyler({ useColor: true });
-    expect(styler.kind('*')).toBe(dim('*'));
-    expect(styler.kind('↩')).toBe(dim('↩'));
-    expect(styler.kind('⟲')).toBe(dim('⟲'));
+    expect(styler.kind('*')).toBe('*');
+    expect(styler.kind('↩')).toBe('↩');
+    expect(styler.kind('⟲')).toBe('⟲');
     expect(styler.dirName('20260422T0720_initial')).toBe(bold('20260422T0720_initial'));
     expect(styler.sourceHash('4cb4256')).toBe(dim(cyan('4cb4256')));
     expect(styler.destHash('55bada2')).toBe(cyanBright('55bada2'));
@@ -141,7 +141,7 @@ describe('renderMigrationListWithStyle', () => {
       createAnsiMigrationListStyler({ useColor: true }),
     );
     const expectedRow =
-      `${dim('⟲')} ${bold('20260601T1200_backfill_emails')}  ` +
+      `⟲ ${bold('20260601T1200_backfill_emails')}  ` +
       `${dim(cyan('55bada2'))}` +
       `  ${yellow('{backfill_emails_v1}')} ` +
       `${green('(') + [green('production'), bold(greenBright('db'))].join(green(', ')) + green(')')}`;

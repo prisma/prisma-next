@@ -6,7 +6,7 @@ import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { executeMigrationListCommand } from '../../src/commands/migration-list';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
@@ -118,6 +118,10 @@ async function writeSliceSpecPackages(migrationsRoot: string): Promise<void> {
 }
 
 describe('migration list --json golden', () => {
+  afterAll(() => {
+    vi.doUnmock('../../src/config-loader');
+  });
+
   afterEach(async () => {
     await Promise.all(createdDirs.map((dir) => rm(dir, { recursive: true, force: true })));
     createdDirs.length = 0;
@@ -156,5 +160,50 @@ describe('migration list --json golden', () => {
       '20260422T0742_migration',
       '20260422T0720_initial',
     ]);
+  });
+
+  it('pins head ref decoration on extension tip migration --json', async () => {
+    const HASH_POSTGIS = `sha256:9aabbcc${'0'.repeat(57)}`;
+    const cwd = await mkdtemp(join(tmpdir(), 'read-cmd-list-head-json-'));
+    createdDirs.push(cwd);
+    const contractPath = await writeContract(cwd, HASH_55bada2);
+    const postgisDir = join(cwd, 'migrations', 'postgis');
+    await mkdir(join(postgisDir, 'refs'), { recursive: true });
+    const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
+      from: null,
+      to: HASH_POSTGIS,
+      providedInvariants: [],
+      createdAt: '2026-02-25T14:30:00.000Z',
+    };
+    const metadata: MigrationMetadata = {
+      ...baseMetadata,
+      migrationHash: computeMigrationHash(baseMetadata, [ADDITIVE_OP]),
+    };
+    await writeMigrationPackage(join(postgisDir, '20260601T0000_install_postgis'), metadata, [
+      ADDITIVE_OP,
+    ]);
+    await writeFile(
+      join(postgisDir, 'refs', 'head.json'),
+      `${JSON.stringify({ hash: HASH_POSTGIS, invariants: [] }, null, 2)}\n`,
+    );
+    await writeFile(
+      join(postgisDir, 'contract.json'),
+      JSON.stringify({
+        storage: { storageHash: HASH_POSTGIS },
+        schemaVersion: '1.0.0',
+        target: TARGET,
+        targetFamily: TARGET_FAMILY,
+      }),
+    );
+    mocks.loadConfig.mockResolvedValue(baseConfig(contractPath));
+
+    const flags = parseGlobalFlags({ json: true, quiet: true });
+    const ui = createTerminalUI(flags);
+    const result = await executeMigrationListCommand({ config: contractPath }, flags, ui);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const postgisSpace = result.value.spaces.find((s) => s.spaceId === 'postgis');
+    expect(postgisSpace?.migrations[0]?.refs).toEqual(['head']);
   });
 });
