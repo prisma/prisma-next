@@ -22,7 +22,9 @@ describe('createPerMemberVerifier', () => {
       packages: [],
       refs: {},
       headRef: { hash: contract.storage.storageHash, invariants: [] },
+      refsDir: '/tmp/refs',
       resolveContract: () => contract,
+      deserializeContract: (json) => json as Contract,
     });
 
     const verifySchema = vi.fn().mockReturnValue({

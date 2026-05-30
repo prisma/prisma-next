@@ -28,7 +28,12 @@ export {
   type GraphWalkStrategyInputs,
   graphWalkStrategy,
 } from '../aggregate/strategies/graph-walk';
-export type { ContractSpaceAggregate, ContractSpaceMember } from '../aggregate/types';
+export type {
+  ContractAtOptions,
+  ContractAtResult,
+  ContractSpaceAggregate,
+  ContractSpaceMember,
+} from '../aggregate/types';
 export {
   type AggregateVerifierError,
   type AggregateVerifierInput,
