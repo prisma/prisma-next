@@ -387,14 +387,12 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
       },
       timeouts.typeScriptCompilation,
     );
+  });
 
+  describe('migration new narrows to app package corruption only', () => {
     it(
-      'migration new refuses before scaffolding the new migration',
+      'refuses on app-space hash mismatch before scaffolding',
       async () => {
-        // `migration new` is mutating: the gate runs before it computes
-        // the `from` reference, so a tampered on-disk package refuses with
-        // the integrity envelope rather than silently degrading to a
-        // misleading "no initial migration" diagnostic off a partial graph.
         const { createMigrationNewCommand } = await import('../../src/commands/migration-new');
         const fixture = await setupTamperFixture();
         tempDirs.push(fixture.cwd);
@@ -415,6 +413,96 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
         );
 
         expectIntegrityRefusal(captured);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
+      'proceeds when cross-space layout drift is the only integrity fault',
+      async () => {
+        const ORPHAN_HASH = `sha256:${'c'.repeat(64)}`;
+        const cwd = await mkdtemp(join(tmpdir(), 'cli-migration-new-orphan-'));
+        tempDirs.push(cwd);
+
+        await mkdir(join(cwd, 'migrations', 'app'), { recursive: true });
+
+        const orphanDir = join(cwd, 'migrations', 'orphan_ext');
+        await mkdir(orphanDir, { recursive: true });
+        await writeTestPackage(
+          join(orphanDir, '00001_orphan_base'),
+          { from: null, to: ORPHAN_HASH, providedInvariants: [], createdAt: CREATED_AT },
+          ORIGINAL_OPS,
+        );
+        await mkdir(join(orphanDir, 'refs'), { recursive: true });
+        await writeFile(
+          join(orphanDir, 'refs', 'head.json'),
+          `${JSON.stringify({ hash: ORPHAN_HASH, invariants: [] }, null, 2)}\n`,
+        );
+        await writeFile(
+          join(orphanDir, 'contract.json'),
+          JSON.stringify({
+            storage: { storageHash: ORPHAN_HASH },
+            schemaVersion: SCHEMA_VERSION,
+            target: TARGET,
+            targetFamily: TARGET_FAMILY,
+          }),
+        );
+
+        const contractDir = join(cwd, 'src', 'prisma');
+        await mkdir(contractDir, { recursive: true });
+        await writeFile(
+          join(contractDir, 'contract.json'),
+          JSON.stringify({
+            storage: { storageHash: TO_HASH },
+            schemaVersion: SCHEMA_VERSION,
+            target: TARGET,
+            targetFamily: TARGET_FAMILY,
+          }),
+        );
+        await writeFile(join(contractDir, 'contract.d.ts'), 'export {};\n');
+
+        setupConfigMock();
+        mocks.loadConfig.mockResolvedValue({
+          family: {
+            familyId: TARGET_FAMILY,
+            create: vi.fn().mockReturnValue({
+              deserializeContract: (json: unknown) => json,
+            }),
+          },
+          target: {
+            id: TARGET,
+            familyId: TARGET_FAMILY,
+            targetId: TARGET,
+            kind: 'target',
+            migrations: {
+              createPlanner: vi.fn().mockReturnValue({
+                emptyMigration: vi.fn().mockReturnValue({
+                  renderTypeScript: () => 'export default async function migrate() {}',
+                }),
+              }),
+            },
+          },
+          adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+          driver: { kind: 'driver', familyId: TARGET_FAMILY, targetId: TARGET },
+          contract: { output: 'src/prisma/contract.json' },
+        });
+
+        process.chdir(cwd);
+
+        const { createMigrationNewCommand } = await import('../../src/commands/migration-new');
+
+        consoleOutput.length = 0;
+        consoleErrors.length = 0;
+        const exitCode = await runAndCaptureExit(() =>
+          executeCommand(createMigrationNewCommand(), ['--name', 'layout-drift-ok', '--json']),
+        );
+        const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+        expect(exitCode, jsonLine ?? consoleErrors.join('\n')).toBe(0);
+
+        expect(jsonLine).toBeDefined();
+        const payload = JSON.parse(jsonLine!) as { readonly ok?: boolean; readonly dir?: string };
+        expect(payload.ok).toBe(true);
+        expect(payload.dir).toMatch(/migrations[/\\]app[/\\]/);
       },
       timeouts.typeScriptCompilation,
     );
