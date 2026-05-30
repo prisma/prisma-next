@@ -26,6 +26,7 @@ import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/packag
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs } from '@prisma-next/migration-tools/refs';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { cyan, dim, magenta, yellow } from 'colorette';
@@ -529,6 +530,22 @@ export async function loadAggregateStatusSpaces(args: {
  * the existing `readContractEnvelope` path will report the same
  * problem via a status diagnostic, no need to double-surface.
  */
+
+function appContractShellForAggregateLoad(args: {
+  readonly contractHash: string;
+  readonly targetId: string;
+  readonly targetFamily: string;
+}): Contract {
+  return blindCast<Contract, 'status aggregate load without contract.json'>({
+    storage: { storageHash: args.contractHash },
+    schemaVersion: '0.0.0',
+    target: args.targetId,
+    targetFamily: args.targetFamily,
+    models: {},
+    profileHash: EMPTY_CONTRACT_HASH,
+  });
+}
+
 async function loadContractRawSafely(config: {
   contract?: { output?: string };
 }): Promise<unknown | null> {
@@ -620,15 +637,24 @@ async function executeMigrationStatusCommand(
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
   const deserializeContract = (json: unknown): Contract => familyInstance.deserializeContract(json);
-  const appContractForLoad =
-    contractRawForAggregate !== null
-      ? deserializeContract(contractRawForAggregate)
-      : deserializeContract({
-          storage: { storageHash: contractHash },
-          schemaVersion: '0.0.0',
-          target: config.target.id,
-          targetFamily: config.target.familyId,
-        });
+  const appContractShell = appContractShellForAggregateLoad({
+    contractHash,
+    targetId: config.target.id,
+    targetFamily: config.target.familyId,
+  });
+  let appContractForLoad: Contract = appContractShell;
+  if (contractRawForAggregate !== null) {
+    try {
+      appContractForLoad = deserializeContract(contractRawForAggregate);
+    } catch (error) {
+      diagnostics.push({
+        code: 'CONTRACT.UNREADABLE',
+        severity: 'warn',
+        message: `Could not deserialize contract: ${error instanceof Error ? error.message : 'unknown error'}`,
+        hints: ["Run 'prisma-next contract emit' to generate a valid contract"],
+      });
+    }
+  }
 
   let aggregate: ContractSpaceAggregate;
   try {
