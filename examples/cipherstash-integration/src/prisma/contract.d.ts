@@ -40,7 +40,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:904fa8a2fad61c89714ac8144d9244f8f0dd9827d45555f2f09d571d46f9d22d'>;
+  StorageHashBase<'sha256:4687e5a836c1c9a4a3d0d889de2fe1abc4f7068432ada9f3fa15d34c5b872ed4'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -85,68 +85,66 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<
     {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly tables: {
-            readonly users: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly email: {
-                  readonly nativeType: 'eql_v2_encrypted';
-                  readonly codecId: 'cipherstash/string@1';
-                  readonly nullable: false;
-                  readonly typeParams: {
-                    readonly equality: true;
-                    readonly freeTextSearch: true;
-                    readonly orderAndRange: true;
-                  };
-                };
-                readonly salary: {
-                  readonly nativeType: 'eql_v2_encrypted';
-                  readonly codecId: 'cipherstash/double@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-                };
-                readonly accountid: {
-                  readonly nativeType: 'eql_v2_encrypted';
-                  readonly codecId: 'cipherstash/bigint@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-                };
-                readonly birthday: {
-                  readonly nativeType: 'eql_v2_encrypted';
-                  readonly codecId: 'cipherstash/date@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
-                };
-                readonly emailverified: {
-                  readonly nativeType: 'eql_v2_encrypted';
-                  readonly codecId: 'cipherstash/boolean@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly equality: true };
-                };
-                readonly preferences: {
-                  readonly nativeType: 'eql_v2_encrypted';
-                  readonly codecId: 'cipherstash/json@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly searchableJson: true };
+      readonly storageHash: StorageHash;
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {
+          readonly users: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly email: {
+                readonly nativeType: 'eql_v2_encrypted';
+                readonly codecId: 'cipherstash/string@1';
+                readonly nullable: false;
+                readonly typeParams: {
+                  readonly equality: true;
+                  readonly freeTextSearch: true;
+                  readonly orderAndRange: true;
                 };
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
+              readonly salary: {
+                readonly nativeType: 'eql_v2_encrypted';
+                readonly codecId: 'cipherstash/double@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+              };
+              readonly accountid: {
+                readonly nativeType: 'eql_v2_encrypted';
+                readonly codecId: 'cipherstash/bigint@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+              };
+              readonly birthday: {
+                readonly nativeType: 'eql_v2_encrypted';
+                readonly codecId: 'cipherstash/date@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+              };
+              readonly emailverified: {
+                readonly nativeType: 'eql_v2_encrypted';
+                readonly codecId: 'cipherstash/boolean@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly equality: true };
+              };
+              readonly preferences: {
+                readonly nativeType: 'eql_v2_encrypted';
+                readonly codecId: 'cipherstash/json@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly searchableJson: true };
+              };
             };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
         };
       };
-      readonly storageHash: StorageHash;
     },
     {
       readonly User: {
@@ -499,5 +497,5 @@ type ContractBase = Omit<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Namespaces = Contract['storage']['namespaces'];
+export type Namespaces = Omit<Contract['storage'], 'storageHash' | 'types'>;
 export type Models = Contract['models'];

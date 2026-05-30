@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4c8df727b4bc8b1c76ea8ecf452785f537e8e80fa6d66e271262e81bd4bd232c'>;
+  StorageHashBase<'sha256:28583a90f7a7ff4a76a53eead4a5e4e84bd089f1c1adb08dc5cbb56e56970aef'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:63d6acb216ecdc40b22f2e9d59e179ccec2d77cdc9ac3d6711a363046d02660e'>;
 export type ProfileHash =
@@ -55,29 +55,27 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<
     {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly tables: {
-            readonly Note: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
-                  readonly nullable: false;
-                  readonly typeParams: { readonly length: 36 };
-                };
+      readonly storageHash: StorageHash;
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {
+          readonly Note: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'character';
+                readonly codecId: 'sql/char@1';
+                readonly nullable: false;
+                readonly typeParams: { readonly length: 36 };
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
             };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [];
+            foreignKeys: readonly [];
           };
         };
       };
-      readonly storageHash: StorageHash;
     },
     {
       readonly Note: {
@@ -141,5 +139,5 @@ type ContractBase = Omit<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Namespaces = Contract['storage']['namespaces'];
+export type Namespaces = Omit<Contract['storage'], 'storageHash' | 'types'>;
 export type Models = Contract['models'];

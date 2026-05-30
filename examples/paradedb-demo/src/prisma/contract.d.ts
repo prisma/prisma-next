@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:3e50138f416ab435ac8933c9d2ddcb725f486464d13054a8100f17f06d97f970'>;
+  StorageHashBase<'sha256:7a0dcb146f55a9e986e84aa8aa3557ea8a4cb0211e818789487c808cd90fd358'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -70,50 +70,48 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = Omit<
   ContractType<
     {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'sql-namespace';
-          readonly tables: {
-            readonly item: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'int4';
-                  readonly codecId: 'pg/int4@1';
-                  readonly nullable: false;
-                };
-                readonly description: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly category: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly rating: {
-                  readonly nativeType: 'int4';
-                  readonly codecId: 'pg/int4@1';
-                  readonly nullable: false;
-                };
+      readonly storageHash: StorageHash;
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'sql-namespace';
+        readonly tables: {
+          readonly item: {
+            columns: {
+              readonly id: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                readonly nullable: false;
               };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [
-                {
-                  readonly columns: readonly ['id', 'description', 'category', 'rating'];
-                  readonly name: 'item_bm25_idx';
-                  readonly type: 'bm25';
-                  readonly options: { readonly key_field: 'id' };
-                },
-              ];
-              foreignKeys: readonly [];
+              readonly description: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly category: {
+                readonly nativeType: 'text';
+                readonly codecId: 'pg/text@1';
+                readonly nullable: false;
+              };
+              readonly rating: {
+                readonly nativeType: 'int4';
+                readonly codecId: 'pg/int4@1';
+                readonly nullable: false;
+              };
             };
+            primaryKey: { readonly columns: readonly ['id'] };
+            uniques: readonly [];
+            indexes: readonly [
+              {
+                readonly columns: readonly ['id', 'description', 'category', 'rating'];
+                readonly name: 'item_bm25_idx';
+                readonly type: 'bm25';
+                readonly options: { readonly key_field: 'id' };
+              },
+            ];
+            foreignKeys: readonly [];
           };
         };
       };
-      readonly storageHash: StorageHash;
     },
     {
       readonly Item: {
@@ -198,5 +196,5 @@ type ContractBase = Omit<
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
-export type Namespaces = Contract['storage']['namespaces'];
+export type Namespaces = Omit<Contract['storage'], 'storageHash' | 'types'>;
 export type Models = Contract['models'];

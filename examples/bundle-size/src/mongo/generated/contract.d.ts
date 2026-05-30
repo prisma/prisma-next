@@ -35,14 +35,12 @@ export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTyp
 type ContractBase = Omit<
   ContractType<
     {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'mongo-namespace';
-          readonly collections: { readonly notes: MongoCollection };
-        };
-      };
       readonly storageHash: StorageHash;
+      readonly __unbound__: {
+        readonly id: '__unbound__';
+        readonly kind: 'mongo-namespace';
+        readonly collections: { readonly notes: MongoCollection };
+      };
     },
     {
       readonly Note: {

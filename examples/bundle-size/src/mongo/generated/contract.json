@@ -27,16 +27,14 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "collections": {
-          "notes": {
-            "kind": "mongo-collection"
-          }
-        },
-        "id": "__unbound__",
-        "kind": "mongo-database"
-      }
+    "__unbound__": {
+      "collections": {
+        "notes": {
+          "kind": "mongo-collection"
+        }
+      },
+      "id": "__unbound__",
+      "kind": "mongo-database"
     },
     "storageHash": "sha256:e76437adce58a82f595cd7f493cd976de749c10bcd10c59428b57c5cc4f1d085"
   },

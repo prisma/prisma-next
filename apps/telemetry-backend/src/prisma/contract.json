@@ -174,116 +174,114 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
-        "tables": {
-          "telemetry_event": {
-            "columns": {
-              "agent": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "arch": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "command": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "databaseTarget": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "extensions": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
-              },
-              "flags": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
-              },
-              "id": {
-                "codecId": "pg/int8@1",
-                "default": {
-                  "expression": "autoincrement()",
-                  "kind": "function"
-                },
-                "nativeType": "int8",
-                "nullable": false
-              },
-              "ingestedAt": {
-                "codecId": "pg/timestamptz@1",
-                "default": {
-                  "expression": "now()",
-                  "kind": "function"
-                },
-                "nativeType": "timestamptz",
-                "nullable": false
-              },
-              "installationId": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "os": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "packageManager": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "runtimeName": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "runtimeVersion": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "tsVersion": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": true
-              },
-              "version": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              }
+    "__unbound__": {
+      "id": "__unbound__",
+      "kind": "postgres-unbound-schema",
+      "tables": {
+        "telemetry_event": {
+          "columns": {
+            "agent": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": true
             },
-            "foreignKeys": [],
-            "indexes": [
-              {
-                "columns": [
-                  "ingestedAt"
-                ]
-              }
-            ],
-            "primaryKey": {
+            "arch": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "command": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "databaseTarget": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": true
+            },
+            "extensions": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": false
+            },
+            "flags": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "pg/int8@1",
+              "default": {
+                "expression": "autoincrement()",
+                "kind": "function"
+              },
+              "nativeType": "int8",
+              "nullable": false
+            },
+            "ingestedAt": {
+              "codecId": "pg/timestamptz@1",
+              "default": {
+                "expression": "now()",
+                "kind": "function"
+              },
+              "nativeType": "timestamptz",
+              "nullable": false
+            },
+            "installationId": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "os": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "packageManager": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": true
+            },
+            "runtimeName": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "runtimeVersion": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "tsVersion": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": true
+            },
+            "version": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [
+            {
               "columns": [
-                "id"
+                "ingestedAt"
               ]
-            },
-            "uniques": []
-          }
+            }
+          ],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:41700ef5fda97339b39ea345a56aae72a1ff4be11ddc3ffcab7130bfc71c109d"
+    "storageHash": "sha256:4f585a6d5ec8b2a0b4026bad9292393ac5298aee4e6f7dccfdda4a1e13279c84"
   },
   "capabilities": {
     "postgres": {

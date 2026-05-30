@@ -115,85 +115,83 @@
     }
   },
   "storage": {
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
-        "tables": {
-          "users": {
-            "columns": {
-              "accountid": {
-                "codecId": "cipherstash/bigint@1",
-                "nativeType": "eql_v2_encrypted",
-                "nullable": false,
-                "typeParams": {
-                  "equality": true,
-                  "orderAndRange": true
-                }
-              },
-              "birthday": {
-                "codecId": "cipherstash/date@1",
-                "nativeType": "eql_v2_encrypted",
-                "nullable": false,
-                "typeParams": {
-                  "equality": true,
-                  "orderAndRange": true
-                }
-              },
-              "email": {
-                "codecId": "cipherstash/string@1",
-                "nativeType": "eql_v2_encrypted",
-                "nullable": false,
-                "typeParams": {
-                  "equality": true,
-                  "freeTextSearch": true,
-                  "orderAndRange": true
-                }
-              },
-              "emailverified": {
-                "codecId": "cipherstash/boolean@1",
-                "nativeType": "eql_v2_encrypted",
-                "nullable": false,
-                "typeParams": {
-                  "equality": true
-                }
-              },
-              "id": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "preferences": {
-                "codecId": "cipherstash/json@1",
-                "nativeType": "eql_v2_encrypted",
-                "nullable": false,
-                "typeParams": {
-                  "searchableJson": true
-                }
-              },
-              "salary": {
-                "codecId": "cipherstash/double@1",
-                "nativeType": "eql_v2_encrypted",
-                "nullable": false,
-                "typeParams": {
-                  "equality": true,
-                  "orderAndRange": true
-                }
+    "__unbound__": {
+      "id": "__unbound__",
+      "kind": "postgres-unbound-schema",
+      "tables": {
+        "users": {
+          "columns": {
+            "accountid": {
+              "codecId": "cipherstash/bigint@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "orderAndRange": true
               }
             },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "birthday": {
+              "codecId": "cipherstash/date@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "orderAndRange": true
+              }
             },
-            "uniques": []
-          }
+            "email": {
+              "codecId": "cipherstash/string@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "freeTextSearch": true,
+                "orderAndRange": true
+              }
+            },
+            "emailverified": {
+              "codecId": "cipherstash/boolean@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true
+              }
+            },
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "preferences": {
+              "codecId": "cipherstash/json@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "searchableJson": true
+              }
+            },
+            "salary": {
+              "codecId": "cipherstash/double@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "orderAndRange": true
+              }
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
         }
       }
     },
-    "storageHash": "sha256:904fa8a2fad61c89714ac8144d9244f8f0dd9827d45555f2f09d571d46f9d22d"
+    "storageHash": "sha256:4687e5a836c1c9a4a3d0d889de2fe1abc4f7068432ada9f3fa15d34c5b872ed4"
   },
   "capabilities": {
     "postgres": {
