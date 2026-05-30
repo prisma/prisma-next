@@ -32,10 +32,9 @@ behaviour.**
   / self) + convergence/divergence detection over a space's
   `MigrationListEntry[]`. Kind is **not** a per-row predicate — `↩` requires
   knowing `to` is an ancestor of `from` over the forward edge set — so it is
-  computed here, reusing the `MigrationGraph` adjacency idiom. It is a
-  **tolerant** pass (does not call `reconstructGraph`, which throws on
-  self-edge-without-data-op / duplicate hash) so the list view stays robust and
-  offline. **No genesis/single-root assumption:** the node set is exactly the
+  computed here via an **independent** tolerant adjacency + 3-colour DFS (does
+  not call `reconstructGraph` or share `detectCycles` — those throw / assume
+  strict genesis). The list view stays robust and offline. **No genesis/single-root assumption:** the node set is exactly the
   hashes present as `from`/`to`; roots are forward-in-degree-0 nodes (zero, one, or
   several), and `EMPTY_CONTRACT_HASH` is only one possible root — many on-disk
   graphs have no genesis edge. Both renderers consume this classifier.

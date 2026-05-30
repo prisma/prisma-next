@@ -71,21 +71,14 @@ Concretely:
 The view never re-derives graph structure ad hoc. Convergence (forward in-degree
 ≥ 2), divergence (forward out-degree ≥ 2), and edge kind (forward / rollback /
 self) are all
-**topology facts**, and `migration-tools` already owns the migration topology:
-the `MigrationGraph` model (`forwardChain` / `reverseChain` adjacency) plus
-reachability helpers. So:
-
-- The pure layout/classification logic lives in **`migration-tools`** (the
-  package that owns both `MigrationListEntry` and `MigrationGraph`), reusing the
-  `MigrationGraph` adjacency idiom.
-- It does **not** call `reconstructGraph` directly: that constructor *throws*
-  (self-edge-without-data-op, duplicate migration hash) to enforce a valid graph
-  for path-resolution. The list views must stay **tolerant** — show every
-  on-disk migration, offline, never fail — so the topology helper for this view
-  is a tolerant adjacency/degree/classification pass over the enumerator's
-  `MigrationListEntry[]`, placed beside `MigrationGraph` and sharing its
-  conventions. (Why a second, tolerant builder exists is recorded here so it
-  isn't mistaken for an oversight.)
+**topology facts**, and `migration-tools` owns a dedicated tolerant classifier for
+this view. It does **not** call `reconstructGraph` or reuse `MigrationGraph`'s
+`detectCycles` — those paths throw on invalid graphs and assume a strict genesis
+model. Instead the classifier **re-implements** an independent adjacency build +
+3-colour DFS over the enumerator's `MigrationListEntry[]`, placed beside
+`MigrationGraph` and sharing only naming conventions (`EMPTY_CONTRACT_HASH`,
+hash canonicalization). The second pass exists because the list views must stay
+**tolerant** — show every on-disk migration, offline, never fail.
 - **No single-root / genesis assumption.** The strict `MigrationGraph` path
   (`findLeaf`, `reconstructGraph`) anchors traversal at `EMPTY_CONTRACT_HASH` and
   throws `NO_INITIAL_MIGRATION` when no edge departs it — but **many on-disk

@@ -1,5 +1,8 @@
 import { EMPTY_CONTRACT_HASH } from './constants';
-import { classifyMigrationListGraphTopology, type EdgeKind } from './migration-list-graph-topology';
+import {
+  classifyMigrationListGraphTopology,
+  type MigrationEdgeKind,
+} from './migration-list-graph-topology';
 import type { MigrationListEntry } from './migration-list-types';
 
 export type ConnectorKind = 'fanBelow' | 'joinBelow';
@@ -7,7 +10,7 @@ export type ConnectorKind = 'fanBelow' | 'joinBelow';
 export interface MigrationLayoutRow {
   readonly kind: 'migration';
   readonly entry: MigrationListEntry;
-  readonly edgeKind: EdgeKind;
+  readonly edgeKind: MigrationEdgeKind;
   readonly laneIndex: number;
   readonly passThroughLanes: readonly number[];
   readonly woven: boolean;
@@ -63,7 +66,7 @@ function forwardOutDegree(
 
 function buildForwardProducersByTo(
   entries: readonly MigrationListEntry[],
-  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
+  kindByMigrationHash: ReadonlyMap<string, MigrationEdgeKind>,
 ): Map<string, MigrationListEntry[]> {
   const byTo = new Map<string, MigrationListEntry[]>();
   for (const entry of entries) {
@@ -190,7 +193,11 @@ export function computeMigrationListGraphLayout(
     return undefined;
   }
 
-  function placeWoven(entry: MigrationListEntry, edgeKind: EdgeKind, laneIndex: number): void {
+  function placeWoven(
+    entry: MigrationListEntry,
+    edgeKind: MigrationEdgeKind,
+    laneIndex: number,
+  ): void {
     const passThroughLanes = activeLaneIndices().filter((index) => index !== laneIndex);
     rows.push({
       kind: 'migration',
@@ -204,7 +211,7 @@ export function computeMigrationListGraphLayout(
     lanes[laneIndex] = { want: canonicalFrom(entry.from), active: true };
   }
 
-  function placeUnwoven(entry: MigrationListEntry, edgeKind: EdgeKind): void {
+  function placeUnwoven(entry: MigrationListEntry, edgeKind: MigrationEdgeKind): void {
     const passThroughLanes = activeLaneIndices();
     const laneIndex = passThroughLanes.length === 0 ? 0 : Math.max(...passThroughLanes) + 1;
     rows.push({

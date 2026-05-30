@@ -6,7 +6,7 @@ import type {
   NodeLineLayoutRow,
 } from '@prisma-next/migration-tools/migration-list-graph-layout';
 import { computeMigrationListGraphLayout } from '@prisma-next/migration-tools/migration-list-graph-layout';
-import type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
+import type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
   MigrationListResult,
@@ -33,7 +33,7 @@ interface GlyphPalette {
   readonly node: string;
   readonly forwardArrow: string;
   readonly emptySource: string;
-  readonly kind: Record<EdgeKind, string>;
+  readonly kind: Record<MigrationEdgeKind, string>;
   readonly fanBelow: (branchCount: number) => string;
   readonly joinBelow: (branchCount: number) => string;
 }
