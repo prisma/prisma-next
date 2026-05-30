@@ -46,9 +46,6 @@ const HASH_FAN_B = `sha256:${'e'.repeat(64)}`;
 const HASH_FAN_C = `sha256:${'f'.repeat(64)}`;
 const HASH_POSTGIS = `sha256:9aabbcc${'0'.repeat(57)}`;
 const HASH_SHARED = `sha256:shared0${'0'.repeat(57)}`;
-const HASH_ROLLBACK_TIP = `sha256:tiprb00${'0'.repeat(57)}`;
-const HASH_ROLLBACK_END = `sha256:endrb00${'0'.repeat(57)}`;
-const HASH_LINEAR_MID = `sha256:linmid0${'0'.repeat(57)}`;
 const HASH_LINEAR_TIP = `sha256:lintip0${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
@@ -691,51 +688,39 @@ describe('runMigrationList — JSON output shape', () => {
 });
 
 describe('runMigrationList — per-space topology classification', () => {
-  it('classifies the same contract hash differently across spaces', async () => {
+  it('keeps a cross-space spurious cycle forward in both spaces', async () => {
+    // `app` carries HASH_SHARED -> HASH_LINEAR_TIP and `ext` carries the reverse
+    // edge. The two form a 2-cycle only when the spaces are merged into one
+    // graph. Classifying per space (correct) leaves both edges forward;
+    // reverting to a single global classification would turn exactly one into a
+    // rollback back-edge. Asserting neither space renders `↩` fails the moment
+    // classification stops being scoped per space.
     const { migrationsRoot } = await setupFixture();
 
     await writePackage(migrationsRoot, {
       spaceId: 'app',
-      dirName: '20260101T0000_init',
+      dirName: '20260101T0000_app_init',
       from: null,
       to: HASH_SHARED,
     });
     await writePackage(migrationsRoot, {
       spaceId: 'app',
-      dirName: '20260101T0001_continue',
+      dirName: '20260101T0001_app_fwd',
       from: HASH_SHARED,
-      to: HASH_ROLLBACK_TIP,
-    });
-    await writePackage(migrationsRoot, {
-      spaceId: 'app',
-      dirName: '20260101T0002_rollback',
-      from: HASH_ROLLBACK_TIP,
-      to: HASH_SHARED,
-    });
-    await writePackage(migrationsRoot, {
-      spaceId: 'app',
-      dirName: '20260101T0003_after',
-      from: HASH_SHARED,
-      to: HASH_ROLLBACK_END,
+      to: HASH_LINEAR_TIP,
     });
 
     await writePackage(migrationsRoot, {
       spaceId: 'ext',
-      dirName: '20260101T0000_init',
+      dirName: '20260101T0000_ext_init',
       from: null,
-      to: HASH_SHARED,
-    });
-    await writePackage(migrationsRoot, {
-      spaceId: 'ext',
-      dirName: '20260101T0001_mid',
-      from: HASH_SHARED,
-      to: HASH_LINEAR_MID,
-    });
-    await writePackage(migrationsRoot, {
-      spaceId: 'ext',
-      dirName: '20260101T0002_tip',
-      from: HASH_LINEAR_MID,
       to: HASH_LINEAR_TIP,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'ext',
+      dirName: '20260101T0001_ext_fwd',
+      from: HASH_LINEAR_TIP,
+      to: HASH_SHARED,
     });
 
     const result = await runMigrationList({ migrationsDir: migrationsRoot });
@@ -745,10 +730,10 @@ describe('runMigrationList — per-space topology classification', () => {
     const appBlock = flat.split('\n\next:')[0] ?? '';
     const extBlock = flat.split('\n\next:')[1]?.split('\n\n')[0] ?? '';
 
-    expect(appBlock).toContain('↩ 20260101T0002_rollback');
-    expect(appBlock).toContain('* 20260101T0003_after');
+    expect(appBlock).not.toContain('↩');
+    expect(appBlock).toContain('* 20260101T0001_app_fwd');
     expect(extBlock).not.toContain('↩');
-    expect(extBlock).toMatch(/^\s+\* 20260101T0002_tip/m);
+    expect(extBlock).toContain('* 20260101T0001_ext_fwd');
   });
 });
 

@@ -99,7 +99,7 @@ function renderMigrationGutter(
   const cells: string[] = [];
   for (let lane = 0; lane <= maxLane; lane++) {
     if (lane === row.laneIndex) {
-      cells.push(laneCell(palette.kind[row.edgeKind]));
+      cells.push(laneCell(style.kind(palette.kind[row.edgeKind])));
     } else if (row.passThroughLanes.includes(lane)) {
       cells.push(laneCell(style.lane(palette.lane)));
     } else {
