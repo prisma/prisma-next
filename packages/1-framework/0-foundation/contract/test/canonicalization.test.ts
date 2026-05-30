@@ -12,6 +12,8 @@ import {
   canonicalizeContractToObject as canonicalizeContractToObjectRaw,
   orderTopLevel,
 } from '../src/canonicalization';
+import { createPreserveEmptyPredicate, type PathPattern } from '../src/canonicalization-path-match';
+import { createStorageSort, type NamedArraySortTarget } from '../src/canonicalization-storage-sort';
 import type { Contract } from '../src/contract-types';
 import { coreHash, profileHash } from '../src/types';
 
@@ -35,93 +37,20 @@ function canonicalizeContract(
   return canonicalizeContractRaw(contract, { ...identityOptions, ...options });
 }
 
-// Minimal SQL-family preserve-empty hook used by tests that exercise SQL storage paths.
-// Mirrors the subset of SqlContractSerializerBase.shouldPreserveEmpty relevant to each test.
-function sqlPreserveEmpty(path: readonly string[]): boolean {
-  const len = path.length;
-  if (len < 2 || path[0] !== 'storage') return false;
-  if (path[1] === 'namespaces') {
-    // storage.namespaces.X.tables
-    if (len === 4 && path[3] === 'tables') return true;
-    // storage.namespaces.X.tables.Y (per-table entry)
-    if (len === 5 && path[3] === 'tables') return true;
-    // storage.namespaces.X.tables.Y.uniques / .indexes / .foreignKeys
-    if (
-      len === 6 &&
-      path[3] === 'tables' &&
-      (path[5] === 'uniques' || path[5] === 'indexes' || path[5] === 'foreignKeys')
-    )
-      return true;
-    // FK boolean fields in array-form foreignKeys: path length 7, key is 'constraint' or 'index'
-    if (
-      len === 7 &&
-      path[3] === 'tables' &&
-      path[5] === 'foreignKeys' &&
-      (path[6] === 'constraint' || path[6] === 'index')
-    )
-      return true;
-  }
-  if (path[1] === 'types' && len === 4 && path[3] === 'typeParams') return true;
-  return false;
-}
+const sqlPreserveEmptyPatterns = [
+  ['storage', 'namespaces', '*', 'tables'],
+  ['storage', 'namespaces', '*', 'tables', '*'],
+  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'types', '*', 'typeParams'],
+] as const satisfies readonly PathPattern[];
 
-// Minimal SQL sort hook: sorts indexes and uniques by name within each table.
-function sqlSortStorage(storage: unknown): unknown {
-  if (!storage || typeof storage !== 'object') return storage;
-  const s = storage as Record<string, unknown>;
-  const namespaces = s['namespaces'];
-  if (!namespaces || typeof namespaces !== 'object') return storage;
-  const ns = namespaces as Record<string, unknown>;
-  const sortedNs: Record<string, unknown> = {};
-  for (const nsId of Object.keys(ns)) {
-    const nsEntry = ns[nsId];
-    if (!nsEntry || typeof nsEntry !== 'object') {
-      sortedNs[nsId] = nsEntry;
-      continue;
-    }
-    const tables = (nsEntry as Record<string, unknown>)['tables'];
-    if (!tables || typeof tables !== 'object') {
-      sortedNs[nsId] = nsEntry;
-      continue;
-    }
-    const sortedTables: Record<string, unknown> = {};
-    for (const tname of Object.keys(tables as Record<string, unknown>).sort()) {
-      const t = (tables as Record<string, unknown>)[tname];
-      if (!t || typeof t !== 'object') {
-        sortedTables[tname] = t;
-        continue;
-      }
-      const tableObj = t as Record<string, unknown>;
-      const sorted: Record<string, unknown> = { ...tableObj };
-      const byName = (a: unknown, b: unknown): number => {
-        const na =
-          a &&
-          typeof a === 'object' &&
-          'name' in a &&
-          typeof (a as { name?: unknown }).name === 'string'
-            ? (a as { name: string }).name
-            : '';
-        const nb =
-          b &&
-          typeof b === 'object' &&
-          'name' in b &&
-          typeof (b as { name?: unknown }).name === 'string'
-            ? (b as { name: string }).name
-            : '';
-        return na.localeCompare(nb);
-      };
-      if (Array.isArray(tableObj['indexes'])) {
-        sorted['indexes'] = [...tableObj['indexes']].sort(byName);
-      }
-      if (Array.isArray(tableObj['uniques'])) {
-        sorted['uniques'] = [...tableObj['uniques']].sort(byName);
-      }
-      sortedTables[tname] = sorted;
-    }
-    sortedNs[nsId] = { ...(nsEntry as Record<string, unknown>), tables: sortedTables };
-  }
-  return { ...s, namespaces: sortedNs };
-}
+const sqlSortTargets = [
+  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+] as const satisfies readonly NamedArraySortTarget[];
+
+const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
+const sqlSortStorage = createStorageSort(sqlSortTargets);
 
 function minimal(overrides?: Record<string, unknown>): Contract {
   return {
