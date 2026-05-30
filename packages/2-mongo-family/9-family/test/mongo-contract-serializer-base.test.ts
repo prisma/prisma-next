@@ -10,9 +10,7 @@ function makeValidContractJson() {
     targetFamily: 'mongo',
     roots: { items: crossRef('Item') },
     storage: {
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: { items: {} } },
-      },
+      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: { items: {} } },
     },
     models: {
       Item: {

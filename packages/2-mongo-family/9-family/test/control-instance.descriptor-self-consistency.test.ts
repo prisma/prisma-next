@@ -16,13 +16,11 @@ const TARGET = 'mongo' as const;
 const TARGET_FAMILY = 'mongo' as const;
 
 const fixtureStorageBody = {
-  namespaces: {
-    [UNBOUND_NAMESPACE_ID]: {
-      id: UNBOUND_NAMESPACE_ID,
-      collections: {
-        fixture_box: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
-        },
+  [UNBOUND_NAMESPACE_ID]: {
+    id: UNBOUND_NAMESPACE_ID,
+    collections: {
+      fixture_box: {
+        indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
       },
     },
   },

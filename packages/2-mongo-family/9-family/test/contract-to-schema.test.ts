@@ -38,11 +38,9 @@ function makeContract(collections: Record<string, MongoCollectionData>): MongoCo
     models: {},
     storage: {
       storageHash: 'sha256:test-storage',
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          collections: builtCollections,
-        },
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        collections: builtCollections,
       },
     },
   } as unknown as MongoContract;

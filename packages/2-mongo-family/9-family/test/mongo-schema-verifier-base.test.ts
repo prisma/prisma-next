@@ -1,7 +1,11 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { MongoStorage } from '@prisma-next/mongo-contract';
+import {
+  buildMongoStorageInput,
+  type MongoNamespaceShape,
+  MongoStorage,
+} from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { MongoSchemaVerifierBase } from '../src/core/ir/mongo-schema-verifier-base';
 
@@ -11,11 +15,12 @@ class FakeNamespace implements Namespace {
 }
 
 function makeFakeStorage(namespaces: Readonly<Record<string, Namespace>>): MongoStorage {
-  return new MongoStorage({
-    storageHash: coreHash('fake-hash'),
-    collections: {},
-    namespaces,
-  });
+  return new MongoStorage(
+    buildMongoStorageInput({
+      storageHash: coreHash('fake-hash'),
+      namespaces: namespaces as Readonly<Record<string, MongoNamespaceShape>>,
+    }),
+  );
 }
 
 interface FakeContract {

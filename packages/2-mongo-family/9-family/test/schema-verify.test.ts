@@ -46,11 +46,9 @@ function buildContract(
     models: {},
     storage: {
       storageHash: 'sha256:test',
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          collections: builtCollections,
-        },
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        collections: builtCollections,
       },
     },
     capabilities: {},
@@ -1360,9 +1358,7 @@ describe('verifyMongoSchema', () => {
       return {
         storage: {
           storageHash: 'sha256:authoring-test',
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: {} },
-          },
+          [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: {} },
         },
       } as unknown as MongoContract;
     }
