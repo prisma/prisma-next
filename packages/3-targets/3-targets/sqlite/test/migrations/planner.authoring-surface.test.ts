@@ -3,6 +3,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   SqlUnboundNamespace,
 } from '@prisma-next/sql-contract/types';
@@ -15,26 +16,28 @@ function createContract(): Contract<SqlStorage> {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:profile'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:to'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:to'),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-        }),
-      },
-    }),
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
@@ -46,10 +49,12 @@ function createContract(): Contract<SqlStorage> {
 function fromContractWithHash(hash: string): Contract<SqlStorage> {
   return {
     ...createContract(),
-    storage: new SqlStorage({
-      storageHash: coreHash(hash),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash(hash),
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+      }),
+    ),
   };
 }
 
