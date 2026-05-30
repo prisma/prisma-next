@@ -22,7 +22,7 @@ Diagnostic deltas:  brief reissues 4→1 · I12 halts 1→0 · spec amendments 3
 Verdict: candidate dominates — strictly more correct AND cheaper-to-correct.
 ```
 
-The headline is the **two-tier scorecard**: a binary correctness gate sourced from outside the run (CI / merge / a calibrated LLM judge), then efficiency scored only over the runs that passed the gate. The composite scalar `E[wallclock | CORRECT] / P(CORRECT)` exists as a decision-time _ranker_ when diagnostics are ambiguous — it is never the dashboard headline. Getting there needs three things the framework doesn't have yet: an honest scorecard that refuses to imply "good" without a correctness signal; a judge that can _produce_ that correctness signal and is calibrated against human grading; and a harness that spawns enough comparable runs to make "better than" a measured claim rather than a vibe.
+The headline is the **two-tier scorecard**: a binary correctness gate sourced from outside the run (mechanical: validation gates pass; QA: a successful QA run; intent: a calibrated LLM judge), then efficiency scored only over the runs that passed the gate. The composite scalar `E[wallclock | CORRECT] / P(CORRECT)` exists as a decision-time _ranker_ when diagnostics are ambiguous — it is never the dashboard headline. Getting there needs three things the framework doesn't have yet: an honest scorecard that refuses to imply "good" without a correctness signal; a judge that can _produce_ that correctness signal and is calibrated against human grading; and a harness that spawns enough comparable runs to make "better than" a measured claim rather than a vibe.
 
 ## Non-goals
 
@@ -39,14 +39,17 @@ The headline is the **two-tier scorecard**: a binary correctness gate sourced fr
 - **`drive-diagnose-run` skill.** The scorecard and honest verdict line extend this skill's report. The post-hoc parser it ships needs validation against ≥3 real instrumented runs (TML-2728), which this project's harness produces.
 - **`drive-run-retro` skill.** The auto-retro ("pass the trace back to the model that produced it and ask what it would have needed") surfaces clues alongside operator-driven retro findings — it feeds this skill, it does not replace it.
 - **Cursor SDK (`@cursor/sdk`).** The controlled-experiment harness spawns `k=N` orchestrator runs with pinned models for skill-version A/B.
-- **Judge model is deliberately cross-family** from the orchestrator under test (e.g. GPT grades Claude, or vice versa) to avoid same-family grading bias.
+- **Judge model is deliberately cross-family** from the orchestrator under test (a hard requirement) to avoid same-family grading bias. Default judge: **GPT 5.5** — cross-family from the Claude orchestrator under test today. The judge model is a pinned per-experiment parameter; when the orchestrator under test is itself non-Claude, the default flips to a cross-family model accordingly.
 
 ## Cross-cutting requirements
 
-- **Correctness is the #1 axis and a hard gate.** The scorecard is two-tier: Tier 1 is a binary correctness gate sourced _externally_ to the run (CI result / merge status / calibrated judge); Tier 2 (efficiency: tokens, wall-clock, rework) is scored **only over runs that passed Tier 1**. Speed never compensates for incorrectness.
+- **Correctness is the #1 axis and a hard gate.** The scorecard is two-tier: Tier 1 is a binary correctness gate sourced _externally_ to the run; Tier 2 (efficiency: tokens, wall-clock, rework) is scored **only over runs that passed Tier 1**. Speed never compensates for incorrectness.
+- **The correctness gate is composed, not CI-dependent.** Sandboxed golden-case runs cannot rely on CI (that needs an isolated fork, and we don't open real PRs into the repo from experiments). For a sandboxed run, **Tier-1 CORRECT = validation gates pass (`pnpm typecheck` / `test` / `lint` per the team DoD) AND a successful QA run AND the judge's intent/requirements verdict passes**. Merge status / CI is an _optional stronger_ signal, used only for real-ticket runs that open a PR against an isolated fork (out of scope for slice 1).
+- **QA plans are pre-written.** Each golden case ships its `drive-qa-plan` script in its acceptance set, authored alongside the brief — so the QA-run signal is available deterministically at run time, not authored mid-run.
 - **The report must never let all-green metrics imply "good."** Until a correctness signal exists for a run, the verdict line reads `not computable` and names the missing input — it does not stay silent.
-- **The judge is trusted only once calibrated.** ≥80% agreement with human grading on a held-out subset before its output is used as the Tier-1 signal.
-- **A/B comparisons are reproducible.** Same brief, pinned models, fixed `k` → a report that another operator can regenerate and get the same verdict shape.
+- **The judge is trusted only once calibrated.** ≥80% agreement with human grading on a held-out subset before its output is used as the Tier-1 intent signal.
+- **Tokens are measured, not estimated.** The harness accumulates per-run usage from the SDK's `TurnEndedUpdate.usage` (`inputTokens` / `outputTokens` / `cacheReadTokens` / `cacheWriteTokens`) into a `tokens` trace field; hand-runs leave it `null` → scorecard renders `n/a (no signal)`.
+- **A/B comparisons are reproducible.** Same brief, pinned orchestrator + judge models, fixed `k` → a report that another operator can regenerate and get the same verdict shape. The baseline for "how good" is the immediately-previous skill version on the same golden case(s); cross-run aggregation against the accreting corpus is the longer-term baseline.
 - **Every slice keeps `drive-diagnose-run` and the trace tooling green.** No slice leaves the diagnostics report unrunnable.
 
 ## Transitional-shape constraints
@@ -69,12 +72,16 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 
 ## Open Questions
 
-1. **Is this one project or two (judge vs harness)?** The decomposition lands at the top of the 1–4 slice range (see the plan), and the judge and the experiment-harness are separable bodies of work. Working position: keep it as one project — the harness exists _to feed the judge_ a corpus, and the A/B engine exists _to consume_ the judge's correctness signal; splitting them severs that loop across two trackers. Revisit if the slice count grows past 4 at pickup.
-2. **Judge model choice (cross-family).** Working position: pin a specific cross-family model when the judge slice starts; record it in the slice spec so calibration is reproducible.
-3. **Where the token signal comes from.** Working position: the SDK reports per-run usage for harness-spawned runs; add a `tokens` field to the trace vocabulary that the harness populates. Hand-runs leave it `null` → scorecard renders `n/a (no signal)`.
-4. **External-correctness feed source + precedence.** Working position: accept all three (CI result, merge status, judge verdict); precedence CI/merge > judge when both exist.
-5. **Baseline for "how good."** Working position: A/B against the immediately-previous skill version; cross-run aggregation against an accreting corpus is the longer-term baseline.
-6. **Bespoke scorer vs. third-party eval framework.** Existing eval frameworks (Inspect, Braintrust, promptfoo, LangSmith) assume the unit-under-test is a single model call or a RAG pipeline; our unit is a multi-hour SDK-spawned agent run scored from heterogeneous signals (trace + PR + CI/merge + judge). Working position: **build the minimal bespoke scorer; the run-production harness stays ours regardless.** Slice 3 (TML-2736) carries a time-boxed spike to check whether one of these frameworks can host just the correctness rubric + calibration bookkeeping with _less_ total complexity than hand-rolling it — adopt only on a clear win, otherwise stay bespoke.
+None remaining — the project-level questions were resolved during shaping (logged below).
+
+## Decisions (resolved during shaping)
+
+1. **One project, not two.** Kept as one project — the harness exists _to feed the judge_ a corpus and the A/B engine exists _to consume_ the judge's correctness signal; splitting severs that loop across two trackers. Revisit only if slice 4 splits and the count crosses 4.
+2. **Judge model: cross-family is a hard requirement; default GPT 5.5.** The judge is a pinned per-experiment parameter that must be cross-family from the orchestrator under test. Default is **GPT 5.5** (cross-family from today's Claude orchestrator); the default flips when the orchestrator under test is non-Claude.
+3. **Token signal from the SDK.** Per-run `tokens` accumulated from `TurnEndedUpdate.usage` (`inputTokens` / `outputTokens` / `cacheReadTokens` / `cacheWriteTokens`); added to the trace vocabulary; hand-runs `null` → `n/a (no signal)`. Per-dispatch attribution deferred.
+4. **Correctness gate is composed (not CI-dependent).** Sandboxed Tier-1 CORRECT = validation gates pass AND a successful QA run AND the judge's intent verdict passes. QA plans are pre-written in each golden case's acceptance set. Merge/CI is an optional stronger signal only for real-PR runs against an isolated fork (out of scope for slice 1).
+5. **Baseline = previous skill version.** A/B against the immediately-previous skill version on the same golden case(s); cross-run aggregation is the longer-term baseline.
+6. **Bespoke-minimal scorer by default.** Build the minimal bespoke scorer; slice 3 (TML-2736) runs a time-boxed spike to check whether a third-party framework hosts the rubric + calibration with _less_ net complexity — adopt only on a clear win. The run-production harness stays bespoke regardless.
 
 ## References
 

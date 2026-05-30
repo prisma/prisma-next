@@ -18,7 +18,7 @@
 
 The headline of every run report is a scorecard with a strict tier order:
 
-- **Tier 1 — correctness gate (binary, external).** Sourced from _outside_ the run: CI result, merge status, or a calibrated LLM judge. A run is `CORRECT` or not. This is the #1 axis.
+- **Tier 1 — correctness gate (binary, external, composed).** Sourced from _outside_ the run. For sandboxed golden-case runs (no CI without an isolated fork), `CORRECT` = validation gates pass (`pnpm typecheck` / `test` / `lint`) **AND** a successful QA run (each golden case ships a pre-written `drive-qa-plan` in its acceptance set) **AND** the judge's intent/requirements verdict passes. Merge status / CI is an optional stronger signal only for real-PR runs against an isolated fork. A run is `CORRECT` or not. This is the #1 axis.
 - **Tier 2 — efficiency, scored only over `CORRECT` runs.** Tokens-to-correct, wall-clock-to-correct, rework (rounds-per-dispatch). Scoring an incorrect run's efficiency is meaningless, so Tier 2 is gated on Tier 1.
 
 When the Tier-1 input is absent, the verdict line reads `not computable` and names the missing input. This is the correct shippable state until the judge exists — not a stub.
@@ -29,7 +29,7 @@ When the Tier-1 input is absent, the verdict line reads `not computable` and nam
 
 ### The judge
 
-Three prompt sets, judge model cross-family from the orchestrator under test: (a) correctness rubric (mechanical / requirements / intent); (b) failure-mode classifier (F1–F9 + scope traps + QA coverage-gate gaps); (c) operator-turn classifier (five buckets distinguishing legitimate design/authz turns from illegitimate correction/rescue turns). Calibrated against an accreting corpus to ≥80% held-out agreement before its output feeds Tier 1.
+Three prompt sets, judge model cross-family from the orchestrator under test (hard requirement; default **GPT 5.5**, cross-family from today's Claude orchestrator; a pinned per-experiment parameter): (a) correctness rubric (mechanical / requirements / intent); (b) failure-mode classifier (F1–F9 + scope traps + QA coverage-gate gaps); (c) operator-turn classifier (five buckets distinguishing legitimate design/authz turns from illegitimate correction/rescue turns). Calibrated against an accreting corpus to ≥80% held-out agreement before its output feeds Tier 1.
 
 ### The harness
 
@@ -51,12 +51,14 @@ The single hardest sequencing constraint: judge calibration needs ~10–20 instr
 
 ## Open questions
 
-- **Is this one project or two?** Working position: one project; the feed→consume loop is the project. Revisit on a slice-4 split.
-- **Judge model choice (cross-family).** Working position: pin a specific cross-family model at the judge slice; record it in the slice spec for reproducible calibration.
-- **Token-signal source.** Working position: SDK per-run usage for harness-spawned runs; add a `tokens` field to the trace vocabulary; hand-runs leave it `null` → `n/a (no signal)`.
-- **External-correctness feed precedence.** Working position: CI/merge > judge when both exist.
-- **Baseline for "how good."** Working position: A/B against the immediately-previous skill version; cross-run aggregation is the longer-term baseline.
-- **Bespoke scorer vs. third-party framework.** Working position: bespoke-minimal by default; slice-3 spike checks whether a framework hosts the rubric + calibration with less net complexity; adopt only on a clear win. Harness stays bespoke.
+None remaining — all resolved during shaping (see spec § Decisions). For the record:
+
+- **One project, not two** — the feed→consume loop is the project; revisit only on a slice-4 split.
+- **Judge model** — cross-family hard requirement; default GPT 5.5; pinned per experiment.
+- **Token signal** — per-run `tokens` from the SDK's `TurnEndedUpdate.usage`; hand-runs `null`.
+- **Correctness gate** — composed (validation gates + QA run + judge intent) for sandboxed runs; merge/CI optional, real-PR-only.
+- **Baseline** — previous skill version on the same golden case(s).
+- **Scorer** — bespoke-minimal by default; slice-3 spike gates any framework adoption on a net-complexity win.
 
 ## References
 
