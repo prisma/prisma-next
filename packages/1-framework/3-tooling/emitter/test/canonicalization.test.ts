@@ -16,15 +16,12 @@ import { createTestContract } from './utils';
 
 function unboundNamespaceTables(tables: Record<string, unknown>) {
   return {
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-    },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
   };
 }
 
 function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<string, unknown> {
-  const namespaces = storage['namespaces'] as Record<string, unknown>;
-  const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+  const unbound = storage[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
   return unbound['tables'] as Record<string, unknown>;
 }
 
@@ -36,15 +33,15 @@ const canonicalizeContract = (
 ): string => canonicalizeContractRaw(c, { serializeContract: identitySerialize, ...opts });
 
 const sqlPreserveEmptyPatterns = [
-  ['storage', 'namespaces', '*', 'tables'],
-  ['storage', 'namespaces', '*', 'tables', '*'],
-  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
-  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', '*', 'tables'],
+  ['storage', '*', 'tables', '*'],
+  ['storage', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
   ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
-  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+  { path: ['*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
 const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
@@ -169,7 +166,7 @@ describe('canonicalization', () => {
     expect(parsed).toMatchObject({
       models: expect.anything(),
       storage: {
-        namespaces: expect.anything(),
+        storageHash: expect.anything(),
       },
     });
     // Required top-level fields (capabilities, extensionPacks, meta) are preserved even when empty.
@@ -184,17 +181,14 @@ describe('canonicalization', () => {
   it('preserves an empty per-namespace tables slot when SQL shouldPreserveEmpty hook is provided', () => {
     const ir = createTestContract({
       storage: {
-        namespaces: {
-          public: { id: 'public', tables: {} },
-        },
+        public: { id: 'public', tables: {} },
       },
     });
 
     const result = canonicalizeContract(ir, { shouldPreserveEmpty: sqlPreserveEmpty });
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const namespaces = storage['namespaces'] as Record<string, unknown>;
-    const publicNs = namespaces['public'] as Record<string, unknown>;
+    const publicNs = storage['public'] as Record<string, unknown>;
     expect(publicNs).toMatchObject({ id: 'public', tables: {} });
   });
 
@@ -336,11 +330,9 @@ describe('canonicalization', () => {
     it('preserves empty namespace table entries when SQL shouldPreserveEmpty hook is provided', () => {
       const ir = createTestContract({
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              tables: { users: {}, posts: {} },
-            },
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { users: {}, posts: {} },
           },
         },
       });
@@ -355,11 +347,9 @@ describe('canonicalization', () => {
     it('sorts table names lexicographically within a namespace', () => {
       const ir = createTestContract({
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              tables: { zebras: {}, apples: {}, mangoes: {} },
-            },
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { zebras: {}, apples: {}, mangoes: {} },
           },
         },
       });
@@ -373,21 +363,17 @@ describe('canonicalization', () => {
     it('produces different hashes when namespace tables differ', () => {
       const ir1 = createTestContract({
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              tables: { users: {} },
-            },
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { users: {} },
           },
         },
       });
       const ir2 = createTestContract({
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              tables: { users: {}, posts: {} },
-            },
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: { users: {}, posts: {} },
           },
         },
       });
