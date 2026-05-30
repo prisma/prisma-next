@@ -32,10 +32,25 @@ One reviewable unit: every reader of these four symbols is a construction path, 
 |---|---|---|
 | Empty-contract construction (zero declared namespaces) | Refusal trigger | `DEFAULT_NAMESPACES` exists to inject an `__unbound__` singleton here. The premise is that the builders always construct at least `__unbound__`, so the injector is redundant. If a construction path genuinely depends on injection, construction discipline isn't centralised — **HALT and report** rather than re-adding it. |
 
+## Round 2 — review actions (PR #630)
+
+The shim removal extracted construction into `buildSqlNamespace()` / `buildMongoNamespace()` free functions and renamed the old `SqlNamespacePayload` / `MongoNamespacePayload` classes to `SqlNamespaceFromTablesInput` / `MongoNamespaceFromCollectionsInput`. Review surfaced that the rename carried forward the original anti-pattern (class identity named after its constructor input) and a few smaller smells in the surrounding construction paths. All five actions stay within this slice's surfaces.
+
+| # | Site | Action |
+|---|---|---|
+| R1 | `build-{sql,mongo}-namespace.ts` concrete class | Name the bound concretion by **identity**, not by its constructor input. Move the input shape into a static factory method (e.g. `class SqlBoundNamespace … static fromTablesInput(input)`), sibling to the existing `SqlUnboundNamespace` / `MongoUnboundNamespace`. Fold the `buildXNamespace()` free function into the factory. |
+| R2 | `buildMongoNamespaceMap` (and SQL twin) | Drop the `instanceof NamespaceBase` discrimination in favour of the family's `kind`-based discriminator, or restructure so the map builder is handed a single already-built shape. |
+| R3 | `sql-storage.ts` `SqlStorage` constructor | Justify-or-remove the `as Readonly<…> & { __unbound__: SqlNamespace }` cast. If `SqlStorageInput['namespaces']` already brands `__unbound__`, the cast is redundant; otherwise narrow it. |
+| R4 | `validators.ts` `validateStorage` (+ `sql-contract-serializer-base.ts` `hydrateSqlStorage`) | Replace the inline `...(x !== undefined ? { types: x } : {})` conditional spread with the `ifDefined(...)` helper. |
+| R5 | `sql-contract-serializer-base.ts` `hydrateSqlNamespaceMap` | Clarify the raw-vs-hydrated distinction (naming or a one-line comment): "raw" = post-structural-validation entries not yet materialised into family IR class instances; "hydrated" = materialised `Namespace` instances. |
+
+**Refusal trigger (R1):** the public *structural types* `SqlNamespace` / `MongoNamespace` exist so emitted `contract.d.ts` literals (no runtime `kind`, not class instances) structurally satisfy the namespace slot. If naming the concrete class by identity would force the structural type to disappear and break `.d.ts` literal assignability, **HALT and report** with options rather than collapsing the type into the class.
+
 ## Slice-specific done conditions
 
 - [ ] Grep gate clean: the four named symbols return zero hits outside this project's docs.
 - [ ] If the deletion shifts any emitted `contract.json`, the regen is committed with a one-line explanation in the PR (expected: none, since builders already inject).
+- [ ] Review actions R1–R5 addressed (or a refusal trigger reported); no `*FromTablesInput` / `*FromCollectionsInput` class names remain.
 
 ## Open Questions
 
