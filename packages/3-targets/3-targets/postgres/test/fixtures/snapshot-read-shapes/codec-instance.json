@@ -7,24 +7,22 @@
   "models": {},
   "storage": {
     "storageHash": "sha256:fixture-codec-instance",
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "tables": {
-          "embeddings": {
-            "columns": {
-              "vec": {
-                "codecId": "pg/vector@1",
-                "nativeType": "vector",
-                "nullable": false,
-                "typeRef": "Embedding1536"
-              }
-            },
-            "foreignKeys": [],
-            "indexes": [],
-            "primaryKey": { "columns": ["vec"] },
-            "uniques": []
-          }
+    "__unbound__": {
+      "id": "__unbound__",
+      "tables": {
+        "embeddings": {
+          "columns": {
+            "vec": {
+              "codecId": "pg/vector@1",
+              "nativeType": "vector",
+              "nullable": false,
+              "typeRef": "Embedding1536"
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "primaryKey": { "columns": ["vec"] },
+          "uniques": []
         }
       }
     },
