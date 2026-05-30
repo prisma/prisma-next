@@ -11,6 +11,7 @@ import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm } from '@prisma-next/sql-orm-client';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   createExecutionContext,
@@ -44,10 +45,10 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
     createSchema(rawDb, contract);
     seedData(rawDb);
 
-    const { runtime, context } = await createSqliteRuntime(contract, dbPath);
+    const { runtime, context, rawCodecInferer } = await createSqliteRuntime(contract, dbPath);
 
     try {
-      const db: Db<TContract> = sqlBuilder<TContract>({ context });
+      const db: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
       const ormClient = orm({
         context,
         runtime: {
@@ -176,7 +177,11 @@ function seedData(db: DatabaseSync): void {
 async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   dbPath: string,
-): Promise<{ runtime: Runtime; context: ExecutionContext<TContract> }> {
+): Promise<{
+  runtime: Runtime;
+  context: ExecutionContext<TContract>;
+  rawCodecInferer: RawCodecInferer;
+}> {
   const stack = createSqlExecutionStack({
     target: sqliteTarget,
     adapter: sqliteAdapter,
@@ -195,5 +200,5 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
     driver,
   });
 
-  return { runtime, context };
+  return { runtime, context, rawCodecInferer: stack.adapter.rawCodecInferer };
 }

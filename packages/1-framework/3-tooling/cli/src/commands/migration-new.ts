@@ -12,19 +12,15 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   copyFilesWithRename,
   formatMigrationDirName,
-  readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import {
-  findLatestMigration,
-  reconstructGraph,
-} from '@prisma-next/migration-tools/migration-graph';
+import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -36,7 +32,6 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
-  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -46,6 +41,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { refusePackageCorruptionOnAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -71,7 +67,10 @@ async function executeMigrationNewCommand(
   options: MigrationNewOptions,
 ): Promise<Result<MigrationNewResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
+  const { migrationsDir, appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
 
   // Construct the family instance up-front so the on-disk contract read
   // below crosses the serializer seam (`familyInstance.deserializeContract`)
@@ -98,7 +97,8 @@ async function executeMigrationNewCommand(
 
   let toContract: Contract;
   try {
-    toContract = familyInstance.deserializeContract(JSON.parse(contractJsonContent) as unknown);
+    const parsedContract: unknown = JSON.parse(contractJsonContent);
+    toContract = familyInstance.deserializeContract(parsedContract);
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {
@@ -118,45 +118,47 @@ async function executeMigrationNewCommand(
     );
   }
 
+  const aggregate = await loadContractSpaceAggregate({
+    migrationsDir,
+    deserializeContract: (json) => familyInstance.deserializeContract(json),
+    appContract: toContract,
+  });
+  const packageCorruptionFailure = refusePackageCorruptionOnAggregate(aggregate);
+  if (packageCorruptionFailure) {
+    return notOk(packageCorruptionFailure);
+  }
+
+  const packages = aggregate.app.packages;
+  const graph = aggregate.app.graph();
+
   let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
 
-  try {
-    const packages = await readMigrationsDir(appMigrationsDir);
-
-    if (packages.length > 0) {
-      const graph = reconstructGraph(packages);
-
-      if (options.from) {
-        const match = packages.find((p) => p.metadata.to.startsWith(options.from!));
-        if (!match) {
-          return notOk(
-            errorRuntime('Starting contract not found', {
-              why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
-              fix: 'Check that the --from hash matches a known migration target hash.',
-            }),
-          );
-        }
-        fromHash = match.metadata.to;
-        fromContractSourceDir = match.dirPath;
-      } else {
-        const latestMigration = findLatestMigration(graph);
-        if (latestMigration) {
-          fromHash = latestMigration.to;
-          const leafPkg = packages.find(
-            (p) => p.metadata.migrationHash === latestMigration.migrationHash,
-          );
-          if (leafPkg) {
-            fromContractSourceDir = leafPkg.dirPath;
-          }
+  if (packages.length > 0) {
+    if (options.from) {
+      const match = packages.find((p) => p.metadata.to.startsWith(options.from!));
+      if (!match) {
+        return notOk(
+          errorRuntime('Starting contract not found', {
+            why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
+            fix: 'Check that the --from hash matches a known migration target hash.',
+          }),
+        );
+      }
+      fromHash = match.metadata.to;
+      fromContractSourceDir = match.dirPath;
+    } else {
+      const latestMigration = findLatestMigration(graph);
+      if (latestMigration) {
+        fromHash = latestMigration.to;
+        const leafPkg = packages.find(
+          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
+        );
+        if (leafPkg) {
+          fromContractSourceDir = leafPkg.dirPath;
         }
       }
     }
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    throw error;
   }
 
   if (fromHash === toStorageHash && !options.from) {

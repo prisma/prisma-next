@@ -102,7 +102,7 @@ function collectOwnedNames(
   const owned = new Set<string>();
   for (const other of otherMembers) {
     if (other.spaceId === member.spaceId) continue;
-    for (const name of extractStorageElementNames(other.contract)) {
+    for (const name of extractStorageElementNames(other.contract())) {
       owned.add(name);
     }
   }

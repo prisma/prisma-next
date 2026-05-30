@@ -88,7 +88,6 @@ import {
   compileUpsertReturning,
   mergeAnnotations,
 } from './query-plan';
-import { augmentSelectionForJoinColumns } from './selection-shaping';
 import {
   type AggregateBuilder,
   type AggregateResult,
@@ -1188,11 +1187,7 @@ export class Collection<
 
     const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
-    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
-    const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
-      this.state.selectedFields,
-      parentJoinColumns,
-    );
+    const { selectedForQuery: selectedForInsert, hiddenColumns } = this.#augmentMutationSelection();
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
       const plans = compileInsertReturningSplit(
         this.contract,
@@ -1205,7 +1200,9 @@ export class Collection<
         runtime: this.ctx.runtime,
         plans,
         tableName: this.tableName,
+        modelName: this.modelName,
         includes: this.state.includes,
+        selectedFields: this.state.selectedFields,
         hiddenColumns,
         mapRow: (mapped) => mapped as Row,
       });
@@ -1219,8 +1216,10 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
+      tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
@@ -1492,11 +1491,7 @@ export class Collection<
       throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
     }
 
-    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
-    const { selectedForQuery: selectedForUpsert, hiddenColumns } = augmentSelectionForJoinColumns(
-      this.state.selectedFields,
-      parentJoinColumns,
-    );
+    const { selectedForQuery: selectedForUpsert, hiddenColumns } = this.#augmentMutationSelection();
     const compiled = mergeAnnotations(
       compileUpsertReturning(
         this.contract,
@@ -1512,8 +1507,10 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
+      tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
       onMissingRowMessage: `upsert() for model "${this.modelName}" did not return a row`,
@@ -1663,11 +1660,7 @@ export class Collection<
 
     applyUpdateDefaults(this.ctx, this.tableName, mappedData);
 
-    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
-    const { selectedForQuery: selectedForUpdate, hiddenColumns } = augmentSelectionForJoinColumns(
-      this.state.selectedFields,
-      parentJoinColumns,
-    );
+    const { selectedForQuery: selectedForUpdate, hiddenColumns } = this.#augmentMutationSelection();
     const compiled = mergeAnnotations(
       compileUpdateReturning(
         this.contract,
@@ -1682,8 +1675,10 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
+      tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
@@ -1811,11 +1806,11 @@ export class Collection<
   #executeDeleteReturning(
     annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
   ): AsyncIterableResult<Row> {
-    const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
-    const { selectedForQuery: selectedForDelete, hiddenColumns } = augmentSelectionForJoinColumns(
-      this.state.selectedFields,
-      parentJoinColumns,
-    );
+    if (this.state.includes.length > 0) {
+      return this.#executeDeleteReturningWithIncludes(annotationsMap);
+    }
+
+    const { selectedForQuery: selectedForDelete, hiddenColumns } = this.#augmentMutationSelection();
     const compiled = mergeAnnotations(
       compileDeleteReturning(this.contract, this.tableName, this.state.filters, selectedForDelete),
       annotationsMap,
@@ -1824,11 +1819,53 @@ export class Collection<
       contract: this.contract,
       runtime: this.ctx.runtime,
       compiled,
+      tableName: this.tableName,
       modelName: this.modelName,
       includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
       hiddenColumns,
       mapRow: (mapped) => mapped as Row,
     });
+  }
+
+  /**
+   * Delete read-back with includes.
+   *
+   * A parent-anchored single-query include read can't observe a row
+   * that has already been deleted, so this reads the rows together with
+   * their relations BEFORE issuing the DELETE. The snapshot is fully
+   * drained into a plain array with `.toArray()` while the rows still
+   * exist; only then does the DELETE run. The yielded `for..of` walks
+   * that in-memory array, not a live cursor, so nothing reads from the
+   * deleted rows after the fact. Snapshot read and delete share one
+   * `withMutationScope` so they are atomic; the returned relations
+   * reflect the row's state at delete time.
+   */
+  #executeDeleteReturningWithIncludes(
+    annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
+  ): AsyncIterableResult<Row> {
+    const collection = this;
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      const snapshot = await withMutationScope(collection.ctx.runtime, async (scope) => {
+        const rows = await dispatchCollectionRows<Row>({
+          contract: collection.contract,
+          runtime: scope,
+          state: collection.state,
+          tableName: collection.tableName,
+          modelName: collection.modelName,
+        }).toArray();
+        const deletePlan = mergeAnnotations(
+          compileDeleteCount(collection.contract, collection.tableName, collection.state.filters),
+          annotationsMap,
+        );
+        await executeQueryPlan<Record<string, unknown>>(scope, deletePlan).toArray();
+        return rows;
+      });
+      for (const row of snapshot) {
+        yield row;
+      }
+    };
+    return new AsyncIterableResult(generator());
   }
 
   /**
@@ -1890,6 +1927,32 @@ export class Collection<
     }
 
     return criterion;
+  }
+
+  /**
+   * Shape the projection for a mutation's `RETURNING` clause.
+   *
+   * Without includes, the mutation returns the caller's projection
+   * directly. With includes, it returns only the row identity columns
+   * (PK / unique): those rows are reloaded through the read path
+   * (`reloadMutationRowsByIdentities`), which re-selects the caller's
+   * projection together with the relations, so the `RETURNING` clause
+   * need only carry enough to key that read-back.
+   */
+  #augmentMutationSelection(): {
+    selectedForQuery: readonly string[] | undefined;
+    hiddenColumns: readonly string[];
+  } {
+    if (this.state.includes.length > 0) {
+      const identityColumns = resolveRowIdentityColumns(this.contract, this.tableName);
+      if (identityColumns.length === 0) {
+        throw new Error(
+          `Cannot load includes for the mutation result on model "${this.modelName}": table "${this.tableName}" has no primary key or unique constraint to key the include read-back on.`,
+        );
+      }
+      return { selectedForQuery: identityColumns, hiddenColumns: [] };
+    }
+    return { selectedForQuery: this.state.selectedFields, hiddenColumns: [] };
   }
 
   async #findFirstMatchingRowIdentityWhere(): Promise<AnyExpression | null> {

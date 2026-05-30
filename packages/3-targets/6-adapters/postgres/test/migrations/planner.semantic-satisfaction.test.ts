@@ -11,7 +11,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  type SqlNamespaceTablesInput,
+  buildSqlNamespace,
   SqlStorage,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
@@ -214,7 +214,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
 });
 
 function createTestContract(tables: Record<string, StorageTableInput> = {}): Contract<SqlStorage> {
-  const unboundNs: SqlNamespaceTablesInput = { id: UNBOUND_NAMESPACE_ID, tables };
+  const unboundNs = buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables });
   return {
     target: 'postgres',
     targetFamily: 'sql',

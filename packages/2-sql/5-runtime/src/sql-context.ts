@@ -73,6 +73,7 @@ import type {
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type {
   AppliedMutationDefault,
   CodecDescriptorRegistry,
@@ -134,7 +135,12 @@ export interface SqlRuntimeAdapterDescriptor<
     TTargetId
   > = SqlRuntimeAdapterInstance<TTargetId>,
 > extends RuntimeAdapterDescriptor<'sql', TTargetId, TAdapterInstance>,
-    SqlStaticContributions {}
+    SqlStaticContributions {
+  /**
+   * Codec inferer used by `fns.raw` to look up the codec id for a bare-literal interpolation. Required on every SQL adapter descriptor — the facade reads it off the descriptor at client-construction time without instantiating the runtime adapter.
+   */
+  readonly rawCodecInferer: RawCodecInferer;
+}
 
 export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string>
   extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>>,

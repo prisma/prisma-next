@@ -1,11 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 
-export type IncludeStrategy = 'lateral' | 'correlated' | 'multiQuery';
+export type IncludeStrategy = 'lateral' | 'correlated';
 
 /**
- * Choose the SQL emission strategy for nested includes based on the
- * contract's declared capabilities.
+ * Choose the single-query SQL emission strategy for nested includes
+ * based on the contract's declared capabilities.
  *
  * - `'lateral'`: outer SELECT with one LATERAL JOIN per relation,
  *   aggregating to JSON. Requires both `lateral` and `jsonAgg`.
@@ -13,29 +13,19 @@ export type IncludeStrategy = 'lateral' | 'correlated' | 'multiQuery';
  * - `'correlated'`: outer SELECT with one correlated subquery per
  *   relation, aggregating to JSON. Requires `jsonAgg` only.
  *   SQLite has `jsonAgg` (via `json_group_array`) but no LATERAL.
- * - `'multiQuery'`: fallback. One SELECT per relation, stitched
- *   together in JS via `WHERE pk IN (parent-pk-values)`. Always
- *   correct; just N+1 round-trips.
  *
- * The capability flags are looked up under the contract's
- * `targetFamily` and `target` namespaces — the two layers the contract
- * emitter actually populates. Cross-namespace ("`postgres.lateral`
- * found while running SQLite") false positives are impossible because
- * we only inspect the running target's namespaces.
+ * Every supported SQL target provides `jsonAgg`; the only axis the
+ * selector reads is `lateral`. Targets that declare neither flag are
+ * not supported on the read path — there is no multi-query fallback.
+ *
+ * The `lateral` flag is looked up under the contract's `targetFamily`
+ * and `target` namespaces — the two layers the contract emitter
+ * actually populates. Cross-namespace ("`postgres.lateral` found while
+ * running SQLite") false positives are impossible because we only
+ * inspect the running target's namespaces.
  */
 export function selectIncludeStrategy(contract: Contract<SqlStorage>): IncludeStrategy {
-  const hasLateral = capabilityFlag(contract, 'lateral');
-  const hasJsonAgg = capabilityFlag(contract, 'jsonAgg');
-
-  if (hasLateral && hasJsonAgg) {
-    return 'lateral';
-  }
-
-  if (hasJsonAgg) {
-    return 'correlated';
-  }
-
-  return 'multiQuery';
+  return capabilityFlag(contract, 'lateral') ? 'lateral' : 'correlated';
 }
 
 /**

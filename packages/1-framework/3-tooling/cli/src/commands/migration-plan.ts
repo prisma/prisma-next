@@ -576,7 +576,7 @@ async function executeMigrationPlanCommand(
         planner,
         migrations,
         frameworkComponents,
-        aggregate.app.contract,
+        aggregate.app.contract(),
         fromContract,
         aggregate.app.spaceId,
       );
@@ -653,7 +653,7 @@ async function executeMigrationPlanCommand(
       planner,
       migrations,
       frameworkComponents,
-      aggregate.app.contract,
+      aggregate.app.contract(),
       fromContract,
       aggregate.app.spaceId,
     );

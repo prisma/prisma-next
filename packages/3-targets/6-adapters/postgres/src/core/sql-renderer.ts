@@ -23,6 +23,7 @@ import {
   type OperationExpr,
   type OrderByItem,
   type ProjectionItem,
+  type RawExpr,
   type RawSqlExpr,
   type SelectAst,
   type SubqueryExpr,
@@ -347,6 +348,7 @@ function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
     case 'exists':
     case 'null-check':
     case 'not':
+    case 'raw-expr':
       return false;
   }
 }
@@ -550,6 +552,8 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
       return renderLiteral(node);
     case 'list':
       return renderListLiteral(node, contract, pim);
+    case 'raw-expr':
+      return renderRawExpr(node, contract, pim);
     // v8 ignore next 4
     default:
       throw new Error(
@@ -822,4 +826,10 @@ function renderRawSql(ast: RawSqlExpr, contract: PostgresContract, pim: ParamInd
     }
   }
   return out.join('');
+}
+
+function renderRawExpr(node: RawExpr, contract: PostgresContract, pim: ParamIndexMap): string {
+  return node.parts
+    .map((part) => (typeof part === 'string' ? part : renderExpr(part, contract, pim)))
+    .join('');
 }

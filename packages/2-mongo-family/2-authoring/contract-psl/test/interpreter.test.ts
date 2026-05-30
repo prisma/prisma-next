@@ -8,7 +8,12 @@ import type {
 import { crossRef } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { MongoCollection, MongoStorage, MongoValidator } from '@prisma-next/mongo-contract';
+import {
+  buildMongoNamespace,
+  MongoCollection,
+  MongoStorage,
+  MongoValidator,
+} from '@prisma-next/mongo-contract';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
@@ -919,7 +924,7 @@ describe('interpretPslDocumentToMongoContract', () => {
             /^sha256:/,
           ) as unknown as StorageHashBase<`sha256:${string}`>,
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
+            [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
               id: UNBOUND_NAMESPACE_ID,
               collections: {
                 users: new MongoCollection({
@@ -958,7 +963,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                   }),
                 }),
               },
-            },
+            }),
           },
         }),
         extensionPacks: {},

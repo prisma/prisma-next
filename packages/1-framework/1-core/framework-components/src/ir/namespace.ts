@@ -44,8 +44,8 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
  * own native idiom). Generic consumers walking "all named entries" go
  * through a family-typed namespace, not the framework `Namespace`.
  *
- * Every namespace concretion (e.g. `SqlNamespacePayload`,
- * `MongoNamespacePayload`, target-promoted namespaces like
+ * Every namespace concretion (e.g. family-built SQL namespaces,
+ * `MongoUnboundNamespace`, target-promoted namespaces like
  * `PostgresSchema`) carries exactly: `id` (enumerable string), `kind`
  * (non-enumerable string discriminator set via `Object.defineProperty`),
  * and one or more entity-kind slot maps — each an own-enumerable property

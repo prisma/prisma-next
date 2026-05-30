@@ -4,7 +4,11 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  SqlUnboundNamespace,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
@@ -66,7 +70,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
             tables: {
               user: {
@@ -85,7 +89,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       roots: {},
@@ -237,7 +241,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
             tables: {
               user: {
@@ -256,7 +260,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       roots: {},
@@ -304,7 +308,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
             tables: {
               document: {
@@ -323,7 +327,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       roots: {},
@@ -369,7 +373,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
             tables: {
               document: {
@@ -388,7 +392,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
                 foreignKeys: [],
               },
             },
-          },
+          }),
         },
       }),
       roots: {},

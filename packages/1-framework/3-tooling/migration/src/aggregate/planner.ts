@@ -1,4 +1,5 @@
 import { notOk, ok } from '@prisma-next/utils/result';
+import { requireHeadRef } from './aggregate';
 import type {
   AggregatePerSpacePlan,
   AggregatePlannerError,
@@ -28,7 +29,7 @@ export type {
  * 1. If `callerPolicy.ignoreGraphFor.has(member.spaceId)`:
  *    - If `member.headRef.invariants` is empty → synth.
  *    - Else → `policyConflict` (synth cannot satisfy authored invariants).
- * 2. Else if `member.migrations.graph` is non-empty AND graph-walk
+ * 2. Else if `member.graph()` is non-empty AND graph-walk
  *    succeeds → graph-walk.
  * 3. Else if `member.headRef.invariants` is empty → synth.
  * 4. Else → graph-walk failure → `extensionPathUnreachable` /
@@ -60,15 +61,16 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
   for (const member of orderedMembers) {
     const otherMembers = allMembers.filter((m) => m.spaceId !== member.spaceId);
     const currentMarker = currentDBState.markersBySpaceId.get(member.spaceId) ?? null;
+    const headRef = requireHeadRef(member);
 
     const ignoreGraph = callerPolicy.ignoreGraphFor.has(member.spaceId);
-    const invariantsRequired = member.headRef.invariants.length > 0;
+    const invariantsRequired = headRef.invariants.length > 0;
 
     if (ignoreGraph && invariantsRequired) {
       const conflict: AggregatePlannerError = {
         kind: 'policyConflict',
         spaceId: member.spaceId,
-        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${member.spaceId}", but the member declares non-empty head-ref invariants (${member.headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${member.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
+        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${member.spaceId}", but the member declares non-empty head-ref invariants (${headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${member.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
       };
       return notOk(conflict);
     }
@@ -97,7 +99,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
 
     // Try graph-walk first when the graph has nodes; fall back to synth
     // when the graph is empty AND no invariants are required.
-    if (member.migrations.graph.nodes.size > 0) {
+    if (member.graph().nodes.size > 0) {
       const walked = graphWalkStrategy({
         aggregateTargetId: aggregate.targetId,
         member,
@@ -111,7 +113,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
         return notOk({
           kind: 'extensionPathUnreachable',
           spaceId: member.spaceId,
-          target: member.headRef.hash,
+          target: headRef.hash,
         });
       }
       // unsatisfiable — surface
@@ -128,7 +130,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
       return notOk({
         kind: 'extensionPathUnsatisfiable',
         spaceId: member.spaceId,
-        missingInvariants: [...member.headRef.invariants].sort(),
+        missingInvariants: [...headRef.invariants].sort(),
       });
     }
 

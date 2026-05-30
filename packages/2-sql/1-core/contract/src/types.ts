@@ -1,6 +1,7 @@
 import type { CodecTrait } from '@prisma-next/framework-components/codec';
 import type { ReferentialAction } from './ir/foreign-key';
 
+export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
 export {
   ForeignKey,
   type ForeignKeyInput,

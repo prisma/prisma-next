@@ -3,6 +3,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  buildSqlNamespace,
   type ForeignKey,
   type ReferentialAction,
   SqlStorage,
@@ -39,7 +40,7 @@ function createRefActionContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             user: {
@@ -62,7 +63,7 @@ function createRefActionContract(
               foreignKeys: [fk],
             },
           },
-        },
+        }),
       },
     }),
     roots: {},

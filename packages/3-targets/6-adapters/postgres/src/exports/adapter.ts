@@ -1,1 +1,1 @@
-export { createPostgresAdapter } from '../core/adapter';
+export { createPostgresAdapter, postgresRawCodecInferer } from '../core/adapter';

@@ -1,7 +1,18 @@
+import {
+  classifyMigrationListGraphTopology,
+  type EdgeKind,
+} from '@prisma-next/migration-tools/migration-list-graph-topology';
 import type {
   MigrationListEntry,
   MigrationListResult,
 } from '@prisma-next/migration-tools/migration-list-types';
+import {
+  computeMigrationDirNameWidth,
+  formatMigrationDataColumn,
+  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+} from './migration-list-data-column';
+
+export type { EdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
 
 export type {
   MigrationListEntry,
@@ -9,11 +20,11 @@ export type {
   MigrationSpaceListEntry,
 } from '@prisma-next/migration-tools/migration-list-types';
 
-const HASH_WIDTH = 7;
-const EMPTY_SOURCE = '∅';
-const SELF_EDGE_GLYPH = '⟲';
-const FORWARD_EDGE_GLYPH = '→';
-const DECORATION_PREFIX = '  ';
+const KIND_GLYPH: Record<EdgeKind, string> = {
+  forward: '*',
+  rollback: '↩',
+  self: '⟲',
+};
 
 /**
  * Semantic styler for `migration list` output tokens. Token-typed so
@@ -29,10 +40,12 @@ const DECORATION_PREFIX = '  ';
  * having to re-parse a joined block.
  */
 export interface MigrationListStyler {
+  kind(text: string): string;
   dirName(text: string): string;
   sourceHash(text: string): string;
   destHash(text: string): string;
   glyph(text: string): string;
+  lane(text: string): string;
   invariants(ids: readonly string[]): string;
   refs(names: readonly string[]): string;
   spaceHeading(text: string): string;
@@ -41,10 +54,12 @@ export interface MigrationListStyler {
 }
 
 export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
+  kind: (text) => text,
   dirName: (text) => text,
   sourceHash: (text) => text,
   destHash: (text) => text,
   glyph: (text) => text,
+  lane: (text) => text,
   invariants: (ids) => `{${ids.join(', ')}}`,
   refs: (names) => `(${names.join(', ')})`,
   spaceHeading: (text) => text,
@@ -52,57 +67,27 @@ export const IDENTITY_MIGRATION_LIST_STYLER: MigrationListStyler = {
   emptyState: (text) => text,
 };
 
-function abbreviateContractHash(hash: string): string {
-  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
-  return stripped.slice(0, HASH_WIDTH);
-}
-
-function formatSourceColumn(from: string | null, style: MigrationListStyler): string {
-  if (from === null) {
-    return style.glyph(EMPTY_SOURCE) + ' '.repeat(HASH_WIDTH - EMPTY_SOURCE.length);
-  }
-  return style.sourceHash(abbreviateContractHash(from));
-}
-
-function formatDestColumn(from: string | null, to: string, style: MigrationListStyler): string {
-  if (from !== null && from === to) {
-    return ' '.repeat(HASH_WIDTH);
-  }
-  return style.destHash(abbreviateContractHash(to));
-}
-
-function formatArrowGlyph(from: string | null, to: string, style: MigrationListStyler): string {
-  return style.glyph(from !== null && from === to ? SELF_EDGE_GLYPH : FORWARD_EDGE_GLYPH);
-}
-
-function formatDecorations(
-  providedInvariants: readonly string[],
-  refs: readonly string[],
-  style: MigrationListStyler,
-): string {
-  const blocks: string[] = [];
-  if (providedInvariants.length > 0) {
-    blocks.push(style.invariants(providedInvariants));
-  }
-  if (refs.length > 0) {
-    blocks.push(style.refs(refs));
-  }
-  if (blocks.length === 0) return '';
-  return `${DECORATION_PREFIX}${blocks.join(' ')}`;
+function resolveEdgeKind(
+  migrationHash: string,
+  kindByMigrationHash: ReadonlyMap<string, EdgeKind>,
+): EdgeKind {
+  return kindByMigrationHash.get(migrationHash) ?? 'forward';
 }
 
 function formatMigrationRow(
   migration: MigrationListEntry,
   dirNameWidth: number,
+  edgeKind: EdgeKind,
   style: MigrationListStyler,
 ): string {
-  const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - migration.dirName.length));
-  const dirName = `${style.dirName(migration.dirName)}${dirNamePadding}`;
-  const source = formatSourceColumn(migration.from, style);
-  const arrow = formatArrowGlyph(migration.from, migration.to, style);
-  const dest = formatDestColumn(migration.from, migration.to, style);
-  const decorations = formatDecorations(migration.providedInvariants, migration.refs, style);
-  return `${dirName}${source} ${arrow} ${dest}${decorations}`;
+  const kindColumn = `${style.kind(KIND_GLYPH[edgeKind])} `;
+  const data = formatMigrationDataColumn(migration, {
+    dirNameWidth,
+    edgeKind,
+    style,
+    forwardArrow: MIGRATION_LIST_FORWARD_EDGE_GLYPH,
+  });
+  return `${kindColumn}${data}`;
 }
 
 function formatEmptyStateLine(spaceId: string, style: MigrationListStyler): string {
@@ -123,8 +108,16 @@ function renderSpaceBlock(
     return [style.spaceHeading(`${spaceId}:`), `  ${emptyLine}`];
   }
 
-  const dirNameWidth = Math.max(...migrations.map((entry) => entry.dirName.length)) + 2;
-  const rows = migrations.map((entry) => formatMigrationRow(entry, dirNameWidth, style));
+  const kindByMigrationHash = classifyMigrationListGraphTopology(migrations).kindByMigrationHash;
+  const dirNameWidth = computeMigrationDirNameWidth(migrations);
+  const rows = migrations.map((entry) =>
+    formatMigrationRow(
+      entry,
+      dirNameWidth,
+      resolveEdgeKind(entry.migrationHash, kindByMigrationHash),
+      style,
+    ),
+  );
   if (!multiSpace) {
     return rows;
   }

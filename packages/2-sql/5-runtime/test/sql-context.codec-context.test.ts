@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -83,7 +83,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
       roots: {},
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        namespaces: { __unbound__: { id: '__unbound__', tables } },
+        namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
       }),
       extensionPacks: {},
       capabilities: {},
@@ -190,7 +190,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
 
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      namespaces: { __unbound__: { id: '__unbound__', tables } },
+      namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
       ...ifDefined(
         'types',
         types
@@ -437,7 +437,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       roots: {},
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
-        namespaces: { __unbound__: { id: '__unbound__', tables } },
+        namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
       }),
       extensionPacks: {},
       capabilities: {},

@@ -1,18 +1,11 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import {
-  freezeNode,
-  type Namespace,
-  NamespaceBase,
-  type Storage,
-  UNBOUND_NAMESPACE_ID,
-} from '@prisma-next/framework-components/ir';
+import { freezeNode, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
 } from './postgres-enum-storage-entry';
 import { SqlNode } from './sql-node';
-import { SqlUnboundNamespace } from './sql-unbound-namespace';
-import { StorageTable, type StorageTableInput } from './storage-table';
+import type { StorageTable, StorageTableInput } from './storage-table';
 import {
   isStorageTypeInstance,
   type StorageTypeInstance,
@@ -30,10 +23,6 @@ export type SqlStorageTypeEntry =
   | StorageTypeInstanceInput
   | PostgresEnumStorageEntry;
 
-const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
-  [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
-});
-
 export interface SqlNamespaceTablesInput {
   readonly id: string;
   readonly tables?: Record<string, StorageTable | StorageTableInput>;
@@ -43,59 +32,9 @@ export interface SqlNamespaceTablesInput {
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
-  readonly namespaces?: Readonly<Record<string, Namespace | SqlNamespaceTablesInput>>;
-}
-
-class SqlNamespacePayload extends NamespaceBase {
-  declare readonly kind: string;
-  declare readonly enum?: Readonly<Record<string, PostgresEnumStorageEntry>>;
-
-  readonly id: string;
-  readonly tables: Readonly<Record<string, StorageTable>>;
-
-  constructor(input: SqlNamespaceTablesInput) {
-    super();
-    this.id = input.id;
-    this.tables = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.tables ?? {}).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
-        ]),
-      ),
-    );
-    if (input.enum !== undefined && Object.keys(input.enum).length > 0) {
-      Object.defineProperty(this, 'enum', {
-        value: Object.freeze({ ...input.enum }),
-        writable: false,
-        enumerable: true,
-        configurable: false,
-      });
-    }
-    Object.defineProperty(this, 'kind', {
-      value: 'sql-namespace',
-      writable: false,
-      enumerable: false,
-      configurable: true,
-    });
-    freezeNode(this);
-  }
-}
-
-function normaliseNamespaceEntry(
-  nsKey: string,
-  ns: Namespace | SqlNamespaceTablesInput,
-): Namespace {
-  if (ns instanceof NamespaceBase) {
-    return ns;
-  }
-  const input = ns as SqlNamespaceTablesInput; // JSON namespace payloads match SqlNamespaceTablesInput before SqlNamespacePayload materialises StorageTable instances.
-  const tableCount = Object.keys(input.tables ?? {}).length;
-  const typeCount = Object.keys(input.enum ?? {}).length;
-  if (nsKey === UNBOUND_NAMESPACE_ID && tableCount === 0 && typeCount === 0) {
-    return SqlUnboundNamespace.instance;
-  }
-  return new SqlNamespacePayload(input);
+  readonly namespaces: Readonly<Record<string, SqlNamespace>> & {
+    readonly __unbound__: SqlNamespace;
+  };
 }
 
 /**
@@ -108,16 +47,11 @@ function normaliseNamespaceEntry(
  * target-specific storage extensions).
  *
  * Honours the framework `Storage` interface: every SQL IR carries a
- * `namespaces` map keyed by namespace id. The default singleton
- * (`{ [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance }`)
- * binds every contract authored before per-target namespace concretions
- * land; per-target namespace classes (`PostgresSchema.unbound`,
- * `SqliteUnboundDatabase.instance`) earn their slots when each
- * target's namespace shape lands.
+ * `namespaces` map keyed by namespace id. Callers must supply fully
+ * constructed `Namespace` instances — construction discipline lives
+ * in the authoring builders and deserializer hydration paths.
  *
- * The constructor normalises optional `types` into class instances and
- * materialises plain namespace envelope objects into `Namespace` class
- * instances so downstream walks see a uniform AST.
+ * The constructor normalises optional `types` into class instances.
  * `types` is polymorphic per Decision 18 Option B: codec-triple inputs
  * are stamped with `kind: 'codec-instance'`; class-instance kinds
  * (e.g. Postgres-enum entries satisfying `PostgresEnumStorageEntry`)
@@ -149,19 +83,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   constructor(input: SqlStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    const inputNamespaces = input.namespaces ?? DEFAULT_NAMESPACES;
-    const normalised: Record<string, SqlNamespace> = Object.fromEntries(
-      Object.entries(inputNamespaces).map(([nsKey, ns]) => [
-        nsKey,
-        normaliseNamespaceEntry(nsKey, ns) as SqlNamespace,
-      ]),
-    );
-    if (!normalised[UNBOUND_NAMESPACE_ID]) {
-      normalised[UNBOUND_NAMESPACE_ID] = SqlUnboundNamespace.instance as SqlNamespace;
-    }
-    this.namespaces = Object.freeze(normalised) as Readonly<Record<string, SqlNamespace>> & {
-      readonly __unbound__: SqlNamespace;
-    };
+    this.namespaces = Object.freeze(input.namespaces);
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(

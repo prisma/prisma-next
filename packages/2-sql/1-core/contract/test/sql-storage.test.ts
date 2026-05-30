@@ -1,4 +1,6 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
+import { buildSqlNamespace } from '../src/ir/build-sql-namespace';
 import { SqlStorage, type SqlStorageTypeEntry } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
 
@@ -21,10 +23,15 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     foreignKeys: [],
   });
 
+  const unboundWithUsers = buildSqlNamespace({
+    id: UNBOUND_NAMESPACE_ID,
+    tables: { users: baseTable },
+  });
+
   it('accepts a tagged codec-instance entry unchanged', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:abc',
-      tables: { users: baseTable },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
       types: {
         Score: {
           kind: 'codec-instance',
@@ -43,15 +50,10 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
   });
 
   it('stamps the discriminator on an untagged codec triple authored via toStorageTypeInstance input', async () => {
-    // The construction-input type still accepts untagged codec triples
-    // for ergonomic authoring; callers go through `toStorageTypeInstance`
-    // (or pass the tagged shape) to enter the slot. Direct constructor
-    // input of `{ codecId, nativeType, typeParams }` without a `kind`
-    // is rejected by the strict normaliser — the test below pins that.
     const { toStorageTypeInstance } = await import('../src/ir/storage-type-instance');
     const storage = new SqlStorage({
       storageHash: 'sha256:abc',
-      tables: { users: baseTable },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
       types: {
         Score: toStorageTypeInstance({
           codecId: 'pg/int4@1',
@@ -73,7 +75,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          tables: { users: baseTable },
+          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { Embedding1536: untagged },
         }),
     ).toThrow(/Embedding1536/);
@@ -89,7 +91,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          tables: { users: baseTable },
+          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { Score: untagged },
         }),
     ).toThrow(/missing.*kind/i);
@@ -104,7 +106,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          tables: { users: baseTable },
+          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { Mystery: unknownKind },
         }),
     ).toThrow(/Mystery.*mystery-kind/);
@@ -122,7 +124,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          tables: { users: baseTable },
+          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { user_type: rawPostgresEnum },
         }),
     ).toThrow(/postgres-enum/);

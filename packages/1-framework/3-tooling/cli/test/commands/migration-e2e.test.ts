@@ -136,7 +136,7 @@ describe('migration plan → emit end-to-end', () => {
           ops2,
         );
 
-        const packages = await readMigrationsDir(migrationsDir);
+        const { packages } = await readMigrationsDir(migrationsDir);
         expect(packages).toHaveLength(2);
 
         const graph = reconstructGraph(packages);
@@ -172,7 +172,7 @@ describe('migration plan → emit end-to-end', () => {
       );
 
       // Read migrations and check leaf
-      const packages = await readMigrationsDir(migrationsDir);
+      const { packages } = await readMigrationsDir(migrationsDir);
       const graph = reconstructGraph(packages);
       const leaf = findLeaf(graph);
 

@@ -1,6 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { readFile } from 'node:fs/promises';
+import { createControlStack } from '@prisma-next/framework-components/control';
+import type { IntegrityViolation } from '@prisma-next/migration-tools/aggregate';
+import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
+import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
 import { readRefs } from '@prisma-next/migration-tools/refs';
@@ -9,15 +14,20 @@ import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   addGlobalOptions,
-  loadMigrationPackages,
+  resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
   setCommandSeeAlso,
 } from '../utils/command-helpers';
+import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import {
+  type CheckFailure,
+  integrityViolationToCheckFailure,
+} from '../utils/integrity-violation-to-check-failure';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 import { INTEGRITY_FAILED, OK, PRECONDITION } from './migration-check/exit-codes';
 
@@ -25,12 +35,7 @@ interface MigrationCheckOptions extends CommonCommandOptions {
   readonly config?: string;
 }
 
-export interface CheckFailure {
-  readonly pnCode: string;
-  readonly where: string;
-  readonly why: string;
-  readonly fix: string;
-}
+export type { CheckFailure } from '../utils/integrity-violation-to-check-failure';
 
 export interface MigrationCheckResult {
   readonly ok: boolean;
@@ -38,11 +43,6 @@ export interface MigrationCheckResult {
   readonly summary: string;
 }
 
-/**
- * Canonical user-facing locator for a check failure: the cwd-relative path
- * to the migration package directory. Surfacing the same shape across every
- * PN code means `--json` consumers can branch uniformly on `where`.
- */
 function migrationPathRelative(dirPath: string): string {
   return relative(process.cwd(), dirPath);
 }
@@ -63,21 +63,6 @@ function checkFileExists(dirPath: string, dirName: string, fileName: string): Ch
   return null;
 }
 
-/**
- * Within-migration snapshot-consistency check (PN-MIG-CHECK-005).
- *
- * Compares the migration's stored `metadata.to` against the `storageHash`
- * recorded in its on-disk `end-contract.json` snapshot. The two values are
- * independent on-disk records of the same fact (the migration's destination
- * contract); drift between them indicates the package is internally
- * corrupt. Cross-migration consistency (one migration's end-contract.json
- * agreeing with the next migration's start-contract.json) is a separate
- * check that requires shadow execution and is deferred to
- * `migration preflight`.
- *
- * Shared between the graph-wide and per-migration code paths so both report
- * the same failure for the same on-disk state.
- */
 function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | null {
   const endContractPath = join(pkg.dirPath, 'end-contract.json');
   if (!existsSync(endContractPath)) return null;
@@ -104,6 +89,27 @@ function checkSnapshotConsistency(pkg: OnDiskMigrationPackage): CheckFailure | n
   return null;
 }
 
+async function loadAggregateIntegrityViolations(
+  config: Awaited<ReturnType<typeof loadConfig>>,
+  migrationsDir: string,
+): Promise<readonly IntegrityViolation[]> {
+  try {
+    const contractJsonContent = await readFile(resolveContractPath(config), 'utf-8');
+    const familyInstance = config.family.create(createControlStack(config));
+    const declaredExtensions = toDeclaredExtensionsFromRaw(config.extensionPacks ?? []);
+
+    const parsedAppContract: unknown = JSON.parse(contractJsonContent);
+    const aggregate = await loadContractSpaceAggregate({
+      migrationsDir,
+      deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
+      appContract: familyInstance.deserializeContract(parsedAppContract),
+    });
+    return aggregate.checkIntegrity({ declaredExtensions, checkContracts: true });
+  } catch {
+    return [];
+  }
+}
+
 async function executeMigrationCheckCommand(
   target: string | undefined,
   options: MigrationCheckOptions,
@@ -111,10 +117,8 @@ async function executeMigrationCheckCommand(
   ui: TerminalUI,
 ): Promise<{ result: MigrationCheckResult; exitCode: number }> {
   const config = await loadConfig(options.config);
-  const { configPath, appMigrationsDir, appMigrationsRelative, refsDir } = resolveMigrationPaths(
-    options.config,
-    config,
-  );
+  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative, refsDir } =
+    resolveMigrationPaths(options.config, config);
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -135,37 +139,9 @@ async function executeMigrationCheckCommand(
 
   const failures: CheckFailure[] = [];
 
-  let bundles: Awaited<ReturnType<typeof loadMigrationPackages>>['bundles'];
-  let graph: Awaited<ReturnType<typeof loadMigrationPackages>>['graph'];
-  try {
-    const loaded = await loadMigrationPackages(appMigrationsDir);
-    bundles = loaded.bundles;
-    graph = loaded.graph;
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      const pnCode =
-        error.code === 'MIGRATION.HASH_MISMATCH' ? 'PN-MIG-CHECK-001' : 'PN-MIG-CHECK-002';
-      // Normalise to a cwd-relative path. `error.details.dir` is absolute
-      // (the migration-tools layer doesn't know the caller's cwd); the
-      // `filePath` fallback is also absolute. Surfacing the relative form
-      // matches the rest of the command's `where` shape and keeps `--json`
-      // consumers from having to special-case the bootstrap-failure path.
-      const rawWhere =
-        (error.details?.['dir'] as string) ?? (error.details?.['filePath'] as string) ?? null;
-      const where = rawWhere ? relative(process.cwd(), rawWhere) : 'unknown';
-      failures.push({
-        pnCode,
-        where,
-        why: error.why,
-        fix: error.fix,
-      });
-      return {
-        result: { ok: false, failures, summary: `${failures.length} integrity failure(s)` },
-        exitCode: INTEGRITY_FAILED,
-      };
-    }
-    throw error;
-  }
+  const loaded = await readMigrationsDir(appMigrationsDir);
+  const bundles: readonly OnDiskMigrationPackage[] = loaded.packages;
+  const graph = reconstructGraph(bundles);
 
   if (existsSync(appMigrationsDir)) {
     const loadedDirNames = new Set(bundles.map((p) => p.dirName));
@@ -236,29 +212,9 @@ async function executeMigrationCheckCommand(
       });
     }
 
-    // PN-MIG-CHECK-005 must fire per-migration as well as graph-wide; both
-    // call sites delegate to the shared helper so the same on-disk drift
-    // produces the same failure regardless of how the user invoked check.
     const snapshotFailure = checkSnapshotConsistency(matchedPkg);
     if (snapshotFailure) failures.push(snapshotFailure);
   } else {
-    for (const pkg of bundles) {
-      for (const f of ['migration.json', 'ops.json']) {
-        const fail = checkFileExists(pkg.dirPath, pkg.dirName, f);
-        if (fail) failures.push(fail);
-      }
-
-      const verification = verifyMigrationHash(pkg);
-      if (!verification.ok) {
-        failures.push({
-          pnCode: 'PN-MIG-CHECK-001',
-          where: migrationFileRelative(pkg.dirPath, 'migration.json'),
-          why: `Stored hash ${verification.storedHash} does not match recomputed hash ${verification.computedHash}`,
-          fix: 'Re-emit the migration package or restore from version control.',
-        });
-      }
-    }
-
     for (const pkg of bundles) {
       const snapshotFailure = checkSnapshotConsistency(pkg);
       if (snapshotFailure) failures.push(snapshotFailure);
@@ -294,6 +250,10 @@ async function executeMigrationCheckCommand(
       }
     } catch {
       // Refs unreadable — skip ref checks
+    }
+
+    for (const violation of await loadAggregateIntegrityViolations(config, migrationsDir)) {
+      failures.push(integrityViolationToCheckFailure(violation, migrationsDir));
     }
   }
 

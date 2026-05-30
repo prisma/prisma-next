@@ -24,12 +24,15 @@ import type {
   OperationExpr,
   OrderByItem,
   ProjectionItem,
+  RawExpr,
+  RawSqlLiteral,
   SelectAst,
   SqlQueryable,
   SubqueryExpr,
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
@@ -64,6 +67,29 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     return renderLoweredSql(ast, context.contract);
   }
 }
+
+/** Codec-id lookup for bare-literal interpolations used by `fns.raw` on a sqlite client. Contributed as the descriptor's static `rawCodecInferer` slot. */
+export const sqliteRawCodecInferer: RawCodecInferer = {
+  inferCodec(value: RawSqlLiteral): string {
+    switch (typeof value) {
+      case 'number':
+        return Number.isSafeInteger(value) && value % 1 === 0
+          ? 'sqlite/integer@1'
+          : 'sqlite/real@1';
+      case 'bigint':
+        return 'sqlite/bigint@1';
+      case 'string':
+        return 'sqlite/text@1';
+      case 'boolean':
+        return 'sqlite/integer@1';
+      case 'object':
+        if (value instanceof Uint8Array) return 'sqlite/blob@1';
+    }
+    throw new Error(
+      'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+    );
+  },
+};
 
 /**
  * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
@@ -234,9 +260,17 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return renderLiteral(node);
     case 'list':
       return renderListLiteral(node);
+    case 'raw-expr':
+      return renderRawExpr(node, contract);
     default:
       throw new Error(`Unsupported expression node kind: ${(node as { kind: string }).kind}`);
   }
+}
+
+function renderRawExpr(node: RawExpr, contract?: SqliteContract): string {
+  return node.parts
+    .map((part) => (typeof part === 'string' ? part : renderExpr(part, contract)))
+    .join('');
 }
 
 // `excluded` is a pseudo-table in ON CONFLICT DO UPDATE that references the row proposed for insertion. It is not quoted because it's a keyword.

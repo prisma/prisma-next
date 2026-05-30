@@ -94,6 +94,7 @@ const ctx: RuntimeMiddlewareContext = {
   log: { info: () => {}, warn: () => {}, error: () => {} },
   contentHash: async () => 'mock-hash',
   scope: 'runtime',
+  planExecutionId: 'test-fixture-plan-execution-id',
 };
 
 describe('RuntimeCore', () => {
@@ -210,5 +211,58 @@ describe('RuntimeCore', () => {
     expect(runtime.closeCalls).toBe(0);
     await runtime.close();
     expect(runtime.closeCalls).toBe(1);
+  });
+
+  describe('planExecutionId', () => {
+    interface Observation {
+      readonly hook: 'beforeExecute' | 'afterExecute';
+      readonly planExecutionId: string;
+    }
+
+    function observer(log: Observation[]): RuntimeMiddleware<MockExec> {
+      return {
+        name: 'observer',
+        async beforeExecute(_plan, hookCtx) {
+          log.push({ hook: 'beforeExecute', planExecutionId: hookCtx.planExecutionId });
+        },
+        async afterExecute(_plan, _result, hookCtx) {
+          log.push({ hook: 'afterExecute', planExecutionId: hookCtx.planExecutionId });
+        },
+      };
+    }
+
+    it('assigns the same planExecutionId to beforeExecute and afterExecute within one execute call', async () => {
+      const log: Observation[] = [];
+      const runtime = new MockRuntime([observer(log)], ctx, [{ id: 1 }]);
+      const plan: MockPlan = { draftId: 'one-execute', meta };
+
+      await runtime.execute(plan).toArray();
+
+      expect(log).toHaveLength(2);
+      expect(log[0]?.hook).toBe('beforeExecute');
+      expect(log[1]?.hook).toBe('afterExecute');
+      expect(log[0]?.planExecutionId).toBeTypeOf('string');
+      expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+    });
+
+    it('assigns distinct planExecutionIds to two executions of the same plan instance', async () => {
+      const log: Observation[] = [];
+      const runtime = new MockRuntime([observer(log)], ctx, [{ id: 1 }]);
+      const plan: MockPlan = { draftId: 'shared-plan', meta };
+
+      await runtime.execute(plan).toArray();
+      await runtime.execute(plan).toArray();
+
+      expect(log).toHaveLength(4);
+      const firstExecId = log[0]?.planExecutionId;
+      const secondExecId = log[2]?.planExecutionId;
+      expect(firstExecId).toBeTypeOf('string');
+      expect(secondExecId).toBeTypeOf('string');
+      // Within each execute call, beforeExecute and afterExecute see the same ID.
+      expect(log[0]?.planExecutionId).toBe(log[1]?.planExecutionId);
+      expect(log[2]?.planExecutionId).toBe(log[3]?.planExecutionId);
+      // Across execute calls, the IDs differ.
+      expect(firstExecId).not.toBe(secondExecId);
+    });
   });
 });

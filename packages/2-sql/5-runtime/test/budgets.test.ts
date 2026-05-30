@@ -31,6 +31,7 @@ function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): Sql
     },
     contentHash: async () => 'mock-hash',
     scope: 'runtime' as const,
+    planExecutionId: 'test-fixture-plan-execution-id',
     ...overrides,
   };
 }

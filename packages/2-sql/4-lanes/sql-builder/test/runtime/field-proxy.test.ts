@@ -1,7 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { tableToScope } from '../../src/runtime/builder-base';
@@ -76,7 +75,12 @@ describe('createFieldProxy', () => {
     };
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:h'),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: { Post: table } } },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables: { Post: table },
+        }),
+      },
       types: {
         Embedding1536: {
           kind: 'codec-instance',

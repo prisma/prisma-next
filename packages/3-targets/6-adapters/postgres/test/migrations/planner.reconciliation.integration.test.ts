@@ -5,7 +5,7 @@ import {
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -36,7 +36,9 @@ function makeContract(
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables } },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+      },
     }),
     roots: {},
     models: {},
@@ -993,7 +995,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       storage: new SqlStorage({
         storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
             tables: {
               item: {
@@ -1019,7 +1021,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 values: ['active', 'inactive'],
               }),
             },
-          },
+          }),
         },
       }),
       roots: {},
@@ -1269,7 +1271,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       storage: new SqlStorage({
         storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
             id: UNBOUND_NAMESPACE_ID,
             tables: {
               item: {
@@ -1295,7 +1297,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 values: ['active', 'inactive'],
               }),
             },
-          },
+          }),
         },
       }),
       roots: {},

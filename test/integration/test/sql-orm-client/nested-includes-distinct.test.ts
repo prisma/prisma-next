@@ -269,10 +269,10 @@ describe('integration/nested-includes/distinct', () => {
   // the grandchild correlated subquery can find its parent. The column
   // is then stripped from the user-visible row shape.
   //
-  // Mirror of `augmentSelectionForJoinColumns` + `stripHiddenMappedFields`
-  // in the multi-query stitcher; if the new lowering forgets the force-
-  // include, the grandchild arrays come back empty (or the SQL fails at
-  // lower-time because the join key is unresolved).
+  // Driven by `augmentSelectionForJoinColumns` + `stripHiddenMappedFields`;
+  // if the lowering forgets the force-include, the grandchild arrays come
+  // back empty (or the SQL fails at lower-time because the join key is
+  // unresolved).
   // ===========================================================================
 
   describe('force-include of grandchild join keys', () => {

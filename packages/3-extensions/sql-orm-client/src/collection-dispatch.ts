@@ -17,11 +17,22 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
-import { isToOneCardinality, resolvePolymorphismInfo } from './collection-contract';
+import {
+  AndExpr,
+  type AnyExpression,
+  BinaryExpr,
+  ColumnRef,
+  ListExpression,
+  LiteralExpr,
+  OrExpr,
+} from '@prisma-next/sql-relational-core/ast';
+import {
+  isToOneCardinality,
+  resolvePolymorphismInfo,
+  resolveRowIdentityColumns,
+} from './collection-contract';
 import {
   acquireRuntimeScope,
-  createRowEnvelope,
   mapPolymorphicRow,
   mapResultRows,
   mapStorageRowToModelFields,
@@ -30,20 +41,18 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { selectIncludeStrategy } from './include-strategy';
-import {
-  compileRelationSelect,
-  compileSelect,
-  compileSelectWithIncludeStrategy,
-} from './query-plan';
+import { compileSelect, compileSelectWithIncludeStrategy } from './query-plan';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
-import type {
-  CollectionContext,
-  CollectionState,
-  IncludeCombineBranch,
-  IncludeExpr,
-  IncludeScalar,
-  RelationCardinalityTag,
+import {
+  type CollectionContext,
+  type CollectionState,
+  emptyState,
+  type IncludeCombineBranch,
+  type IncludeExpr,
+  type IncludeScalar,
+  type RelationCardinalityTag,
 } from './types';
+import { bindWhereExpr } from './where-binding';
 
 export function dispatchCollectionRows<Row>(options: {
   contract: Contract<SqlStorage>;
@@ -66,50 +75,23 @@ export function dispatchCollectionRows<Row>(options: {
     return mapResultRows(source, mapper);
   }
 
-  return dispatchWithIncludeStrategy<Row>(options);
+  return dispatchWithIncludes<Row>(options);
 }
 
-function dispatchWithIncludeStrategy<Row>(options: {
+// Both include builders — lateral and correlated — lower every include
+// descriptor shape (row, scalar reducers, and combine()) at any depth
+// into a single query. Dispatch picks one purely on the `lateral`
+// capability flag via `selectIncludeStrategy`; the read path has no
+// multi-query fallback.
+function dispatchWithIncludes<Row>(options: {
   contract: Contract<SqlStorage>;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
   modelName: string;
 }): AsyncIterableResult<Row> {
-  const strategy = selectIncludeStrategy(options.contract);
-
-  // Both single-query builders (lateral, correlated) lower every
-  // include descriptor shape — row, scalar reducers, and combine() —
-  // at any depth (TML-2594 + TML-2595 + TML-2588). Dispatch routes
-  // purely on the contract's capability flags via `selectIncludeStrategy`.
-  // The `'multiQuery'` arm remains reachable only from synthetic test
-  // contracts that declare neither `lateral` nor `jsonAgg` capabilities;
-  // its removal is tracked separately.
-  switch (strategy) {
-    case 'lateral':
-      return dispatchWithSingleQueryIncludes<Row>({
-        ...options,
-        strategy: 'lateral',
-      });
-    case 'correlated':
-      return dispatchWithSingleQueryIncludes<Row>({
-        ...options,
-        strategy: 'correlated',
-      });
-    default:
-      return dispatchWithMultiQueryIncludes<Row>(options);
-  }
-}
-
-function dispatchWithSingleQueryIncludes<Row>(options: {
-  strategy: 'lateral' | 'correlated';
-  contract: Contract<SqlStorage>;
-  runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
-  state: CollectionState;
-  tableName: string;
-  modelName: string;
-}): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName, strategy } = options;
+  const { contract, runtime, state, tableName, modelName } = options;
+  const strategy = selectIncludeStrategy(contract);
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
@@ -170,312 +152,103 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
   return new AsyncIterableResult(generator());
 }
 
-function dispatchWithMultiQueryIncludes<Row>(options: {
+/**
+ * Reload the rows a mutation just wrote (create / createAll / update /
+ * updateAll / upsert) through the read-path dispatch, so `.include()`
+ * relations resolve via the exact same lateral / correlated builders,
+ * decode, hidden-column stripping, and polymorphism mapping a read
+ * query uses — there is no parallel mutation read-back implementation.
+ *
+ * The mutation returns only its identity columns (PK / unique); this
+ * re-selects those rows with the caller's projection + includes, keyed
+ * by `identity IN (...)`. One round-trip regardless of row count or
+ * include depth. The read-back observes the just-written rows because
+ * it runs on the same runtime — and therefore the same transaction —
+ * the mutation ran on.
+ *
+ * Delete read-back does NOT come through here: a parent-anchored
+ * include query can't observe an already-deleted row, so delete reads
+ * its snapshot before issuing the DELETE (see `collection.ts`).
+ */
+export function reloadMutationRowsByIdentities<Row>(options: {
   contract: Contract<SqlStorage>;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
-  state: CollectionState;
   tableName: string;
   modelName: string;
+  identityRows: readonly Record<string, unknown>[];
+  selectedFields: readonly string[] | undefined;
+  includes: readonly IncludeExpr[];
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName } = options;
-  const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-    const { scope, release } = await acquireRuntimeScope(runtime);
-    try {
-      const parentJoinColumns = state.includes.map((include) => include.localColumn);
-      const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
-        augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
-      const parentCompiled = compileSelect(
-        contract,
-        tableName,
-        {
-          ...state,
-          includes: [],
-          selectedFields: parentSelectedForQuery,
-        },
-        modelName,
-      );
-      const parentRowsRaw = await executeQueryPlan<Record<string, unknown>>(
-        scope,
-        parentCompiled,
-      ).toArray();
-      if (parentRowsRaw.length === 0) {
-        return;
-      }
+  const { contract, runtime, tableName, modelName, identityRows, selectedFields, includes } =
+    options;
+  if (identityRows.length === 0) {
+    return emptyResult<Row>();
+  }
 
-      const polyInfo = resolvePolymorphismInfo(contract, modelName);
-      const parentRows = parentRowsRaw.map((row) => {
-        const mapped = polyInfo
-          ? mapPolymorphicRow(contract, modelName, polyInfo, row, state.variantName)
-          : mapStorageRowToModelFields(contract, modelName, row);
-        return { raw: row, mapped } as RowEnvelope;
-      });
-      await stitchIncludes(scope, contract, parentRows, state.includes);
-
-      if (hiddenParentColumns.length > 0) {
-        for (const row of parentRows) {
-          stripHiddenMappedFields(contract, modelName, row.mapped, hiddenParentColumns);
-        }
-      }
-
-      for (const row of parentRows) {
-        yield row.mapped as Row;
-      }
-    } finally {
-      if (release) {
-        await release();
-      }
-    }
-  };
-
-  return new AsyncIterableResult(generator());
-}
-
-export async function stitchIncludes(
-  scope: RuntimeScope,
-  contract: Contract<SqlStorage>,
-  parentRows: RowEnvelope[],
-  includes: readonly IncludeExpr[],
-): Promise<void> {
-  for (const include of includes) {
-    const parentJoinValues = uniqueValues(
-      parentRows.map((row) => row.raw[include.localColumn]).filter((value) => value !== undefined),
+  const identityColumns = resolveRowIdentityColumns(contract, tableName);
+  if (identityColumns.length === 0) {
+    throw new Error(
+      `Cannot load includes for the mutation result on model "${modelName}": table "${tableName}" has no primary key or unique constraint to key the include read-back on.`,
     );
-
-    if (parentJoinValues.length === 0) {
-      assignEmptyIncludeResult(parentRows, include);
-      continue;
-    }
-
-    if (include.combine) {
-      await stitchCombinedInclude(scope, contract, parentRows, include, parentJoinValues);
-      continue;
-    }
-
-    if (include.scalar) {
-      await stitchScalarInclude(
-        scope,
-        contract,
-        parentRows,
-        include,
-        include.scalar,
-        parentJoinValues,
-      );
-      continue;
-    }
-
-    await stitchRowInclude(scope, contract, parentRows, include, include.nested, parentJoinValues);
   }
+
+  const identityFilter = buildIdentityInFilter(contract, tableName, identityColumns, identityRows);
+  if (!identityFilter) {
+    return emptyResult<Row>();
+  }
+
+  return dispatchCollectionRows<Row>({
+    contract,
+    runtime,
+    state: {
+      ...emptyState(),
+      filters: [identityFilter],
+      selectedFields,
+      includes,
+    },
+    tableName,
+    modelName,
+  });
 }
 
-async function stitchCombinedInclude(
-  scope: RuntimeScope,
+function emptyResult<Row>(): AsyncIterableResult<Row> {
+  return new AsyncIterableResult((async function* (): AsyncGenerator<Row, void, unknown> {})());
+}
+
+// Identity values come straight from the mutation's `RETURNING`, so they
+// are unique by construction — no JS-side dedup; the database evaluates
+// the `IN` list (or the composite-key `OR` of equality tuples) directly.
+function buildIdentityInFilter(
   contract: Contract<SqlStorage>,
-  parentRows: RowEnvelope[],
-  include: IncludeExpr,
-  parentJoinValues: readonly unknown[],
-): Promise<void> {
-  const branches = include.combine ?? {};
-
-  for (const parent of parentRows) {
-    parent.mapped[include.relationName] = {};
-  }
-
-  for (const [branchName, branch] of Object.entries(branches)) {
-    if (branch.kind === 'rows') {
-      const rowsByParent = await resolveRowsByParent(
-        scope,
-        contract,
-        include,
-        branch.state,
-        parentJoinValues,
-      );
-      for (const parent of parentRows) {
-        const parentJoinValue = parent.raw[include.localColumn];
-        const relatedRows = rowsByParent.get(parentJoinValue) ?? [];
-        const combined = parent.mapped[include.relationName] as Record<string, unknown>;
-        combined[branchName] = coerceIncludeResult(relatedRows, branch.state, include.cardinality);
-      }
-      continue;
+  tableName: string,
+  identityColumns: readonly string[],
+  identityRows: readonly Record<string, unknown>[],
+): AnyExpression | undefined {
+  const [singleColumn, ...rest] = identityColumns;
+  if (singleColumn !== undefined && rest.length === 0) {
+    const values = identityRows
+      .map((row) => row[singleColumn])
+      .filter((value) => value !== undefined);
+    if (values.length === 0) {
+      return undefined;
     }
-
-    const scalarByParent = await resolveScalarByParent(
-      scope,
+    return bindWhereExpr(
       contract,
-      include,
-      branch.selector,
-      parentJoinValues,
-    );
-    for (const parent of parentRows) {
-      const parentJoinValue = parent.raw[include.localColumn];
-      const combined = parent.mapped[include.relationName] as Record<string, unknown>;
-      combined[branchName] =
-        scalarByParent.get(parentJoinValue) ?? emptyScalarResult(branch.selector.fn);
-    }
-  }
-}
-
-async function stitchScalarInclude(
-  scope: RuntimeScope,
-  contract: Contract<SqlStorage>,
-  parentRows: RowEnvelope[],
-  include: IncludeExpr,
-  selector: IncludeScalar<unknown>,
-  parentJoinValues: readonly unknown[],
-): Promise<void> {
-  const scalarByParent = await resolveScalarByParent(
-    scope,
-    contract,
-    include,
-    selector,
-    parentJoinValues,
-  );
-
-  for (const parent of parentRows) {
-    const parentJoinValue = parent.raw[include.localColumn];
-    parent.mapped[include.relationName] =
-      scalarByParent.get(parentJoinValue) ?? emptyScalarResult(selector.fn);
-  }
-}
-
-async function stitchRowInclude(
-  scope: RuntimeScope,
-  contract: Contract<SqlStorage>,
-  parentRows: RowEnvelope[],
-  include: IncludeExpr,
-  state: CollectionState,
-  parentJoinValues: readonly unknown[],
-): Promise<void> {
-  const rowsByParent = await resolveRowsByParent(scope, contract, include, state, parentJoinValues);
-
-  for (const parent of parentRows) {
-    const parentJoinValue = parent.raw[include.localColumn];
-    const relatedRows = rowsByParent.get(parentJoinValue) ?? [];
-    parent.mapped[include.relationName] = coerceIncludeResult(
-      relatedRows,
-      state,
-      include.cardinality,
+      BinaryExpr.in(ColumnRef.of(tableName, singleColumn), ListExpression.fromValues(values)),
     );
   }
-}
 
-async function resolveRowsByParent(
-  scope: RuntimeScope,
-  contract: Contract<SqlStorage>,
-  include: IncludeExpr,
-  state: CollectionState,
-  parentJoinValues: readonly unknown[],
-): Promise<Map<unknown, Record<string, unknown>[]>> {
-  // Multi-query stitching reads `child.raw[grandchildInclude.localColumn]`
-  // for every immediate include in `state.includes` to bucket children by
-  // join value. A user-supplied `.select(...)` on the child that omits any
-  // of those join columns would silently yield `undefined` for the join
-  // value, producing empty nested arrays at depth >= 2. Force every
-  // direct nested include's `localColumn` into the child's selected set
-  // alongside `include.targetColumn` so the stitcher always sees a
-  // defined join value. The next level of recursion (when grandchild
-  // stitching itself dispatches through `resolveRowsByParent`) repeats
-  // this same augmentation for its own children.
-  const nestedJoinColumns = state.includes.map((nested) => nested.localColumn);
-  const requiredChildColumns = Array.from(
-    new Set<string>([include.targetColumn, ...nestedJoinColumns]),
-  );
-  const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
-    augmentSelectionForJoinColumns(state.selectedFields, requiredChildColumns);
-
-  const childCompiled = compileRelationSelect(
-    contract,
-    include.relatedTableName,
-    include.targetColumn,
-    parentJoinValues,
-    {
-      ...state,
-      selectedFields: childSelectedForQuery,
-    },
-  );
-  const childRowsRaw = await executeQueryPlan<Record<string, unknown>>(
-    scope,
-    childCompiled,
-  ).toArray();
-  const childRows = childRowsRaw.map((row) =>
-    createRowEnvelope(contract, include.relatedModelName, row),
-  );
-
-  if (state.includes.length > 0) {
-    await stitchIncludes(scope, contract, childRows, state.includes);
+  if (identityRows.length === 0) {
+    return undefined;
   }
-
-  const childByParentJoin = new Map<unknown, Record<string, unknown>[]>();
-  for (const child of childRows) {
-    const joinValue = child.raw[include.targetColumn];
-
-    if (hiddenChildColumns.length > 0) {
-      stripHiddenMappedFields(contract, include.relatedModelName, child.mapped, hiddenChildColumns);
-    }
-
-    let bucket = childByParentJoin.get(joinValue);
-    if (!bucket) {
-      bucket = [];
-      childByParentJoin.set(joinValue, bucket);
-    }
-    bucket.push(child.mapped);
-  }
-
-  return childByParentJoin;
-}
-
-async function resolveScalarByParent(
-  scope: RuntimeScope,
-  contract: Contract<SqlStorage>,
-  include: IncludeExpr,
-  selector: IncludeScalar<unknown>,
-  parentJoinValues: readonly unknown[],
-): Promise<Map<unknown, unknown>> {
-  const requiredColumns = selector.column
-    ? [include.targetColumn, selector.column]
-    : [include.targetColumn];
-  const { selectedForQuery } = augmentSelectionForJoinColumns(
-    selector.state.selectedFields,
-    requiredColumns,
+  const tuples = identityRows.map((row) =>
+    AndExpr.of(
+      identityColumns.map((column) =>
+        BinaryExpr.eq(ColumnRef.of(tableName, column), LiteralExpr.of(row[column])),
+      ),
+    ),
   );
-
-  const childCompiled = compileRelationSelect(
-    contract,
-    include.relatedTableName,
-    include.targetColumn,
-    parentJoinValues,
-    {
-      ...selector.state,
-      selectedFields: selectedForQuery,
-      includes: [],
-    },
-  );
-  const childRowsRaw = await executeQueryPlan<Record<string, unknown>>(
-    scope,
-    childCompiled,
-  ).toArray();
-
-  const rowsByParent = new Map<unknown, Record<string, unknown>[]>();
-  for (const row of childRowsRaw) {
-    const joinValue = row[include.targetColumn];
-    let bucket = rowsByParent.get(joinValue);
-    if (!bucket) {
-      bucket = [];
-      rowsByParent.set(joinValue, bucket);
-    }
-    bucket.push(row);
-  }
-
-  const scalarByParent = new Map<unknown, unknown>();
-  for (const [joinValue, rows] of rowsByParent) {
-    const scopedRows = slicePerParent(rows, selector.state);
-    scalarByParent.set(joinValue, computeScalarValue(selector, scopedRows));
-  }
-
-  return scalarByParent;
-}
-
-function uniqueValues(values: unknown[]): unknown[] {
-  return [...new Set(values)];
+  return bindWhereExpr(contract, OrExpr.of(tuples));
 }
 
 /**
@@ -541,12 +314,13 @@ function decodeIncludePayload(
  *
  * On a parent with zero matching child rows the LATERAL still produces
  * one row (aggregates collapse the empty input to a single row), so
- * the combine envelope here is always present. The `assignEmptyIncludeResult`
- * no-LATERAL-row short-circuit writes the empty per-branch shape
- * directly to `parent.mapped[relationName]` and never enters the
- * decoder, so a missing or non-object envelope here is always a
- * planner/decoder bug — `parseCombineEnvelope` throws loudly rather
- * than papering over it with an empty shape.
+ * the combine envelope here is always present in the read path. The
+ * mutation read-back's `assignEmptyMutationIncludes` writes the empty
+ * per-branch shape directly to `parent.mapped[relationName]` for any
+ * parent absent from the read-back result and never enters the decoder,
+ * so a missing or non-object envelope here is always a planner/decoder
+ * bug — `parseCombineEnvelope` throws loudly rather than papering over
+ * it with an empty shape.
  */
 function decodeCombineIncludePayload(
   contract: Contract<SqlStorage>,
@@ -604,8 +378,9 @@ function describeEnvelopeShape(value: unknown): string {
  *
  * Contract: the envelope is always either
  *   - a `{ value: <primitive> }` JSON object (the SQL path), or
- *   - `null` / `undefined` (the `assignEmptyIncludeResult`
- *     no-LATERAL-row short-circuit before this decoder runs).
+ *   - `null` / `undefined` (the mutation read-back's
+ *     `assignEmptyMutationIncludes` short-circuit before this decoder
+ *     runs, for a parent absent from the read-back result).
  *
  * Any other shape — array, primitive, string that JSON-parses to
  * non-object — indicates a planner / decoder bug, so we throw
@@ -636,33 +411,6 @@ function decodeScalarIncludePayload(
     );
   }
   return parsed['value'];
-}
-
-function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {
-  if (include.combine) {
-    for (const parent of parentRows) {
-      const combined: Record<string, unknown> = {};
-      for (const [branchName, branch] of Object.entries(include.combine)) {
-        combined[branchName] =
-          branch.kind === 'rows'
-            ? emptyIncludeResult(include.cardinality)
-            : emptyScalarResult(branch.selector.fn);
-      }
-      parent.mapped[include.relationName] = combined;
-    }
-    return;
-  }
-
-  if (include.scalar) {
-    for (const parent of parentRows) {
-      parent.mapped[include.relationName] = emptyScalarResult(include.scalar.fn);
-    }
-    return;
-  }
-
-  for (const parent of parentRows) {
-    parent.mapped[include.relationName] = emptyIncludeResult(include.cardinality);
-  }
 }
 
 function parseIncludedRows(value: unknown): Record<string, unknown>[] {
@@ -705,94 +453,6 @@ function coerceSingleQueryIncludeResult(
   return isToOneCardinality(cardinality) ? (rows[0] ?? null) : rows;
 }
 
-function slicePerParent(
-  rows: Record<string, unknown>[],
-  state: CollectionState,
-): Record<string, unknown>[] {
-  const offset = state.offset ?? 0;
-  if (state.limit === undefined) {
-    return rows.slice(offset);
-  }
-  return rows.slice(offset, offset + state.limit);
-}
-
-function emptyIncludeResult(
-  cardinality: RelationCardinalityTag | undefined,
-): Record<string, unknown>[] | Record<string, unknown> | null {
-  return isToOneCardinality(cardinality) ? null : [];
-}
-
-function coerceIncludeResult(
-  rows: Record<string, unknown>[],
-  state: CollectionState,
-  cardinality: RelationCardinalityTag | undefined,
-): Record<string, unknown>[] | Record<string, unknown> | null {
-  const sliced = slicePerParent(rows, state);
-  return isToOneCardinality(cardinality) ? (sliced[0] ?? null) : sliced;
-}
-
 function emptyScalarResult(fn: IncludeScalar<unknown>['fn']): number | null {
   return fn === 'count' ? 0 : null;
-}
-
-function computeScalarValue(
-  selector: IncludeScalar<unknown>,
-  rows: readonly Record<string, unknown>[],
-): number | null {
-  if (selector.fn === 'count') {
-    return rows.length;
-  }
-
-  const column = selector.column;
-  if (!column) {
-    return null;
-  }
-
-  const numericValues = rows
-    .map((row) => coerceNumericValue(row[column]))
-    .filter((value): value is number => value !== null);
-
-  if (numericValues.length === 0) {
-    return null;
-  }
-
-  if (selector.fn === 'sum') {
-    return numericValues.reduce((total, value) => total + value, 0);
-  }
-
-  if (selector.fn === 'avg') {
-    const total = numericValues.reduce((sum, value) => sum + value, 0);
-    return total / numericValues.length;
-  }
-
-  if (selector.fn === 'min') {
-    return Math.min(...numericValues);
-  }
-
-  if (selector.fn === 'max') {
-    return Math.max(...numericValues);
-  }
-
-  return null;
-}
-
-function coerceNumericValue(value: unknown): number | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  if (typeof value === 'bigint') {
-    return Number(value);
-  }
-
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    return Number.isNaN(numeric) ? null : numeric;
-  }
-
-  return null;
 }

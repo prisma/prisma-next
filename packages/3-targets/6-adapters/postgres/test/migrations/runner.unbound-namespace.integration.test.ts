@@ -5,7 +5,7 @@ import {
 } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -45,7 +45,7 @@ function buildUnboundContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:unbound-multi-tenant'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             tenant: {
@@ -59,7 +59,7 @@ function buildUnboundContract(): Contract<SqlStorage> {
               foreignKeys: [],
             },
           },
-        },
+        }),
       },
     }),
     roots: {},

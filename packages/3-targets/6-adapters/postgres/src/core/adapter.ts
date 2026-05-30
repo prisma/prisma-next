@@ -6,8 +6,10 @@ import type {
   AnyQueryAst,
   LowererContext,
   MarkerReadResult,
+  RawSqlLiteral,
   SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
+import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
@@ -54,6 +56,27 @@ class PostgresAdapterImpl
     return renderLoweredSql(ast, context.contract, this.codecLookup);
   }
 }
+
+/** Codec-id lookup for bare-literal interpolations used by `fns.raw` on a postgres client. Contributed as the descriptor's static `rawCodecInferer` slot. */
+export const postgresRawCodecInferer: RawCodecInferer = {
+  inferCodec(value: RawSqlLiteral): string {
+    switch (typeof value) {
+      case 'number':
+        return Number.isSafeInteger(value) && value % 1 === 0 ? 'pg/int4' : 'pg/float8';
+      case 'bigint':
+        return 'pg/int8';
+      case 'string':
+        return 'pg/text';
+      case 'boolean':
+        return 'pg/bool';
+      case 'object':
+        if (value instanceof Uint8Array) return 'pg/bytea';
+    }
+    throw new Error(
+      'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+    );
+  },
+};
 
 async function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
   const exists = await queryable.query(
