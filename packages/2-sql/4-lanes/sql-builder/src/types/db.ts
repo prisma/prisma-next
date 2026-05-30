@@ -3,8 +3,9 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
-type StorageNamespaceEntry = { readonly tables: Readonly<Record<string, StorageTable>> };
-
+// Reserved sibling keys under the flat `storage` plane (ADR 221): they sit
+// alongside the namespace-id keys but are not namespaces, so the
+// table-name walk below excludes them.
 type StorageNamespaceKey<S> = Exclude<keyof S, 'storageHash' | 'types'>;
 
 // The sql-builder DSL is flat by table name across every declared
@@ -13,10 +14,17 @@ type StorageNamespaceKey<S> = Exclude<keyof S, 'storageHash' | 'types'>;
 // first call site); landing the namespace-aware DSL surface (db.<ns>.<table>)
 // is tracked separately. Within scope here: the DSL accepts the
 // flat storage shape directly and walks every namespace.
+//
+// The constraint only requires the reserved `storageHash` key to be
+// present; namespace-id keys are read structurally per concrete contract
+// (the `SqlStorage` class type exposes them, as does the emitted
+// `contract.d.ts`). Intersecting a `Record<string, …namespace…>` here
+// would force `storageHash` itself to be a namespace entry, which the
+// reserved-key storage shape cannot satisfy.
 export type TableProxyContract = {
   readonly storage: {
     readonly storageHash: string;
-  } & Readonly<Record<string, StorageNamespaceEntry>>;
+  };
   readonly capabilities: CapabilitiesBase;
 };
 
@@ -26,13 +34,29 @@ export type UnboundTables<C extends TableProxyContract> = {
   readonly [Name in TableNamesAcrossNamespaces<C>]: TableInAnyNamespace<C, Name>;
 };
 
+// Each non-reserved key holds a namespace entry whose `tables` map we walk.
+// `.tables` is pulled out with a constrained `infer` (rather than indexed
+// directly) for two reasons: the reserved `storageHash` sibling — which the
+// constraint permits but which is not a namespace — never has `['tables']`
+// indexed into it, and `infer Tables extends Record<string, StorageTable>`
+// re-establishes the `StorageTable` upper bound that the prior
+// `namespaces`-keyed constraint supplied, so downstream `Scope`/`ScopeTable`
+// derivations still see a `StorageTable`.
 type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
-  [NSId in StorageNamespaceKey<C['storage']>]: keyof C['storage'][NSId]['tables'] & string;
+  [NSId in StorageNamespaceKey<C['storage']>]: C['storage'][NSId] extends {
+    readonly tables: infer Tables extends Record<string, StorageTable>;
+  }
+    ? keyof Tables & string
+    : never;
 }[StorageNamespaceKey<C['storage']>];
 
 type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
-  [NSId in StorageNamespaceKey<C['storage']>]: Name extends keyof C['storage'][NSId]['tables']
-    ? C['storage'][NSId]['tables'][Name]
+  [NSId in StorageNamespaceKey<C['storage']>]: C['storage'][NSId] extends {
+    readonly tables: infer Tables extends Record<string, StorageTable>;
+  }
+    ? Name extends keyof Tables
+      ? Tables[Name]
+      : never
     : never;
 }[StorageNamespaceKey<C['storage']>];
 

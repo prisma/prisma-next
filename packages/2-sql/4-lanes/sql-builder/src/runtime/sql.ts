@@ -1,9 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import {
-  getStorageNamespace,
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
