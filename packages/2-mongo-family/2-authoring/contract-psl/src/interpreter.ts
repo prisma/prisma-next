@@ -802,6 +802,9 @@ function isRelationField(field: PslField, modelNames: ReadonlySet<string>): bool
   return modelNames.has(field.typeName);
 }
 
+// PSL scalar type name whose codec is mandated for a Mongo model's `_id`.
+const MONGO_OBJECT_ID_PSL_TYPE = 'ObjectId';
+
 function resolveFieldCodecId(
   field: PslField,
   scalarTypeDescriptors: ReadonlyMap<string, string>,
@@ -952,12 +955,35 @@ export function interpretPslDocumentToMongoContract(
 
     const isVariantModel = pslModel.attributes.some((attr) => attr.name === 'base');
     const hasIdField = pslModel.fields.some((f) => getAttribute(f.attributes, 'id') !== undefined);
-    if (!hasIdField && !isVariantModel) {
-      diagnostics.push({
-        code: 'PSL_MISSING_ID_FIELD',
-        message: `Model "${pslModel.name}" has no field with @id attribute. Every model must have exactly one @id field.`,
-        sourceId,
-      });
+    // Variant models inherit the base's identity and are validated through their base.
+    if (!isVariantModel) {
+      if (!hasIdField) {
+        diagnostics.push({
+          code: 'PSL_MISSING_ID_FIELD',
+          message: `Model "${pslModel.name}" has no field with @id attribute. Every model must have exactly one @id field.`,
+          sourceId,
+        });
+      } else {
+        // The resulting document must carry an `_id` of BSON type objectId. We
+        // assert on the emitted shape (the mapped-name-keyed field record), not
+        // on how the user spelled it — `id ObjectId @id @map("_id")` and a field
+        // literally named `_id` both satisfy it; a non-objectId or unmapped id
+        // does not.
+        const objectIdCodecId = scalarTypeDescriptors.get(MONGO_OBJECT_ID_PSL_TYPE);
+        const idField = fields['_id'];
+        const idIsObjectId =
+          idField !== undefined &&
+          idField.type.kind === 'scalar' &&
+          objectIdCodecId !== undefined &&
+          idField.type.codecId === objectIdCodecId;
+        if (!idIsObjectId) {
+          diagnostics.push({
+            code: 'PSL_MONGO_ID_REQUIRED',
+            message: `Model "${pslModel.name}" must declare an _id field of type ObjectId (e.g. \`id ObjectId @id @map("_id")\`).`,
+            sourceId,
+          });
+        }
+      }
     }
 
     models[pslModel.name] = { fields, relations, storage: { collection: collectionName } };

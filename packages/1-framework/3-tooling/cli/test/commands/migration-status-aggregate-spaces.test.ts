@@ -54,6 +54,7 @@ function makeMember(spaceId: string, hash: string, empty = false): ContractSpace
     headRef: { hash, invariants: [] },
     graph: () => (empty ? makeEmptyGraph() : makeNonEmptyGraph()),
     contract: () => contract,
+    contractAt: vi.fn(),
   };
 }
 
