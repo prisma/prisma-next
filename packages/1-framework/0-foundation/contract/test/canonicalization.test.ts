@@ -735,11 +735,21 @@ describe('framework canonicalizer has no SQL/Mongo storage path knowledge', () =
     const { dirname, join } = await import('node:path');
     const sourcePath = join(dirname(fileURLToPath(import.meta.url)), '../src/canonicalization.ts');
     const source = await readFile(sourcePath, 'utf8');
-    const forbidden = [
-      "'tables'",
-      "'indexes'",
-      "'uniques'",
-      "'foreignKeys'",
+    // Strip comments so doc-comment prose (e.g. markdown `indexes` references)
+    // doesn't trip the path-literal guard; only real code literals must fail.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    // Path literals are forbidden regardless of quoting style (single, double,
+    // or backtick) so a hardcoded token can't slip past in a different quote.
+    const forbiddenPathLiterals = ['tables', 'indexes', 'uniques', 'foreignKeys'];
+    for (const token of forbiddenPathLiterals) {
+      const quotedLiteral = new RegExp(`['"\`]${token}['"\`]`);
+      expect(
+        code,
+        `framework canonicalizer must not reference the ${token} path literal`,
+      ).not.toMatch(quotedLiteral);
+    }
+    // Helper identifiers are bare references, so a plain substring check suffices.
+    const forbiddenIdentifiers = [
       'sortIndexesAndUniques',
       'sortTableArrays',
       'isNamespaceTable',
@@ -747,7 +757,7 @@ describe('framework canonicalizer has no SQL/Mongo storage path knowledge', () =
       'isStorageTypeTypeParams',
       'isFkBooleanField',
     ];
-    for (const token of forbidden) {
+    for (const token of forbiddenIdentifiers) {
       expect(source, `framework canonicalizer must not reference ${token}`).not.toContain(token);
     }
   });
