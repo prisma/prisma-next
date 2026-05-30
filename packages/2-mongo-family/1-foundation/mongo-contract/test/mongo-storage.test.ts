@@ -1,7 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import {
   freezeNode,
-  type IRNode,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -17,7 +16,7 @@ const hash = coreHash('h_0');
 class TestNamespace extends NamespaceBase {
   readonly kind = 'test-namespace' as const;
   readonly id: string;
-  readonly collections: Readonly<Record<string, IRNode>> = Object.freeze({});
+  readonly collections: Readonly<Record<string, MongoCollection>> = Object.freeze({});
 
   constructor(id: string) {
     super();
@@ -73,13 +72,14 @@ describe('MongoStorage', () => {
     expect(Object.isFrozen(storage)).toBe(true);
   });
 
-  it('requires a namespaces map at construction', () => {
-    expect(
-      () =>
-        new MongoStorage({
-          storageHash: hash,
-          namespaces: { [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance },
-        }),
-    ).not.toThrow();
+  it('constructs from the unbound namespace singleton alone', () => {
+    // `namespaces` is a required field on `MongoStorageInput`, so the
+    // empty/omitted case is a type error rather than a runtime throw —
+    // this exercises the happy path of an unbound-only storage.
+    const storage = new MongoStorage({
+      storageHash: hash,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance },
+    });
+    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(MongoUnboundNamespace.instance);
   });
 });

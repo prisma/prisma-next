@@ -6,11 +6,12 @@ import {
   CrossReferenceSchema,
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
-import type { Namespace } from '@prisma-next/framework-components/ir';
+import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
 import { buildSqlNamespaceMap } from './ir/build-sql-namespace';
+import { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 import {
   type ForeignKeyInput,
   type ForeignKeyReferenceInput,
@@ -265,6 +266,11 @@ export function createSqlStorageSchema(
     '+': 'reject',
     storageHash: 'string',
     'types?': type({ '[string]': DocumentScopedStorageTypeSchema }),
+    // `__unbound__` is NOT required here: cross-namespace contracts can
+    // declare only named namespaces (see cross-namespace FK fixtures). The
+    // `__unbound__` brand on `SqlStorageInput['namespaces']` is kept sound at
+    // construction time by injecting the unbound singleton when absent
+    // (see `validateStorage` / `hydrateSqlStorage`), not by structural require.
     'namespaces?': type({ '[string]': namespaceEntry }),
   }) as Type<unknown>;
 }
@@ -441,20 +447,25 @@ export function validateStorage(value: unknown): SqlStorage {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  // The arktype-validated shape matches `SqlStorageInput`
-  // structurally. Funnel through the constructor so nested IR fields
-  // (`types`) are normalised into class instances and the
-  // branded `storageHash` is preserved on the returned `SqlStorage`.
-  const validated = result as SqlStorageInput & {
-    readonly namespaces?: SqlStorageInput['namespaces'];
-  };
+  // Arktype validates the JSON-safe envelope, but the `ColumnDefault`
+  // union carries runtime-only `bigint | Date` that the validation DSL
+  // can't express (see NOTE above), so bridge the validated shape to the
+  // input type. Construction below re-materialises nested IR fields.
+  const validated = blindCast<
+    SqlStorageInput & { readonly namespaces?: SqlStorageInput['namespaces'] },
+    'arktype validated the JSON envelope but its output type is unknown (ColumnDefault carries runtime-only bigint|Date); bridge to the input shape'
+  >(result);
+  const namespaces = buildSqlNamespaceMap(validated.namespaces ?? {});
+  // The `__unbound__` brand is made true at construction: if the validated
+  // namespaces omit the late-bound slot (e.g. a contract declaring only named
+  // namespaces), inject the family unbound singleton rather than asserting a
+  // shape that isn't there. Reconstructing the literal lets the branded
+  // `SqlStorageInput['namespaces']` hold with no cast.
+  const unbound = namespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance;
   return new SqlStorage({
     storageHash: validated.storageHash,
     ...ifDefined('types', validated.types),
-    namespaces: blindCast<
-      SqlStorageInput['namespaces'],
-      'structural storage validation requires the __unbound__ namespace slot'
-    >(buildSqlNamespaceMap(validated.namespaces ?? {})),
+    namespaces: { ...namespaces, [UNBOUND_NAMESPACE_ID]: unbound },
   });
 }
 
