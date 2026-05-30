@@ -8,7 +8,6 @@ import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { blindCast } from '@prisma-next/utils/casts';
 import { PG_ENUM_CODEC_ID } from '../codec-ids';
 import type { PostgresEnumType } from '../postgres-enum-type';
 import { isPostgresSchema } from '../postgres-schema';
@@ -22,17 +21,68 @@ interface PgStorageTypeEntry {
   readonly typeParams?: { readonly values?: unknown };
 }
 
-/** Reads the Postgres annotation envelope (`schema.annotations.pg`). */
-function readPgAnnotations(schema: SqlSchemaIR): {
+/** Postgres-specific subtree on family `SqlSchemaIR.annotations`. */
+export interface PostgresSchemaIrAnnotations {
   readonly schema?: string;
-  readonly storageTypes?: Record<string, PgStorageTypeEntry>;
-} {
-  return (
-    blindCast<
-      { schema?: string; storageTypes?: Record<string, PgStorageTypeEntry> } | undefined,
-      'pg annotation envelope is an untyped index-signature slot'
-    >(schema.annotations?.['pg']) ?? {}
-  );
+  readonly storageTypes?: Readonly<Record<string, PgStorageTypeEntry>>;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readPgStorageTypeEntry(value: unknown): PgStorageTypeEntry | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const codecId = Reflect.get(value, 'codecId');
+  const typeParamsRaw = Reflect.get(value, 'typeParams');
+  const typeParams =
+    typeParamsRaw !== undefined &&
+    typeParamsRaw !== null &&
+    typeof typeParamsRaw === 'object' &&
+    !Array.isArray(typeParamsRaw)
+      ? { values: Reflect.get(typeParamsRaw, 'values') }
+      : undefined;
+  return {
+    ...(typeof codecId === 'string' ? { codecId } : {}),
+    ...(typeParams !== undefined ? { typeParams } : {}),
+  };
+}
+
+function readPgStorageTypesMap(
+  value: unknown,
+): Readonly<Record<string, PgStorageTypeEntry>> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const entries: Record<string, PgStorageTypeEntry> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    const entry = readPgStorageTypeEntry(entryValue);
+    if (entry !== undefined) {
+      entries[key] = entry;
+    }
+  }
+  return Object.keys(entries).length > 0 ? entries : undefined;
+}
+
+/**
+ * Reads the Postgres annotation envelope (`schema.annotations.pg`) from
+ * family Schema IR. `SqlAnnotations` is an open target-pack extensibility
+ * map (`Record<string, unknown>`); this accessor narrows the `pg` slot at
+ * runtime so Postgres code can read introspection fields without casts.
+ */
+export function readPostgresSchemaIrAnnotations(schema: SqlSchemaIR): PostgresSchemaIrAnnotations {
+  const raw = schema.annotations?.['pg'];
+  if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {};
+  }
+  const schemaField = readOptionalString(Reflect.get(raw, 'schema'));
+  const storageTypes = readPgStorageTypesMap(Reflect.get(raw, 'storageTypes'));
+  return {
+    ...(schemaField !== undefined ? { schema: schemaField } : {}),
+    ...(storageTypes !== undefined ? { storageTypes } : {}),
+  };
 }
 
 /**
@@ -63,7 +113,7 @@ export function resolveDdlSchemaForNamespaceStorage(
   schemaIr?: SqlSchemaIR,
 ): string {
   if (namespaceId === UNBOUND_NAMESPACE_ID) {
-    return (schemaIr ? readPgAnnotations(schemaIr).schema : undefined) ?? 'public';
+    return (schemaIr ? readPostgresSchemaIrAnnotations(schemaIr).schema : undefined) ?? 'public';
   }
   const namespace = storage.namespaces[namespaceId];
   if (namespace && isPostgresSchema(namespace)) {
@@ -115,7 +165,7 @@ export function readExistingEnumValues(
   schemaName: string,
   nativeType: string,
 ): readonly string[] | null {
-  const storageTypes = readPgAnnotations(schema).storageTypes;
+  const storageTypes = readPostgresSchemaIrAnnotations(schema).storageTypes;
   const existing = storageTypes?.[enumStorageCompoundKey(schemaName, nativeType)];
   if (!existing || existing.codecId !== PG_ENUM_CODEC_ID) {
     return null;
