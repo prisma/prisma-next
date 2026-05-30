@@ -109,9 +109,9 @@ Working schema emits `a94b7b4` (where `main` also points); the DB is still at
 gap between the `(contract)` row and the `(db)` row.
 
 ```
-○   a94b7b4  (main, contract)
+○   a94b7b4              (main, contract)
 │↑  add_posts            ef9de27 → a94b7b4
-○   ef9de27  (db, prod)
+○   ef9de27              (db, prod)
 │↑  init                 ∅ → ef9de27
 ○   ∅
 ```
@@ -122,7 +122,7 @@ After applying, the DB, the current contract, and `main` all point at the tip. A
 three names collapse into one parenthetical; no glyph juggling.
 
 ```
-○   a94b7b4  (main, db, contract)
+○   a94b7b4              (main, db, contract)
 │↑  add_posts            ef9de27 → a94b7b4
 ○   ef9de27
 │↑  init                 ∅ → ef9de27
@@ -139,9 +139,9 @@ is no migration here. The `(contract)` decoration, plus the absence of any edge 
 the node, *is* the "you've changed your schema, run `migration plan`" signal.
 
 ```
-○   c0ffee0  (contract)
+○   c0ffee0              (contract)
 
-○   a94b7b4  (main, db)
+○   a94b7b4              (main, db)
 │↑  add_posts            ef9de27 → a94b7b4
 ○   ef9de27
 │↑  init                 ∅ → ef9de27
@@ -332,7 +332,7 @@ root is **not** `∅` — its parent was pruned (no `○ ∅` beneath it).
 
 ○   ddddddd
 │↑  other_root           ccccccc → ddddddd
-○   ccccccc              (root: parent pruned)
+○   ccccccc
 ```
 
 ## dangling parent
@@ -342,7 +342,7 @@ root is **not** `∅` — its parent was pruned (no `○ ∅` beneath it).
 │↑  continue             eeeeeee → fffffff
 ○   eeeeeee
 │↑  after_prune          ddddddd → eeeeeee
-○   ddddddd              (root: parent pruned)
+○   ddddddd
 ```
 
 ## self-edge
