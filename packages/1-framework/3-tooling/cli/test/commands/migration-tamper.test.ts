@@ -11,21 +11,30 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 /**
- * End-to-end coverage for the `MIGRATION.HASH_MISMATCH` diagnostic. Each
- * tamper case lays down a valid migration package, surgically corrupts
- * `ops.json` after attestation, drives a real CLI command, and captures
- * the rendered diagnostic. T3.5 then asserts that all four commands
- * produce byte-equal user-visible diagnostics, pinning the spec's
- * "same human-readable diagnostic regardless of which command triggered
- * the load" acceptance criterion.
+ * End-to-end coverage for tamper detection under the tolerant
+ * contract-space model. Each case lays down a valid migration package,
+ * surgically corrupts `ops.json` after attestation, drives a real CLI
+ * command, and captures the rendered diagnostic.
+ *
+ * The tolerant loader no longer throws on a corrupt package at load —
+ * `readMigrationsDir` represents the tamper as a `hashMismatch`
+ * violation and retains the package. Detection is therefore relocated
+ * to the explicit `checkIntegrity()` gate, and the behaviour now splits
+ * by command class (project spec § behaviour matrix):
+ *
+ *   - **Gating commands** (`migrate`, `migration plan`, `migration
+ *     status`, `migration new`) refuse via the structured contract-space
+ *     integrity envelope (`PN-MIG-5002` + `meta.violations[]`). For
+ *     `migrate` the gate is a pure offline check that fires *before*
+ *     `client.connect()`, preserving the "refuse before connecting"
+ *     safety property — the stub driver is never reached.
+ *   - **Read / render** (`migration show <target>`) loads the tolerant
+ *     aggregate without an integrity gate and renders the named package.
  *
  * `loadConfig` is mocked because resolving a real `prisma-next.config.ts`
  * would pull in TypeScript transpilation and a target adapter. Everything
  * downstream of `loadConfig` runs against real on-disk fixtures: the
- * tampered package and the contract.json. The `loadMigrationPackages` /
- * `readMigrationPackage` paths inside each command are exercised
- * unmocked, so the loader-boundary integrity check inside
- * `readMigrationPackage` is what actually fires the diagnostic.
+ * tampered package and the contract.json.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -211,7 +220,7 @@ async function captureDiagnostic(
   }
   const envelope = JSON.parse(jsonLine) as CliErrorEnvelope;
 
-  // --- Human pass: rendered diagnostic (used for the uniformity assertion in T3.5).
+  // --- Human pass: rendered diagnostic returned for the caller's assertions.
   consoleOutput.length = 0;
   consoleErrors.length = 0;
   await runAndCaptureExit(invokeHuman);
@@ -220,9 +229,30 @@ async function captureDiagnostic(
   return { exitCode, envelope, humanText };
 }
 
-const diagnostics: CapturedDiagnostic[] = [];
+/**
+ * Assert the shared contract-space integrity refusal produced by the
+ * gating commands: a non-zero exit, the `PN-MIG-5002` structured
+ * envelope, the tamper carried in `meta.violations[]` (a
+ * `hashMismatch` violation against the `app` space),
+ * and the human-rendered "Contract-space integrity failure" line.
+ */
+function expectIntegrityRefusal(captured: CapturedDiagnostic): void {
+  expect(captured.exitCode).not.toBe(0);
+  expect(captured.envelope.code).toBe('PN-MIG-5002');
+  expect(captured.envelope.summary).toContain('Contract-space integrity failure');
 
-describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
+  const violations = captured.envelope.meta?.['violations'] as
+    | ReadonlyArray<Record<string, unknown>>
+    | undefined;
+  expect(Array.isArray(violations)).toBe(true);
+  expect(violations?.some((v) => v['kind'] === 'hashMismatch' && v['spaceId'] === 'app')).toBe(
+    true,
+  );
+
+  expect(captured.humanText).toContain('Contract-space integrity failure');
+}
+
+describe('migration tamper detection (tolerant model, per-command class)', () => {
   let consoleOutput: string[];
   let consoleErrors: string[];
   let cleanupMocks: () => void;
@@ -256,198 +286,252 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
     vi.resetModules();
   });
 
-  it(
-    'migrate surfaces MIGRATION.HASH_MISMATCH before connecting',
-    async () => {
-      const { createMigrateCommand } = await import('../../src/commands/migrate');
-      const fixture = await setupTamperFixture();
-      tempDirs.push(fixture.cwd);
-      process.chdir(fixture.cwd);
+  describe('gating commands refuse via the structured 5002 integrity envelope', () => {
+    it(
+      'migrate refuses before connecting — the offline gate fires before client.connect',
+      async () => {
+        const { createMigrateCommand } = await import('../../src/commands/migrate');
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
 
-      const captured = await captureDiagnostic(
-        () => executeCommand(createMigrateCommand(), ['--json']),
-        () => executeCommand(createMigrateCommand(), ['--no-color', '--quiet']),
-        consoleOutput,
-        consoleErrors,
-        fixture.cwd,
-      );
+        const captured = await captureDiagnostic(
+          () => executeCommand(createMigrateCommand(), ['--json']),
+          () => executeCommand(createMigrateCommand(), ['--no-color', '--quiet']),
+          consoleOutput,
+          consoleErrors,
+          fixture.cwd,
+        );
 
-      expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-      expect(captured.humanText).toContain('Migration package is corrupt');
-
-      diagnostics.push(captured);
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'migration plan surfaces MIGRATION.HASH_MISMATCH before planning work (T3.2)',
-    async () => {
-      const { createMigrationPlanCommand } = await import('../../src/commands/migration-plan');
-      const fixture = await setupTamperFixture();
-      tempDirs.push(fixture.cwd);
-      process.chdir(fixture.cwd);
-
-      const captured = await captureDiagnostic(
-        () => executeCommand(createMigrationPlanCommand(), ['--json']),
-        () => executeCommand(createMigrationPlanCommand(), ['--no-color', '--quiet']),
-        consoleOutput,
-        consoleErrors,
-        fixture.cwd,
-      );
-
-      expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-      expect(captured.humanText).toContain('Migration package is corrupt');
-
-      diagnostics.push(captured);
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'migration status surfaces MIGRATION.HASH_MISMATCH (T3.3)',
-    async () => {
-      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
-      const fixture = await setupTamperFixture();
-      tempDirs.push(fixture.cwd);
-      process.chdir(fixture.cwd);
-
-      const captured = await captureDiagnostic(
-        () => executeCommand(createMigrationStatusCommand(), ['--json']),
-        () => executeCommand(createMigrationStatusCommand(), ['--no-color', '--quiet']),
-        consoleOutput,
-        consoleErrors,
-        fixture.cwd,
-      );
-
-      expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-      expect(captured.humanText).toContain('Migration package is corrupt');
-
-      diagnostics.push(captured);
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'migration show surfaces MIGRATION.HASH_MISMATCH via readMigrationPackage (T3.4)',
-    async () => {
-      // `migration show` calls `readMigrationPackage` directly when given an
-      // explicit path argument, exercising the integrity check on the
-      // single-package code path (distinct from `loadMigrationPackages` used
-      // by apply/plan/status). Both paths funnel through the same loader, so
-      // the diagnostic is uniform — that's exactly what T3.5 verifies.
-      const { createMigrationShowCommand } = await import('../../src/commands/migration-show');
-      const fixture = await setupTamperFixture();
-      tempDirs.push(fixture.cwd);
-      process.chdir(fixture.cwd);
-
-      // Pass a cwd-relative path so the rendered "where" matches the form
-      // used by readMigrationsDir-driven commands (apply/plan/status). Both
-      // paths reach the same `errorMigrationHashMismatch(dir, ...)` site;
-      // the only observable difference would be how the `dir` argument was
-      // resolved.
-      const captured = await captureDiagnostic(
-        () => executeCommand(createMigrationShowCommand(), [fixture.relativePackageDir, '--json']),
-        () =>
-          executeCommand(createMigrationShowCommand(), [
-            fixture.relativePackageDir,
-            '--no-color',
-            '--quiet',
-          ]),
-        consoleOutput,
-        consoleErrors,
-        fixture.cwd,
-      );
-
-      expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-      expect(captured.humanText).toContain('Migration package is corrupt');
-
-      diagnostics.push(captured);
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'migration new surfaces MIGRATION.HASH_MISMATCH for the existing on-disk migration (T3.8)',
-    async () => {
-      // `migration new` calls `readMigrationsDir` to compute the `from`
-      // reference for the new migration. When an existing on-disk
-      // package is tampered, the integrity check fires before any
-      // scaffolding work — the user asks to *create* a new migration
-      // and the diagnostic surfaces the **existing** corrupt package
-      // verbatim, with no off-topic "couldn't generate new migration"
-      // framing. T3.5's set-equality assertion automatically extends
-      // to this fifth capture, pinning the unified-UX guarantee.
-      const { createMigrationNewCommand } = await import('../../src/commands/migration-new');
-      const fixture = await setupTamperFixture();
-      tempDirs.push(fixture.cwd);
-      process.chdir(fixture.cwd);
-
-      const captured = await captureDiagnostic(
-        () => executeCommand(createMigrationNewCommand(), ['--name', 'next', '--json']),
-        () =>
-          executeCommand(createMigrationNewCommand(), ['--name', 'next', '--no-color', '--quiet']),
-        consoleOutput,
-        consoleErrors,
-        fixture.cwd,
-      );
-
-      expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-      expect(captured.humanText).toContain('Migration package is corrupt');
-
-      diagnostics.push(captured);
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it('renders the same human diagnostic regardless of which command triggered the load (T3.5)', () => {
-    expect(diagnostics).toHaveLength(5);
-
-    const userVisible = diagnostics.map((d) => ({
-      summary: d.envelope.summary,
-      code: d.envelope.code,
-      why: d.envelope.why,
-      fix: d.envelope.fix,
-      where: d.envelope.where?.path ?? null,
-    }));
-
-    // The user-visible portion of the envelope is what `formatErrorOutput`
-    // renders at default verbosity (summary, code, why, fix, where). All
-    // four commands map `MigrationToolsError` through `errorRuntime`, so a
-    // divergence here would surface as a divergence in the human-rendered
-    // diagnostic the user sees.
-    // If this fails, vitest will print the array of distinct envelopes —
-    // pass a JSON-formatted message so the divergence is human-readable.
-    const canonical = userVisible.map((u) => JSON.stringify(u));
-    expect(new Set(canonical).size, JSON.stringify(userVisible, null, 2)).toBe(1);
-
-    // The rendered stderr text (clack-wrapped, ANSI-stripped, tempdir-normalized)
-    // must also be uniform — this is the property the spec asserts directly.
-    const renderedTexts = diagnostics.map((d) => d.humanText);
-    expect(new Set(renderedTexts).size).toBe(1);
-
-    // Machine-readable envelope shape: every command must carry the full
-    // `details` payload from `errorMigrationHashMismatch` in `meta`.
-    // The shared `mapMigrationToolsError` helper in `cli-errors` is the
-    // single mapping site, so the envelope shape (`dir`, `storedHash`,
-    // `computedHash` alongside `code`) is identical across all five
-    // commands by construction.
-    const metaKeys = diagnostics.map((d) =>
-      Object.keys(d.envelope.meta ?? {})
-        .sort()
-        .join(','),
+        // The stub driver cannot connect; reaching the `5002` integrity
+        // envelope (rather than a driver/connection error) proves the
+        // gate ran before the driver was ever touched.
+        expectIntegrityRefusal(captured);
+      },
+      timeouts.typeScriptCompilation,
     );
-    expect(new Set(metaKeys).size, JSON.stringify(metaKeys, null, 2)).toBe(1);
-    for (const d of diagnostics) {
-      expect(d.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
-      expect(typeof d.envelope.meta?.['dir']).toBe('string');
-      expect(typeof d.envelope.meta?.['storedHash']).toBe('string');
-      expect(typeof d.envelope.meta?.['computedHash']).toBe('string');
-    }
+
+    it(
+      'migration plan refuses before planning work',
+      async () => {
+        const { createMigrationPlanCommand } = await import('../../src/commands/migration-plan');
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
+
+        const captured = await captureDiagnostic(
+          () => executeCommand(createMigrationPlanCommand(), ['--json']),
+          () => executeCommand(createMigrationPlanCommand(), ['--no-color', '--quiet']),
+          consoleOutput,
+          consoleErrors,
+          fixture.cwd,
+        );
+
+        expectIntegrityRefusal(captured);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
+      'migration status refuses on the reader-subset package-corruption gate',
+      async () => {
+        const { createMigrationStatusCommand } = await import(
+          '../../src/commands/migration-status'
+        );
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
+
+        const captured = await captureDiagnostic(
+          () => executeCommand(createMigrationStatusCommand(), ['--json']),
+          () => executeCommand(createMigrationStatusCommand(), ['--no-color', '--quiet']),
+          consoleOutput,
+          consoleErrors,
+          fixture.cwd,
+        );
+
+        expectIntegrityRefusal(captured);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
+      'migration status tolerates package corruption when the app contract is unreadable',
+      async () => {
+        const { createMigrationStatusCommand } = await import(
+          '../../src/commands/migration-status'
+        );
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
+
+        await rm(join(fixture.cwd, 'src', 'prisma', 'contract.json'));
+
+        consoleOutput.length = 0;
+        consoleErrors.length = 0;
+        const exitCode = await runAndCaptureExit(() =>
+          executeCommand(createMigrationStatusCommand(), ['--json']),
+        );
+        expect(exitCode).toBe(0);
+
+        const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+        expect(jsonLine).toBeDefined();
+        const payload = JSON.parse(jsonLine!) as {
+          readonly ok?: boolean;
+          readonly diagnostics?: ReadonlyArray<{ readonly code?: string }>;
+        };
+        expect(payload.ok).toBe(true);
+        expect(payload.diagnostics?.some((d) => d.code === 'CONTRACT.UNREADABLE')).toBe(true);
+      },
+      timeouts.typeScriptCompilation,
+    );
+  });
+
+  describe('migration new narrows to app package corruption only', () => {
+    it(
+      'refuses on app-space hash mismatch before scaffolding',
+      async () => {
+        const { createMigrationNewCommand } = await import('../../src/commands/migration-new');
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
+
+        const captured = await captureDiagnostic(
+          () => executeCommand(createMigrationNewCommand(), ['--name', 'next', '--json']),
+          () =>
+            executeCommand(createMigrationNewCommand(), [
+              '--name',
+              'next',
+              '--no-color',
+              '--quiet',
+            ]),
+          consoleOutput,
+          consoleErrors,
+          fixture.cwd,
+        );
+
+        expectIntegrityRefusal(captured);
+      },
+      timeouts.typeScriptCompilation,
+    );
+
+    it(
+      'proceeds when cross-space layout drift is the only integrity fault',
+      async () => {
+        const ORPHAN_HASH = `sha256:${'c'.repeat(64)}`;
+        const cwd = await mkdtemp(join(tmpdir(), 'cli-migration-new-orphan-'));
+        tempDirs.push(cwd);
+
+        await mkdir(join(cwd, 'migrations', 'app'), { recursive: true });
+
+        const orphanDir = join(cwd, 'migrations', 'orphan_ext');
+        await mkdir(orphanDir, { recursive: true });
+        await writeTestPackage(
+          join(orphanDir, '00001_orphan_base'),
+          { from: null, to: ORPHAN_HASH, providedInvariants: [], createdAt: CREATED_AT },
+          ORIGINAL_OPS,
+        );
+        await mkdir(join(orphanDir, 'refs'), { recursive: true });
+        await writeFile(
+          join(orphanDir, 'refs', 'head.json'),
+          `${JSON.stringify({ hash: ORPHAN_HASH, invariants: [] }, null, 2)}\n`,
+        );
+        await writeFile(
+          join(orphanDir, 'contract.json'),
+          JSON.stringify({
+            storage: { storageHash: ORPHAN_HASH },
+            schemaVersion: SCHEMA_VERSION,
+            target: TARGET,
+            targetFamily: TARGET_FAMILY,
+          }),
+        );
+
+        const contractDir = join(cwd, 'src', 'prisma');
+        await mkdir(contractDir, { recursive: true });
+        await writeFile(
+          join(contractDir, 'contract.json'),
+          JSON.stringify({
+            storage: { storageHash: TO_HASH },
+            schemaVersion: SCHEMA_VERSION,
+            target: TARGET,
+            targetFamily: TARGET_FAMILY,
+          }),
+        );
+        await writeFile(join(contractDir, 'contract.d.ts'), 'export {};\n');
+
+        setupConfigMock();
+        mocks.loadConfig.mockResolvedValue({
+          family: {
+            familyId: TARGET_FAMILY,
+            create: vi.fn().mockReturnValue({
+              deserializeContract: (json: unknown) => json,
+            }),
+          },
+          target: {
+            id: TARGET,
+            familyId: TARGET_FAMILY,
+            targetId: TARGET,
+            kind: 'target',
+            migrations: {
+              createPlanner: vi.fn().mockReturnValue({
+                emptyMigration: vi.fn().mockReturnValue({
+                  renderTypeScript: () => 'export default async function migrate() {}',
+                }),
+              }),
+            },
+          },
+          adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
+          driver: { kind: 'driver', familyId: TARGET_FAMILY, targetId: TARGET },
+          contract: { output: 'src/prisma/contract.json' },
+        });
+
+        process.chdir(cwd);
+
+        const { createMigrationNewCommand } = await import('../../src/commands/migration-new');
+
+        consoleOutput.length = 0;
+        consoleErrors.length = 0;
+        const exitCode = await runAndCaptureExit(() =>
+          executeCommand(createMigrationNewCommand(), ['--name', 'layout-drift-ok', '--json']),
+        );
+        const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+        expect(exitCode, jsonLine ?? consoleErrors.join('\n')).toBe(0);
+
+        expect(jsonLine).toBeDefined();
+        const payload = JSON.parse(jsonLine!) as { readonly ok?: boolean; readonly dir?: string };
+        expect(payload.ok).toBe(true);
+        expect(payload.dir).toMatch(/migrations[/\\]app[/\\]/);
+      },
+      timeouts.typeScriptCompilation,
+    );
+  });
+
+  describe('migration show uses the tolerant aggregate', () => {
+    it(
+      'migration show <path> renders a tampered package from aggregate load (exit 0)',
+      async () => {
+        const { createMigrationShowCommand } = await import('../../src/commands/migration-show');
+        const fixture = await setupTamperFixture();
+        tempDirs.push(fixture.cwd);
+        process.chdir(fixture.cwd);
+
+        try {
+          await executeCommand(createMigrationShowCommand(), [
+            fixture.relativePackageDir,
+            '--json',
+          ]);
+        } catch {
+          // process.exit
+        }
+        const exitCode = getExitCode() ?? 1;
+
+        const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+        expect(exitCode, jsonLine ?? consoleErrors.join('\n')).toBe(0);
+        expect(jsonLine).toBeDefined();
+        const payload = JSON.parse(jsonLine!) as { readonly ok?: boolean };
+        expect(payload.ok).toBe(true);
+      },
+      timeouts.typeScriptCompilation,
+    );
   });
 });

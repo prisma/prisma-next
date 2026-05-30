@@ -314,9 +314,7 @@ export function formatMigrationApplyCommandOutput(
   return lines.join('\n');
 }
 
-interface MigrationShowSpacePresent {
-  readonly kind: 'present';
-  readonly spaceId: string;
+interface MigrationShowPresent {
   readonly dirName: string;
   readonly dirPath: string;
   readonly from: string | null;
@@ -332,22 +330,11 @@ interface MigrationShowSpacePresent {
   readonly summary: string;
 }
 
-interface MigrationShowSpaceMissing {
-  readonly kind: 'missing';
-  readonly spaceId: string;
-  readonly summary: string;
-}
-
-type MigrationShowSpaceResult = MigrationShowSpacePresent | MigrationShowSpaceMissing;
-
 interface MigrationShowResult {
-  readonly spaces: readonly MigrationShowSpaceResult[];
+  readonly migration: MigrationShowPresent;
 }
 
-function formatSpaceShowBlock(
-  space: MigrationShowSpacePresent,
-  useColor: boolean,
-): readonly string[] {
+function formatSpaceShowBlock(space: MigrationShowPresent, useColor: boolean): readonly string[] {
   const formatGreen = createColorFormatter(useColor, green);
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
@@ -403,28 +390,7 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   }
 
   const useColor = flags.color !== false;
-  const formatDimText = (text: string) => formatDim(useColor, text);
-  const multipleSpaces = result.spaces.length > 1;
-  const lines: string[] = [];
-
-  for (let i = 0; i < result.spaces.length; i++) {
-    const space = result.spaces[i]!;
-    if (multipleSpaces) {
-      lines.push(formatDimText(`── ${space.spaceId} ──`));
-    }
-    if (space.kind === 'missing') {
-      lines.push(formatDimText(`  ${space.summary}`));
-    } else {
-      for (const line of formatSpaceShowBlock(space, useColor)) {
-        lines.push(line);
-      }
-    }
-    if (i < result.spaces.length - 1) {
-      lines.push('');
-    }
-  }
-
-  return lines.join('\n');
+  return formatSpaceShowBlock(result.migration, useColor).join('\n');
 }
 
 /**

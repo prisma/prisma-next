@@ -1,6 +1,7 @@
 import type { AssertionResult } from './assertions/types.ts';
 import type { LoadError, UnknownEvent } from './load.ts';
 import type { Metrics } from './metrics.ts';
+import type { CorrectnessComponent, RunScore, Scorecard } from './scorecard.ts';
 
 export type RunMeta = {
   tracePath: string;
@@ -12,6 +13,7 @@ export type RunMeta = {
 
 export type ReportInput = {
   metrics: Metrics;
+  scorecard: Scorecard;
   assertions: AssertionResult[];
   loadErrors: LoadError[];
   unknown: UnknownEvent[];
@@ -240,11 +242,9 @@ function renderLifecycle(m: Metrics['lifecycle']): string {
 function renderOperator(m: Metrics['operator'], turnCountOverride?: number | null): string {
   const value =
     turnCountOverride != null ? String(turnCountOverride) : naCell(m.operator_turn_count_note);
-  const rows: string[][] = [
-    ['operator turn count', value],
-    ['token usage', 'n/a — not instrumented (no token-usage event in the trace vocabulary)'],
-  ];
-  return `### Operator\n\n${mdTable(['Metric', 'Value'], rows)}`;
+  const rows: string[][] = [['operator turn count', value]];
+  const note = '_Token usage is reported in the Scorecard (Tier 2), not here._';
+  return `### Operator\n\n${note}\n\n${mdTable(['Metric', 'Value'], rows)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,17 +271,131 @@ function renderProvenance(origin: RunMeta['origin']): string {
   return captions[origin];
 }
 
-function renderVerdict(): string {
+// ---------------------------------------------------------------------------
+// Two-tier scorecard (the report headline)
+// ---------------------------------------------------------------------------
+
+function fmtComponent(c: CorrectnessComponent): string {
+  return c === null ? '—' : c;
+}
+
+function fmtTokenCell(value: number | null): string {
+  return value === null ? naCell(undefined) : String(value);
+}
+
+function verdictCell(run: RunScore): string {
+  if (run.verdict === 'correct') return 'CORRECT';
+  if (run.verdict === 'incorrect') return 'INCORRECT';
+  return `not computable (missing: ${run.missing_inputs.join(', ')})`;
+}
+
+function renderVerdictLine(scorecard: Scorecard): string {
+  if (!scorecard.has_any_correctness_signal) {
+    return [
+      '**Run verdict — not computable:** no external correctness signal in the trace ',
+      '(no `correctness-recorded` event). Tier-1 correctness is sourced outside the run — ',
+      "mechanical gates (typecheck / test / lint) + a QA run + the judge's intent verdict. ",
+      "Until that signal is recorded, this run's correctness is unknown; ",
+      'do not read the all-green metrics below as "good".',
+    ].join('');
+  }
+
+  const correct = scorecard.runs.filter((r) => r.verdict === 'correct').length;
+  const incorrect = scorecard.runs.filter((r) => r.verdict === 'incorrect').length;
+  const notComputable = scorecard.runs.filter((r) => r.verdict === 'not-computable');
+
+  const parts: string[] = [];
+  if (correct > 0) parts.push(`${String(correct)} CORRECT`);
+  if (incorrect > 0) parts.push(`${String(incorrect)} INCORRECT`);
+  if (notComputable.length > 0) parts.push(`${String(notComputable.length)} not computable`);
+
+  let line = `**Run verdict:** ${parts.join(', ')}.`;
+  if (notComputable.length > 0) {
+    const missing = [...new Set(notComputable.flatMap((r) => r.missing_inputs))];
+    line += ` Missing inputs for the not-computable run(s): ${missing.join(', ')}.`;
+  }
+  if (correct === 0) {
+    line += ' No run passed the Tier-1 correctness gate — do not read the metrics below as "good".';
+  }
+  return line;
+}
+
+function renderTier1(scorecard: Scorecard): string {
+  const rows = scorecard.runs.map((r) => [
+    r.run_id,
+    fmtComponent(r.correctness?.mechanical ?? null),
+    fmtComponent(r.correctness?.qa ?? null),
+    fmtComponent(r.correctness?.intent ?? null),
+    verdictCell(r),
+  ]);
+
+  const table =
+    rows.length === 0
+      ? '_No runs in the trace._'
+      : mdTable(['Run', 'Mechanical', 'QA', 'Intent', 'Verdict'], rows);
+
   return [
-    '## Run verdict',
+    '### Tier 1 — correctness gate (binary, external)',
     '',
-    '**Not computable** from this trace alone — this report describes *what happened*, not *how good the run was*:',
+    table,
     '',
-    '- **Correctness** (the primary axis): no external correctness signal in the trace; round-end verdicts are emitter-asserted, not CI / merge / judge results.',
-    '- **Tokens** (top efficiency target): not instrumented — no token-usage event exists in the trace vocabulary.',
-    '- **Baseline**: single-run report; "how good vs. the alternative" requires cross-run comparison.',
+    renderVerdictLine(scorecard),
+  ].join('\n');
+}
+
+function renderTier2(scorecard: Scorecard, metrics: Metrics): string {
+  const heading = '### Tier 2 — efficiency (CORRECT runs only)';
+
+  if (scorecard.correct_run_ids.length === 0) {
+    const reason = scorecard.has_any_correctness_signal
+      ? 'no run was graded CORRECT'
+      : 'no correctness signal was recorded';
+    return [
+      heading,
+      '',
+      `_Hidden — ${reason}. Scoring an incorrect or ungraded run's efficiency is meaningless, so Tier 2 is gated on Tier 1._`,
+    ].join('\n');
+  }
+
+  const t = scorecard.correct_tokens;
+  const rows: string[][] = [
+    ['tokens — input', fmtTokenCell(t.input_tokens)],
+    ['tokens — output', fmtTokenCell(t.output_tokens)],
+    ['tokens — cache read', fmtTokenCell(t.cache_read_tokens)],
+    ['tokens — cache write', fmtTokenCell(t.cache_write_tokens)],
+  ];
+
+  if (metrics.lifecycle.project_wallclock_ms !== null) {
+    rows.push(['wall-clock (project)', fmtMs(metrics.lifecycle.project_wallclock_ms)]);
+  } else if (metrics.rework.dispatch_wallclock_ms !== null) {
+    rows.push(['wall-clock (dispatch total)', fmtMs(metrics.rework.dispatch_wallclock_ms.total)]);
+  } else {
+    rows.push(['wall-clock', naCell(undefined)]);
+  }
+
+  if (metrics.rework.rounds_per_dispatch !== null) {
+    rows.push([
+      'rework (rounds per dispatch, mean)',
+      metrics.rework.rounds_per_dispatch.mean.toFixed(2),
+    ]);
+  } else {
+    rows.push(['rework (rounds per dispatch, mean)', naCell(undefined)]);
+  }
+
+  const note = `_Scored over ${String(scorecard.correct_run_ids.length)} CORRECT run(s): ${scorecard.correct_run_ids.join(', ')}. Tokens come from the per-run \`tokens-recorded\` feed; wall-clock and rework are trace-wide aggregates (per-run attribution is the experiment engine's remit)._`;
+
+  return [heading, '', note, '', mdTable(['Metric', 'Value'], rows)].join('\n');
+}
+
+function renderScorecard(scorecard: Scorecard, metrics: Metrics): string {
+  return [
+    '## Scorecard',
     '',
-    'Treat all-green metrics below as "no recorded problems", not "verified good".',
+    '> Two-tier: **Tier 1** is a binary correctness gate sourced from outside the run; **Tier 2** (efficiency) is scored only over runs that passed Tier 1. Speed never compensates for incorrectness.',
+    '',
+    renderTier1(scorecard),
+    '',
+    renderTier2(scorecard, metrics),
   ].join('\n');
 }
 
@@ -324,7 +438,7 @@ function renderAssertions(assertions: AssertionResult[]): string {
 // ---------------------------------------------------------------------------
 
 export function renderReport(input: ReportInput): string {
-  const { metrics, assertions, loadErrors, unknown, runMeta } = input;
+  const { metrics, scorecard, assertions, loadErrors, unknown, runMeta } = input;
 
   const lines: string[] = [];
 
@@ -350,7 +464,7 @@ export function renderReport(input: ReportInput): string {
   lines.push('');
   lines.push('---');
   lines.push('');
-  lines.push(renderVerdict());
+  lines.push(renderScorecard(scorecard, metrics));
   lines.push('');
   lines.push('---');
   lines.push('');

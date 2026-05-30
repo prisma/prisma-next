@@ -193,6 +193,55 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-29 retro, project `dev-to-ship-migration-handoff`. The `ref-cmds-snapshot-integration` slice (declared parallel-safe against the `docs-and-adr` slice on "different command surface") had its single commit `70dfb715e` also rewrite ADR 218 (+253 lines) — a `docs-and-adr` deliverable. The Parallel A reviewer's verdict claimed the diff was "confined to `ref.ts`, `cli-errors.ts`, the two test files, and the four scoped test artefacts"; `git show --stat` showed the ADR. The rewrite was editorial (added code references, tightened Context, condensed prose), not a factual divergence, so it was accepted as-is — but the miss was a reviewer-discipline failure, not a benign coincidence, and a factual divergence on the same path would have shipped just as silently.
 
+### F11. Spec-pinned module placement not enforced at dispatch or review
+
+**Symptom.** The spec / design-notes pin a module's package or layer placement explicitly ("X lives in the CLI formatter"), but the build dispatch places it elsewhere because both homes feel locally plausible. The divergence isn't caught until a PR-level architect review, after the placement has already accreted an export surface and tests around it.
+
+**Detection signal.**
+
+- The spec has one or more explicit "X lives in `<package/layer>`" statements.
+- The dispatch brief restates *scope* (what to build) but not the *placement constraint* (where it must live).
+- The reviewer verdict doesn't reconcile the produced file paths against the spec's placement statements — it checks behaviour, not location.
+
+**Mitigation.**
+
+- When the spec pins placement, the dispatch brief must restate it as a hard constraint ("the layout module MUST live in the CLI formatter, not `migration-tools`") and the dispatch DoD must grep the produced file's path against the pinned location.
+- Reviewer reconciles placement explicitly against the spec, the same way `git show --stat` grounds the file-list claim (see F10).
+
+**Reference incident.** 2026-05-30, project `migration-list-graph`. `design-notes.md` + `spec.md` stated three times that lane geometry / node-line placement lives in the CLI formatter; the build placed `migration-list-graph-layout.ts` in `migration-tools`, pushing view-model geometry onto the domain package's public surface. Caught at PR #628's architect review (Finding A); moved to the CLI in TML-2733 (PR #636).
+
+### F12. "Correct the docs" executed as a spot-fix instead of an exhaustive sweep
+
+**Symptom.** Told to remove or correct a claim across the docs, the executor fixes the occurrences it was shown and leaves other phrasings of the same claim. The docs still contradict reality after the "correction," and a later reviewer finds the residuals.
+
+**Detection signal.**
+
+- A docs-correction commit touches some files asserting claim X, but a grep for X's synonyms still returns hits.
+- The correction's diff is visibly smaller than the claim's footprint across the doc set.
+
+**Mitigation.**
+
+- Scope a claim-scrub as: grep every phrasing of the claim, enumerate all hits, correct each, then re-grep until the residual is empty — not "fix the instance I was shown." Add the closing re-grep to the dispatch DoD (see [`grep-library.md` § Docs claim-scrub](./grep-library.md)).
+
+**Reference incident.** 2026-05-30, project `migration-list-graph`. TML-2733's "correct the false 'reuse `MigrationGraph` / mirrors `detectCycles`' claim" first pass fixed `design-notes.md:75` + `plan.md:23` but left `design-notes.md:164/383/422/430` and `spec.md:140/203`. Caught at PR #636's principal-engineer review; swept in the review-fix commit.
+
+### F13. Regression test for a boundary / scoping property doesn't discriminate
+
+**Symptom.** A test added to lock property P ("classification is scoped per space") uses a fixture where P-holds and ¬P produce *identical* output, so the test would still pass if the guard were removed. The test exercises the feature but does not protect the invariant it was filed to protect.
+
+**Detection signal.**
+
+- The dispatch DoD said "add a test for P" and a test exists — but reverting the guard (mentally or actually) leaves the test green.
+- The fixture doesn't straddle the boundary the property is about (e.g. a per-space test whose only cycle is internal to a single space, so per-space and global classification coincide).
+
+**Mitigation.**
+
+- A regression test for property P must **fail under ¬P**. Construct the fixture so the boundary matters: for a scoping property, the same entity must play different roles across the boundary (e.g. a cross-space spurious cycle that only forms when the scopes are merged). Verify by reverting the guard, or by reasoning that the scoped and unscoped paths diverge on this fixture.
+- A brief / DoD that says "add a regression test" should require the falsification check, not just the test's existence.
+- **Canonical candidate** (generalises to any system): land in canonical via `drive-update-skills` if a second occurrence confirms the pattern.
+
+**Reference incident.** 2026-05-30, project `migration-list-graph`. TML-2733's first per-space classification test used a cycle internal to one space, so per-space and global classification were byte-identical — it would not fail under a revert to global scoping. Caught at PR #636's principal-engineer review (F03); rewritten as a cross-space spurious cycle (`app: X→Y`, `ext: Y→X`).
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

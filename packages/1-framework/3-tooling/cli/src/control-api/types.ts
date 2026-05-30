@@ -18,7 +18,6 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { Result } from '@prisma-next/utils/result';
 import type { ExecuteDbVerifyResult } from './operations/db-verify';
 
@@ -548,12 +547,6 @@ export interface MigrationApplyOptions {
   readonly contract: unknown;
   /** Migrations root directory (`migrations/` under the project). */
   readonly migrationsDir: string;
-  /**
-   * Already-loaded app-space migration packages. The CLI loads these
-   * via `loadMigrationPackages(appMigrationsDir)` before invoking
-   * `migrationApply`.
-   */
-  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
   /**
    * Optional app-space ref override. When provided, the app member's
    * graph-walk targets this hash instead of `contract.storage.storageHash`.

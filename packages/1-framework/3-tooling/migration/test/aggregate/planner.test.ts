@@ -9,26 +9,16 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
+import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import { planAggregate } from '../../src/aggregate/planner';
 import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../src/constants';
-import type { MigrationGraph } from '../../src/graph';
-import { reconstructGraph } from '../../src/migration-graph';
 import type { OnDiskMigrationPackage } from '../../src/package';
-import { createAttestedPackage } from '../fixtures';
+import { createAttestedPackage, makeContractSpaceMember } from '../fixtures';
 
 const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
-
-function emptyGraph(): MigrationGraph {
-  return {
-    nodes: new Set<string>(),
-    forwardChain: new Map(),
-    reverseChain: new Map(),
-    migrationByHash: new Map(),
-  };
-}
 
 function makeMember(args: {
   spaceId: string;
@@ -36,18 +26,12 @@ function makeMember(args: {
   headRef?: { hash: string; invariants: readonly string[] };
   packages?: readonly OnDiskMigrationPackage[];
 }): ContractSpaceMember {
-  const contract = args.contract ?? createSqlContract({ target: 'postgres' });
-  const packages = args.packages ?? [];
-  const graph = packages.length === 0 ? emptyGraph() : reconstructGraph(packages);
-  return {
+  return makeContractSpaceMember({
     spaceId: args.spaceId,
-    contract,
+    contract: args.contract ?? createSqlContract({ target: 'postgres' }),
     headRef: args.headRef ?? { hash: EMPTY_CONTRACT_HASH, invariants: [] },
-    migrations: {
-      graph,
-      packagesByMigrationHash: new Map(packages.map((p) => [p.metadata.migrationHash, p])),
-    },
-  };
+    packages: args.packages ?? [],
+  });
 }
 
 function makeAggregate(args: {
@@ -55,11 +39,12 @@ function makeAggregate(args: {
   extensions?: ContractSpaceMember[];
   targetId?: string;
 }): ContractSpaceAggregate {
-  return {
+  return createContractSpaceAggregate({
     targetId: args.targetId ?? 'postgres',
     app: args.app,
     extensions: args.extensions ?? [],
-  };
+    checkIntegrity: () => [],
+  });
 }
 
 /**

@@ -85,6 +85,13 @@ export interface BaseSchemaIssue {
 
 export interface EnumValuesChangedIssue {
   readonly kind: 'enum_values_changed';
+  /**
+   * Namespace coordinate of the enum type that changed values. Populated by
+   * family verifiers that have the coordinate in scope when constructing the
+   * issue. Downstream planners trust this field as the authoritative subject
+   * coordinate and do not re-derive it by name lookup.
+   */
+  readonly namespaceId: string;
   readonly typeName: string;
   readonly addedValues: readonly string[];
   readonly removedValues: readonly string[];

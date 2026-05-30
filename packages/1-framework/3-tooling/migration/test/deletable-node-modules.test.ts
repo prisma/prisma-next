@@ -30,7 +30,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type DeclaredExtensionEntry, loadContractSpaceAggregate } from '../src/aggregate/loader';
+import { loadContractSpaceAggregate } from '../src/aggregate/loader';
 import { verifyAggregate } from '../src/aggregate/verifier';
 import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
 import {
@@ -263,21 +263,11 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       },
     });
 
-    const declaredExtensions: ReadonlyArray<DeclaredExtensionEntry> = [
-      { id: TEST_SPACE_ID, targetId: 'postgres' },
-    ];
-
-    const loaded = await loadContractSpaceAggregate({
-      targetId: 'postgres',
+    const aggregate = await loadContractSpaceAggregate({
       migrationsDir,
       appContract,
-      declaredExtensions,
       deserializeContract: (json: unknown): Contract => json as Contract,
-      appMigrationPackages: [],
     });
-    expect(loaded.ok).toBe(true);
-    if (!loaded.ok) return;
-    const aggregate = loaded.value.aggregate;
     expect(aggregate.app.spaceId).toBe('app');
     expect(aggregate.extensions.map((e) => e.spaceId)).toEqual([TEST_SPACE_ID]);
 

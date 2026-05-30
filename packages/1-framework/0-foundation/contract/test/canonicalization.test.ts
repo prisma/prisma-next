@@ -12,6 +12,8 @@ import {
   canonicalizeContractToObject as canonicalizeContractToObjectRaw,
   orderTopLevel,
 } from '../src/canonicalization';
+import { createPreserveEmptyPredicate, type PathPattern } from '../src/canonicalization-path-match';
+import { createStorageSort, type NamedArraySortTarget } from '../src/canonicalization-storage-sort';
 import type { Contract } from '../src/contract-types';
 import { coreHash, profileHash } from '../src/types';
 
@@ -34,6 +36,21 @@ function canonicalizeContract(
 ): string {
   return canonicalizeContractRaw(contract, { ...identityOptions, ...options });
 }
+
+const sqlPreserveEmptyPatterns = [
+  ['storage', 'namespaces', '*', 'tables'],
+  ['storage', 'namespaces', '*', 'tables', '*'],
+  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'types', '*', 'typeParams'],
+] as const satisfies readonly PathPattern[];
+
+const sqlSortTargets = [
+  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+] as const satisfies readonly NamedArraySortTarget[];
+
+const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
+const sqlSortStorage = createStorageSort(sqlSortTargets);
 
 function minimal(overrides?: Record<string, unknown>): Contract {
   return {
@@ -244,8 +261,16 @@ describe('default omission', () => {
     expect(result['meta']).toEqual({});
   });
 
-  it('preserves empty storage.namespaces[].tables', () => {
+  it('strips empty storage.namespaces[X].tables without a shouldPreserveEmpty hook', () => {
     const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }));
+    const ns = drill(result, 'storage', 'namespaces', UNBOUND) as Record<string, unknown>;
+    expect(ns).not.toHaveProperty('tables');
+  });
+
+  it('preserves empty storage.namespaces[].tables when shouldPreserveEmpty hook returns true', () => {
+    const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }), {
+      shouldPreserveEmpty: sqlPreserveEmpty,
+    });
     expect(unboundTables(result)).toEqual({});
   });
 
@@ -270,13 +295,14 @@ describe('default omission', () => {
     expect(user['relations']).toEqual({});
   });
 
-  it('preserves empty table uniques, indexes, and foreignKeys', () => {
+  it('preserves empty table uniques, indexes, and foreignKeys when shouldPreserveEmpty hook provided', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({
           users: { columns: {}, uniques: [], indexes: [], foreignKeys: {} },
         }),
       }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
     );
     const table = drill(unboundTables(result), 'users');
     expect(table['uniques']).toEqual([]);
@@ -284,7 +310,7 @@ describe('default omission', () => {
     expect(table['foreignKeys']).toEqual({});
   });
 
-  it('strips false-valued FK boolean fields (constraint, index)', () => {
+  it('strips false-valued FK boolean fields without shouldPreserveEmpty hook', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({
@@ -299,6 +325,24 @@ describe('default omission', () => {
     const fk = drill(unboundTables(result), 'posts', 'foreignKeys', 'fk_user');
     expect(fk).not.toHaveProperty('constraint');
     expect(fk).not.toHaveProperty('index');
+  });
+
+  it('preserves false-valued FK boolean fields in array-form foreignKeys when hook provided', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          posts: {
+            columns: {},
+            foreignKeys: [{ columns: ['user_id'], constraint: false, index: false }],
+          },
+        }),
+      }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
+    );
+    const table = drill(unboundTables(result), 'posts');
+    const fks = table['foreignKeys'] as Array<Record<string, unknown>>;
+    expect(fks[0]?.['constraint']).toBe(false);
+    expect(fks[0]?.['index']).toBe(false);
   });
 
   it('preserves empty execution.mutations.defaults', () => {
@@ -316,11 +360,12 @@ describe('default omission', () => {
     expect(drill(result, 'extensionPacks')['paradedb']).toEqual({});
   });
 
-  it('preserves empty per-namespace table entries (e.g. Mongo collections with no schema)', () => {
+  it('preserves empty per-namespace table entries when shouldPreserveEmpty hook provided', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({ tasks: {} }),
       }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
     );
     expect(unboundTables(result)['tasks']).toEqual({});
   });
@@ -390,7 +435,7 @@ describe('default omission', () => {
 });
 
 describe('index and unique sorting', () => {
-  it('sorts indexes by name', () => {
+  it('sorts indexes by name when sortStorage hook provided', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({
@@ -400,13 +445,14 @@ describe('index and unique sorting', () => {
           },
         }),
       }),
+      { sortStorage: sqlSortStorage },
     );
     const table = drill(unboundTables(result), 'users');
     const indexes = table['indexes'] as Array<{ name: string }>;
     expect(indexes.map((i) => i.name)).toEqual(['idx_a', 'idx_m', 'idx_z']);
   });
 
-  it('sorts uniques by name', () => {
+  it('sorts uniques by name when sortStorage hook provided', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({
@@ -416,6 +462,7 @@ describe('index and unique sorting', () => {
           },
         }),
       }),
+      { sortStorage: sqlSortStorage },
     );
     const table = drill(unboundTables(result), 'users');
     const uniques = table['uniques'] as Array<{ name: string }>;
@@ -462,6 +509,7 @@ describe('index and unique sorting', () => {
           },
         }),
       }),
+      { sortStorage: sqlSortStorage },
     );
     const table = drill(unboundTables(result), 'users');
     const indexes = table['indexes'] as Array<{ name?: string }>;
@@ -479,6 +527,7 @@ describe('index and unique sorting', () => {
           },
         }),
       }),
+      { sortStorage: sqlSortStorage },
     );
     const table = drill(unboundTables(result), 'users');
     const uniques = table['uniques'] as Array<{ name?: string }>;
@@ -621,14 +670,25 @@ describe('domain plane', () => {
 });
 
 describe('typeParams preservation', () => {
-  it('preserves empty storage.types[].typeParams', () => {
+  it('preserves empty storage.types[].typeParams when shouldPreserveEmpty hook provided', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: { storageHash: 'sha256:stub', types: { MyType: { typeParams: {} } } },
+      }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
+    );
+    const myType = drill(result, 'storage', 'types', 'MyType');
+    expect(myType['typeParams']).toEqual({});
+  });
+
+  it('strips empty storage.types[].typeParams without shouldPreserveEmpty hook', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: { storageHash: 'sha256:stub', types: { MyType: { typeParams: {} } } },
       }),
     );
     const myType = drill(result, 'storage', 'types', 'MyType');
-    expect(myType['typeParams']).toEqual({});
+    expect(myType).not.toHaveProperty('typeParams');
   });
 });
 
@@ -643,6 +703,7 @@ describe('array sort with nullish entries', () => {
           },
         }),
       }),
+      { sortStorage: sqlSortStorage },
     );
     const table = drill(unboundTables(result), 'users');
     const indexes = table['indexes'] as Array<unknown>;
@@ -659,9 +720,45 @@ describe('array sort with nullish entries', () => {
           },
         }),
       }),
+      { sortStorage: sqlSortStorage },
     );
     const table = drill(unboundTables(result), 'users');
     const uniques = table['uniques'] as Array<unknown>;
     expect(uniques).toHaveLength(2);
+  });
+});
+
+describe('framework canonicalizer has no SQL/Mongo storage path knowledge', () => {
+  it('canonicalization.ts does not hardcode tables, indexes, uniques, or foreignKeys path guards', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const sourcePath = join(dirname(fileURLToPath(import.meta.url)), '../src/canonicalization.ts');
+    const source = await readFile(sourcePath, 'utf8');
+    // Strip comments so doc-comment prose (e.g. markdown `indexes` references)
+    // doesn't trip the path-literal guard; only real code literals must fail.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    // Path literals are forbidden regardless of quoting style (single, double,
+    // or backtick) so a hardcoded token can't slip past in a different quote.
+    const forbiddenPathLiterals = ['tables', 'indexes', 'uniques', 'foreignKeys'];
+    for (const token of forbiddenPathLiterals) {
+      const quotedLiteral = new RegExp(`['"\`]${token}['"\`]`);
+      expect(
+        code,
+        `framework canonicalizer must not reference the ${token} path literal`,
+      ).not.toMatch(quotedLiteral);
+    }
+    // Helper identifiers are bare references, so a plain substring check suffices.
+    const forbiddenIdentifiers = [
+      'sortIndexesAndUniques',
+      'sortTableArrays',
+      'isNamespaceTable',
+      'isRequiredNamespaceTables',
+      'isStorageTypeTypeParams',
+      'isFkBooleanField',
+    ];
+    for (const token of forbiddenIdentifiers) {
+      expect(source, `framework canonicalizer must not reference ${token}`).not.toContain(token);
+    }
   });
 });

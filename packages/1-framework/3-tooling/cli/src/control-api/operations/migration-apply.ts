@@ -12,11 +12,11 @@ import {
   type ContractSpaceAggregate,
   type ContractSpaceMember,
   graphWalkStrategy,
+  requireHeadRef,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { errorNoInvariantPath } from '@prisma-next/migration-tools/errors';
 import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import {
@@ -56,15 +56,6 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
   readonly migrationsDir: string;
   readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly targetId: TTargetId;
-  /**
-   * Already-loaded app-space migration packages. The CLI command
-   * loads these via `loadMigrationPackages(appMigrationsDir)`; the
-   * operation hydrates the app member's graph with them. Required
-   * because the framework-neutral aggregate loader doesn't know how
-   * to read the user's `migrations/` directory layout (it's family-
-   * aware: ops.json shape, manifest keys, etc.).
-   */
-  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
   /**
    * Optional app-space ref override. When provided, the app member's
    * graph-walk targets this hash instead of `member.headRef.hash`.
@@ -125,7 +116,6 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     migrationsDir,
     extensionPacks,
     targetId,
-    appMigrationPackages,
     refHash,
     refInvariants,
     refName,
@@ -138,7 +128,6 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     appContract: contract,
     extensionPacks,
     deserializeContract: (json) => familyInstance.deserializeContract(json),
-    appMigrationPackages,
   };
   const loaded = await buildContractSpaceAggregate(loadInputs);
   if (!loaded.ok) {
@@ -161,12 +150,15 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   const atHeadResolutions = new Map<string, AggregatePerSpacePlan>();
   for (const member of allMembers) {
     const isAppMember = member.spaceId === aggregate.app.spaceId;
-    const targetHash = isAppMember && refHash !== undefined ? refHash : member.headRef.hash;
+    // The aggregate passed the integrity gate, so every member's head ref
+    // is resolved (the app's is synthesised from the live contract).
+    const headRef = requireHeadRef(member);
+    const targetHash = isAppMember && refHash !== undefined ? refHash : headRef.hash;
     const liveMarker = markerRows.get(member.spaceId) ?? null;
 
     // Empty-graph members fail loudly: replay needs an on-disk path
     // and an empty graph means the user has never planned this space.
-    if (member.migrations.graph.nodes.size === 0) {
+    if (member.graph().nodes.size === 0) {
       // Edge case: target == EMPTY (greenfield, nothing to do) or
       // the live marker already matches the target. Loader integrity
       // allows this for extensions whose head ref is the empty
@@ -197,9 +189,9 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     const targetInvariants =
       isAppMember && refHash !== undefined && refInvariants !== undefined
         ? refInvariants
-        : member.headRef.invariants;
+        : headRef.invariants;
     const targetMember: ContractSpaceMember =
-      targetHash === member.headRef.hash && targetInvariants === member.headRef.invariants
+      targetHash === headRef.hash && targetInvariants === headRef.invariants
         ? member
         : { ...member, headRef: { hash: targetHash, invariants: targetInvariants } };
 
@@ -224,7 +216,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       // is never a graph node, producing an empty `structuralPath` and
       // a less actionable diagnostic.
       const fromHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
-      const structural = findPathWithDecision(targetMember.migrations.graph, fromHash, targetHash, {
+      const structural = findPathWithDecision(targetMember.graph(), fromHash, targetHash, {
         required: new Set<string>(),
       });
       const structuralPath =
@@ -369,7 +361,7 @@ function buildAtHeadResolution(args: {
       providedInvariants: [],
     },
     displayOps: [],
-    destinationContract: member.contract,
+    destinationContract: member.contract(),
     strategy: 'graph-walk',
     migrationEdges: [],
   };
@@ -407,7 +399,7 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
     (r) => r.spaceId === args.aggregate.app.spaceId,
   );
   const appMarkerHash =
-    appResolution?.entry.plan.destination.storageHash ?? args.aggregate.app.headRef.hash;
+    appResolution?.entry.plan.destination.storageHash ?? requireHeadRef(args.aggregate.app).hash;
 
   // Per-migration entries (one per authored edge) preserve the
   // single-space `migrationsApplied` count semantics for back-compat

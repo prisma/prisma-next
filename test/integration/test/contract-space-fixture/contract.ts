@@ -1,6 +1,7 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { TEST_BOX_TABLE } from './constants';
 
@@ -37,6 +38,7 @@ export const TEST_HEAD_HASH = computeStorageHash({
   target: TARGET,
   targetFamily: TARGET_FAMILY,
   storage: storageBody,
+  ...sqlContractCanonicalizationHooks,
 });
 
 /**

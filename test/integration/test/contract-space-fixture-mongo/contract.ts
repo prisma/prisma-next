@@ -1,6 +1,7 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { MONGO_TEST_COLLECTION } from './constants';
 
 const TARGET = 'mongo' as const;
@@ -51,6 +52,7 @@ export const MONGO_TEST_HEAD_HASH = computeStorageHash({
   target: TARGET,
   targetFamily: TARGET_FAMILY,
   storage: storageBody,
+  ...mongoContractCanonicalizationHooks,
 });
 
 /**

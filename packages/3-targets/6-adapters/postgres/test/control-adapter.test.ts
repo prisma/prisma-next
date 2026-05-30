@@ -1,5 +1,6 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { enumStorageCompoundKey } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -94,7 +95,7 @@ describe('PostgresControlAdapter', () => {
 
       expect(result.annotations?.['pg']).toMatchObject({
         storageTypes: {
-          role: {
+          [enumStorageCompoundKey('public', 'role')]: {
             codecId: 'pg/enum@1',
             nativeType: 'role',
             typeParams: { values: ['USER', 'ADMIN'] },

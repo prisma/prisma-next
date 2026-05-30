@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
 import {
   classifyMigrationListGraphTopology,
-  type EdgeKind,
-  type MigrationGraphTopology,
+  type MigrationEdgeKind,
+  type MigrationListGraphTopology,
 } from '../src/migration-list-graph-topology';
 import type { MigrationListEntry } from '../src/migration-list-types';
 
@@ -27,11 +27,11 @@ function entry(
   };
 }
 
-function classify(entries: readonly MigrationListEntry[]): MigrationGraphTopology {
+function classify(entries: readonly MigrationListEntry[]): MigrationListGraphTopology {
   return classifyMigrationListGraphTopology(entries);
 }
 
-function kind(topology: MigrationGraphTopology, migrationHash: string): EdgeKind {
+function kind(topology: MigrationListGraphTopology, migrationHash: string): MigrationEdgeKind {
   const k = topology.kindByMigrationHash.get(migrationHash);
   if (k === undefined) {
     throw new Error(`missing kind for ${migrationHash}`);
@@ -39,11 +39,11 @@ function kind(topology: MigrationGraphTopology, migrationHash: string): EdgeKind
   return k;
 }
 
-function forwardIn(topology: MigrationGraphTopology, contractHash: string): number {
+function forwardIn(topology: MigrationListGraphTopology, contractHash: string): number {
   return topology.forwardInDegree.get(contractHash) ?? 0;
 }
 
-function forwardOut(topology: MigrationGraphTopology, contractHash: string): number {
+function forwardOut(topology: MigrationListGraphTopology, contractHash: string): number {
   return topology.forwardOutDegree.get(contractHash) ?? 0;
 }
 
@@ -179,6 +179,19 @@ describe('classifyMigrationListGraphTopology', () => {
     expect(kind(topology, eCtoB.migrationHash)).toBe('forward');
     expect(kind(topology, eAtoC.migrationHash)).toBe('forward');
     expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
+  });
+
+  it('seeds pure-cycle back-edge lexically when a rooted component is also present', () => {
+    const eInit = entry('20250101_init', null, 'hash_root');
+    const eNext = entry('20250201_next', 'hash_root', 'hash_tip');
+    const eAtoB = entry('20250301_cycle_ab', 'hash_aaa', 'hash_bbb');
+    const eBtoA = entry('20250302_cycle_ba', 'hash_bbb', 'hash_aaa');
+    const topology = classify([eBtoA, eAtoB, eNext, eInit]);
+
+    expect(kind(topology, eInit.migrationHash)).toBe('forward');
+    expect(kind(topology, eNext.migrationHash)).toBe('forward');
+    expect(kind(topology, eAtoB.migrationHash)).toBe('forward');
+    expect(kind(topology, eBtoA.migrationHash)).toBe('rollback');
   });
 
   it('marks exactly one edge rollback in a two-node cycle', () => {

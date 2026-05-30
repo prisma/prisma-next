@@ -1,4 +1,8 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
+import {
+  createPreserveEmptyPredicate,
+  type PathPattern,
+} from '@prisma-next/contract/hashing-utils';
 import { describe, expect, it } from 'vitest';
 import { assertDescriptorSelfConsistency } from '../src/assert-descriptor-self-consistency';
 import { MigrationToolsError } from '../src/errors';
@@ -19,10 +23,21 @@ const STORAGE_BODY = {
 
 const TARGET = 'postgres';
 const FAMILY = 'sql';
+
+const sqlPreserveEmptyPatterns = [
+  ['storage', 'namespaces', '*', 'tables'],
+  ['storage', 'namespaces', '*', 'tables', '*'],
+  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+] as const satisfies readonly PathPattern[];
+
+const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
+
+const SQL_HOOKS = { shouldPreserveEmpty: sqlPreserveEmpty };
 const REAL_HASH = computeStorageHash({
   target: TARGET,
   targetFamily: FAMILY,
   storage: STORAGE_BODY,
+  ...SQL_HOOKS,
 });
 
 // Production-shape storage carries `storageHash` alongside the body; the
@@ -39,6 +54,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: STORAGE,
         headRefHash: REAL_HASH,
+        ...SQL_HOOKS,
       }),
     ).not.toThrow();
   });
@@ -51,6 +67,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: STORAGE,
         headRefHash: 'sha256:stale-hash',
+        ...SQL_HOOKS,
       }),
     ).toThrowError(MigrationToolsError);
   });
@@ -64,6 +81,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: STORAGE,
         headRefHash: 'sha256:stale-hash',
+        ...SQL_HOOKS,
       });
     } catch (error) {
       if (MigrationToolsError.is(error)) captured = error;
@@ -91,6 +109,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: reorderedStorage,
         headRefHash: REAL_HASH,
+        ...SQL_HOOKS,
       }),
     ).not.toThrow();
   });
@@ -103,6 +122,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: { ...STORAGE_BODY, storageHash: REAL_HASH },
         headRefHash: REAL_HASH,
+        ...SQL_HOOKS,
       }),
     ).not.toThrow();
     expect(() =>
@@ -112,6 +132,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: STORAGE_BODY,
         headRefHash: REAL_HASH,
+        ...SQL_HOOKS,
       }),
     ).not.toThrow();
   });
@@ -136,6 +157,7 @@ describe('assertDescriptorSelfConsistency', () => {
       target: TARGET,
       targetFamily: FAMILY,
       storage: namespacedBody,
+      ...SQL_HOOKS,
     });
     const onDiskStorage = {
       namespaces: {
@@ -154,6 +176,7 @@ describe('assertDescriptorSelfConsistency', () => {
         targetFamily: FAMILY,
         storage: onDiskStorage,
         headRefHash: namespacedHash,
+        ...SQL_HOOKS,
       }),
     ).not.toThrow();
   });

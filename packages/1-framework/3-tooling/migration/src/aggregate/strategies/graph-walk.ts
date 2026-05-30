@@ -1,7 +1,8 @@
 import type { MigrationPlan } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '../../constants';
 import { findPathWithDecision } from '../../migration-graph';
-import type { MigrationOps } from '../../package';
+import type { MigrationOps, OnDiskMigrationPackage } from '../../package';
+import { requireHeadRef } from '../aggregate';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { AggregatePerSpacePlan } from '../planner-types';
 import type { ContractSpaceMember } from '../types';
@@ -9,7 +10,7 @@ import type { ContractSpaceMember } from '../types';
 /**
  * Outcome variants for the graph-walk strategy. Mirrors
  * {@link import('../../compute-extension-space-apply-path').ExtensionSpaceApplyPathOutcome}
- * but operates against the **already-hydrated** `member.migrations.graph`
+ * but operates against the member's lazily-reconstructed `graph()`
  * instead of re-reading from disk. The aggregate planner converts
  * these into {@link import('../planner-types').AggregatePlannerError}
  * variants.
@@ -49,13 +50,17 @@ export interface GraphWalkStrategyInputs {
  */
 export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutcome {
   const { aggregateTargetId, member, currentMarker, refName } = input;
-  const { graph, packagesByMigrationHash } = member.migrations;
+  const headRef = requireHeadRef(member);
+  const graph = member.graph();
+  const packagesByMigrationHash = new Map<string, OnDiskMigrationPackage>(
+    member.packages.map((pkg) => [pkg.metadata.migrationHash, pkg]),
+  );
 
   const fromHash = currentMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
   const markerInvariants = new Set(currentMarker?.invariants ?? []);
-  const required = new Set(member.headRef.invariants.filter((id) => !markerInvariants.has(id)));
+  const required = new Set(headRef.invariants.filter((id) => !markerInvariants.has(id)));
 
-  const outcome = findPathWithDecision(graph, fromHash, member.headRef.hash, {
+  const outcome = findPathWithDecision(graph, fromHash, headRef.hash, {
     required,
     ...(refName !== undefined ? { refName } : {}),
   });
@@ -98,7 +103,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
     targetId: aggregateTargetId,
     spaceId: member.spaceId,
     origin: currentMarker === null ? null : { storageHash: currentMarker.storageHash },
-    destination: { storageHash: member.headRef.hash },
+    destination: { storageHash: headRef.hash },
     operations: pathOps,
     providedInvariants: [...providedInvariantsSet].sort(),
   };
@@ -108,7 +113,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
     result: {
       plan,
       displayOps: pathOps,
-      destinationContract: member.contract,
+      destinationContract: member.contract(),
       strategy: 'graph-walk',
       migrationEdges: edgeRefs,
       pathDecision: outcome.decision,

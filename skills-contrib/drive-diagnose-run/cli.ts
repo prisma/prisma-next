@@ -6,6 +6,7 @@ import { loadTrace } from './load.ts';
 import { computeMetrics } from './metrics.ts';
 import { parseTranscript } from './posthoc.ts';
 import { renderReport } from './report.ts';
+import { computeScorecard } from './scorecard.ts';
 
 function getProjectRunIds(events: TraceEvent[]): string[] {
   const ids = new Set<string>();
@@ -77,12 +78,14 @@ function run(): void {
         : 'native';
 
   const metrics = computeMetrics(nativeEvents);
+  const scorecard = computeScorecard(nativeEvents);
   const assertions = runAssertions(nativeEvents);
   const projectRunIds = getProjectRunIds(nativeEvents);
   const reportTracePath = tracePath ?? posthocPath ?? '(unknown)';
 
   const report = renderReport({
     metrics,
+    scorecard,
     assertions,
     loadErrors: nativeErrors,
     unknown: nativeUnknown,

@@ -133,6 +133,10 @@ function createMockComponents() {
     kind: 'target',
     targetId: 'postgres',
     familyId: 'sql',
+    contractSerializer: {
+      serializeContract: (contract: unknown) => contract,
+      deserializeContract: (json: unknown) => json,
+    },
     // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
   } as unknown as ControlTargetDescriptor<any, any, any>;
 

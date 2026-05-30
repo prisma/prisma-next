@@ -12,6 +12,10 @@ import type {
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import {
+  enumStorageCompoundKey,
+  resolveDdlSchemaForNamespaceStorage,
+} from '../core/migrations/enum-planning';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
@@ -78,6 +82,18 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,
+          // Schema-qualify enum annotation keys so the projected "from" IR's
+          // `storageTypes` match `readExistingEnumValues` on the read side
+          // (the contract-to-contract `migration plan` path). The DDL-schema
+          // resolution + compound-key format stay here in the target layer;
+          // the family projector treats the returned string as opaque.
+          // `undefined` schema IR ⇒ the unbound coordinate resolves to the
+          // default `public` landing schema, matching the read-side fallback.
+          resolveEnumStorageKey: (storage, namespaceId, nativeType) =>
+            enumStorageCompoundKey(
+              resolveDdlSchemaForNamespaceStorage(storage, namespaceId, undefined),
+              nativeType,
+            ),
         });
       },
     },

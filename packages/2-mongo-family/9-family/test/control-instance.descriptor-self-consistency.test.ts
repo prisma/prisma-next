@@ -5,6 +5,7 @@ import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
+import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
@@ -31,6 +32,7 @@ const FIXTURE_HEAD_HASH = computeStorageHash({
   target: TARGET,
   targetFamily: TARGET_FAMILY,
   storage: fixtureStorageBody,
+  ...mongoContractCanonicalizationHooks,
 });
 
 function buildContract(): MongoContract<MongoStorage> {

@@ -70,8 +70,10 @@ withTempDir(({ createTempDir }) => {
         expect(plan.exitCode, 'B.02: migration plan').toBe(0);
         expect(stripAnsi(plan.stdout), 'B.02: shows migration').toContain('add-name-column');
 
-        // B.03: migration show
-        const show = await runMigrationShow(ctx);
+        // B.03: migration show (explicit target — latest planned migration)
+        const showTarget = getLatestMigrationDir(ctx);
+        expect(showTarget, 'B.03: planned migration dir').toBeDefined();
+        const show = await runMigrationShow(ctx, [showTarget!]);
         expect(show.exitCode, 'B.03: migration show').toBe(0);
 
         // B.04: migration emit --dir <planned-dir>
@@ -128,8 +130,10 @@ withTempDir(({ createTempDir }) => {
 
         // --- Merged from Journey X: migration show variants ---
 
-        // X.01: migration show (latest — already tested in B.03, verify again post-apply)
-        const showLatest = await runMigrationShow(ctx);
+        // X.01: migration show (latest dir — already tested in B.03, verify again post-apply)
+        const latestDir = getLatestMigrationDir(ctx);
+        expect(latestDir, 'X.01: latest migration dir').toBeDefined();
+        const showLatest = await runMigrationShow(ctx, [latestDir!]);
         expect(showLatest.exitCode, 'X.01: show latest').toBe(0);
 
         // X.02: migration show by path (first migration dir)
