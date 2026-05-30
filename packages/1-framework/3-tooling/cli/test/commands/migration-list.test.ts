@@ -7,9 +7,15 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationListResult } from '@prisma-next/migration-tools/migration-list-types';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
-import { afterEach, describe, expect, it } from 'vitest';
-import { runMigrationList } from '../../src/commands/migration-list';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  renderMigrationListHumanOutput,
+  runMigrationList,
+} from '../../src/commands/migration-list';
+import { detectGlyphMode } from '../../src/utils/formatters/migration-list-graph-render';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
+import { parseGlobalFlags } from '../../src/utils/global-flags';
+import { createTerminalUI } from '../../src/utils/terminal-ui';
 
 /**
  * Verifies the `migration list` command's data-and-policy core:
@@ -129,6 +135,22 @@ function expectOk<T>(
   }
 }
 
+function renderListed(listResult: MigrationListResult): string {
+  return renderMigrationList(listResult);
+}
+
+function renderGraphListed(
+  listResult: MigrationListResult,
+  glyphMode: 'unicode' | 'ascii',
+  useColor = false,
+): string {
+  return renderMigrationListHumanOutput(listResult, {
+    graph: true,
+    glyphMode,
+    useColor,
+  });
+}
+
 describe('runMigrationList — slice-spec worked example', () => {
   it('renders the slice-spec worked example byte-for-byte (single space)', async () => {
     const { migrationsRoot } = await setupFixture();
@@ -182,14 +204,14 @@ describe('runMigrationList — slice-spec worked example', () => {
     expectOk(result);
 
     const expected =
-      '20260601T1200_backfill_emails     55bada2 ⟲          {backfill_emails_v1} (production)\n' +
-      '20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
-      '20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
-      '20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '20260422T0720_initial             ∅       → 4cb4256\n' +
+      '⟲ 20260601T1200_backfill_emails     55bada2  {backfill_emails_v1} (production)\n' +
+      '* 20260518T1701_namespaces_bookend  2f45cc7 → 804e018  (db)\n' +
+      '* 20260422T0748_migration           55bada2 → 2f45cc7  (staging)\n' +
+      '* 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
+      '* 20260422T0720_initial             ∅       → 4cb4256\n' +
       '\n' +
       '5 migration(s) on disk';
-    expect(renderMigrationList(result.value)).toBe(expected);
+    expect(renderListed(result.value)).toBe(expected);
   });
 
   it('renders every on-disk migration as exactly one row (row-count guarantee)', async () => {
@@ -255,8 +277,8 @@ describe('runMigrationList — slice-spec worked example', () => {
 
     // Human pass — confirm every dirName lands on its own row, no
     // dedup, no silent omission. Count rows directly.
-    const human = renderMigrationList(result.value);
-    const rows = human.split('\n').filter((line) => /^\d{8}T\d{4}_/.test(line));
+    const human = renderListed(result.value);
+    const rows = human.split('\n').filter((line) => /^(\s*)?[*↩⟲] \d{8}T\d{4}_/.test(line));
     expect(rows).toHaveLength(specs.length);
     for (const spec of specs) {
       expect(human).toContain(spec.dirName);
@@ -304,15 +326,15 @@ describe('runMigrationList — slice-spec worked example', () => {
 
     const expected =
       'app:\n' +
-      '  20260518T1701_namespaces_bookend  55bada2 → 804e018  (db)\n' +
-      '  20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
-      '  20260422T0720_initial             ∅       → 4cb4256\n' +
+      '  * 20260518T1701_namespaces_bookend  55bada2 → 804e018  (db)\n' +
+      '  * 20260422T0742_migration           4cb4256 → 55bada2  (production)\n' +
+      '  * 20260422T0720_initial             ∅       → 4cb4256\n' +
       '\n' +
       'postgis:\n' +
-      '  20260601T0000_install_postgis_extension  ∅       → 9aabbcc  (db)\n' +
+      '  * 20260601T0000_install_postgis_extension  ∅       → 9aabbcc  (db)\n' +
       '\n' +
       '4 migration(s) across 2 contract space(s)';
-    expect(renderMigrationList(result.value)).toBe(expected);
+    expect(renderListed(result.value)).toBe(expected);
     expect(result.value.summary).toBe('4 migration(s) across 2 contract space(s)');
   });
 
@@ -343,7 +365,7 @@ describe('runMigrationList — slice-spec worked example', () => {
       expect(m.to).toBe(HASH_FAN_C);
       expect(m.refs).toEqual(['production']);
     }
-    const human = renderMigrationList(result.value);
+    const human = renderListed(result.value);
     const matches = [...human.matchAll(/\(production\)/g)];
     expect(matches).toHaveLength(2);
   });
@@ -374,8 +396,8 @@ describe('runMigrationList — slice-spec worked example', () => {
     // The `⟲` row has hash-width pad in the destination slot and no
     // decoration block at all. Trailing newline + summary follows.
     const expected =
-      '20260101T0000_useless_self_edge  4cb4256 ⟲        \n' + '\n' + '1 migration(s) on disk';
-    expect(renderMigrationList(result.value)).toBe(expected);
+      '⟲ 20260101T0000_useless_self_edge  4cb4256\n' + '\n' + '1 migration(s) on disk';
+    expect(renderListed(result.value)).toBe(expected);
   });
 
   it('renders self-edge with invariants as `⟲ … {invariant_id}`', async () => {
@@ -395,10 +417,10 @@ describe('runMigrationList — slice-spec worked example', () => {
       'backfill_emails_v1',
     ]);
 
-    const human = renderMigrationList(result.value);
-    // Spec rule: hash column for `to` is blank-padded on a self-edge,
-    // followed by a uniform 2-space decoration prefix before `{...}`.
-    expect(human).toMatch(/55bada2 ⟲ {10}\{backfill_emails_v1\}/);
+    const human = renderListed(result.value);
+    expect(human).toMatch(/^⟲ 20260601T1200_backfill_emails/);
+    expect(human).toMatch(/55bada2 {2}\{backfill_emails_v1\}/);
+    expect(human).not.toContain('→');
   });
 
   it('renders the empty-state line when the migrations directory does not exist', async () => {
@@ -408,9 +430,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     // Empty-state synthesizes the app space so the renderer can name a
     // directory.
     expect(result.value.spaces).toEqual([{ spaceId: 'app', migrations: [] }]);
-    expect(renderMigrationList(result.value)).toBe(
-      'There are no migrations in migrations/app/ yet',
-    );
+    expect(renderListed(result.value)).toBe('There are no migrations in migrations/app/ yet');
   });
 
   it('renders the empty-state line for an existing-but-empty default scope (only stray non-space dirs)', async () => {
@@ -421,9 +441,41 @@ describe('runMigrationList — slice-spec worked example', () => {
     await mkdir(migrationsRoot, { recursive: true });
     const result = await runMigrationList({ migrationsDir: migrationsRoot });
     expectOk(result);
-    expect(renderMigrationList(result.value)).toBe(
-      'There are no migrations in migrations/app/ yet',
-    );
+    expect(renderListed(result.value)).toBe('There are no migrations in migrations/app/ yet');
+  });
+
+  it('threads topology classification so skip-rollback shows a leading ↩ glyph', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_chain_a',
+      from: null,
+      to: HASH_FAN_BASE,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_chain_b',
+      from: HASH_FAN_BASE,
+      to: HASH_FAN_A,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0002_chain_c',
+      from: HASH_FAN_A,
+      to: HASH_FAN_B,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260106T0000_skip_back',
+      from: HASH_FAN_B,
+      to: HASH_FAN_BASE,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+    const human = renderListed(result.value);
+    expect(human).toMatch(/^↩ 20260106T0000_skip_back/m);
+    expect(human).toContain('* 20260101T0002_chain_c');
   });
 });
 
@@ -455,7 +507,7 @@ describe('runMigrationList — --space flag', () => {
       '20260601T0000_install_postgis_extension',
     ]);
 
-    const human = renderMigrationList(result.value);
+    const human = renderListed(result.value);
     // Single-space output → no per-space heading.
     expect(human).not.toContain('app:');
     expect(human).not.toContain('postgis:');
@@ -474,9 +526,7 @@ describe('runMigrationList — --space flag', () => {
     });
     expectOk(result);
     expect(result.value.spaces).toEqual([{ spaceId: 'postgis', migrations: [] }]);
-    expect(renderMigrationList(result.value)).toBe(
-      'There are no migrations in migrations/postgis/ yet',
-    );
+    expect(renderListed(result.value)).toBe('There are no migrations in migrations/postgis/ yet');
   });
 
   it('emits MIGRATION.SPACE_NOT_FOUND when --space names a non-existent contract space', async () => {
@@ -632,5 +682,287 @@ describe('runMigrationList — JSON output shape', () => {
     expectOk(result);
     expect(result.value.spaces.map((s) => s.spaceId)).toEqual(['app', 'postgis']);
     expect(result.value.summary).toBe('2 migration(s) across 2 contract space(s)');
+  });
+});
+
+describe('migration list --graph human output', () => {
+  it('renders linear history byte-identical to the flat list', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_chain_a',
+      from: null,
+      to: HASH_FAN_BASE,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_chain_b',
+      from: HASH_FAN_BASE,
+      to: HASH_FAN_A,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0002_chain_c',
+      from: HASH_FAN_A,
+      to: HASH_FAN_B,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const flat = renderListed(result.value);
+    const graph = renderGraphListed(result.value, 'unicode');
+    const flatRows = flat.split('\n').slice(0, 3).join('\n');
+    expect(graph.split('\n').slice(0, 3).join('\n')).toBe(flatRows);
+  });
+
+  it('renders a branched convergence tree with node-line and lane gutters', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'unicode');
+    expect(graph).toBe(
+      'o   fffffff\n' +
+        '├─┐\n' +
+        '* │ 20260101T0001_right  bbbbbbb → fffffff\n' +
+        '│ * 20260101T0000_left   aaaaaaa → fffffff\n' +
+        '\n' +
+        '2 migration(s) on disk',
+    );
+  });
+
+  it('forces ASCII glyphs when glyph mode is ascii', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'ascii');
+    expect(graph).toContain('+-\\');
+    expect(graph).toContain('->');
+    expect(graph).not.toContain('→');
+  });
+
+  it('picks ASCII for non-TTY stdout via injected runtime', () => {
+    const ui = createTerminalUI(parseGlobalFlags({}), {
+      isTTY: false,
+      env: { LANG: 'en_US.UTF-8' },
+    });
+    expect(ui.resolveGlyphMode(false)).toBe('ascii');
+    expect(detectGlyphMode(ui.glyphModeInput())).toBe('ascii');
+  });
+
+  it('picks Unicode on a UTF-8 TTY via injected runtime', () => {
+    const ui = createTerminalUI(parseGlobalFlags({}), {
+      isTTY: true,
+      env: { LANG: 'en_US.UTF-8' },
+    });
+    expect(ui.resolveGlyphMode(false)).toBe('unicode');
+  });
+
+  it('lets --ascii override a UTF-8 TTY', () => {
+    const ui = createTerminalUI(parseGlobalFlags({}), {
+      isTTY: true,
+      env: { LANG: 'en_US.UTF-8' },
+    });
+    expect(ui.resolveGlyphMode(true)).toBe('ascii');
+  });
+
+  it('keeps Unicode glyphs when color is disabled', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const coloredOff = renderGraphListed(result.value, 'unicode', false);
+    const ascii = renderGraphListed(result.value, 'ascii', false);
+    expect(coloredOff).toContain('→');
+    expect(coloredOff).not.toContain('->');
+    expect(ascii).toContain('->');
+  });
+
+  it('keeps ANSI styling when ASCII glyph mode is on', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const wrapSgr =
+      (open: string, close: string) =>
+      (text: string): string =>
+        `${open}${text}${close}`;
+    vi.doMock('colorette', () => ({
+      bold: wrapSgr('\u001b[1m', '\u001b[22m'),
+      dim: wrapSgr('\u001b[2m', '\u001b[22m'),
+      cyan: wrapSgr('\u001b[36m', '\u001b[39m'),
+      cyanBright: wrapSgr('\u001b[96m', '\u001b[39m'),
+      yellow: wrapSgr('\u001b[33m', '\u001b[39m'),
+      green: wrapSgr('\u001b[32m', '\u001b[39m'),
+      greenBright: wrapSgr('\u001b[92m', '\u001b[39m'),
+    }));
+    vi.resetModules();
+    try {
+      const { parseGlobalFlags: parseFlags } = await import('../../src/utils/global-flags');
+      const { createTerminalUI: createUi } = await import('../../src/utils/terminal-ui');
+      const { renderMigrationListHumanOutput: renderHuman } = await import(
+        '../../src/commands/migration-list'
+      );
+      const ui = createUi(parseFlags({}), {
+        isTTY: true,
+        env: { LANG: 'en_US.UTF-8' },
+      });
+      const graph = renderHuman(result.value, {
+        graph: true,
+        glyphMode: ui.resolveGlyphMode(true),
+        useColor: true,
+      });
+      expect(graph).toContain('\u001b[');
+      expect(graph).toContain('->');
+      expect(graph).not.toContain('→');
+    } finally {
+      vi.doUnmock('colorette');
+      vi.resetModules();
+    }
+  });
+
+  it('scopes graph output with --space', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({
+      migrationsDir: migrationsRoot,
+      spaceFilter: 'postgis',
+    });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'unicode');
+    expect(graph).not.toContain('app:');
+    expect(graph).not.toContain('20260422T0720_initial');
+    expect(graph).toContain('20260101T0000_left');
+    expect(graph).toContain('o   fffffff');
+  });
+
+  it('renders multi-space graph blocks with headings and summary', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260422T0720_initial',
+      from: null,
+      to: HASH_4cb4256,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260101T0001_right',
+      from: HASH_BRANCH_Y,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const graph = renderGraphListed(result.value, 'unicode');
+    expect(graph).toBe(
+      'app:\n' +
+        '  * 20260422T0720_initial  ∅       → 4cb4256\n' +
+        '\n' +
+        'postgis:\n' +
+        '  o   fffffff\n' +
+        '  ├─┐\n' +
+        '  * │ 20260101T0001_right  bbbbbbb → fffffff\n' +
+        '  │ * 20260101T0000_left   aaaaaaa → fffffff\n' +
+        '\n' +
+        '3 migration(s) across 2 contract space(s)',
+    );
+  });
+
+  it('leaves JSON serialization unchanged by graph rendering options', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'app',
+      dirName: '20260101T0000_left',
+      from: HASH_BRANCH_X,
+      to: HASH_FAN_C,
+    });
+
+    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    expectOk(result);
+
+    const json = JSON.stringify(result.value, null, 2);
+    expect(json).toContain('20260101T0000_left');
+    expect(json).not.toContain('├─┐');
+    expect(JSON.parse(json)).toEqual(result.value);
   });
 });

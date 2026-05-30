@@ -1,4 +1,4 @@
-import type { TraceEvent } from '../schema.ts';
+import type { TraceEvent } from '../../drive-record-traces/schema.ts';
 import { checkBriefDiscipline } from './brief.ts';
 import { checkCascadeRules } from './cascade.ts';
 import { checkInvariants } from './invariants.ts';

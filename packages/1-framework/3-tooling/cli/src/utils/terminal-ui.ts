@@ -1,7 +1,14 @@
 import * as clack from '@clack/prompts';
 import { bold, cyan, dim, green, red, yellow } from 'colorette';
+import {
+  detectGlyphMode,
+  type GlyphMode,
+  type GlyphModeInput,
+} from './formatters/migration-list-graph-render';
 import type { GlobalFlags } from './global-flags';
 import { shutdownSignal } from './shutdown';
+
+export interface TerminalUIRuntime extends GlyphModeInput {}
 
 /**
  * Composable CLI output abstraction.
@@ -36,17 +43,50 @@ export class TerminalUI {
    */
   readonly forcePretty: boolean;
 
+  /**
+   * Whether stdout is a TTY — used for migration-list graph glyph detection.
+   */
+  readonly stdoutIsTTY: boolean;
+
+  /**
+   * Process environment snapshot for locale-aware glyph detection.
+   */
+  readonly env: Readonly<Record<string, string | undefined>>;
+
   private static readonly stderrOpts = { output: process.stderr } as const;
 
   constructor(options?: {
     readonly color?: boolean | undefined;
     readonly interactive?: boolean | undefined;
     readonly forcePretty?: boolean | undefined;
+    readonly stdoutIsTTY?: boolean | undefined;
+    readonly env?: Readonly<Record<string, string | undefined>> | undefined;
   }) {
     // --interactive/--no-interactive override TTY detection
     this.isInteractive = options?.interactive ?? !!process.stdout.isTTY;
     this.forcePretty = options?.forcePretty ?? false;
     this.useColor = options?.color ?? (this.isInteractive || this.forcePretty);
+    this.stdoutIsTTY = options?.stdoutIsTTY ?? !!process.stdout.isTTY;
+    this.env = options?.env ?? process.env;
+  }
+
+  get isTTY(): boolean {
+    return this.stdoutIsTTY;
+  }
+
+  /**
+   * Resolve graph glyph mode for `migration list --graph`. `--ascii` forces
+   * ASCII; otherwise delegates to the pure {@link detectGlyphMode} helper.
+   */
+  resolveGlyphMode(forceAscii: boolean): GlyphMode {
+    if (forceAscii) {
+      return 'ascii';
+    }
+    return detectGlyphMode(this.glyphModeInput());
+  }
+
+  glyphModeInput(): GlyphModeInput {
+    return { isTTY: this.stdoutIsTTY, env: this.env };
   }
 
   private get shouldDecorate(): boolean {
@@ -288,10 +328,15 @@ export class TerminalUI {
   }
 }
 
-export function createTerminalUI(flags: GlobalFlags): TerminalUI {
+export function createTerminalUI(
+  flags: GlobalFlags,
+  runtime?: Partial<TerminalUIRuntime>,
+): TerminalUI {
   return new TerminalUI({
     color: flags.color,
     interactive: flags.interactive,
     forcePretty: flags.format === 'pretty' && flags.explicitFormat,
+    stdoutIsTTY: runtime?.isTTY,
+    env: runtime?.env,
   });
 }
