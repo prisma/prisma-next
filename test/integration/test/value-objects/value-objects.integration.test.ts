@@ -193,13 +193,11 @@ describe('value objects: end-to-end SQL pipeline', () => {
     expect(homeAddressField.type).toEqual({ kind: 'valueObject', name: 'Address' });
     expect(homeAddressField.nullable).toBe(false);
 
-    const storage = contract.storage as unknown as {
-      namespaces: Record<
-        string,
-        { tables: Record<string, { columns: Record<string, { nativeType: string }> }> }
-      >;
-    };
-    const userTable = storage.namespaces[UNBOUND_NAMESPACE_ID]!.tables['user'];
+    const storage = contract.storage as unknown as Record<
+      string,
+      { tables: Record<string, { columns: Record<string, { nativeType: string }> }> }
+    >;
+    const userTable = storage[UNBOUND_NAMESPACE_ID]!.tables['user'];
     expect(userTable).toBeDefined();
     expect(userTable!.columns['homeAddress']).toBeDefined();
     expect(userTable!.columns['homeAddress']!.nativeType).toBe('jsonb');

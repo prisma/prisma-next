@@ -90,47 +90,45 @@
   },
   "storage": {
     "storageHash": "sha256:vo-sql-test-storage-hash",
-    "namespaces": {
-      "__unbound__": {
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema",
-        "tables": {
-          "shop": {
-            "columns": {
-              "id": {
-                "codecId": "pg/int4@1",
-                "nativeType": "int4",
-                "nullable": false,
-                "default": {
-                  "kind": "function",
-                  "expression": "autoincrement()"
-                }
-              },
-              "name": {
-                "codecId": "pg/text@1",
-                "nativeType": "text",
-                "nullable": false
-              },
-              "location": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": false
-              },
-              "notes": {
-                "codecId": "pg/jsonb@1",
-                "nativeType": "jsonb",
-                "nullable": true
+    "__unbound__": {
+      "id": "__unbound__",
+      "kind": "postgres-unbound-schema",
+      "tables": {
+        "shop": {
+          "columns": {
+            "id": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false,
+              "default": {
+                "kind": "function",
+                "expression": "autoincrement()"
               }
             },
-            "primaryKey": {
-              "columns": [
-                "id"
-              ]
+            "name": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "uniques": [],
-            "indexes": [],
-            "foreignKeys": []
-          }
+            "location": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": false
+            },
+            "notes": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": true
+            }
+          },
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
         }
       }
     }

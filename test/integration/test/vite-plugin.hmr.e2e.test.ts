@@ -1,5 +1,7 @@
 import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getStorageNamespace } from '@prisma-next/framework-components/ir';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import * as vite7 from 'vite7';
 import * as vite8 from 'vite8';
@@ -16,10 +18,8 @@ const pslFixtureSubdir = 'vite-plugin-psl';
 
 const UNBOUND_NAMESPACE = '__unbound__';
 
-function unboundUserColumns(storage: {
-  namespaces: Record<string, { tables: { user: { columns: Record<string, unknown> } } }>;
-}) {
-  return storage.namespaces[UNBOUND_NAMESPACE]!.tables.user.columns;
+function unboundUserColumns(storage: object) {
+  return getStorageNamespace<SqlNamespace>(storage, UNBOUND_NAMESPACE)!.tables['user']!.columns;
 }
 
 type ViteModuleNodeLike = object;

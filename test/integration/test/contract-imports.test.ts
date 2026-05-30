@@ -179,9 +179,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 // biome-ignore lint/suspicious/noExplicitAny: test code with type assertions
 const _contract: Contract = {} as any;
 const _storage: Contract['storage'] = _contract.storage;
-const _namespaces: Contract['storage']['namespaces'] = _storage.namespaces;
-const _tables: Contract['storage']['namespaces']['__unbound__']['tables'] =
-  _namespaces['__unbound__'].tables;
+const _tables: Contract['storage']['__unbound__']['tables'] = _storage['__unbound__'].tables;
 
 // Verify we can access CodecTypes
 const _codecTypes: CodecTypes = {} as any;
@@ -190,7 +188,7 @@ const _codecTypes: CodecTypes = {} as any;
 const _sqlStorage: SqlStorage = _contract.storage;
 
 // Verify the contract type is correctly structured
-type UserTable = Contract['storage']['namespaces']['__unbound__']['tables']['user'];
+type UserTable = Contract['storage']['__unbound__']['tables']['user'];
 type UserColumns = UserTable['columns'];
 type UserIdColumn = UserColumns['id'];
 `;
@@ -318,7 +316,7 @@ import contractJson from './contract.json' with { type: 'json' };
 const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
 // Verify we can access all exported types
-const _namespaces: Namespaces = contract.storage.namespaces;
+const _namespaces: Namespaces = contract.storage;
 const _tables = _namespaces['__unbound__'].tables;
 const _models: Models = contract.models;
 

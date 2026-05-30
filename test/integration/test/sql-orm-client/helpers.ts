@@ -105,7 +105,7 @@ export function buildMixedPolyContract(): TestContract {
     base: 'Task',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.tasks = {
+  raw.storage[UNBOUND_NAMESPACE_ID].tables.tasks = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -118,7 +118,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.features = {
+  raw.storage[UNBOUND_NAMESPACE_ID].tables.features = {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -166,17 +166,17 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
+  raw.storage[UNBOUND_NAMESPACE_ID].tables.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.role = {
+  raw.storage[UNBOUND_NAMESPACE_ID].tables.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.namespaces[UNBOUND_NAMESPACE_ID].tables.users.columns.plan = {
+  raw.storage[UNBOUND_NAMESPACE_ID].tables.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,

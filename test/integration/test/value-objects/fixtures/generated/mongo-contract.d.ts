@@ -68,13 +68,11 @@ type ContractBase = {
     };
   };
   readonly storage: {
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'mongo-namespace';
-        readonly collections: {
-          readonly shops: { readonly kind: 'mongo-collection' };
-        };
+    readonly __unbound__: {
+      readonly id: '__unbound__';
+      readonly kind: 'mongo-namespace';
+      readonly collections: {
+        readonly shops: { readonly kind: 'mongo-collection' };
       };
     };
     readonly storageHash: StorageHash;

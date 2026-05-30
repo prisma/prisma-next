@@ -323,20 +323,17 @@ describe('family instance schemaVerify', () => {
           ...contract,
           storage: {
             ...contract.storage,
-            namespaces: {
-              ...contract.storage.namespaces,
-              __unbound__: {
-                ...contract.storage.namespaces.__unbound__,
-                tables: {
-                  ...contract.storage.namespaces.__unbound__.tables,
-                  user: {
-                    ...contract.storage.namespaces.__unbound__.tables.user,
-                    columns: {
-                      ...contract.storage.namespaces.__unbound__.tables.user.columns,
-                      email: {
-                        ...contract.storage.namespaces.__unbound__.tables.user.columns.email,
-                        codecId: 'pg/unknown-type@1' as const,
-                      },
+            __unbound__: {
+              ...contract.storage.__unbound__,
+              tables: {
+                ...contract.storage.__unbound__.tables,
+                user: {
+                  ...contract.storage.__unbound__.tables.user,
+                  columns: {
+                    ...contract.storage.__unbound__.tables.user.columns,
+                    email: {
+                      ...contract.storage.__unbound__.tables.user.columns.email,
+                      codecId: 'pg/unknown-type@1' as const,
                     },
                   },
                 },
