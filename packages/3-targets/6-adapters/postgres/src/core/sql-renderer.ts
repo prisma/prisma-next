@@ -1,10 +1,7 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import {
-  getStorageNamespace,
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { SqlNamespace } from '@prisma-next/sql-contract/types';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -684,9 +681,7 @@ function getInsertColumnOrder(
   }
 
   let table: { columns: Record<string, unknown> } | undefined;
-  for (const ns of storageNamespaceValues(contract.storage)) {
-    // Namespace.tables is Record<string, IRNode> at the interface level;
-    // SQL family namespaces hold StorageTable instances which have .columns.
+  for (const ns of storageNamespaceValues<SqlNamespace>(contract.storage)) {
     const found = ns.tables[tableName] as { columns: Record<string, unknown> } | undefined;
     if (found !== undefined) {
       table = found;

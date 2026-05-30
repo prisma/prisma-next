@@ -10,7 +10,11 @@ import {
   type MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor, {
   postgresRenderDefault,
 } from '@prisma-next/target-postgres/control';
@@ -29,12 +33,14 @@ function createEmptyContract(): Contract<SqlStorage> {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables: {} }),
-      },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:test'),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables: {} }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
@@ -63,12 +69,14 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       const fromContract: Contract<SqlStorage> = {
         ...createEmptyContract(),
-        storage: new SqlStorage({
-          storageHash: coreHash('sha256:from'),
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables: {} }),
-          },
-        }),
+        storage: new SqlStorage(
+          buildSqlStorageInput({
+            storageHash: coreHash('sha256:from'),
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables: {} }),
+            },
+          }),
+        ),
       };
       const result = planner.plan({
         contract,

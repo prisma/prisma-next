@@ -9,7 +9,11 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
@@ -48,30 +52,32 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash(`sha256:pg-ext-test-v${version}`),
-    storage: new SqlStorage({
-      storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            _ext_helper: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                ...(version === 2
-                  ? {
-                      note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-                    }
-                  : {}),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              _ext_helper: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  ...(version === 2
+                    ? {
+                        note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+                      }
+                    : {}),
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-        }),
-      },
-    }),
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},

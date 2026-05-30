@@ -2,7 +2,11 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -23,33 +27,40 @@ const contractWithEnum: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
   profileHash: profileHash('sha256:test'),
-  storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-        id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              role: { nativeType: 'role', codecId: 'pg/enum@1', nullable: false, typeRef: 'Role' },
+  storage: new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:test'),
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                role: {
+                  nativeType: 'role',
+                  codecId: 'pg/enum@1',
+                  nullable: false,
+                  typeRef: 'Role',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        },
-        enum: {
-          Role: new PostgresEnumType({
-            name: 'Role',
-            nativeType: 'role',
-            values: ['USER', 'ADMIN'],
-          }),
-        },
-      }),
-    },
-  }),
+          enum: {
+            Role: new PostgresEnumType({
+              name: 'Role',
+              nativeType: 'role',
+              values: ['USER', 'ADMIN'],
+            }),
+          },
+        }),
+      },
+    }),
+  ),
   roots: {},
   models: {},
   capabilities: {},

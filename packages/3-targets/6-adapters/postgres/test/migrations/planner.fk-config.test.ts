@@ -2,7 +2,11 @@ import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-nex
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
@@ -16,52 +20,54 @@ function createFkTestContract(fkConfig: {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-            post: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'user',
-                    columns: ['id'],
-                  },
-                  constraint: fkConfig.constraint,
-                  index: fkConfig.index,
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:contract'),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
                 },
-              ],
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              post: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'post',
+                      columns: ['userId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'user',
+                      columns: ['id'],
+                    },
+                    constraint: fkConfig.constraint,
+                    index: fkConfig.index,
+                  },
+                ],
+              },
             },
-          },
-        }),
-      },
-    }),
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},

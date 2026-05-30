@@ -2,7 +2,11 @@ import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-nex
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -27,55 +31,57 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:cross-ns-fk'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:cross-ns-fk'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            post: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                author_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'post',
-                    columns: ['author_id'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId('auth'),
-                    tableName: 'user',
-                    columns: ['id'],
-                  },
-                  constraint: true,
-                  index: false,
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:cross-ns-fk'),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              post: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  author_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 },
-              ],
-            },
-          },
-        }),
-        auth: buildSqlNamespace({
-          id: 'auth',
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'post',
+                      columns: ['author_id'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId('auth'),
+                      tableName: 'user',
+                      columns: ['id'],
+                    },
+                    constraint: true,
+                    index: false,
+                  },
+                ],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-        }),
-      },
-    }),
+          }),
+          auth: buildSqlNamespace({
+            id: 'auth',
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+            },
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},

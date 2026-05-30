@@ -4,6 +4,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   type ForeignKey,
   type ReferentialAction,
   SqlStorage,
@@ -37,35 +38,37 @@ function createRefActionContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:contract'),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-            post: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              post: {
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [fk],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [fk],
             },
-          },
-        }),
-      },
-    }),
+          }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},

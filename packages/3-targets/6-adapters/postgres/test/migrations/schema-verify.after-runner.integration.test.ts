@@ -2,7 +2,11 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -119,37 +123,39 @@ describe.sequential('Schema verification after runner - integration', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract-with-defaults'),
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-              id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                user: {
-                  columns: {
-                    id: {
-                      nativeType: 'int4',
-                      codecId: 'pg/int4@1',
-                      nullable: false,
-                      default: { kind: 'function', expression: 'autoincrement()' },
+        storage: new SqlStorage(
+          buildSqlStorageInput({
+            storageHash: coreHash('sha256:contract-with-defaults'),
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+                id: UNBOUND_NAMESPACE_ID,
+                tables: {
+                  user: {
+                    columns: {
+                      id: {
+                        nativeType: 'int4',
+                        codecId: 'pg/int4@1',
+                        nullable: false,
+                        default: { kind: 'function', expression: 'autoincrement()' },
+                      },
+                      createdAt: {
+                        nativeType: 'timestamptz',
+                        codecId: 'pg/timestamptz@1',
+                        nullable: false,
+                        default: { kind: 'function', expression: 'now()' },
+                      },
+                      email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
                     },
-                    createdAt: {
-                      nativeType: 'timestamptz',
-                      codecId: 'pg/timestamptz@1',
-                      nullable: false,
-                      default: { kind: 'function', expression: 'now()' },
-                    },
-                    email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
-              },
-            }),
-          },
-        }),
+              }),
+            },
+          }),
+        ),
         roots: {},
         models: {},
         capabilities: {},
@@ -183,38 +189,40 @@ describe.sequential('Schema verification after runner - integration', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract-enum-mixed-case'),
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-              id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                Organization: {
-                  columns: {
-                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                    billingState: {
-                      nativeType: 'BillingState',
-                      codecId: 'pg/enum@1',
-                      nullable: false,
-                      typeRef: 'BillingState',
+        storage: new SqlStorage(
+          buildSqlStorageInput({
+            storageHash: coreHash('sha256:contract-enum-mixed-case'),
+            namespaces: {
+              [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+                id: UNBOUND_NAMESPACE_ID,
+                tables: {
+                  Organization: {
+                    columns: {
+                      id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                      billingState: {
+                        nativeType: 'BillingState',
+                        codecId: 'pg/enum@1',
+                        nullable: false,
+                        typeRef: 'BillingState',
+                      },
                     },
+                    primaryKey: { columns: ['id'] },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
-              },
-              enum: {
-                BillingState: new PostgresEnumType({
-                  name: 'BillingState',
-                  nativeType: 'BillingState',
-                  values: ['ok', 'atRisk', 'blocked'],
-                }),
-              },
-            }),
-          },
-        }),
+                enum: {
+                  BillingState: new PostgresEnumType({
+                    name: 'BillingState',
+                    nativeType: 'BillingState',
+                    values: ['ok', 'atRisk', 'blocked'],
+                  }),
+                },
+              }),
+            },
+          }),
+        ),
         roots: {},
         models: {},
         capabilities: {},

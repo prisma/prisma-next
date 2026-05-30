@@ -5,7 +5,12 @@ import {
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -34,12 +39,14 @@ function makeContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
-      },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
+        },
+      }),
+    ),
     roots: {},
     models: {},
     capabilities: {},
@@ -992,38 +999,40 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              item: {
-                columns: {
-                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  status: {
-                    nativeType: 'status_type',
-                    codecId: 'pg/enum@1',
-                    nullable: false,
-                    typeRef: 'status_type',
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                item: {
+                  columns: {
+                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                    status: {
+                      nativeType: 'status_type',
+                      codecId: 'pg/enum@1',
+                      nullable: false,
+                      typeRef: 'status_type',
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-            enum: {
-              status_type: new PostgresEnumType({
-                name: 'status_type',
-                nativeType: 'status_type',
-                values: ['active', 'inactive'],
-              }),
-            },
-          }),
-        },
-      }),
+              enum: {
+                status_type: new PostgresEnumType({
+                  name: 'status_type',
+                  nativeType: 'status_type',
+                  values: ['active', 'inactive'],
+                }),
+              },
+            }),
+          },
+        }),
+      ),
       roots: {},
       models: {},
       capabilities: {},
@@ -1268,38 +1277,40 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              item: {
-                columns: {
-                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  status: {
-                    nativeType: 'StatusType',
-                    codecId: 'pg/enum@1',
-                    nullable: false,
-                    typeRef: 'StatusType',
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+              id: UNBOUND_NAMESPACE_ID,
+              tables: {
+                item: {
+                  columns: {
+                    id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                    status: {
+                      nativeType: 'StatusType',
+                      codecId: 'pg/enum@1',
+                      nullable: false,
+                      typeRef: 'StatusType',
+                    },
                   },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-            enum: {
-              StatusType: new PostgresEnumType({
-                name: 'StatusType',
-                nativeType: 'StatusType',
-                values: ['active', 'inactive'],
-              }),
-            },
-          }),
-        },
-      }),
+              enum: {
+                StatusType: new PostgresEnumType({
+                  name: 'StatusType',
+                  nativeType: 'StatusType',
+                  values: ['active', 'inactive'],
+                }),
+              },
+            }),
+          },
+        }),
+      ),
       roots: {},
       models: {},
       capabilities: {},

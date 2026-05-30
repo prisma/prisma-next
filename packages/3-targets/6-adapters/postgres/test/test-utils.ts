@@ -10,6 +10,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   type StorageTableInput,
   type StorageTypeInstance,
@@ -24,10 +25,12 @@ export function createTestContract(
     tables: overrides.tables ?? {},
   });
   return createContract<SqlStorage>({
-    storage: new SqlStorage({
-      storageHash: (overrides.storageHash ?? 'sha256:test') as never,
-      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: (overrides.storageHash ?? 'sha256:test') as never,
+        namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
+      }),
+    ),
   });
 }
 
