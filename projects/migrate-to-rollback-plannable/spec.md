@@ -45,6 +45,22 @@ sequence: no edge from `<current>` to `<target>` → plan one with `migration pl
 with a one-line note that a rollback plan is expected to contain destructive
 (`DROP`) ops to review before applying.
 
+**4. `migrate --to <node>` verifies against the target contract.** Today
+`migrate` (`migrate.ts`) always hands the **emitted** `contract.json` to
+`migrationApply` as the contract to verify the landed state against, while `--to`
+only selects the graph *target hash*. The postgres runner enforces "landed state
+== provided contract" (`DESTINATION_CONTRACT_MISMATCH`), so applying any target
+that isn't the emitted contract — every rollback, every arbitrary historical
+target — dead-ends *after* the edge has been planned. This makes change #3's
+advertised `migrate --to <target>` command a lie for the rollback case. Fix:
+when `--to` resolves to a graph node, verify/apply against that target bundle's
+`end-contract.json` instead of the emitted `contract.json`. This mirrors
+`db update --to` (`db-update.ts`) exactly, and `migrate.ts` already reads the
+same `end-contract.json` for the `advanceRef` snapshot — it just doesn't use it
+as the apply contract. This does **not** auto-plan: `migrate` still refuses to
+invent a missing edge; it only verifies against the resolved target rather than
+the emitted contract.
+
 Worked example (the J5 audit's failing case, after this slice):
 
 ```
@@ -65,12 +81,15 @@ disk.
 
 ## Coherence rationale
 
-The error message and the `--to` flag are one change, not two: rewriting the
-diagnostic to advertise `migration plan --to` is meaningless until the flag
-exists, and shipping the flag without fixing the diagnostic leaves the
-advertised-but-broken `<dir>^` trap in place. One reviewer holds "the rollback
-edge is now plannable, and the error that sends you there is honest" in a single
-sitting.
+The error message, the `plan --to` flag, and the `migrate --to` verification
+target are one change, not three: rewriting the diagnostic to advertise
+`migration plan --to` is meaningless until the flag exists; shipping the flag
+without fixing the diagnostic leaves the advertised-but-broken `<dir>^` trap in
+place; and fixing the diagnostic without the `migrate --to` verification target
+just relocates the dead end one command further along (the advertised `migrate
+--to <target>` would still refuse with `DESTINATION_CONTRACT_MISMATCH`). One
+reviewer holds "the rollback edge is now plannable, `migrate --to` actually
+applies it, and the error that sends you there is honest" in a single sitting.
 
 ## Scope
 
@@ -83,6 +102,11 @@ sitting.
 - `packages/1-framework/3-tooling/cli/src/utils/cli-errors.ts`
   (`errorPathUnreachable`) and `control-api/operations/migration-apply.ts`
   (`buildPathNotFoundFailure.why`) — diagnostic coherence.
+- `packages/1-framework/3-tooling/cli/src/commands/migrate.ts` — when `--to`
+  resolves to a graph node, verify/apply against the target bundle's
+  `end-contract.json` instead of the emitted `contract.json` (mirrors
+  `db update --to`). Without this, the planned reverse edge dead-ends at
+  `DESTINATION_CONTRACT_MISMATCH` and the slice's worked example does not hold.
 - Tests + fixtures for the above; `migration plan` help text; `docs/architecture
   docs/subsystems/7. Migration System.md` (`migration plan` synopsis + § Recovery
   affordances) and `@prisma-next/cli` README.
@@ -90,7 +114,8 @@ sitting.
 **Out:**
 
 - Auto-planning a reverse edge inside `migrate --to` (rejected by design — keep
-  the refusal invariant).
+  the refusal invariant; change #4 only redirects which contract `migrate`
+  verifies against, it never invents an edge).
 - Empty-graph special-casing for `--to` (decided: `--to` only swaps the
   destination; `--from`/auto-baseline resolution untouched).
 - Any source-drift reminder in `migration plan --to` output (decided: out — the
@@ -167,28 +192,59 @@ wording is a dispatch-time copy detail, not a design fork.
   `control-api/operations/migration-apply.ts` (`buildPathNotFoundFailure.why`). Not
   the planner behaviour (Dispatch 1).
 
-### Dispatch 3: docs + fixtures (+ `neverPlanned` `why` coherence)
+### Dispatch 3: `migrate --to <node>` verifies against the target contract (+ AC-3 reproduction)
+
+- **Outcome:** `migrate --to <ref>` resolving to a graph node verifies/applies
+  against that target bundle's `end-contract.json` rather than the emitted
+  `contract.json`, mirroring `db update --to`. The slice's worked example now
+  holds end-to-end: from a two-migration applied state, `migration plan --to
+  <dir>^` emits a reverse package and `migrate --to <dir>^` then succeeds and
+  moves the marker back — **with no contract-source edit**. Test-first: a unit
+  test pinning that `migrate --to <node>` selects the target's `end-contract.json`
+  as the apply contract, plus the AC-3 integration round-trip (the failing repro
+  the implementer already wrote at
+  `test/integration/test/cli-journeys/plan-to-rollback.e2e.test.ts`) goes green.
+- **Builds on:** Dispatch 1 (`plan --to` emits the reverse package) and Dispatch 2
+  (the diagnostic that advertises `migrate --to <target>` — now honest).
+- **Hands to:** the advertised recovery sequence works end-to-end; AC-3 PASS.
+- **Focus:** `migrate.ts` (target-contract selection when `--to` resolves to a
+  node) + AC-3 reproduction. Not docs/fixtures (Dispatch 4) — though the
+  `migrate` behavioural change may shift command-output fixtures, which Dispatch 4
+  regenerates.
+
+### Dispatch 4: docs + fixtures (+ `neverPlanned` `why` coherence)
 
 - **Outcome:** `docs/architecture docs/subsystems/7. Migration System.md`
   (`migration plan` synopsis + § Recovery affordances table) and the
-  `@prisma-next/cli` README reflect `--to`; `pnpm fixtures:check` is green
-  (CLI-help / command snapshots regenerated for the new flag). Additionally, the
-  sibling `neverPlanned` diagnostic's own `why` (`buildNeverPlannedFailure` in
+  `@prisma-next/cli` README reflect `--to` (both the `plan --to` flag and the
+  now-working `migrate --to <node>` rollback path); `pnpm fixtures:check` is green
+  (CLI-help / command snapshots regenerated). Additionally, the sibling
+  `neverPlanned` diagnostic's own `why` (`buildNeverPlannedFailure` in
   `control-api/operations/migration-apply.ts`) no longer redundantly tells the
   user to "run migration plan" now that D2's shared `fix` owns the recovery — the
   two compose non-redundantly the same way the `pathUnreachable` branch does.
-- **Builds on:** Dispatch 1 (flag + help string) and Dispatch 2 (diagnostic text)
-  — both feed snapshot fixtures and the docs.
+- **Builds on:** Dispatches 1–3 — flag, diagnostic, and the `migrate --to`
+  behaviour all feed snapshot fixtures and the docs.
 - **Hands to:** slice-DoD met — feature, honest diagnostics (both branches),
   current docs, green fixtures.
 - **Focus:** docs + README + fixture regen + the one-line `neverPlanned` `why`
-  edit (folded from review item E1) with a test assertion. No planner/behavioural
-  change.
+  edit (folded from review item E1) with a test assertion. No behavioural change.
 
 > **E1 resolution (orchestrator decision).** Review of D2 surfaced that the
 > `neverPlanned` branch's `why` carries the same redundancy D2 removed from the
-> `pathUnreachable` branch. Folded into D3 as a one-line message edit rather than
-> a separate round — same diagnostic-coherence goal, trivially related.
+> `pathUnreachable` branch. Folded into the closing dispatch as a one-line message
+> edit rather than a separate round — same diagnostic-coherence goal, trivially
+> related.
+
+> **Scope correction (operator-confirmed).** D3 originally assumed `migrate --to`
+> already applied a planned arbitrary-target edge. Implementing the AC-3
+> reproduction proved it does not: `migrate` verifies the landed state against the
+> emitted `contract.json`, so any non-emitted target (every rollback) dead-ends at
+> `DESTINATION_CONTRACT_MISMATCH` *after* the edge is planned — the advertised
+> `migrate --to <target>` command from D2 would still fail. The operator confirmed
+> expanding scope to fix `migrate --to`'s verification target (mirroring
+> `db update --to`). This is the true closure of TML-2690; without it the slice
+> ships a relocated dead end.
 
 ## Open items
 
