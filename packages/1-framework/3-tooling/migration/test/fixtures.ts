@@ -72,15 +72,20 @@ export function makeContractSpaceMember(args: {
   headRef?: ContractSpaceHeadRecord | null;
   packages?: readonly OnDiskMigrationPackage[];
   refs?: Refs;
+  refsDir?: string;
+  deserializeContract?: (raw: unknown) => Contract;
 }): ContractSpaceMember {
   const contract = args.contract ?? createContract();
+  const deserializeContract = args.deserializeContract ?? ((raw: unknown) => raw as Contract);
   return createContractSpaceMember({
     spaceId: args.spaceId,
     packages: args.packages ?? [],
     refs: args.refs ?? {},
     headRef:
       args.headRef === undefined ? { hash: EMPTY_CONTRACT_HASH, invariants: [] } : args.headRef,
+    refsDir: args.refsDir ?? '/tmp/refs',
     resolveContract: () => contract,
+    deserializeContract,
   });
 }
 

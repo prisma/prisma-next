@@ -1,11 +1,152 @@
+import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
+import { join } from 'pathe';
+import {
+  errorBundleNotFoundForGraphNode,
+  errorContractDeserializationFailed,
+  errorHashNotInGraph,
+  errorInvalidJson,
+  errorMissingFile,
+  errorSnapshotMissing,
+  MigrationToolsError,
+} from '../errors';
 import type { MigrationGraph } from '../graph';
+import { isGraphNode } from '../graph-membership';
 import type { IntegrityQueryOptions, IntegrityViolation } from '../integrity-violation';
 import { reconstructGraph } from '../migration-graph';
 import type { OnDiskMigrationPackage } from '../package';
 import type { Refs } from '../refs';
+import { readRefSnapshot } from '../refs/snapshot';
 import type { ContractSpaceHeadRecord } from '../verify-contract-spaces';
-import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
+import type {
+  ContractAtOptions,
+  ContractAtResult,
+  ContractSpaceAggregate,
+  ContractSpaceMember,
+} from './types';
+
+function hasErrnoCode(error: unknown, code: string): boolean {
+  return error instanceof Error && (error as { code?: string }).code === code;
+}
+
+function contractAtMemoKey(hash: string, refName: string | undefined): string {
+  return `${hash}\0${refName ?? ''}`;
+}
+
+function deserializeContractAtPath(
+  filePath: string,
+  contractJson: unknown,
+  deserializeContract: (raw: unknown) => Contract,
+): Contract {
+  try {
+    return deserializeContract(contractJson);
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw errorContractDeserializationFailed(filePath, message);
+  }
+}
+
+async function readGraphNodeEndContract(
+  packageDir: string,
+  deserializeContract: (raw: unknown) => Contract,
+): Promise<{ contractJson: unknown; contractDts: string; contract: Contract }> {
+  const jsonPath = join(packageDir, 'end-contract.json');
+  const dtsPath = join(packageDir, 'end-contract.d.ts');
+
+  let rawJson: string;
+  try {
+    rawJson = await readFile(jsonPath, 'utf-8');
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) {
+      throw errorMissingFile('end-contract.json', packageDir);
+    }
+    throw error;
+  }
+
+  let contractJson: unknown;
+  try {
+    contractJson = JSON.parse(rawJson);
+  } catch (error) {
+    throw errorInvalidJson(jsonPath, error instanceof Error ? error.message : String(error));
+  }
+
+  let contractDts: string;
+  try {
+    contractDts = await readFile(dtsPath, 'utf-8');
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) {
+      throw errorMissingFile('end-contract.d.ts', packageDir);
+    }
+    throw error;
+  }
+
+  const contract = deserializeContractAtPath(jsonPath, contractJson, deserializeContract);
+  return { contractJson, contractDts, contract };
+}
+
+async function resolveContractAt(args: {
+  readonly hash: string;
+  readonly opts: ContractAtOptions | undefined;
+  readonly refsDir: string;
+  readonly packages: readonly OnDiskMigrationPackage[];
+  readonly graph: MigrationGraph;
+  readonly deserializeContract: (raw: unknown) => Contract;
+}): Promise<ContractAtResult> {
+  const { hash, opts, refsDir, packages, graph, deserializeContract } = args;
+  const refName = opts?.refName;
+
+  if (refName !== undefined) {
+    const snapshot = await readRefSnapshot(refsDir, refName);
+    if (snapshot) {
+      const jsonPath = join(refsDir, `${refName}.contract.json`);
+      return {
+        hash,
+        contractJson: snapshot.contract,
+        contractDts: snapshot.contractDts,
+        contract: deserializeContractAtPath(jsonPath, snapshot.contract, deserializeContract),
+      };
+    }
+
+    if (isGraphNode(hash, graph)) {
+      return resolveGraphNodeContractAt({
+        hash,
+        packages,
+        deserializeContract,
+        explicitLabel: refName,
+      });
+    }
+
+    throw errorSnapshotMissing(refName);
+  }
+
+  if (isGraphNode(hash, graph)) {
+    return resolveGraphNodeContractAt({ hash, packages, deserializeContract });
+  }
+
+  throw errorHashNotInGraph(hash, graph);
+}
+
+async function resolveGraphNodeContractAt(args: {
+  readonly hash: string;
+  readonly packages: readonly OnDiskMigrationPackage[];
+  readonly deserializeContract: (raw: unknown) => Contract;
+  readonly explicitLabel?: string;
+}): Promise<ContractAtResult> {
+  const { hash, packages, deserializeContract, explicitLabel } = args;
+  const matchingBundle = packages.find((pkg) => pkg.metadata.to === hash);
+  if (!matchingBundle) {
+    throw errorBundleNotFoundForGraphNode(hash, explicitLabel);
+  }
+
+  const { contractJson, contractDts, contract } = await readGraphNodeEndContract(
+    matchingBundle.dirPath,
+    deserializeContract,
+  );
+  return { hash, contractJson, contractDts, contract };
+}
 
 /**
  * Resolve a member's head ref, asserting it is present. The apply/verify
@@ -25,37 +166,64 @@ export function requireHeadRef(member: ContractSpaceMember): ContractSpaceHeadRe
 }
 
 /**
- * Build a {@link ContractSpaceMember} with lazily-memoised `graph()` and
- * `contract()` facets.
+ * Build a {@link ContractSpaceMember} with lazily-memoised `graph()`,
+ * `contract()`, and `contractAt()` facets.
  *
  * `graph()` reconstructs the migration graph from `packages` on first
  * call and caches it. `contract()` calls `resolveContract` on first call
  * and caches the result; a throwing `resolveContract` (e.g. a missing or
  * undeserializable on-disk contract) re-throws on each call rather than
  * caching a value — `checkIntegrity` surfaces that as `contractUnreadable`.
+ * `contractAt()` materializes the contract at an arbitrary graph node with
+ * the same resolution order as plan-time ref resolution: ref snapshot first
+ * (when `opts.refName` is set), else the matching package's `end-contract.*`.
  */
 export function createContractSpaceMember(args: {
   readonly spaceId: string;
   readonly packages: readonly OnDiskMigrationPackage[];
   readonly refs: Refs;
   readonly headRef: ContractSpaceHeadRecord | null;
+  readonly refsDir: string;
   readonly resolveContract: () => Contract;
+  readonly deserializeContract: (raw: unknown) => Contract;
 }): ContractSpaceMember {
-  const { spaceId, packages, refs, headRef, resolveContract } = args;
+  const { spaceId, packages, refs, headRef, refsDir, resolveContract, deserializeContract } = args;
   let graphMemo: MigrationGraph | undefined;
   let contractMemo: Contract | undefined;
+  const contractAtMemo = new Map<string, ContractAtResult>();
+
+  function memberGraph(): MigrationGraph {
+    graphMemo ??= reconstructGraph(packages);
+    return graphMemo;
+  }
+
   return {
     spaceId,
     packages,
     refs,
     headRef,
-    graph() {
-      graphMemo ??= reconstructGraph(packages);
-      return graphMemo;
-    },
+    graph: memberGraph,
     contract() {
       contractMemo ??= resolveContract();
       return contractMemo;
+    },
+    async contractAt(hash, opts) {
+      const key = contractAtMemoKey(hash, opts?.refName);
+      const cached = contractAtMemo.get(key);
+      if (cached) {
+        return cached;
+      }
+
+      const result = await resolveContractAt({
+        hash,
+        opts,
+        refsDir,
+        packages,
+        graph: memberGraph(),
+        deserializeContract,
+      });
+      contractAtMemo.set(key, result);
+      return result;
     },
   };
 }
