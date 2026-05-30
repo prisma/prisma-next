@@ -101,7 +101,7 @@ D1–D4 landed the tolerant queryable model and opened PR #626. Review ([`review
 
 This re-scope corrects the slice boundary's premise. The original rationale deferred `list`/`graph`/`log` to slice 2 because they "only add consumers to a sound foundation." The foundation was not sound; hardening it now keeps slice 2 a true pure-net-deletion follow-up instead of multiplying the debt across three more readers. **Slice 1 now means: deliver the foundation correctly.** Decisions settled with the operator (2026-05-30) and recorded in [`reviews/pr-626/code-review.md`](reviews/pr-626/code-review.md) § Operator review: (1) `migration new`'s gate narrows to the package-corruption subset; (2) add a `duplicateMigrationHash` violation kind and make `graph()` genuinely pure; (3) rename `requireContracts` → `checkContracts`; (4) re-export the integrity vocabulary from `/aggregate` and drop the standalone subpath; (5) move slice-1 consumers off `command-helpers.loadMigrationPackages` but keep the function (its deletion is slice 2, once `list`/`graph`/`log` move off it).
 
-Hard chain: **D5 → D6 → D7 / D8 / D9**. D10 runs in parallel.
+Hard chain: **D5 → D6 → D7 / D8 → D9 / D10**. D11 (tail) runs last on the single implementer. (D8 establishes the load-once pattern that D9/D10 follow.)
 
 #### Dispatch 5: integrity vocabulary made whole + surface tightened
 
@@ -124,23 +124,32 @@ Hard chain: **D5 → D6 → D7 / D8 / D9**. D10 runs in parallel.
 - **Hands to:** One integrity engine behind the flagship consumer; the net-deletion DoD met at `migration check`.
 - **Focus:** `migration-check.ts`; closes §6, F12, F06, W3, W5. **Out:** other consumers (D8/D9).
 
-#### Dispatch 8: gating consumers on one aggregate, loaded once, `checkIntegrity()` visible
+> **Re-plan (during D8 grounding).** The original Dispatch 8 folded `migrate` + `status` + `new` into one. `migrate`/`status` apply one uniform load-once + hoist-refusal pattern; `migration new` is a distinct outcome (narrow its refusal breadth to the package-corruption subset + drop a redundant read + test the breadth). Mixing a mechanical fan-out with a distinct design change fails dispatch-INVEST *Small*, so D8 was split: **D8 = migrate + status**, **D9 = migration new**; `show` → **D10**, the tail → **D11**.
 
-- **Outcome:** `migrate`, `migration status`, and `migration new` each load the `ContractSpaceAggregate` **once** and query it — no `readMigrationsDir` / `loadMigrationPackages` re-read after construction; `detectPackageCorruption` is inverted to accept an already-loaded aggregate; the two domain steps are legible at each refusal site (load → `checkIntegrity(opts)`), with `gate` naming removed; the integrity refusal is hoisted **above** any `--to` / `--from` resolution; `migration new`'s gate narrows to the package-corruption subset and is covered by a test. These three move off `command-helpers.loadMigrationPackages` (the function stays for slice 2).
+#### Dispatch 8: `migrate` + `status` — one aggregate, loaded once, refusal hoisted, `checkIntegrity()` visible
+
+- **Outcome:** `migrate` and `migration status` each load the `ContractSpaceAggregate` **once** and query its facets (graph / packages / refs) — no `loadMigrationPackages` / `readMigrationsDir` re-read after construction; `detectPackageCorruption` is inverted to accept an already-loaded aggregate (status loads once for both its corruption gate and its space enumeration); the two domain steps are legible at each refusal site (load → `checkIntegrity(opts)`), with `gate` naming removed; the integrity refusal is hoisted **above** any `--to` / `--from` resolution. Both move off `command-helpers.loadMigrationPackages` (the function stays for slice 2).
 - **Builds on:** D5 (vocabulary/opts) + D6 (shared mapper).
-- **Hands to:** Every gating consumer on one model, loaded once, refusing correctly and legibly.
-- **Focus:** `migrate.ts`, `migration-status.ts`, `migration-new.ts`; closes F01, F02, F08, F13, SD12, W2, W6, W7, W9, W10, W11. **Out:** `migration show` (D9).
+- **Hands to:** The two gating reader/writer commands on one model, loaded once, refusing correctly and legibly — establishing the load-once pattern D9/D10 follow.
+- **Focus:** `migrate.ts`, `migration-status.ts`; closes F02, F08, F13, SD12 (these two), W2, W9, W10, W11. **Out:** `migration new` (D9), `migration show` (D10).
 
-#### Dispatch 9: re-point `migration show` onto the aggregate
+#### Dispatch 9: `migration new` — narrow the gate to package-corruption + single read
+
+- **Outcome:** `migration new`'s integrity refusal narrows from the full cross-space `buildContractSpaceAggregate` gate to the **package-corruption subset** (it should refuse on a tampered/inconsistent on-disk set, not on unrelated cross-space drift), expressed via a visible `checkIntegrity()` (no `gate` naming); the post-gate redundant `readMigrationsDir` (the from-hash lookup) is served from the single loaded aggregate instead of a second disk read; a test pins the narrowed breadth (corruption refuses; unrelated cross-space drift does not). Moves off `command-helpers.loadMigrationPackages` if applicable.
+- **Builds on:** D5 + D6 + D8's load-once pattern.
+- **Hands to:** `migration new` refusing on the right (narrower) set, reading disk once.
+- **Focus:** `migration-new.ts`; closes F01, W6, W7. **Out:** other consumers.
+
+#### Dispatch 10: re-point `migration show` onto the aggregate
 
 - **Outcome:** `migration show` loads the aggregate once and queries `space(id)` → `.packages` / `.graph()` / `.contract()` / `.refs`, replacing all three `readMigrationsDir` call sites; the "skip the aggregate, read the dir directly" deferral (which contradicted the slice spec) is removed; `problems` are no longer silently dropped — `show` renders regardless per the per-command policy, with partial-omission handled explicitly. Closes AC7's `show` gap.
-- **Builds on:** D5 + D6 (and the load-once pattern established in D8).
+- **Builds on:** D5 + D6 + D8's load-once pattern.
 - **Hands to:** `migration show` reading through the one model — the last slice-1 reader on the aggregate.
 - **Focus:** `migration-show.ts`; closes F09, W8, AC7. **Out:** `list`/`graph`/`log` (slice 2).
 
-#### Dispatch 10: correctness / vocabulary / test / doc tail
+#### Dispatch 11: correctness / vocabulary / test / doc tail
 
 - **Outcome:** the tolerant head-ref / ref readers re-throw catastrophic I/O (`EACCES` / `EIO` / unknown codes) instead of swallowing it as `refUnreadable` (F11); recovery `fix` hints no longer point at `prisma-next migrate` for faults `migrate` now refuses (F10); the self-edge vocabulary is reframed around **data-invariant presence** — the `PN-MIG-CHECK-007` row, the `why`/`fix` strings, and the glossary stop saying "no data operation / applies nothing" (SD10/W1); the mongo `toSpaceMember` shim is built via `createContractSpaceMember`, deleting the `as unknown as ContractSpaceMember` cast and the dead `migrations` field (F03); a package-level test asserts `db verify`'s per-member verifier receives the resolved contract value, not the thunk (F05); the `io.test.ts` invalid-JSON test is renamed (CR); the duplicated `**Scope.**` heading + `PN-CHECK-005`/`PN-MIG-CHECK-005` spelling are fixed (SD08/SD09); cheap lexical polish (SD03/SD05/SD06/SD07) applied where it doesn't ripple.
-- **Builds on:** D5 (so SD10 wording matches the kind set) — otherwise independent; runs in parallel with D7–D9.
+- **Builds on:** D5 (so SD10 wording matches the kind set) — otherwise independent; runs after D7–D10 on the single implementer.
 - **Hands to:** The small-issue tail cleared; the cross-consumer matrix extended where a new behaviour (duplicate-hash representation, narrowed swallows) needs pinning.
-- **Focus:** `loader.ts`, `contract-space-aggregate-loader.ts`, `migration-check.ts` (strings), the subsystem doc + glossary, `mongo-target/control-target.ts`, `db-verify` tests, `io.test.ts`; closes SD03, SD05–SD10, F03, F05, F10, F11. **Out:** structural changes (covered by D5–D9).
+- **Focus:** `loader.ts`, `contract-space-aggregate-loader.ts`, `migration-check.ts` (strings), the subsystem doc + glossary, `mongo-target/control-target.ts`, `db-verify` tests, `io.test.ts`; closes SD03, SD05–SD10, F03, F05, F10, F11. **Out:** structural changes (covered by D5–D10).
