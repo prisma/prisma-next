@@ -6,7 +6,7 @@ import {
 } from '../src/canonicalization-storage-sort';
 
 const sqlSortTargets = [
-  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+  { path: ['*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
 describe('createStorageSort', () => {
@@ -14,22 +14,20 @@ describe('createStorageSort', () => {
 
   it('sorts indexes and uniques by name within each table', () => {
     const storage = {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          tables: {
-            users: {
-              columns: {},
-              indexes: [{ name: 'idx_z' }, { name: 'idx_a' }],
-              uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
-            },
+      __unbound__: {
+        id: '__unbound__',
+        tables: {
+          users: {
+            columns: {},
+            indexes: [{ name: 'idx_z' }, { name: 'idx_a' }],
+            uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
           },
         },
       },
     };
 
     const sorted = sortStorage(storage) as typeof storage;
-    const table = sorted.namespaces.__unbound__.tables.users;
+    const table = sorted.__unbound__.tables.users;
     expect(table.indexes.map((i) => i.name)).toEqual(['idx_a', 'idx_z']);
     expect(table.uniques.map((u) => u.name)).toEqual(['uq_a', 'uq_z']);
   });
@@ -41,11 +39,9 @@ describe('createStorageSort', () => {
 
   it('passes through namespaces without tables', () => {
     const storage = {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          collections: { posts: { columns: {} } },
-        },
+      __unbound__: {
+        id: '__unbound__',
+        collections: { posts: { columns: {} } },
       },
     };
     expect(sortStorage(storage)).toEqual(storage);
@@ -53,35 +49,31 @@ describe('createStorageSort', () => {
 
   it('passes non-object namespace and table entries through unchanged', () => {
     const storage = {
-      namespaces: {
-        broken: null,
-        __unbound__: {
-          id: '__unbound__',
-          tables: { bad: null },
-        },
+      broken: null,
+      __unbound__: {
+        id: '__unbound__',
+        tables: { bad: null },
       },
     };
     const sorted = sortStorage(storage) as typeof storage;
-    expect(sorted.namespaces.broken).toBeNull();
-    expect(sorted.namespaces.__unbound__.tables.bad).toBeNull();
+    expect(sorted.broken).toBeNull();
+    expect(sorted.__unbound__.tables.bad).toBeNull();
   });
 
   it('sorts entries without name using empty-string fallback', () => {
     const storage = {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          tables: {
-            users: {
-              columns: {},
-              indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
-            },
+      __unbound__: {
+        id: '__unbound__',
+        tables: {
+          users: {
+            columns: {},
+            indexes: [{ columns: ['b'] }, { name: 'idx_a', columns: ['a'] }],
           },
         },
       },
     };
     const sorted = sortStorage(storage) as typeof storage;
-    const indexes = sorted.namespaces.__unbound__.tables.users.indexes;
+    const indexes = sorted.__unbound__.tables.users.indexes;
     expect(indexes[0]).toEqual({ columns: ['b'] });
     expect(indexes[1]).toEqual({ name: 'idx_a', columns: ['a'] });
   });

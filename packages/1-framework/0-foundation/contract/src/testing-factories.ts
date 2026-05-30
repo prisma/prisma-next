@@ -33,16 +33,14 @@ type ContractOverrides<
 
 const DUMMY_HASH = coreHash('sha256:test');
 
-const DEFAULT_FRAMEWORK_STORAGE = { namespaces: {} } as const;
+const DEFAULT_FRAMEWORK_STORAGE = {} as const;
 
 const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
 
 const DEFAULT_SQL_STORAGE = {
-  namespaces: {
-    [UNBOUND_NAMESPACE_ID]: {
-      id: UNBOUND_NAMESPACE_ID,
-      tables: {},
-    },
+  [UNBOUND_NAMESPACE_ID]: {
+    id: UNBOUND_NAMESPACE_ID,
+    tables: {},
   },
 } as const;
 
@@ -99,11 +97,10 @@ export function createContract<
 }
 
 type SqlStorageLike = StorageBase & {
-  readonly namespaces: Readonly<
+  readonly types?: Record<string, unknown>;
+} & Readonly<
     Record<string, { readonly id: string; readonly tables: Readonly<Record<string, unknown>> }>
   >;
-  readonly types?: Record<string, unknown>;
-};
 
 type SqlModelLike = ContractModel<ModelStorageBase & { table: string }>;
 

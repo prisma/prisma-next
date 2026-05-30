@@ -38,15 +38,15 @@ function canonicalizeContract(
 }
 
 const sqlPreserveEmptyPatterns = [
-  ['storage', 'namespaces', '*', 'tables'],
-  ['storage', 'namespaces', '*', 'tables', '*'],
-  ['storage', 'namespaces', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
-  ['storage', 'namespaces', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', '*', 'tables'],
+  ['storage', '*', 'tables', '*'],
+  ['storage', '*', 'tables', '*', ['uniques', 'indexes', 'foreignKeys']],
+  ['storage', '*', 'tables', '*', 'foreignKeys', ['constraint', 'index']],
   ['storage', 'types', '*', 'typeParams'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
-  { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
+  { path: ['*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
 const sqlPreserveEmpty = createPreserveEmptyPredicate(sqlPreserveEmptyPatterns);
@@ -58,7 +58,7 @@ function minimal(overrides?: Record<string, unknown>): Contract {
     target: 'postgres',
     roots: {},
     models: {},
-    storage: { storageHash: coreHash('sha256:stub'), namespaces: {} },
+    storage: { storageHash: coreHash('sha256:stub') },
     extensionPacks: {},
     capabilities: {},
     meta: {},
@@ -72,9 +72,7 @@ const UNBOUND = '__unbound__';
 function unboundStorage(tables: Record<string, unknown>): Record<string, unknown> {
   return {
     storageHash: 'sha256:stub',
-    namespaces: {
-      [UNBOUND]: { id: UNBOUND, tables },
-    },
+    [UNBOUND]: { id: UNBOUND, tables },
   };
 }
 
@@ -87,7 +85,7 @@ function drill(obj: Record<string, unknown>, ...keys: string[]): Record<string, 
 }
 
 function unboundTables(result: Record<string, unknown>): Record<string, unknown> {
-  return drill(result, 'storage', 'namespaces', UNBOUND, 'tables');
+  return drill(result, 'storage', UNBOUND, 'tables');
 }
 
 describe('canonicalizeContractToObject', () => {
@@ -131,7 +129,7 @@ describe('canonicalizeContractToObject', () => {
 
   it('includes storageHash when provided inside storage', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:abc', namespaces: {} } }),
+      minimal({ storage: { storageHash: 'sha256:abc' } }),
     );
     expect(drill(result, 'storage')['storageHash']).toBe('sha256:abc');
   });
@@ -142,9 +140,7 @@ describe('canonicalizeContractToObject', () => {
   });
 
   it('keeps storageHash inside storage', () => {
-    const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:s', namespaces: {} } }),
-    );
+    const result = canonicalizeContractToObject(minimal({ storage: { storageHash: 'sha256:s' } }));
     expect(result).not.toHaveProperty('storageHash');
     expect(drill(result, 'storage')['storageHash']).toBe('sha256:s');
   });
@@ -263,13 +259,13 @@ describe('default omission', () => {
     expect(result['meta']).toEqual({});
   });
 
-  it('strips empty storage.namespaces[X].tables without a shouldPreserveEmpty hook', () => {
+  it('strips empty storage namespace tables without a shouldPreserveEmpty hook', () => {
     const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }));
-    const ns = drill(result, 'storage', 'namespaces', UNBOUND) as Record<string, unknown>;
+    const ns = drill(result, 'storage', UNBOUND) as Record<string, unknown>;
     expect(ns).not.toHaveProperty('tables');
   });
 
-  it('preserves empty storage.namespaces[].tables when shouldPreserveEmpty hook returns true', () => {
+  it('preserves empty storage namespace tables when shouldPreserveEmpty hook returns true', () => {
     const result = canonicalizeContractToObject(minimal({ storage: unboundStorage({}) }), {
       shouldPreserveEmpty: sqlPreserveEmpty,
     });
@@ -473,7 +469,7 @@ describe('index and unique sorting', () => {
 
   it('handles storage without namespaces (no-op)', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:stub', namespaces: {} } }),
+      minimal({ storage: { storageHash: 'sha256:stub' } }),
     );
     expect(result['storage']).toBeDefined();
   });
@@ -551,14 +547,12 @@ describe('index and unique sorting', () => {
       minimal({
         storage: {
           storageHash: 'sha256:stub',
-          namespaces: {
-            broken: null as unknown as Record<string, unknown>,
-          },
+          broken: null as unknown as Record<string, unknown>,
         },
       }),
     );
     const storage = drill(result, 'storage');
-    expect((storage['namespaces'] as Record<string, unknown>)['broken']).toBeNull();
+    expect(storage['broken']).toBeNull();
   });
 
   it('passes namespaces without a tables map through unchanged (e.g. Mongo)', () => {
@@ -566,16 +560,14 @@ describe('index and unique sorting', () => {
       minimal({
         storage: {
           storageHash: 'sha256:stub',
-          namespaces: {
-            [UNBOUND]: {
-              id: UNBOUND,
-              collections: { posts: { columns: {} } },
-            },
+          [UNBOUND]: {
+            id: UNBOUND,
+            collections: { posts: { columns: {} } },
           },
         },
       }),
     );
-    const ns = drill(result, 'storage', 'namespaces', UNBOUND);
+    const ns = drill(result, 'storage', UNBOUND);
     expect(ns).not.toHaveProperty('tables');
     expect(ns['collections']).toEqual({ posts: {} });
   });
@@ -599,7 +591,7 @@ describe('canonicalizeContract', () => {
 
   it('produces identical output as JSON.stringify of canonicalizeContractToObject', () => {
     const input = minimal({
-      storage: { storageHash: 'sha256:test', namespaces: {} },
+      storage: { storageHash: 'sha256:test' },
       profileHash: 'sha256:profile',
     });
     const objResult = canonicalizeContractToObject(input);
@@ -688,7 +680,6 @@ describe('typeParams preservation', () => {
       minimal({
         storage: {
           storageHash: 'sha256:stub',
-          namespaces: {},
           types: { MyType: { typeParams: {} } },
         },
       }),

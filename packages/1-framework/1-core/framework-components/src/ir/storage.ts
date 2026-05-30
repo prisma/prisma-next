@@ -1,6 +1,6 @@
-import type { StorageBase } from '@prisma-next/contract/types';
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { IRNode } from './ir-node';
-import type { Namespace } from './namespace';
+import { isStoragePlaneReservedKey, storageNamespaceEntries } from './storage-plane-keys';
 
 /**
  * Canonical address for a named entity in Contract IR / Schema IR.
@@ -32,17 +32,17 @@ export interface EntityCoordinate {
  * `plane: 'storage'` (the parameter type binds the plane).
  *
  * Iterates each namespace's own-enumerable properties structurally.
- * Skips `id` (known scalar); `kind` is non-enumerable on namespace
+ * Skips reserved storage-plane keys (`storageHash`, `types`) and the
+ * namespace scalar `id`. `kind` is non-enumerable on namespace
  * concretions and does not appear in `Object.entries`. For every other
  * property whose value is a non-null object, yields one coordinate per
  * entry key in that map. No family-specific slot vocabulary is required.
  */
-export function* elementCoordinates(
-  storage: Pick<StorageBase, 'namespaces'>,
-): Generator<EntityCoordinate> {
-  for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+export function* elementCoordinates(storage: Record<string, unknown>): Generator<EntityCoordinate> {
+  for (const [namespaceId, ns] of storageNamespaceEntries(storage)) {
     for (const [entityKind, slot] of Object.entries(ns)) {
       if (entityKind === 'id') continue;
+      if (isStoragePlaneReservedKey(entityKind)) continue;
       if (slot === null || typeof slot !== 'object') continue;
       for (const entityName of Object.keys(slot)) {
         yield { plane: 'storage', namespaceId, entityKind, entityName };
@@ -52,18 +52,17 @@ export function* elementCoordinates(
 }
 
 /**
- * Framework-level promise that every Contract IR / Schema IR carries a
- * collection of namespaces keyed by namespace id. Family storage
- * concretions (`SqlStorage`, `MongoStorage`) refine the shape with
- * family-specific fields (tables, collections, enums, …); target
- * concretions add target fields where the family vocabulary doesn't
+ * Framework-level promise that every Contract IR / Schema IR storage plane
+ * carries a content hash and one or more namespace entries keyed directly
+ * by namespace id (ADR 221 — no `namespaces` wrapper segment). Family
+ * storage concretions (`SqlStorage`, `MongoStorage`) refine namespace
+ * entries with family-specific fields (tables, collections, enums, …);
+ * target concretions add target fields where the family vocabulary doesn't
  * reach.
  *
- * Keeping `namespaces` at the framework layer enforces that every storage
- * object — across any target — is namespace-scoped. The framework can
- * therefore walk the namespace map without knowing the family alphabet, and
- * the `(namespace.id, name)` keying that the verifier and planner depend on
- * is honest at every layer.
+ * `storageHash` is a typed own property; namespace ids are own-enumerable
+ * keys on the same object. Reserved-key skipping for walks lives in
+ * {@link storageNamespaceEntries} / {@link isStoragePlaneReservedKey}.
  *
  * Extends `IRNode` so the framework's IR-walking surfaces (verifiers,
  * serializers) can dispatch on `Storage`-typed slots through the same
@@ -72,20 +71,14 @@ export function* elementCoordinates(
  * the interface promotion makes the typing honest.
  *
  * **Persisted envelope shape is target-owned, not framework-promised.**
- * Whether the `namespaces` map appears in the on-disk JSON envelope is
- * a per-target decision made by `ContractSerializer.serializeContract`.
- * Some targets emit a JSON-clean namespace shape that round-trips
- * through `JSON.stringify` cleanly (SQL today via the family-layer
- * identity serializer); others ship runtime-only fields on their
- * namespace concretions and override `serializeContract` to strip
- * them (Mongo). Future open (F16): extend the per-target
- * `ContractSerializer` integration-test surface with an explicit
- * envelope-shape assertion for each target, so the strip-vs-pass-through
- * choice is locked at test time rather than implied by the override
- * presence/absence. Earned by PR2's per-target namespace lift, when
- * `PostgresSchema` / `SqliteUnboundDatabase` start carrying
- * target-specific fields.
+ * Whether runtime-only fields on namespace concretions are stripped at
+ * serialize time is a per-target decision made by
+ * `ContractSerializer.serializeContract`. Some targets emit a JSON-clean
+ * namespace shape that round-trips through `JSON.stringify` cleanly (SQL
+ * today via the family-layer identity serializer); others ship
+ * runtime-only fields on their namespace concretions and override
+ * `serializeContract` to strip them (Mongo).
  */
 export interface Storage extends IRNode {
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  readonly storageHash: StorageHashBase<string>;
 }

@@ -48,12 +48,10 @@ describe('createContract', () => {
   });
 
   it('computes different storageHash for different storage', () => {
-    const c1 = createContract({ storage: { namespaces: {} } });
+    const c1 = createContract({ storage: {} });
     const c2 = createSqlContract({
       storage: {
-        namespaces: {
-          public: { id: 'public', tables: { user: { columns: {} } } },
-        },
+        public: { id: 'public', tables: { user: { columns: {} } } },
       },
     });
     expect(c1.storage.storageHash).not.toBe(c2.storage.storageHash);
@@ -70,21 +68,21 @@ describe('createSqlContract', () => {
   it('includes storage with tables', () => {
     const contract = createSqlContract({
       storage: {
-        namespaces: {
-          __unbound__: {
-            id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                },
+        __unbound__: {
+          id: '__unbound__',
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
               },
             },
           },
         },
       },
     });
-    const unbound = contract.storage.namespaces['__unbound__'];
+    const unbound = (contract.storage as Record<string, { tables?: Record<string, unknown> }>)[
+      '__unbound__'
+    ];
     expect(unbound).toBeDefined();
     const tables = unbound!.tables as Record<string, unknown>;
     expect(tables).toHaveProperty('user');

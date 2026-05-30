@@ -67,15 +67,15 @@ export interface StorageNamespace {
 /**
  * Base type for family-specific storage blocks.
  * Family storage types (SqlStorage, MongoStorage, etc.) extend this to carry the
- * storage hash alongside family-specific data (tables, collections, etc.).
+ * storage hash alongside namespace entries keyed directly by namespace id
+ * (ADR 221 — no `namespaces` wrapper segment).
  *
- * The `namespaces` map is carried by every hydrated storage block. Serialized
- * envelope shape is target-owned; this types the in-memory contract after
- * `deserializeContract`.
+ * Namespace entries are dynamic keys on the storage object; use
+ * `storageNamespaceEntries` from `@prisma-next/framework-components/ir`
+ * to walk them without treating `storageHash` / `types` as namespaces.
  */
 export interface StorageBase<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, StorageNamespace>>;
 }
 
 export interface FieldType {

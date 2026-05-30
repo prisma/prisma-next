@@ -17,20 +17,19 @@ function assertStoragePlaneCoordinates(coordinates: EntityCoordinate[]): void {
 describe('elementCoordinates', () => {
   it('walks a synthetic Storage literal structurally', () => {
     const storage = {
-      namespaces: {
-        alpha: {
-          id: 'alpha',
-          kind: 'test-namespace',
-          widgets: { a: {}, b: {} },
-          gadgets: { x: {} },
-          skippedNull: null,
-          skippedScalar: 'ignored',
-        },
-        beta: {
-          id: 'beta',
-          kind: 'test-namespace',
-          tables: { users: {}, posts: {}, comments: {} },
-        },
+      storageHash: 'sha256:test',
+      alpha: {
+        id: 'alpha',
+        kind: 'test-namespace',
+        widgets: { a: {}, b: {} },
+        gadgets: { x: {} },
+        skippedNull: null,
+        skippedScalar: 'ignored',
+      },
+      beta: {
+        id: 'beta',
+        kind: 'test-namespace',
+        tables: { users: {}, posts: {}, comments: {} },
       },
     };
 
@@ -51,5 +50,21 @@ describe('elementCoordinates', () => {
     expect(coordinates.some((c) => c.entityKind === 'id')).toBe(false);
     expect(coordinates.some((c) => c.entityKind === 'skippedNull')).toBe(false);
     expect(coordinates.some((c) => c.entityKind === 'skippedScalar')).toBe(false);
+  });
+
+  it('skips storageHash and types reserved keys', () => {
+    const storage = {
+      storageHash: 'sha256:test',
+      types: { foo: { kind: 'codec-instance' } },
+      __unbound__: {
+        id: '__unbound__',
+        tables: { users: {} },
+      },
+    };
+
+    const coordinates = [...elementCoordinates(storage)];
+    expect(coordinates).toEqual([
+      { plane: 'storage', namespaceId: '__unbound__', entityKind: 'tables', entityName: 'users' },
+    ]);
   });
 });

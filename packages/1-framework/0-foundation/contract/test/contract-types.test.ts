@@ -28,7 +28,7 @@ describe('unified contract types', () => {
   describe('StorageBase', () => {
     it('carries branded storageHash', () => {
       const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
-      const storage = { storageHash: hash, namespaces: {} };
+      const storage = { storageHash: hash };
       expect(storage.storageHash).toBe('sha256:abc123');
     });
   });
@@ -48,7 +48,7 @@ describe('unified contract types', () => {
             storage: {},
           },
         },
-        storage: { storageHash: hash, namespaces: {} },
+        storage: { storageHash: hash },
         capabilities: {},
         extensionPacks: {},
         meta: {},
@@ -67,7 +67,7 @@ describe('unified contract types', () => {
         targetFamily: 'sql',
         roots: {},
         models: {},
-        storage: { storageHash: hash, namespaces: {} },
+        storage: { storageHash: hash },
         capabilities: {},
         extensionPacks: {},
         meta: {},
@@ -107,7 +107,7 @@ describe('unified contract types', () => {
             storage: {},
           },
         },
-        storage: { storageHash: hash, namespaces: {} },
+        storage: { storageHash: hash },
         capabilities: {},
         extensionPacks: {},
         meta: {},

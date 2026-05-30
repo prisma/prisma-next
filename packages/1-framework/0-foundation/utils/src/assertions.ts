@@ -6,7 +6,8 @@
  *
  * @example
  * ```typescript
- * const table = storage.namespaces[namespaceId].tables[tableName];
+ * const ns = getStorageNamespace(storage as Record<string, unknown>, namespaceId);
+ * const table = ns?.tables[tableName];
  * assertDefined(table, `Table "${tableName}" not found`);
  * // table is now narrowed to non-nullable
  * ```
