@@ -1,18 +1,24 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationListResult } from '@prisma-next/migration-tools/migration-list-types';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  migrationSpaceListEntriesFromAggregate,
+  type RunMigrationListInputs,
   renderMigrationListHumanOutput,
   runMigrationList,
 } from '../../src/commands/migration-list';
 import { renderMigrationList } from '../../src/utils/formatters/migration-list-render';
+import type { MigrationListResult } from '../../src/utils/formatters/migration-list-types';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 import { detectGlyphMode } from '../../src/utils/glyph-mode';
 import { createTerminalUI } from '../../src/utils/terminal-ui';
@@ -53,6 +59,41 @@ const ADDITIVE_OP: MigrationPlanOperation = {
   label: 'Create table users',
   operationClass: 'additive',
 };
+
+const TEST_APP_CONTRACT = createSqlContract({
+  target: 'postgres',
+  storage: {
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: { user: { columns: { id: {} } } },
+      },
+    },
+  },
+});
+
+const identityDeserialize = (json: unknown): Contract => json as Contract;
+
+async function listSpacesFromDisk(migrationsDir: string) {
+  const aggregate = await loadContractSpaceAggregate({
+    migrationsDir,
+    appContract: TEST_APP_CONTRACT,
+    deserializeContract: identityDeserialize,
+  });
+  return migrationSpaceListEntriesFromAggregate(aggregate, migrationsDir);
+}
+
+async function runMigrationListFromDisk(inputs: {
+  readonly migrationsDir: string;
+  readonly spaceFilter?: string;
+}) {
+  const spaces = await listSpacesFromDisk(inputs.migrationsDir);
+  const core: RunMigrationListInputs = { spaces };
+  if (inputs.spaceFilter !== undefined) {
+    return runMigrationList({ ...core, spaceFilter: inputs.spaceFilter });
+  }
+  return runMigrationList(core);
+}
 
 const BACKFILL_OP = {
   id: 'data.backfill_emails',
@@ -202,7 +243,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     await writeRefFor(migrationsRoot, { spaceId: 'app', name: 'staging', hash: HASH_2f45cc7 });
     await writeRefFor(migrationsRoot, { spaceId: 'app', name: 'db', hash: HASH_804e018 });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const expected =
@@ -264,7 +305,7 @@ describe('runMigrationList — slice-spec worked example', () => {
       await writePackage(migrationsRoot, spec);
     }
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     // JSON pass — count and assertion are the trustworthy oracle for
@@ -323,7 +364,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     await writeRefFor(migrationsRoot, { spaceId: 'app', name: 'db', hash: HASH_804e018 });
     await writeRefFor(migrationsRoot, { spaceId: 'postgis', name: 'db', hash: HASH_POSTGIS });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const expected =
@@ -357,7 +398,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     });
     await writeRefFor(migrationsRoot, { spaceId: 'app', name: 'production', hash: HASH_FAN_C });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     // Both converging rows carry the same ref decoration on the same destination.
@@ -387,7 +428,7 @@ describe('runMigrationList — slice-spec worked example', () => {
       providedInvariants: [],
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     const [entry] = result.value.spaces[0]!.migrations;
     expect(entry?.from).toBe(HASH_4cb4256);
@@ -413,7 +454,7 @@ describe('runMigrationList — slice-spec worked example', () => {
       ops: [BACKFILL_OP],
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     expect(result.value.spaces[0]!.migrations[0]!.providedInvariants).toEqual([
       'backfill_emails_v1',
@@ -427,7 +468,9 @@ describe('runMigrationList — slice-spec worked example', () => {
 
   it('renders the empty-state line when the migrations directory does not exist', async () => {
     const { cwd } = await setupFixture();
-    const result = await runMigrationList({ migrationsDir: join(cwd, 'no-such-migrations') });
+    const result = await runMigrationListFromDisk({
+      migrationsDir: join(cwd, 'no-such-migrations'),
+    });
     expectOk(result);
     // Empty-state synthesizes the app space so the renderer can name a
     // directory.
@@ -441,7 +484,7 @@ describe('runMigrationList — slice-spec worked example', () => {
     // (or it's entirely empty). Still synthesizes the app empty-state
     // so the user sees a directory name.
     await mkdir(migrationsRoot, { recursive: true });
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     expect(renderListed(result.value)).toBe('There are no migrations in migrations/app/ yet');
   });
@@ -473,7 +516,7 @@ describe('runMigrationList — slice-spec worked example', () => {
       to: HASH_FAN_BASE,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     const human = renderListed(result.value);
     expect(human).toMatch(/^↩ 20260106T0000_skip_back/m);
@@ -498,7 +541,7 @@ describe('runMigrationList — --space flag', () => {
       to: HASH_POSTGIS,
     });
 
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: migrationsRoot,
       spaceFilter: 'postgis',
     });
@@ -522,7 +565,7 @@ describe('runMigrationList — --space flag', () => {
     const { migrationsRoot } = await setupFixture();
     await mkdir(join(migrationsRoot, 'postgis'), { recursive: true });
 
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: migrationsRoot,
       spaceFilter: 'postgis',
     });
@@ -541,7 +584,7 @@ describe('runMigrationList — --space flag', () => {
       to: HASH_4cb4256,
     });
 
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: migrationsRoot,
       spaceFilter: 'postgis',
     });
@@ -556,7 +599,7 @@ describe('runMigrationList — --space flag', () => {
 
   it('emits MIGRATION.SPACE_NOT_FOUND with empty available list when migrations/ is missing', async () => {
     const { cwd } = await setupFixture();
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: join(cwd, 'no-such-migrations'),
       spaceFilter: 'postgis',
     });
@@ -569,7 +612,7 @@ describe('runMigrationList — --space flag', () => {
 
   it('emits MIGRATION.INVALID_SPACE_ID when --space value violates the naming rule', async () => {
     const { migrationsRoot } = await setupFixture();
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: migrationsRoot,
       spaceFilter: '../escape',
     });
@@ -598,7 +641,7 @@ describe('runMigrationList — --space flag', () => {
       invariants: [],
     });
 
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: migrationsRoot,
       spaceFilter: 'refs',
     });
@@ -633,7 +676,7 @@ describe('runMigrationList — JSON output shape', () => {
       hash: HASH_55bada2,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     // Shape mirrors MigrationListResult — top-level keys, then per-space
@@ -680,10 +723,40 @@ describe('runMigrationList — JSON output shape', () => {
       to: HASH_POSTGIS,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
     expect(result.value.spaces.map((s) => s.spaceId)).toEqual(['app', 'postgis']);
     expect(result.value.summary).toBe('2 migration(s) across 2 contract space(s)');
+  });
+
+  it('JSON lists head ref decoration on extension tip migration', async () => {
+    const { migrationsRoot } = await setupFixture();
+    await writePackage(migrationsRoot, {
+      spaceId: 'postgis',
+      dirName: '20260601T0000_install_postgis_extension',
+      from: null,
+      to: HASH_POSTGIS,
+    });
+    const refsDir = join(migrationsRoot, 'postgis', 'refs');
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(
+      join(refsDir, 'head.json'),
+      `${JSON.stringify({ hash: HASH_POSTGIS, invariants: [] }, null, 2)}\n`,
+    );
+    await writeFile(
+      join(migrationsRoot, 'postgis', 'contract.json'),
+      JSON.stringify({
+        storage: { storageHash: HASH_POSTGIS },
+        schemaVersion: '1.0.0',
+        target: 'postgres',
+        targetFamily: 'sql',
+      }),
+    );
+
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
+    expectOk(result);
+    const postgis = result.value.spaces.find((s) => s.spaceId === 'postgis');
+    expect(postgis?.migrations[0]?.refs).toEqual(['head']);
   });
 });
 
@@ -723,7 +796,7 @@ describe('runMigrationList — per-space topology classification', () => {
       to: HASH_SHARED,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const flat = renderListed(result.value);
@@ -759,7 +832,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_B,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const flat = renderListed(result.value);
@@ -783,7 +856,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const graph = renderGraphListed(result.value, 'unicode');
@@ -812,7 +885,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const graph = renderGraphListed(result.value, 'ascii');
@@ -861,7 +934,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const coloredOff = renderGraphListed(result.value, 'unicode', false);
@@ -886,7 +959,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const wrapSgr =
@@ -948,7 +1021,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({
+    const result = await runMigrationListFromDisk({
       migrationsDir: migrationsRoot,
       spaceFilter: 'postgis',
     });
@@ -982,7 +1055,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const graph = renderGraphListed(result.value, 'unicode');
@@ -1009,7 +1082,7 @@ describe('migration list --graph human output', () => {
       to: HASH_FAN_C,
     });
 
-    const result = await runMigrationList({ migrationsDir: migrationsRoot });
+    const result = await runMigrationListFromDisk({ migrationsDir: migrationsRoot });
     expectOk(result);
 
     const json = JSON.stringify(result.value, null, 2);

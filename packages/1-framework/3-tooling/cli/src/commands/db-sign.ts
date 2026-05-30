@@ -5,7 +5,6 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
-import { readRefs } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative, resolve } from 'pathe';
@@ -25,13 +24,13 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadMigrationPackages,
   maskConnectionUrl,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import {
   formatSchemaVerifyJson,
@@ -99,9 +98,14 @@ async function executeDbSignCommand(
 
   if (effectiveContractArg) {
     try {
-      const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
-      const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
-      const refs = await readRefs(refsDir);
+      const { migrationsDir } = resolveMigrationPaths(options.config, config);
+      const loaded = await buildReadAggregate(config, { migrationsDir });
+      if (!loaded.ok) {
+        return notOk(loaded.failure);
+      }
+      const graph = loaded.value.aggregate.app.graph();
+      const bundles = loaded.value.aggregate.app.packages;
+      const refs = loaded.value.aggregate.app.refs;
       const refResult = parseContractRef(effectiveContractArg, { graph, refs });
       if (!refResult.ok) {
         return notOk(mapRefResolutionError(refResult.failure));

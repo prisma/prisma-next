@@ -1,4 +1,4 @@
-import { EMPTY_CONTRACT_HASH } from './constants';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationListEntry } from './migration-list-types';
 
 export type MigrationEdgeKind = 'forward' | 'rollback' | 'self';

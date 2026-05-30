@@ -1,14 +1,14 @@
-import type {
-  MigrationListEntry,
-  MigrationListResult,
-  MigrationSpaceListEntry,
-} from '@prisma-next/migration-tools/migration-list-types';
 import { describe, expect, it } from 'vitest';
 import {
   IDENTITY_MIGRATION_LIST_STYLER,
   renderMigrationList,
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+  MigrationSpaceListEntry,
+} from '../../../src/utils/formatters/migration-list-types';
 
 const HASH_A = 'sha256:abcdef0123456789abcdef0123456789abcdef0123456789ab';
 const HASH_B = 'sha256:1234567890abcdef1234567890abcdef1234567890abcdef12';

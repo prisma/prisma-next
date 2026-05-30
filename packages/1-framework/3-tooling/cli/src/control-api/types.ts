@@ -577,9 +577,9 @@ export interface MigrationApplyOptions {
 
 /**
  * A single on-disk migration package surfaced to the operation. The
- * SQL family already produces this shape via `loadMigrationPackages`;
- * the operation hands it through to the framework-neutral aggregate
- * loader's `appMigrationPackages` slot.
+ * SQL family surfaces this shape from the tolerant contract-space
+ * aggregate's app packages; the operation hands it through to the
+ * framework-neutral aggregate loader's `appMigrationPackages` slot.
  *
  * (Originally named `MigrationApplyStep` for the legacy single-space
  * apply path; the name is kept for compatibility with existing CLI

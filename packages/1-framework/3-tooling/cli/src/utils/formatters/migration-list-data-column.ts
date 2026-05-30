@@ -1,7 +1,7 @@
-import type { MigrationEdgeKind } from '@prisma-next/migration-tools/migration-list-graph-topology';
-import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
 import type { GlyphMode } from '../glyph-mode';
+import type { MigrationEdgeKind } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
+import type { MigrationListEntry } from './migration-list-types';
 
 export const MIGRATION_LIST_HASH_WIDTH = 7;
 export const MIGRATION_LIST_EMPTY_SOURCE = '∅';

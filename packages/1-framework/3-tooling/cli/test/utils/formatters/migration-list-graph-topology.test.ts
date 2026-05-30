@@ -1,11 +1,11 @@
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { describe, expect, it } from 'vitest';
-import { EMPTY_CONTRACT_HASH } from '../src/constants';
 import {
   classifyMigrationListGraphTopology,
   type MigrationEdgeKind,
   type MigrationListGraphTopology,
-} from '../src/migration-list-graph-topology';
-import type { MigrationListEntry } from '../src/migration-list-types';
+} from '../../../src/utils/formatters/migration-list-graph-topology';
+import type { MigrationListEntry } from '../../../src/utils/formatters/migration-list-types';
 
 let hashCounter = 0;
 

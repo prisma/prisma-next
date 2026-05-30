@@ -1,5 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import type {
   ContractSpaceAggregate,
   DeclaredExtensionEntry,
@@ -7,8 +10,12 @@ import type {
   IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import { CliStructuredError } from './cli-errors';
+import { CliStructuredError, errorUnexpected, mapMigrationToolsError } from './cli-errors';
+import { readContractEnvelope, resolveContractPath } from './command-helpers';
 import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
 
 const CONTRACT_SPACES_DOCS_URL = 'https://pris.ly/contract-spaces';
@@ -278,4 +285,112 @@ export async function buildContractSpaceAggregate<
     return notOk(failure);
   }
   return ok(loaded.value);
+}
+
+/**
+ * Build a minimal app {@link Contract} carrying only the project's
+ * contract-identity (`storage.storageHash` + `target` / `targetFamily`)
+ * when the real `contract.json` is absent or undeserializable.
+ *
+ * `loadContractSpaceAggregate` requires an `appContract` to synthesise the
+ * app space's head ref from its storage hash. Read commands query only that
+ * hash and the target — never `models` — so an empty-`models` stand-in is
+ * sufficient for them. It is *not* a valid contract for any consumer that
+ * reads schema, which is why this is confined to the read-aggregate path.
+ */
+export function appContractStandInFromIdentity(args: {
+  readonly contractHash: string;
+  readonly targetId: string;
+  readonly targetFamily: string;
+}): Contract {
+  return blindCast<
+    Contract,
+    'read-aggregate consumers query only storage.storageHash and target; empty models stand in for an unreadable contract.json'
+  >({
+    storage: { storageHash: args.contractHash },
+    schemaVersion: '0.0.0',
+    target: args.targetId,
+    targetFamily: args.targetFamily,
+    models: {},
+    profileHash: EMPTY_CONTRACT_HASH,
+  });
+}
+
+export async function loadContractRawSafely(config: {
+  contract?: { output?: string };
+}): Promise<unknown | null> {
+  try {
+    const path = resolveContractPath(config);
+    const raw = await readFile(path, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tolerant {@link ContractSpaceAggregate} assembly for read-only CLI
+ * commands. No integrity gate — callers query `aggregate.app` (or other
+ * facets) without re-reading `migrations/`. When `contract.json` is absent
+ * or undeserializable, the app contract falls back to an identity-only
+ * stand-in ({@link appContractStandInFromIdentity}), so these commands
+ * load without requiring a readable contract.
+ */
+export async function buildReadAggregate(
+  config: PrismaNextConfig,
+  options: { readonly migrationsDir: string },
+): Promise<
+  Result<
+    { readonly aggregate: ContractSpaceAggregate; readonly contractHash: string },
+    CliStructuredError
+  >
+> {
+  let contractHash: string = EMPTY_CONTRACT_HASH;
+  try {
+    const envelope = await readContractEnvelope(config);
+    contractHash = envelope.storageHash;
+  } catch {
+    // Contract unreadable — marker uses EMPTY_CONTRACT_HASH
+  }
+
+  try {
+    const contractRawForAggregate = await loadContractRawSafely(config);
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    const deserializeContract = (json: unknown): Contract =>
+      familyInstance.deserializeContract(json);
+    let appContractForLoad: Contract = appContractStandInFromIdentity({
+      contractHash,
+      targetId: config.target.id,
+      targetFamily: config.target.familyId,
+    });
+    if (contractRawForAggregate !== null) {
+      try {
+        appContractForLoad = deserializeContract(contractRawForAggregate);
+      } catch {
+        // Deserialization failed — identity-only stand-in fallback
+      }
+    }
+
+    const loaded = await loadContractSpaceAggregateForCli({
+      targetId: config.target.id,
+      migrationsDir: options.migrationsDir,
+      appContract: appContractForLoad,
+      extensionPacks: config.extensionPacks ?? [],
+      deserializeContract,
+    });
+    if (!loaded.ok) {
+      return loaded;
+    }
+    return ok({ aggregate: loaded.value, contractHash });
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read migrations directory: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
 }

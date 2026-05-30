@@ -1,8 +1,3 @@
-import type {
-  MigrationListEntry,
-  MigrationListResult,
-  MigrationSpaceListEntry,
-} from '@prisma-next/migration-tools/migration-list-types';
 import { bold, cyan, cyanBright, dim, green, greenBright, yellow } from 'colorette';
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,6 +6,11 @@ import {
   renderMigrationListWithStyle,
 } from '../../../src/utils/formatters/migration-list-render';
 import { createAnsiMigrationListStyler } from '../../../src/utils/formatters/migration-list-styler';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+  MigrationSpaceListEntry,
+} from '../../../src/utils/formatters/migration-list-types';
 
 const HASH_C = 'sha256:4cb4256c30b7a8123456789012345678901234567890123456';
 const HASH_D = 'sha256:55bada2f123456789012345678901234567890123456789012';

@@ -138,7 +138,30 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     refsDir = join(appMigrationsDir, 'refs');
     await mkdir(refsDir, { recursive: true });
     configPath = join(tempDir, 'prisma-next.config.ts');
+    await writeFile(
+      join(tempDir, 'contract.json'),
+      JSON.stringify({
+        storage: { storageHash: HASH_A },
+        schemaVersion: '1.0.0',
+        target: 'postgres',
+        targetFamily: 'sql',
+      }),
+    );
     mocks.loadConfig.mockResolvedValue({
+      family: {
+        familyId: 'sql',
+        create: vi.fn().mockReturnValue({
+          deserializeContract: (json: unknown) => json,
+        }),
+      },
+      target: {
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        kind: 'target',
+        migrations: {},
+      },
+      contract: { output: join(tempDir, 'contract.json') },
       migrations: { dir: 'migrations' },
     });
   });

@@ -3,8 +3,8 @@ import {
   classifyMigrationListGraphTopology,
   type MigrationEdgeKind,
   type MigrationListGraphTopology,
-} from '@prisma-next/migration-tools/migration-list-graph-topology';
-import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
+} from './migration-list-graph-topology';
+import type { MigrationListEntry } from './migration-list-types';
 
 export type ConnectorKind = 'fanBelow' | 'joinAbove';
 

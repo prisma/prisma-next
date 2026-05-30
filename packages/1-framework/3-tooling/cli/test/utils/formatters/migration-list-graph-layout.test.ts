@@ -1,4 +1,3 @@
-import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
 import { describe, expect, it } from 'vitest';
 import {
   type ConnectorLayoutRow,
@@ -7,6 +6,7 @@ import {
   type MigrationLayoutRow,
   type NodeLineLayoutRow,
 } from '../../../src/utils/formatters/migration-list-graph-layout';
+import type { MigrationListEntry } from '../../../src/utils/formatters/migration-list-types';
 
 let hashCounter = 0;
 

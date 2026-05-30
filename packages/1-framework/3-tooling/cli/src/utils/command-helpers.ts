@@ -3,10 +3,7 @@ import type { ControlTargetDescriptor } from '@prisma-next/framework-components/
 import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { NoInvariantPathStructuralEdge } from '@prisma-next/migration-tools/errors';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
-import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
-import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { APP_SPACE_ID, spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
@@ -229,27 +226,6 @@ export function targetSupportsMigrations(target: ControlTargetDescriptor<string,
 
 export function getTargetMigrations(target: ControlTargetDescriptor<string, string>) {
   return hasMigrations(target) ? target.migrations : undefined;
-}
-
-/**
- * Reads the migrations directory and builds the migration graph from all
- * packages. Throws on I/O or graph errors — callers handle error mapping.
- *
- * Every on-disk package is content-addressed (`migrationHash` is always a
- * string); there is no draft state to filter out.
- */
-export async function loadMigrationPackages(migrationsDir: string): Promise<{
-  bundles: readonly OnDiskMigrationPackage[];
-  graph: MigrationGraph;
-}> {
-  // `readMigrationsDir` is tolerant: it retains hash-/invariant-mismatched
-  // packages and omits unparseable ones, reporting both via `problems`.
-  // This helper preserves its historical `{ bundles, graph }` contract by
-  // exposing the retained packages; callers that need to surface load
-  // problems read them from the tolerant primitive directly.
-  const { packages } = await readMigrationsDir(migrationsDir);
-  const graph = reconstructGraph(packages);
-  return { bundles: packages, graph };
 }
 
 /**

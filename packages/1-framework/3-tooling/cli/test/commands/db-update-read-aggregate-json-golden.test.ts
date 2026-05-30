@@ -1,0 +1,198 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { join } from 'pathe';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDbUpdateCommand } from '../../src/commands/db-update';
+import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
+
+const mocks = vi.hoisted(() => ({
+  loadConfig: vi.fn(),
+  dbUpdate: vi.fn(),
+  connect: vi.fn(),
+  close: vi.fn(),
+}));
+
+vi.mock('../../src/config-loader', () => ({
+  loadConfig: mocks.loadConfig,
+}));
+
+vi.mock('../../src/control-api/client', () => ({
+  createControlClient: vi.fn(() => ({
+    connect: mocks.connect,
+    dbUpdate: mocks.dbUpdate,
+    close: mocks.close,
+  })),
+}));
+
+const HASH_A = `sha256:${'a'.repeat(64)}`;
+const HASH_B = `sha256:${'b'.repeat(64)}`;
+const ADDITIVE_OP: MigrationPlanOperation = {
+  id: 'table.users',
+  label: 'Create users',
+  operationClass: 'additive',
+};
+
+const createdDirs: string[] = [];
+
+async function setupFixture(): Promise<{
+  contractPath: string;
+  dirNext: string;
+  endContract: Record<string, unknown>;
+}> {
+  const cwd = await mkdtemp(join(tmpdir(), 'db-update-read-agg-'));
+  createdDirs.push(cwd);
+  const contractPath = join(cwd, 'contract.json');
+  const defaultContract = {
+    storage: { storageHash: HASH_A },
+    schemaVersion: '1.0.0',
+    target: 'postgres',
+    targetFamily: 'sql',
+  };
+  const endContract = {
+    storage: { storageHash: HASH_B },
+    schemaVersion: '1.0.0',
+    target: 'postgres',
+    targetFamily: 'sql',
+  };
+  await writeFile(contractPath, JSON.stringify(defaultContract));
+
+  const appDir = join(cwd, 'migrations', 'app');
+  await mkdir(appDir, { recursive: true });
+  const dirInit = formatMigrationDirName(new Date('2026-01-01T10:00:00Z'), 'init');
+  const dirNext = formatMigrationDirName(new Date('2026-01-02T10:00:00Z'), 'add_users');
+  for (const [dirName, from, to] of [
+    [dirInit, null, HASH_A] as const,
+    [dirNext, HASH_A, HASH_B] as const,
+  ]) {
+    const metadataBase: Omit<MigrationMetadata, 'migrationHash'> = {
+      from,
+      to,
+      providedInvariants: [],
+      createdAt: '2026-01-01T10:00:00.000Z',
+    };
+    const metadata: MigrationMetadata = {
+      ...metadataBase,
+      migrationHash: computeMigrationHash(metadataBase, [ADDITIVE_OP]),
+    };
+    await writeMigrationPackage(join(appDir, dirName), metadata, [ADDITIVE_OP]);
+  }
+  await writeFile(join(appDir, dirNext, 'end-contract.json'), JSON.stringify(endContract));
+
+  return { contractPath, dirNext, endContract };
+}
+
+describe('db update read aggregate --json golden', () => {
+  afterAll(() => {
+    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('../../src/control-api/client');
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.close.mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    await Promise.all(createdDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+    createdDirs.length = 0;
+  });
+
+  it('pins --json dry-run output when --to resolves via aggregate packages', async () => {
+    const { contractPath, dirNext, endContract } = await setupFixture();
+    mocks.loadConfig.mockResolvedValue({
+      family: {
+        familyId: 'sql',
+        create: vi.fn().mockReturnValue({
+          deserializeContract: (json: unknown) => json,
+        }),
+      },
+      target: {
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        kind: 'target',
+        migrations: {},
+      },
+      adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+      driver: { kind: 'driver' },
+      db: { connection: 'postgres://localhost/db-update-golden' },
+      contract: { output: contractPath },
+    });
+
+    const dbUpdateValue = {
+      ok: true as const,
+      mode: 'plan' as const,
+      plan: {
+        operations: [{ id: 'table.users', label: 'Create users', operationClass: 'additive' }],
+        preview: undefined,
+      },
+      destination: { storageHash: HASH_B },
+      summary: 'Plan ready',
+    };
+    mocks.dbUpdate.mockResolvedValue({ ok: true, value: dbUpdateValue });
+
+    const { consoleOutput, cleanup } = setupCommandMocks({ isTTY: false });
+    const updateCmd = createDbUpdateCommand();
+    const exitCode = await executeCommand(updateCmd, [
+      '--to',
+      dirNext,
+      '--dry-run',
+      '--json',
+      '--db',
+      'postgres://localhost/db-update-golden',
+      '--config',
+      contractPath,
+    ]);
+    cleanup();
+
+    expect(exitCode).toBe(0);
+    const callContract = mocks.dbUpdate.mock.calls[0]![0].contract as Record<string, unknown>;
+    expect(callContract).toEqual(endContract);
+
+    const json = consoleOutput.join('\n');
+    const parsed = JSON.parse(json) as {
+      ok: boolean;
+      mode: string;
+      plan: {
+        targetId: string;
+        destination: { storageHash: string };
+        operations: Array<{ id: string; label: string; operationClass: string }>;
+      };
+      advancedRef: null;
+      plannedAdvanceRef: null;
+      summary: string;
+      timings: { total: number };
+    };
+    expect(parsed.timings.total).toBeGreaterThanOrEqual(0);
+    const { timings: _timings, ...stable } = parsed;
+    expect(JSON.stringify(stable, null, 2)).toBe(
+      [
+        '{',
+        '  "ok": true,',
+        '  "mode": "plan",',
+        '  "plan": {',
+        '    "targetId": "postgres",',
+        '    "destination": {',
+        `      "storageHash": "${HASH_B}"`,
+        '    },',
+        '    "operations": [',
+        '      {',
+        '        "id": "table.users",',
+        '        "label": "Create users",',
+        '        "operationClass": "additive"',
+        '      }',
+        '    ]',
+        '  },',
+        '  "advancedRef": null,',
+        '  "plannedAdvanceRef": null,',
+        '  "summary": "Plan ready"',
+        '}',
+      ].join('\n'),
+    );
+  });
+});
