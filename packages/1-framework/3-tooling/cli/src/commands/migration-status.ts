@@ -5,6 +5,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import {
   type ContractMarkerRecordLike,
+  type ContractSpaceAggregate,
   graphWalkStrategy,
   loadContractSpaceAggregate,
   requireHeadRef,
@@ -42,7 +43,6 @@ import {
 import {
   addGlobalOptions,
   collectDeclaredInvariants,
-  loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -53,10 +53,10 @@ import {
   toStructuralEdge,
 } from '../utils/command-helpers';
 import {
-  type BuildAggregateInputs,
-  buildContractSpaceAggregate,
-  mapIntegrityViolations,
+  refuseContractSpaceIntegrity,
+  refusePackageCorruptionOnAggregate,
 } from '../utils/contract-space-aggregate-loader';
+import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
 import {
   type EdgeStatus,
   type EdgeStatusKind,
@@ -436,72 +436,25 @@ function resolveDisplayChain(
  * version reports per-space marker + pending state alongside the
  * cross-space totals.
  */
-/**
- * Reader-subset integrity gate for `migration status`. The tolerant
- * loader retains a hash-/invariants-mismatched package and omits an
- * unloadable one instead of throwing, so a genuinely corrupt on-disk
- * package would otherwise surface downstream as a misleading
- * "cannot reconstruct migration history". This refuses early with the
- * structured `5002` integrity envelope on exactly the package
- * corruptions the prior throwing loader rejected
- * (`hashMismatch` / `providedInvariantsMismatch` / `packageUnloadable`)
- * — behaviour-preservation. Self-edges, head-ref, layout, and contract
- * drift stay tolerated: `status` is a reader, not a gating command.
- *
- * Returns the structured failure to refuse on, or `null` to proceed.
- * Any error building the model is swallowed — the existing pipeline's
- * contract / load diagnostics own those paths.
- */
-async function detectPackageCorruption(args: {
-  readonly migrationsDir: string;
-  readonly contractRaw: unknown;
-  readonly deserializeContract: (json: unknown) => Contract;
-}): Promise<CliStructuredError | null> {
-  try {
-    const aggregate = await loadContractSpaceAggregate({
-      migrationsDir: args.migrationsDir,
-      deserializeContract: args.deserializeContract,
-      appContract: args.deserializeContract(args.contractRaw),
-    });
-    const corruption = aggregate
-      .checkIntegrity()
-      .filter(
-        (v) =>
-          v.kind === 'hashMismatch' ||
-          v.kind === 'providedInvariantsMismatch' ||
-          v.kind === 'packageUnloadable',
-      );
-    return mapIntegrityViolations(corruption);
-  } catch {
-    return null;
-  }
-}
-
 export async function loadAggregateStatusSpaces(args: {
-  readonly targetId: string;
-  readonly migrationsDir: string;
-  readonly appContractRaw: unknown;
-  readonly extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'];
-  readonly deserializeContract: BuildAggregateInputs<string, string>['deserializeContract'];
+  readonly aggregate: ContractSpaceAggregate;
+  readonly extensionPacks: ReadonlyArray<unknown>;
   readonly markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null;
 }): Promise<readonly MigrationStatusSpaceEntry[]> {
-  const loadInputs: BuildAggregateInputs<string, string> = {
-    targetId: args.targetId,
-    migrationsDir: args.migrationsDir,
-    appContract: args.deserializeContract(args.appContractRaw),
-    extensionPacks: args.extensionPacks,
-    deserializeContract: args.deserializeContract,
-  };
-
-  const loaded = await buildContractSpaceAggregate(loadInputs);
-  if (!loaded.ok) {
-    // Loader failure (drift, layout violation, etc.) — surfacing it
-    // as a status diagnostic would duplicate `migration plan`'s job.
+  const declaredExtensions = toDeclaredExtensionsFromRaw(args.extensionPacks);
+  if (
+    refuseContractSpaceIntegrity(args.aggregate, {
+      declaredExtensions,
+      checkContracts: true,
+    })
+  ) {
+    // Full integrity refusal (drift, layout violation, etc.) — surfacing
+    // it as a status diagnostic would duplicate `migration plan`'s job.
     // The single-space app pipeline still runs; extensions are simply
     // not enumerated.
     return [];
   }
-  const aggregate = loaded.value;
+  const aggregate = args.aggregate;
 
   const orderedMembers = [...aggregate.extensions, aggregate.app];
   const rows: MigrationStatusSpaceEntry[] = [];
@@ -628,8 +581,10 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, appMigrationsDir, appMigrationsRelative, migrationsDir, refsDir } =
-    resolveMigrationPaths(options.config, config);
+  const { configPath, appMigrationsRelative, migrationsDir, refsDir } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
 
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
@@ -647,37 +602,81 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
+  const diagnostics: StatusDiagnostic[] = [];
+  let contractHash: string = EMPTY_CONTRACT_HASH;
+  try {
+    const envelope = await readContractEnvelope(config);
+    contractHash = envelope.storageHash;
+  } catch (error) {
+    diagnostics.push({
+      code: 'CONTRACT.UNREADABLE',
+      severity: 'warn',
+      message: `Could not read contract: ${error instanceof Error ? error.message : 'unknown error'}`,
+      hints: ["Run 'prisma-next contract emit' to generate a valid contract"],
+    });
+  }
+
+  const contractRawForAggregate = await loadContractRawSafely(config);
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+  const deserializeContract = (json: unknown): Contract => familyInstance.deserializeContract(json);
+  const appContractForLoad =
+    contractRawForAggregate !== null
+      ? deserializeContract(contractRawForAggregate)
+      : deserializeContract({
+          storage: { storageHash: contractHash },
+          schemaVersion: '0.0.0',
+          target: config.target.id,
+          targetFamily: config.target.familyId,
+        });
+
+  let aggregate: ContractSpaceAggregate;
+  try {
+    aggregate = await loadContractSpaceAggregate({
+      migrationsDir,
+      deserializeContract,
+      appContract: appContractForLoad,
+    });
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read migrations directory: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
+
+  const corruptionFailure = refusePackageCorruptionOnAggregate(aggregate);
+  if (corruptionFailure) {
+    return notOk(corruptionFailure);
+  }
+
+  const appGraph = aggregate.app.graph();
+
   let fromOverrideHash: string | undefined;
 
   if (options.to || options.from) {
-    try {
-      const { graph: earlyGraph } = await loadMigrationPackages(appMigrationsDir);
+    if (options.to) {
+      const refResult = parseContractRef(options.to, { graph: appGraph, refs: allRefs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      activeRefHash = refResult.value.hash;
+      if (refResult.value.provenance.kind === 'ref') {
+        const resolvedRefName = refResult.value.provenance.refName;
+        activeRefName = resolvedRefName;
+        activeRefEntry = allRefs[resolvedRefName];
+      }
+    }
 
-      if (options.to) {
-        const refResult = parseContractRef(options.to, { graph: earlyGraph, refs: allRefs });
-        if (!refResult.ok) {
-          return notOk(mapRefResolutionError(refResult.failure));
-        }
-        activeRefHash = refResult.value.hash;
-        if (refResult.value.provenance.kind === 'ref') {
-          const resolvedRefName = refResult.value.provenance.refName;
-          activeRefName = resolvedRefName;
-          activeRefEntry = allRefs[resolvedRefName];
-        }
+    if (options.from) {
+      const fromResult = parseContractRef(options.from, { graph: appGraph, refs: allRefs });
+      if (!fromResult.ok) {
+        return notOk(mapRefResolutionError(fromResult.failure));
       }
-
-      if (options.from) {
-        const fromResult = parseContractRef(options.from, { graph: earlyGraph, refs: allRefs });
-        if (!fromResult.ok) {
-          return notOk(mapRefResolutionError(fromResult.failure));
-        }
-        fromOverrideHash = fromResult.value.hash;
-      }
-    } catch (error) {
-      if (MigrationToolsError.is(error)) {
-        return notOk(mapMigrationToolsError(error));
-      }
-      throw error;
+      fromOverrideHash = fromResult.value.hash;
     }
   }
 
@@ -718,34 +717,8 @@ async function executeMigrationStatusCommand(
     ui.stderr(header);
   }
 
-  const diagnostics: StatusDiagnostic[] = [];
-  let contractHash: string = EMPTY_CONTRACT_HASH;
-  try {
-    const envelope = await readContractEnvelope(config);
-    contractHash = envelope.storageHash;
-  } catch (error) {
-    diagnostics.push({
-      code: 'CONTRACT.UNREADABLE',
-      severity: 'warn',
-      message: `Could not read contract: ${error instanceof Error ? error.message : 'unknown error'}`,
-      hints: ["Run 'prisma-next contract emit' to generate a valid contract"],
-    });
-  }
-
-  let bundles: readonly OnDiskMigrationPackage[];
-  let graph: MigrationGraph;
-  try {
-    ({ bundles, graph } = await loadMigrationPackages(appMigrationsDir));
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read migrations directory: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
-  }
+  const bundles = aggregate.app.packages;
+  const graph = appGraph;
 
   if (bundles.length === 0) {
     if (dbConnection && hasDriver) {
@@ -856,42 +829,15 @@ async function executeMigrationStatusCommand(
     allMarkers = null;
   }
 
-  // Build the aggregate enumeration of contract spaces. Lossy on
-  // failure (extensions are simply omitted) so the existing
-  // single-space app pipeline below still runs even if extensions
-  // can't be loaded — a strict failure here would degrade the
-  // load-bearing app-space output for unrelated reasons.
-  const contractRawForAggregate = await loadContractRawSafely(config);
   let aggregateSpaces: readonly MigrationStatusSpaceEntry[] = [];
   if (contractRawForAggregate !== null) {
-    // The aggregate loader needs a typed-Contract producer. Build a
-    // real control stack so `deserializeContract` runs against a fully
-    // composed family instance — descriptors that read stack members
-    // during construction (e.g. codec lookups) get a consistent view.
-    const stack = createControlStack(config);
-    const familyInstance = config.family.create(stack);
-
-    const corruptionFailure = await detectPackageCorruption({
-      migrationsDir,
-      contractRaw: contractRawForAggregate,
-      deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
-    });
-    if (corruptionFailure) {
-      return notOk(corruptionFailure);
-    }
-
     try {
       aggregateSpaces = await loadAggregateStatusSpaces({
-        targetId: config.target.targetId,
-        migrationsDir,
-        appContractRaw: contractRawForAggregate,
+        aggregate,
         extensionPacks: config.extensionPacks ?? [],
-        deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
         markersBySpace: allMarkers,
       });
     } catch {
-      // Loader failure short-circuits silently — the existing
-      // single-space app pipeline below still runs.
       aggregateSpaces = [];
     }
   }

@@ -7,23 +7,11 @@ import type {
 import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
-import { ok, type Result } from '@prisma-next/utils/result';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  buildContractSpaceAggregate: vi.fn(),
   graphWalkStrategy: vi.fn(),
 }));
-
-vi.mock('../../src/utils/contract-space-aggregate-loader', async () => {
-  const actual = await vi.importActual<
-    typeof import('../../src/utils/contract-space-aggregate-loader')
-  >('../../src/utils/contract-space-aggregate-loader');
-  return {
-    ...actual,
-    buildContractSpaceAggregate: mocks.buildContractSpaceAggregate,
-  };
-});
 
 vi.mock('@prisma-next/migration-tools/aggregate', async () => {
   const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/aggregate')>(
@@ -88,22 +76,17 @@ function makeMember(spaceId: string, hash: string, empty = false): ContractSpace
 function makeAggregate(args: {
   app: ContractSpaceMember;
   extensions?: readonly ContractSpaceMember[];
-}): Result<ContractSpaceAggregate, never> {
-  return ok(
-    createContractSpaceAggregate({
-      targetId: 'postgres',
-      app: args.app,
-      extensions: args.extensions ?? [],
-      checkIntegrity: () => [],
-    }),
-  );
+}): ContractSpaceAggregate {
+  return createContractSpaceAggregate({
+    targetId: 'postgres',
+    app: args.app,
+    extensions: args.extensions ?? [],
+    checkIntegrity: () => [],
+  });
 }
 
 describe('loadAggregateStatusSpaces', () => {
   afterEach(async () => {
-    mocks.buildContractSpaceAggregate.mockReset();
-    // Reset back to delegating to the real strategy so prior `mockReturnValue`
-    // installations don't leak between tests.
     const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/aggregate')>(
       '@prisma-next/migration-tools/aggregate',
     );
@@ -111,26 +94,14 @@ describe('loadAggregateStatusSpaces', () => {
     mocks.graphWalkStrategy.mockImplementation(actual.graphWalkStrategy);
   });
 
-  afterAll(() => {
-    vi.doUnmock('../../src/utils/contract-space-aggregate-loader');
-    vi.resetModules();
-  });
-
   it('renders per-space rows as marker-unknown when markersBySpace is null', async () => {
     const app = makeMember('app', APP_HASH);
     const ext = makeMember('ext-a', EMPTY_CONTRACT_HASH, true);
-    mocks.buildContractSpaceAggregate.mockResolvedValue(makeAggregate({ app, extensions: [ext] }));
-
     const rows = await loadAggregateStatusSpaces({
-      targetId: 'postgres',
-      migrationsDir: '/tmp/__nope',
-      appContractRaw: {},
+      aggregate: makeAggregate({ app, extensions: [ext] }),
       extensionPacks: [],
-      deserializeContract: () => ({}) as Contract,
       markersBySpace: null,
     });
-
-    expect(mocks.buildContractSpaceAggregate).toHaveBeenCalledTimes(1);
     expect(rows).toHaveLength(2);
     for (const row of rows) {
       expect(row).not.toHaveProperty('markerHash');
@@ -143,14 +114,9 @@ describe('loadAggregateStatusSpaces', () => {
   it('renders per-space rows with marker fields when markersBySpace is a Map', async () => {
     const app = makeMember('app', APP_HASH);
     const ext = makeMember('ext-a', EMPTY_CONTRACT_HASH, true);
-    mocks.buildContractSpaceAggregate.mockResolvedValue(makeAggregate({ app, extensions: [ext] }));
-
     const rows = await loadAggregateStatusSpaces({
-      targetId: 'postgres',
-      migrationsDir: '/tmp/__nope',
-      appContractRaw: {},
+      aggregate: makeAggregate({ app, extensions: [ext] }),
       extensionPacks: [],
-      deserializeContract: () => ({}) as Contract,
       markersBySpace: new Map(),
     });
 
@@ -175,7 +141,6 @@ describe('loadAggregateStatusSpaces', () => {
 
   it('counts pending migrations (edges), not lowered ops — multi-op migration counts as one', async () => {
     const app = makeMember('app', APP_HASH, /*empty*/ false);
-    mocks.buildContractSpaceAggregate.mockResolvedValue(makeAggregate({ app }));
     // One graph edge that lowers to three ops: pendingCount must be 1,
     // not 3 — a single authored migration is one unit of pending work.
     mocks.graphWalkStrategy.mockReturnValue({
@@ -195,11 +160,8 @@ describe('loadAggregateStatusSpaces', () => {
     });
 
     const rows = await loadAggregateStatusSpaces({
-      targetId: 'postgres',
-      migrationsDir: '/tmp/__nope',
-      appContractRaw: {},
+      aggregate: makeAggregate({ app }),
       extensionPacks: [],
-      deserializeContract: () => ({}) as Contract,
       markersBySpace: new Map(),
     });
 
@@ -208,7 +170,6 @@ describe('loadAggregateStatusSpaces', () => {
 
   it('counts a zero-op migration as one pending unit', async () => {
     const app = makeMember('app', APP_HASH, /*empty*/ false);
-    mocks.buildContractSpaceAggregate.mockResolvedValue(makeAggregate({ app }));
     mocks.graphWalkStrategy.mockReturnValue({
       kind: 'ok',
       result: {
@@ -226,11 +187,8 @@ describe('loadAggregateStatusSpaces', () => {
     });
 
     const rows = await loadAggregateStatusSpaces({
-      targetId: 'postgres',
-      migrationsDir: '/tmp/__nope',
-      appContractRaw: {},
+      aggregate: makeAggregate({ app }),
       extensionPacks: [],
-      deserializeContract: () => ({}) as Contract,
       markersBySpace: new Map(),
     });
 
