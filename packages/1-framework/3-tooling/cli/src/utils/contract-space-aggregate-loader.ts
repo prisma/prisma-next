@@ -3,6 +3,7 @@ import type { ControlExtensionDescriptor } from '@prisma-next/framework-componen
 import type {
   ContractSpaceAggregate,
   DeclaredExtensionEntry,
+  IntegrityQueryOptions,
   IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
@@ -174,18 +175,86 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
   readonly deserializeContract: (contractJson: unknown) => Contract;
 }
 
+function declaredExtensionsFromInputs(
+  extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'],
+): readonly DeclaredExtensionEntry[] {
+  return toDeclaredExtensionsFromRaw(extensionPacks as ReadonlyArray<unknown>);
+}
+
+/**
+ * Reject extension descriptors whose configured target disagrees with
+ * the project target before any on-disk read.
+ */
+export function refuseDeclaredExtensionTargetMismatch<
+  TFamilyId extends string,
+  TTargetId extends string,
+>(inputs: BuildAggregateInputs<TFamilyId, TTargetId>): CliStructuredError | null {
+  for (const declared of declaredExtensionsFromInputs(inputs.extensionPacks)) {
+    if (declared.targetId !== inputs.targetId) {
+      return targetMismatchError(declared.id, inputs.targetId, declared.targetId);
+    }
+  }
+  return null;
+}
+
+/**
+ * Load the tolerant {@link ContractSpaceAggregate} once at the CLI
+ * surface. Construction never throws on disk content; callers query
+ * {@link ContractSpaceAggregate.app} / extension facets instead of
+ * re-reading `migrations/`.
+ */
+export async function loadContractSpaceAggregateForCli<
+  TFamilyId extends string,
+  TTargetId extends string,
+>(
+  inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
+): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
+  const targetFailure = refuseDeclaredExtensionTargetMismatch(inputs);
+  if (targetFailure) {
+    return notOk(targetFailure);
+  }
+
+  const aggregate = await loadContractSpaceAggregate({
+    migrationsDir: inputs.migrationsDir,
+    deserializeContract: inputs.deserializeContract,
+    appContract: inputs.appContract,
+  });
+  return ok(aggregate);
+}
+
+/**
+ * Run `checkIntegrity` on a loaded aggregate and map violations into
+ * the contract-space refusal envelope, or return `null` when the model
+ * is acceptable for the requested check scope.
+ */
+export function refuseContractSpaceIntegrity(
+  aggregate: ContractSpaceAggregate,
+  options: IntegrityQueryOptions,
+): CliStructuredError | null {
+  return mapIntegrityViolations(aggregate.checkIntegrity(options));
+}
+
+const PACKAGE_CORRUPTION_KINDS = new Set<IntegrityViolation['kind']>([
+  'hashMismatch',
+  'providedInvariantsMismatch',
+  'packageUnloadable',
+]);
+
+/**
+ * Reader-subset integrity refusal for `migration status`: package
+ * corruptions only (`hashMismatch`, `providedInvariantsMismatch`,
+ * `packageUnloadable`).
+ */
+export function refusePackageCorruptionOnAggregate(
+  aggregate: ContractSpaceAggregate,
+): CliStructuredError | null {
+  const corruption = aggregate.checkIntegrity().filter((v) => PACKAGE_CORRUPTION_KINDS.has(v.kind));
+  return mapIntegrityViolations(corruption);
+}
+
 /**
  * Construct the tolerant {@link ContractSpaceAggregate} at the CLI
- * surface and apply the explicit integrity gate.
- *
- * Construction never throws on disk content: the aggregate loader reads
- * every space's packages, refs, and head ref tolerantly, synthesising
- * the app head ref from the live contract's storage hash and reading
- * extension state (packages / refs / contract.json) from disk. The gate
- * then runs `checkIntegrity({ declaredExtensions, checkContracts })`
- * — the same checks the prior throw-on-load loader enforced — and maps
- * any violation into a {@link CliStructuredError}, so callers that
- * previously relied on construction-time throws refuse identically.
+ * surface and apply the explicit integrity refusal.
  *
  * App-space migration packages are read from `migrations/<app>/` by the
  * loader itself; callers no longer thread them through.
@@ -196,30 +265,17 @@ export async function buildContractSpaceAggregate<
 >(
   inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
 ): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
-  const declaredExtensions: readonly DeclaredExtensionEntry[] = toDeclaredExtensionsFromRaw(
-    inputs.extensionPacks as ReadonlyArray<unknown>,
-  );
-
-  // Precheck the declared targets before touching disk: a descriptor
-  // configured for a different target than the project's is a
-  // configuration error independent of on-disk state, and the prior
-  // loader rejected it first.
-  for (const declared of declaredExtensions) {
-    if (declared.targetId !== inputs.targetId) {
-      return notOk(targetMismatchError(declared.id, inputs.targetId, declared.targetId));
-    }
+  const declaredExtensions = declaredExtensionsFromInputs(inputs.extensionPacks);
+  const loaded = await loadContractSpaceAggregateForCli(inputs);
+  if (!loaded.ok) {
+    return loaded;
   }
-
-  const aggregate = await loadContractSpaceAggregate({
-    migrationsDir: inputs.migrationsDir,
-    deserializeContract: inputs.deserializeContract,
-    appContract: inputs.appContract,
+  const failure = refuseContractSpaceIntegrity(loaded.value, {
+    declaredExtensions,
+    checkContracts: true,
   });
-
-  const violations = aggregate.checkIntegrity({ declaredExtensions, checkContracts: true });
-  const failure = mapIntegrityViolations(violations);
   if (failure) {
     return notOk(failure);
   }
-  return ok(aggregate);
+  return ok(loaded.value);
 }

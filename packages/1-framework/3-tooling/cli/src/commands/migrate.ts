@@ -35,7 +35,6 @@ import {
 import {
   addGlobalOptions,
   collectDeclaredInvariants,
-  loadMigrationPackages,
   maskConnectionUrl,
   resolveContractPath,
   resolveMigrationPaths,
@@ -43,7 +42,11 @@ import {
   setCommandExamples,
   targetSupportsMigrations,
 } from '../utils/command-helpers';
-import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
+import {
+  loadContractSpaceAggregateForCli,
+  refuseContractSpaceIntegrity,
+} from '../utils/contract-space-aggregate-loader';
+import { toDeclaredExtensionsFromRaw } from '../utils/extension-pack-inputs';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -99,8 +102,10 @@ async function executeMigrateCommand(
   startTime: number,
 ): Promise<Result<MigrateResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative, refsDir } =
-    resolveMigrationPaths(options.config, config);
+  const { configPath, migrationsDir, appMigrationsRelative, refsDir } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
 
   const dbConnection = options.db ?? config.db?.connection;
   if (!dbConnection) {
@@ -128,30 +133,7 @@ async function executeMigrateCommand(
     );
   }
 
-  let refEntry: RefEntry | undefined;
   const toArg = options.to;
-
-  if (toArg) {
-    try {
-      const refs = await readRefs(refsDir);
-      const { graph } = await loadMigrationPackages(appMigrationsDir);
-      const refResult = parseContractRef(toArg, { graph, refs });
-      if (!refResult.ok) {
-        return notOk(mapRefResolutionError(refResult.failure));
-      }
-      if (refResult.value.provenance.kind === 'ref') {
-        const resolved = refs[refResult.value.provenance.refName];
-        if (resolved) refEntry = resolved;
-      } else {
-        refEntry = { hash: refResult.value.hash, invariants: [] };
-      }
-    } catch (error) {
-      if (MigrationToolsError.is(error)) {
-        return notOk(mapMigrationToolsError(error));
-      }
-      throw error;
-    }
-  }
 
   // Construct the family instance up-front so the on-disk contract read
   // crosses the serializer seam (`familyInstance.deserializeContract`) at
@@ -194,6 +176,42 @@ async function executeMigrateCommand(
     );
   }
 
+  const loadedAggregate = await loadContractSpaceAggregateForCli({
+    targetId: config.target.targetId,
+    migrationsDir,
+    appContract: contractRaw,
+    extensionPacks: config.extensionPacks ?? [],
+    deserializeContract: (json) => familyInstance.deserializeContract(json),
+  });
+  if (!loadedAggregate.ok) {
+    return notOk(loadedAggregate.failure);
+  }
+  const aggregate = loadedAggregate.value;
+  const integrityFailure = refuseContractSpaceIntegrity(aggregate, {
+    declaredExtensions: toDeclaredExtensionsFromRaw(
+      (config.extensionPacks ?? []) as ReadonlyArray<unknown>,
+    ),
+    checkContracts: true,
+  });
+  if (integrityFailure) {
+    return notOk(integrityFailure);
+  }
+
+  let refEntry: RefEntry | undefined;
+  if (toArg) {
+    const refs = await readRefs(refsDir);
+    const refResult = parseContractRef(toArg, { graph: aggregate.app.graph(), refs });
+    if (!refResult.ok) {
+      return notOk(mapRefResolutionError(refResult.failure));
+    }
+    if (refResult.value.provenance.kind === 'ref') {
+      const resolved = refs[refResult.value.provenance.refName];
+      if (resolved) refEntry = resolved;
+    } else {
+      refEntry = { hash: refResult.value.hash, invariants: [] };
+    }
+  }
+
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -218,33 +236,8 @@ async function executeMigrateCommand(
     ui.stderr(header);
   }
 
-  let appPackages: Awaited<ReturnType<typeof loadMigrationPackages>>;
-  try {
-    appPackages = await loadMigrationPackages(appMigrationsDir);
-  } catch (error) {
-    if (MigrationToolsError.is(error)) {
-      return notOk(mapMigrationToolsError(error));
-    }
-    throw error;
-  }
-
-  // Gate the contract-space aggregate before opening a DB connection.
-  // `checkIntegrity` is a pure offline check (on-disk migration state +
-  // the live app contract — no driver), and the transitional constraint
-  // forbids any window where a broken set touches a database. Refusing
-  // here preserves the original "refuse before connecting" safety
-  // property: a tampered/inconsistent set fails with the `5002` integrity
-  // envelope before the driver is ever created.
-  const gate = await buildContractSpaceAggregate({
-    targetId: config.target.targetId,
-    migrationsDir,
-    appContract: contractRaw,
-    extensionPacks: config.extensionPacks ?? [],
-    deserializeContract: (json) => familyInstance.deserializeContract(json),
-  });
-  if (!gate.ok) {
-    return notOk(gate.failure);
-  }
+  const appGraph = aggregate.app.graph();
+  const appBundles = aggregate.app.packages;
 
   const client = createControlClient({
     family: config.family,
@@ -259,20 +252,19 @@ async function executeMigrateCommand(
 
     const allMarkers = await client.readAllMarkers();
     const appMarker = allMarkers.get('app') ?? null;
-    const { graph } = appPackages;
 
-    if (appMarker !== null && !isGraphNode(appMarker.storageHash, graph)) {
+    if (appMarker !== null && !isGraphNode(appMarker.storageHash, appGraph)) {
       return notOk(
         errorMarkerMismatch(
           appMarker.storageHash,
-          [...graph.nodes].sort(),
-          findLatestMigration(graph)?.to ?? null,
+          [...appGraph.nodes].sort(),
+          findLatestMigration(appGraph)?.to ?? null,
         ),
       );
     }
 
     if (refEntry && refEntry.invariants.length > 0) {
-      const declared = collectDeclaredInvariants(appPackages.graph);
+      const declared = collectDeclaredInvariants(appGraph);
       const known = new Set<string>(declared);
       for (const id of appMarker?.invariants ?? []) known.add(id);
       const unknown = refEntry.invariants.filter((id) => !known.has(id));
@@ -315,7 +307,7 @@ async function executeMigrateCommand(
         unknown
       >;
       if (toArg && refEntry) {
-        const matchingBundle = appPackages.bundles.find((p) => p.metadata.to === refEntry.hash);
+        const matchingBundle = appBundles.find((p) => p.metadata.to === refEntry.hash);
         if (matchingBundle) {
           const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
           contractJsonPathForSnapshot = endContractPath;
