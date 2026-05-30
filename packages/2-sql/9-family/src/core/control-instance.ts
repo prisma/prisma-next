@@ -25,10 +25,7 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import {
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
+import { storageNamespaceValues } from '@prisma-next/framework-components/ir';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
