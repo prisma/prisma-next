@@ -288,6 +288,33 @@ export async function deleteRef(refsDir: string, name: string): Promise<void> {
   }
 }
 
+/**
+ * Index user-authored refs by the contract hash each ref points at.
+ * Each bucket is sorted lex-asc for deterministic output.
+ */
+export function refsByContractHash(refs: Refs): ReadonlyMap<string, readonly string[]> {
+  const byHash = new Map<string, string[]>();
+  for (const [name, entry] of Object.entries(refs)) {
+    const bucket = byHash.get(entry.hash);
+    if (bucket) bucket.push(name);
+    else byHash.set(entry.hash, [name]);
+  }
+  for (const bucket of byHash.values()) {
+    bucket.sort();
+  }
+  return byHash;
+}
+
+/**
+ * Read `migrations/<space>/refs/*.json` and index by destination hash.
+ * Returns an empty map when the refs directory does not exist.
+ */
+export async function resolveRefsByContractHash(
+  refsDir: string,
+): Promise<ReadonlyMap<string, readonly string[]>> {
+  return refsByContractHash(await readRefs(refsDir));
+}
+
 export function resolveRef(refs: Refs, name: string): RefEntry {
   if (!validateRefName(name)) {
     throw errorInvalidRefName(name);

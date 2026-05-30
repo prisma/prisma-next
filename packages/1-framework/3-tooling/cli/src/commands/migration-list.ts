@@ -1,5 +1,3 @@
-import { enumerateMigrationSpaces } from '@prisma-next/migration-tools/enumerate-migration-spaces';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type {
   MigrationListResult,
   MigrationSpaceListEntry,
@@ -13,8 +11,6 @@ import {
   type CliStructuredError,
   errorInvalidSpaceId,
   errorSpaceNotFound,
-  errorUnexpected,
-  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -23,6 +19,7 @@ import {
   setCommandExamples,
   setCommandSeeAlso,
 } from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import {
   type GlyphMode,
   renderMigrationListGraphResult,
@@ -32,6 +29,7 @@ import { createAnsiMigrationListStyler } from '../utils/formatters/migration-lis
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import { migrationSpaceListEntriesFromAggregate } from '../utils/migration-space-list-from-aggregate';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 
@@ -60,23 +58,15 @@ export function renderMigrationListHumanOutput(
 }
 
 /**
- * Inputs for {@link runMigrationList} — the pure-ish data-and-policy core
- * of `migration list` that tests exercise directly.
+ * Inputs for {@link runMigrationList} — the policy core of `migration list`
+ * that tests exercise directly.
  *
- * The core depends only on the filesystem rooted at `migrationsDir`. It
- * does NOT call `loadConfig`, parse CLI flags, render a styled header,
- * or write to any stream. Output rendering is the caller's concern (the
- * CLI shell renders via {@link renderMigrationList}; JSON callers
- * serialize the {@link MigrationListResult} directly).
+ * The core does not call `loadConfig`, parse CLI flags, render a styled
+ * header, or write to any stream. Enumeration is supplied by the caller
+ * (the CLI shell builds it from {@link migrationSpaceListEntriesFromAggregate}).
  */
 export interface RunMigrationListInputs {
-  /** Absolute path to the project's `migrations/` directory. */
-  readonly migrationsDir: string;
-  /**
-   * Optional contract-space id to narrow the result to a single space.
-   * Same validation rules as {@link isValidSpaceId}. When absent, every
-   * on-disk space contributes.
-   */
+  readonly spaces: readonly MigrationSpaceListEntry[];
   readonly spaceFilter?: string;
 }
 
@@ -89,57 +79,21 @@ function computeSummary(spaces: readonly MigrationSpaceListEntry[]): string {
 }
 
 /**
- * The unit-testable core of `migration list`. Given an absolute
- * `migrationsDir` and an optional `spaceFilter`, enumerates every
- * on-disk migration (via {@link enumerateMigrationSpaces}), narrows to
- * the requested space if any, and assembles a {@link MigrationListResult}
- * ready for the renderer or JSON serializer.
- *
- * The enumerator is the single source of truth for "what is a contract
- * space": existence, the `--space` candidate-suggestion list, and
- * scoping are all derived from one {@link enumerateMigrationSpaces}
- * traversal. This means the reserved-name exclusion the enumerator
- * applies (e.g. the per-space `refs/` subdirectory) is honoured here for
- * free — a `--space refs` request resolves to `SPACE_NOT_FOUND`, not a
- * synthesized empty-state.
- *
- * Distinct empty-state paths:
+ * Policy core of `migration list`: validates `--space`, narrows the
+ * pre-enumerated spaces, and assembles a {@link MigrationListResult}.
  *
  * - `migrations/` missing or contains no valid space directories →
- *   synthesizes `[{ spaceId: APP_SPACE_ID, migrations: [] }]` so the
- *   renderer's empty-state path can name a directory (spec § Empty-state +
- *   the `migrations/` missing edge case).
- * - `--space <id>` on an existing-but-empty space dir → the enumerator
- *   surfaces `{ spaceId, migrations: [] }`; `<id>` is in the set, so it
- *   scopes to that entry and renders the empty-state the same way.
- * - `--space <id>` on a non-existent (or reserved) space → structured
- *   `MIGRATION.SPACE_NOT_FOUND` error (NOT empty-state).
- *
- * Errors caught here:
- *
- * - {@link MigrationToolsError} from the enumerator → mapped through
- *   {@link mapMigrationToolsError} so callers see the catalogue code.
- * - Anything else (filesystem etc.) → wrapped via {@link errorUnexpected}.
+ *   caller passes `spaces: []`; this synthesizes `[{ spaceId: APP_SPACE_ID, migrations: [] }]`.
+ * - `--space <id>` on an existing-but-empty space → `{ spaceId, migrations: [] }` in the input.
+ * - `--space <id>` on a non-existent (or reserved) space → `SPACE_NOT_FOUND`.
  */
-export async function runMigrationList(
+export function runMigrationList(
   inputs: RunMigrationListInputs,
-): Promise<Result<MigrationListResult, CliStructuredError>> {
-  const { migrationsDir, spaceFilter } = inputs;
+): Result<MigrationListResult, CliStructuredError> {
+  const { spaces, spaceFilter } = inputs;
 
   if (spaceFilter !== undefined && !isValidSpaceId(spaceFilter)) {
     return notOk(errorInvalidSpaceId(spaceFilter));
-  }
-
-  let spaces: readonly MigrationSpaceListEntry[];
-  try {
-    spaces = await enumerateMigrationSpaces({ projectMigrationsDir: migrationsDir });
-  } catch (error) {
-    if (MigrationToolsError.is(error)) return notOk(mapMigrationToolsError(error));
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to enumerate migrations: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
   }
 
   if (spaceFilter !== undefined && !spaces.some((s) => s.spaceId === spaceFilter)) {
@@ -164,7 +118,7 @@ export async function runMigrationList(
  * stderr (interactive mode only), and delegates to {@link runMigrationList}.
  * Kept intentionally thin so the unit-testable surface lives in the core.
  */
-async function executeMigrationListCommand(
+export async function executeMigrationListCommand(
   options: MigrationListOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
@@ -189,8 +143,18 @@ async function executeMigrationListCommand(
     ui.stderr(header);
   }
 
-  return runMigrationList({
+  const loaded = await buildReadAggregate(config, { migrationsDir });
+  if (!loaded.ok) {
+    return notOk(loaded.failure);
+  }
+
+  const spaces = await migrationSpaceListEntriesFromAggregate(
+    loaded.value.aggregate,
     migrationsDir,
+  );
+
+  return runMigrationList({
+    spaces,
     ...ifDefined('spaceFilter', options.space),
   });
 }

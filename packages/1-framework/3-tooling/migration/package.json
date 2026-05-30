@@ -74,10 +74,6 @@
       "types": "./dist/exports/migration-list-types.d.mts",
       "import": "./dist/exports/migration-list-types.mjs"
     },
-    "./enumerate-migration-spaces": {
-      "types": "./dist/exports/enumerate-migration-spaces.d.mts",
-      "import": "./dist/exports/enumerate-migration-spaces.mjs"
-    },
     "./migration-list-graph-topology": {
       "types": "./dist/exports/migration-list-graph-topology.d.mts",
       "import": "./dist/exports/migration-list-graph-topology.mjs"

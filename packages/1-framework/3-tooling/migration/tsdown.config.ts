@@ -11,7 +11,6 @@ export default defineConfig({
     'exports/invariants': 'src/exports/invariants.ts',
     'exports/migration-graph': 'src/exports/migration-graph.ts',
     'exports/migration-list-types': 'src/exports/migration-list-types.ts',
-    'exports/enumerate-migration-spaces': 'src/exports/enumerate-migration-spaces.ts',
     'exports/migration-list-graph-topology': 'src/exports/migration-list-graph-topology.ts',
     'exports/migration-list-graph-layout': 'src/exports/migration-list-graph-layout.ts',
     'exports/refs': 'src/exports/refs.ts',
