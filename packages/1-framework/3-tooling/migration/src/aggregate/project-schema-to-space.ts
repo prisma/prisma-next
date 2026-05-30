@@ -97,9 +97,7 @@ function collectOwnedNames(
   const owned = new Set<string>();
   for (const other of otherMembers) {
     if (other.spaceId === member.spaceId) continue;
-    for (const { entityName } of elementCoordinates(
-      other.contract().storage as unknown as Record<string, unknown>,
-    )) {
+    for (const { entityName } of elementCoordinates(other.contract().storage)) {
       owned.add(entityName);
     }
   }

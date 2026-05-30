@@ -10,16 +10,15 @@ export const STORAGE_PLANE_RESERVED_KEYS = ['storageHash', 'types'] as const;
 
 export type StoragePlaneReservedKey = (typeof STORAGE_PLANE_RESERVED_KEYS)[number];
 
+const RESERVED_KEY_SET: ReadonlySet<string> = new Set(STORAGE_PLANE_RESERVED_KEYS);
+
 export function isStoragePlaneReservedKey(key: string): key is StoragePlaneReservedKey {
-  return (STORAGE_PLANE_RESERVED_KEYS as readonly string[]).includes(key);
+  return RESERVED_KEY_SET.has(key);
 }
 
 function isNamespaceEntry(value: unknown): value is Namespace {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    typeof (value as { id: unknown }).id === 'string'
+    typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string'
   );
 }
 
@@ -64,7 +63,14 @@ export function getStorageNamespace<T extends Namespace = Namespace>(
   if (isStoragePlaneReservedKey(namespaceId)) {
     return undefined;
   }
-  const value = (storage as Record<string, unknown>)[namespaceId];
+  // The public parameter is `object` so both family storage class instances
+  // and plain validated records flow in without a cast; reading a dynamic
+  // namespace-id key requires asserting the string index-signature shape that
+  // `object` deliberately omits.
+  const value = blindCast<
+    Record<string, unknown>,
+    'storage walk reads a dynamic namespace-id key off the structurally-opaque `object` parameter'
+  >(storage)[namespaceId];
   return isNamespaceEntry(value)
     ? blindCast<T, 'caller selects the family namespace concretion via the type parameter'>(value)
     : undefined;

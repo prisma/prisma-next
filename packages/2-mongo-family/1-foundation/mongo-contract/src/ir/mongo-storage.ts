@@ -7,6 +7,7 @@ import {
   type Namespace,
   type Storage,
 } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { MongoCollection, MongoCollectionInput } from './mongo-collection';
 
 export interface MongoNamespaceCollectionsInput {
@@ -35,10 +36,18 @@ export type MongoStorageNamespacesInput<THash extends string = string> = {
 export function buildMongoStorageInput<THash extends string>(
   input: MongoStorageNamespacesInput<THash>,
 ): MongoStorageInput<THash> {
-  return flatStorageInput({
-    storageHash: input.storageHash,
-    namespaces: input.namespaces,
-  }) as MongoStorageInput<THash>;
+  // `flatStorageInput` carries a shared optional `types?` slot that
+  // `MongoStorageInput` omits, so the spread result is not nominally the
+  // Mongo input type even though it is structurally the flat Mongo storage.
+  return blindCast<
+    MongoStorageInput<THash>,
+    'flatStorageInput exposes an optional types slot MongoStorageInput omits; the spread is otherwise the flat Mongo storage input'
+  >(
+    flatStorageInput({
+      storageHash: input.storageHash,
+      namespaces: input.namespaces,
+    }),
+  );
 }
 
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {

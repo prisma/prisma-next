@@ -216,9 +216,7 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
       });
     }
 
-    for (const { entityName: elementName } of elementCoordinates(
-      contract.storage as unknown as Record<string, unknown>,
-    )) {
+    for (const { entityName: elementName } of elementCoordinates(contract.storage)) {
       const claimers = elementClaimedBy.get(elementName);
       if (claimers) claimers.push(member.spaceId);
       else elementClaimedBy.set(elementName, [member.spaceId]);

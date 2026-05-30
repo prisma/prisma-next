@@ -214,9 +214,7 @@ function detectOrphanElements(
   const claimedTables = new Set<string>();
   for (const member of members) {
     const contract = member.contract();
-    for (const { entityName } of elementCoordinates(
-      contract.storage as unknown as Record<string, unknown>,
-    )) {
+    for (const { entityName } of elementCoordinates(contract.storage)) {
       claimedTables.add(entityName);
     }
   }

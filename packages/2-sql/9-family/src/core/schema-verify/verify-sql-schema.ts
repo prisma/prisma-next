@@ -145,7 +145,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       PostgresEnumStorageEntry | StorageTypeInstance
     >),
   };
-  for (const ns of storageNamespaceValues(contract.storage) as SqlNamespace[]) {
+  for (const ns of storageNamespaceValues<SqlNamespace>(contract.storage)) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
@@ -228,7 +228,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   // Namespace-scoped enums, verified per `(namespaceId, typeName)`.
   for (const nsId of [...storageNamespaceEntries(contract.storage)].map(([id]) => id)) {
-    const ns = getStorageNamespace(contract.storage, nsId) as SqlNamespace | undefined;
+    const ns = getStorageNamespace<SqlNamespace>(contract.storage, nsId);
     if (!ns) continue;
     const nsEnums = ns.enum;
     if (!nsEnums) continue;
@@ -411,7 +411,7 @@ function verifySchemaTables(options: {
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   for (const namespaceId of namespaceIds) {
-    const ns = getStorageNamespace(contract.storage, namespaceId) as SqlNamespace | undefined;
+    const ns = getStorageNamespace<SqlNamespace>(contract.storage, namespaceId);
     if (!ns) continue;
     for (const [tableName, contractTableRaw] of Object.entries(ns.tables)) {
       if (!(contractTableRaw instanceof StorageTable)) {
@@ -466,9 +466,8 @@ function verifySchemaTables(options: {
     for (const tableName of Object.keys(schemaTables)) {
       const claimed = namespaceIds.some(
         (namespaceId) =>
-          (getStorageNamespace(contract.storage, namespaceId) as SqlNamespace | undefined)?.tables[
-            tableName
-          ] !== undefined,
+          getStorageNamespace<SqlNamespace>(contract.storage, namespaceId)?.tables[tableName] !==
+          undefined,
       );
       if (!claimed) {
         // `namespaceId` is intentionally absent: an extra table exists in the
@@ -1192,7 +1191,7 @@ function resolveContractColumnTypeMetadata(
     return {
       codecId: referencedType.codecId,
       nativeType: referencedType.nativeType,
-      typeParams: { values: referencedType.values } as unknown as Record<string, unknown>,
+      typeParams: { values: referencedType.values },
     };
   }
   if (isStorageTypeInstance(referencedType)) {

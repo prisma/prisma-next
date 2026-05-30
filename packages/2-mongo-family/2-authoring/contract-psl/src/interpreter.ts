@@ -1153,7 +1153,7 @@ export function interpretPslDocumentToMongoContract(
         }),
       },
     }),
-  ) as Contract['storage'];
+  );
   const capabilities: Record<string, Record<string, boolean>> = {};
 
   return ok({

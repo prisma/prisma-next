@@ -79,8 +79,8 @@ export function contractToMongoSchemaIR(contract: Contract | null): MongoSchemaI
   }
 
   const collections: MongoSchemaCollection[] = [];
-  for (const ns of storageNamespaceValues(contract.storage)) {
-    for (const [name, def] of Object.entries((ns as MongoNamespaceShape).collections)) {
+  for (const ns of storageNamespaceValues<MongoNamespaceShape>(contract.storage)) {
+    for (const [name, def] of Object.entries(ns.collections)) {
       collections.push(convertCollection(name, def));
     }
   }

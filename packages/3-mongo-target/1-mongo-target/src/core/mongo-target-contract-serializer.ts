@@ -17,8 +17,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
   protected constructTargetContract(validated: MongoContract): MongoTargetContract {
     const { storage, ...rest } = validated;
     const namespaces = Object.fromEntries(
-      [...storageNamespaceEntries(storage)].map(([nsId, nsData]) => {
-        const ns = nsData as MongoNamespaceShape;
+      [...storageNamespaceEntries<MongoNamespaceShape>(storage)].map(([nsId, ns]) => {
         const collections = ns.collections;
         const collectionCount = Object.keys(collections).length;
         if (nsId === UNBOUND_NAMESPACE_ID && collectionCount === 0) {
@@ -47,14 +46,13 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
     const storageOut: Record<string, JsonObject | string> = {
       storageHash: String(storage.storageHash),
     };
-    for (const [nsId, ns] of [...storageNamespaceEntries(storage)]) {
-      const mongoNs = ns as MongoNamespaceShape;
+    for (const [nsId, ns] of [...storageNamespaceEntries<MongoNamespaceShape>(storage)]) {
       const collectionsOut: Record<string, JsonObject> = {};
-      for (const [collName, coll] of Object.entries(mongoNs.collections)) {
+      for (const [collName, coll] of Object.entries(ns.collections)) {
         collectionsOut[collName] = JSON.parse(JSON.stringify(coll)) as JsonObject;
       }
       storageOut[nsId] = {
-        id: mongoNs.id,
+        id: ns.id,
         kind: 'mongo-database',
         collections: collectionsOut,
       };

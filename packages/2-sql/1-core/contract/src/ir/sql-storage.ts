@@ -6,6 +6,7 @@ import {
   type Namespace,
   type Storage,
 } from '@prisma-next/framework-components/ir';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
@@ -53,11 +54,20 @@ export type SqlStorageNamespacesInput<THash extends string = string> = {
 export function buildSqlStorageInput<THash extends string>(
   input: SqlStorageNamespacesInput<THash>,
 ): SqlStorageInput<THash> {
-  return flatStorageInput({
-    storageHash: input.storageHash,
-    ...(input.types !== undefined ? { types: input.types } : {}),
-    namespaces: input.namespaces,
-  }) as SqlStorageInput<THash>;
+  // `flatStorageInput` widens the namespace spread to
+  // `Record<string, SqlNamespace>`; TS cannot re-derive the
+  // `__unbound__`-branded `SqlStorageInput` from a spread, but the
+  // `SqlStorageNamespacesInput` parameter already guarantees that brand.
+  return blindCast<
+    SqlStorageInput<THash>,
+    'flat spread cannot reconstruct the __unbound__-branded SqlStorageInput; the namespaces-keyed input guarantees the brand'
+  >(
+    flatStorageInput({
+      storageHash: input.storageHash,
+      ...(input.types !== undefined ? { types: input.types } : {}),
+      namespaces: input.namespaces,
+    }),
+  );
 }
 
 /**

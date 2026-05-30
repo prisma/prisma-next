@@ -257,8 +257,8 @@ export function detectDestructiveChanges(
   ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   for (const namespaceId of namespaceIds) {
-    const fromNs = getStorageNamespace(from, namespaceId) as SqlNamespace | undefined;
-    const toNs = getStorageNamespace(to, namespaceId) as SqlNamespace | undefined;
+    const fromNs = getStorageNamespace<SqlNamespace>(from, namespaceId);
+    const toNs = getStorageNamespace<SqlNamespace>(to, namespaceId);
     const fromTables = fromNs?.tables;
     if (!fromTables) continue;
 
@@ -335,7 +335,7 @@ export function contractToSchemaIR(
   const allTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {
     ...((storage.types ?? {}) as ResolvedStorageTypes),
   };
-  for (const ns of storageNamespaceValues(storage) as SqlNamespace[]) {
+  for (const ns of storageNamespaceValues<SqlNamespace>(storage)) {
     const nsEnums = (ns as { enum?: Record<string, PostgresEnumStorageEntry> }).enum;
     if (nsEnums) {
       for (const [k, v] of Object.entries(nsEnums)) {
@@ -345,7 +345,7 @@ export function contractToSchemaIR(
   }
   const storageTypes = allTypes as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
-  for (const ns of storageNamespaceValues(storage) as SqlNamespace[]) {
+  for (const ns of storageNamespaceValues<SqlNamespace>(storage)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.tables)) {
       if (!(tableDefRaw instanceof StorageTable)) {
         throw new Error(

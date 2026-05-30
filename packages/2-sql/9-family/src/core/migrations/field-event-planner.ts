@@ -75,8 +75,8 @@ export function planFieldEventOperations(
   const dropped: FieldEntry[] = [];
   const altered: FieldEntry[] = [];
 
-  const priorStorage = priorContract?.storage as unknown as Record<string, unknown> | undefined;
-  const newStorage = newContract.storage as unknown as Record<string, unknown>;
+  const priorStorage = priorContract?.storage;
+  const newStorage = newContract.storage;
 
   const namespaceIds = unionSorted(
     priorStorage ? [...storageNamespaceEntries(priorStorage)].map(([id]) => id) : [],
@@ -84,10 +84,8 @@ export function planFieldEventOperations(
   );
 
   for (const namespaceId of namespaceIds) {
-    const priorNs = getStorageNamespace(priorStorage ?? {}, namespaceId) as
-      | SqlNamespace
-      | undefined;
-    const newNs = getStorageNamespace(newStorage, namespaceId) as SqlNamespace | undefined;
+    const priorNs = getStorageNamespace<SqlNamespace>(priorStorage ?? {}, namespaceId);
+    const newNs = getStorageNamespace<SqlNamespace>(newStorage, namespaceId);
     const priorTables = priorNs?.tables;
     const newTables = newNs?.tables;
 

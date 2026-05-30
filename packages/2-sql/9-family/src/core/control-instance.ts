@@ -32,7 +32,7 @@ import {
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -69,11 +69,7 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
     contract.storage !== null &&
     storageNamespaceValues(contract.storage).length > 0
   ) {
-    const namespaces = Object.fromEntries(storageNamespaceEntries(contract.storage)) as Record<
-      string,
-      { readonly tables?: Readonly<Record<string, unknown>> }
-    >;
-    for (const ns of Object.values(namespaces)) {
+    for (const ns of storageNamespaceValues<SqlNamespace>(contract.storage)) {
       const tbls = ns.tables;
       if (typeof tbls !== 'object' || tbls === null) continue;
       for (const table of Object.values(tbls)) {

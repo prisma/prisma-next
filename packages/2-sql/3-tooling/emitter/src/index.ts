@@ -24,6 +24,7 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
   if (!params || Object.keys(params).length === 0) {
@@ -79,7 +80,10 @@ export const sqlEmission = {
   id: 'sql',
 
   validateTypes(contract: Contract, _ctx: ValidationContext): void {
-    const storage = contract.storage as unknown as SqlStorage | undefined;
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'SQL emission hook runs only for SQL-family contracts; the framework Contract surface types storage as the family-agnostic StorageBase'
+    >(contract.storage);
     if (!storage?.storageHash) {
       return;
     }
@@ -112,7 +116,10 @@ export const sqlEmission = {
       throw new Error(`Expected targetFamily "sql", got "${contract.targetFamily}"`);
     }
 
-    const storage = contract.storage as unknown as SqlStorage | undefined;
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'SQL emission hook runs only for SQL-family contracts; the framework Contract surface types storage as the family-agnostic StorageBase'
+    >(contract.storage);
     if (!storage?.storageHash) {
       throw new Error('SQL contract must have storage with storageHash');
     }
@@ -258,7 +265,10 @@ export const sqlEmission = {
   },
 
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
-    const storage = contract.storage as unknown as SqlStorage;
+    const storage = blindCast<
+      SqlStorage,
+      'SQL emission hook runs only for SQL-family contracts; the framework Contract surface types storage as the family-agnostic StorageBase'
+    >(contract.storage);
     const namespaceTypeEntries = generateFlatStorageNamespaceTypeEntries(storage);
     const domainTypes = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
       | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
@@ -297,7 +307,10 @@ export const sqlEmission = {
     const storageField = sqlModel.storage?.fields?.[fieldName];
     if (!storageField) return undefined;
 
-    const storage = contract.storage as unknown as SqlStorage | undefined;
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'SQL emission hook runs only for SQL-family contracts; the framework Contract surface types storage as the family-agnostic StorageBase'
+    >(contract.storage);
     if (!storage) return undefined;
 
     const tableName = sqlModel.storage.table;
@@ -308,7 +321,7 @@ export const sqlEmission = {
     if (!column) return undefined;
 
     if (column.typeRef) {
-      const ns = getStorageNamespace(storage, located.namespaceId) as SqlNamespace | undefined;
+      const ns = getStorageNamespace<SqlNamespace>(storage, located.namespaceId);
       const nsEnums =
         ns !== undefined && 'enum' in ns
           ? (

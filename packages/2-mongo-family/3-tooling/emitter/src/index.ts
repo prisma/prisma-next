@@ -16,7 +16,10 @@ import type {
 const MONGO_NAMESPACE_KIND_FALLBACK = 'mongo-namespace' as const;
 
 function mongoNamespaceSerializedKind(ns: Namespace): string {
-  const kind = (ns as { kind?: unknown }).kind;
+  // `kind` is typed `string` on `Namespace`, but plain-literal namespaces
+  // built through the DSL omit it at runtime; widen to `unknown` (no cast)
+  // and fall back when it is absent.
+  const kind: unknown = ns.kind;
   if (typeof kind === 'string') {
     return `readonly kind: ${serializeValue(kind)}`;
   }
@@ -25,8 +28,8 @@ function mongoNamespaceSerializedKind(ns: Namespace): string {
 
 function assertUniqueMongoCollectionNames(storage: MongoStorage): void {
   const seen = new Map<string, string>();
-  for (const [namespaceId, ns] of [...storageNamespaceEntries(storage)]) {
-    for (const coll of Object.keys((ns as MongoNamespaceShape).collections)) {
+  for (const [namespaceId, ns] of [...storageNamespaceEntries<MongoNamespaceShape>(storage)]) {
+    for (const coll of Object.keys(ns.collections)) {
       const existing = seen.get(coll);
       if (existing !== undefined && existing !== namespaceId) {
         throw new Error(
@@ -64,15 +67,15 @@ function generateMongoNamespaceCollectionsType(
 }
 
 function generateMongoFlatStorageType(storage: MongoStorage): string {
-  const sorted = [...storageNamespaceEntries(storage)].sort(([a], [b]) => a.localeCompare(b));
+  const sorted = [...storageNamespaceEntries<MongoNamespaceShape>(storage)].sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
   if (sorted.length === 0) {
     return '';
   }
   const parts: string[] = [];
   for (const [name, ns] of sorted) {
-    const collectionsType = generateMongoNamespaceCollectionsType(
-      (ns as MongoNamespaceShape).collections as Readonly<Record<string, MongoCollection>>,
-    );
+    const collectionsType = generateMongoNamespaceCollectionsType(ns.collections);
     parts.push(
       `readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)}; ${mongoNamespaceSerializedKind(ns)}; readonly collections: ${collectionsType} }`,
     );
@@ -132,7 +135,7 @@ export const mongoEmission = {
       throw new Error('Mongo contract must have storage');
     }
     if (
-      storageNamespaceValues(storage).length === 0 &&
+      storageNamespaceValues<MongoNamespaceShape>(storage).length === 0 &&
       !getStorageNamespace(storage, '__unbound__')
     ) {
       throw new Error('Mongo contract must have at least one storage namespace entry');
@@ -141,8 +144,8 @@ export const mongoEmission = {
     assertUniqueMongoCollectionNames(storage);
 
     const collectionNames = new Set<string>();
-    for (const ns of storageNamespaceValues(storage)) {
-      for (const c of Object.keys((ns as MongoNamespaceShape).collections)) {
+    for (const ns of storageNamespaceValues<MongoNamespaceShape>(storage)) {
+      for (const c of Object.keys(ns.collections)) {
         collectionNames.add(c);
       }
     }

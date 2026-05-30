@@ -7,9 +7,11 @@ import {
   type MongoCollectionInput,
   type MongoContract,
   MongoContractSchema,
+  type MongoNamespaceShape,
   validateMongoStorage,
 } from '@prisma-next/mongo-contract';
 import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/canonicalization-hooks';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type as arktypeType, type Type } from 'arktype';
 
@@ -124,13 +126,24 @@ export abstract class MongoContractSerializerBase<TContract>
     const hydratedStorage: Record<string, unknown> = {
       storageHash: contract.storage.storageHash,
     };
-    for (const [nsId, nsEnvelope] of storageNamespaceEntries(contract.storage)) {
-      const rawCollections =
-        (nsEnvelope as { collections?: Record<string, unknown> }).collections ?? {};
+    for (const [nsId, nsEnvelope] of storageNamespaceEntries<MongoNamespaceShape>(
+      contract.storage,
+    )) {
+      const rawCollections = nsEnvelope.collections ?? {};
       const hydratedCollections = Object.fromEntries(
         Object.entries(rawCollections).map(([name, raw]) => [
           name,
-          raw instanceof MongoCollection ? raw : new MongoCollection(raw as MongoCollectionInput),
+          // Structurally-validated (not yet hydrated) entries are typed as
+          // `MongoCollection` but carry plain input data until this
+          // constructor runs; the input shape is the constructor's contract.
+          raw instanceof MongoCollection
+            ? raw
+            : new MongoCollection(
+                blindCast<
+                  MongoCollectionInput,
+                  'validated-but-unhydrated collection entry is plain input data, not yet a MongoCollection instance'
+                >(raw),
+              ),
         ]),
       );
       hydratedStorage[nsId] = {
@@ -139,9 +152,15 @@ export abstract class MongoContractSerializerBase<TContract>
         collections: hydratedCollections,
       };
     }
+    // `hydratedStorage` is assembled as a flat record (namespace ids keyed
+    // directly under storage); the namespaced `MongoContract['storage']`
+    // type cannot be reconstructed from the dynamic-key assembly.
     return {
       ...contract,
-      storage: hydratedStorage as MongoContract['storage'],
+      storage: blindCast<
+        MongoContract['storage'],
+        'flat namespace-keyed storage reassembled from dynamic keys; the namespaced storage type is not derivable from the record build'
+      >(hydratedStorage),
     };
   }
 
