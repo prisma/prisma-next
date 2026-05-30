@@ -75,12 +75,10 @@ describe('createFieldProxy', () => {
     };
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:h'),
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          tables: { Post: table },
-        }),
-      },
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        tables: { Post: table },
+      }),
       types: {
         Embedding1536: {
           kind: 'codec-instance',

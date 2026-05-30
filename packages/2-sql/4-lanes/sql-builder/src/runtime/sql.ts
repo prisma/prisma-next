@@ -1,4 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
+import {
+  getStorageNamespace,
+  storageNamespaceEntries,
+  storageNamespaceValues,
+} from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -17,7 +22,7 @@ export interface SqlOptions<C extends Contract<SqlStorage> & TableProxyContract>
 // at the DSL call site; landing the namespace-aware DSL is tracked
 // separately.
 function findTableAcrossNamespaces(storage: SqlStorage, name: string): StorageTable | undefined {
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const ns of storageNamespaceValues(storage as Record<string, unknown>)) {
     const tables = (ns as { tables?: Readonly<Record<string, StorageTable>> }).tables ?? {};
     if (Object.hasOwn(tables, name)) {
       return tables[name];

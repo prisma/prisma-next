@@ -3,18 +3,20 @@ import type { TableProxy } from './table-proxy';
 
 export type CapabilitiesBase = Record<string, Record<string, boolean>>;
 
+type StorageNamespaceEntry = { readonly tables: Readonly<Record<string, StorageTable>> };
+
+type StorageNamespaceKey<S> = Exclude<keyof S, 'storageHash' | 'types'>;
+
 // The sql-builder DSL is flat by table name across every declared
 // namespace. Two namespaces declaring tables with the same name produce
 // a union at the DSL surface (which collapses to a type error at the
 // first call site); landing the namespace-aware DSL surface (db.<ns>.<table>)
 // is tracked separately. Within scope here: the DSL accepts the
-// namespaced storage shape directly and walks every namespace.
+// flat storage shape directly and walks every namespace.
 export type TableProxyContract = {
   readonly storage: {
-    readonly namespaces: Readonly<
-      Record<string, { readonly tables: Readonly<Record<string, StorageTable>> }>
-    >;
-  };
+    readonly storageHash: string;
+  } & Readonly<Record<string, StorageNamespaceEntry>>;
   readonly capabilities: CapabilitiesBase;
 };
 
@@ -25,15 +27,14 @@ export type UnboundTables<C extends TableProxyContract> = {
 };
 
 type TableNamesAcrossNamespaces<C extends TableProxyContract> = {
-  [NSId in keyof C['storage']['namespaces']]: keyof C['storage']['namespaces'][NSId]['tables'] &
-    string;
-}[keyof C['storage']['namespaces']];
+  [NSId in StorageNamespaceKey<C['storage']>]: keyof C['storage'][NSId]['tables'] & string;
+}[StorageNamespaceKey<C['storage']>];
 
 type TableInAnyNamespace<C extends TableProxyContract, Name extends string> = {
-  [NSId in keyof C['storage']['namespaces']]: Name extends keyof C['storage']['namespaces'][NSId]['tables']
-    ? C['storage']['namespaces'][NSId]['tables'][Name]
+  [NSId in StorageNamespaceKey<C['storage']>]: Name extends keyof C['storage'][NSId]['tables']
+    ? C['storage'][NSId]['tables'][Name]
     : never;
-}[keyof C['storage']['namespaces']];
+}[StorageNamespaceKey<C['storage']>];
 
 export type Db<C extends TableProxyContract> = {
   [Name in TableNamesAcrossNamespaces<C>]: TableProxy<C, Name>;
