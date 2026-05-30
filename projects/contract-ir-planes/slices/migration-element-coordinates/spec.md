@@ -43,6 +43,7 @@ One reviewable unit: the namespace topology becomes a first-class part of the co
 - [ ] `pnpm fixtures:check` zero-diff (type-only change, no envelope movement).
 - [ ] `pnpm lint:casts` does not regress (expected to improve — the bridge is removed).
 - [ ] Workspace typecheck + affected package tests green.
+- [ ] **Upgrade instructions (conditional).** If the topology lift's type fan-out edits `packages/3-extensions/**/src` or `examples/**/src` to typecheck against the new `StorageBase` shape, a matching `record-upgrade-instructions` entry is authored on this branch (extension-author skill for `3-extensions/`, user skill for `examples/`). If the fan-out stays inside framework/family packages — no downstream consumer source changes — **no entry is needed; do not ship a no-op `changes: []` placeholder.**
 
 ## Open Questions
 
@@ -74,6 +75,7 @@ Sequential; each hands a **green workspace** to the next. Lands on the existing 
 - **Builds on:** current PR #629 head (the leaned bridge).
 - **Hands to:** a storage type that statically exposes `namespaces` from any `StorageBase`-typed value; green workspace.
 - **Focus:** the substrate + the type fan-out to keep it green. Halt-and-split if the fan-out exceeds one coherent M (see edge-case table). Do **not** touch the migration consumers' duck-typing yet — that's D2, kept separate so this judgment isn't buried in the fan-out.
+- **Watch the downstream blast radius.** `StorageBase` is a public exported type (`@prisma-next/contract`); a type-only change to it can still break downstream TypeScript. If keeping the workspace green requires editing `packages/3-extensions/**/src` or `examples/**/src`, that's a consumer-facing breaking change — run `record-upgrade-instructions` and author the matching entry on this branch (see the conditional done-condition). If only framework/family packages move, no entry is needed.
 
 ### D2 — Delete the duck-typing; walk through `contract.storage` directly
 
