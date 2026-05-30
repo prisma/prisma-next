@@ -2,7 +2,7 @@
 
 ## At a glance
 
-Versioned event vocabulary for Drive orchestrator instrumentation. Every instrumented skill emits structured events to a project-scoped `trace.jsonl` file (see [`emission.md`](./emission.md) for path resolution and append protocol). Slice 1 ships eleven event types: five on the build-loop dispatch/round spine and six on the planning chain (spec/plan authoring, triage, I12 halts). Slice 2 adds six lifecycle/cadence event types (project + slice bookends, health-check cadence, retro landing), bringing the total to **seventeen**. Later slices extend the vocabulary without breaking readers that honour `schema_version`.
+Versioned event vocabulary for Drive orchestrator instrumentation. Every instrumented skill emits structured events to a project-scoped `trace.jsonl` file (see [`emission.md`](./emission.md) for path resolution and append protocol). Slice 1 ships eleven event types: five on the build-loop dispatch/round spine and six on the planning chain (spec/plan authoring, triage, I12 halts). Slice 2 adds six lifecycle/cadence event types (project + slice bookends, health-check cadence, retro landing), bringing the total to seventeen. Two per-run experiment feeds consumed by the diagnostics scorecard (`tokens-recorded`, `correctness-recorded`) bring the total to **nineteen**. Later additions extend the vocabulary without breaking readers that honour `schema_version`.
 
 **Vocabulary version:** `schema_version: "1"`.
 
@@ -19,7 +19,7 @@ Every event carries these fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `event_id` | UUID v4 | Unique per event; assigned at emit time. |
-| `event_type` | string | One of the documented event-type names. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. Lifecycle / cadence: `project-started`, `project-closed`, `slice-started`, `slice-completed`, `health-check-fired`, `retro-landed`. |
+| `event_type` | string | One of the documented event-type names. Build loop: `dispatch-start`, `dispatch-end`, `round-start`, `round-end`, `brief-issued`. Planning chain: `spec-authored`, `spec-amended`, `plan-authored`, `plan-amended`, `triage-verdict`, `falsified-assumption`. Lifecycle / cadence: `project-started`, `project-closed`, `slice-started`, `slice-completed`, `health-check-fired`, `retro-landed`. Experiment feeds: `tokens-recorded`, `correctness-recorded`. |
 | `schema_version` | string | Vocabulary version. Slice 1 ships `"1"`. |
 | `ts` | ISO 8601 UTC string | Wall-clock at emit time. |
 | `project_run_id` | string | Stable identifier for the ProjectRun this event belongs to. Format: project slug for in-project work (e.g. `sample-project`); `orphan-<slice-slug>` for orphan slices; `direct-<ISO-ts>` for direct changes. Slice 1 hard-codes this per emission site from orchestrator context; automated detection is a later-slice concern. |
@@ -348,6 +348,49 @@ Payload-only fields below; merge with the common envelope at emit time.
 {"event_id":"e5000006-0005-4005-8005-000000000006","event_type":"retro-landed","schema_version":"1","ts":"2026-05-30T15:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"trigger_class":"dispatch-failure","landing_surfaces":["canonical-skill","adr"],"is_mandatory_final":false}
 ```
 
+## Event types (experiment feeds)
+
+These two events are **per-run feeds** consumed by the `drive-diagnose-run` two-tier scorecard. Unlike the build-loop / planning / lifecycle events, they are not emitted by the orchestrated run itself — they are appended **after and outside** the run: the live-experiment harness accumulates token usage across the whole SDK run, and the judge records the external correctness verdict post-hoc. Each is keyed by `project_run_id` (one per run). A hand-run that uses neither simply omits both; the scorecard then renders `not computable` (correctness) and `n/a (no signal)` (tokens). Fields are snake_case to match the vocabulary; the token field names mirror the Cursor SDK's `TurnEndedUpdate.usage` camelCase 1:1.
+
+### `tokens-recorded`
+
+**Trigger.** The live-experiment harness records per-run token usage accumulated from the Cursor SDK's `TurnEndedUpdate.usage`. Emitted once per run. Hand-runs (no SDK) never emit it.
+
+**Emitting skills.** The live-experiment harness (SDK-spawned runs); not emitted by hand-run orchestration.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `input_tokens` | integer ≥ 0 \| null | `usage.inputTokens` total for the run; `null` when the SDK did not report it. |
+| `output_tokens` | integer ≥ 0 \| null | `usage.outputTokens` total for the run; `null` when unreported. |
+| `cache_read_tokens` | integer ≥ 0 \| null | `usage.cacheReadTokens` total for the run; `null` when unreported. |
+| `cache_write_tokens` | integer ≥ 0 \| null | `usage.cacheWriteTokens` total for the run; `null` when unreported. |
+
+#### JSONL example
+
+```jsonl
+{"event_id":"f7000001-0007-4007-8007-000000000001","event_type":"tokens-recorded","schema_version":"1","ts":"2026-05-30T16:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"input_tokens":1900000,"output_tokens":42000,"cache_read_tokens":800000,"cache_write_tokens":12000}
+```
+
+### `correctness-recorded`
+
+**Trigger.** The external Tier-1 correctness feed for a run, recorded by the judge. Emitted once per run. Until the judge grades the run, no such event exists and the run's correctness is `not computable`.
+
+**Emitting skills.** The judge (later slice); not emitted by hand-run orchestration.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `mechanical` | enum \| null | `"pass"` \| `"fail"` \| `null`. Validation-gates outcome (`typecheck` / `test` / `lint`); `null` when not yet recorded. |
+| `qa` | enum \| null | `"pass"` \| `"fail"` \| `null`. QA-run outcome (pre-written `drive-qa-plan`); `null` when not yet recorded. |
+| `intent` | enum \| null | `"pass"` \| `"fail"` \| `null`. Judge intent/requirements verdict; `null` when not yet recorded. |
+
+> **Note.** Tier-1 `CORRECT` requires all three components to be `"pass"`. Any `null` leaves the run `not computable` and the scorecard names the null component(s); any `"fail"` makes the run `INCORRECT`. This event is the *slot* the judge fills; building the judge is a later slice.
+
+#### JSONL example
+
+```jsonl
+{"event_id":"f8000001-0008-4008-8008-000000000001","event_type":"correctness-recorded","schema_version":"1","ts":"2026-05-30T16:05:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"mechanical":"pass","qa":"pass","intent":"pass"}
+```
+
 ## Machine-readable schema
 
 The TypeScript arktype definitions for all event types live in [`skills-contrib/drive-record-traces/schema.ts`](./schema.ts). That file is the single source of truth; consumers such as `drive-diagnose-run` import from it directly.
@@ -374,6 +417,8 @@ One example line per slice-1 event type (build loop, then planning chain). Paylo
 {"event_id":"e5000004-0005-4005-8005-000000000004","event_type":"slice-completed","schema_version":"1","ts":"2026-05-30T14:30:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"slice_slug":"01-initial-scaffolding","result":"merged","pr_ref":"#42"}
 {"event_id":"e5000005-0005-4005-8005-000000000005","event_type":"health-check-fired","schema_version":"1","ts":"2026-05-30T14:32:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"cadence":"per-slice-merge","drift_signal_count":2,"max_drift_severity":"low","recommended_next":"Review scope changes before starting slice 2."}
 {"event_id":"e5000006-0005-4005-8005-000000000006","event_type":"retro-landed","schema_version":"1","ts":"2026-05-30T15:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"trigger_class":"dispatch-failure","landing_surfaces":["canonical-skill","adr"],"is_mandatory_final":false}
+{"event_id":"f7000001-0007-4007-8007-000000000001","event_type":"tokens-recorded","schema_version":"1","ts":"2026-05-30T16:00:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"input_tokens":1900000,"output_tokens":42000,"cache_read_tokens":800000,"cache_write_tokens":12000}
+{"event_id":"f8000001-0008-4008-8008-000000000001","event_type":"correctness-recorded","schema_version":"1","ts":"2026-05-30T16:05:00.000Z","project_run_id":"my-new-project","orchestrator_agent_id":null,"mechanical":"pass","qa":"pass","intent":"pass"}
 ```
 
 ## References

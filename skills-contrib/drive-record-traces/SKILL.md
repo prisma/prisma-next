@@ -56,6 +56,8 @@ The build loop, planning chain, and lifecycle/cadence skills emit seventeen even
 | `drive-run-retro` | `retro-landed` |
 | `drive-start-workflow` | `dispatch-start`, `round-start`, `brief-issued`, `round-end`, `dispatch-end` (direct-change sub-path only — build-loop spine reuse; see `emission.md` § Direct-change build-loop spine reuse) |
 
+Two further event types — `tokens-recorded` and `correctness-recorded` — are **experiment feeds** consumed by the `drive-diagnose-run` scorecard rather than emitted by the workflow skills above. They are appended after and outside the orchestrated run (the live-experiment harness records token usage; the judge records the external correctness verdict), so they have no emit-site in a hand-run. See [`events.md`](./events.md) § Event types (experiment feeds).
+
 The read-time assertion + diagnostic-metrics tooling extends this vocabulary in later work; additions go in [`events.md`](./events.md) under the same `schema_version` discipline (additive changes keep `"1"`; a breaking change bumps the version).
 
 ## References
