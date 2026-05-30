@@ -1,7 +1,12 @@
 import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { asNamespaceId, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
@@ -62,7 +67,7 @@ function unboundStorage(
   return new SqlStorage({
     storageHash,
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
+      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables }),
     },
   });
 }
@@ -87,7 +92,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             User: table({
@@ -98,7 +103,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -117,7 +122,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -135,7 +140,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
       types: {
         MyVector: {
@@ -165,7 +170,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -179,7 +184,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -214,7 +219,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             Post: table({
@@ -228,7 +233,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
       types: {
         Embedding1536: {
@@ -263,7 +268,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -276,7 +281,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -288,7 +293,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -300,7 +305,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -312,7 +317,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -324,7 +329,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -336,7 +341,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -348,7 +353,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -360,7 +365,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -372,7 +377,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -384,7 +389,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -393,7 +398,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -406,7 +411,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -416,7 +421,7 @@ describe('contractToSchemaIR', () => {
               primaryKey: { columns: ['id'], name: 'T_pkey' },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -428,7 +433,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -438,7 +443,7 @@ describe('contractToSchemaIR', () => {
               uniques: [{ columns: ['email'], name: 'T_email_key' }],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -450,7 +455,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -460,7 +465,7 @@ describe('contractToSchemaIR', () => {
               indexes: [{ columns: ['email'], name: 'T_email_idx' }],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -474,7 +479,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             Post: table({
@@ -502,7 +507,7 @@ describe('contractToSchemaIR', () => {
               ],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -524,7 +529,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             User: table({
@@ -534,7 +539,7 @@ describe('contractToSchemaIR', () => {
               columns: { id: col({ nativeType: 'text' }) },
             }),
           },
-        },
+        }),
       },
     });
 
@@ -547,7 +552,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -556,7 +561,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
       types: {
         Embedding: {
@@ -585,7 +590,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -594,7 +599,7 @@ describe('contractToSchemaIR', () => {
               },
             }),
           },
-        },
+        }),
       },
       types: {
         Embedding: {
@@ -625,7 +630,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({
@@ -636,7 +641,7 @@ describe('contractToSchemaIR', () => {
               uniques: [{ columns: ['a', 'b'] }],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -648,7 +653,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             Post: table({
@@ -671,7 +676,7 @@ describe('contractToSchemaIR', () => {
               ],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -688,7 +693,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             User: table({
@@ -716,7 +721,7 @@ describe('contractToSchemaIR', () => {
               ],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -728,7 +733,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             User: table({
@@ -756,7 +761,7 @@ describe('contractToSchemaIR', () => {
               ],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -768,7 +773,7 @@ describe('contractToSchemaIR', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             User: table({
@@ -809,7 +814,7 @@ describe('contractToSchemaIR', () => {
               ],
             }),
           },
-        },
+        }),
       },
     });
 
@@ -832,12 +837,12 @@ describe('detectDestructiveChanges', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           tables: {
             T: table({ columns: { a: col({ nativeType: 'text' }) } }),
           },
-        },
+        }),
       },
     });
     expect(detectDestructiveChanges(storage, storage)).toEqual([]);

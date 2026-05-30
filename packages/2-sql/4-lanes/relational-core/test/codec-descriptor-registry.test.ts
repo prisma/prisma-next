@@ -1,6 +1,7 @@
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  buildSqlNamespace,
   SqlStorage,
   type SqlStorageTypeEntry,
   type StorageTableInput,
@@ -76,7 +77,12 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
   }): SqlStorage {
     return new SqlStorage({
       storageHash: 'sha256:test' as SqlStorage['storageHash'],
-      namespaces: { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables: parts.tables } },
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          tables: parts.tables,
+        }),
+      },
       ...ifDefined('types', parts.types),
     });
   }

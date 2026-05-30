@@ -1,5 +1,5 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
@@ -21,7 +21,7 @@ const testContract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),
     namespaces: {
-      __unbound__: {
+      __unbound__: buildSqlNamespace({
         id: '__unbound__',
         tables: {
           user: {
@@ -33,7 +33,7 @@ const testContract: Contract<SqlStorage> = {
             foreignKeys: [],
           },
         },
-      },
+      }),
     },
   }),
   extensionPacks: {},

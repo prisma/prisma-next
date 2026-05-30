@@ -1,21 +1,22 @@
 import { coreHash } from '@prisma-next/contract/types';
 import {
   freezeNode,
-  type IRNode,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
+import { buildMongoNamespace } from '../src/ir/build-mongo-namespace';
 import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoIndex } from '../src/ir/mongo-index';
 import { MongoStorage } from '../src/ir/mongo-storage';
+import { MongoUnboundNamespace } from '../src/ir/mongo-unbound-namespace';
 
 const hash = coreHash('h_0');
 
 class TestNamespace extends NamespaceBase {
   readonly kind = 'test-namespace' as const;
   readonly id: string;
-  readonly collections: Readonly<Record<string, IRNode>> = Object.freeze({});
+  readonly collections: Readonly<Record<string, MongoCollection>> = Object.freeze({});
 
   constructor(id: string) {
     super();
@@ -35,18 +36,18 @@ describe('MongoStorage', () => {
     expect(Object.keys(storage)).toEqual(expect.arrayContaining(['storageHash', 'namespaces']));
   });
 
-  it('normalises plain namespace envelopes with collection collections', () => {
+  it('accepts built namespace instances with collections', () => {
     const storage = new MongoStorage({
       storageHash: hash,
       namespaces: {
-        default: {
+        default: buildMongoNamespace({
           id: 'default',
           collections: {
             events: new MongoCollection({
               indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })],
             }),
           },
-        },
+        }),
       },
     });
     expect(storage.namespaces['default']!.collections['events']).toBeInstanceOf(MongoCollection);
@@ -71,8 +72,14 @@ describe('MongoStorage', () => {
     expect(Object.isFrozen(storage)).toBe(true);
   });
 
-  it('defaults to unbound namespace when namespaces omitted', () => {
-    const storage = new MongoStorage({ storageHash: hash });
-    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]).toBeDefined();
+  it('constructs from the unbound namespace singleton alone', () => {
+    // `namespaces` is a required field on `MongoStorageInput`, so the
+    // empty/omitted case is a type error rather than a runtime throw —
+    // this exercises the happy path of an unbound-only storage.
+    const storage = new MongoStorage({
+      storageHash: hash,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: MongoUnboundNamespace.instance },
+    });
+    expect(storage.namespaces[UNBOUND_NAMESPACE_ID]).toBe(MongoUnboundNamespace.instance);
   });
 });

@@ -2,7 +2,7 @@ import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-nex
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  type SqlNamespaceTablesInput,
+  buildSqlNamespace,
   SqlStorage,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
@@ -13,10 +13,10 @@ import { planIssues } from '../../src/core/migrations/issue-planner';
 function makeContract(
   overrides: { tables?: Record<string, StorageTableInput> } = {},
 ): Contract<SqlStorage> {
-  const unboundNs: SqlNamespaceTablesInput = {
+  const unboundNs = buildSqlNamespace({
     id: UNBOUND_NAMESPACE_ID,
     tables: overrides.tables ?? {},
-  };
+  });
   return {
     target: 'sqlite',
     targetFamily: 'sql',

@@ -117,10 +117,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       if (isPostgresSchema(ns)) {
         namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
       } else {
-        // Family-level SqlNamespacePayload / SqlUnboundNamespace haven't
-        // been promoted to a PostgresSchema instance yet (e.g. they came
-        // straight from the TS builder, which uses the family-shared
-        // SqlStorage constructor). Serialise them as postgres-schema /
+        // Family-level SqlUnboundNamespace or other family-built SQL
+        // namespaces haven't been promoted to a PostgresSchema instance
+        // yet (e.g. they came straight from the TS builder before a target
+        // `createNamespace` factory ran). Serialise them as postgres-schema /
         // postgres-unbound-schema so the round-trip through
         // deserializeContract hydrates them back into PostgresSchema
         // instances.

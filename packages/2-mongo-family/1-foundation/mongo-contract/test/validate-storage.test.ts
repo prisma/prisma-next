@@ -7,6 +7,7 @@ function crossRef(model: string, namespace = 'default') {
 }
 
 import type { MongoContract } from '../src/contract-types';
+import { buildMongoNamespace } from '../src/ir/build-mongo-namespace';
 import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoStorage } from '../src/ir/mongo-storage';
 import { validateMongoStorage } from '../src/validate-storage';
@@ -19,7 +20,10 @@ function storageWithItemsCollections(
   return new MongoStorage({
     storageHash: DUMMY_HASH,
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections },
+      [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
+        id: UNBOUND_NAMESPACE_ID,
+        collections,
+      }),
     },
   });
 }

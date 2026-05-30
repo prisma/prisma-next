@@ -9,12 +9,19 @@ import {
   instantiateExecutionStack,
   type RuntimeDriverDescriptor,
 } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  SqlStorage,
+  type SqlStorageInput,
+  SqlUnboundNamespace,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   AnyQueryAst,
@@ -394,11 +401,15 @@ export function createStubAdapter(): StubAdapter {
   };
 }
 
+export function unboundNamespaceWithTables(tables: Record<string, StorageTableInput>) {
+  return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables });
+}
+
 export function createTestContract(
   contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage'>> & {
     storageHash?: string;
     profileHash?: string;
-    storage?: Omit<SqlStorageInput, 'storageHash'>;
+    storage?: Partial<Omit<SqlStorageInput, 'storageHash'>>;
   },
 ): Contract<SqlStorage> {
   const { execution, ...rest } = contract;
@@ -408,8 +419,15 @@ export function createTestContract(
     target: rest['target'] ?? 'postgres',
     targetFamily: rest['targetFamily'] ?? 'sql',
     storage: rest['storage']
-      ? new SqlStorage({ ...rest['storage'], storageHash: storageHashValue })
-      : new SqlStorage({ storageHash: storageHashValue }),
+      ? new SqlStorage({
+          ...rest['storage'],
+          storageHash: storageHashValue,
+          namespaces: rest['storage'].namespaces ?? { __unbound__: SqlUnboundNamespace.instance },
+        })
+      : new SqlStorage({
+          storageHash: storageHashValue,
+          namespaces: { __unbound__: SqlUnboundNamespace.instance },
+        }),
     models: rest['models'] ?? {},
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},
