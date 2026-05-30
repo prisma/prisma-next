@@ -25,7 +25,7 @@ import {
   type RuntimeTargetDescriptor,
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { storageNamespaceValues, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
@@ -351,7 +351,7 @@ function collectTypeRefSites(
   storage: SqlStorage,
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
     for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (typeof column.typeRef !== 'string') continue;
@@ -411,7 +411,7 @@ function validateColumnTypeParams(
   storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
     for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeParams) {
@@ -440,7 +440,7 @@ function assertColumnCodecIntegrity(
   storage: SqlStorage,
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
-  for (const ns of Object.values(storage.namespaces)) {
+  for (const ns of storageNamespaceValues(storage as unknown as Record<string, unknown>)) {
     for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
@@ -555,7 +555,7 @@ function buildContractCodecRegistry(
     }
   }
 
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  for (const ns of storageNamespaceValues(contract.storage as unknown as Record<string, unknown>)) {
     for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const [columnName, column] of Object.entries(table.columns)) {
         if (column.typeRef !== undefined) continue;
@@ -587,7 +587,7 @@ function buildContractCodecRegistry(
     };
   });
 
-  for (const ns of Object.values(contract.storage.namespaces)) {
+  for (const ns of storageNamespaceValues(contract.storage as unknown as Record<string, unknown>)) {
     for (const [tableName, table] of Object.entries(ns.tables as SqlNamespaceTables)) {
       for (const columnName of Object.keys(table.columns)) {
         const ref = codecDescriptors.codecRefForColumn(tableName, columnName);

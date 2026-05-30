@@ -18,24 +18,26 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
-    namespaces: {
-      __unbound__: buildSqlNamespace({
-        id: '__unbound__',
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+  storage: new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:test'),
+      namespaces: {
+        __unbound__: buildSqlNamespace({
+          id: '__unbound__',
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
-        },
-      }),
-    },
-  }),
+        }),
+      },
+    }),
+  ),
   extensionPacks: {},
   capabilities: {},
   meta: {},

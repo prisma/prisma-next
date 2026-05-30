@@ -2,7 +2,12 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlNamespace,
+  buildSqlStorageInput,
+  SqlStorage,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -81,10 +86,12 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
-      }),
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
+        }),
+      ),
       extensionPacks: {},
       capabilities: {},
       meta: {},
@@ -188,26 +195,28 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
       };
     }
 
-    const storage = new SqlStorage({
-      storageHash: coreHash('sha256:test'),
-      namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
-      ...ifDefined(
-        'types',
-        types
-          ? Object.fromEntries(
-              Object.entries(types).map(([name, params]) => [
-                name,
-                {
-                  kind: 'codec-instance' as const,
-                  codecId: 'pgvector/vector@1',
-                  nativeType: 'vector',
-                  typeParams: params as Record<string, unknown>,
-                },
-              ]),
-            )
-          : undefined,
-      ),
-    });
+    const storage = new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:test'),
+        namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
+        ...ifDefined(
+          'types',
+          types
+            ? Object.fromEntries(
+                Object.entries(types).map(([name, params]) => [
+                  name,
+                  {
+                    kind: 'codec-instance' as const,
+                    codecId: 'pgvector/vector@1',
+                    nativeType: 'vector',
+                    typeParams: params as Record<string, unknown>,
+                  },
+                ]),
+              )
+            : undefined,
+        ),
+      }),
+    );
 
     return {
       targetFamily: 'sql',
@@ -435,10 +444,12 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
-      }),
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: { __unbound__: buildSqlNamespace({ id: '__unbound__', tables }) },
+        }),
+      ),
       extensionPacks: {},
       capabilities: {},
       meta: {},

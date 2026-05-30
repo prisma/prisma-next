@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/codec';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   type SqlStorageTypeEntry,
 } from '@prisma-next/sql-contract/types';
@@ -56,26 +57,28 @@ function createParamTypesTestContract(
     profileHash: profileHash('sha256:test'),
     models: {},
     roots: {},
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
-      namespaces: {
-        __unbound__: buildSqlNamespace({
-          id: '__unbound__',
-          tables: {
-            test: {
-              columns: options?.tableColumns ?? {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:test'),
+        namespaces: {
+          __unbound__: buildSqlNamespace({
+            id: '__unbound__',
+            tables: {
+              test: {
+                columns: options?.tableColumns ?? {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-        }),
-      },
-      ...ifDefined('types', options?.types),
-    }),
+          }),
+        },
+        ...ifDefined('types', options?.types),
+      }),
+    ),
     extensionPacks: {},
     capabilities: {},
     meta: {},

@@ -17,8 +17,10 @@ import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   type SqlStorageInput,
+  type SqlStorageNamespacesInput,
   SqlUnboundNamespace,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
@@ -409,7 +411,7 @@ export function createTestContract(
   contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage'>> & {
     storageHash?: string;
     profileHash?: string;
-    storage?: Partial<Omit<SqlStorageInput, 'storageHash'>>;
+    storage?: Partial<Omit<SqlStorageNamespacesInput, 'storageHash'>>;
   },
 ): Contract<SqlStorage> {
   const { execution, ...rest } = contract;
@@ -418,16 +420,13 @@ export function createTestContract(
   return {
     target: rest['target'] ?? 'postgres',
     targetFamily: rest['targetFamily'] ?? 'sql',
-    storage: rest['storage']
-      ? new SqlStorage({
-          ...rest['storage'],
-          storageHash: storageHashValue,
-          namespaces: rest['storage'].namespaces ?? { __unbound__: SqlUnboundNamespace.instance },
-        })
-      : new SqlStorage({
-          storageHash: storageHashValue,
-          namespaces: { __unbound__: SqlUnboundNamespace.instance },
-        }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: storageHashValue,
+        namespaces: rest['storage']?.namespaces ?? { __unbound__: SqlUnboundNamespace.instance },
+        ...(rest['storage']?.types !== undefined ? { types: rest['storage'].types } : {}),
+      }),
+    ),
     models: rest['models'] ?? {},
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},

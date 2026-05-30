@@ -3,6 +3,7 @@ import { mergeCapabilityMatrices } from '@prisma-next/framework-components/compo
 import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
 import {
   buildSqlNamespace,
+  buildSqlStorageInput,
   SqlStorage,
   SqlUnboundNamespace,
 } from '@prisma-next/sql-contract/types';
@@ -31,10 +32,12 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
-    namespaces: { __unbound__: SqlUnboundNamespace.instance },
-  }),
+  storage: new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:test'),
+      namespaces: { __unbound__: SqlUnboundNamespace.instance },
+    }),
+  ),
   extensionPacks: {},
   capabilities: {},
   meta: {},
@@ -302,24 +305,26 @@ describe('contract/stack validation errors', () => {
   it('throws RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR when contract references a generator the stack does not provide', () => {
     const contractWithUnknownGenerator: Contract<SqlStorage> = {
       ...testContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: {
-          __unbound__: buildSqlNamespace({
-            id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: {
+            __unbound__: buildSqlNamespace({
+              id: '__unbound__',
+              tables: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -350,25 +355,27 @@ describe('contract/stack validation errors', () => {
   it('lists all missing mutation default generator ids in a single error', () => {
     const contractWithMissingGenerators: Contract<SqlStorage> = {
       ...testContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: {
-          __unbound__: buildSqlNamespace({
-            id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                  slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: {
+            __unbound__: buildSqlNamespace({
+              id: '__unbound__',
+              tables: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -401,24 +408,26 @@ describe('contract/stack validation errors', () => {
   it('passes when all referenced mutation default generator ids are registered', () => {
     const contractWithRegisteredGenerator: Contract<SqlStorage> = {
       ...testContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: {
-          __unbound__: buildSqlNamespace({
-            id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: {
+            __unbound__: buildSqlNamespace({
+              id: '__unbound__',
+              tables: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -441,26 +450,28 @@ describe('contract/stack validation errors', () => {
 describe('applyMutationDefaults', () => {
   const contractWithDefaults: Contract<SqlStorage> = {
     ...testContract,
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
-      namespaces: {
-        __unbound__: buildSqlNamespace({
-          id: '__unbound__',
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:test'),
+        namespaces: {
+          __unbound__: buildSqlNamespace({
+            id: '__unbound__',
+            tables: {
+              user: {
+                columns: {
+                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-        }),
-      },
-    }),
+          }),
+        },
+      }),
+    ),
     execution: {
       executionHash: executionHash('sha256:test'),
       mutations: {
@@ -558,25 +569,27 @@ describe('applyMutationDefaults', () => {
 
     const contractWithCounter: Contract<SqlStorage> = {
       ...testContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: {
-          __unbound__: buildSqlNamespace({
-            id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-                  touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: {
+            __unbound__: buildSqlNamespace({
+              id: '__unbound__',
+              tables: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                    touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -653,26 +666,28 @@ describe('applyMutationDefaults', () => {
 
     const contractWithCorrelationId: Contract<SqlStorage> = {
       ...testContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: {
-          __unbound__: buildSqlNamespace({
-            id: '__unbound__',
-            tables: {
-              event: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                  correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: {
+            __unbound__: buildSqlNamespace({
+              id: '__unbound__',
+              tables: {
+                event: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -740,24 +755,26 @@ describe('applyMutationDefaults', () => {
 
     const contractWithCounter: Contract<SqlStorage> = {
       ...testContract,
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
-        namespaces: {
-          __unbound__: buildSqlNamespace({
-            id: '__unbound__',
-            tables: {
-              user: {
-                columns: {
-                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      storage: new SqlStorage(
+        buildSqlStorageInput({
+          storageHash: coreHash('sha256:test'),
+          namespaces: {
+            __unbound__: buildSqlNamespace({
+              id: '__unbound__',
+              tables: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
                 },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-          }),
-        },
-      }),
+            }),
+          },
+        }),
+      ),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {

@@ -7,24 +7,22 @@ import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
 type TestContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
-        readonly tables: {
-          readonly document: {
-            readonly columns: {
-              readonly id: {
-                readonly nativeType: 'int4';
-                readonly codecId: 'pg/int4@1';
-                nullable: false;
-              };
+    readonly __unbound__: {
+      readonly id: '__unbound__';
+      readonly kind: 'sql-namespace';
+      readonly tables: {
+        readonly document: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
             };
-            readonly primaryKey: { readonly columns: readonly ['id'] };
-            readonly uniques: readonly [];
-            readonly indexes: readonly [];
-            readonly foreignKeys: readonly [];
           };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
       };
     };

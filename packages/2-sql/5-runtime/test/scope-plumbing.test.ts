@@ -6,7 +6,11 @@ import {
   type RuntimeDriverInstance,
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import {
+  buildSqlStorageInput,
+  SqlStorage,
+  SqlUnboundNamespace,
+} from '@prisma-next/sql-contract/types';
 import type {
   Codec,
   SelectAst,
@@ -45,10 +49,12 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
-    namespaces: { __unbound__: SqlUnboundNamespace.instance },
-  }),
+  storage: new SqlStorage(
+    buildSqlStorageInput({
+      storageHash: coreHash('sha256:test'),
+      namespaces: { __unbound__: SqlUnboundNamespace.instance },
+    }),
+  ),
   extensionPacks: {},
   capabilities: {},
   meta: {},

@@ -136,13 +136,15 @@ function createTestContract(
     profileHash: profileHash('sha256:test'),
     models: {},
     roots: {},
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
-      namespaces: {
-        __unbound__: buildSqlNamespace({ id: '__unbound__', tables: tableEntries }),
-      },
-      ...ifDefined('types', types),
-    }),
+    storage: new SqlStorage(
+      buildSqlStorageInput({
+        storageHash: coreHash('sha256:test'),
+        namespaces: {
+          __unbound__: buildSqlNamespace({ id: '__unbound__', tables: tableEntries }),
+        },
+        ...ifDefined('types', types),
+      }),
+    ),
     extensionPacks: {},
     capabilities: {},
     meta: {},
