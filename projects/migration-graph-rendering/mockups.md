@@ -18,7 +18,8 @@ of a node; it is always the connector between two contracts.
 1. **Root(s) at the bottom, tip(s) at the top.** Forward edges point **up** (`↑`),
    rollbacks point **down** (`↓`).
 2. **A contract is one `○ <hash>` row**, appearing exactly once in the whole graph.
-   `◆` marks the contract the DB is currently at.
+   Refs, the DB marker, and the current contract **decorate that row** — they are not
+   glyph swaps on the `○`. See rule 10 + § node overlays.
 3. **A migration is one edge row** — every migration on its own row (vertical space
    is cheap, horizontal is not).
 4. **The arrow sits in the migration's own lane**, in the lane's second cell:
@@ -46,6 +47,15 @@ of a node; it is always the connector between two contracts.
    spine to live and is drawn as an **explicit arc**.
 9. **Self-edges** are also their own edge row — `⟲` is the direction glyph (a loop),
    name and `hash → hash` data intact; never collapsed onto the node row.
+10. **Node overlays reuse the `migration list --graph` `(refs)` decoration** — *not*
+    the old `migration graph` per-marker glyph tags (`◆ db`, `◇ contract`, rotating
+    ref colours). Whatever points at a contract is appended to its node row as a single
+    parenthetical, comma-separated name list — exactly the trailing `(…)` the flat list
+    and `--graph` already draw on a migration's destination. Two names are reserved and
+    ride the same parens alongside user ref names (styled to pop, never a separate
+    glyph): `db` (the live database marker — "the DB is at this contract") and
+    `contract` (the contract the working schema currently emits). A node nothing points
+    at carries no decoration. See § node overlays.
 
 ### Routed arcs (node-skipping backward edges only)
 
@@ -76,6 +86,62 @@ arrow are the visual aid.
 
 ```
 ○   a94b7b4
+│↑  add_posts            ef9de27 → a94b7b4
+○   ef9de27
+│↑  init                 ∅ → ef9de27
+○   ∅
+```
+
+## node overlays — refs, DB marker, current contract
+
+The three "where am I" overlays use the **`migration list --graph` decoration
+verbatim**: a trailing `(…)` of the names pointing at the contract, appended to the
+**node row**. In the flat list that parenthetical hangs off a migration's destination;
+here, where nodes *are* contracts, it hangs off the node itself. `db` and `contract`
+are reserved names that share the parens with user refs. Order is stable: user refs
+lexicographically, then `db`, then `contract`. (The active ref — the one you're working
+against — may be bolded, the way the flat list bolds `db`.)
+
+### the common case — DB one migration behind the current contract
+
+Working schema emits `a94b7b4` (where `main` also points); the DB is still at
+`ef9de27` (where `prod` also points). The "one pending migration" story is just the
+gap between the `(contract)` row and the `(db)` row.
+
+```
+○   a94b7b4  (main, contract)
+│↑  add_posts            ef9de27 → a94b7b4
+○   ef9de27  (db, prod)
+│↑  init                 ∅ → ef9de27
+○   ∅
+```
+
+### everything aligned — fresh apply
+
+After applying, the DB, the current contract, and `main` all point at the tip. All
+three names collapse into one parenthetical; no glyph juggling.
+
+```
+○   a94b7b4  (main, db, contract)
+│↑  add_posts            ef9de27 → a94b7b4
+○   ef9de27
+│↑  init                 ∅ → ef9de27
+○   ∅
+```
+
+### detached current contract — changed but not yet planned
+
+The working schema emits `c0ffee0`, but no migration produces it yet, so it is a node
+with **no incoming edge** — a floating node carrying `(contract)`, exactly like the
+disjoint-forest / dangling-parent roots. We deliberately **do not** draw the old
+phantom dashed connector from the tip: an edge in this view is a migration, and there
+is no migration here. The `(contract)` decoration, plus the absence of any edge into
+the node, *is* the "you've changed your schema, run `migration plan`" signal.
+
+```
+○   c0ffee0  (contract)
+
+○   a94b7b4  (main, db)
 │↑  add_posts            ef9de27 → a94b7b4
 ○   ef9de27
 │↑  init                 ∅ → ef9de27
