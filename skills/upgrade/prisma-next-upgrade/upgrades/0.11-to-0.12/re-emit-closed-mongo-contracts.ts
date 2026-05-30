@@ -93,10 +93,44 @@ async function isMongoContract(contractPath: string): Promise<boolean> {
   return raw.includes('"kind": "mongo-database"') || raw.includes('"kind":"mongo-database"');
 }
 
+/**
+ * A contract is in the closed-validator (post-0.12) format when every object
+ * schema that declares a `properties` map also carries `additionalProperties:
+ * false`. That covers collection validators, nested value objects, and each
+ * polymorphic `oneOf` branch — all of which expose `properties`.
+ *
+ * The one exception is a polymorphic schema's top-level node: it carries both
+ * base `properties` and a `oneOf`, and is deliberately left open because
+ * closure is enforced on each branch (a document must match exactly one closed
+ * branch). Such a node is exempt from the `additionalProperties: false`
+ * requirement, but its branches are still walked and checked.
+ *
+ * A substring scan is unsafe here: a single closed branch would mask a sibling
+ * that still needs re-emitting.
+ */
 function contractLooksClosed(raw: string): boolean {
-  return (
-    raw.includes('"additionalProperties": false') || raw.includes('"additionalProperties":false')
-  );
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+
+  function isClosed(node: unknown): boolean {
+    if (node === null || typeof node !== 'object') return true;
+    if (Array.isArray(node)) return node.every(isClosed);
+
+    const obj = node as Record<string, unknown>;
+    const hasProperties = typeof obj['properties'] === 'object' && obj['properties'] !== null;
+    const isPolymorphicTopLevel = Array.isArray(obj['oneOf']);
+    if (hasProperties && !isPolymorphicTopLevel && obj['additionalProperties'] !== false) {
+      return false;
+    }
+
+    return Object.values(obj).every(isClosed);
+  }
+
+  return isClosed(parsed);
 }
 
 async function packageJsonHasEmitScript(configDir: string): Promise<boolean> {
