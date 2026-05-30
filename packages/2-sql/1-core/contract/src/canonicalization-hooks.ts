@@ -1,3 +1,4 @@
+import type { PreserveEmptyPredicate, StorageSort } from '@prisma-next/contract/hashing';
 import {
   createPreserveEmptyPredicate,
   createStorageSort,
@@ -17,11 +18,15 @@ const sortTargets = [
   { path: ['namespaces', '*', 'tables', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
-const shouldPreserveEmpty = createPreserveEmptyPredicate(preserveEmptyPatterns);
+const shouldPreserveEmpty: PreserveEmptyPredicate =
+  createPreserveEmptyPredicate(preserveEmptyPatterns);
 
-const sortStorage = createStorageSort(sortTargets);
+const sortStorage: StorageSort = createStorageSort(sortTargets);
 
-export const sqlContractCanonicalizationHooks = {
+export const sqlContractCanonicalizationHooks: {
+  readonly shouldPreserveEmpty: PreserveEmptyPredicate;
+  readonly sortStorage: StorageSort;
+} = {
   shouldPreserveEmpty,
   sortStorage,
-} as const;
+};

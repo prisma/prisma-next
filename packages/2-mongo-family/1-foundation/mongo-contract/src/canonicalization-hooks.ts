@@ -1,3 +1,4 @@
+import type { PreserveEmptyPredicate } from '@prisma-next/contract/hashing';
 import {
   createPreserveEmptyPredicate,
   type PathPattern,
@@ -8,8 +9,11 @@ const preserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'collections', '*'],
 ] as const satisfies readonly PathPattern[];
 
-const shouldPreserveEmpty = createPreserveEmptyPredicate(preserveEmptyPatterns);
+const shouldPreserveEmpty: PreserveEmptyPredicate =
+  createPreserveEmptyPredicate(preserveEmptyPatterns);
 
-export const mongoContractCanonicalizationHooks = {
+export const mongoContractCanonicalizationHooks: {
+  readonly shouldPreserveEmpty: PreserveEmptyPredicate;
+} = {
   shouldPreserveEmpty,
-} as const;
+};
