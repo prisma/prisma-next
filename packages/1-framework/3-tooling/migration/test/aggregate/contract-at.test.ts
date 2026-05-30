@@ -113,6 +113,7 @@ describe('ContractSpaceMember.contractAt', () => {
 
     expect(result.hash).toBe(HASH_B);
     expect(result.provenance).toBe('graph-node');
+    if (result.provenance !== 'graph-node') throw new Error('expected graph-node provenance');
     expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
     expect((result.contractJson as { storage: { storageHash: string } }).storage.storageHash).toBe(
@@ -128,6 +129,7 @@ describe('ContractSpaceMember.contractAt', () => {
     const result = await member.contractAt(HASH_B, { refName: 'staging' });
 
     expect(result.provenance).toBe('graph-node');
+    if (result.provenance !== 'graph-node') throw new Error('expected graph-node provenance');
     expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
   });

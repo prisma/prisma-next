@@ -9,14 +9,22 @@ export interface ContractAtOptions {
   readonly refName?: string;
 }
 
-export interface ContractAtResult {
-  readonly hash: string;
-  readonly contractJson: unknown;
-  readonly contractDts: string;
-  readonly contract: Contract;
-  readonly provenance: 'snapshot' | 'graph-node';
-  readonly sourceDir?: string;
-}
+export type ContractAtResult =
+  | {
+      readonly provenance: 'snapshot';
+      readonly hash: string;
+      readonly contractJson: unknown;
+      readonly contractDts: string;
+      readonly contract: Contract;
+    }
+  | {
+      readonly provenance: 'graph-node';
+      readonly sourceDir: string;
+      readonly hash: string;
+      readonly contractJson: unknown;
+      readonly contractDts: string;
+      readonly contract: Contract;
+    };
 
 /**
  * One contract space — app or extension — as a member of a

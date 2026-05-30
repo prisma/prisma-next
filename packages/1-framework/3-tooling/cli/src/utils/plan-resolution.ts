@@ -123,7 +123,7 @@ async function resolveContractRef(
       contract: at.contract,
       contractJson: at.contractJson,
       contractDts: at.contractDts,
-      sourceDir: at.sourceDir!,
+      sourceDir: at.sourceDir,
     });
   } catch (error) {
     return mapContractAtError(
