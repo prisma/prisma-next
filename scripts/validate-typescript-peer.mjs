@@ -15,9 +15,8 @@
 // install it. Optional-peer declaration preserves type-checking support for
 // consumers that do use TypeScript.
 //
-// Wired into CI via the `lint` job (as `pnpm lint:ts-peer`). Also runnable
-// locally:
-//   pnpm lint:ts-peer
+// Wired into CI via `pnpm lint:manifests`, which runs this after the
+// package-manifest license check. Also runnable directly:
 //
 // Usage:
 //   node scripts/validate-typescript-peer.mjs           — exit 1 on offenders
