@@ -73,7 +73,7 @@ export function contractValueObjects(
   return contract.domain.namespaces[resolved]!.valueObjects;
 }
 
-export function buildDomainPlaneFromFlat(params: {
+export function domainPlaneOf(params: {
   readonly models: Record<string, ContractModelBase>;
   readonly valueObjects?: Record<string, ContractValueObject>;
   readonly namespaceId?: string;

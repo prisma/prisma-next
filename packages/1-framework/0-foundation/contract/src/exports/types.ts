@@ -12,9 +12,10 @@ export type {
   DomainPlane,
 } from '../domain-envelope';
 export {
-  buildDomainPlaneFromFlat,
   contractModels,
   contractValueObjects,
+  DomainNamespaceResolutionError,
+  domainPlaneOf,
   modelCoordinateKey,
   resolveSingleDomainNamespaceId,
   UNBOUND_DOMAIN_NAMESPACE_ID,

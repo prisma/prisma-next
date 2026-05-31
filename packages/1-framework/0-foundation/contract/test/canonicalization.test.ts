@@ -17,7 +17,7 @@ import {
 import { createPreserveEmptyPredicate, type PathPattern } from '../src/canonicalization-path-match';
 import { createStorageSort, type NamedArraySortTarget } from '../src/canonicalization-storage-sort';
 import type { Contract } from '../src/contract-types';
-import { buildDomainPlaneFromFlat } from '../src/domain-envelope';
+import { domainPlaneOf } from '../src/domain-envelope';
 import type { ContractModelBase, ContractValueObject } from '../src/domain-types';
 import { coreHash, profileHash } from '../src/types';
 
@@ -73,7 +73,7 @@ function minimal(overrides?: Record<string, unknown>): Contract {
     domain:
       domainOverride !== undefined
         ? (domainOverride as Contract['domain'])
-        : buildDomainPlaneFromFlat({
+        : domainPlaneOf({
             models: models as Record<string, ContractModelBase>,
             ...ifDefined(
               'valueObjects',

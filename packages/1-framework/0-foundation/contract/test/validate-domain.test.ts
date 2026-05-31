@@ -9,7 +9,7 @@ function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ContractValidationError } from '../src/contract-validation-error';
-import { buildDomainPlaneFromFlat } from '../src/domain-envelope';
+import { domainPlaneOf } from '../src/domain-envelope';
 import type { ContractValueObject } from '../src/domain-types';
 import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
@@ -47,7 +47,7 @@ function makeValidContract(overrides: Record<string, unknown> = {}): DomainContr
     domain:
       domainOverride !== undefined
         ? (domainOverride as DomainContractShape['domain'])
-        : buildDomainPlaneFromFlat({
+        : domainPlaneOf({
             models,
             ...ifDefined(
               'valueObjects',
