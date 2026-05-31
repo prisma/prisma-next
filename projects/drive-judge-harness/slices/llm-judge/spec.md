@@ -27,14 +27,16 @@ The judge takes an injected `JudgeModel` (same pattern as `run-one-brief`'s `cre
 ```
   rubric-correctness.ts   # requirements + intent; structured {requirements: pass|fail, intent: pass|fail, reasons}
   classify-failure.ts     # failure-mode classifier (F1–F9 + scope traps + QA coverage-gate gaps)
-  classify-operator.ts    # operator-turn classifier (5 buckets: legitimate design/authz vs illegitimate correction/rescue)
+  classify-operator.ts    # operator-turn classifier (the measurement-model's 5 canonical buckets: legitimate-design / legitimate-authorisation / illegitimate-asked / illegitimate-correction / illegitimate-rescue)
 ```
 
 Each renders a prompt from the run inputs (`acceptance.md` oracle + diff + relevant trace slices), calls the `JudgeModel`, and parses a **structured, schema-validated** verdict (arktype). The rubric scores **requirements** (acceptance criteria met) and **intent** (the run did the right thing, design-quality) — **mechanical** correctness stays gate-sourced (validation gates), not judged. Reasons/evidence are captured for the auto-retro surface.
 
-### 3. Emit the `intent` correctness signal
+### 3. Emit the `intent` correctness signal (merge-preserving)
 
-The judge's rubric verdict is emitted as a **`correctness-recorded`** trace event (the slice-1 schema event) carrying the `intent` (and `requirements`) component, through the existing **deterministic emitter** (`drive-record-traces/emit.ts`). The slice-1 scorecard already reads `correctness-recorded` and composes `mechanical ∧ qa ∧ intent` → verdict. **No edits to `drive-diagnose-run` or `schema.ts`** — the judge is a producer of an event the scorecard already consumes.
+The judge's rubric verdict (requirements folded into the single `intent` component the schema carries) is emitted as a **`correctness-recorded`** trace event through the existing **deterministic emitter** (`drive-record-traces/emit.ts`). The slice-1 scorecard already reads `correctness-recorded` and composes `mechanical ∧ qa ∧ intent` → verdict. **No edits to `drive-diagnose-run` or `schema.ts`** — the judge is a producer of an event the scorecard already consumes.
+
+**The one non-obvious constraint:** the scorecard is **last-write-wins per run** — a `correctness-recorded` event replaces the *whole* `{mechanical, qa, intent}` triple; it does not merge components. So the judge cannot emit `{mechanical:null, qa:null, intent:pass}` — that would clobber any `mechanical`/`qa` already recorded by the gate/QA step. The judge's emit step therefore **reads the run's latest recorded `{mechanical, qa}` (if any) and emits a merged triple** that fills `intent` while preserving the others. A small `emit-correctness.ts` helper does the read-merge-emit so the merge rule lives in one place.
 
 ### 4. Calibration harness — built, run deferred
 
@@ -68,6 +70,7 @@ One reviewer holds this in one sitting: it is the single "make Tier-1 computable
 | The judge is uncalibrated (no corpus yet) | Reflected in status + DoD | The `intent` event is emitted but flagged uncalibrated; the project-DoD calibration item stays unchecked; the scorecard still composes it (honest, with the caveat surfaced). |
 | Same-family grading bias | Guarded by design | Judge model is a pinned cross-family parameter (default GPT 5.5 vs the Claude orchestrator); the live adapter rejects a same-family judge id. |
 | Tests must not make real model calls | Designed for | `JudgeModel` is injected; tests pass a mock; the live SDK adapter is reached only on `--live` + key. |
+| Scorecard is last-write-wins on the whole `{mechanical, qa, intent}` triple | Designed around | `emit-correctness.ts` reads the run's latest recorded `{mechanical, qa}` and emits a merged triple filling `intent` — never nulls out a sibling component. End-to-end test asserts a prior `mechanical:pass` survives the judge's emission. |
 
 ## Slice-specific done conditions
 
