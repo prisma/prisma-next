@@ -28,7 +28,18 @@ test('InferModelRow resolves User fields', () => {
     MongoModelsMap<Contract>['User']['fields'],
     CodecTypes
   >;
-  expectTypeOf<UserRow>().toEqualTypeOf<FieldOutputTypes['User']>();
+  expectTypeOf<UserRow['_id']>().toEqualTypeOf<string>();
+  expectTypeOf<UserRow['name']>().toEqualTypeOf<string>();
+  expectTypeOf<UserRow['email']>().toEqualTypeOf<string>();
+  expectTypeOf<UserRow['loginCount']>().toEqualTypeOf<number>();
+  expectTypeOf<UserRow['tags']>().toEqualTypeOf<string[]>();
+});
+
+test('FieldOutputTypes resolves User.homeAddress from domain value objects', () => {
+  expectTypeOf<FieldOutputTypes['User']['homeAddress']>().toEqualTypeOf<{
+    city: string;
+    country: string;
+  } | null>();
 });
 
 test('InferModelRow resolves embedded model fields', () => {

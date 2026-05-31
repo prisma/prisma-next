@@ -4,6 +4,7 @@ import {
   type ContractValueObject,
   contractModels,
   contractValueObjects,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
@@ -119,11 +120,19 @@ type ContractBase = Omit<
 ${storageType},
 ${modelsType}
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: ${serializeValue(contract.target)};
   readonly targetFamily: ${serializeValue(contract.targetFamily)};
   readonly roots: ${rootsType};
+  readonly domain: {
+    readonly namespaces: {
+      readonly ${UNBOUND_DOMAIN_NAMESPACE_ID}: {
+        readonly models: ${modelsType};
+        ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
+      };
+    };
+  };
   readonly capabilities: ${serializeValue(contract.capabilities)};
   readonly extensionPacks: ${serializeValue(contract.extensionPacks)};${executionClause}
   readonly meta: ${serializeValue(contract.meta)};
