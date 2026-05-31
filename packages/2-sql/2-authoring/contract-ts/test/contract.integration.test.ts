@@ -4,6 +4,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { sqlStorageFixture, validSqlContractJson } from './sql-contract-json-fixture';
+import type { StorageLike } from './unbound-tables';
 import { unboundTables } from './unbound-tables';
 
 describe('SqlContractSerializer', () => {
@@ -40,7 +41,7 @@ describe('SqlContractSerializer', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           primaryKey: { columns: ['id'] },
         },
       }),
@@ -53,7 +54,7 @@ describe('SqlContractSerializer', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           primaryKey: { columns: ['id'], name: 'user_pkey' },
           indexes: [{ columns: ['id'], name: 'user_pkey' }],
         },

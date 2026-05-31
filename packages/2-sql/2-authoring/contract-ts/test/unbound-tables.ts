@@ -1,7 +1,7 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 
-type StorageLike = {
+export type StorageLike = {
   readonly namespaces: Readonly<
     Record<string, { readonly tables?: Readonly<Record<string, unknown>> }>
   >;

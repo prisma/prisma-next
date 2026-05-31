@@ -9,6 +9,7 @@ import {
   sqlStorageFixture,
   validSqlContractJson,
 } from './sql-contract-json-fixture';
+import type { StorageLike } from './unbound-tables';
 import { unboundTables } from './unbound-tables';
 
 function contractTablesRecord(contract: Record<string, unknown>): Record<string, unknown> {
@@ -89,7 +90,7 @@ describe('SqlContractSerializer logic validation', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           primaryKey: { columns: ['nonExistent'] },
           uniques: [],
           indexes: [],
@@ -107,7 +108,7 @@ describe('SqlContractSerializer logic validation', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           uniques: [{ columns: ['nonExistent'] }],
           indexes: [],
           foreignKeys: [],
@@ -124,7 +125,7 @@ describe('SqlContractSerializer logic validation', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           indexes: [{ columns: ['nonExistent'] }],
           uniques: [],
           foreignKeys: [],
@@ -141,13 +142,13 @@ describe('SqlContractSerializer logic validation', () => {
       ...validContractInput,
       storage: sqlStorageFixture({
         User: {
-          ...unboundTables(validContractInput.storage)['User'],
+          ...unboundTables(validContractInput.storage as StorageLike)['User'],
           uniques: [],
           indexes: [],
           foreignKeys: [],
         },
         Post: {
-          ...unboundTables(validContractInput.storage)['Post'],
+          ...unboundTables(validContractInput.storage as StorageLike)['Post'],
           foreignKeys: [
             {
               source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'Post', columns: ['userId'] },

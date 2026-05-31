@@ -6,6 +6,17 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 
+function normalizeModels(
+  models: Record<string, ContractModelBase>,
+): Record<string, ContractModelBase> {
+  return Object.fromEntries(
+    Object.entries(models).map(([name, model]) => [
+      name,
+      { ...model, relations: model.relations ?? {} },
+    ]),
+  ) as Record<string, ContractModelBase>;
+}
+
 const defaultTables = {
   User: {
     columns: {
@@ -32,7 +43,7 @@ export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
     domain:
       domain ??
       domainPlaneOf({
-        models: (models ?? {}) as Record<string, ContractModelBase>,
+        models: normalizeModels((models ?? {}) as Record<string, ContractModelBase>),
         namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
       }),
     storage:
@@ -47,11 +58,14 @@ export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
 
 export function withContractModels(
   base: Record<string, unknown>,
-  models: Record<string, ContractModelBase>,
+  models: Record<string, object>,
   patch: Record<string, unknown> = {},
 ) {
   const { domain: _domain, models: _models, ...rest } = { ...base, ...patch };
-  return validSqlContractJson({ ...rest, models });
+  return validSqlContractJson({
+    ...rest,
+    models: normalizeModels(models as Record<string, ContractModelBase>),
+  });
 }
 
 export function domainModelsRecord(
