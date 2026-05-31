@@ -108,11 +108,6 @@ describe('snapshot-read shape scan — checked-in on-disk contracts deserialize 
     if (rel.includes('mongo-demo')) return false;
     if (rel.includes('multi-extension-monorepo/packages/audit')) return false;
     if (rel.includes('multi-extension-monorepo/packages/feature-flags')) return false;
-    // `examples/prisma-next-demo/test/fixtures/basic-contract.json` is
-    // a structurally stale test fixture (storageHash at top level, no
-    // `storage.storageHash`); unrelated to TML-2536, surfaced as a
-    // side-quest.
-    if (rel.includes('prisma-next-demo/test/fixtures/basic-contract.json')) return false;
     // The Postgis demo's checked-in migrations also carry untagged
     // polymorphic `storage.types` entries (`WgsGeometry`, `geometry`)
     // — same TML-2536 class as the demo, but regeneration needs a
