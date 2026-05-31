@@ -1,4 +1,4 @@
-import type { InferModelRow } from '@prisma-next/mongo-contract';
+import type { InferModelRow, MongoModelsMap } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import type {
   CodecTypes,
@@ -6,7 +6,12 @@ import type {
 } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 
 test('InferModelRow resolves Task fields', () => {
-  type TaskRow = InferModelRow<Contract, 'Task', Contract['models']['Task']['fields'], CodecTypes>;
+  type TaskRow = InferModelRow<
+    Contract,
+    'Task',
+    MongoModelsMap<Contract>['Task']['fields'],
+    CodecTypes
+  >;
   expectTypeOf({} as TaskRow).toExtend<{
     _id: string;
     title: string;
@@ -16,7 +21,12 @@ test('InferModelRow resolves Task fields', () => {
 });
 
 test('InferModelRow resolves User fields', () => {
-  type UserRow = InferModelRow<Contract, 'User', Contract['models']['User']['fields'], CodecTypes>;
+  type UserRow = InferModelRow<
+    Contract,
+    'User',
+    MongoModelsMap<Contract>['User']['fields'],
+    CodecTypes
+  >;
   expectTypeOf({} as UserRow).toExtend<{
     _id: string;
     name: string;
@@ -31,7 +41,7 @@ test('InferModelRow resolves embedded model fields', () => {
   type AddressRow = InferModelRow<
     Contract,
     'Address',
-    Contract['models']['Address']['fields'],
+    MongoModelsMap<Contract>['Address']['fields'],
     CodecTypes
   >;
   expectTypeOf({} as AddressRow).toExtend<{
@@ -42,11 +52,16 @@ test('InferModelRow resolves embedded model fields', () => {
 });
 
 test('InferModelRow resolves variant model fields', () => {
-  type BugRow = InferModelRow<Contract, 'Bug', Contract['models']['Bug']['fields'], CodecTypes>;
+  type BugRow = InferModelRow<
+    Contract,
+    'Bug',
+    MongoModelsMap<Contract>['Bug']['fields'],
+    CodecTypes
+  >;
   type FeatureRow = InferModelRow<
     Contract,
     'Feature',
-    Contract['models']['Feature']['fields'],
+    MongoModelsMap<Contract>['Feature']['fields'],
     CodecTypes
   >;
   expectTypeOf({} as BugRow).toExtend<{ severity: string }>();
@@ -60,7 +75,7 @@ test('InferModelRow resolves Comment with date field', () => {
   type CommentRow = InferModelRow<
     Contract,
     'Comment',
-    Contract['models']['Comment']['fields'],
+    MongoModelsMap<Contract>['Comment']['fields'],
     CodecTypes
   >;
   expectTypeOf({} as CommentRow).toExtend<{

@@ -3,6 +3,7 @@ import type {
   ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoModelDefinition,
   MongoModelsMap,
   MongoTypeMaps,
   RootModelName,
@@ -641,11 +642,11 @@ export function createCollectionHandle<
     const validRoots = Object.keys(c.roots).join(', ');
     throw new Error(`Unknown root: "${rootName}". Valid roots: ${validRoots}`);
   }
-  const model = contractModels(c)[modelName];
+  const model = contractModels(c)[modelName] as MongoModelDefinition | undefined;
   if (!model) {
     throw new Error(`Unknown model: "${modelName}" referenced by root "${rootName}".`);
   }
-  const collectionName = model.storage?.collection ?? rootName;
+  const collectionName = model.storage.collection ?? rootName;
   if (!c.storage?.storageHash) {
     throw new Error(
       'Contract is missing storage.storageHash. Pass a validated contract to mongoQuery().',
