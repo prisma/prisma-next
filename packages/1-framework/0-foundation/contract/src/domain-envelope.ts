@@ -55,7 +55,11 @@ export function resolveSingleDomainNamespaceId(domain: DomainPlane, namespaceId?
       `expected exactly one domain namespace, found ${namespaceIds.length} (${namespaceIds.join(', ')})`,
     );
   }
-  return namespaceIds[0]!;
+  const [soleNamespaceId] = namespaceIds;
+  if (soleNamespaceId === undefined) {
+    throw new DomainNamespaceResolutionError('domain has no namespaces');
+  }
+  return soleNamespaceId;
 }
 
 export function contractModels(
@@ -63,7 +67,13 @@ export function contractModels(
   namespaceId?: string,
 ): Record<string, ContractModelBase> {
   const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
-  return contract.domain.namespaces[resolved]!.models;
+  const domainNamespace = contract.domain.namespaces[resolved];
+  if (domainNamespace === undefined) {
+    throw new DomainNamespaceResolutionError(
+      `domain namespace "${resolved}" is not present on the contract`,
+    );
+  }
+  return domainNamespace.models;
 }
 
 export function contractValueObjects(
@@ -71,7 +81,13 @@ export function contractValueObjects(
   namespaceId?: string,
 ): Record<string, ContractValueObject> | undefined {
   const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
-  return contract.domain.namespaces[resolved]!.valueObjects;
+  const domainNamespace = contract.domain.namespaces[resolved];
+  if (domainNamespace === undefined) {
+    throw new DomainNamespaceResolutionError(
+      `domain namespace "${resolved}" is not present on the contract`,
+    );
+  }
+  return domainNamespace.valueObjects;
 }
 
 export function domainPlaneOf<TModels extends Record<string, ContractModelBase>>(params: {
