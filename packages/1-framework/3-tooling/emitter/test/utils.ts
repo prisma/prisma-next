@@ -8,9 +8,9 @@ import {
   type NamedArraySortTarget,
   type PathPattern,
 } from '@prisma-next/contract/hashing-utils';
-import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import { createContract } from '@prisma-next/test-utils';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
 import { emit as emitImpl } from '../src/exports';

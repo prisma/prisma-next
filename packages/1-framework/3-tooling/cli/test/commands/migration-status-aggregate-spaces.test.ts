@@ -1,4 +1,3 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSpaceAggregate,
@@ -9,6 +8,7 @@ import * as migrationAggregate from '@prisma-next/migration-tools/aggregate';
 import { createContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { loadAggregateStatusSpaces, computeTotalPendingAcrossSpaces } = await import(

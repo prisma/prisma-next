@@ -1,7 +1,7 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContractSpaceMember } from '@prisma-next/migration-tools/aggregate';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it, vi } from 'vitest';
 import {

@@ -1,6 +1,6 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
-import { createContract } from '@prisma-next/contract/testing';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import type { ReferentialAction, SqlStorage } from '../src/types';

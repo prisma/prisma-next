@@ -39,7 +39,6 @@
     "./contract-validation-error": "./dist/contract-validation-error.mjs",
     "./hashing": "./dist/hashing.mjs",
     "./hashing-utils": "./dist/hashing-utils.mjs",
-    "./testing": "./dist/testing.mjs",
     "./types": "./dist/types.mjs",
     "./validate-domain": "./dist/validate-domain.mjs",
     "./package.json": "./package.json"

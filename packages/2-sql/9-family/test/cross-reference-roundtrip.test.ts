@@ -1,4 +1,3 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
 import {
   type Contract,
   CrossReferenceSchema,
@@ -7,6 +6,7 @@ import {
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { SqlContractSerializer } from '../src/core/ir/sql-contract-serializer';
