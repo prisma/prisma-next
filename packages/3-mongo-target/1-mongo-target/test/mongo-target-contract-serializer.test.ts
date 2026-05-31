@@ -56,6 +56,7 @@ function makeValidContractJson() {
           fields: {
             _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
           },
+          relations: {},
           storage: { collection: 'items' },
         },
       },
@@ -154,6 +155,7 @@ describe('MongoTargetContractSerializer', () => {
               fields: {
                 _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
               },
+              relations: {},
               storage: { collection: 'items' },
             },
           },
