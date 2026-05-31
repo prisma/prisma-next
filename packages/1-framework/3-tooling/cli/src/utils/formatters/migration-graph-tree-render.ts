@@ -238,14 +238,11 @@ export function renderMigrationGraphTree(
     }
 
     let gutter = row.cells.map((cell) => renderCellPair(cell, style)).join('');
-    const nextRow = model.rows[rowIndex + 1];
     const prevRow = model.rows[rowIndex - 1];
     let laneSpan = row.cells.length;
     if (row.kind === 'node') {
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
-      if (nextRow?.kind === 'branch-connector') {
-        laneSpan = nextRow.cells.length;
-      } else if (prevRow?.kind === 'merge-connector' || contractHash === EMPTY_CONTRACT_HASH) {
+      if (prevRow?.kind === 'merge-connector' || contractHash === EMPTY_CONTRACT_HASH) {
         laneSpan = 1;
       } else {
         laneSpan = row.cells.length;
