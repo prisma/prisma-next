@@ -245,20 +245,20 @@ One contract (`ef9de27`) with N children that never reconverge — each child is
 tip. This is the mirror of `converging-branches`: instead of a convergence node at the
 top fanning down, there is no top node at all — N separate tips each open a lane, and all
 N lanes **merge down into the shared parent** at the bottom (one merge connector, no branch
-connector). Tips stack newest-first (col 0 = newest); the divergence reads as the lanes
-coming together into `ef9de27`.
+connector). Sibling tips open lanes in creation order (col 0 = oldest tip, the same input
+order every fan uses); the divergence reads as the lanes coming together into `ef9de27`.
 
 ```
-○             b01f4d9
-│↑            add_settings        ef9de27 → b01f4d9
-│ ○           becd3f1
-│ │↑          add_category        ef9de27 → becd3f1
+○             73e3abe
+│↑            add_phone           ef9de27 → 73e3abe
+│ ○           a94b7b4
+│ │↑          add_posts           ef9de27 → a94b7b4
 │ │ ○         6656a6e
 │ │ │↑        add_avatar          ef9de27 → 6656a6e
-│ │ │ ○       a94b7b4
-│ │ │ │↑      add_posts           ef9de27 → a94b7b4
-│ │ │ │ ○     73e3abe
-│ │ │ │ │↑    add_phone           ef9de27 → 73e3abe
+│ │ │ ○       becd3f1
+│ │ │ │↑      add_category        ef9de27 → becd3f1
+│ │ │ │ ○     b01f4d9
+│ │ │ │ │↑    add_settings        ef9de27 → b01f4d9
 ├─┴─┴─┴─╯
 ○             ef9de27
 │↑            init                ∅ → ef9de27
