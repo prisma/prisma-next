@@ -1,5 +1,4 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -157,8 +156,8 @@ describe('contract definition constraint support', () => {
 
     expect(unboundTables(contract.storage)['post']!.foreignKeys).toHaveLength(1);
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
       constraint: true,
       index: true,
     });
@@ -173,8 +172,8 @@ describe('contract definition constraint support', () => {
 
     expect(unboundTables(contract.storage)['post']!.foreignKeys).toHaveLength(1);
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
       constraint: true,
       index: true,
       name: 'post_userId_fkey',
@@ -319,8 +318,8 @@ describe('contract definition constraint support', () => {
     });
 
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
       constraint: true,
       index: true,
     });
@@ -335,8 +334,8 @@ describe('contract definition constraint support', () => {
     });
 
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
       constraint: false,
       index: true,
     });
@@ -351,8 +350,8 @@ describe('contract definition constraint support', () => {
     });
 
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
+      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
       constraint: true,
       index: false,
     });

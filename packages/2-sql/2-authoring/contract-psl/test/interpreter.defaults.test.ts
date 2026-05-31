@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -81,7 +80,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     });
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             defaults: {
               columns: {
@@ -211,7 +210,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             defaults: {
               columns: {
@@ -456,7 +455,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             synthetic: {
               columns: {
@@ -524,7 +523,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
 
     expect(result.value.storage).toMatchObject({
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
+        public: {
           tables: {
             synthetic: {
               columns: {

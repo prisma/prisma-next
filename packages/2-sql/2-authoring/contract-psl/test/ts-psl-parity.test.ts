@@ -536,18 +536,18 @@ model Post {
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;
     const tsStorage = tsContract.storage as unknown as SqlStorage;
     const pslFks: readonly ForeignKey[] =
-      pslStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
+      pslStorage.namespaces['public']?.tables['post']?.foreignKeys ?? [];
     const tsFks: readonly ForeignKey[] =
-      tsStorage.namespaces['__unbound__']?.tables['post']?.foreignKeys ?? [];
+      tsStorage.namespaces['public']?.tables['post']?.foreignKeys ?? [];
 
     expect(tsFks.length).toBe(1);
     expect(pslFks.length).toBe(1);
     expect(tsFks[0]).toMatchObject({
-      source: { namespaceId: '__unbound__', tableName: 'post' },
+      source: { namespaceId: 'public', tableName: 'post' },
       target: { namespaceId: 'auth', tableName: 'user' },
     });
     expect(pslFks[0]).toMatchObject({
-      source: { namespaceId: '__unbound__', tableName: 'post' },
+      source: { namespaceId: 'public', tableName: 'post' },
       target: { namespaceId: 'auth', tableName: 'user' },
     });
     expect(tsFks).toEqual(pslFks);

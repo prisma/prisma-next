@@ -1,6 +1,5 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
@@ -153,18 +152,18 @@ describe('shared contract definition lowering', () => {
     expect(unboundTables(contract.storage)['blog_post']?.foreignKeys).toEqual([
       {
         source: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
+          namespaceId: 'public',
           tableName: 'blog_post',
           columns: ['author_id'],
         },
-        target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'app_user', columns: ['id'] },
+        target: { namespaceId: 'public', tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_author_id_fkey',
         constraint: true,
         index: true,
       },
     ]);
     expect(models['User']?.relations['posts']).toEqual({
-      to: crossRef('Post'),
+      to: crossRef('Post', 'public'),
       cardinality: '1:N',
       on: {
         localFields: ['id'],
