@@ -40,8 +40,6 @@ import {
   createExecutionContext,
   type createRuntime,
   createSqlExecutionStack,
-  ensureSchemaStatement,
-  ensureTableStatement,
   writeContractMarker,
 } from '../src/exports';
 import type {
@@ -53,6 +51,30 @@ import type {
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { defineTestCodec } from './test-codec';
+
+// Postgres control-table bootstrap DDL used by tests to seed an
+// already-initialised database. Production routes this through the control
+// adapter (`ensureControlTableAsts()`); these literals reproduce the exact
+// SQL the retired `ensure*Statement` constants held, for test setup only.
+export const ensureSchemaStatement: SqlStatement = {
+  sql: 'create schema if not exists prisma_contract',
+  params: [],
+};
+
+export const ensureTableStatement: SqlStatement = {
+  sql: `create table if not exists prisma_contract.marker (
+    space text not null primary key default '${APP_SPACE_ID}',
+    core_hash text not null,
+    profile_hash text not null,
+    contract_json jsonb,
+    canonical_version int,
+    updated_at timestamptz not null default now(),
+    app_tag text,
+    meta jsonb not null default '{}',
+    invariants text[] not null default '{}'
+  )`,
+  params: [],
+};
 
 function createTestMutationDefaultGenerators() {
   return builtinGeneratorIds.map((id) => ({

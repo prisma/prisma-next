@@ -9,12 +9,6 @@ import {
   lit,
   now,
 } from '@prisma-next/sql-relational-core/contract-free';
-import { ensureSchemaStatement, ensureTableStatement } from '@prisma-next/sql-runtime';
-import {
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-  ensurePrismaContractSchemaStatement,
-} from '@prisma-next/target-postgres/statement-builders';
 import { describe, expect, it } from 'vitest';
 import type { PostgresContract } from '../../src/core/types';
 import {
@@ -79,22 +73,45 @@ const ledgerTableAst = createTable(
   { ifNotExists: true },
 );
 
-describe('Postgres DDL lowering — byte-equality with bootstrap constants', () => {
-  it('lowers create-schema equal to the schema bootstrap constant', () => {
-    const sql = lowerSql(createSchema('prisma_contract', { ifNotExists: true }));
-    expect(sql).toBe(ensurePrismaContractSchemaStatement.sql);
-    expect(sql).toBe(ensureSchemaStatement.sql);
+// Byte-equality regression pins: the exact SQL the retired bootstrap
+// constants produced. The lowered DDL must remain identical to these.
+const expectedSchemaSql = 'create schema if not exists prisma_contract';
+const expectedMarkerSql = `create table if not exists prisma_contract.marker (
+    space text not null primary key default '${APP_SPACE_ID}',
+    core_hash text not null,
+    profile_hash text not null,
+    contract_json jsonb,
+    canonical_version int,
+    updated_at timestamptz not null default now(),
+    app_tag text,
+    meta jsonb not null default '{}',
+    invariants text[] not null default '{}'
+  )`;
+const expectedLedgerSql = `create table if not exists prisma_contract.ledger (
+    id bigserial primary key,
+    created_at timestamptz not null default now(),
+    origin_core_hash text,
+    origin_profile_hash text,
+    destination_core_hash text not null,
+    destination_profile_hash text,
+    contract_json_before jsonb,
+    contract_json_after jsonb,
+    operations jsonb not null
+  )`;
+
+describe('Postgres DDL lowering — byte-equality with bootstrap SQL', () => {
+  it('lowers create-schema equal to the schema bootstrap SQL', () => {
+    expect(lowerSql(createSchema('prisma_contract', { ifNotExists: true }))).toBe(
+      expectedSchemaSql,
+    );
   });
 
-  it('lowers the marker table equal to the marker bootstrap constant', () => {
-    const sql = lowerSql(markerTableAst);
-    expect(sql).toBe(ensureMarkerTableStatement.sql);
-    expect(sql).toBe(ensureTableStatement.sql);
+  it('lowers the marker table equal to the marker bootstrap SQL', () => {
+    expect(lowerSql(markerTableAst)).toBe(expectedMarkerSql);
   });
 
-  it('lowers the ledger table equal to the ledger bootstrap constant', () => {
-    const sql = lowerSql(ledgerTableAst);
-    expect(sql).toBe(ensureLedgerTableStatement.sql);
+  it('lowers the ledger table equal to the ledger bootstrap SQL', () => {
+    expect(lowerSql(ledgerTableAst)).toBe(expectedLedgerSql);
   });
 
   it('lowers DDL with empty params', () => {
@@ -117,10 +134,6 @@ describe('Postgres control adapter — ensureControlTableAsts routed bootstrap',
     const sql = controlAdapter
       .ensureControlTableAsts()
       .map((ast) => controlAdapter.lower(ast, { contract }).sql);
-    expect(sql).toEqual([
-      ensurePrismaContractSchemaStatement.sql,
-      ensureMarkerTableStatement.sql,
-      ensureLedgerTableStatement.sql,
-    ]);
+    expect(sql).toEqual([expectedSchemaSql, expectedMarkerSql, expectedLedgerSql]);
   });
 });

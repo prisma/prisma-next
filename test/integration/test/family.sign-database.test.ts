@@ -11,12 +11,12 @@ import {
 } from '@prisma-next/framework-components/control';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { writeContractMarker } from '@prisma-next/sql-runtime';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+  executeStatement,
+} from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import type { DevDatabase } from '@prisma-next/test-utils';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';

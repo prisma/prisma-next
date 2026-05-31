@@ -1,12 +1,7 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import {
-  buildMergeMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-  ensurePrismaContractSchemaStatement,
-} from '@prisma-next/target-postgres/statement-builders';
+import { buildMergeMarkerStatements } from '@prisma-next/target-postgres/statement-builders';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { expectNoMarkerOrLedgerWrites } from '../utils/dbAssertions';
 import {
@@ -24,6 +19,42 @@ import {
   testTimeout,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
+
+// Control-table bootstrap DDL used to seed scenarios that simulate an
+// already-initialised database. Production routes this through the control
+// adapter; these literals reproduce the exact SQL for test setup.
+const ensurePrismaContractSchemaStatement = {
+  sql: 'create schema if not exists prisma_contract',
+  params: [] as const,
+};
+const ensureMarkerTableStatement = {
+  sql: `create table if not exists prisma_contract.marker (
+    space text not null primary key default '${APP_SPACE_ID}',
+    core_hash text not null,
+    profile_hash text not null,
+    contract_json jsonb,
+    canonical_version int,
+    updated_at timestamptz not null default now(),
+    app_tag text,
+    meta jsonb not null default '{}',
+    invariants text[] not null default '{}'
+  )`,
+  params: [] as const,
+};
+const ensureLedgerTableStatement = {
+  sql: `create table if not exists prisma_contract.ledger (
+    id bigserial primary key,
+    created_at timestamptz not null default now(),
+    origin_core_hash text,
+    origin_profile_hash text,
+    destination_core_hash text not null,
+    destination_profile_hash text,
+    contract_json_before jsonb,
+    contract_json_after jsonb,
+    operations jsonb not null
+  )`,
+  params: [] as const,
+};
 
 describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;

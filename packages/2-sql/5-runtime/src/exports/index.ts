@@ -55,8 +55,6 @@ export {
 export type { SqlStatement } from '../sql-marker';
 export {
   APP_SPACE_ID,
-  ensureSchemaStatement,
-  ensureTableStatement,
   readContractMarker,
   writeContractMarker,
 } from '../sql-marker';

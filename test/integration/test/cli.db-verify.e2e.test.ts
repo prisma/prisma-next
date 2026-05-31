@@ -7,12 +7,12 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
+import { writeContractMarker } from '@prisma-next/sql-runtime';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+  executeStatement,
+} from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

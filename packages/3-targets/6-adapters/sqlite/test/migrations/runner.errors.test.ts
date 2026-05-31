@@ -1,11 +1,7 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
-import {
-  buildWriteMarkerStatements,
-  ensureLedgerTableStatement,
-  ensureMarkerTableStatement,
-} from '@prisma-next/target-sqlite/statement-builders';
+import { buildWriteMarkerStatements } from '@prisma-next/target-sqlite/statement-builders';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -21,6 +17,38 @@ import {
   type TestDatabase,
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
+
+// Control-table bootstrap DDL used to seed scenarios that simulate an
+// already-initialised database. Production routes this through the control
+// adapter; these literals reproduce the exact SQL for test setup.
+const ensureMarkerTableStatement = {
+  sql: `CREATE TABLE IF NOT EXISTS _prisma_marker (
+    space TEXT NOT NULL PRIMARY KEY DEFAULT '${APP_SPACE_ID}',
+    core_hash TEXT NOT NULL,
+    profile_hash TEXT NOT NULL,
+    contract_json TEXT,
+    canonical_version INTEGER,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    app_tag TEXT,
+    meta TEXT NOT NULL DEFAULT '{}',
+    invariants TEXT NOT NULL DEFAULT '[]'
+  )`,
+  params: [] as const,
+};
+const ensureLedgerTableStatement = {
+  sql: `CREATE TABLE IF NOT EXISTS _prisma_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    origin_core_hash TEXT,
+    origin_profile_hash TEXT,
+    destination_core_hash TEXT NOT NULL,
+    destination_profile_hash TEXT,
+    contract_json_before TEXT,
+    contract_json_after TEXT,
+    operations TEXT NOT NULL
+  )`,
+  params: [] as const,
+};
 
 describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.databaseOperation }, () => {
   let testDb: TestDatabase;

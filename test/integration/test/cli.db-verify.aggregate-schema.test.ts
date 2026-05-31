@@ -8,12 +8,12 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { writeContractMarker } from '@prisma-next/sql-runtime';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+  executeStatement,
+} from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import testContractSpaceExtension from './contract-space-fixture/control';

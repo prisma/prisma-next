@@ -16,12 +16,12 @@ import { defineContract, field, model } from '@prisma-next/postgres/contract-bui
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
+import { writeContractMarker } from '@prisma-next/sql-runtime';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
-import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
+  executeStatement,
+} from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
