@@ -62,7 +62,7 @@ describe('mongo contract builder', () => {
       users: { kind: 'mongo-collection' },
       posts: { kind: 'mongo-collection' },
     });
-    expect(contractModels(contract).Post).toEqual({
+    expect(contractModels(contract)['Post']).toEqual({
       storage: {
         collection: 'posts',
       },
@@ -153,18 +153,19 @@ describe('mongo contract builder', () => {
         },
       },
     });
-    expect(contractModels(contract).Task.storage).toEqual({
+    const models = contractModels(contract);
+    expect(models['Task']!.storage).toEqual({
       collection: 'tasks',
       relations: {
         comments: { field: 'comments' },
       },
     });
-    expect(contractModels(contract).Task.discriminator).toEqual({ field: 'type' });
-    expect(contractModels(contract).Task.variants).toEqual({
+    expect(models['Task']!.discriminator).toEqual({ field: 'type' });
+    expect(models['Task']!.variants).toEqual({
       Bug: { value: 'bug' },
     });
-    expect(contractModels(contract).Bug.base).toEqual(crossRef('Task'));
-    expect(contractModels(contract).Comment.owner).toBe('Task');
+    expect(models['Bug']!.base).toEqual(crossRef('Task'));
+    expect(models['Comment']!.owner).toBe('Task');
   });
 
   it('lowers Mongo indexes into namespaced storage collections', () => {
