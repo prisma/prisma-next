@@ -6,10 +6,12 @@
 
 ## At a glance
 
-Single sequential stack. S1 closed and proved the IR substrate ([ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)). **Storage on `main` already matches the amended ADR** (`{ storageHash, types?, namespaces }`). The **domain** plane was never wired — `models` / `valueObjects` remain flat at the contract root. A closed PR (#649) attempted to flatten storage; that direction was wrong (heterogeneous-map cost). ADR 221 is amended to prescribe symmetric `{ …metadata?, namespaces }` envelopes per plane.
+Single sequential stack on top of the closed **contract-ir-planes** substrate ([ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)). **Storage on `main` already matches the amended ADR** (`{ storageHash, types?, namespaces }`). The **domain** plane was never wired — `models` / `valueObjects` remain flat at the contract root. A closed PR (#649) attempted to flatten storage instead; that direction was wrong (heterogeneous-map cost), and ADR 221 was amended to prescribe symmetric `{ …metadata?, namespaces }` envelopes per plane.
+
+Units are **named, not numbered** — the S-numbering drifted during replanning and bought nothing.
 
 ```text
-S2 — wire symmetric domain plane   →   S3 — Postgres public-by-default   →   S4 — runtime qualification   →   S5 — explicit-namespace DSL (deferrable)
+domain-plane   →   public-by-default   →   runtime-qualification   →   explicit-dsl (deferrable)
 ```
 
 One worktree + branch per slice; slice tickets at pickup.
@@ -18,23 +20,23 @@ One worktree + branch per slice; slice tickets at pickup.
 
 ### Stack (deliver in order)
 
-#### S1 — contract IR planes + pack-contributed entity-kind mechanism + Postgres enum migration
+#### contract-ir-planes — two-plane IR + pack-contributed entity-kind mechanism + Postgres enum exemplar
 
 **Unit type:** Sub-project (multi-slice; **closed** — [ADR 221](../../docs/architecture%20docs/adrs/ADR%20221%20-%20Contract%20IR%20two%20planes%20with%20uniform%20entity%20coordinate%20and%20pack-contributed%20entity%20kinds.md)).
 
-**Outcome.** Two-plane model, entity coordinate, pack-contributed entity kinds (Postgres enum exemplar), storage plane with `namespaces` wrapper. Domain plane not yet wired.
+**Outcome.** Two-plane model, entity coordinate, pack-contributed entity kinds (Postgres enum exemplar), storage plane in the `{ storageHash, types?, namespaces }` envelope. Domain plane not yet wired.
 
 **Linear:** [TML-2584](https://linear.app/prisma-company/issue/TML-2584) (Done).
 
-#### S2 — wire the symmetric domain plane
+#### domain-plane — wire the symmetric domain plane
 
-**Unit type:** Slice (one PR; likely two dispatches).
+**Unit type:** Slice (one PR; two dispatches).
 
 **Purpose.** Move flat `contract.models` / `contract.valueObjects` under `contract.domain.namespaces.<ns>.{ models, valueObjects }`, matching storage's envelope. Amend consumers (emitter, validators, migration walks, fixtures). **Do not change storage** — it is already correct on `main`. Framework domain has no `types` member; doc-scoped codec aliases stay on SQL `storage.types`.
 
-**Linear:** ticket at pickup (replaces cancelled [TML-2747](https://linear.app/prisma-company/issue/TML-2747) flatten attempt).
+**Linear:** [TML-2751](https://linear.app/prisma-company/issue/TML-2751) (replaces the cancelled [TML-2747](https://linear.app/prisma-company/issue/TML-2747) storage-flatten attempt).
 
-**Depends on.** S1 (closed).
+**Depends on.** contract-ir-planes (closed).
 
 **Validation gate.**
 
@@ -44,19 +46,19 @@ One worktree + branch per slice; slice tickets at pickup.
 
 **Priority.** Must-ship core.
 
-#### S3 — Postgres public-by-default at the PSL interpreter
+#### public-by-default — Postgres `public` namespace at the PSL interpreter
 
 **Unit type:** Slice (single PR).
 
-**Purpose.** Un-namespaced Postgres models default to `public`; `__unbound__` is explicit PSL opt-in. Removes hardcoded `"public".` prefix logic; regenerates Postgres contract artifacts.
+**Purpose.** Un-namespaced Postgres models default to `public`; `__unbound__` is explicit PSL opt-in. Removes hardcoded `"public".`-prefix logic; regenerates Postgres contract artifacts.
 
-**Depends on.** S2.
+**Depends on.** domain-plane.
 
 **Validation gate.** Standard package gates + `pnpm fixtures:check`; un-namespaced Postgres model emits under `public`; `__unbound__` opt-in round-trips.
 
 **Linear:** ticket at pickup.
 
-#### S4 — runtime SQL qualification + default-namespace DSL/ORM fallback
+#### runtime-qualification — runtime SQL qualification + default-namespace DSL/ORM fallback
 
 **Unit type:** Slice (single PR).
 
@@ -64,13 +66,13 @@ One worktree + branch per slice; slice tickets at pickup.
 
 **Linear:** [TML-2605](https://linear.app/prisma-company/issue/TML-2605).
 
-**Depends on.** S2 + S3.
+**Depends on.** domain-plane + public-by-default.
 
-#### S5 — explicit namespace-aware DSL/ORM surface
+#### explicit-dsl — explicit namespace-aware DSL/ORM surface
 
 **Unit type:** Slice. **Deferrable.**
 
-**Purpose.** `db.sql.<ns>.<table>`, `db.<ns>.<Model>` — additive on S4.
+**Purpose.** `db.sql.<ns>.<table>`, `db.<ns>.<Model>` — additive on runtime-qualification.
 
 **Linear:** [TML-2550](https://linear.app/prisma-company/issue/TML-2550).
 
@@ -80,7 +82,7 @@ None.
 
 ## Dependencies (external)
 
-- [x] **S1 closed.** ADR 221 + storage `namespaces` wrapper on `main`.
+- [x] **contract-ir-planes closed.** ADR 221 + storage `namespaces` envelope on `main`.
 - [x] **ADR 221 amended** — symmetric plane envelopes; framework domain has no `types`.
 - [ ] **Supabase initiative awareness** — coordinated at initiative level.
 
@@ -88,37 +90,37 @@ None.
 
 | Project-DoD | Delivered by |
 |---|---|
-| **PDoD1.** All units delivered or deferred | S2 + S3 + S4; S5 optional |
-| **PDoD2.** Emitted IR matches ADR 221 (symmetric `domain` + `storage` envelopes) | S2 |
-| **PDoD3.** Postgres public-by-default; `__unbound__` opt-in | S3 |
-| **PDoD4.** Runtime SQL qualification | S3 + S4 |
-| **PDoD5.** Zero query-API breakage for default-namespace consumers | S3 + S4 |
-| **PDoD6.** Multi-namespace E2E authorable + queryable | S2 + S4 |
-| **PDoD7.** Pack-contributed entity kinds (enum exemplar) | S1 |
+| **PDoD1.** All must-ship units delivered; explicit-dsl delivered or deferred | domain-plane + public-by-default + runtime-qualification; explicit-dsl optional |
+| **PDoD2.** Emitted IR matches ADR 221 (symmetric `domain` + `storage` envelopes) | domain-plane |
+| **PDoD3.** Pack-contributed entity kinds (enum exemplar) | contract-ir-planes |
+| **PDoD4.** Postgres public-by-default; `__unbound__` opt-in | public-by-default |
+| **PDoD5.** Runtime SQL qualification | public-by-default + runtime-qualification |
+| **PDoD6.** Zero query-API breakage for default-namespace consumers | public-by-default + runtime-qualification |
+| **PDoD7.** Multi-namespace E2E authorable + queryable | domain-plane + runtime-qualification |
 | **PDoD8–PDoD10.** ADRs, Linear complete, folder cleanup | Close-out |
 
 ## Risks + open questions
 
-1. **Fixture churn (S2 + S3).** Mitigation: `pnpm fixtures:emit` / `pnpm fixtures:check` in slice DoD.
+1. **Fixture churn (domain-plane + public-by-default).** Both regenerate on-disk contracts. Mitigation: `pnpm fixtures:emit` / `pnpm fixtures:check` in slice DoD.
 2. **Domain-plane blast radius.** Every consumer of `contract.models` must migrate to `contract.domain.namespaces` walks; refusal trigger if scope expands into storage reshape.
-3. **S3 default-namespace policy.** Regenerates all Postgres contracts; upgrade instructions if downstream *source* changes.
+3. **public-by-default policy.** Regenerates all Postgres contracts; upgrade instructions if downstream *source* changes.
 
 ## Sequencing visualisation
 
 ```text
-S1 — contract-ir-planes   ✓ CLOSED  (ADR 221; storage.namespaces on main)
+contract-ir-planes   ✓ CLOSED  (ADR 221; storage.namespaces on main)
    │
    ▼
-S2 — symmetric domain plane ([TML-2751](https://linear.app/prisma-company/issue/TML-2751))
+domain-plane ([TML-2751](https://linear.app/prisma-company/issue/TML-2751))   ← IN PROGRESS
    │
    ▼
-S3 — Postgres public-by-default
+public-by-default
    │
    ▼
-S4 — runtime qualification (TML-2605)
+runtime-qualification (TML-2605)
    │
    ▼
-S5 — explicit-namespace DSL (deferrable, TML-2550)
+explicit-dsl (deferrable, TML-2550)
 ```
 
 ## Close-out (required)
