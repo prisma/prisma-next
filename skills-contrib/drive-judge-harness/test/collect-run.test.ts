@@ -61,6 +61,7 @@ function fakePrepared(overrides?: Partial<PreparedRun>): PreparedRun {
     skillBundleSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     prepareCommit,
     materialized: true,
+    preexistingTracePaths: [],
     ...overrides,
   };
 }
@@ -125,6 +126,87 @@ describe('collectRun — trace collection', () => {
     const result = collectRun(fakePrepared());
     assert.equal(result.untraced, true);
     assert.equal(result.matchedTrace, null);
+  });
+});
+
+describe('collectRun — preexistingTracePaths exclusion', () => {
+  it('returns only the run-emitted trace, not the pre-existing baseline trace', () => {
+    const baselinePath = join(runDir, 'baseline-trace.jsonl');
+    const runEmittedPath = join(runDir, 'run-emitted-trace.jsonl');
+
+    writeFileSync(baselinePath, `${VALID_TRACE_LINE}\n`);
+    writeFileSync(runEmittedPath, `${VALID_TRACE_LINE}\n`);
+
+    // Simulate: baseline-trace was present before the run started
+    const result = collectRun(fakePrepared({ preexistingTracePaths: [baselinePath] }));
+
+    assert.equal(result.tracePaths.length, 1, 'only one trace should be returned');
+    assert.ok(
+      result.tracePaths[0]?.endsWith('run-emitted-trace.jsonl'),
+      'the returned trace must be the run-emitted one',
+    );
+    assert.ok(
+      !result.tracePaths.some((p) => p.endsWith('baseline-trace.jsonl')),
+      'the baseline-committed trace must not appear in results',
+    );
+    assert.equal(result.untraced, false);
+  });
+
+  it('returns no traces when every valid jsonl is listed in preexistingTracePaths', () => {
+    const baselinePath = join(runDir, 'old-trace.jsonl');
+    writeFileSync(baselinePath, `${VALID_TRACE_LINE}\n`);
+
+    const result = collectRun(fakePrepared({ preexistingTracePaths: [baselinePath] }));
+
+    assert.equal(result.tracePaths.length, 0);
+    assert.equal(result.matchedTrace, null);
+    assert.equal(result.untraced, true);
+  });
+
+  it('agent_id matching runs over the run-emitted set only', () => {
+    const baselinePath = join(runDir, 'baseline-trace.jsonl');
+    const runEmittedPath = join(runDir, 'run-trace.jsonl');
+
+    // Both are valid traces but with different agent IDs.
+    const baselineLine = JSON.stringify({
+      event_id: 'e1',
+      schema_version: '1',
+      ts: '2026-05-31T00:00:00.000Z',
+      project_run_id: 'proj-base',
+      orchestrator_agent_id: 'agent-baseline',
+      event_type: 'dispatch-start',
+      dispatch_id: 'd1',
+      dispatch_name: 'baseline',
+      subagent_type: 'generalPurpose',
+      model: null,
+      parent_dispatch_id: null,
+    });
+    const runLine = JSON.stringify({
+      event_id: 'e2',
+      schema_version: '1',
+      ts: '2026-05-31T00:00:00.000Z',
+      project_run_id: 'proj-run',
+      orchestrator_agent_id: 'agent-run',
+      event_type: 'dispatch-start',
+      dispatch_id: 'd2',
+      dispatch_name: 'run',
+      subagent_type: 'generalPurpose',
+      model: null,
+      parent_dispatch_id: null,
+    });
+
+    writeFileSync(baselinePath, `${baselineLine}\n`);
+    writeFileSync(runEmittedPath, `${runLine}\n`);
+
+    const result = collectRun(fakePrepared({ preexistingTracePaths: [baselinePath] }), {
+      agentId: 'agent-baseline',
+    });
+
+    // 'agent-baseline' is only in the preexisting trace; the run-emitted set has
+    // only 'agent-run'. The exclusion must happen before matching.
+    assert.equal(result.tracePaths.length, 1);
+    assert.ok(result.tracePaths[0]?.endsWith('run-trace.jsonl'));
+    assert.ok(result.matchedTrace?.endsWith('run-trace.jsonl'));
   });
 });
 

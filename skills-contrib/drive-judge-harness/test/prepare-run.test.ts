@@ -162,6 +162,37 @@ describe('prepareRun', () => {
     const prepared = prepareRun(config, { materialize: mockMaterialize });
     assert.equal(prepared.prepareCommit.length, 40);
   });
+
+  it('preexistingTracePaths is empty when the base checkout has no .jsonl files', () => {
+    const config: PrepareRunConfig = {
+      repoUnderTestDir: repoDir,
+      baseRef,
+      skillBundle: { repoDir, ref: bundleRef },
+      runDir,
+    };
+    const prepared = prepareRun(config, { materialize: mockMaterialize });
+    assert.ok(Array.isArray(prepared.preexistingTracePaths));
+    assert.equal(prepared.preexistingTracePaths.length, 0);
+  });
+
+  it('preexistingTracePaths lists committed .jsonl files present at baseline', () => {
+    // Add a .jsonl to the base checkout so it's in the worktree after prepare-run
+    mkdirSync(join(repoDir, 'wip', 'drive-trace'), { recursive: true });
+    writeFileSync(join(repoDir, 'wip', 'drive-trace', 'old-trace.jsonl'), '{"event_id":"e0"}\n');
+    gitIn(repoDir, 'add', '-A');
+    gitIn(repoDir, 'commit', '-m', 'add old trace');
+    const baseRefWithTrace = gitIn(repoDir, 'rev-parse', 'HEAD');
+
+    const config: PrepareRunConfig = {
+      repoUnderTestDir: repoDir,
+      baseRef: baseRefWithTrace,
+      skillBundle: { repoDir, ref: bundleRef },
+      runDir,
+    };
+    const prepared = prepareRun(config, { materialize: mockMaterialize });
+    assert.equal(prepared.preexistingTracePaths.length, 1);
+    assert.ok(prepared.preexistingTracePaths[0]?.endsWith('old-trace.jsonl'));
+  });
 });
 
 describe('prepareRun + collectRun — empty-overlay cut point', () => {

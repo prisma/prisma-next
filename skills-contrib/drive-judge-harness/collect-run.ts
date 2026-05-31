@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { type } from 'arktype';
 import { join } from 'pathe';
 import { Slice1TraceEvent } from '../drive-record-traces/schema.ts';
 import type { PreparedRun } from './prepare-run.ts';
+import { findJsonlFiles } from './trace-files.ts';
 
 export type CollectedRun = {
   tracePaths: string[];
@@ -12,25 +13,6 @@ export type CollectedRun = {
   diffStat: { filesChanged: number; insertions: number; deletions: number };
   untraced: boolean;
 };
-
-function findJsonlFiles(dir: string): string[] {
-  const results: string[] = [];
-  let entries: Dirent[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return results;
-  }
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...findJsonlFiles(fullPath));
-    } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
-      results.push(fullPath);
-    }
-  }
-  return results;
-}
 
 function firstLineOf(filePath: string): string | null {
   let content: string;
@@ -106,9 +88,10 @@ export function collectRun(
   prepared: PreparedRun,
   opts?: { agentId?: string | null },
 ): CollectedRun {
-  const { runDir, prepareCommit } = prepared;
+  const { runDir, prepareCommit, preexistingTracePaths } = prepared;
 
-  const allJsonl = findJsonlFiles(runDir);
+  const preexistingSet = new Set(preexistingTracePaths);
+  const allJsonl = findJsonlFiles(runDir).filter((p) => !preexistingSet.has(p));
   const tracePaths = allJsonl.filter(isValidTrace);
 
   let matchedTrace: string | null = null;

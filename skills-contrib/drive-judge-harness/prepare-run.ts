@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { findJsonlFiles } from './trace-files.ts';
 
 export type SkillBundleRef = {
   repoDir: string;
@@ -19,6 +20,11 @@ export type PreparedRun = {
   skillBundleSha: string;
   prepareCommit: string;
   materialized: boolean;
+  /** Paths of all `.jsonl` files present under `runDir` immediately after the
+   *  baseline commit — i.e. traces committed in the base checkout before the
+   *  agent run starts. `collectRun` excludes these so only run-emitted traces
+   *  are collected. Deterministic snapshot (no mtime reliance). */
+  preexistingTracePaths: string[];
 };
 
 export type PrepareRunDeps = {
@@ -97,6 +103,8 @@ export function prepareRun(config: PrepareRunConfig, deps?: PrepareRunDeps): Pre
   git(['commit', '--allow-empty', '-m', 'prepare-run baseline'], config.runDir);
   const prepareCommit = git(['rev-parse', 'HEAD'], config.runDir).stdout;
 
+  const preexistingTracePaths = findJsonlFiles(config.runDir);
+
   return {
     runDir: config.runDir,
     baseRef: config.baseRef,
@@ -104,5 +112,6 @@ export function prepareRun(config: PrepareRunConfig, deps?: PrepareRunDeps): Pre
     skillBundleSha,
     prepareCommit,
     materialized: matResult.ok,
+    preexistingTracePaths,
   };
 }
