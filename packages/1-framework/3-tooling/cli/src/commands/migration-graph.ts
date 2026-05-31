@@ -90,9 +90,11 @@ export function createMigrationGraphCommand(): Command {
   setCommandDescriptions(
     command,
     'Show the migration graph topology',
-    'Renders the migration graph as an ASCII tree. Offline — does not\n' +
-      'consult the database. Use --json for machine-readable output or\n' +
-      '--dot for Graphviz DOT format.',
+    'Renders the migration graph topology. Offline — does not consult\n' +
+      'the database. Use --tree for the condensed annotated tree\n' +
+      '(--ascii swaps box-drawing for pipe-friendly ASCII glyphs),\n' +
+      '--json for machine-readable output, or --dot for Graphviz DOT\n' +
+      'format.',
   );
   setCommandExamples(command, [
     'prisma-next migration graph',
