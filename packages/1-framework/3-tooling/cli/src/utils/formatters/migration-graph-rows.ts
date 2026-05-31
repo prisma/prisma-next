@@ -42,6 +42,10 @@ export interface MigrationGraphRowModel {
   readonly edgesByTo: ReadonlyMap<string, readonly ClassifiedEdge[]>;
 }
 
+export interface BuildMigrationGraphRowsOptions {
+  readonly contractHash?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Weak connectivity — identify disjoint components
 // ---------------------------------------------------------------------------
@@ -271,18 +275,33 @@ function postOrderNodes(
  * - classifies every edge as `forward`, `rollback`, or `self`;
  * - produces a deterministic vertical node ordering (tips at index 0, roots
  *   at the end) within each weakly-connected component;
- * - separates disjoint components with `null` sentinels.
+ * - separates disjoint components with `null` sentinels;
+ * - optionally prepends a detached current contract as its own single-node
+ *   component when `contractHash` is not already in the graph.
  *
  * No columns, no lane allocation, no glyphs, no rendering.
  */
-export function buildMigrationGraphRows(graph: MigrationGraph): MigrationGraphRowModel {
+export function buildMigrationGraphRows(
+  graph: MigrationGraph,
+  options: BuildMigrationGraphRowsOptions = {},
+): MigrationGraphRowModel {
+  const emptyModel: MigrationGraphRowModel = {
+    nodes: [],
+    edges: [],
+    edgesByFrom: new Map(),
+    edgesByTo: new Map(),
+  };
+
   if (graph.nodes.size === 0) {
-    return {
-      nodes: [],
-      edges: [],
-      edgesByFrom: new Map(),
-      edgesByTo: new Map(),
-    };
+    const contractHash = options.contractHash;
+    if (
+      contractHash !== undefined &&
+      contractHash !== EMPTY_CONTRACT_HASH &&
+      !graph.nodes.has(contractHash)
+    ) {
+      return { ...emptyModel, nodes: [contractHash] };
+    }
+    return emptyModel;
   }
 
   // 1. Classify all edges (shared DFS, same algorithm as Tier-2)
@@ -328,6 +347,18 @@ export function buildMigrationGraphRows(graph: MigrationGraph): MigrationGraphRo
     for (const node of ordered) {
       nodes.push(node);
     }
+  }
+
+  const contractHash = options.contractHash;
+  if (
+    contractHash !== undefined &&
+    contractHash !== EMPTY_CONTRACT_HASH &&
+    !graph.nodes.has(contractHash)
+  ) {
+    if (nodes.length > 0) {
+      nodes.unshift(null);
+    }
+    nodes.unshift(contractHash);
   }
 
   return { nodes, edges, edgesByFrom, edgesByTo };

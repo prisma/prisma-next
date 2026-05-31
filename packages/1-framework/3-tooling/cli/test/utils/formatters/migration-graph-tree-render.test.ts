@@ -45,7 +45,9 @@ function tree(
   edges: readonly MigrationEdge[],
   opts: Parameters<typeof renderMigrationGraphTree>[1] = { colorize: false },
 ): string {
-  const rowModel = buildMigrationGraphRows(graph(edges));
+  const rowModel = buildMigrationGraphRows(graph(edges), {
+    ...(opts.contractHash !== undefined ? { contractHash: opts.contractHash } : {}),
+  });
   const layout = buildMigrationGraphLayout(rowModel);
   return renderMigrationGraphTree(layout, opts);
 }
@@ -63,6 +65,29 @@ describe('renderMigrationGraphTree', () => {
     expect(tree([init, addPosts])).toBe(
       [
         '○   a94b7b4',
+        '│↑  add_posts            ef9de27 → a94b7b4',
+        '○   ef9de27',
+        '│↑  init                 ∅ → ef9de27',
+        '○   ∅',
+      ].join('\n'),
+    );
+  });
+
+  it('renders a detached contract as a floating node per mockup', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    expect(
+      tree([init, addPosts], {
+        colorize: false,
+        refsByHash: refsMap([{ hash: 'a94b7b4', names: ['main'] }]),
+        dbHash: 'a94b7b4',
+        contractHash: 'c0ffee0',
+      }),
+    ).toBe(
+      [
+        '○   c0ffee0              (contract)',
+        '',
+        '○   a94b7b4              (main, db)',
         '│↑  add_posts            ef9de27 → a94b7b4',
         '○   ef9de27',
         '│↑  init                 ∅ → ef9de27',

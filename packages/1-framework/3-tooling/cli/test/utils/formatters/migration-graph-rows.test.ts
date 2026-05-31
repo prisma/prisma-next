@@ -408,6 +408,49 @@ describe('buildMigrationGraphRows', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Detached contract (floating node component)
+  // -------------------------------------------------------------------------
+
+  describe('detached contract hash', () => {
+    it('prepends a single-node component when contractHash is not in the graph', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+      const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+      const g = graph([init, addPosts]);
+      const without = buildMigrationGraphRows(g);
+      const withDetached = buildMigrationGraphRows(g, { contractHash: 'c0ffee0' });
+
+      expect(without.nodes).toEqual(['a94b7b4', 'ef9de27', EMPTY_CONTRACT_HASH]);
+      expect(withDetached.nodes).toEqual([
+        'c0ffee0',
+        null,
+        'a94b7b4',
+        'ef9de27',
+        EMPTY_CONTRACT_HASH,
+      ]);
+      expect(withDetached.edges).toEqual(without.edges);
+    });
+
+    it('leaves the row model unchanged when contractHash is already a graph node', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+      const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+      const g = graph([init, addPosts]);
+      const baseline = buildMigrationGraphRows(g);
+      const withExisting = buildMigrationGraphRows(g, { contractHash: 'a94b7b4' });
+
+      expect(withExisting).toEqual(baseline);
+    });
+
+    it('leaves the row model unchanged for EMPTY_CONTRACT_HASH', () => {
+      const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+      const g = graph([init]);
+      const baseline = buildMigrationGraphRows(g);
+      const withEmpty = buildMigrationGraphRows(g, { contractHash: EMPTY_CONTRACT_HASH });
+
+      expect(withEmpty).toEqual(baseline);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Determinism
   // -------------------------------------------------------------------------
 

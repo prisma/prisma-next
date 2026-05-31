@@ -146,7 +146,11 @@ export function createMigrationGraphCommand(): Command {
               const existing = refsByHash.get(ref.hash);
               refsByHash.set(ref.hash, existing ? [...existing, ref.name] : [ref.name]);
             }
-            const rowModel = buildMigrationGraphRows(graphResult.graph);
+            const rowModel = buildMigrationGraphRows(graphResult.graph, {
+              ...(graphResult.contractHash !== null
+                ? { contractHash: graphResult.contractHash }
+                : {}),
+            });
             const layout = buildMigrationGraphLayout(rowModel);
             const activeRef = graphResult.refs.find((ref) => ref.active);
             const treeOutput = renderMigrationGraphTree(layout, {
