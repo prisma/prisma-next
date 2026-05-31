@@ -1,5 +1,10 @@
-import type { Contract } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  type ContractModelBase,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import type {
   CodecDescriptor,
   CodecMeta,
@@ -405,10 +410,16 @@ export function unboundNamespaceWithTables(tables: Record<string, StorageTableIn
   return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, tables });
 }
 
+export function emptySqlTestDomain() {
+  return buildDomainPlaneFromFlat({ models: {} });
+}
+
 export function createTestContract(
-  contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage'>> & {
+  contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage' | 'domain'>> & {
     storageHash?: string;
     profileHash?: string;
+    models?: Record<string, ContractModelBase>;
+    domain?: Contract<SqlStorage>['domain'];
     storage?: Partial<Omit<SqlStorageInput, 'storageHash'>>;
   },
 ): Contract<SqlStorage> {
@@ -428,7 +439,7 @@ export function createTestContract(
           storageHash: storageHashValue,
           namespaces: { __unbound__: SqlUnboundNamespace.instance },
         }),
-    models: rest['models'] ?? {},
+    domain: rest['domain'] ?? buildDomainPlaneFromFlat({ models: rest['models'] ?? {} }),
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},
     extensionPacks: rest['extensionPacks'] ?? {},

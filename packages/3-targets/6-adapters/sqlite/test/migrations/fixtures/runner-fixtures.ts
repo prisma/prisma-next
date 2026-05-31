@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, {
   createMigrationPlan,
@@ -42,7 +47,7 @@ export const contract: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},

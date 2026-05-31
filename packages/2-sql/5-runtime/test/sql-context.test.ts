@@ -1,4 +1,10 @@
-import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  executionHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import { mergeCapabilityMatrices } from '@prisma-next/framework-components/components';
 import type { RuntimeDriverDescriptor } from '@prisma-next/framework-components/execution';
 import {
@@ -29,7 +35,7 @@ const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
   profileHash: profileHash('sha256:test'),
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),

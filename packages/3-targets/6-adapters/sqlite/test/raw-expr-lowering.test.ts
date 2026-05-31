@@ -1,3 +1,4 @@
+import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   ColumnRef,
@@ -39,7 +40,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
 }) as SqliteContract;
 
 function selectWithWhere(whereExpr: import('@prisma-next/sql-relational-core/ast').AnyExpression) {

@@ -135,7 +135,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
         }
       `);
 
-      expect(modelsOf(ir)['Bug']?.storage).toMatchObject({ collection: 'tasks' });
+      expect(modelsOf(ir)['Bug']).toMatchObject({ storage: { collection: 'tasks' } });
     });
 
     it('assembles multiple variants on the base', () => {

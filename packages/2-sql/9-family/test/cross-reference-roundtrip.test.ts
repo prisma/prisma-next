@@ -71,7 +71,7 @@ describe('cross-reference shape round-trip', () => {
 
     expect(serialized.roots.users).toEqual(rootsCrossRef);
     const serializedModels = contractModels(serializer.deserializeContract(serialized) as Contract);
-    expect(serializedModels.User?.relations?.posts?.to).toEqual(relationCrossRef);
-    expect(serializedModels.Post?.base).toEqual(baseCrossRef);
+    expect(serializedModels['User']?.relations?.['posts']?.to).toEqual(relationCrossRef);
+    expect(serializedModels['Post']?.base).toEqual(baseCrossRef);
   });
 });

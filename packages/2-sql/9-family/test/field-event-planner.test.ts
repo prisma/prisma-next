@@ -1,5 +1,5 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
-import { profileHash } from '@prisma-next/contract/types';
+import { buildDomainPlaneFromFlat, profileHash } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -47,7 +47,7 @@ function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage,
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     roots: {},
     capabilities: {},
     extensionPacks: {},

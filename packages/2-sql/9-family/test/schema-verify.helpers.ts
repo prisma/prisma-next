@@ -4,6 +4,7 @@
 
 import {
   asNamespaceId,
+  buildDomainPlaneFromFlat,
   type ColumnDefault,
   type Contract,
   profileHash,
@@ -52,7 +53,7 @@ export function createTestContract(
       },
       ...ifDefined('types', storageTypes),
     }),
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     capabilities: {},
     meta: {},
     extensionPacks,

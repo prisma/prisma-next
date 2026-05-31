@@ -42,6 +42,10 @@ function domainNamespacesOf(contract: DomainContractInput): DomainPlane['namespa
   return contract.domain.namespaces;
 }
 
+function isLegacyFlatDomainRoot(contract: DomainContractInput): contract is LegacyFlatDomainRoot {
+  return domainNamespacesOf(contract) === undefined;
+}
+
 export function contractModels(contract: DomainContractInput): Record<string, ContractModelBase> {
   const namespaces = domainNamespacesOf(contract);
   if (namespaces !== undefined) {
@@ -51,7 +55,10 @@ export function contractModels(contract: DomainContractInput): Record<string, Co
     }
     return merged;
   }
-  return contract.models ?? {};
+  if (isLegacyFlatDomainRoot(contract)) {
+    return contract.models ?? {};
+  }
+  return {};
 }
 
 export function contractValueObjects(
@@ -68,7 +75,10 @@ export function contractValueObjects(
     }
     return any ? merged : undefined;
   }
-  return contract.valueObjects;
+  if (isLegacyFlatDomainRoot(contract)) {
+    return contract.valueObjects;
+  }
+  return undefined;
 }
 
 export function buildDomainPlaneFromFlat(params: {
