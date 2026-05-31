@@ -239,6 +239,137 @@ The arrow-in-lane carries the three merge rows and three add rows with no colour
 ○   ∅
 ```
 
+## wide-fan — pure divergence, no reconvergence
+
+One contract (`ef9de27`) with N children that never reconverge — each child is its own
+tip. This is the mirror of `converging-branches`: instead of a convergence node at the
+top fanning down, there is no top node at all — N separate tips each open a lane, and all
+N lanes **merge down into the shared parent** at the bottom (one merge connector, no branch
+connector). Tips stack newest-first (col 0 = newest); the divergence reads as the lanes
+coming together into `ef9de27`.
+
+```
+○             b01f4d9
+│↑            add_settings        ef9de27 → b01f4d9
+│ ○           becd3f1
+│ │↑          add_category        ef9de27 → becd3f1
+│ │ ○         6656a6e
+│ │ │↑        add_avatar          ef9de27 → 6656a6e
+│ │ │ ○       a94b7b4
+│ │ │ │↑      add_posts           ef9de27 → a94b7b4
+│ │ │ │ ○     73e3abe
+│ │ │ │ │↑    add_phone           ef9de27 → 73e3abe
+├─┴─┴─┴─╯
+○             ef9de27
+│↑            init                ∅ → ef9de27
+○             ∅
+```
+
+## sub-branches — nested divergence, lanes reused
+
+`ef9de27` diverges to `{73e3abe, 6656a6e}`, and `73e3abe` itself diverges to
+`{a94b7b4, 3ee5d20}`. Because each divergence's child-lanes merge back into their own
+parent (not into each other), the **same two lanes are reused** for both fans — no extra
+width. Each fan is a merge connector above its divergence node, exactly like `wide-fan`,
+just stacked.
+
+```
+○       a94b7b4
+│↑      add_posts            73e3abe → a94b7b4
+│ ○     3ee5d20
+│ │↑    add_bio              73e3abe → 3ee5d20
+├─╯
+○       73e3abe
+│↑      add_phone            ef9de27 → 73e3abe
+│ ○     6656a6e
+│ │↑    add_avatar           ef9de27 → 6656a6e
+├─╯
+○       ef9de27
+│↑      init                 ∅ → ef9de27
+○       ∅
+```
+
+## diamond-sub-branch — a diamond with a leaf spur off one arm
+
+The lower diamond is the familiar `73e3abe`/`6656a6e → 3b2d98d` shape (lanes 0/1). One arm,
+`6656a6e`, *also* diverges into a leaf spur (`bob_experiment → becd3f1 → b01f4d9`), so
+`6656a6e` is both a diamond arm **and** a divergence: its `merge_bob` lane (1) and its spur
+lane (2) merge into it. The spur takes a third lane that opens at its tip `b01f4d9` and
+closes at `6656a6e`.
+
+```
+○         3b2d98d
+├─╮
+│↑│       merge_alice        73e3abe → 3b2d98d
+│ │↑      merge_bob          6656a6e → 3b2d98d
+○ │       73e3abe
+│↑│       alice_add_phone    ef9de27 → 73e3abe
+│ │ ○     b01f4d9
+│ │ │↑    bob_experiment_2   becd3f1 → b01f4d9
+│ │ ○     becd3f1
+│ │ │↑    bob_experiment     6656a6e → becd3f1
+│ ├─╯
+│ ○       6656a6e
+│ │↑      bob_add_avatar     ef9de27 → 6656a6e
+├─╯
+○         ef9de27
+│↑        init               ∅ → ef9de27
+○         ∅
+```
+
+## complex — divergence + diamond + spine + a leaf tip
+
+`ef9de27` diverges three ways: into the diamond arms (`73e3abe`, `6656a6e`, which reconverge
+at `3b2d98d`) and into a standalone leaf tip `a94b7b4` (`staging_posts`). Above the diamond,
+a linear spine continues (`3b2d98d → 0276f92 → cd5c15b`). The leaf tip sits low — where it
+topologically belongs, one edge above the divergence — so its lane (2) is short, exactly
+like `kitchen-sink`'s short branch. All three lanes merge into `ef9de27`.
+
+```
+○         cd5c15b
+│↑        add_tags           0276f92 → cd5c15b
+○         0276f92
+│↑        add_comments       3b2d98d → 0276f92
+○         3b2d98d
+├─╮
+│↑│       merge_alice        73e3abe → 3b2d98d
+│ │↑      merge_bob          6656a6e → 3b2d98d
+○ │       73e3abe
+│↑│       alice_add_phone    ef9de27 → 73e3abe
+│ ○       6656a6e
+│ │↑      bob_add_avatar     ef9de27 → 6656a6e
+│ │ ○     a94b7b4
+│ │ │↑    staging_posts      ef9de27 → a94b7b4
+├─┴─╯
+○         ef9de27
+│↑        init               ∅ → ef9de27
+○         ∅
+```
+
+## multi-edge — parallel migrations between one pair
+
+Several migrations can connect the **same two contracts** — same `from`, same `to`. This is a
+multigraph edge, *not* a divergence and *not* a convergence: it happens when more than one
+migration independently produces the same resulting contract from the same starting contract
+(e.g. two developers each author a migration `aaaaaaa → bbbbbbb`). The real world is messy.
+
+Each migration is still its own row (rule 3), and because every one connects the same adjacent
+pair, each is a plain `│↑` (rule 7) — they **stack in the one lane, no fan**. A fan would be
+wrong: the edges do not branch (one source) and do not merge (one target). Order follows the
+same recency ordering the flat list uses (newest first; descending `dirName` in this example).
+
+```
+○   bbbbbbb
+│↑  variant_c            aaaaaaa → bbbbbbb
+│↑  variant_b            aaaaaaa → bbbbbbb
+│↑  variant_a            aaaaaaa → bbbbbbb
+○   aaaaaaa
+│↑  init                 ∅ → aaaaaaa
+○   ∅
+```
+
+(The `multi-branch` fixture is the real-world instance: four migrations `3ee5d20 → bdc08a6`.)
+
 ## cross-link — nonlinear forward history
 
 `A→B→C`, `A→D→E`, plus a cross edge `B→E`. `B` diverges (to `C` and `E`); `E`
@@ -320,6 +451,15 @@ back-lanes; each tees off its source node and lands across the gutter into its t
 │↑        init                ∅ → ef9de27
 ○         ∅
 ```
+
+### multi-rollback-branch — divergence + a node-skipping rollback (composed, deferred)
+
+This fixture composes a nested divergence (`73e3abe → {a94b7b4, 3ee5d20→0276f92→cd5c15b}`)
+with a back edge `0276f92 → 73e3abe` that skips `3ee5d20` — a routed back-arc teeing off
+`0276f92` and landing across the gutter into `73e3abe`. Because it needs **both** the
+generalised divergence allocator *and* the routed-arc machinery, its full rendering is
+deferred until both land; the divergence half is captured by `sub-branches` above and the
+arc half by `skip-rollback`.
 
 ## disjoint forest (the real world is messy)
 
