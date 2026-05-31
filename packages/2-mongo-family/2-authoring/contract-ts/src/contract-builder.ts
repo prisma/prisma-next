@@ -522,19 +522,27 @@ type MaybeValueObjectsSection<ValueObjects extends Record<string, AnyValueObject
         readonly valueObjects: ContractValueObjectsFromRecord<ValueObjects>;
       };
 
-type MongoContractBaseFromDefinition<Definition> = Simplify<
+type MongoDomainNamespaceFromDefinition<Definition> = Simplify<
   {
-    readonly target: DefinitionTargetId<Definition>;
-    readonly targetFamily: DefinitionFamilyId<Definition>;
-    readonly roots: DefinitionRoots<Definition>;
     readonly models: ContractModelsFromRecord<DefinitionModels<Definition>>;
-    readonly storage: DefinitionStorage<Definition>;
-    readonly capabilities: Record<string, never>;
-    readonly extensionPacks: DefinitionExtensionPacks<Definition>;
-    readonly profileHash: ProfileHashBase<string>;
-    readonly meta: Record<string, never>;
   } & MaybeValueObjectsSection<DefinitionValueObjects<Definition>>
 >;
+
+type MongoContractBaseFromDefinition<Definition> = Simplify<{
+  readonly target: DefinitionTargetId<Definition>;
+  readonly targetFamily: DefinitionFamilyId<Definition>;
+  readonly roots: DefinitionRoots<Definition>;
+  readonly domain: {
+    readonly namespaces: {
+      readonly [K in typeof UNBOUND_NAMESPACE_ID]: MongoDomainNamespaceFromDefinition<Definition>;
+    };
+  };
+  readonly storage: DefinitionStorage<Definition>;
+  readonly capabilities: Record<string, never>;
+  readonly extensionPacks: DefinitionExtensionPacks<Definition>;
+  readonly profileHash: ProfileHashBase<string>;
+  readonly meta: Record<string, never>;
+}>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
@@ -1551,8 +1559,14 @@ function buildContractFromDefinition<
     target: definition.target.targetId,
     targetFamily: definition.family.familyId,
     roots,
-    models: builtModels,
-    ...(Object.keys(builtValueObjects).length > 0 ? { valueObjects: builtValueObjects } : {}),
+    domain: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          models: builtModels,
+          ...(Object.keys(builtValueObjects).length > 0 ? { valueObjects: builtValueObjects } : {}),
+        },
+      },
+    },
     storage,
     capabilities,
     extensionPacks: definition.extensionPacks ?? {},

@@ -75,7 +75,7 @@ export type RootModelName<
   TContract extends MongoContract,
   RootName extends keyof TContract['roots'] & string,
 > = TContract['roots'][RootName] extends { readonly model: infer M extends string }
-  ? M & keyof TContract['models']
+  ? M & keyof import('@prisma-next/contract/types').ContractModelsMap<TContract>
   : never;
 
 export type MongoTypeMaps<

@@ -1,3 +1,4 @@
+import { normalizeLegacyDomainRoot } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import {
@@ -86,7 +87,11 @@ export abstract class MongoContractSerializerBase<TContract>
    */
   protected parseMongoContractStructure(json: unknown): MongoContract {
     const schema = this.contractSchema ?? MongoContractSchema;
-    const parsed = schema(json);
+    const normalized =
+      typeof json === 'object' && json !== null
+        ? normalizeLegacyDomainRoot(json as Record<string, unknown>)
+        : json;
+    const parsed = schema(normalized);
     if (parsed instanceof arktypeType.errors) {
       throw new Error(`Contract structural validation failed: ${parsed.summary}`);
     }
