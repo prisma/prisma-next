@@ -837,11 +837,9 @@ describe('buildMigrationGraphLayout', () => {
     );
   });
 
-  // Locked target for the routed-back-arc feature (`mockups.md` § routed arcs). A
-  // node-skipping rollback tees off its source node (`○─╮`), runs a back-lane down
+  // A node-skipping rollback tees off its source node (`○─╮`), runs a back-lane down
   // past the intervening node, and lands in its target (`○◂╯`). The rollback row sits
-  // immediately below its source so the tee connects. `it.fails` until routing lands;
-  // the implementer flips this to `it` once the layout produces the arc.
+  // immediately below its source so the tee connects. See `mockups.md` § routed arcs.
   it('routes a node-skipping rollback as a back-arc per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPhone = edge('aaa', 'bbb', 'add_phone');
