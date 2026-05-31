@@ -202,9 +202,8 @@ export interface MigrationPlan {
    * `options.space` against `plan.spaceId` so the marker row gets keyed
    * by the right space when applying via {@link MigrationRunner.execute}.
    *
-   * Optional for backward compatibility with single-space callers that
-   * pre-date the contract-space aggregate; when present, runners
-   * enforce that it matches `options.space`.
+   * Optional because not every plan carries a space id; when present,
+   * runners enforce that it matches `options.space`.
    */
   readonly spaceId?: string;
   /**
@@ -451,8 +450,8 @@ export interface MigrationPlanner<
  *
  * Each entry's `driver` must reference the same connection the outer
  * transaction is opened on (typically the same value as the top-level
- * `driver` on `execute`). A single-space apply passes a one-element
- * `perSpaceOptions` list.
+ * `driver` on `execute`). An apply that targets one space passes a
+ * one-element `perSpaceOptions` list.
  *
  * Family-specific runners (e.g. the SQL family's `SqlMigrationRunner`) define
  * a richer per-space option shape that is structurally compatible with this

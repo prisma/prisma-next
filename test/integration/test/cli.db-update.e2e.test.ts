@@ -309,7 +309,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(applyOutput).toContain('Applied');
           // M6 T6.5/T6.6: `Signature:` was renamed to per-space `marker:`
-          // (or `App-space marker:` in single-space fallback).
+          // (or `App-space marker:` when only the app space is present).
           expect(applyOutput).toMatch(/marker:/);
 
           // Verify slug column exists in database

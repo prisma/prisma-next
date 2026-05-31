@@ -82,8 +82,8 @@ export class MongoMigrationRunner {
     const { commandExecutor, inspectionExecutor, adapter, driver, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
     // Plans produced by the contract-space-aware planner stamp `spaceId`
-    // onto the plan; pre-port single-space callers leave it absent and
-    // fall through to the application's well-known space.
+    // onto the plan; plans without one fall through to the application's
+    // well-known space.
     const space = options.plan.spaceId ?? APP_SPACE_ID;
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, operations);
@@ -203,11 +203,11 @@ export class MongoMigrationRunner {
 
     if (!isNoOp) {
       const liveSchema = await this.deps.introspectSchema();
-      // In a multi-space aggregate the live database holds collections
-      // owned by sibling spaces; the target descriptor's aggregate `execute`
-      // injects a `projectSchema` that strips them so per-space verify
-      // only checks the slice this contract claims. Single-space
-      // callers leave the projection identity (no-op).
+      // When an aggregate spans more than one space the live database
+      // holds collections owned by sibling spaces; the target descriptor's
+      // `execute` injects a `projectSchema` that strips them so per-space
+      // verify only checks the slice this contract claims. Callers that
+      // don't project leave the projection identity (no-op).
       const verifySchema = options.projectSchema ? options.projectSchema(liveSchema) : liveSchema;
       const verifyResult = verifyMongoSchema({
         contract: options.destinationContract,

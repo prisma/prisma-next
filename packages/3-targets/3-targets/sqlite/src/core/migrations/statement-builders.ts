@@ -80,7 +80,7 @@ export interface WriteMarkerInput {
    * Logical space identifier for this marker row. Required at every
    * call site so the type system surfaces every place that needs to
    * thread the value (rather than letting an `?? APP_SPACE_ID`
-   * fall-through silently collapse multi-space markers onto the
+   * fall-through silently collapse per-space markers onto the
    * `'app'` row). App-plan callers pass {@link APP_SPACE_ID}
    * (`'app'`); per-extension callers pass the extension's space id.
    */

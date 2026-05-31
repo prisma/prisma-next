@@ -299,7 +299,7 @@ describe('Mongo contract-space aggregate e2e', {
       //
       // Non-strict: `instance.schemaVerify` walks the whole live DB
       // at this surface (no per-space projection — that is the
-      // multi-space runner's job, exercised in the happy path
+      // runner's job, exercised in the happy path
       // above). Sibling app-owned collections would otherwise
       // surface as strict-mode extras; non-strict elides those
       // warnings while genuine drift on a contract-declared index

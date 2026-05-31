@@ -205,7 +205,7 @@ function planFor(contract: MongoContract, fromContract: MongoContract | null) {
   return JSON.parse(serializeMongoOps(ops)) as readonly MongoMigrationPlanOperation[];
 }
 
-describe('mongoTargetDescriptor.execute (multi-space)', {
+describe('mongoTargetDescriptor.execute (across spaces)', {
   timeout: timeouts.spinUpMongoMemoryServer,
 }, () => {
   let replSet: MongoMemoryReplSet;
@@ -295,7 +295,7 @@ describe('mongoTargetDescriptor.execute (multi-space)', {
     }
   });
 
-  it('degenerate single-space invocation succeeds', async () => {
+  it('degenerate one-space invocation succeeds', async () => {
     const runner = makeRunner();
     const appContract = buildAppContract();
     const appOps = planFor(appContract, null);

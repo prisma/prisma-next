@@ -235,7 +235,7 @@ export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
    * pass the extension's space id. Required at every call site so the
    * type system surfaces every place that needs to thread the value
    * (rather than letting an `?? APP_SPACE_ID` fall-through silently
-   * collapse multi-space markers onto the `'app'` row).
+   * collapse per-space markers onto the `'app'` row).
    *
    * @see specs/framework-mechanism.spec.md § 2.
    */
@@ -413,8 +413,8 @@ export interface SqlMigrationRunner<TTargetDetails> {
   /**
    * Apply one or more per-space migration plans, opening and managing the
    * outer transaction (and any target-specific connection-level setup, e.g.
-   * SQLite's `PRAGMA foreign_keys` toggle). A single-space apply passes a
-   * one-element `perSpaceOptions` list.
+   * SQLite's `PRAGMA foreign_keys` toggle). An apply that targets one space
+   * passes a one-element `perSpaceOptions` list.
    *
    * The caller orders the input list (typically via the aggregate planner's
    * `applyOrder`: extensions alphabetical, then app). A failure on any space

@@ -258,7 +258,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
     ).toBeDefined();
   });
 
-  it('mode=plan produces a multi-space plan ordered alphabetically (extensions first, app last)', async () => {
+  it('mode=plan produces a plan across spaces ordered alphabetically (extensions first, app last)', async () => {
     project = await setupTestProject();
 
     const result = await executeDbInit({
