@@ -6,7 +6,20 @@ import type {
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 import type { MongoParamRefMutator } from './param-ref-mutator';
 
-export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
+/**
+ * Per-execute middleware context for Mongo. See {@link MongoMiddleware} for
+ * plan/command lifecycle during `beforeExecute` vs later hooks.
+ */
+export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {
+  /**
+   * Stable digest of `meta.storageHash` plus the **resolved** wire command.
+   * Valid only on post-resolution plans (typically `afterExecute` or intercept
+   * after `resolveParams`). Calling this from `beforeExecute` throws
+   * `RUNTIME.CONTENT_HASH_REQUIRES_RESOLVED_COMMAND` because `plan.command`
+   * is still an unresolved draft at that point.
+   */
+  contentHash(exec: MongoExecutionPlan): Promise<string>;
+}
 
 /**
  * Mongo-domain middleware. Extends the framework `RuntimeMiddleware`
@@ -18,9 +31,20 @@ export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
  * telemetry) — which carry no `familyId` — remain assignable. When
  * present, it must be `'mongo'`; the runtime rejects mismatches at
  * construction time via `checkMiddlewareCompatibility`.
+ *
+ * **Pre-resolve `beforeExecute` contract:** `plan.command` holds the
+ * unresolved `MongoLoweredDraft`, not a wire command. Observe and mutate
+ * parameters via `params.entries()` / `replaceValue` / `replaceValues` only.
+ * Do not inspect `plan.command` structurally or call `ctx.contentHash` in
+ * this hook. After the chain, `resolveParams` produces the frozen wire
+ * command used in `afterExecute` and for `contentHash`.
  */
 export interface MongoMiddleware extends RuntimeMiddleware<MongoExecutionPlan> {
   readonly familyId?: 'mongo';
+  /**
+   * Runs after structural lower, before `resolveParams`. `plan.command` is the
+   * unresolved draft; use `params` for param-ref access, not `plan.command`.
+   */
   beforeExecute?(
     plan: MongoExecutionPlan,
     ctx: MongoMiddlewareContext,

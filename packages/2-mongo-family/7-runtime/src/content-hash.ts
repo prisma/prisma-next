@@ -1,6 +1,35 @@
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { hashContent } from '@prisma-next/utils/hash-content';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
+
+/** @internal */
+export const RUNTIME_CONTENT_HASH_REQUIRES_RESOLVED_COMMAND =
+  'RUNTIME.CONTENT_HASH_REQUIRES_RESOLVED_COMMAND' as const;
+
+/**
+ * Resolved wire commands are frozen class instances (`InsertOneWireCommand`, …);
+ * pre-resolve `beforeExecute` plans hold a plain-object `MongoLoweredDraft` in the
+ * command slot. O(1) prototype check — no tree walk on the hot path.
+ */
+function isResolvedMongoWireCommand(command: unknown): boolean {
+  if (command === null || typeof command !== 'object') {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(command);
+  return proto !== null && proto !== Object.prototype;
+}
+
+function assertContentHashOnResolvedCommand(command: unknown): void {
+  if (isResolvedMongoWireCommand(command)) {
+    return;
+  }
+  throw runtimeError(
+    RUNTIME_CONTENT_HASH_REQUIRES_RESOLVED_COMMAND,
+    'contentHash and computeMongoContentHash are only valid on a resolved wire command (after param resolution, e.g. from afterExecute). During beforeExecute, plan.command holds an unresolved MongoLoweredDraft — use params.entries() and the param mutator instead of contentHash or structural reads of plan.command.',
+    { phase: 'beforeExecute' },
+  );
+}
 
 /**
  * Computes a stable content hash for a lowered Mongo execution plan.
@@ -36,14 +65,14 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  * bounded, opaque digest. See `@prisma-next/utils/hash-content` for the
  * rationale.
  *
+ * @throws {RuntimeErrorEnvelope} {@link RUNTIME_CONTENT_HASH_REQUIRES_RESOLVED_COMMAND}
+ * when `exec.command` is still a pre-resolve draft (plain object), e.g. when
+ * `contentHash` is called from `beforeExecute`.
+ *
  * @internal
  */
 export function computeMongoContentHash(exec: MongoExecutionPlan): Promise<string> {
-  // Spread `exec.command` to a plain object: `canonicalStringify`
-  // rejects class instances by design (so `Map`/`Set`/class instances
-  // cannot collapse to `{}` and silently collide). All wire-command
-  // data lives on own enumerable properties, so this preserves the
-  // same canonical form and therefore the same hash.
+  assertContentHashOnResolvedCommand(exec.command);
   return hashContent(
     canonicalStringify({
       storageHash: exec.meta.storageHash,

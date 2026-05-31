@@ -51,9 +51,11 @@ export type MongoParamRefEntryUnion<TCodecMap extends Record<string, unknown>> =
  * `replaceValue` overload enforce this at compile time.
  *
  * `entries()` performs a flat walk over the `MongoLoweredDraft` tree via
- * `flattenMongoParamRefs`, yielding every `MongoParamRef` leaf in document
- * fields, array elements, filter predicates, update operators, and pipeline
- * stages.
+ * {@link flattenMongoParamRefs}, yielding every `MongoParamRef` leaf in
+ * document fields, array elements, filter predicates, update operators, and
+ * pipeline stages. The walk matches `resolveDraftSlot` in the Mongo adapter
+ * (plain-object and array slots only; `Date` and other non-plain objects are
+ * leaves in both paths).
  *
  * Allocation discipline: the working-overrides map is only allocated on the
  * first `replaceValue` / `replaceValues` call. If no middleware mutates,
@@ -99,6 +101,9 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 // ─── Internal tree-walk helpers ────────────────────────────────────────────
+// Descent mirrors resolveDraftSlot in adapter-mongo/resolve-value.ts: recurse
+// arrays and plain records; treat MongoParamRef, primitives, Date, and other
+// non-plain objects as leaves.
 
 function* flattenDraftSlot(value: unknown): Generator<MongoParamRef> {
   if (value instanceof MongoParamRef) {
@@ -123,6 +128,11 @@ function* flattenDraftSlot(value: unknown): Generator<MongoParamRef> {
  * regardless of nesting — object values, array elements, filter predicate
  * values, update operator values, and pipeline stage values. Raw command
  * variants carry no `MongoParamRef` nodes so they yield zero entries.
+ *
+ * **Walk parity:** slot traversal matches `resolveDraftSlot` / `resolveParams`
+ * — refs appear only in plain-object and array containers; `Date` and other
+ * non-plain objects are leaves (not descended into), so middleware sees every
+ * ref the resolve pass will encode.
  */
 export function* flattenMongoParamRefs(draft: MongoLoweredDraft): Generator<MongoParamRef> {
   switch (draft.kind) {

@@ -2,7 +2,7 @@ import type { PlanMeta } from '@prisma-next/contract/types';
 import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
+import { AggregateWireCommand, type AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   MongoExecutionContext,
@@ -28,7 +28,8 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
       }),
     ),
     resolveParams: vi.fn(
-      async (): Promise<AnyMongoWireCommand> => ({}) as unknown as AnyMongoWireCommand,
+      async (draft: MongoLoweredDraft): Promise<AnyMongoWireCommand> =>
+        new AggregateWireCommand(draft.collection, []),
     ),
   };
   const target: MongoRuntimeTargetDescriptor<'mongo'> = {
