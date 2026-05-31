@@ -128,7 +128,7 @@ describe('renderMigrationGraphTree', () => {
     const mergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
     expect(tree([init, alice, bob, mergeAlice, mergeBob])).toBe(
       [
-        '○     3b2d98d',
+        '○   3b2d98d',
         '├─╮',
         '│↑│   merge_alice        73e3abe → 3b2d98d',
         '│ │↑  merge_bob          6656a6e → 3b2d98d',
@@ -154,7 +154,7 @@ describe('renderMigrationGraphTree', () => {
     const mergeAvatar = edge('6656a6e', '3116048', 'merge_avatar');
     expect(tree([init, addPhone, addPosts, addAvatar, mergePhone, mergePosts, mergeAvatar])).toBe(
       [
-        '○       3116048',
+        '○   3116048',
         '├─┬─╮',
         '│↑│ │   merge_phone      73e3abe → 3116048',
         '│ │↑│   merge_posts      a94b7b4 → 3116048',
@@ -230,7 +230,7 @@ describe('renderMigrationGraphTree', () => {
         },
       ),
     ).toMatchInlineSnapshot(`
-      "○     cd5c15b            (main, contract)
+      "○   cd5c15b              (main, contract)
       ├─╮
       │↑│   merge_2a           0276f92 → cd5c15b
       │ │↑  merge_2b           a94b7b4 → cd5c15b
@@ -239,7 +239,7 @@ describe('renderMigrationGraphTree', () => {
       │ ○   a94b7b4
       │ │↑  add_posts_branch   3b2d98d → a94b7b4
       ├─╯
-      ○     3b2d98d
+      ○   3b2d98d
       ├─╮
       │↑│   merge_alice        73e3abe → 3b2d98d
       │ │↑  merge_bob          6656a6e → 3b2d98d
