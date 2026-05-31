@@ -6,9 +6,6 @@ import {
   type CreateTableColumn,
 } from '../ast/types';
 
-export type { ColumnDefault, ColumnType, CreateTableColumn };
-export { CreateSchemaAst, CreateTableAst };
-
 /**
  * Constructs a `CREATE SCHEMA [IF NOT EXISTS] <name>` AST node.
  *
@@ -66,14 +63,19 @@ export function col(
   return descriptor;
 }
 
-/** Literal-value column default (e.g. `'app'`, `'{}'`, `'[]'`). */
+/** Literal-value column default (e.g. the app space id). */
 export function lit(value: string): { readonly kind: 'literal'; readonly value: string } {
   return { kind: 'literal', value };
 }
 
-/** Current-timestamp column default (`now()` / `datetime('now')`). */
+/** Current-timestamp column default (`now()` / `datetime('now')` via renderer). */
 export function now(): { readonly kind: 'now' } {
   return { kind: 'now' };
+}
+
+/** Empty array/JSON collection default (dialect-specific literal via renderer). */
+export function emptyCollection(): { readonly kind: 'empty-collection' } {
+  return { kind: 'empty-collection' };
 }
 
 function parseTableName(name: string): { schema?: string; name: string } {

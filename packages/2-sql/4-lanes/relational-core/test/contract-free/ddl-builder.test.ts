@@ -1,6 +1,13 @@
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
-import { col, createSchema, createTable, lit, now } from '../../src/contract-free/ddl';
+import {
+  col,
+  createSchema,
+  createTable,
+  emptyCollection,
+  lit,
+  now,
+} from '../../src/contract-free/ddl';
 import { CreateSchemaAst, CreateTableAst } from '../../src/exports/ast';
 
 describe('createSchema', () => {
@@ -122,8 +129,19 @@ describe('now', () => {
   });
 });
 
-describe('Postgres marker table via builder', () => {
-  it('constructs the marker table AST matching the Postgres DDL shape', () => {
+describe('emptyCollection', () => {
+  it('produces an empty-collection ColumnDefault', () => {
+    expect(emptyCollection()).toEqual({ kind: 'empty-collection' });
+  });
+
+  it('is accepted as a column default by col', () => {
+    const c = col('invariants', 'text-array', { notNull: true, default: emptyCollection() });
+    expect(c.default).toEqual({ kind: 'empty-collection' });
+  });
+});
+
+describe('marker table via builder', () => {
+  it('constructs one neutral-descriptor AST for control-table bootstrap', () => {
     const ast = createTable(
       'prisma_contract.marker',
       [
@@ -138,8 +156,8 @@ describe('Postgres marker table via builder', () => {
         col('canonical_version', 'int'),
         col('updated_at', 'timestamptz', { notNull: true, default: now() }),
         col('app_tag', 'text'),
-        col('meta', 'jsonb', { notNull: true, default: lit('{}') }),
-        col('invariants', 'text-array', { notNull: true, default: lit('{}') }),
+        col('meta', 'jsonb', { notNull: true, default: emptyCollection() }),
+        col('invariants', 'text-array', { notNull: true, default: emptyCollection() }),
       ],
       { ifNotExists: true },
     );
@@ -160,18 +178,24 @@ describe('Postgres marker table via builder', () => {
       notNull: true,
       default: { kind: 'now' },
     });
+    expect(ast.columns[7]).toMatchObject({
+      name: 'meta',
+      type: 'jsonb',
+      notNull: true,
+      default: { kind: 'empty-collection' },
+    });
     expect(ast.columns[8]).toMatchObject({
       name: 'invariants',
       type: 'text-array',
       notNull: true,
-      default: { kind: 'literal', value: '{}' },
+      default: { kind: 'empty-collection' },
     });
     expect(ast.collectParamRefs()).toEqual([]);
   });
 });
 
-describe('Postgres ledger table via builder', () => {
-  it('constructs the ledger table AST matching the Postgres DDL shape', () => {
+describe('ledger table via builder', () => {
+  it('constructs one neutral-descriptor AST for control-table bootstrap', () => {
     const ast = createTable(
       'prisma_contract.ledger',
       [
@@ -191,66 +215,12 @@ describe('Postgres ledger table via builder', () => {
     expect(ast.table).toEqual({ schema: 'prisma_contract', name: 'ledger' });
     expect(ast.columns).toHaveLength(9);
     expect(ast.columns[0]).toMatchObject({ name: 'id', type: 'bigserial', primaryKey: true });
-    expect(ast.collectParamRefs()).toEqual([]);
-  });
-});
-
-describe('SQLite marker table via builder', () => {
-  it('constructs the marker table AST matching the SQLite DDL shape', () => {
-    const ast = createTable(
-      '_prisma_marker',
-      [
-        col('space', 'text', {
-          notNull: true,
-          primaryKey: true,
-          default: lit(APP_SPACE_ID),
-        }),
-        col('core_hash', 'text', { notNull: true }),
-        col('profile_hash', 'text', { notNull: true }),
-        col('contract_json', 'text'),
-        col('canonical_version', 'int'),
-        col('updated_at', 'text', { notNull: true, default: now() }),
-        col('app_tag', 'text'),
-        col('meta', 'text', { notNull: true, default: lit('{}') }),
-        col('invariants', 'text', { notNull: true, default: lit('[]') }),
-      ],
-      { ifNotExists: true },
-    );
-
-    expect(ast.table).toEqual({ name: '_prisma_marker' });
-    expect(ast.table.schema).toBeUndefined();
-    expect(ast.columns).toHaveLength(9);
-    expect(ast.columns[8]).toMatchObject({
-      name: 'invariants',
-      type: 'text',
+    expect(ast.columns[1]).toMatchObject({
+      name: 'created_at',
+      type: 'timestamptz',
       notNull: true,
-      default: { kind: 'literal', value: '[]' },
+      default: { kind: 'now' },
     });
-    expect(ast.collectParamRefs()).toEqual([]);
-  });
-});
-
-describe('SQLite ledger table via builder', () => {
-  it('constructs the ledger table AST matching the SQLite DDL shape', () => {
-    const ast = createTable(
-      '_prisma_ledger',
-      [
-        col('id', 'bigserial', { primaryKey: true }),
-        col('created_at', 'text', { notNull: true, default: now() }),
-        col('origin_core_hash', 'text'),
-        col('origin_profile_hash', 'text'),
-        col('destination_core_hash', 'text', { notNull: true }),
-        col('destination_profile_hash', 'text'),
-        col('contract_json_before', 'text'),
-        col('contract_json_after', 'text'),
-        col('operations', 'text', { notNull: true }),
-      ],
-      { ifNotExists: true },
-    );
-
-    expect(ast.table).toEqual({ name: '_prisma_ledger' });
-    expect(ast.columns).toHaveLength(9);
-    expect(ast.columns[0]).toMatchObject({ name: 'id', type: 'bigserial', primaryKey: true });
     expect(ast.collectParamRefs()).toEqual([]);
   });
 });

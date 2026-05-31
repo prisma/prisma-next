@@ -1823,27 +1823,24 @@ export class DeleteAst extends QueryAst {
 /**
  * Dialect-neutral column type used in {@link CreateTableColumn}.
  *
- * Renderers map these to dialect-specific SQL types:
- * - `text` → `text` (Postgres) / `TEXT` (SQLite)
- * - `text-array` → `text[]` (Postgres) / `TEXT` (SQLite, stored as JSON)
- * - `jsonb` → `jsonb` (Postgres) / `TEXT` (SQLite, stored as JSON)
- * - `int` → `int` (Postgres) / `INTEGER` (SQLite)
- * - `bigserial` → `bigserial` (Postgres) / `INTEGER` with AUTOINCREMENT (SQLite)
- * - `timestamptz` → `timestamptz` (Postgres) / `TEXT` (SQLite, ISO-8601)
+ * These names are target-agnostic; per-dialect SQL types are chosen in the
+ * adapter renderer (e.g. Postgres `text[]` / `jsonb` / `timestamptz` /
+ * `bigserial`, SQLite `TEXT` / `INTEGER` with AUTOINCREMENT).
  */
 export type ColumnType = 'text' | 'text-array' | 'jsonb' | 'int' | 'bigserial' | 'timestamptz';
 
 /**
  * Dialect-neutral column default intent used in {@link CreateTableColumn}.
  *
- * - `literal` — a SQL literal baked into the DDL (e.g. `'app'`, `'{}'`, `'[]'`).
- *   Renderers emit it as-is; no dialect adjustment needed.
- * - `now` — current-timestamp default. Postgres renders `now()`;
- *   SQLite renders `(datetime('now'))`.
+ * - `literal` — a fixed SQL literal (e.g. the app space id).
+ * - `now` — current timestamp (`now()` / `datetime('now')` in the renderer).
+ * - `empty-collection` — empty array or JSON collection; the renderer maps to
+ *   dialect-specific literals (e.g. Postgres `'{}'`, SQLite `'[]'`).
  */
 export type ColumnDefault =
   | { readonly kind: 'literal'; readonly value: string }
-  | { readonly kind: 'now' };
+  | { readonly kind: 'now' }
+  | { readonly kind: 'empty-collection' };
 
 /**
  * Descriptor for a single column in a {@link CreateTableAst} node.
@@ -1920,11 +1917,9 @@ export class CreateTableAst extends QueryAst {
     );
     this.ifNotExists = ifNotExists;
     this.columns = Object.freeze(
-      columns.map((c) => {
+      columns.map((c): CreateTableColumn => {
         const d = c.default !== undefined ? Object.freeze({ ...c.default }) : undefined;
-        return Object.freeze(
-          d !== undefined ? { ...c, default: d } : { ...c },
-        ) as CreateTableColumn;
+        return Object.freeze(d !== undefined ? { ...c, default: d } : { ...c });
       }),
     );
     this.freeze();

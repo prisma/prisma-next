@@ -127,7 +127,7 @@ describe('AnyQueryAst DDL exhaustiveness', () => {
 });
 
 describe('CreateTableAst — marker + ledger column shapes', () => {
-  it('expresses the Postgres marker table column set', () => {
+  it('expresses the marker table with neutral column descriptors', () => {
     const ast = CreateTableAst.of(
       { schema: 'prisma_contract', name: 'marker' },
       [
@@ -144,12 +144,17 @@ describe('CreateTableAst — marker + ledger column shapes', () => {
         { name: 'canonical_version', type: 'int' },
         { name: 'updated_at', type: 'timestamptz', notNull: true, default: { kind: 'now' } },
         { name: 'app_tag', type: 'text' },
-        { name: 'meta', type: 'jsonb', notNull: true, default: { kind: 'literal', value: '{}' } },
+        {
+          name: 'meta',
+          type: 'jsonb',
+          notNull: true,
+          default: { kind: 'empty-collection' },
+        },
         {
           name: 'invariants',
           type: 'text-array',
           notNull: true,
-          default: { kind: 'literal', value: '{}' },
+          default: { kind: 'empty-collection' },
         },
       ],
       { ifNotExists: true },
@@ -157,11 +162,20 @@ describe('CreateTableAst — marker + ledger column shapes', () => {
 
     expect(ast.columns).toHaveLength(9);
     expect(ast.columns[0]).toMatchObject({ name: 'space', type: 'text', primaryKey: true });
-    expect(ast.columns[5]).toMatchObject({ name: 'updated_at', default: { kind: 'now' } });
+    expect(ast.columns[5]).toMatchObject({
+      name: 'updated_at',
+      type: 'timestamptz',
+      default: { kind: 'now' },
+    });
+    expect(ast.columns[8]).toMatchObject({
+      name: 'invariants',
+      type: 'text-array',
+      default: { kind: 'empty-collection' },
+    });
     expect(ast.collectParamRefs()).toEqual([]);
   });
 
-  it('expresses the Postgres ledger table column set', () => {
+  it('expresses the ledger table with neutral column descriptors', () => {
     const ast = CreateTableAst.of(
       { schema: 'prisma_contract', name: 'ledger' },
       [
@@ -174,66 +188,6 @@ describe('CreateTableAst — marker + ledger column shapes', () => {
         { name: 'contract_json_before', type: 'jsonb' },
         { name: 'contract_json_after', type: 'jsonb' },
         { name: 'operations', type: 'jsonb', notNull: true },
-      ],
-      { ifNotExists: true },
-    );
-
-    expect(ast.columns).toHaveLength(9);
-    expect(ast.columns[0]).toMatchObject({ name: 'id', type: 'bigserial', primaryKey: true });
-    expect(ast.collectParamRefs()).toEqual([]);
-  });
-
-  it('expresses the SQLite marker table column set', () => {
-    const ast = CreateTableAst.of(
-      { name: '_prisma_marker' },
-      [
-        {
-          name: 'space',
-          type: 'text',
-          notNull: true,
-          primaryKey: true,
-          default: { kind: 'literal', value: APP_SPACE_ID },
-        },
-        { name: 'core_hash', type: 'text', notNull: true },
-        { name: 'profile_hash', type: 'text', notNull: true },
-        { name: 'contract_json', type: 'text' },
-        { name: 'canonical_version', type: 'int' },
-        { name: 'updated_at', type: 'text', notNull: true, default: { kind: 'now' } },
-        { name: 'app_tag', type: 'text' },
-        {
-          name: 'meta',
-          type: 'text',
-          notNull: true,
-          default: { kind: 'literal', value: '{}' },
-        },
-        {
-          name: 'invariants',
-          type: 'text',
-          notNull: true,
-          default: { kind: 'literal', value: '[]' },
-        },
-      ],
-      { ifNotExists: true },
-    );
-
-    expect(ast.columns).toHaveLength(9);
-    expect(ast.columns[0]).toMatchObject({ name: 'space', type: 'text', primaryKey: true });
-    expect(ast.collectParamRefs()).toEqual([]);
-  });
-
-  it('expresses the SQLite ledger table column set', () => {
-    const ast = CreateTableAst.of(
-      { name: '_prisma_ledger' },
-      [
-        { name: 'id', type: 'bigserial', primaryKey: true },
-        { name: 'created_at', type: 'text', notNull: true, default: { kind: 'now' } },
-        { name: 'origin_core_hash', type: 'text' },
-        { name: 'origin_profile_hash', type: 'text' },
-        { name: 'destination_core_hash', type: 'text', notNull: true },
-        { name: 'destination_profile_hash', type: 'text' },
-        { name: 'contract_json_before', type: 'text' },
-        { name: 'contract_json_after', type: 'text' },
-        { name: 'operations', type: 'text', notNull: true },
       ],
       { ifNotExists: true },
     );
