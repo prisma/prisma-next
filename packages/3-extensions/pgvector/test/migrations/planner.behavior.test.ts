@@ -1,5 +1,6 @@
 import {
   asNamespaceId,
+  buildDomainPlaneFromFlat,
   type ColumnDefaultLiteralInputValue,
   type Contract,
   coreHash,
@@ -600,7 +601,7 @@ function createTestContract(
       storageHash: storageHashValue,
     }),
     roots: {},
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

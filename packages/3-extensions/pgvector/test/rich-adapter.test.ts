@@ -1,4 +1,5 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
+import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -70,7 +71,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
 }) as PostgresContract;
 
 describe('Postgres rich AST lowering', () => {
