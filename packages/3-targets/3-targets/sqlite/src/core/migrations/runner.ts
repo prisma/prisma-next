@@ -150,7 +150,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
 
     // FK pragma toggle and the FK integrity check both span the outer
-    // transaction — see `execute(...)` for the full rationale.
+    // transaction: PRAGMA foreign_keys is a no-op inside a transaction, so the
+    // toggle has to wrap BEGIN/COMMIT.
     const fkWasEnabled = await this.readForeignKeysEnabled(driver);
     if (fkWasEnabled) {
       await driver.query('PRAGMA foreign_keys = OFF');

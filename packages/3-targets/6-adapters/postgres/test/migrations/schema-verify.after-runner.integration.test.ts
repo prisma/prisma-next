@@ -87,7 +87,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       perSpaceOptions: [
         {
           space: result.plan.spaceId ?? APP_SPACE_ID,
-
           plan: result.plan,
           driver: d,
           destinationContract: contractInput,

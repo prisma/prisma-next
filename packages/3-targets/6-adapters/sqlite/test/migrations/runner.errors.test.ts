@@ -48,7 +48,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
           plan: emptyPlan,
           driver,
           destinationContract: contract,
@@ -76,7 +75,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: failingPlan.spaceId ?? APP_SPACE_ID,
-
           plan: failingPlan,
           driver,
           destinationContract: contract,
@@ -129,7 +127,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
           plan: emptyPlan,
           driver,
           destinationContract: contract,
@@ -197,7 +194,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: planWithFailingPostcheck.spaceId ?? APP_SPACE_ID,
-
           plan: planWithFailingPostcheck,
           driver,
           destinationContract: contract,
@@ -256,7 +252,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: planWithInvalidSql.spaceId ?? APP_SPACE_ID,
-
           plan: planWithInvalidSql,
           driver,
           destinationContract: contract,
@@ -312,7 +307,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
           plan: emptyPlan,
           driver,
           destinationContract: contract,
@@ -361,7 +355,6 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: APP_SPACE_ID,
-
           plan,
           driver,
           destinationContract: contract,
@@ -417,7 +410,6 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
       perSpaceOptions: [
         {
           space: planWithPolicyViolation.spaceId ?? APP_SPACE_ID,
-
           plan: planWithPolicyViolation,
           driver,
           destinationContract: contract,

@@ -8,8 +8,7 @@ import {
 import {
   APP_SPACE_ID,
   hasMigrations,
-  hasMultiSpaceRunner,
-  type MultiSpaceRunnerPerSpaceOptions,
+  type MigrationRunnerPerSpaceOptions,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
@@ -29,7 +28,7 @@ const ALL_POLICY = {
 
 const EXT_SPACE = 'cipherstash';
 
-type PerSpaceOptions = MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'> & {
+type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'> & {
   readonly strictVerification?: boolean;
 };
 
@@ -41,9 +40,7 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
 
 function makeRunner() {
   if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
-  const runner = mongoTargetDescriptor.migrations.createRunner(makeFamily());
-  if (!hasMultiSpaceRunner(runner)) throw new Error('expected multi-space-capable runner');
-  return runner;
+  return mongoTargetDescriptor.migrations.createRunner(makeFamily());
 }
 
 function buildAppContract(): MongoContract {
@@ -208,7 +205,7 @@ function planFor(contract: MongoContract, fromContract: MongoContract | null) {
   return JSON.parse(serializeMongoOps(ops)) as readonly MongoMigrationPlanOperation[];
 }
 
-describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
+describe('mongoTargetDescriptor.execute (multi-space)', {
   timeout: timeouts.spinUpMongoMemoryServer,
 }, () => {
   let replSet: MongoMemoryReplSet;
@@ -283,7 +280,7 @@ describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
         },
       ];
 
-      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+      const result = await runner.execute({ driver, perSpaceOptions });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('unreachable');
@@ -305,7 +302,7 @@ describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
 
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
-      const result = await runner.executeAcrossSpaces({
+      const result = await runner.execute({
         driver,
         perSpaceOptions: [
           {
@@ -337,7 +334,7 @@ describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
     const runner = makeRunner();
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
-      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions: [] });
+      const result = await runner.execute({ driver, perSpaceOptions: [] });
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('unreachable');
       expect(result.value.perSpaceResults).toEqual([]);
@@ -392,7 +389,7 @@ describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
         },
       ];
 
-      const failingResult = await runner.executeAcrossSpaces({
+      const failingResult = await runner.execute({
         driver,
         perSpaceOptions: failingPerSpaceOptions,
       });
@@ -442,7 +439,7 @@ describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
         },
       ];
 
-      const resumeResult = await runner.executeAcrossSpaces({
+      const resumeResult = await runner.execute({
         driver,
         perSpaceOptions: resumePerSpaceOptions,
       });

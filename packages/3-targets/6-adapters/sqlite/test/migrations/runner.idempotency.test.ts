@@ -73,7 +73,6 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       perSpaceOptions: [
         {
           space: APP_SPACE_ID,
-
           plan,
           driver,
           destinationContract: contract,
@@ -129,7 +128,6 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       perSpaceOptions: [
         {
           space: initPlan.spaceId ?? APP_SPACE_ID,
-
           plan: initPlan,
           driver,
           destinationContract: contract,
@@ -163,7 +161,6 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       perSpaceOptions: [
         {
           space: noOpPlan.spaceId ?? APP_SPACE_ID,
-
           plan: noOpPlan,
           driver,
           destinationContract: contract,
@@ -215,7 +212,6 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       perSpaceOptions: [
         {
           space: initPlan.spaceId ?? APP_SPACE_ID,
-
           plan: initPlan,
           driver,
           destinationContract: contract,
@@ -263,7 +259,6 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       perSpaceOptions: [
         {
           space: selfEdgePlan.spaceId ?? APP_SPACE_ID,
-
           plan: selfEdgePlan,
           driver,
           destinationContract: contract,

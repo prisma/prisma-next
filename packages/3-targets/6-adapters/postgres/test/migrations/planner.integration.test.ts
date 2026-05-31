@@ -63,7 +63,6 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       perSpaceOptions: [
         {
           space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
-
           plan: initialPlan.plan,
           driver: driver!,
           destinationContract: contract,

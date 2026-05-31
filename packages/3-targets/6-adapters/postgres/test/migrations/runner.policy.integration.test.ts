@@ -86,7 +86,6 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
         perSpaceOptions: [
           {
             space: planWithPolicyViolation.spaceId ?? APP_SPACE_ID,
-
             plan: planWithPolicyViolation,
             driver: driver!,
             destinationContract: contract,
@@ -158,7 +157,6 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
         perSpaceOptions: [
           {
             space: planWithDataOp.spaceId ?? APP_SPACE_ID,
-
             plan: planWithDataOp,
             driver: driver!,
             destinationContract: contract,
@@ -240,7 +238,6 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
         perSpaceOptions: [
           {
             space: planWithDestructiveOp.spaceId ?? APP_SPACE_ID,
-
             plan: planWithDestructiveOp,
             driver: driver!,
             destinationContract: contract,

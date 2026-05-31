@@ -67,7 +67,6 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         perSpaceOptions: [
           {
             space: result.plan.spaceId ?? APP_SPACE_ID,
-
             plan: result.plan,
             driver: driver!,
             destinationContract: contract,
@@ -131,7 +130,6 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         perSpaceOptions: [
           {
             space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
-
             plan: initialPlan.plan,
             driver: driver!,
             destinationContract: contract,
@@ -155,7 +153,6 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         perSpaceOptions: [
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
             plan: emptyPlan,
             driver: driver!,
             destinationContract: contract,

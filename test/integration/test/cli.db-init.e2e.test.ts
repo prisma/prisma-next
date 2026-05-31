@@ -295,7 +295,7 @@ withTempDir(({ createTempDir }) => {
             ) as Record<string, unknown>;
 
             // Verify structure - should be noop with existing marker.
-            // The noop case routes through `executeAcrossSpaces` with an
+            // The noop case routes through `execute` with an
             // empty plan; the summary reflects the multi-space envelope
             // rather than a single-space "already at target" string.
             expect(jsonOutput).toMatchObject({
