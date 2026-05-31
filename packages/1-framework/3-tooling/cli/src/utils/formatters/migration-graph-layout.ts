@@ -8,6 +8,7 @@ export type StructuralCell =
   | { readonly kind: 'empty' }
   | { readonly kind: 'node'; readonly contractHash: string }
   | { readonly kind: 'vertical-pass' }
+  | { readonly kind: 'horizontal-pass' }
   | { readonly kind: 'branch-tee' }
   | { readonly kind: 'branch-corner' }
   | { readonly kind: 'merge-tee' }
@@ -603,6 +604,7 @@ function layoutComponent(
 
   function emitNodeRow(contractHash: string): void {
     const column = nodeColumnByHash.get(contractHash) ?? 0;
+    ensureGridWidth(column + 1);
     const passThrough = activeLaneIndices().filter((index) => index !== column);
     rows.push({
       kind: 'node',

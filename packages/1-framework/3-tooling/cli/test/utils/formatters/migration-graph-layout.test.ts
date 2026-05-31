@@ -98,11 +98,122 @@ function expectEdgeGeometry(
   expect(row.passThroughLanes).toEqual([...passThroughLanes]);
 }
 
+// Debug renderer: turns the structural cell roles back into the box-drawing glyphs
+// from `mockups.md` so each fixture's inline snapshot shows the actual diagram next to
+// the geometry assertions. This is a test-only aid — the production text renderer is a
+// separate stage — so its glyph set approximates the (slightly inconsistent) hand-drawn
+// mockups: rounded corners (`╮`/`╯`) throughout, two chars per lane column.
+function arrowForEdgeKind(kind: string): string {
+  if (kind === 'rollback') return '↓';
+  if (kind === 'self') return '⟲';
+  return '↑';
+}
+
+function renderCellPair(cell: StructuralCell): string {
+  switch (cell.kind) {
+    case 'node':
+      return '○ ';
+    case 'vertical-pass':
+      return '│ ';
+    case 'edge-lane':
+      return `│${arrowForEdgeKind(cell.edgeKind)}`;
+    default:
+      return '  ';
+  }
+}
+
+function renderConnectorRow(row: MigrationGraphGridRow, gridWidth: number): string {
+  const isMerge = row.kind === 'merge-connector';
+  // F2's target model emits column-absolute connector cells (one per lane, including
+  // pass-throughs); today's connectors are span-relative. Render from cells when they
+  // span the full grid, otherwise fall back to startLane/endLane.
+  if (row.cells.length === gridWidth) {
+    let seenTee = false;
+    let out = '';
+    for (const cell of row.cells) {
+      switch (cell.kind) {
+        case 'branch-tee':
+          out += seenTee ? '┬─' : '├─';
+          seenTee = true;
+          break;
+        case 'merge-tee':
+          out += seenTee ? '┴─' : '├─';
+          seenTee = true;
+          break;
+        case 'branch-corner':
+          out += '╮ ';
+          break;
+        case 'merge-corner':
+          out += '╯ ';
+          break;
+        case 'vertical-pass':
+          out += '│ ';
+          break;
+        case 'horizontal-pass':
+          out += '──';
+          break;
+        default:
+          out += '  ';
+      }
+    }
+    return out;
+  }
+
+  const start = row.startLane ?? 0;
+  const end = row.endLane ?? start;
+  let out = '';
+  for (let column = 0; column < gridWidth; column++) {
+    if (column < start || column > end) out += '  ';
+    else if (column === start) out += '├─';
+    else if (column === end) out += isMerge ? '╯ ' : '╮ ';
+    else out += isMerge ? '┴─' : '┬─';
+  }
+  return out;
+}
+
+function rowLabel(row: MigrationGraphGridRow): string {
+  if (row.kind === 'node') {
+    return row.contractHash === EMPTY_CONTRACT_HASH ? '∅' : (row.contractHash ?? '');
+  }
+  if (row.kind === 'edge') return row.edge?.dirName ?? '';
+  return '';
+}
+
+function renderLayout(model: { rows: readonly MigrationGraphGridRow[] }): string {
+  const gridWidth = model.rows.reduce(
+    (max, row) =>
+      row.kind === 'node' || row.kind === 'edge' ? Math.max(max, row.cells.length) : max,
+    1,
+  );
+  const stripEnd = (line: string): string => line.replace(/\s+$/, '');
+
+  return model.rows
+    .map((row) => {
+      if (row.kind === 'component-separator') return '';
+      if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
+        return stripEnd(renderConnectorRow(row, gridWidth));
+      }
+      const gutter = row.cells.map(renderCellPair).join('');
+      const label = rowLabel(row);
+      if (label === '') return stripEnd(gutter);
+      return stripEnd(`${gutter.padEnd(gridWidth * 2 + 4, ' ')}${label}`);
+    })
+    .join('\n');
+}
+
 describe('buildMigrationGraphLayout', () => {
   it('lays out a linear chain in lane zero without connectors', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPosts = edge('aaa', 'bbb', 'add_posts');
     const model = layout([init, addPosts]);
+
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○     bbb
+      │↑    add_posts
+      ○     aaa
+      │↑    init
+      ○     ∅"
+    `);
 
     expect(model.rows.filter(isNodeRow)).toHaveLength(3);
     expect(model.rows.filter(isEdgeRow)).toHaveLength(2);
@@ -123,6 +234,21 @@ describe('buildMigrationGraphLayout', () => {
     const mergeAlice = edge('alice', 'tip', 'merge_alice');
     const mergeBob = edge('bob', 'tip', 'merge_bob');
     const model = layout([init, alice, bob, mergeAlice, mergeBob]);
+
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○       tip
+      ├─╮
+      │↑│     merge_alice
+      │ │↑    merge_bob
+      ○ │     alice
+      │↑│     alice_add_phone
+      │ ○     bob
+      │ │↑    bob_add_avatar
+      ├─╯
+      ○       root
+      │↑      init
+      ○       ∅"
+    `);
 
     const branch = model.rows.find(isBranchConnector);
     expect(branch).toMatchObject({
@@ -174,6 +300,30 @@ describe('buildMigrationGraphLayout', () => {
       merge2b,
     ]);
 
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○       tip
+      ├─╮
+      │↑│     merge_2a
+      │ │↑    merge_2b
+      ○ │     branch_a
+      │↑│     add_comments
+      │ ○     branch_b
+      │ │↑    add_posts_branch
+      ├─╯
+      ○       mid
+      ├─╮
+      │↑│     merge_1a
+      │ │↑    merge_1b
+      ○ │     alice
+      │↑│     alice_add_phone
+      │ ○     bob
+      │ │↑    bob_add_avatar
+      ├─╯
+      ○       root
+      │↑      init
+      ○       ∅"
+    `);
+
     const branchConnectors = model.rows.filter(isBranchConnector);
     expect(branchConnectors).toHaveLength(2);
     expect(
@@ -206,6 +356,24 @@ describe('buildMigrationGraphLayout', () => {
       mergePosts,
       mergeAvatar,
     ]);
+
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○         tip
+      ├─┬─╮
+      │↑│ │     merge_phone
+      │ │↑│     merge_posts
+      │ │ │↑    merge_avatar
+      ○ │ │     phone
+      │↑│ │     add_phone
+      │ ○ │     posts
+      │ │↑│     add_posts
+      │ │ ○     avatar
+      │ │ │↑    add_avatar
+      ├─┴─╯
+      ○         root
+      │↑        init
+      ○         ∅"
+    `);
 
     const branch = model.rows.find(isBranchConnector);
     expect(branch).toMatchObject({ branchCount: 3, startLane: 0, endLane: 2 });
@@ -299,6 +467,30 @@ describe('buildMigrationGraphLayout', () => {
       migration,
     ]);
 
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○       tip_long
+      │↑      kitchen_sink
+      │↓      rollback
+      ○       n5
+      │↑      add_comments
+      ○       n4
+      │↑      add_posts
+      ○       n3
+      │↑      change_default
+      ○       n2
+      │↑      email_default
+      ○       n1
+      │↑      add_phone
+      │ ○     tip_short
+      │ │↑    migration
+      │ ○     s1
+      │ │↑    widen_email
+      ├─╯
+      ○       root
+      │↑      init
+      ○       ∅"
+    `);
+
     const mergeAtRoot = model.rows.find(
       (r) => r.kind === 'merge-connector' && r.contractHash === 'root',
     );
@@ -337,6 +529,15 @@ describe('buildMigrationGraphLayout', () => {
     const next = edge('aaa', 'bbb', 'next');
     const model = layout([init, noop, next]);
 
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○     bbb
+      │↑    next
+      │⟲    noop
+      ○     aaa
+      │↑    init
+      ○     ∅"
+    `);
+
     const aaaNodeIndex = model.rows.findIndex((r) => r.kind === 'node' && r.contractHash === 'aaa');
     const noopIndex = model.rows.findIndex((r) => r.kind === 'edge' && r.edge?.dirName === 'noop');
     const nextIndex = model.rows.findIndex((r) => r.kind === 'edge' && r.edge?.dirName === 'next');
@@ -354,6 +555,18 @@ describe('buildMigrationGraphLayout', () => {
     const otherRoot = edge('ccc', 'ddd', 'other_root');
     const model = layout([appInit, appNext, otherRoot]);
 
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○     bbb
+      │↑    app_next
+      ○     aaa
+      │↑    app_init
+      ○     ∅
+
+      ○     ddd
+      │↑    other_root
+      ○     ccc"
+    `);
+
     expect(model.rows.some((r) => r.kind === 'component-separator')).toBe(true);
     expect(model.rows.filter(isNodeRow)).toHaveLength(5);
   });
@@ -364,6 +577,19 @@ describe('buildMigrationGraphLayout', () => {
     const rollbackAdjacent = edge('bbb', 'aaa', 'rollback_adjacent');
     const model = layout([init, addPosts, rollbackAdjacent]);
 
+    // FIXME(rollback-lane-lifecycle): the `init`/`∅` rows below carry a phantom lane 1
+    // (`│ │↑` / `○ │`). An adjacent rollback leaves lane 0 reserved for its source, so the
+    // forward `init` edge spills into a second lane. Per `mockups.md` § pure-cycle the whole
+    // chain is single-lane: `│↑ init` then `○ ∅`. Snapshot pins current (wrong) output.
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○       bbb
+      │↑      add_posts
+      │↓      rollback_adjacent
+      ○       aaa
+      │ │↑    init
+      ○ │     ∅"
+    `);
+
     expectEdgeGeometry(model.rows, 'rollback_adjacent', 0, [], 'adjacent');
 
     const init2 = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
@@ -371,6 +597,20 @@ describe('buildMigrationGraphLayout', () => {
     const addBio = edge('bbb', 'ccc', 'add_bio');
     const rollbackSkip = edge('ccc', 'aaa', 'rollback_skip');
     const modelSkip = layout([init2, addPhone, addBio, rollbackSkip]);
+
+    // FIXME(rollback-lane-lifecycle): same phantom lane 1 as the adjacent case (`│ │↑` /
+    // `○ │` from `add_phone` downward). The node-skipping rollback also still lacks its
+    // routed arc (`mockups.md` § routed arcs) — deferred. Snapshot pins current output.
+    expect(renderLayout(modelSkip)).toMatchInlineSnapshot(`
+      "○       ccc
+      │↑      add_bio
+      │↓      rollback_skip
+      ○       bbb
+      │ │↑    add_phone
+      ○ │     aaa
+      │ │↑    init
+      ○ │     ∅"
+    `);
 
     expectEdgeGeometry(modelSkip.rows, 'rollback_skip', 0, [], 'node-skipping-rollback');
   });
