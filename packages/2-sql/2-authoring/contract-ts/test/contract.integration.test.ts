@@ -8,9 +8,7 @@ import { unboundTables } from './unbound-tables';
 function sqlStorageFixture(tables: Record<string, unknown>) {
   return {
     storageHash: 'sha256:test',
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-    },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
   };
 }
 

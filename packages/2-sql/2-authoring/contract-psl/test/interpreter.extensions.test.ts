@@ -359,21 +359,19 @@ model Document {
     if (!result.ok) return;
     expect(documentScopedTypes(result.value) ?? {}).toEqual({});
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            document: {
-              columns: {
-                shortName: {
-                  codecId: 'custom/varchar@1',
-                  nativeType: 'character varying',
-                  nullable: false,
-                },
-                embedding: {
-                  codecId: 'custom/vector@1',
-                  nativeType: 'vector',
-                  nullable: true,
-                },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          document: {
+            columns: {
+              shortName: {
+                codecId: 'custom/varchar@1',
+                nativeType: 'character varying',
+                nullable: false,
+              },
+              embedding: {
+                codecId: 'custom/vector@1',
+                nativeType: 'vector',
+                nullable: true,
               },
             },
           },

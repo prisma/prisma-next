@@ -26,7 +26,7 @@ describe('SqlContractSerializer edge cases', () => {
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
-  it('handles storage without tables property', () => {
+  it('accepts storage with only storageHash (defaults to an empty unbound namespace)', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -38,9 +38,9 @@ describe('SqlContractSerializer edge cases', () => {
       roots: {},
       models: {},
       storage: { storageHash: 'sha256:test' },
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      // biome-ignore lint/suspicious/noExplicitAny: testing minimal valid input
     } as any;
-    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 
   it('rejects models with null relations', () => {

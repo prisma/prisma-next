@@ -31,7 +31,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
   it('accepts a tagged codec-instance entry unchanged', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:abc',
-      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+      [UNBOUND_NAMESPACE_ID]: unboundWithUsers,
       types: {
         Score: {
           kind: 'codec-instance',
@@ -53,7 +53,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     const { toStorageTypeInstance } = await import('../src/ir/storage-type-instance');
     const storage = new SqlStorage({
       storageHash: 'sha256:abc',
-      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+      [UNBOUND_NAMESPACE_ID]: unboundWithUsers,
       types: {
         Score: toStorageTypeInstance({
           codecId: 'pg/int4@1',
@@ -75,7 +75,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+          [UNBOUND_NAMESPACE_ID]: unboundWithUsers,
           types: { Embedding1536: untagged },
         }),
     ).toThrow(/Embedding1536/);
@@ -91,7 +91,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+          [UNBOUND_NAMESPACE_ID]: unboundWithUsers,
           types: { Score: untagged },
         }),
     ).toThrow(/missing.*kind/i);
@@ -106,7 +106,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+          [UNBOUND_NAMESPACE_ID]: unboundWithUsers,
           types: { Mystery: unknownKind },
         }),
     ).toThrow(/Mystery.*mystery-kind/);
@@ -124,7 +124,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       () =>
         new SqlStorage({
           storageHash: 'sha256:abc',
-          namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
+          [UNBOUND_NAMESPACE_ID]: unboundWithUsers,
           types: { user_type: rawPostgresEnum },
         }),
     ).toThrow(/postgres-enum/);

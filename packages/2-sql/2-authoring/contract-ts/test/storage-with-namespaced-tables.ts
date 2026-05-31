@@ -11,11 +11,9 @@ export function storageWithNamespacedTables(storage: LegacyStorage): Record<stri
   }
   return {
     ...rest,
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables,
-      },
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables,
     },
   };
 }

@@ -231,11 +231,9 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: { collection: 'userProfile' },
       });
       expect(ir.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            collections: { userProfile: {} },
-          },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          collections: { userProfile: {} },
         },
       });
     });
@@ -252,11 +250,9 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: { collection: 'users' },
       });
       expect(ir.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            collections: { users: {} },
-          },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          collections: { users: {} },
         },
       });
     });
@@ -595,13 +591,11 @@ describe('interpretPslDocumentToMongoContract', () => {
       `);
 
       expect(ir.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            collections: {
-              user: {},
-              post: {},
-            },
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          collections: {
+            user: {},
+            post: {},
           },
         },
       });

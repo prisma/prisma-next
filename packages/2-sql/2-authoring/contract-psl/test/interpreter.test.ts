@@ -62,15 +62,13 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                email: {
-                  codecId: 'custom/text@1',
-                  nativeType: 'custom_text',
-                },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          user: {
+            columns: {
+              email: {
+                codecId: 'custom/text@1',
+                nativeType: 'custom_text',
               },
             },
           },
@@ -165,15 +163,13 @@ describe('interpretPslDocumentToSqlContract', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                slug: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          user: {
+            columns: {
+              slug: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
               },
             },
           },
@@ -243,16 +239,14 @@ model Comment {
     expect(result.value.target).toBe('postgres');
     expect(result.value.roots).toEqual({ user: crossRef('User') });
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-                email: { codecId: 'pg/text@1', nativeType: 'text' },
-              },
-              primaryKey: { columns: ['id'] },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              email: { codecId: 'pg/text@1', nativeType: 'text' },
             },
+            primaryKey: { columns: ['id'] },
           },
         },
       },
@@ -289,16 +283,14 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            idlessThing: {
-              columns: {
-                email: { codecId: 'pg/text@1', nativeType: 'text' },
-                token: { codecId: 'pg/text@1', nativeType: 'text' },
-              },
-              uniques: [{ columns: ['email'] }],
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          idlessThing: {
+            columns: {
+              email: { codecId: 'pg/text@1', nativeType: 'text' },
+              token: { codecId: 'pg/text@1', nativeType: 'text' },
             },
+            uniques: [{ columns: ['email'] }],
           },
         },
       },
@@ -341,12 +333,10 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            compositeThing: {
-              primaryKey: { columns: ['email', 'token'] },
-            },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          compositeThing: {
+            primaryKey: { columns: ['email', 'token'] },
           },
         },
       },
@@ -375,14 +365,12 @@ model Comment {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            composite_thing: {
-              primaryKey: {
-                columns: ['email_address', 'api_token'],
-                name: 'composite_thing_pkey',
-              },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          composite_thing: {
+            primaryKey: {
+              columns: ['email_address', 'api_token'],
+              name: 'composite_thing_pkey',
             },
           },
         },
@@ -479,38 +467,36 @@ model Member {
       team_member: crossRef('Member'),
     });
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            org_team: {
-              columns: {
-                team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-              },
-              primaryKey: { columns: ['team_id'] },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          org_team: {
+            columns: {
+              team_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
             },
-            team_member: {
-              columns: {
-                member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
-                team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
-              },
-              primaryKey: { columns: ['member_id'] },
-              indexes: [{ columns: ['team_ref'] }],
-              uniques: [{ columns: ['team_ref', 'member_id'] }],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
-                    tableName: 'team_member',
-                    columns: ['team_ref'],
-                  },
-                  target: {
-                    namespaceId: UNBOUND_NAMESPACE_ID,
-                    tableName: 'org_team',
-                    columns: ['team_id'],
-                  },
+            primaryKey: { columns: ['team_id'] },
+          },
+          team_member: {
+            columns: {
+              member_id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              team_ref: { codecId: 'pg/int4@1', nativeType: 'int4' },
+            },
+            primaryKey: { columns: ['member_id'] },
+            indexes: [{ columns: ['team_ref'] }],
+            uniques: [{ columns: ['team_ref', 'member_id'] }],
+            foreignKeys: [
+              {
+                source: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'team_member',
+                  columns: ['team_ref'],
                 },
-              ],
-            },
+                target: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  tableName: 'org_team',
+                  columns: ['team_id'],
+                },
+              },
+            ],
           },
         },
       },
@@ -585,14 +571,12 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            tables: {
-              order_item: {
-                primaryKey: {
-                  columns: ['order_id', 'product_id'],
-                  name: 'order_item_pkey',
-                },
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            order_item: {
+              primaryKey: {
+                columns: ['order_id', 'product_id'],
+                name: 'order_item_pkey',
               },
             },
           },
@@ -623,12 +607,10 @@ model OrderItem {
     if (!result.ok) return;
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            membership: {
-              primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
-            },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          membership: {
+            primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
           },
         },
       },
@@ -657,19 +639,17 @@ model OrderItem {
       if (!result.ok) return;
 
       expect(result.value.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            tables: {
-              doc: {
-                indexes: [
-                  {
-                    columns: ['body'],
-                    name: 'doc_body_bm25_idx',
-                    type: 'bm25',
-                    options: { key_field: 'id' },
-                  },
-                ],
-              },
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            doc: {
+              indexes: [
+                {
+                  columns: ['body'],
+                  name: 'doc_body_bm25_idx',
+                  type: 'bm25',
+                  options: { key_field: 'id' },
+                },
+              ],
             },
           },
         },
@@ -695,12 +675,10 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            tables: {
-              doc: {
-                indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
-              },
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            doc: {
+              indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
             },
           },
         },

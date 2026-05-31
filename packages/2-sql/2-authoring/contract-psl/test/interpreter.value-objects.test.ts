@@ -122,16 +122,14 @@ model User {
     });
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                homeAddress: {
-                  nativeType: 'jsonb',
-                  codecId: 'pg/jsonb@1',
-                  nullable: true,
-                },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          user: {
+            columns: {
+              homeAddress: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: true,
               },
             },
           },
@@ -170,16 +168,14 @@ model User {
     });
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                tags: {
-                  nativeType: 'jsonb',
-                  codecId: 'pg/jsonb@1',
-                  nullable: false,
-                },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          user: {
+            columns: {
+              tags: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
               },
             },
           },
@@ -223,16 +219,14 @@ model User {
     });
 
     expect(result.value.storage).toMatchObject({
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          tables: {
-            user: {
-              columns: {
-                addresses: {
-                  nativeType: 'jsonb',
-                  codecId: 'pg/jsonb@1',
-                  nullable: false,
-                },
+      [UNBOUND_NAMESPACE_ID]: {
+        tables: {
+          user: {
+            columns: {
+              addresses: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
               },
             },
           },

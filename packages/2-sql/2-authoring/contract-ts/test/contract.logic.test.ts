@@ -9,19 +9,16 @@ import { unboundTables } from './unbound-tables';
 function sqlStorageFixture(tables: Record<string, unknown>) {
   return {
     storageHash: 'sha256:test',
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables,
-      },
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables,
     },
   };
 }
 
 function contractTablesRecord(contract: Record<string, unknown>): Record<string, unknown> {
   const storage = contract['storage'] as Record<string, unknown>;
-  const namespaces = storage['namespaces'] as Record<string, unknown>;
-  const slot = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+  const slot = storage[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
   return slot['tables'] as Record<string, unknown>;
 }
 

@@ -86,11 +86,9 @@ describe('prismaContract provider helper', () => {
         targetFamily: 'sql',
         target: 'postgres',
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              tables: {
-                user: expect.any(Object),
-              },
+          [UNBOUND_NAMESPACE_ID]: {
+            tables: {
+              user: expect.any(Object),
             },
           },
         },
@@ -123,11 +121,9 @@ describe('prismaContract provider helper', () => {
 
       expect(result.value).toMatchObject({
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              tables: {
-                user: expect.any(Object),
-              },
+          [UNBOUND_NAMESPACE_ID]: {
+            tables: {
+              user: expect.any(Object),
             },
           },
         },
@@ -449,16 +445,14 @@ model Document {
         },
       });
       expect(result.value.storage).toMatchObject({
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            tables: {
-              user: {
-                columns: {
-                  dbExpr: {
-                    default: {
-                      kind: 'function',
-                      expression: 'gen_random_uuid()',
-                    },
+        [UNBOUND_NAMESPACE_ID]: {
+          tables: {
+            user: {
+              columns: {
+                dbExpr: {
+                  default: {
+                    kind: 'function',
+                    expression: 'gen_random_uuid()',
                   },
                 },
               },
