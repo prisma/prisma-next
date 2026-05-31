@@ -50,10 +50,9 @@ export interface MongoMigrationRunnerExecuteOptions {
    * `verifyMongoSchema`, so per-space verification only sees the slice
    * the destination contract actually claims.
    *
-   * The target descriptor's aggregate `execute` injects this callback,
-   * derived from the sibling spaces in the aggregate. Single-space
-   * callers leave it unset and verify against the whole introspected
-   * schema (the pre-aggregate behaviour).
+   * The target descriptor's `execute` injects this callback, derived
+   * from the sibling spaces in the aggregate. Callers that don't project
+   * leave it unset and verify against the whole introspected schema.
    */
   readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
 }

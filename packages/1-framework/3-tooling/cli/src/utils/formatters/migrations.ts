@@ -182,7 +182,7 @@ export function formatMigrationPlanOutput(
       );
     }
   } else if (result.plan?.operations && result.plan.operations.length > 0) {
-    // Single-space fallback (no aggregate breakdown). Same flat tree
+    // App-only / no-aggregate-breakdown fallback. Same flat tree
     // we've always rendered.
     lines.push(`${formatDimText('│')}`);
     for (let i = 0; i < result.plan.operations.length; i++) {
@@ -441,8 +441,8 @@ export function formatMigrationApplyOutput(
         ),
       );
     } else if (result.marker) {
-      // Single-space fallback (no aggregate breakdown surfaced — e.g.
-      // older callers / non-aggregate code paths). The label is
+      // App-only / no-aggregate-breakdown fallback (e.g. older callers
+      // / non-aggregate code paths). The label is
       // `App-space marker` (not `Signature`) so that when only one
       // marker is observable we still name what it covers explicitly.
       lines.push(`${formatDimText(`  App-space marker: ${result.marker.storageHash}`)}`);

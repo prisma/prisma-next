@@ -31,7 +31,7 @@ import {
  * Postgres equivalent of the SQLite `db-init-update.cli.test.ts`.
  *
  * Locks the CLI-level half of:
- * - AM4 (rollback) — a failure in any space rolls back every space's
+ * - rollback — a failure in any space rolls back every space's
  *   writes and preserves pre-execution markers.
  * - AM9 (atomic init across spaces).
  * - AM10 (only the bumped extension advances on a follow-up update).
