@@ -250,10 +250,7 @@ export const sqlEmission = {
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as unknown as SqlStorage;
     const namespacesType = generateStorageNamespacesType(storage.namespaces);
-    const domainTypes = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
-      | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
-      | undefined;
-    const docTypes = generateDocumentScopedStorageTypesType(domainTypes ?? storage.types);
+    const docTypes = generateDocumentScopedStorageTypesType(storage.types);
     const typesClause = docTypes === undefined ? '' : `; readonly types: ${docTypes}`;
     return `{ readonly namespaces: ${namespacesType}${typesClause}; readonly storageHash: ${storageHashTypeName} }`;
   },
@@ -308,13 +305,7 @@ export const sqlEmission = {
             ).enum
           : undefined;
       const fromNamespace = nsEnums?.[column.typeRef];
-      const fromDomain = (
-        contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
-          | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
-          | undefined
-      )?.[column.typeRef];
-      const fromDocument = fromDomain ?? storage.types?.[column.typeRef];
-      const typeInstance = fromNamespace ?? fromDocument;
+      const typeInstance = fromNamespace ?? storage.types?.[column.typeRef];
       if (typeInstance === undefined) return undefined;
       if (isPostgresEnumStorageEntry(typeInstance)) {
         return { values: typeInstance.values };

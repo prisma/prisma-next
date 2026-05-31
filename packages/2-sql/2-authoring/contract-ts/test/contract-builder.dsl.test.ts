@@ -2,7 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
-import { modelsOf } from './contract-test-helpers';
+import { modelsMapForAssertions, modelsOf } from './contract-test-helpers';
 import { crossRef } from './cross-ref-helpers';
 
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -270,7 +270,7 @@ describe('contract DSL authoring surface', () => {
         columns: Record<string, unknown>;
       }
     >;
-    const models = modelsOf(contract);
+    const models = modelsMapForAssertions(contract);
     expect(tables['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
@@ -581,7 +581,7 @@ describe('contract DSL authoring surface', () => {
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
-    const models = modelsOf(contract);
+    const models = modelsMapForAssertions(contract);
     expect(models['BlogPost']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
     expect(models['BlogPost']?.storage.fields['authorId']).toEqual({
       column: 'author_identifier',
