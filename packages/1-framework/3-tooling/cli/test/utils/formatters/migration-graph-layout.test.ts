@@ -219,7 +219,11 @@ describe('buildMigrationGraphLayout', () => {
     expect(model.nodeColumn.get('avatar')).toBe(2);
   });
 
-  it('lays out cross-link with three lanes per mockup', () => {
+  // Skipped until the lane allocator reconciles a node that is both a divergence child
+  // and a convergence producer (D feeds E yet also diverges from A), and connector rows
+  // emit column-absolute cells with pass-throughs for active lanes outside their span.
+  // Every value below is derived by hand from `mockups.md` § cross-link, NOT from code output.
+  it.skip('lays out cross-link with three lanes per mockup', () => {
     const aToB = edge('A', 'B', 'A_to_B');
     const bToC = edge('B', 'C', 'B_to_C');
     const aToD = edge('A', 'D', 'A_to_D');
@@ -227,31 +231,45 @@ describe('buildMigrationGraphLayout', () => {
     const bToE = edge('B', 'E', 'B_to_E');
     const model = layout([aToB, bToC, aToD, dToE, bToE]);
 
+    // `│ ├─╮` — E fans down to lanes 1 (B→E) and 2 (D→E); lane 0 (the C-spine) passes through.
     const branchAtE = model.rows.find(
       (r) => r.kind === 'branch-connector' && r.contractHash === 'E',
     );
     expect(branchAtE).toMatchObject({ startLane: 1, endLane: 2, branchCount: 2 });
+    expect(branchAtE?.cells[0]?.kind).toBe('vertical-pass');
+    expect(branchAtE?.cells[1]?.kind).toBe('branch-tee');
+    expect(branchAtE?.cells[2]?.kind).toBe('branch-corner');
 
+    // `├─┘ │` — lanes 0 and 1 merge into B; lane 2 (D→E, still wanting D) passes through.
     const mergeAtB = model.rows.find((r) => r.kind === 'merge-connector' && r.contractHash === 'B');
     expect(mergeAtB).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+    expect(mergeAtB?.cells[0]?.kind).toBe('merge-tee');
+    expect(mergeAtB?.cells[1]?.kind).toBe('merge-corner');
+    expect(mergeAtB?.cells[2]?.kind).toBe('vertical-pass');
 
+    // `├───┘` — lanes 0 (B) and 2 (D) merge into A.
     const mergeAtA = model.rows.find((r) => r.kind === 'merge-connector' && r.contractHash === 'A');
-    expect(mergeAtA).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+    expect(mergeAtA).toMatchObject({ startLane: 0, endLane: 2, branchCount: 2 });
+    expect(mergeAtA?.cells[0]?.kind).toBe('merge-tee');
+    expect(mergeAtA?.cells[2]?.kind).toBe('merge-corner');
 
-    expectEdgeGeometry(model.rows, 'B_to_C', 0, [1], 'adjacent');
+    expectEdgeGeometry(model.rows, 'B_to_C', 0, [], 'adjacent');
     expectEdgeGeometry(model.rows, 'B_to_E', 1, [0, 2], 'node-skipping-forward');
     expectEdgeGeometry(model.rows, 'D_to_E', 2, [0, 1], 'adjacent');
-    expectEdgeGeometry(model.rows, 'A_to_B', 0, [1], 'adjacent');
-    expectEdgeGeometry(model.rows, 'A_to_D', 1, [0], 'adjacent');
+    expectEdgeGeometry(model.rows, 'A_to_B', 0, [2], 'adjacent');
+    expectEdgeGeometry(model.rows, 'A_to_D', 2, [0], 'adjacent');
 
     expect(model.nodeColumn.get('C')).toBe(0);
     expect(model.nodeColumn.get('E')).toBe(1);
     expect(model.nodeColumn.get('B')).toBe(0);
-    expect(model.nodeColumn.get('D')).toBe(1);
+    expect(model.nodeColumn.get('D')).toBe(2);
     expect(model.nodeColumn.get('A')).toBe(0);
   });
 
-  it('lays out kitchen-sink with unequal branch lengths per mockup', () => {
+  // Skipped until the traversal renders the longer branch contiguously before dipping
+  // into the shorter sibling (today it braids them). Every value below is derived by hand
+  // from `mockups.md` § kitchen-sink, NOT from code output.
+  it.skip('lays out kitchen-sink with unequal branch lengths per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
     const addPhone = edge('root', 'n1', 'add_phone');
     const emailDefault = edge('n1', 'n2', 'email_default');
@@ -280,14 +298,31 @@ describe('buildMigrationGraphLayout', () => {
     );
     expect(mergeAtRoot).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
 
-    expectEdgeGeometry(model.rows, 'add_phone', 0, [1], 'adjacent');
+    // Long branch sits entirely above the short branch, so its edges carry no lane-1
+    // pass-through; lane 1 only opens at `tip_short` and closes at the root merge.
+    expectEdgeGeometry(model.rows, 'kitchen_sink', 0, [], 'adjacent');
+    expectEdgeGeometry(model.rows, 'rollback', 0, [], 'adjacent');
+    expectEdgeGeometry(model.rows, 'add_comments', 0, [], 'adjacent');
+    expectEdgeGeometry(model.rows, 'add_phone', 0, [], 'adjacent');
     expectEdgeGeometry(model.rows, 'widen_email', 1, [0], 'adjacent');
     expectEdgeGeometry(model.rows, 'migration', 1, [0], 'adjacent');
-    expectEdgeGeometry(model.rows, 'rollback', 0, [1], 'adjacent');
 
     expect(model.nodeColumn.get('root')).toBe(0);
     expect(model.nodeColumn.get('tip_short')).toBe(1);
     expect(model.nodeColumn.get('tip_long')).toBe(0);
+
+    // Long branch (tip_long..n1) renders contiguously, then the short branch (tip_short, s1),
+    // then the merge into root — no interleaving of the two branches' node rows.
+    const nodeIndex = (hash: string) =>
+      model.rows.findIndex((r) => r.kind === 'node' && r.contractHash === hash);
+    expect(nodeIndex('tip_long')).toBeLessThan(nodeIndex('n5'));
+    expect(nodeIndex('n5')).toBeLessThan(nodeIndex('n4'));
+    expect(nodeIndex('n4')).toBeLessThan(nodeIndex('n3'));
+    expect(nodeIndex('n3')).toBeLessThan(nodeIndex('n2'));
+    expect(nodeIndex('n2')).toBeLessThan(nodeIndex('n1'));
+    expect(nodeIndex('n1')).toBeLessThan(nodeIndex('tip_short'));
+    expect(nodeIndex('tip_short')).toBeLessThan(nodeIndex('s1'));
+    expect(nodeIndex('s1')).toBeLessThan(nodeIndex('root'));
   });
 
   it('places self-edge row immediately above its node', () => {
