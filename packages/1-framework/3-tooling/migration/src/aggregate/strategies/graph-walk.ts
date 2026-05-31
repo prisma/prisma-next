@@ -4,7 +4,7 @@ import { findPathWithDecision } from '../../migration-graph';
 import type { MigrationOps, OnDiskMigrationPackage } from '../../package';
 import { requireHeadRef } from '../aggregate';
 import type { ContractMarkerRecordLike } from '../marker-types';
-import type { AggregatePerSpacePlan } from '../planner-types';
+import type { PerSpacePlan } from '../planner-types';
 import type { ContractSpaceMember } from '../types';
 
 /**
@@ -12,11 +12,11 @@ import type { ContractSpaceMember } from '../types';
  * {@link import('../../compute-extension-space-apply-path').ExtensionSpaceApplyPathOutcome}
  * but operates against the member's lazily-reconstructed `graph()`
  * instead of re-reading from disk. The aggregate planner converts
- * these into {@link import('../planner-types').AggregatePlannerError}
+ * these into {@link import('../planner-types').PlannerError}
  * variants.
  */
 export type GraphWalkOutcome =
-  | { readonly kind: 'ok'; readonly result: AggregatePerSpacePlan }
+  | { readonly kind: 'ok'; readonly result: PerSpacePlan }
   | { readonly kind: 'unreachable' }
   | { readonly kind: 'unsatisfiable'; readonly missing: readonly string[] };
 

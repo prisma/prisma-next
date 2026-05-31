@@ -10,7 +10,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
-import { planAggregate } from '../../src/aggregate/planner';
+import { planMigration } from '../../src/aggregate/planner';
 import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../src/constants';
 import type { OnDiskMigrationPackage } from '../../src/package';
@@ -88,7 +88,7 @@ function makeSyntheticPlan(targetId: string): MigrationPlanWithAuthoringSurface 
   };
 }
 
-describe('planAggregate', () => {
+describe('planMigration', () => {
   it('selects synth for the app member when callerPolicy.ignoreGraphFor includes its spaceId', async () => {
     const aggregate = makeAggregate({
       app: makeMember({ spaceId: 'app' }),
@@ -96,7 +96,7 @@ describe('planAggregate', () => {
     const stubPlan = makeSyntheticPlan('placeholder-target-id-from-stub');
     const planner = makeStubPlanner({ kind: 'success', plan: stubPlan });
 
-    const result = await planAggregate({
+    const result = await planMigration({
       aggregate,
       currentDBState: {
         markersBySpaceId: new Map(),
@@ -133,7 +133,7 @@ describe('planAggregate', () => {
     const stubPlan = makeSyntheticPlan('postgres');
     const planner = makeStubPlanner({ kind: 'success', plan: stubPlan });
 
-    const result = await planAggregate({
+    const result = await planMigration({
       aggregate,
       currentDBState: {
         markersBySpaceId: new Map(),
@@ -171,7 +171,7 @@ describe('planAggregate', () => {
     const stubPlan = makeSyntheticPlan('postgres');
     const planner = makeStubPlanner({ kind: 'success', plan: stubPlan });
 
-    const result = await planAggregate({
+    const result = await planMigration({
       aggregate,
       currentDBState: {
         markersBySpaceId: new Map(),
@@ -203,7 +203,7 @@ describe('planAggregate', () => {
       plan: makeSyntheticPlan('postgres'),
     });
 
-    const result = await planAggregate({
+    const result = await planMigration({
       aggregate,
       currentDBState: {
         markersBySpaceId: new Map(),
@@ -241,7 +241,7 @@ describe('planAggregate', () => {
       plan: makeSyntheticPlan('postgres'),
     });
 
-    const result = await planAggregate({
+    const result = await planMigration({
       aggregate,
       currentDBState: {
         markersBySpaceId: new Map(),
@@ -273,7 +273,7 @@ describe('planAggregate', () => {
       conflicts: [{ kind: 'typeMismatch', summary: 'incompatible column type' }],
     });
 
-    const result = await planAggregate({
+    const result = await planMigration({
       aggregate,
       currentDBState: {
         markersBySpaceId: new Map(),

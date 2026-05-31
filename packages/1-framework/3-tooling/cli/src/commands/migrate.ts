@@ -11,9 +11,9 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type {
-  AggregatePerSpaceExecutionEntry,
   MigrationApplyFailure,
   MigrationApplyPathDecision,
+  PerSpaceExecutionEntry,
 } from '../control-api/types';
 import {
   CliStructuredError,
@@ -75,7 +75,7 @@ export interface MigrateResult {
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
-  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly pathDecision?: MigrationApplyPathDecision;
   readonly timings: {
     readonly total: number;

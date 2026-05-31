@@ -5,13 +5,10 @@ import type {
   MigrationOperationPolicy,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
-import type {
-  AggregatePerSpacePlan,
-  ContractSpaceAggregate,
-} from '@prisma-next/migration-tools/aggregate';
+import type { ContractSpaceAggregate, PerSpacePlan } from '@prisma-next/migration-tools/aggregate';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
-import type { AggregatePerSpaceExecutionEntry, OnControlProgress } from '../types';
+import type { OnControlProgress, PerSpaceExecutionEntry } from '../types';
 
 /**
  * Span id emitted via `onProgress` for the apply phase. Stable
@@ -24,31 +21,31 @@ const APPLY_SPAN_ID = 'apply' as const;
  * events so the parent CLI command can attribute the span correctly,
  * and used to compose action-specific summary phrasing.
  */
-export type AggregateApplyAction = 'dbInit' | 'dbUpdate' | 'migrationApply';
+export type ApplyAction = 'dbInit' | 'dbUpdate' | 'migrationApply';
 
 /**
- * Failure variant emitted by {@link applyAggregate} when the multi-space
+ * Failure variant emitted by {@link applyMigration} when the multi-space
  * runner itself rejects the apply. Mirrors the failure shape callers
  * already wrap into their own action-specific failure envelopes
  * (`DbInitFailure`, `DbUpdateFailure`, `MigrationApplyFailure`) so each
  * caller keeps owning its own discriminated failure code.
  */
-export interface AggregateApplyRunnerFailure {
+export interface ApplyRunnerFailure {
   readonly summary: string;
   readonly why?: string;
   readonly meta: Record<string, unknown>;
 }
 
-export interface ApplyAggregateInputs<TFamilyId extends string, TTargetId extends string> {
+export interface ApplyMigrationInputs<TFamilyId extends string, TTargetId extends string> {
   readonly aggregate: ContractSpaceAggregate;
   /**
    * Per-space plans, keyed by `spaceId`. Produced by either the full
-   * {@link planAggregate} pipeline (`db init` / `db update` — synth
+   * {@link planMigration} pipeline (`db init` / `db update` — synth
    * for the app, graph-walk for extensions) or by direct
    * {@link graphWalkStrategy} calls (`migrate` — graph-walk
    * for every member). Either way, the runner consumes the same shape.
    */
-  readonly perSpacePlans: ReadonlyMap<string, AggregatePerSpacePlan>;
+  readonly perSpacePlans: ReadonlyMap<string, PerSpacePlan>;
   /**
    * Canonical schedule order — extensions alphabetically by `spaceId`,
    * then app. Mirrors {@link import('@prisma-next/migration-tools/concatenate-space-apply-inputs').concatenateSpaceApplyInputs}'s
@@ -65,22 +62,22 @@ export interface ApplyAggregateInputs<TFamilyId extends string, TTargetId extend
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly policy: MigrationOperationPolicy;
-  readonly action: AggregateApplyAction;
+  readonly action: ApplyAction;
   readonly onProgress?: OnControlProgress;
 }
 
 /**
  * Resolved per-space plan in canonical schedule order. Surfaced from
- * {@link applyAggregate} to callers so each one can build its own
+ * {@link applyMigration} to callers so each one can build its own
  * action-specific success envelope (e.g. `DbInitSuccess` vs
  * `MigrationApplySuccess`) without re-deriving the ordering.
  */
 export interface OrderedResolution {
   readonly spaceId: string;
-  readonly entry: AggregatePerSpacePlan;
+  readonly entry: PerSpacePlan;
 }
 
-export interface ApplyAggregateValue {
+export interface ApplyMigrationValue {
   readonly orderedResolutions: readonly OrderedResolution[];
   readonly totalOpsPlanned: number;
   readonly totalOpsExecuted: number;
@@ -89,13 +86,13 @@ export interface ApplyAggregateValue {
    * envelopes. Each entry carries the post-apply marker (live storage hash
    * plus invariants) so callers can render it directly without re-reading.
    */
-  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  readonly perSpace: readonly PerSpaceExecutionEntry[];
 }
 
-export type ApplyAggregateResult = Result<ApplyAggregateValue, AggregateApplyRunnerFailure>;
+export type ApplyMigrationResult = Result<ApplyMigrationValue, ApplyRunnerFailure>;
 
 /**
- * Runner-driving tail shared by every aggregate apply caller — `db init`,
+ * Runner-driving tail shared by every apply caller — `db init`,
  * `db update`, and `migrate`. Consumes already-resolved per-space
  * plans (the planner-vs-replay distinction is owned by the caller) and
  * dispatches them to the multi-space runner in canonical order.
@@ -110,9 +107,9 @@ export type ApplyAggregateResult = Result<ApplyAggregateValue, AggregateApplyRun
  * so callers don't have to duplicate it; the `action` field on each
  * progress event is taken from the caller's `action` argument.
  */
-export async function applyAggregate<TFamilyId extends string, TTargetId extends string>(
-  inputs: ApplyAggregateInputs<TFamilyId, TTargetId>,
-): Promise<ApplyAggregateResult> {
+export async function applyMigration<TFamilyId extends string, TTargetId extends string>(
+  inputs: ApplyMigrationInputs<TFamilyId, TTargetId>,
+): Promise<ApplyMigrationResult> {
   const {
     aggregate,
     perSpacePlans,
@@ -190,28 +187,28 @@ export async function applyAggregate<TFamilyId extends string, TTargetId extends
 
 /**
  * Project the planner's per-space resolutions into the
- * `AggregatePerSpaceExecutionEntry[]` shape the CLI surfaces.
+ * `PerSpaceExecutionEntry[]` shape the CLI surfaces.
  *
  * `includeMarkers` is `true` for apply-mode (each space's marker is
  * the `destination.storageHash` of its plan, which the runner
  * advances as the last step of each space's transaction) and `false`
  * for plan-mode (no marker has been written yet).
  *
- * Exported alongside {@link applyAggregate} so plan-mode callers can
+ * Exported alongside {@link applyMigration} so plan-mode callers can
  * assemble the same per-space block without going through the runner.
  */
 export function buildPerSpaceBreakdown(
   orderedResolutions: readonly OrderedResolution[],
   appSpaceId: string,
   options: { readonly includeMarkers: boolean },
-): readonly AggregatePerSpaceExecutionEntry[] {
+): readonly PerSpaceExecutionEntry[] {
   return orderedResolutions.map((r) => {
     const operations = r.entry.displayOps.map((op) => ({
       id: op.id,
       label: op.label,
       operationClass: op.operationClass,
     }));
-    const base: AggregatePerSpaceExecutionEntry = {
+    const base: PerSpaceExecutionEntry = {
       spaceId: r.spaceId,
       kind: r.spaceId === appSpaceId ? 'app' : 'extension',
       operations,
@@ -234,7 +231,7 @@ export function buildPerSpaceBreakdown(
  */
 export function collectOrdered(
   applyOrder: readonly string[],
-  perSpace: ReadonlyMap<string, AggregatePerSpacePlan>,
+  perSpace: ReadonlyMap<string, PerSpacePlan>,
 ): readonly OrderedResolution[] {
   return applyOrder.map((spaceId) => {
     const entry = perSpace.get(spaceId);
@@ -247,11 +244,11 @@ export function collectOrdered(
 
 /**
  * Action-appropriate label for the `spanStart` event the apply
- * primitive emits. `applyAggregate` is shared by `db init`, `db update`,
+ * primitive emits. `applyMigration` is shared by `db init`, `db update`,
  * and `migrate`; the span label tracks the user-visible action
  * so structured-progress output reads naturally for each surface.
  */
-export function progressLabelForAction(action: AggregateApplyAction): string {
+export function progressLabelForAction(action: ApplyAction): string {
   switch (action) {
     case 'dbInit':
       return 'Initialising database across spaces';

@@ -1,7 +1,7 @@
 import type { OperationPreview } from '@prisma-next/framework-components/control';
 import { cyan, green, yellow } from 'colorette';
 
-import type { AggregatePerSpaceExecutionEntry } from '../../control-api/types';
+import type { PerSpaceExecutionEntry } from '../../control-api/types';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
@@ -79,9 +79,9 @@ export interface MigrationCommandResult {
    * (extensions alphabetically, then app). Surfaces per-space markers
    * and the ops grouped by space, so the CLI summary can name which
    * space each op and marker belongs to instead of flattening them
-   * into a single ambiguous list. See {@link AggregatePerSpaceExecutionEntry}.
+   * into a single ambiguous list. See {@link PerSpaceExecutionEntry}.
    */
-  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly advancedRef?: { readonly name: string; readonly hash: string } | null;
   readonly plannedAdvanceRef?: { readonly name: string; readonly hash: string } | null;
   readonly summary: string;
@@ -101,7 +101,7 @@ export interface MigrationCommandResult {
  * entirely (no marker has been written yet).
  */
 export function formatPerSpaceBlock(
-  perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>,
+  perSpace: ReadonlyArray<PerSpaceExecutionEntry>,
   mode: 'plan' | 'apply',
   useColor: boolean,
 ): readonly string[] {
@@ -267,7 +267,7 @@ export interface MigrationApplyCommandOutputResult {
    * alphabetically, then app). Always present for the aggregate-walking
    * `migrate` command.
    */
-  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly timings?: {
     readonly total: number;
   };

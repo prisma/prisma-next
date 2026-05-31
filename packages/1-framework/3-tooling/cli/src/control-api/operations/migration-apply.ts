@@ -7,11 +7,11 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import {
-  type AggregatePerSpacePlan,
   type ContractMarkerRecordLike,
   type ContractSpaceAggregate,
   type ContractSpaceMember,
   graphWalkStrategy,
+  type PerSpacePlan,
   requireHeadRef,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
@@ -24,14 +24,14 @@ import {
   buildContractSpaceAggregate,
 } from '../../utils/contract-space-aggregate-loader';
 import type {
-  AggregatePerSpaceExecutionEntry,
   MigrationApplyFailure,
   MigrationApplyPathDecision,
   MigrationApplyResult,
   MigrationApplySuccess,
   OnControlProgress,
+  PerSpaceExecutionEntry,
 } from '../types';
-import { applyAggregate, buildPerSpaceBreakdown } from './apply-aggregate';
+import { applyMigration, buildPerSpaceBreakdown } from './apply';
 
 /**
  * Inputs for the aggregate-walking `migrate` control-api
@@ -97,7 +97,7 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
  *    marker to `member.headRef.hash` (or `refHash` for the app
  *    member when provided). Empty-graph members fail loudly — a
  *    "never planned" space is a user-error condition for replay.
- * 4. Hand off to {@link applyAggregate} (the runner-driving tail
+ * 4. Hand off to {@link applyMigration} (the runner-driving tail
  *    shared with `db init` / `db update`). Marker advancement is
  *    inside the per-space transaction.
  *
@@ -141,13 +141,13 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   // when provided, otherwise its own head; extensions always walk
   // to their own head ref.
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
-  const perSpacePlans = new Map<string, AggregatePerSpacePlan>();
+  const perSpacePlans = new Map<string, PerSpacePlan>();
   // Already-at-head empty-graph members (typically extensions whose
   // head ref is the empty sentinel, or whose live marker already
   // matches the target). Kept out of the runner schedule so we don't
   // write spurious markers for greenfield extensions, but merged back
   // into the success envelope so every loaded member is represented.
-  const atHeadResolutions = new Map<string, AggregatePerSpacePlan>();
+  const atHeadResolutions = new Map<string, PerSpacePlan>();
   for (const member of allMembers) {
     const isAppMember = member.spaceId === aggregate.app.spaceId;
     // The aggregate passed the integrity gate, so every member's head ref
@@ -278,7 +278,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     );
   }
 
-  const applied = await applyAggregate({
+  const applied = await applyMigration({
     aggregate,
     perSpacePlans,
     applyOrder,
@@ -338,7 +338,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
 }
 
 /**
- * Build a zero-op {@link AggregatePerSpacePlan} for an empty-graph
+ * Build a zero-op {@link PerSpacePlan} for an empty-graph
  * member whose live marker already matches the target. Lets the apply
  * pipeline thread the member through `perSpacePlans` -> `applyOrder`
  * -> the success envelope's `perSpace[]` block so the result reflects
@@ -349,7 +349,7 @@ function buildAtHeadResolution(args: {
   readonly member: ContractSpaceMember;
   readonly targetHash: string;
   readonly liveMarker: ContractMarkerRecordLike | null;
-}): AggregatePerSpacePlan {
+}): PerSpacePlan {
   const { aggregateTargetId, member, targetHash, liveMarker } = args;
   return {
     plan: {
@@ -369,7 +369,7 @@ function buildAtHeadResolution(args: {
 
 function sumPlannedOps(
   applyOrder: readonly string[],
-  perSpacePlans: ReadonlyMap<string, AggregatePerSpacePlan>,
+  perSpacePlans: ReadonlyMap<string, PerSpacePlan>,
 ): number {
   let total = 0;
   for (const spaceId of applyOrder) {
@@ -384,9 +384,9 @@ interface BuildSuccessArgs {
   readonly aggregate: ContractSpaceAggregate;
   readonly orderedResolutions: ReadonlyArray<{
     readonly spaceId: string;
-    readonly entry: AggregatePerSpacePlan;
+    readonly entry: PerSpacePlan;
   }>;
-  readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly totalOpsExecuted: number;
   readonly summary: string;
 }

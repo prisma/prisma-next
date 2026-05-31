@@ -1,6 +1,6 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import type { AggregatePerSpaceExecutionEntry } from '../src/control-api/types';
+import type { PerSpaceExecutionEntry } from '../src/control-api/types';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
@@ -253,7 +253,7 @@ describe('formatMigrationApplyOutput', () => {
   });
 
   describe('per-space breakdown (M6 AC4 / AC5)', () => {
-    const perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry> = [
+    const perSpace: ReadonlyArray<PerSpaceExecutionEntry> = [
       {
         spaceId: 'pgvector',
         kind: 'extension',

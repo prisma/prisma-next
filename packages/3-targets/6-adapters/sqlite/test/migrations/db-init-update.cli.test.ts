@@ -40,7 +40,7 @@ import {
  * - atomic init across spaces.
  * - only the bumped extension advances on a follow-up update.
  * - codec hooks firing through the aggregate-pipeline path
- *   (loader → `planAggregate` synth strategy → `frameworkComponents`).
+ *   (loader → `planMigration` synth strategy → `frameworkComponents`).
  *
  * Companion to the unit-level tests in `@prisma-next/cli` that mock
  * the planner / runner. The runner-level multi-space coverage lives in
@@ -505,7 +505,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
     // The codec-emitted op was included in the aggregate operations
     // surfaced to the caller (proves the codec hook flows through
-    // executeDbInit → planAggregate (synth strategy) →
+    // executeDbInit → planMigration (synth strategy) →
     // frameworkComponents).
     const ids = result.value.plan.operations.map((op) => op.id);
     expect(ids).toContain('codec.added.user.email');

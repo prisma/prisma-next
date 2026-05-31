@@ -326,7 +326,7 @@ export interface EmitOptions {
  * to the user instead of being collapsed into a single ambiguous
  * top-level hash.
  */
-export interface AggregatePerSpaceExecutionEntry {
+export interface PerSpaceExecutionEntry {
   readonly spaceId: string;
   /** `'app'` for the application's contract space; `'extension'` for any extension space. */
   readonly kind: 'app' | 'extension';
@@ -387,9 +387,9 @@ export interface DbInitSuccess {
    * alphabetically, then app). Present whenever the aggregate flow
    * produced one — both `mode: 'plan'` and `mode: 'apply'`.
    *
-   * See {@link AggregatePerSpaceExecutionEntry}.
+   * See {@link PerSpaceExecutionEntry}.
    */
-  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -457,9 +457,9 @@ export interface DbUpdateSuccess {
   };
   /**
    * Per-space breakdown in canonical schedule order (extensions
-   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   * alphabetically, then app). See {@link PerSpaceExecutionEntry}.
    */
-  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace?: ReadonlyArray<PerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -538,7 +538,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  * contract-space aggregate, reading per-space marker rows from the
  * live database, plotting per-space paths via `graphWalkStrategy`
  * (replay-only — no synth, no introspection), and dispatching
- * through the shared `applyAggregate` primitive. The CLI command
+ * through the shared `applyMigration` primitive. The CLI command
  * just resolves the descriptor surface (config, refs, contract
  * envelope, app-space migration packages) and hands the inputs in.
  */
@@ -660,10 +660,10 @@ export interface MigrationApplySuccess {
   readonly summary: string;
   /**
    * Per-space breakdown in canonical schedule order (extensions
-   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   * alphabetically, then app). See {@link PerSpaceExecutionEntry}.
    * Always present for the aggregate-walking operation.
    */
-  readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly perSpace: ReadonlyArray<PerSpaceExecutionEntry>;
   /**
    * Path-decision data for the app member. Present whenever the
    * graph-walk strategy ran for the app (i.e. always for the

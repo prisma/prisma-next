@@ -11,9 +11,9 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import {
-  type AggregatePlannerError,
   type ContractSpaceAggregate,
-  planAggregate,
+  type PlannerError,
+  planMigration,
 } from '@prisma-next/migration-tools/aggregate';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -23,7 +23,6 @@ import {
   buildContractSpaceAggregate,
 } from '../../utils/contract-space-aggregate-loader';
 import type {
-  AggregatePerSpaceExecutionEntry,
   DbInitFailure,
   DbInitResult,
   DbInitSuccess,
@@ -31,15 +30,16 @@ import type {
   DbUpdateResult,
   DbUpdateSuccess,
   OnControlProgress,
+  PerSpaceExecutionEntry,
 } from '../types';
-import { applyAggregate, buildPerSpaceBreakdown, collectOrdered } from './apply-aggregate';
+import { applyMigration, buildPerSpaceBreakdown, collectOrdered } from './apply';
 import { stripOperations } from './migration-helpers';
 
 /**
- * Span IDs emitted via `onProgress` during the aggregate apply flow.
+ * Span IDs emitted via `onProgress` during the apply flow.
  * Stable identifiers consumed by the structured-output renderer and by
  * tests asserting on span ids. The `apply` span itself is owned by
- * the {@link applyAggregate} primitive — only the introspect / plan
+ * the {@link applyMigration} primitive — only the introspect / plan
  * spans are emitted directly here.
  */
 const SPAN_IDS = {
@@ -48,13 +48,13 @@ const SPAN_IDS = {
 } as const;
 
 /**
- * Inputs shared by `db init` and `db update` aggregate apply flows.
+ * Inputs shared by `db init` and `db update` apply flows.
  *
  * Accepts the already-validated app contract + descriptor list — the
  * loader gathers the rest from disk + descriptors. The CLI is the
  * descriptor-import boundary; everything downstream is descriptor-free.
  */
-export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetId extends string> {
+export interface ExecuteApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
   readonly contract: Contract;
@@ -83,7 +83,7 @@ export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetI
  *    integrity violation short-circuits with a structured error.
  * 2. **Read DB state**: marker rows (`familyInstance.readAllMarkers`)
  *    + introspected schema (`familyInstance.introspect`).
- * 3. **Plan**: {@link planAggregate} chooses graph-walk vs synth per
+ * 3. **Plan**: {@link planMigration} chooses graph-walk vs synth per
  *    member according to `callerPolicy.ignoreGraphFor`. The app member
  *    is forced through synth (today's daily-driver behaviour); every
  *    extension member walks its on-disk graph.
@@ -92,8 +92,8 @@ export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetI
  *    transaction across every space; failure on any space rolls back
  *    every space's writes.
  */
-export async function executeAggregateApply<TFamilyId extends string, TTargetId extends string>(
-  options: ExecuteAggregateApplyOptions<TFamilyId, TTargetId>,
+export async function executeApply<TFamilyId extends string, TTargetId extends string>(
+  options: ExecuteApplyOptions<TFamilyId, TTargetId>,
 ): Promise<DbInitResult | DbUpdateResult> {
   const {
     driver,
@@ -159,7 +159,7 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
     spanId: SPAN_IDS.plan,
     label: 'Planning migration',
   });
-  const planResult = await planAggregate<TFamilyId, TTargetId>({
+  const planResult = await planMigration<TFamilyId, TTargetId>({
     aggregate,
     currentDBState: { markersBySpaceId: markerRows, schemaIntrospection: schemaIR },
     familyInstance,
@@ -205,13 +205,13 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
     });
   }
 
-  // 5. Apply mode: hand off to the shared `applyAggregate` primitive.
+  // 5. Apply mode: hand off to the shared `applyMigration` primitive.
   // The runner-driving tail is identical for `db init` / `db update` /
   // `migrate` — only how each caller produces `perSpacePlans`
-  // differs (synth + graph-walk via planAggregate here; graph-walk
+  // differs (synth + graph-walk via planMigration here; graph-walk
   // only for migrate). Each caller produces perSpacePlans differently;
   // this helper handles the shared apply tail.
-  const applied = await applyAggregate({
+  const applied = await applyMigration({
     aggregate,
     perSpacePlans: planResult.value.perSpace,
     applyOrder: planResult.value.applyOrder,
@@ -298,7 +298,7 @@ function detectOrphanMarkers(
   });
 }
 
-function mapPlannerError(error: AggregatePlannerError): DbInitResult | DbUpdateResult {
+function mapPlannerError(error: PlannerError): DbInitResult | DbUpdateResult {
   if (error.kind === 'appSynthFailure') {
     const failure: DbInitFailure | DbUpdateFailure = {
       code: 'PLANNING_FAILED',
@@ -337,7 +337,7 @@ function wrapPlanResult(args: {
   readonly operations: readonly MigrationPlanOperation[];
   readonly destination: { readonly storageHash: string; readonly profileHash?: string };
   readonly preview: OperationPreview | undefined;
-  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly summary: string;
 }): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
@@ -361,7 +361,7 @@ function wrapApplyResult(args: {
   readonly destination: { readonly storageHash: string; readonly profileHash?: string };
   readonly operationsPlanned: number;
   readonly operationsExecuted: number;
-  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  readonly perSpace: readonly PerSpaceExecutionEntry[];
   readonly summary: string;
 }): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
