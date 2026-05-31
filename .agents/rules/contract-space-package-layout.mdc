@@ -24,7 +24,8 @@ applications) uses the **same** on-disk shape:
 │       ├── end-contract.d.ts
 │       └── migration.ts
 └── src/
-    ├── contract.prisma              ← PSL source (preferred; TS fallback noted below)
+    ├── contract.prisma              ← PSL source when the space has app-visible schema (preferred; exceptions below)
+    ├── contract.ts                  ← optional TS source (narrow exception)
     ├── contract.json                ← emitted (do not edit)
     ├── contract.d.ts                ← emitted (do not edit)
     └── exports/control.ts           ← descriptor; JSON-imports the artefacts
@@ -35,17 +36,23 @@ applications) uses the **same** on-disk shape:
 
 ## Rules (these are the spots where mistakes recur)
 
-- **Author contracts in PSL (`src/contract.prisma`)**, not TypeScript.
+- **Author contracts in PSL (`src/contract.prisma`)** when the space
+  contributes app-visible schema (models, storage types, namespaces).
   PSL is the canonical authoring surface — it reads as a schema (not as
   builder calls), interoperates with brownfield Prisma schemas, and
   keeps the contract decoupled from the workspace's TS type system.
   Wire it with
   `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`.
-  The narrow exception is contracts that need to declare typed objects
-  the PSL surface doesn't yet express (e.g. parameterised
+  **Migrations-only spaces** that install invariants (e.g. a Postgres
+  extension) but ship no tables or native types omit the source file
+  and wire
+  `emptyContract({ output: 'src/contract.json', target })` in
+  `prisma-next.config.ts` (see `@prisma-next/extension-paradedb`).
+  The narrow **TypeScript** exception is contracts that need to declare
+  typed objects the PSL surface doesn't yet express (e.g. parameterised
   `storage.types` base-type registrations like pgvector's `vector` —
   `types {}` blocks instantiate, they don't register). Such packages
-  may use `src/contract.ts` + `typescriptContract(contract, 'src/contract.json')`,
+  use `src/contract.ts` + `typescriptContract(contract, 'src/contract.json')`,
   with a comment in the contract source naming the missing PSL surface.
 - **No `<space-id>` subdirectory inside `migrations/`.** A package owns
   exactly one contract space, so the `<space-id>` directory adds no
