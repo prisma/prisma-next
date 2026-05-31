@@ -44,5 +44,5 @@ gate periodically.
 ## References
 
 - `calibration.ts` — the agreement tally + 0.80 gate.
-- Slice spec: `projects/drive-judge-harness/slices/llm-judge/spec.md` §
-  Calibration harness — built, run deferred.
+- `../../SKILL.md` § Parked calibration — why the run is deferred and the
+  operator-spend gate that unblocks it.
