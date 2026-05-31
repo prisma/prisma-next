@@ -2,11 +2,9 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 export function sqlTestStorageWithTables(tables: Record<string, unknown>) {
   return {
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables,
-      },
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables,
     },
   };
 }

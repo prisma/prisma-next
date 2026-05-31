@@ -144,7 +144,7 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
   await writeFile(
     join(contractDir, 'contract.json'),
     JSON.stringify({
-      storage: { storageHash: REF_HASH, namespaces: {} },
+      storage: { storageHash: REF_HASH },
       schemaVersion: SCHEMA_VERSION,
       target: TARGET,
       targetFamily: TARGET_FAMILY,
@@ -188,7 +188,7 @@ async function setupFixture(opts: {
   await writeFile(
     join(contractDir, 'contract.json'),
     JSON.stringify({
-      storage: { storageHash: TO_HASH, namespaces: {} },
+      storage: { storageHash: TO_HASH },
       schemaVersion: SCHEMA_VERSION,
       target: TARGET,
       targetFamily: TARGET_FAMILY,

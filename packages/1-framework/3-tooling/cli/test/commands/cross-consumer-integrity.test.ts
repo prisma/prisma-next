@@ -159,7 +159,7 @@ async function writeContract(cwd: string, storageHash: string): Promise<void> {
   await writeFile(
     join(contractDir, 'contract.json'),
     JSON.stringify({
-      storage: { storageHash, namespaces: {} },
+      storage: { storageHash },
       schemaVersion: SCHEMA_VERSION,
       target: TARGET,
       targetFamily: TARGET_FAMILY,
@@ -190,7 +190,7 @@ async function writeCleanOrphanSpace(cwd: string, spaceId: string, hash: string)
   await writeFile(
     join(spaceDir, 'contract.json'),
     JSON.stringify({
-      storage: { storageHash: hash, namespaces: {} },
+      storage: { storageHash: hash },
       schemaVersion: SCHEMA_VERSION,
       target: TARGET,
       targetFamily: TARGET_FAMILY,
@@ -307,7 +307,7 @@ async function setupExtSpaceCorruptionFixture(): Promise<{ cwd: string; extId: s
   await writeFile(
     join(extDir, 'contract.json'),
     JSON.stringify({
-      storage: { storageHash: HASH_C, namespaces: {} },
+      storage: { storageHash: HASH_C },
       schemaVersion: SCHEMA_VERSION,
       target: TARGET,
       targetFamily: TARGET_FAMILY,

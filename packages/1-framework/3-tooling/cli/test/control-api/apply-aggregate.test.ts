@@ -23,7 +23,7 @@ const APP_HASH = `sha256:${'a'.repeat(64)}`;
 
 function makeAppMember(): ContractSpaceMember {
   const contract = {
-    storage: { storageHash: APP_HASH, tables: {}, namespaces: {} },
+    storage: { storageHash: APP_HASH, tables: {} },
   } as unknown as ReturnType<ContractSpaceMember['contract']>;
   return {
     spaceId: 'app',

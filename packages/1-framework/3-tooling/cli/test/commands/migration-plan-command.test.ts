@@ -114,7 +114,7 @@ const NEW_HASH = `sha256:${'c'.repeat(64)}`;
 const REFS_DIR = '/tmp/test/migrations/app/refs';
 
 function makeContractJson(storageHash: string, target = 'mongo'): string {
-  return JSON.stringify({ storage: { storageHash, namespaces: {} }, target });
+  return JSON.stringify({ storage: { storageHash }, target });
 }
 
 function sampleSnapshot(storageHash: string) {

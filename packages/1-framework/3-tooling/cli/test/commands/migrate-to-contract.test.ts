@@ -50,7 +50,7 @@ const OPS: readonly MigrationPlanOperation[] = [
 
 function contractEnvelope(storageHash: string): Record<string, unknown> {
   return {
-    storage: { storageHash, namespaces: {} },
+    storage: { storageHash },
     schemaVersion: SCHEMA_VERSION,
     target: TARGET,
     targetFamily: TARGET_FAMILY,
