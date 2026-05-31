@@ -53,6 +53,8 @@ function renderCellPair(cell: StructuralCell, style: MigrationListStyler): strin
       return style.lane('╯ ');
     case 'arc-branch-corner':
       return style.lane('╮ ');
+    case 'arc-branch-tee':
+      return style.lane('┬─');
     case 'arc-land-corner':
       return style.lane('╯ ');
     case 'arc-crossing':
@@ -210,11 +212,7 @@ function gridUsesSkipRollbackArcs(rows: readonly MigrationGraphGridRow[]): boole
   );
 }
 
-function edgeLabelColumn(
-  row: MigrationGraphGridRow,
-  gridWidth: number,
-  wideLabelColumn: number | undefined,
-): number {
+function edgeLabelColumn(row: MigrationGraphGridRow, wideLabelColumn: number | undefined): number {
   if (wideLabelColumn !== undefined) {
     return wideLabelColumn;
   }
@@ -241,6 +239,11 @@ export function renderMigrationGraphTree(
   const style = createTreeStyler(opts);
   const hashLength = opts.hashLength ?? MIGRATION_LIST_HASH_WIDTH;
   const gridWidth = gridWidthForModel(model.rows);
+  // Skip-rollback arcs occupy the full grid (every lane can carry a back-arc), so
+  // labels start past the whole gutter: `gridWidth * 2` cells + a 4-space gap, the
+  // mockup's column for the first label after the widest `○◂──╯` landing. The
+  // dirName gap widens from `LABEL_GAP` (2) to 3 to match the mockup's extra column
+  // of breathing room before the `from → to` data in arc diagrams.
   const wideLabelColumn = gridUsesSkipRollbackArcs(model.rows) ? gridWidth * 2 + 4 : undefined;
   const dirNameGap = wideLabelColumn !== undefined ? 3 : LABEL_GAP;
   const allEdges = model.rows
@@ -280,7 +283,7 @@ export function renderMigrationGraphTree(
     }
     const labelColumn =
       row.kind === 'edge'
-        ? edgeLabelColumn(row, gridWidth, wideLabelColumn)
+        ? edgeLabelColumn(row, wideLabelColumn)
         : wideLabelColumn !== undefined &&
             (nodeHasArcDecoration(row) || row.contractHash !== undefined)
           ? wideLabelColumn

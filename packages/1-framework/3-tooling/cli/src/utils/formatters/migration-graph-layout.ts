@@ -19,6 +19,7 @@ export type StructuralCell =
   | { readonly kind: 'merge-tee' }
   | { readonly kind: 'merge-corner' }
   | { readonly kind: 'arc-branch-corner' }
+  | { readonly kind: 'arc-branch-tee' }
   | { readonly kind: 'arc-land-corner' }
   | { readonly kind: 'arc-crossing' }
   | { readonly kind: 'arc-land-bridge' }
@@ -624,13 +625,18 @@ function findEdgeRowIndex(rows: readonly MigrationGraphGridRow[], migrationHash:
   return rows.findIndex((row) => row.kind === 'edge' && row.edge?.migrationHash === migrationHash);
 }
 
+// A grid row with a mutable `cells` array. The routing pass clones the
+// immutable rows into this shape so it can paint arc cells in place without
+// stripping `readonly` with a cast.
+type MutableGridRow = Omit<MigrationGraphGridRow, 'cells'> & { cells: StructuralCell[] };
+
 function ensureCellWidth(cells: StructuralCell[], width: number): void {
   while (cells.length < width) {
     cells.push({ kind: 'empty' });
   }
 }
 
-function cloneRow(row: MigrationGraphGridRow): MigrationGraphGridRow {
+function cloneRow(row: MigrationGraphGridRow): MutableGridRow {
   return { ...row, cells: [...row.cells] };
 }
 
@@ -675,13 +681,25 @@ function applySkipRollbackRouting(
 
     edgeColumn.set(edge.migrationHash, backLane);
 
+    // Back-lanes of arcs that tee off this same source node. They share the
+    // node's tee row, so each inner lane reads as a `┬` junction and only the
+    // outermost gets the closing `╮`.
+    const coSourcedLanes = routes
+      .filter((other) => other.edge.from === edge.from)
+      .map((other) => other.backLane);
+    const maxCoSourcedLane = Math.max(...coSourcedLanes);
+
     const sourceRow = result[sourceRowIndex];
     if (sourceRow !== undefined) {
-      const cells = sourceRow.cells as StructuralCell[];
+      const cells = sourceRow.cells;
       ensureCellWidth(cells, backLane + 1);
       const contractHash = sourceRow.contractHash ?? EMPTY_CONTRACT_HASH;
       cells[nodeCol] = { kind: 'node', contractHash, arcTee: true };
       for (let lane = nodeCol + 1; lane < backLane; lane += 1) {
+        if (coSourcedLanes.includes(lane)) {
+          cells[lane] = { kind: 'arc-branch-tee' };
+          continue;
+        }
         const crossed = routes.some(
           (other) =>
             other.edge.migrationHash !== edge.migrationHash &&
@@ -690,31 +708,43 @@ function applySkipRollbackRouting(
         );
         cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'empty' };
       }
-      cells[backLane] = { kind: 'arc-branch-corner' };
+      cells[backLane] =
+        backLane < maxCoSourcedLane ? { kind: 'arc-branch-tee' } : { kind: 'arc-branch-corner' };
     }
 
     const edgeRow = result[edgeRowIndex];
     if (edgeRow !== undefined) {
-      const passThrough = [nodeCol];
-      const width = Math.max(edgeRow.cells.length, backLane + 1);
-      result[edgeRowIndex] = {
-        ...edgeRow,
-        laneIndex: backLane,
-        passThroughLanes: passThrough,
-        cells: buildEdgeCells(edge, backLane, passThrough, 'node-skipping-rollback', width),
+      // Mutate in place rather than rebuild from empty: a co-sourced arc's body
+      // lane may already cross this row, and rebuilding would clobber it.
+      const cells = edgeRow.cells;
+      ensureCellWidth(cells, backLane + 1);
+      cells[nodeCol] = { kind: 'vertical-pass' };
+      cells[backLane] = {
+        kind: 'edge-lane',
+        migrationHash: edge.migrationHash,
+        edgeKind: edge.kind,
+        ownsLabel: true,
+        adjacency: 'node-skipping-rollback',
       };
+      result[edgeRowIndex] = { ...edgeRow, laneIndex: backLane, passThroughLanes: [nodeCol] };
     }
 
-    for (let index = edgeRowIndex + 1; index < targetRowIndex; index += 1) {
+    // Fill the arc body vertically from just below the source tee down to the
+    // row above the landing, skipping the rollback's own labelled edge row.
+    // Starting below the source (rather than below the edge row) keeps a
+    // co-sourced arc's lane connected across an earlier co-sourced edge row.
+    for (let index = sourceRowIndex + 1; index < targetRowIndex; index += 1) {
+      if (index === edgeRowIndex) continue;
       const row = result[index];
       if (row === undefined) continue;
-      const cells = row.cells as StructuralCell[];
+      const cells = row.cells;
       ensureCellWidth(cells, backLane + 1);
       const existing = cells[backLane];
       if (
         existing?.kind !== 'arc-land-corner' &&
         existing?.kind !== 'arc-land-bridge' &&
         existing?.kind !== 'arc-branch-corner' &&
+        existing?.kind !== 'arc-branch-tee' &&
         existing?.kind !== 'arc-crossing'
       ) {
         cells[backLane] = { kind: 'vertical-pass' };
@@ -723,12 +753,20 @@ function applySkipRollbackRouting(
 
     const targetRow = result[targetRowIndex];
     if (targetRow !== undefined) {
-      const cells = targetRow.cells as StructuralCell[];
+      const cells = targetRow.cells;
       ensureCellWidth(cells, backLane + 1);
       const contractHash = targetRow.contractHash ?? EMPTY_CONTRACT_HASH;
       cells[targetCol] = { kind: 'node', contractHash, arcLand: true };
       for (let lane = targetCol + 1; lane < backLane; lane += 1) {
-        cells[lane] = { kind: 'arc-land-bridge' };
+        // A bridged lane that carries another arc still active at this row must
+        // cross over it (`┼`) rather than overwrite it with a bare bridge (`──`).
+        const crossed = routes.some(
+          (other) =>
+            other.edge.migrationHash !== edge.migrationHash &&
+            other.backLane === lane &&
+            routeCrossesRow(other, targetRowIndex, result),
+        );
+        cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'arc-land-bridge' };
       }
       cells[backLane] = { kind: 'arc-land-corner' };
       for (const other of routes) {
