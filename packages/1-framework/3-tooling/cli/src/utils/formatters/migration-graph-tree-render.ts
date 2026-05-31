@@ -1,6 +1,7 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { bold } from 'colorette';
 import stringWidth from 'string-width';
+import type { GlyphMode } from '../glyph-mode';
 import type {
   MigrationGraphGridModel,
   MigrationGraphGridRow,
@@ -9,8 +10,9 @@ import type {
 import type { ClassifiedEdge } from './migration-graph-rows';
 import {
   abbreviateContractHash,
-  MIGRATION_LIST_FORWARD_EDGE_GLYPH,
   MIGRATION_LIST_HASH_WIDTH,
+  migrationListEmptySource,
+  migrationListForwardArrow,
 } from './migration-list-data-column';
 import type { MigrationEdgeKind } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
@@ -25,44 +27,127 @@ export interface RenderMigrationGraphTreeOptions {
   readonly activeRefName?: string;
   readonly hashLength?: number;
   readonly colorize: boolean;
+  readonly glyphMode?: GlyphMode;
 }
 
-function arrowForEdgeKind(kind: MigrationEdgeKind): string {
-  if (kind === 'rollback') return '↓';
-  if (kind === 'self') return '⟲';
-  return '↑';
+interface MigrationGraphTreeGlyphPalette {
+  readonly node: string;
+  readonly arcLand: string;
+  readonly arcTee: string;
+  readonly verticalPass: string;
+  readonly branchTee: string;
+  readonly mergeTee: string;
+  readonly branchCorner: string;
+  readonly mergeCorner: string;
+  readonly arcBranchCorner: string;
+  readonly arcBranchTee: string;
+  readonly arcLandCorner: string;
+  readonly arcCrossing: string;
+  readonly arcLandBridge: string;
+  readonly horizontalPass: string;
+  readonly connectorBranchTee: string;
+  readonly connectorBranchTeeCo: string;
+  readonly connectorMergeTeeCo: string;
+  readonly edgeArrow: Readonly<Record<MigrationEdgeKind, string>>;
+  readonly forwardArrow: string;
+  readonly emptySource: string;
 }
 
-function renderCellPair(cell: StructuralCell, style: MigrationListStyler): string {
+const UNICODE_PALETTE: MigrationGraphTreeGlyphPalette = {
+  node: '○ ',
+  arcLand: '○◂',
+  arcTee: '○─',
+  verticalPass: '│ ',
+  branchTee: '├─',
+  mergeTee: '├─',
+  branchCorner: '╮ ',
+  mergeCorner: '╯ ',
+  arcBranchCorner: '╮ ',
+  arcBranchTee: '┬─',
+  arcLandCorner: '╯ ',
+  arcCrossing: '┼─',
+  arcLandBridge: '──',
+  horizontalPass: '──',
+  connectorBranchTee: '├─',
+  connectorBranchTeeCo: '┬─',
+  connectorMergeTeeCo: '┴─',
+  edgeArrow: { forward: '↑', rollback: '↓', self: '⟲' },
+  forwardArrow: migrationListForwardArrow('unicode'),
+  emptySource: migrationListEmptySource('unicode'),
+};
+
+const ASCII_PALETTE: MigrationGraphTreeGlyphPalette = {
+  node: '* ',
+  arcLand: '*<',
+  arcTee: '*-',
+  verticalPass: '| ',
+  branchTee: '+-',
+  mergeTee: '+-',
+  branchCorner: '\\ ',
+  mergeCorner: '/ ',
+  arcBranchCorner: '\\ ',
+  arcBranchTee: '+-',
+  arcLandCorner: '/ ',
+  arcCrossing: '+-',
+  arcLandBridge: '--',
+  horizontalPass: '--',
+  connectorBranchTee: '+-',
+  connectorBranchTeeCo: '+-',
+  connectorMergeTeeCo: '+-',
+  edgeArrow: { forward: '^', rollback: 'v', self: '@' },
+  forwardArrow: migrationListForwardArrow('ascii'),
+  emptySource: migrationListEmptySource('ascii'),
+};
+
+function paletteFor(mode: GlyphMode): MigrationGraphTreeGlyphPalette {
+  return mode === 'ascii' ? ASCII_PALETTE : UNICODE_PALETTE;
+}
+
+function arrowForEdgeKind(
+  kind: MigrationEdgeKind,
+  palette: MigrationGraphTreeGlyphPalette,
+): string {
+  return palette.edgeArrow[kind];
+}
+
+function renderCellPair(
+  cell: StructuralCell,
+  style: MigrationListStyler,
+  palette: MigrationGraphTreeGlyphPalette,
+): string {
   switch (cell.kind) {
     case 'node':
-      if (cell.arcLand === true) return style.lane('○◂');
-      if (cell.arcTee === true) return style.lane('○─');
-      return '○ ';
+      if (cell.arcLand === true) return style.lane(palette.arcLand);
+      if (cell.arcTee === true) return style.lane(palette.arcTee);
+      return palette.node;
     case 'vertical-pass':
-      return style.lane('│ ');
+      return style.lane(palette.verticalPass);
     case 'edge-lane':
-      return style.lane(cell.ownsLabel ? `│${arrowForEdgeKind(cell.edgeKind)}` : '│ ');
+      return style.lane(
+        cell.ownsLabel
+          ? `${palette.verticalPass.trimEnd()}${arrowForEdgeKind(cell.edgeKind, palette)}`
+          : palette.verticalPass,
+      );
     case 'branch-tee':
-      return style.lane('├─');
+      return style.lane(palette.branchTee);
     case 'merge-tee':
-      return style.lane('├─');
+      return style.lane(palette.mergeTee);
     case 'branch-corner':
-      return style.lane('╮ ');
+      return style.lane(palette.branchCorner);
     case 'merge-corner':
-      return style.lane('╯ ');
+      return style.lane(palette.mergeCorner);
     case 'arc-branch-corner':
-      return style.lane('╮ ');
+      return style.lane(palette.arcBranchCorner);
     case 'arc-branch-tee':
-      return style.lane('┬─');
+      return style.lane(palette.arcBranchTee);
     case 'arc-land-corner':
-      return style.lane('╯ ');
+      return style.lane(palette.arcLandCorner);
     case 'arc-crossing':
-      return style.lane('┼─');
+      return style.lane(palette.arcCrossing);
     case 'arc-land-bridge':
-      return style.lane('──');
+      return style.lane(palette.arcLandBridge);
     case 'horizontal-pass':
-      return style.lane('──');
+      return style.lane(palette.horizontalPass);
     case 'empty':
       return '  ';
   }
@@ -72,6 +157,7 @@ function renderConnectorRow(
   row: MigrationGraphGridRow,
   gridWidth: number,
   style: MigrationListStyler,
+  palette: MigrationGraphTreeGlyphPalette,
 ): string {
   const isMerge = row.kind === 'merge-connector';
   if (row.cells.length === gridWidth) {
@@ -80,24 +166,24 @@ function renderConnectorRow(
     for (const cell of row.cells) {
       switch (cell.kind) {
         case 'branch-tee':
-          out += style.lane(seenTee ? '┬─' : '├─');
+          out += style.lane(seenTee ? palette.connectorBranchTeeCo : palette.connectorBranchTee);
           seenTee = true;
           break;
         case 'merge-tee':
-          out += style.lane(seenTee ? '┴─' : '├─');
+          out += style.lane(seenTee ? palette.connectorMergeTeeCo : palette.connectorBranchTee);
           seenTee = true;
           break;
         case 'branch-corner':
-          out += style.lane('╮ ');
+          out += style.lane(palette.branchCorner);
           break;
         case 'merge-corner':
-          out += style.lane('╯ ');
+          out += style.lane(palette.mergeCorner);
           break;
         case 'vertical-pass':
-          out += style.lane('│ ');
+          out += style.lane(palette.verticalPass);
           break;
         case 'horizontal-pass':
-          out += style.lane('──');
+          out += style.lane(palette.horizontalPass);
           break;
         default:
           out += '  ';
@@ -111,16 +197,17 @@ function renderConnectorRow(
   let out = '';
   for (let column = 0; column < gridWidth; column++) {
     if (column < start || column > end) out += '  ';
-    else if (column === start) out += style.lane('├─');
-    else if (column === end) out += style.lane(isMerge ? '╯ ' : '╮ ');
-    else out += style.lane(isMerge ? '┴─' : '┬─');
+    else if (column === start) out += style.lane(palette.connectorBranchTee);
+    else if (column === end)
+      out += style.lane(isMerge ? palette.mergeCorner : palette.branchCorner);
+    else out += style.lane(isMerge ? palette.connectorMergeTeeCo : palette.connectorBranchTeeCo);
   }
   return out;
 }
 
-function abbreviateHash(hash: string, hashLength: number): string {
+function abbreviateHash(hash: string, hashLength: number, emptySource: string): string {
   if (hash === EMPTY_CONTRACT_HASH) {
-    return '∅';
+    return emptySource;
   }
   const abbreviated = abbreviateContractHash(hash);
   return hashLength === MIGRATION_LIST_HASH_WIDTH ? abbreviated : abbreviated.slice(0, hashLength);
@@ -165,17 +252,18 @@ function formatEdgeHashColumn(
   edge: ClassifiedEdge,
   style: MigrationListStyler,
   hashLength: number,
+  palette: MigrationGraphTreeGlyphPalette,
 ): string {
   if (edge.kind === 'self') {
-    const hash = abbreviateHash(edge.from, hashLength);
-    return `${style.sourceHash(hash)} ${style.glyph(MIGRATION_LIST_FORWARD_EDGE_GLYPH)} ${style.destHash(hash)}`;
+    const hash = abbreviateHash(edge.from, hashLength, palette.emptySource);
+    return `${style.sourceHash(hash)} ${style.glyph(palette.forwardArrow)} ${style.destHash(hash)}`;
   }
   const source =
     edge.from === EMPTY_CONTRACT_HASH
-      ? style.glyph('∅')
-      : style.sourceHash(abbreviateHash(edge.from, hashLength));
-  const arrow = style.glyph(MIGRATION_LIST_FORWARD_EDGE_GLYPH);
-  const dest = style.destHash(abbreviateHash(edge.to, hashLength));
+      ? style.glyph(palette.emptySource)
+      : style.sourceHash(abbreviateHash(edge.from, hashLength, palette.emptySource));
+  const arrow = style.glyph(palette.forwardArrow);
+  const dest = style.destHash(abbreviateHash(edge.to, hashLength, palette.emptySource));
   return `${source} ${arrow} ${dest}`;
 }
 
@@ -198,9 +286,6 @@ function maxDirNameLength(edges: readonly ClassifiedEdge[]): number {
 }
 
 function rowDirNameWidth(labelColumn: number, maxDirNameLen: number, dirNameGap: number): number {
-  // Reserve a gap past the longest dirName so the widest name keeps a column of
-  // whitespace before its `hash → hash` data; without it, a dirName equal to
-  // maxDirNameLen gets zero padding and collides with the source hash.
   return Math.max(maxDirNameLen + dirNameGap, MIN_HASH_DATA_COLUMN - labelColumn);
 }
 
@@ -236,14 +321,11 @@ export function renderMigrationGraphTree(
   model: MigrationGraphGridModel,
   opts: RenderMigrationGraphTreeOptions,
 ): string {
+  const glyphMode = opts.glyphMode ?? 'unicode';
+  const palette = paletteFor(glyphMode);
   const style = createTreeStyler(opts);
   const hashLength = opts.hashLength ?? MIGRATION_LIST_HASH_WIDTH;
   const gridWidth = gridWidthForModel(model.rows);
-  // Skip-rollback arcs occupy the full grid (every lane can carry a back-arc), so
-  // labels start past the whole gutter: `gridWidth * 2` cells + a 4-space gap, the
-  // mockup's column for the first label after the widest `○◂──╯` landing. The
-  // dirName gap widens from `LABEL_GAP` (2) to 3 to match the mockup's extra column
-  // of breathing room before the `from → to` data in arc diagrams.
   const wideLabelColumn = gridUsesSkipRollbackArcs(model.rows) ? gridWidth * 2 + 4 : undefined;
   const dirNameGap = wideLabelColumn !== undefined ? 3 : LABEL_GAP;
   const allEdges = model.rows
@@ -266,11 +348,11 @@ export function renderMigrationGraphTree(
     }
 
     if (row.kind === 'branch-connector' || row.kind === 'merge-connector') {
-      lines.push(renderConnectorRow(row, gridWidth, style).replace(/\s+$/, ''));
+      lines.push(renderConnectorRow(row, gridWidth, style, palette).replace(/\s+$/, ''));
       continue;
     }
 
-    let gutter = row.cells.map((cell) => renderCellPair(cell, style)).join('');
+    let gutter = row.cells.map((cell) => renderCellPair(cell, style, palette)).join('');
     const prevRow = model.rows[rowIndex - 1];
     let laneSpan = row.cells.length;
     if (row.kind === 'node') {
@@ -295,12 +377,12 @@ export function renderMigrationGraphTree(
     ) {
       gutter = row.cells
         .slice(0, 1)
-        .map((cell) => renderCellPair(cell, style))
+        .map((cell) => renderCellPair(cell, style, palette))
         .join('');
     } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
       gutter = row.cells
         .slice(0, laneSpan)
-        .map((cell) => renderCellPair(cell, style))
+        .map((cell) => renderCellPair(cell, style, palette))
         .join('');
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
@@ -313,8 +395,8 @@ export function renderMigrationGraphTree(
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
       const hashText =
         contractHash === EMPTY_CONTRACT_HASH
-          ? '∅'
-          : style.sourceHash(abbreviateHash(contractHash, hashLength));
+          ? palette.emptySource
+          : style.sourceHash(abbreviateHash(contractHash, hashLength, palette.emptySource));
       const overlayNames = overlayNamesForContract(contractHash, opts);
       const overlayPad =
         overlayNames.length > 0
@@ -330,7 +412,7 @@ export function renderMigrationGraphTree(
 
     const dirNamePadding = ' '.repeat(Math.max(0, dirNameWidth - edge.dirName.length));
     const dirName = `${style.dirName(edge.dirName)}${dirNamePadding}`;
-    const hashColumn = formatEdgeHashColumn(edge, style, hashLength);
+    const hashColumn = formatEdgeHashColumn(edge, style, hashLength, palette);
     lines.push(`${gutterPad}${dirName}${hashColumn}`.replace(/\s+$/, ''));
   }
 

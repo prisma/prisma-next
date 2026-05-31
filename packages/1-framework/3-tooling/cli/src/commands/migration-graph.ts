@@ -28,6 +28,7 @@ interface MigrationGraphOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly dot?: boolean;
   readonly tree?: boolean;
+  readonly ascii?: boolean;
 }
 
 export interface MigrationGraphResult {
@@ -98,6 +99,7 @@ export function createMigrationGraphCommand(): Command {
     'prisma-next migration graph --json',
     'prisma-next migration graph --dot',
     'prisma-next migration graph --tree',
+    'prisma-next migration graph --tree --ascii',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
@@ -109,6 +111,7 @@ export function createMigrationGraphCommand(): Command {
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--dot', 'Output in Graphviz DOT format')
     .option('--tree', 'Experimental condensed annotated tree renderer')
+    .option('--ascii', 'Use ASCII glyphs for --tree (pipe-friendly)')
     .action(async (options: MigrationGraphOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
@@ -160,6 +163,7 @@ export function createMigrationGraphCommand(): Command {
                 : {}),
               ...(activeRef !== undefined ? { activeRefName: activeRef.name } : {}),
               colorize: flags.color !== false,
+              glyphMode: ui.resolveGlyphMode(options.ascii === true),
             });
             // Emit the rendered tree to stdout like `migration list --graph`,
             // not through clack's `log.message` rail: the graph is the command's
