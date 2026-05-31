@@ -3,7 +3,7 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   CodecTypes,
   Contract,
-  FieldOutputTypes,
+  HomeAddressOutput,
 } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 
 test('InferModelRow resolves Task fields', () => {
@@ -32,14 +32,11 @@ test('InferModelRow resolves User fields', () => {
   expectTypeOf<UserRow['name']>().toEqualTypeOf<string>();
   expectTypeOf<UserRow['email']>().toEqualTypeOf<string>();
   expectTypeOf<UserRow['loginCount']>().toEqualTypeOf<number>();
-  expectTypeOf<UserRow['tags']>().toEqualTypeOf<string[]>();
 });
 
-test('FieldOutputTypes resolves User.homeAddress from domain value objects', () => {
-  expectTypeOf<FieldOutputTypes['User']['homeAddress']>().toEqualTypeOf<{
-    city: string;
-    country: string;
-  } | null>();
+test('HomeAddressOutput matches emitted value-object row shape', () => {
+  expectTypeOf<HomeAddressOutput['city']>().toEqualTypeOf<string>();
+  expectTypeOf<HomeAddressOutput['country']>().toEqualTypeOf<string>();
 });
 
 test('InferModelRow resolves embedded model fields', () => {

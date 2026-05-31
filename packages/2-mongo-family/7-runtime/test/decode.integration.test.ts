@@ -36,7 +36,7 @@ describe('Mongo runtime decode integration', () => {
       const plan = mongoQuery<TDecodeFixtureContract>({ contractJson: contract })
         .from('users')
         .match((f) =>
-          f._id.eq(MongoParamRef.of(insert.insertedId, { codecId: 'mongo/objectId@1' })),
+          f['_id']!.eq(MongoParamRef.of(insert.insertedId, { codecId: 'mongo/objectId@1' })),
         )
         .build();
 
