@@ -200,6 +200,12 @@ function isAggExprNode(value: object): value is MongoAggExpr {
   return 'accept' in value && typeof value.accept === 'function';
 }
 
+function isAggExprArray(
+  val: MongoAggExpr | ReadonlyArray<MongoAggExpr>,
+): val is ReadonlyArray<MongoAggExpr> {
+  return Array.isArray(val);
+}
+
 function lowerGroupId(groupId: MongoGroupId): unknown {
   if (groupId === null) return null;
   if (isAggExprNode(groupId)) return lowerAggExpr(groupId);
@@ -211,7 +217,7 @@ function lowerExprRecord(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
-    if (Array.isArray(val)) {
+    if (isAggExprArray(val)) {
       result[key] = val.map((v) => lowerAggExpr(v));
     } else {
       result[key] = lowerAggExpr(val);

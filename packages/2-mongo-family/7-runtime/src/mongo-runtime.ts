@@ -121,6 +121,7 @@ class MongoRuntimeImpl
     this.#codecs = options.context.codecs;
   }
 
+  /* v8 ignore start -- one-phase lower satisfies RuntimeCore; execute uses structuralLower + resolveParams */
   protected override async lower(
     plan: MongoQueryPlan,
     ctx: CodecCallContext,
@@ -131,6 +132,7 @@ class MongoRuntimeImpl
       ...ifDefined('resultShape', plan.resultShape),
     };
   }
+  /* v8 ignore stop */
 
   protected override runDriver(exec: MongoExecutionPlan): AsyncIterable<Record<string, unknown>> {
     return this.#driver.execute<Record<string, unknown>>(exec.command);

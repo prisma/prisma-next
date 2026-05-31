@@ -29,12 +29,18 @@ function isUpdatePipeline(
   return Array.isArray(update);
 }
 
+function isDraftUpdatePipeline(
+  update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
+): update is ReadonlyArray<Record<string, unknown>> {
+  return Array.isArray(update);
+}
+
 async function resolveUpdate(
   update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
   codecs: MongoCodecRegistry,
   ctx: CodecCallContext,
 ): Promise<Record<string, unknown> | ReadonlyArray<Record<string, unknown>>> {
-  if (Array.isArray(update)) {
+  if (isDraftUpdatePipeline(update)) {
     return Promise.all(update.map((stage) => resolveDraftDoc(stage, codecs, ctx)));
   }
   return resolveDraftDoc(update, codecs, ctx);
