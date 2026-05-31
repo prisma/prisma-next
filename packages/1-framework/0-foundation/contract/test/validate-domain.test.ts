@@ -5,7 +5,9 @@ function crossRef(model: string, namespace = 'default') {
   return { namespace: asNamespaceId(namespace), model };
 }
 
+import { ifDefined } from '@prisma-next/utils/defined';
 import { ContractValidationError } from '../src/contract-validation-error';
+import { buildDomainPlaneFromFlat } from '../src/domain-envelope';
 import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
 
@@ -17,16 +19,39 @@ function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeValidContract(overrides: Record<string, unknown> = {}) {
-  return {
-    roots: { items: crossRef('Item') },
-    models: {
-      Item: makeMinimalModel({
-        fields: { _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } } },
-      }),
-    },
-    ...overrides,
+function makeValidContract(overrides: Record<string, unknown> = {}): DomainContractShape {
+  const defaultModels = {
+    Item: makeMinimalModel({
+      fields: { _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } } },
+    }),
   };
+  const {
+    models: modelsOverride,
+    valueObjects,
+    roots: rootsOverride,
+    domain: domainOverride,
+    ...rest
+  } = overrides;
+  const models = {
+    ...defaultModels,
+    ...(modelsOverride !== undefined
+      ? (modelsOverride as Record<string, ReturnType<typeof makeMinimalModel>>)
+      : {}),
+  };
+  return {
+    roots: (rootsOverride as DomainContractShape['roots']) ?? { items: crossRef('Item') },
+    domain:
+      domainOverride !== undefined
+        ? (domainOverride as DomainContractShape['domain'])
+        : buildDomainPlaneFromFlat({
+            models,
+            ...ifDefined(
+              'valueObjects',
+              valueObjects as Record<string, { fields: Record<string, unknown> }> | undefined,
+            ),
+          }),
+    ...rest,
+  } as DomainContractShape;
 }
 
 describe('validateContractDomain()', () => {
@@ -372,7 +397,7 @@ describe('validateContractDomain()', () => {
 
   describe('happy path', () => {
     it('validates a complex contract with polymorphism, relations, and ownership', () => {
-      const contract = {
+      const contract = makeValidContract({
         roots: { tasks: crossRef('Task'), users: crossRef('User') },
         models: {
           Task: makeMinimalModel({
@@ -448,14 +473,14 @@ describe('validateContractDomain()', () => {
             owner: 'Task',
           }),
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
   });
 
   describe('value object reference validation', () => {
     it('accepts valid value object references from model fields', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: { users: crossRef('User') },
         models: {
           User: makeMinimalModel({
@@ -473,12 +498,12 @@ describe('validateContractDomain()', () => {
             },
           },
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
 
     it('rejects nonexistent value object reference from model field', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: { users: crossRef('User') },
         models: {
           User: makeMinimalModel({
@@ -488,12 +513,12 @@ describe('validateContractDomain()', () => {
             },
           }),
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).toThrow(/Missing.*does not exist/);
     });
 
     it('accepts self-referencing value object', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: {},
         models: {},
         valueObjects: {
@@ -504,12 +529,12 @@ describe('validateContractDomain()', () => {
             },
           },
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
 
     it('rejects nonexistent value object reference from another value object', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: {},
         models: {},
         valueObjects: {
@@ -519,12 +544,12 @@ describe('validateContractDomain()', () => {
             },
           },
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).toThrow(/Nonexistent.*does not exist/);
     });
 
     it('rejects nonexistent value object reference inside union members', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: { users: crossRef('User') },
         models: {
           User: makeMinimalModel({
@@ -543,12 +568,12 @@ describe('validateContractDomain()', () => {
             },
           }),
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).toThrow(/Ghost.*does not exist/);
     });
 
     it('accepts valid value object reference inside union members', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: { users: crossRef('User') },
         models: {
           User: makeMinimalModel({
@@ -574,14 +599,14 @@ describe('validateContractDomain()', () => {
             },
           },
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).not.toThrow();
     });
   });
 
   describe('field modifier validation', () => {
     it('rejects many + dict on the same field', () => {
-      const contract: DomainContractShape = {
+      const contract = makeValidContract({
         roots: {},
         models: {
           User: makeMinimalModel({
@@ -595,7 +620,7 @@ describe('validateContractDomain()', () => {
             },
           }),
         },
-      };
+      });
       expect(() => validateContractDomain(contract)).toThrow(/many.*dict|dict.*many/i);
     });
   });

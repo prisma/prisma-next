@@ -1,5 +1,6 @@
 import type { CrossReference } from './cross-reference';
-import type { ContractModelBase, ContractValueObject } from './domain-types';
+import type { DomainPlane } from './domain-envelope';
+import type { ContractModelBase } from './domain-types';
 import type {
   ExecutionHashBase,
   ExecutionMutationDefault,
@@ -45,14 +46,11 @@ export interface Contract<
   readonly target: string;
   readonly targetFamily: string;
   readonly roots: Record<string, CrossReference>;
-  readonly models: TModels;
-  readonly valueObjects?: Record<string, ContractValueObject>;
   /**
-   * Domain plane keyed as `domain[plane][namespaceId][entityKind][entityName]`.
-   * Optional until downstream slices populate it; when absent the field is
-   * omitted from the on-disk envelope so emitted contracts stay byte-stable.
+   * Application plane (ADR 221): `domain.namespaces.<nsId>.{ models, valueObjects }`.
+   * `TModels` types the union of model entries across namespaces for family DSL inference.
    */
-  readonly domain?: Record<string, Record<string, Record<string, unknown>>>;
+  readonly domain: DomainPlane<TModels>;
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
@@ -60,3 +58,6 @@ export interface Contract<
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, unknown>;
 }
+
+export type ContractModelsMap<TContract extends Contract> =
+  TContract extends Contract<StorageBase, infer TModels> ? TModels : never;

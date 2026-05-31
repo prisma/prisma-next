@@ -1,5 +1,7 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import { ContractValidationError } from './contract-validation-error';
 import type { CrossReference } from './cross-reference';
+import { contractModels, contractValueObjects, type DomainContractSlice } from './domain-envelope';
 
 export interface DomainModelShape {
   readonly fields: Record<string, unknown>;
@@ -10,23 +12,36 @@ export interface DomainModelShape {
   readonly owner?: string;
 }
 
-export interface DomainContractShape {
+export interface DomainContractShape extends DomainContractSlice {
+  readonly roots: Record<string, CrossReference>;
+}
+
+type FlatDomainContractShape = {
   readonly roots: Record<string, CrossReference>;
   readonly models: Record<string, DomainModelShape>;
   readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
+};
+
+function flattenDomainContract(contract: DomainContractShape): FlatDomainContractShape {
+  return {
+    roots: contract.roots,
+    models: contractModels(contract),
+    ...ifDefined('valueObjects', contractValueObjects(contract)),
+  };
 }
 
 export function validateContractDomain(contract: DomainContractShape): void {
+  const flat = flattenDomainContract(contract);
   const errors: string[] = [];
-  const modelNames = new Set(Object.keys(contract.models));
+  const modelNames = new Set(Object.keys(flat.models));
 
-  validateRoots(contract, modelNames, errors);
-  validateVariantsAndBases(contract, modelNames, errors);
-  validateRelationTargets(contract, modelNames, errors);
-  validateDiscriminators(contract, errors);
-  validateOwnership(contract, modelNames, errors);
-  validateValueObjectReferences(contract, errors);
-  validateFieldModifiers(contract, errors);
+  validateRoots(flat, modelNames, errors);
+  validateVariantsAndBases(flat, modelNames, errors);
+  validateRelationTargets(flat, modelNames, errors);
+  validateDiscriminators(flat, errors);
+  validateOwnership(flat, modelNames, errors);
+  validateValueObjectReferences(flat, errors);
+  validateFieldModifiers(flat, errors);
 
   if (errors.length > 0) {
     throw new ContractValidationError(
@@ -37,7 +52,7 @@ export function validateContractDomain(contract: DomainContractShape): void {
 }
 
 function validateRoots(
-  contract: DomainContractShape,
+  contract: FlatDomainContractShape,
   modelNames: Set<string>,
   errors: string[],
 ): void {
@@ -59,7 +74,7 @@ function validateRoots(
 }
 
 function validateVariantsAndBases(
-  contract: DomainContractShape,
+  contract: FlatDomainContractShape,
   modelNames: Set<string>,
   errors: string[],
 ): void {
@@ -104,7 +119,7 @@ function validateVariantsAndBases(
 }
 
 function validateRelationTargets(
-  contract: DomainContractShape,
+  contract: FlatDomainContractShape,
   modelNames: Set<string>,
   errors: string[],
 ): void {
@@ -120,7 +135,7 @@ function validateRelationTargets(
   }
 }
 
-function validateDiscriminators(contract: DomainContractShape, errors: string[]): void {
+function validateDiscriminators(contract: FlatDomainContractShape, errors: string[]): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
     if (model.discriminator) {
       if (!model.variants || Object.keys(model.variants).length === 0) {
@@ -149,7 +164,7 @@ function validateDiscriminators(contract: DomainContractShape, errors: string[])
 }
 
 function validateOwnership(
-  contract: DomainContractShape,
+  contract: FlatDomainContractShape,
   modelNames: Set<string>,
   errors: string[],
 ): void {
@@ -187,7 +202,7 @@ interface FieldLike {
 }
 
 function forEachContractField(
-  contract: DomainContractShape,
+  contract: FlatDomainContractShape,
   callback: (field: unknown, location: string) => void,
 ): void {
   for (const [modelName, model] of Object.entries(contract.models)) {
@@ -202,7 +217,7 @@ function forEachContractField(
   }
 }
 
-function validateValueObjectReferences(contract: DomainContractShape, errors: string[]): void {
+function validateValueObjectReferences(contract: FlatDomainContractShape, errors: string[]): void {
   const voNames = new Set(Object.keys(contract.valueObjects ?? {}));
 
   function checkType(type: FieldTypeLike | undefined, location: string): void {
@@ -224,7 +239,7 @@ function validateValueObjectReferences(contract: DomainContractShape, errors: st
   });
 }
 
-function validateFieldModifiers(contract: DomainContractShape, errors: string[]): void {
+function validateFieldModifiers(contract: FlatDomainContractShape, errors: string[]): void {
   forEachContractField(contract, (field, location) => {
     const f = field as FieldLike | undefined;
     if (f?.many && f?.dict) {

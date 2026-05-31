@@ -6,6 +6,7 @@ function crossRef(model: string, namespace = 'default') {
 }
 
 import type { Contract } from '../src/contract-types';
+import { buildDomainPlaneFromFlat, contractModels } from '../src/domain-envelope';
 import type { ContractModel } from '../src/domain-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '../src/types';
 
@@ -41,13 +42,15 @@ describe('unified contract types', () => {
         target: 'postgres',
         targetFamily: 'sql',
         roots: { users: crossRef('User') },
-        models: {
-          User: {
-            fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-            relations: {},
-            storage: {},
+        domain: buildDomainPlaneFromFlat({
+          models: {
+            User: {
+              fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
+              relations: {},
+              storage: {},
+            },
           },
-        },
+        }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
         extensionPacks: {},
@@ -66,7 +69,7 @@ describe('unified contract types', () => {
         target: 'postgres',
         targetFamily: 'sql',
         roots: {},
-        models: {},
+        domain: buildDomainPlaneFromFlat({ models: {} }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
         extensionPacks: {},
@@ -85,7 +88,7 @@ describe('unified contract types', () => {
   describe('framework consumer compatibility', () => {
     it('framework code reads domain fields from Contract (opaque storage)', () => {
       function frameworkConsumer(contract: Contract): string[] {
-        return Object.entries(contract.models).map(([name, model]) => {
+        return Object.entries(contractModels(contract)).map(([name, model]) => {
           const fieldCount = Object.keys(model.fields).length;
           return `${name}: ${fieldCount} fields`;
         });
@@ -97,16 +100,18 @@ describe('unified contract types', () => {
         target: 'postgres',
         targetFamily: 'sql',
         roots: { users: crossRef('User') },
-        models: {
-          User: {
-            fields: {
-              id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
-              email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+        domain: buildDomainPlaneFromFlat({
+          models: {
+            User: {
+              fields: {
+                id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+                email: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+              },
+              relations: {},
+              storage: {},
             },
-            relations: {},
-            storage: {},
           },
-        },
+        }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
         extensionPacks: {},

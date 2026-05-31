@@ -1,6 +1,14 @@
-export type { Contract, ContractExecutionSection } from '../contract-types';
+export type { Contract, ContractExecutionSection, ContractModelsMap } from '../contract-types';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
+export type { DomainNamespace, DomainPlane } from '../domain-envelope';
+export {
+  buildDomainPlaneFromFlat,
+  contractModels,
+  contractValueObjects,
+  normalizeLegacyDomainRoot,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
+} from '../domain-envelope';
 export type {
   ContractDiscriminator,
   ContractEmbedRelation,

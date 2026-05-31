@@ -40,8 +40,6 @@ const TOP_LEVEL_ORDER = [
   'target',
   'profileHash',
   'roots',
-  'models',
-  'valueObjects',
   'domain',
   'storage',
   'execution',
@@ -92,9 +90,18 @@ function omitDefaults(
     }
 
     if (isDefaultValue(value)) {
-      const isRequiredModels = isArrayEqual(currentPath, ['models']);
-      const isRequiredNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
-      const isNamespaceSlot =
+      const isRequiredDomainNamespaces = isArrayEqual(currentPath, ['domain', 'namespaces']);
+      const isDomainNamespaceSlot =
+        currentPath.length === 3 &&
+        isArrayEqual([currentPath[0], currentPath[1]], ['domain', 'namespaces']);
+      const isRequiredDomainModels =
+        currentPath.length === 4 &&
+        isArrayEqual(
+          [currentPath[0], currentPath[1], currentPath[3]],
+          ['domain', 'namespaces', 'models'],
+        );
+      const isRequiredStorageNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
+      const isStorageNamespaceSlot =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'namespaces']);
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
@@ -108,26 +115,28 @@ function omitDefaults(
       ]);
       const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
       const isModelRelations =
-        currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[2]], ['models', 'relations']);
-      const isModelStorage =
-        currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[2]], ['models', 'storage']);
-
-      const isDomainUnboundTypeParams =
-        currentPath.length === 5 &&
+        currentPath.length === 6 &&
         currentPath[0] === 'domain' &&
-        currentPath[2] === 'types' &&
-        key === 'typeParams';
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'models' &&
+        currentPath[5] === 'relations';
+      const isModelStorage =
+        currentPath.length === 6 &&
+        currentPath[0] === 'domain' &&
+        currentPath[1] === 'namespaces' &&
+        currentPath[3] === 'models' &&
+        currentPath[5] === 'storage';
 
       const isNullableField = key === 'nullable';
 
       const isFamilyPreserved = shouldPreserveEmpty?.(currentPath) ?? false;
 
       if (
-        !isRequiredModels &&
-        !isRequiredNamespaces &&
-        !isNamespaceSlot &&
+        !isRequiredDomainNamespaces &&
+        !isDomainNamespaceSlot &&
+        !isRequiredDomainModels &&
+        !isRequiredStorageNamespaces &&
+        !isStorageNamespaceSlot &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
@@ -137,7 +146,6 @@ function omitDefaults(
         !isModelRelations &&
         !isModelStorage &&
         !isNullableField &&
-        !isDomainUnboundTypeParams &&
         !isFamilyPreserved
       ) {
         continue;
@@ -232,9 +240,7 @@ export function canonicalizeContractToObject(
     target: serialized['target'],
     profileHash: serialized['profileHash'],
     roots: serialized['roots'],
-    models: serialized['models'],
-    ...ifDefined('valueObjects', serialized['valueObjects']),
-    ...ifDefined('domain', serialized['domain']),
+    domain: serialized['domain'],
     storage: serialized['storage'],
     ...ifDefined('execution', serialized['execution']),
     extensionPacks: serialized['extensionPacks'],
