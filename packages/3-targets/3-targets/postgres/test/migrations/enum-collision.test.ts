@@ -1,4 +1,9 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
@@ -63,7 +68,7 @@ function makeCollisionContract(
       },
     }),
     roots: {},
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -315,7 +320,7 @@ describe('enum namespace collision planning', () => {
           },
         }),
         roots: {},
-        models: {},
+        domain: buildDomainPlaneFromFlat({ models: {} }),
         capabilities: {},
         extensionPacks: {},
         meta: {},
