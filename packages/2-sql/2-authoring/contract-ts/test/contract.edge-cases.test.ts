@@ -28,13 +28,19 @@ describe('SqlContractSerializer edge cases', () => {
 
   it('rejects models with null relations', () => {
     const contractInput = validSqlContractJson({
-      models: {
-        User: {
-          storage: { table: 'user', fields: { id: { column: 'id' } } },
-          fields: {
-            id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+      domain: {
+        namespaces: {
+          __unbound__: {
+            models: {
+              User: {
+                storage: { table: 'user', fields: { id: { column: 'id' } } },
+                fields: {
+                  id: { type: { kind: 'scalar', codecId: 'pg/text@1' }, nullable: false },
+                },
+                relations: null,
+              },
+            },
           },
-          relations: null,
         },
       },
       storage: storageWithNamespacedTables({
