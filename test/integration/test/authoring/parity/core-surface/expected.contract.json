@@ -6,16 +6,16 @@
   "roots": {
     "post": {
       "model": "Post",
-      "namespace": "__unbound__"
+      "namespace": "public"
     },
     "user": {
       "model": "User",
-      "namespace": "__unbound__"
+      "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
-      "__unbound__": {
+      "public": {
         "models": {
           "Post": {
             "fields": {
@@ -57,7 +57,7 @@
                 },
                 "to": {
                   "model": "User",
-                  "namespace": "__unbound__"
+                  "namespace": "public"
                 }
               }
             },
@@ -157,6 +157,19 @@
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",
+        "tables": {}
+      },
+      "public": {
+        "enum": {
+          "Role": {
+            "codecId": "pg/enum@1",
+            "kind": "postgres-enum",
+            "name": "Role",
+            "nativeType": "Role",
+            "values": ["USER", "ADMIN"]
+          }
+        },
+        "id": "public",
         "tables": {
           "post": {
             "columns": {
@@ -193,12 +206,12 @@
                 "onUpdate": "cascade",
                 "source": {
                   "columns": ["userId"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "post"
                 },
                 "target": {
                   "columns": ["id"],
-                  "namespaceId": "__unbound__",
+                  "namespaceId": "public",
                   "tableName": "user"
                 }
               }
@@ -276,22 +289,9 @@
             ]
           }
         }
-      },
-      "public": {
-        "enum": {
-          "Role": {
-            "codecId": "pg/enum@1",
-            "kind": "postgres-enum",
-            "name": "Role",
-            "nativeType": "Role",
-            "values": ["USER", "ADMIN"]
-          }
-        },
-        "id": "public",
-        "tables": {}
       }
     },
-    "storageHash": "sha256:2ac4e1fa70a86dec2a8e97c796547184374f48ad9c43afeebfddf2c94c5365dd",
+    "storageHash": "sha256:a901bb3c04da99b42ac7a5b5e7ea162dfcc22231a690177743353cb6c501262b",
     "types": {
       "Email": {
         "codecId": "pg/text@1",
