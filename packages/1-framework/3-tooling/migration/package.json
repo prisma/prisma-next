@@ -31,13 +31,18 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
-  "engines": {
-    "node": ">=20"
-  },
   "exports": {
     "./metadata": {
       "types": "./dist/exports/metadata.d.mts",
@@ -100,6 +105,9 @@
       "import": "./dist/exports/aggregate.mjs"
     },
     "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

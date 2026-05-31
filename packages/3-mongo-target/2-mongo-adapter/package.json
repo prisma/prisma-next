@@ -32,9 +32,6 @@
     "@prisma-next/utils": "workspace:0.11.0",
     "arktype": "catalog:"
   },
-  "peerDependencies": {
-    "mongodb": "^7.0.0"
-  },
   "devDependencies": {
     "mongodb": "catalog:",
     "@prisma-next/driver-mongo": "workspace:0.11.0",
@@ -49,10 +46,20 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "mongodb": "^7.0.0",
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
     "./codec-types": "./dist/codec-types.mjs",
@@ -60,7 +67,6 @@
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
-  "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",

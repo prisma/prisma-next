@@ -46,10 +46,19 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
+  "types": "./dist/pack.d.mts",
   "exports": {
     "./codec-types": "./dist/codec-types.mjs",
     "./control": "./dist/control.mjs",
@@ -63,8 +72,7 @@
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-mongo-target/1-mongo-target"
   },
-  "types": "./dist/pack.d.mts",
   "prismaNext": {
-    "minServerVersion": "6.0"
+    "minServerVersion": "8.0"
   }
 }

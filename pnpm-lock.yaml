@@ -1195,7 +1195,11 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/0-shared/extension-author-tools: {}
+  packages/0-shared/extension-author-tools:
+    dependencies:
+      typescript:
+        specifier: '>=5.9'
+        version: 5.9.3
 
   packages/1-framework/0-foundation/contract:
     dependencies:
@@ -1793,6 +1797,9 @@ importers:
       strip-ansi:
         specifier: ^7.2.0
         version: 7.2.0
+      typescript:
+        specifier: '>=5.9'
+        version: 5.9.3
       wrap-ansi:
         specifier: ^10.0.0
         version: 10.0.0

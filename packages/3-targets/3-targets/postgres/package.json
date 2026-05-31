@@ -41,6 +41,14 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src",
@@ -81,6 +89,6 @@
     "directory": "packages/3-targets/3-targets/postgres"
   },
   "prismaNext": {
-    "minServerVersion": "14"
+    "minServerVersion": "17"
   }
 }

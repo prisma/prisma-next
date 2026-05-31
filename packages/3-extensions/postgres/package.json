@@ -45,18 +45,19 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/3-extensions/postgres"
-  },
-  "engines": {
-    "node": ">=20"
-  },
+  "types": "./dist/runtime.d.mts",
   "exports": {
     "./config": "./dist/config.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
@@ -68,5 +69,12 @@
     "./target": "./dist/target.mjs",
     "./package.json": "./package.json"
   },
-  "types": "./dist/runtime.d.mts"
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/postgres"
+  }
 }

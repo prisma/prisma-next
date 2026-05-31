@@ -42,15 +42,19 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "src"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prisma/prisma-next.git",
-    "directory": "packages/3-extensions/sqlite"
-  },
+  "types": "./dist/runtime.d.mts",
   "exports": {
     "./config": "./dist/config.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
@@ -59,5 +63,9 @@
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
-  "types": "./dist/runtime.d.mts"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/sqlite"
+  }
 }
