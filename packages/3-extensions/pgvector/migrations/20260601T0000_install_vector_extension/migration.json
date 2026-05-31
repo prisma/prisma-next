@@ -3,5 +3,5 @@
   "to": "sha256:192ac515d804995e7d81598000566a4359e1ad2c0b2ec16f8d324ab90e2407bc",
   "providedInvariants": ["pgvector:install-vector-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
-  "migrationHash": "sha256:d7357d41724e5a75f74909bf558d6d36f317d01a8f1a61e5a92f80d4ca07718b"
+  "migrationHash": "sha256:9394dd0daeabc68c5566f1164ac6b729b32d11dd70d4e0898df6d04aa4ef6f68"
 }

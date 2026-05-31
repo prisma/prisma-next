@@ -1,4 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type {
   ControlAdapterDescriptor,

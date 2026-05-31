@@ -1,4 +1,4 @@
-import type { Contract, ExecutionHashBase } from '@prisma-next/contract/types';
+import type { ExecutionHashBase } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type {
   ControlAdapterDescriptor,
