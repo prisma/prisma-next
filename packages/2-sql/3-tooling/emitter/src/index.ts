@@ -1,4 +1,4 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import { type Contract, type ContractModel, contractModels } from '@prisma-next/contract/types';
 import {
   serializeNamespaceId,
   serializeObjectKey,
@@ -112,7 +112,7 @@ export const sqlEmission = {
 
     assertUniqueSqlTableNames(storage);
 
-    const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
+    const models = contractModels(contract) as Record<string, ContractModel<SqlModelStorage>>;
     const tableNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
       for (const t of Object.keys(ns.tables)) {

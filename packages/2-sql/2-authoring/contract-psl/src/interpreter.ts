@@ -9,7 +9,7 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
-import { crossRef } from '@prisma-next/contract/types';
+import { contractModels, crossRef } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
@@ -1675,7 +1675,7 @@ export function interpretPslDocumentToSqlContract(
   });
 
   let patchedModels = patchModelDomainFields(
-    contract.models as Record<string, ContractModel>,
+    contractModels(contract) as Record<string, ContractModel>,
     modelResolvedFields,
   );
 
@@ -1708,8 +1708,27 @@ export function interpretPslDocumentToSqlContract(
   const patchedContract: Contract = {
     ...contract,
     roots: filteredRoots,
-    models: patchedModels,
-    ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
+    domain: {
+      namespaces: Object.fromEntries(
+        Object.entries(contract.domain.namespaces).map(([namespaceId, namespaceSlice]) => [
+          namespaceId,
+          {
+            models: Object.fromEntries(
+              Object.entries(namespaceSlice.models).map(([modelName, model]) => [
+                modelName,
+                patchedModels[modelName] ?? model,
+              ]),
+            ),
+            ...(namespaceSlice.valueObjects !== undefined
+              ? { valueObjects: namespaceSlice.valueObjects }
+              : {}),
+            ...(namespaceId === UNBOUND_NAMESPACE_ID && Object.keys(valueObjects).length > 0
+              ? { valueObjects }
+              : {}),
+          },
+        ]),
+      ),
+    },
   };
 
   return ok(patchedContract);

@@ -1,4 +1,10 @@
-import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  type ContractModel,
+  type ContractValueObject,
+  contractModels,
+  contractValueObjects,
+} from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   EmissionSpi,
@@ -50,14 +56,16 @@ export function generateContractDts(
 
   const storageType = emitter.generateStorageType(contract, 'StorageHash');
 
-  const modelsType = generateModelsType(
-    contract.models as Record<string, ContractModel>,
-    (name, model) => emitter.generateModelStorageType(name, model),
+  const modelsRecord = contractModels(contract) as Record<string, ContractModel>;
+  const modelsType = generateModelsType(modelsRecord, (name, model) =>
+    emitter.generateModelStorageType(name, model),
   );
 
   const rootsType = generateRootsType(contract.roots);
 
-  const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
+  const valueObjects = contractValueObjects(contract) as
+    | Record<string, ContractValueObject>
+    | undefined;
   const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
   const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
 
@@ -68,14 +76,14 @@ export function generateContractDts(
 
   const resolveFieldTypeParams = emitter.resolveFieldTypeParams
     ? (modelName: string, fieldName: string) => {
-        const model = (contract.models as Record<string, ContractModel> | undefined)?.[modelName];
+        const model = modelsRecord[modelName];
         if (!model) return undefined;
         return emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract);
       }
     : undefined;
 
   const fieldTypesMaps = generateBothFieldTypesMaps(
-    contract.models as Record<string, ContractModel> | undefined,
+    modelsRecord,
     codecLookup,
     resolveFieldTypeParams,
   );

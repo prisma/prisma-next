@@ -4,6 +4,8 @@ import {
   type ContractField,
   type ContractModel,
   CrossReferenceSchema,
+  contractModels,
+  normalizeLegacyDomainRoot,
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -418,9 +420,14 @@ export function createSqlContractSchema(
     'extensionPacks?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
     'roots?': type({ '[string]': CrossReferenceSchema }),
-    models: type({ '[string]': ModelSchema }),
-    'valueObjects?': 'Record<string, unknown>',
-    'domain?': 'unknown',
+    domain: type({
+      namespaces: type({
+        '[string]': type({
+          models: type({ '[string]': ModelSchema }),
+          'valueObjects?': 'Record<string, unknown>',
+        }),
+      }),
+    }),
     storage,
     'execution?': ExecutionSchema,
   }) as Type<unknown>;
@@ -682,7 +689,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
  * columns. Throws `ContractValidationError` on the first mismatch.
  */
 export function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
-  const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
+  const models = contractModels(contract) as Record<string, ContractModel<SqlModelStorage>>;
   for (const [modelName, model] of Object.entries(models)) {
     const storageTable = model.storage.table;
 
@@ -851,15 +858,14 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(
     typeof value === 'object' && value !== null
       ? (() => {
           const { schemaVersion: _, _generated: _g, ...rest } = value as Record<string, unknown>;
-          return rest;
+          return normalizeLegacyDomainRoot(rest);
         })()
       : value;
   const schema = options?.contractSchema ?? SqlContractSchema;
   const validated = validateSqlContractStructure<T>(stripped, schema);
   validateContractDomain({
     roots: validated.roots,
-    models: validated.models,
-    ...(validated.valueObjects ? { valueObjects: validated.valueObjects } : {}),
+    domain: validated.domain,
   });
   validateSqlStorageConsistency(validated);
   const semanticErrors = validateStorageSemantics(validated.storage);

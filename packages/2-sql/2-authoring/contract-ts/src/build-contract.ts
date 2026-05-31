@@ -305,7 +305,7 @@ export function buildSqlContractFromDefinition(
   const tableNameToNamespaceId = new Map<string, string>();
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
-  const models: Record<string, ContractModel> = {};
+  const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
   const roots: Record<string, CrossReference> = {};
 
   for (const semanticModel of definition.models) {
@@ -503,7 +503,12 @@ export function buildSqlContractFromDefinition(
       };
     }
 
-    models[semanticModel.modelName] = {
+    let namespaceModels = modelsByNamespace[namespaceId];
+    if (namespaceModels === undefined) {
+      namespaceModels = {};
+      modelsByNamespace[namespaceId] = namespaceModels;
+    }
+    namespaceModels[semanticModel.modelName] = {
       storage: {
         table: tableName,
         fields: storageFields,
@@ -563,10 +568,6 @@ export function buildSqlContractFromDefinition(
       }),
     ),
   );
-  const domainUnboundTypes =
-    Object.keys(documentTypes).length > 0 ? { types: documentTypes } : undefined;
-  const domain =
-    domainUnboundTypes !== undefined ? { [UNBOUND_NAMESPACE_ID]: domainUnboundTypes } : undefined;
   const storageWithoutHash = {
     ...(Object.keys(documentTypes).length > 0 ? { types: documentTypes } : {}),
     namespaces,
@@ -665,15 +666,28 @@ export function buildSqlContractFromDefinition(
         )
       : undefined;
 
+  const domainNamespaceIds = new Set([
+    ...namespaceCoordinateIds,
+    ...Object.keys(modelsByNamespace),
+  ]);
+  const domainNamespaces = Object.fromEntries(
+    [...domainNamespaceIds].sort().map((namespaceId) => {
+      const modelsInNs = modelsByNamespace[namespaceId] ?? {};
+      const namespaceSlice =
+        namespaceId === UNBOUND_NAMESPACE_ID && valueObjects !== undefined
+          ? { models: modelsInNs, valueObjects }
+          : { models: modelsInNs };
+      return [namespaceId, namespaceSlice];
+    }),
+  );
+
   const contract: Contract<SqlStorage> = {
     target,
     targetFamily,
-    models,
+    domain: { namespaces: domainNamespaces },
     roots,
     storage,
-    ...(domain !== undefined ? { domain } : {}),
     ...(executionWithHash ? { execution: executionWithHash } : {}),
-    ...ifDefined('valueObjects', valueObjects),
     extensionPacks,
     capabilities,
     profileHash,

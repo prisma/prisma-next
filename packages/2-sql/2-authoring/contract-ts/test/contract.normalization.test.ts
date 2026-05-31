@@ -3,6 +3,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { modelsOf } from './contract-test-helpers';
 import { crossRef } from './cross-ref-helpers';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 import { unboundTables } from './unbound-tables';
@@ -317,7 +318,7 @@ describe('SqlContractSerializer structural validation', () => {
       }),
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
+    expect((modelsOf(contract)['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: crossRef('Post'),
         on: { localFields: ['id'], targetFields: ['userId'] },
@@ -386,7 +387,7 @@ describe('SqlContractSerializer structural validation', () => {
       }),
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
+    expect((modelsOf(contract)['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: crossRef('Post'),
         on: { localFields: ['id'], targetFields: ['userId'] },
