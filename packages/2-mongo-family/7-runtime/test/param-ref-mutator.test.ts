@@ -87,6 +87,124 @@ describe('flattenMongoParamRefs', () => {
     };
     expect([...flattenMongoParamRefs(draft)]).toEqual([filterRef, updateRef]);
   });
+
+  it.each([
+    {
+      label: 'updateMany',
+      draft: {
+        kind: 'updateMany',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        update: { $set: { active: new MongoParamRef(true) } },
+        upsert: undefined,
+      } satisfies MongoLoweredDraft,
+      expectedLength: 2,
+    },
+    {
+      label: 'deleteOne',
+      draft: {
+        kind: 'deleteOne',
+        collection: 'users',
+        filter: { id: new MongoParamRef('x') },
+      } satisfies MongoLoweredDraft,
+      expectedLength: 1,
+    },
+    {
+      label: 'findOneAndUpdate',
+      draft: {
+        kind: 'findOneAndUpdate',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        update: { $set: { v: new MongoParamRef('next') } },
+        upsert: true,
+        sort: { _id: 1 as const },
+        returnDocument: 'after' as const,
+      } satisfies MongoLoweredDraft,
+      expectedLength: 2,
+    },
+    {
+      label: 'findOneAndDelete',
+      draft: {
+        kind: 'findOneAndDelete',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        sort: undefined,
+      } satisfies MongoLoweredDraft,
+      expectedLength: 1,
+    },
+    {
+      label: 'rawInsertMany',
+      draft: {
+        kind: 'rawInsertMany',
+        collection: 'users',
+        documents: [{ name: new MongoParamRef('a') }],
+      } satisfies MongoLoweredDraft,
+      expectedLength: 1,
+    },
+    {
+      label: 'rawUpdateOne',
+      draft: {
+        kind: 'rawUpdateOne',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        update: [{ $set: { v: new MongoParamRef(2) } }],
+      } satisfies MongoLoweredDraft,
+      expectedLength: 2,
+    },
+    {
+      label: 'rawUpdateMany',
+      draft: {
+        kind: 'rawUpdateMany',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        update: { $set: { v: new MongoParamRef(2) } },
+      } satisfies MongoLoweredDraft,
+      expectedLength: 2,
+    },
+    {
+      label: 'rawDeleteOne',
+      draft: {
+        kind: 'rawDeleteOne',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+      } satisfies MongoLoweredDraft,
+      expectedLength: 1,
+    },
+    {
+      label: 'rawDeleteMany',
+      draft: {
+        kind: 'rawDeleteMany',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+      } satisfies MongoLoweredDraft,
+      expectedLength: 1,
+    },
+    {
+      label: 'rawFindOneAndUpdate',
+      draft: {
+        kind: 'rawFindOneAndUpdate',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        update: { $set: { v: new MongoParamRef(2) } },
+        upsert: false,
+        sort: undefined,
+        returnDocument: undefined,
+      } satisfies MongoLoweredDraft,
+      expectedLength: 2,
+    },
+    {
+      label: 'rawFindOneAndDelete',
+      draft: {
+        kind: 'rawFindOneAndDelete',
+        collection: 'users',
+        filter: { id: new MongoParamRef(1) },
+        sort: undefined,
+      } satisfies MongoLoweredDraft,
+      expectedLength: 1,
+    },
+  ] as const)('flattens $label drafts', ({ draft, expectedLength }) => {
+    expect([...flattenMongoParamRefs(draft)]).toHaveLength(expectedLength);
+  });
 });
 
 // ─── createMongoParamRefMutator ─────────────────────────────────────────────
@@ -255,6 +373,79 @@ describe('createMongoParamRefMutator', () => {
       }
     });
 
+    it('handles replacement inside array-valued document fields', () => {
+      const ref = new MongoParamRef('draft');
+      const draft: MongoLoweredDraft = {
+        kind: 'insertOne',
+        collection: 'users',
+        document: { tags: [ref] },
+      };
+      const mutator = createMongoParamRefMutator(draft);
+      const [entry] = [...mutator.entries()];
+      mutator.replaceValues([{ ref: entry!.ref, newValue: 'published' }]);
+
+      const updated = mutator.currentDraft();
+      if (updated.kind === 'insertOne') {
+        const tags = updated.document['tags'] as MongoParamRef[];
+        expect(tags[0]!.value).toBe('published');
+      }
+    });
+
+    it('leaves primitive document slots unchanged', () => {
+      const ref = new MongoParamRef('Alice');
+      const draft: MongoLoweredDraft = {
+        kind: 'insertOne',
+        collection: 'users',
+        document: { count: 3, name: ref },
+      };
+      const mutator = createMongoParamRefMutator(draft);
+      const [entry] = [...mutator.entries()];
+      mutator.replaceValues([{ ref: entry!.ref, newValue: 'Bob' }]);
+
+      const updated = mutator.currentDraft();
+      if (updated.kind === 'insertOne') {
+        expect(updated.document['count']).toBe(3);
+        expect((updated.document['name'] as MongoParamRef).value).toBe('Bob');
+      }
+    });
+
+    it('rebuilds rawInsertOne and updateOne drafts', () => {
+      const rawRef = new MongoParamRef('raw');
+      const rawDraft: MongoLoweredDraft = {
+        kind: 'rawInsertOne',
+        collection: 'users',
+        document: { token: rawRef },
+      };
+      const rawMutator = createMongoParamRefMutator(rawDraft);
+      const [rawEntry] = [...rawMutator.entries()];
+      rawMutator.replaceValues([{ ref: rawEntry!.ref, newValue: 'sealed' }]);
+      const rawUpdated = rawMutator.currentDraft();
+      if (rawUpdated.kind === 'rawInsertOne') {
+        expect((rawUpdated.document['token'] as MongoParamRef).value).toBe('sealed');
+      }
+
+      const filterRef = new MongoParamRef(1);
+      const updateRef = new MongoParamRef('admin');
+      const updateDraft: MongoLoweredDraft = {
+        kind: 'updateOne',
+        collection: 'users',
+        filter: { id: filterRef },
+        update: { $set: { role: updateRef } },
+        upsert: false,
+      };
+      const updateMutator = createMongoParamRefMutator(updateDraft);
+      const updateEntries = [...updateMutator.entries()];
+      updateMutator.replaceValues([{ ref: updateEntries[1]!.ref, newValue: 'moderator' }]);
+      const updateUpdated = updateMutator.currentDraft();
+      if (updateUpdated.kind === 'updateOne') {
+        const set = (updateUpdated.update as Record<string, unknown>)['$set'] as Record<
+          string,
+          unknown
+        >;
+        expect((set['role'] as MongoParamRef).value).toBe('moderator');
+      }
+    });
+
     it('handles replacement in filter predicates', () => {
       const ref = new MongoParamRef('active');
       const draft: MongoLoweredDraft = {
@@ -291,6 +482,249 @@ describe('createMongoParamRefMutator', () => {
         expect((amount['$gt'] as MongoParamRef).value).toBe(200);
       }
     });
+
+    it('replaceValue applies a single handle update', () => {
+      const ref = new MongoParamRef('before', { codecId: 'string' });
+      const draft: MongoLoweredDraft = {
+        kind: 'insertOne',
+        collection: 'users',
+        document: { token: ref },
+      };
+      const mutator = createMongoParamRefMutator<{ string: string }>(draft);
+      const [entry] = [...mutator.entries()];
+      if (entry?.codecId === 'string') {
+        mutator.replaceValue(entry.ref, 'after');
+      }
+
+      const updated = mutator.currentDraft();
+      expect(updated.kind).toBe('insertOne');
+      if (updated.kind === 'insertOne') {
+        expect((updated.document['token'] as MongoParamRef).value).toBe('after');
+      }
+    });
+
+    it.each([
+      {
+        label: 'updateMany',
+        refIndex: 1,
+        draft: {
+          kind: 'updateMany',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          update: { $set: { active: new MongoParamRef(false) } },
+          upsert: undefined,
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'updateMany') throw new Error('wrong kind');
+          return (updated.update as Record<string, unknown>)['$set'] as Record<string, unknown>;
+        },
+        field: 'active',
+      },
+      {
+        label: 'deleteOne',
+        refIndex: 0,
+        draft: {
+          kind: 'deleteOne',
+          collection: 'users',
+          filter: { id: new MongoParamRef('old') },
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'deleteOne') throw new Error('wrong kind');
+          return updated.filter;
+        },
+        field: 'id',
+      },
+      {
+        label: 'findOneAndUpdate',
+        refIndex: 1,
+        draft: {
+          kind: 'findOneAndUpdate',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          update: { $set: { v: new MongoParamRef('a') } },
+          upsert: false,
+          sort: undefined,
+          returnDocument: 'before' as const,
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'findOneAndUpdate') throw new Error('wrong kind');
+          return (updated.update as Record<string, unknown>)['$set'] as Record<string, unknown>;
+        },
+        field: 'v',
+      },
+      {
+        label: 'findOneAndDelete',
+        refIndex: 0,
+        draft: {
+          kind: 'findOneAndDelete',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          sort: { _id: -1 as const },
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'findOneAndDelete') throw new Error('wrong kind');
+          return updated.filter;
+        },
+        field: 'id',
+      },
+      {
+        label: 'rawInsertMany',
+        refIndex: 0,
+        draft: {
+          kind: 'rawInsertMany',
+          collection: 'users',
+          documents: [{ name: new MongoParamRef('a') }],
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawInsertMany') throw new Error('wrong kind');
+          return updated.documents[0]!;
+        },
+        field: 'name',
+      },
+      {
+        label: 'rawUpdateOne pipeline',
+        refIndex: 1,
+        draft: {
+          kind: 'rawUpdateOne',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          update: [{ $set: { v: new MongoParamRef(0) } }],
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawUpdateOne') throw new Error('wrong kind');
+          const stage = (updated.update as ReadonlyArray<Record<string, unknown>>)[0]!;
+          return stage['$set'] as Record<string, unknown>;
+        },
+        field: 'v',
+      },
+      {
+        label: 'rawFindOneAndUpdate',
+        refIndex: 1,
+        draft: {
+          kind: 'rawFindOneAndUpdate',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          update: { $set: { v: new MongoParamRef(0) } },
+          upsert: true,
+          sort: undefined,
+          returnDocument: undefined,
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawFindOneAndUpdate') throw new Error('wrong kind');
+          return (updated.update as Record<string, unknown>)['$set'] as Record<string, unknown>;
+        },
+        field: 'v',
+      },
+      {
+        label: 'rawUpdateMany',
+        refIndex: 1,
+        draft: {
+          kind: 'rawUpdateMany',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          update: { $set: { v: new MongoParamRef(0) } },
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawUpdateMany') throw new Error('wrong kind');
+          return (updated.update as Record<string, unknown>)['$set'] as Record<string, unknown>;
+        },
+        field: 'v',
+      },
+      {
+        label: 'rawDeleteOne',
+        refIndex: 0,
+        draft: {
+          kind: 'rawDeleteOne',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawDeleteOne') throw new Error('wrong kind');
+          return updated.filter;
+        },
+        field: 'id',
+      },
+      {
+        label: 'rawDeleteMany',
+        refIndex: 0,
+        draft: {
+          kind: 'rawDeleteMany',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawDeleteMany') throw new Error('wrong kind');
+          return updated.filter;
+        },
+        field: 'id',
+      },
+      {
+        label: 'rawFindOneAndDelete',
+        refIndex: 0,
+        draft: {
+          kind: 'rawFindOneAndDelete',
+          collection: 'users',
+          filter: { id: new MongoParamRef(1) },
+          sort: undefined,
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawFindOneAndDelete') throw new Error('wrong kind');
+          return updated.filter;
+        },
+        field: 'id',
+      },
+      {
+        label: 'rawAggregate pipeline',
+        refIndex: 0,
+        draft: {
+          kind: 'rawAggregate',
+          collection: 'orders',
+          pipeline: [{ $match: { amount: { $gt: new MongoParamRef(1) } } }],
+        } satisfies MongoLoweredDraft,
+        read: (updated: MongoLoweredDraft) => {
+          if (updated.kind !== 'rawAggregate') throw new Error('wrong kind');
+          const match = updated.pipeline[0]!['$match'] as Record<string, unknown>;
+          return match['amount'] as Record<string, unknown>;
+        },
+        field: '$gt',
+      },
+    ])('rebuilds $label draft after replacement', ({ draft, read, field, refIndex }) => {
+      const mutator = createMongoParamRefMutator(draft);
+      const entries = [...mutator.entries()];
+      mutator.replaceValues([{ ref: entries[refIndex]!.ref, newValue: 'mutated' }]);
+      const slot = read(mutator.currentDraft());
+      expect((slot[field] as MongoParamRef).value).toBe('mutated');
+    });
+  });
+
+  it('reuses the overrides map across sequential replacements', () => {
+    const ref1 = new MongoParamRef('a', { codecId: 'string' });
+    const ref2 = new MongoParamRef('b', { codecId: 'string' });
+    const draft: MongoLoweredDraft = {
+      kind: 'insertOne',
+      collection: 'users',
+      document: { first: ref1, second: ref2 },
+    };
+    const mutator = createMongoParamRefMutator<{ string: string }>(draft);
+    const entries = [...mutator.entries()];
+    const first = entries.find((e) => e.value === 'a');
+    const second = entries.find((e) => e.value === 'b');
+    if (first?.codecId === 'string') {
+      mutator.replaceValue(first.ref, 'A');
+    }
+    if (second?.codecId === 'string') {
+      mutator.replaceValue(second.ref, 'B');
+    }
+
+    const reread = [...mutator.entries()];
+    expect(reread.find((e) => e.codecId === 'string' && e.value === 'A')).toBeDefined();
+    expect(reread.find((e) => e.codecId === 'string' && e.value === 'B')).toBeDefined();
+
+    const updated = mutator.currentDraft();
+    if (updated.kind === 'insertOne') {
+      expect((updated.document['first'] as MongoParamRef).value).toBe('A');
+      expect((updated.document['second'] as MongoParamRef).value).toBe('B');
+    }
   });
 
   describe('reference-identity fast path', () => {
