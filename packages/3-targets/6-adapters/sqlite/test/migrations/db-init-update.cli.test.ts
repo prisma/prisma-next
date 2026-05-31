@@ -35,7 +35,7 @@ import {
  *
  * Locks the CLI-level half of:
  *
- * - rollback semantics — a multi-space failure rolls back every
+ * - rollback semantics — a failure in any space rolls back every
  *   space's writes and preserves pre-execution markers.
  * - atomic init across spaces.
  * - only the bumped extension advances on a follow-up update.
@@ -43,8 +43,8 @@ import {
  *   (loader → `planMigration` synth strategy → `frameworkComponents`).
  *
  * Companion to the unit-level tests in `@prisma-next/cli` that mock
- * the planner / runner. The runner-level multi-space coverage lives in
- * `runner.multi-space.test.ts`.
+ * the planner / runner. The runner-level cross-space coverage lives in
+ * `runner.across-spaces.test.ts`.
  *
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
@@ -515,7 +515,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     // Every other test in this file declares at least one extension
     // pack; this one exercises the empty-extensionPacks path through
     // the aggregate loader / planner / runner so a future refactor
-    // that breaks single-space SQLite does not slip past CI.
+    // that breaks app-only SQLite does not slip past CI.
     const tmpDir = createTmpDir();
     const migrationsDir = join(tmpDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });

@@ -43,7 +43,7 @@ examples/multi-extension-monorepo/
 │   │       └── control.ts               ← `auditExtensionDescriptor` (JSON-import wiring)
 │   └── feature-flags/                   ← internal "package" #2 (same shape)
 └── test/
-    └── multi-space.e2e.integration.test.ts
+    └── e2e.integration.test.ts
 ```
 
 The aggregate root at `app/prisma-next.config.ts` is the config an application author writes — the CLI reads it for `contract emit`, `migration plan`, `db init`, and `db update`. It imports the extension descriptors from `packages/*/src/control.ts` and lists them in `extensionPacks`, exactly as a real application would import published extensions from npm.
@@ -86,4 +86,4 @@ Each internal "package" under `packages/` follows the **contract-space package l
 4. Update `migrations/refs/head.json` to point at the new contract `storageHash` plus the union of `providedInvariants` across all migrations.
 5. The descriptor at `packages/<pkg>/src/control.ts` is **JSON-import wiring** over the on-disk artefacts; no manual edits are required for routine schema changes.
 
-The `multi-space.e2e.integration.test.ts` consumes both descriptors through their public `contractSpace` surface — pulling `{contractJson, migrations, headRef}` directly — so the only thing the test depends on at the source level are `src/constants.ts` (for `<PKG>_SPACE_ID`, table names, etc.) and `src/control.ts` (the descriptor itself).
+The `e2e.integration.test.ts` consumes both descriptors through their public `contractSpace` surface — pulling `{contractJson, migrations, headRef}` directly — so the only thing the test depends on at the source level are `src/constants.ts` (for `<PKG>_SPACE_ID`, table names, etc.) and `src/control.ts` (the descriptor itself).

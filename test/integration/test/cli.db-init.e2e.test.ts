@@ -296,8 +296,8 @@ withTempDir(({ createTempDir }) => {
 
             // Verify structure - should be noop with existing marker.
             // The noop case routes through `execute` with an
-            // empty plan; the summary reflects the multi-space envelope
-            // rather than a single-space "already at target" string.
+            // empty plan; the summary reflects the across-spaces envelope
+            // rather than a bare "already at target" string.
             expect(jsonOutput).toMatchObject({
               ok: true,
               mode: 'apply',

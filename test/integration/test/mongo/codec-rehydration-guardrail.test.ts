@@ -186,7 +186,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
     await db.dropDatabase();
   });
 
-  it('runs rehydrated multi-space aggregate without consulting codec runtime instances', async () => {
+  it('runs a rehydrated aggregate across spaces without consulting codec runtime instances', async () => {
     // Family stack carries NO codec runtime instances — empty
     // `controlStack` means no `extensionPacks`, no codec
     // descriptors, nothing for the runner to consult. If the runner

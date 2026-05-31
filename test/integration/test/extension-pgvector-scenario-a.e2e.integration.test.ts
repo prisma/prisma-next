@@ -324,7 +324,7 @@ describe.sequential('pgvector Scenario A end-to-end (PGlite, T4.3)', {
     expect(installOp?.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS vector');
   });
 
-  it('mode=plan against the real install op produces a multi-space plan', async () => {
+  it('mode=plan against the real install op produces a plan across spaces', async () => {
     project = await setupTestProject({ migration: pgvectorBaselineMigration });
 
     const result = await executeDbInit({

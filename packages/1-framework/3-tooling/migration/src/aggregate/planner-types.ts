@@ -99,8 +99,8 @@ export interface PlannerInput<TFamilyId extends string, TTargetId extends string
 /**
  * Per-edge metadata for the chain assembled by the graph-walk
  * strategy. Lets `migrate` surface a per-migration `applied[]`
- * entry (preserving the single-space `migrationsApplied` count
- * semantics) without re-walking the graph.
+ * entry (preserving the `migrationsApplied` count semantics) without
+ * re-walking the graph.
  *
  * `synth`-produced plans leave this absent — synthesised plans don't
  * have authored edges to surface.

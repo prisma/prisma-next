@@ -60,8 +60,6 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
    * Optional app-space ref override. When provided, the app member's
    * graph-walk targets this hash instead of `member.headRef.hash`.
    * Extensions are unaffected — they always walk to their own head.
-   *
-   * Sub-spec § `--ref <hash>` semantics under multi-space.
    */
   readonly refHash?: string;
   /**
@@ -393,7 +391,7 @@ interface BuildSuccessArgs {
 
 function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
   // The marker hash surfaced at the top level is the **app member's**
-  // post-apply marker (today's single-space `markerHash` field).
+  // post-apply marker (the top-level `markerHash` field).
   // Per-space markers live on `perSpace[].marker.storageHash`.
   const appResolution = args.orderedResolutions.find(
     (r) => r.spaceId === args.aggregate.app.spaceId,
@@ -402,10 +400,9 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
     appResolution?.entry.plan.destination.storageHash ?? requireHeadRef(args.aggregate.app).hash;
 
   // Per-migration entries (one per authored edge) preserve the
-  // single-space `migrationsApplied` count semantics for back-compat
-  // with existing JSON-shape consumers (e.g. `parsed.applied.length`
-  // in integration tests). The aggregate per-space breakdown lives on
-  // `perSpace[]`.
+  // `migrationsApplied` count semantics for back-compat with existing
+  // JSON-shape consumers (e.g. `parsed.applied.length` in integration
+  // tests). The aggregate per-space breakdown lives on `perSpace[]`.
   const applied = args.orderedResolutions.flatMap((r) => {
     const edges = r.entry.migrationEdges ?? [];
     return edges.map((edge) => ({
@@ -486,11 +483,10 @@ export function buildPathNotFoundFailure(
   targetHash: string,
 ): MigrationApplyFailure {
   const fromHash = marker?.storageHash ?? '<empty>';
-  // The single-space-degenerate phrasing names the user-visible
-  // condition (a contract has been emitted that no on-disk
-  // migration reaches) so the error reads naturally for the
-  // single-space app case. Multi-space callers see the same
-  // condition expressed against the offending space.
+  // The app-case phrasing names the user-visible condition (a
+  // contract has been emitted that no on-disk migration reaches) so
+  // the error reads naturally for the app member. Extension spaces
+  // see the same condition expressed against the offending space.
   const summary =
     spaceId === 'app'
       ? 'Current contract has no planned migration path'

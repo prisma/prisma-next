@@ -31,13 +31,13 @@ import {
  * Postgres equivalent of the SQLite `db-init-update.cli.test.ts`.
  *
  * Locks the CLI-level half of:
- * - AM4 (rollback) — multi-space failure rolls back every space's
+ * - AM4 (rollback) — a failure in any space rolls back every space's
  *   writes and preserves pre-execution markers.
  * - AM9 (atomic init across spaces).
  * - AM10 (only the bumped extension advances on a follow-up update).
  *
  * The runner-level half of AM12 is locked by the existing
- * `runner.multi-space.integration.test.ts` in this package.
+ * `runner.across-spaces.integration.test.ts` in this package.
  */
 
 const EXT_SPACE_ID = 'pg_ext_test_contract_space';

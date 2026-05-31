@@ -216,7 +216,7 @@ describe('formatMigrationApplyOutput', () => {
     // M6 (T6.5 / AC4): single-line `Signature:` is replaced. When the
     // result carries no per-space breakdown we fall back to a labelled
     // `App-space marker:` line that names what the hash covers; the
-    // multi-space block lives in the per-space output (see other tests).
+    // across-spaces block lives in the per-space output (see other tests).
     expect(stripped).toContain('App-space marker: sha256:dest-hash');
     expect(stripped).not.toContain('Signature: sha256:dest-hash');
   });

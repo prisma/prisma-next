@@ -268,7 +268,7 @@ describe('runContractSpaceSeedPhase', () => {
     expect(out.seeded).toEqual([]);
   });
 
-  it('orders multi-space output deterministically (alphabetical by spaceId)', async () => {
+  it('orders per-space output deterministically (alphabetical by spaceId)', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
       extensionPacks: [

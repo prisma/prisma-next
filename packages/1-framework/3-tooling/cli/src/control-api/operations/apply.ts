@@ -24,8 +24,8 @@ const APPLY_SPAN_ID = 'apply' as const;
 export type ApplyAction = 'dbInit' | 'dbUpdate' | 'migrationApply';
 
 /**
- * Failure variant emitted by {@link applyMigration} when the multi-space
- * runner itself rejects the apply. Mirrors the failure shape callers
+ * Failure variant emitted by {@link applyMigration} when the runner
+ * itself rejects the apply. Mirrors the failure shape callers
  * already wrap into their own action-specific failure envelopes
  * (`DbInitFailure`, `DbUpdateFailure`, `MigrationApplyFailure`) so each
  * caller keeps owning its own discriminated failure code.
@@ -95,7 +95,7 @@ export type ApplyMigrationResult = Result<ApplyMigrationValue, ApplyRunnerFailur
  * Runner-driving tail shared by every apply caller — `db init`,
  * `db update`, and `migrate`. Consumes already-resolved per-space
  * plans (the planner-vs-replay distinction is owned by the caller) and
- * dispatches them to the multi-space runner in canonical order.
+ * dispatches them to the runner in canonical order.
  *
  * Marker advancement is part of the runner's per-space transaction
  * (the SQL family runner writes the marker as the last step of each
