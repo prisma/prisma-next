@@ -1,6 +1,6 @@
 import type { CrossReference } from './cross-reference';
 import type { DomainPlane } from './domain-envelope';
-import type { ContractModelBase } from './domain-types';
+import type { ContractModelBase, ContractValueObject } from './domain-types';
 import type {
   ExecutionHashBase,
   ExecutionMutationDefault,
@@ -61,3 +61,31 @@ export interface Contract<
 
 export type ContractModelsMap<TContract extends Contract> =
   TContract extends Contract<StorageBase, infer TModels> ? TModels : never;
+
+type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
+  value: infer I,
+) => void
+  ? I
+  : never;
+
+type NamespaceValueObjectsOf<TNamespace> = TNamespace extends {
+  readonly valueObjects?: infer VO;
+}
+  ? VO extends Record<string, ContractValueObject>
+    ? VO
+    : Record<never, never>
+  : Record<never, never>;
+
+/** Merged value-object map across all domain namespaces (for type-level inference). */
+export type ContractValueObjectsMap<TContract extends Contract> =
+  UnionToIntersection<
+    {
+      [K in keyof TContract['domain']['namespaces']]: NamespaceValueObjectsOf<
+        TContract['domain']['namespaces'][K]
+      >;
+    }[keyof TContract['domain']['namespaces']]
+  > extends infer Merged
+    ? Merged extends Record<string, ContractValueObject>
+      ? Merged
+      : Record<never, never>
+    : Record<never, never>;

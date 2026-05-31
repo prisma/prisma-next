@@ -1,4 +1,9 @@
-export type { Contract, ContractExecutionSection, ContractModelsMap } from '../contract-types';
+export type {
+  Contract,
+  ContractExecutionSection,
+  ContractModelsMap,
+  ContractValueObjectsMap,
+} from '../contract-types';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export type { DomainNamespace, DomainPlane } from '../domain-envelope';
