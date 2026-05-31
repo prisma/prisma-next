@@ -7,7 +7,12 @@ import type {
   AnyFromSource,
   AnyQueryAst,
   BinaryExpr,
+  ColumnDefault,
   ColumnRef,
+  ColumnType,
+  CreateSchemaAst,
+  CreateTableAst,
+  CreateTableColumn,
   DeleteAst,
   InsertAst,
   InsertValue,
@@ -125,6 +130,12 @@ export function renderLoweredSql(
       break;
     case 'delete':
       sql = renderDelete(node);
+      break;
+    case 'create-schema':
+      sql = renderCreateSchema(node);
+      break;
+    case 'create-table':
+      sql = renderCreateTable(node);
       break;
     default:
       throw new Error(`Unsupported AST node kind: ${(node as { kind: string }).kind}`);
@@ -572,6 +583,48 @@ function renderReturning(returning: ReadonlyArray<ProjectionItem> | undefined): 
       return `${renderExpr(item.expr)} AS ${quoteIdentifier(item.alias)}`;
     })
     .join(', ')}`;
+}
+
+function renderCreateSchema(_ast: CreateSchemaAst): string {
+  return '';
+}
+
+function renderCreateTable(ast: CreateTableAst): string {
+  const columns = ast.columns.map((column) => `    ${renderColumnDef(column)}`).join(',\n');
+  return `CREATE TABLE${ast.ifNotExists ? ' IF NOT EXISTS' : ''} ${ast.table.name} (\n${columns}\n  )`;
+}
+
+function renderColumnDef(column: CreateTableColumn): string {
+  const parts: string[] = [column.name, renderColumnType(column.type)];
+  if (column.notNull) parts.push('NOT NULL');
+  if (column.primaryKey && column.type !== 'bigserial') parts.push('PRIMARY KEY');
+  if (column.default !== undefined) parts.push(`DEFAULT ${renderColumnDefault(column.default)}`);
+  return parts.join(' ');
+}
+
+function renderColumnType(type: ColumnType): string {
+  switch (type) {
+    case 'text':
+    case 'text-array':
+    case 'jsonb':
+    case 'timestamptz':
+      return 'TEXT';
+    case 'int':
+      return 'INTEGER';
+    case 'bigserial':
+      return 'INTEGER PRIMARY KEY AUTOINCREMENT';
+  }
+}
+
+function renderColumnDefault(def: ColumnDefault): string {
+  switch (def.kind) {
+    case 'literal':
+      return def.value;
+    case 'now':
+      return "(datetime('now'))";
+    case 'empty-collection':
+      return "'[]'";
+  }
 }
 
 async function readSqliteMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
