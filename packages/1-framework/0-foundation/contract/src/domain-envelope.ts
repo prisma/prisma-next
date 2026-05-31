@@ -27,25 +27,48 @@ export type DomainContractSlice = {
   readonly domain: DomainPlane;
 };
 
-export function contractModels(contract: DomainContractSlice): Record<string, ContractModelBase> {
-  const merged: Record<string, ContractModelBase> = {};
-  for (const ns of Object.values(contract.domain.namespaces)) {
-    Object.assign(merged, ns.models);
+/** Pre-domain-envelope contract root still carrying flat `models` / `valueObjects`. */
+export type LegacyFlatDomainRoot = {
+  readonly models?: Record<string, ContractModelBase>;
+  readonly valueObjects?: Record<string, ContractValueObject>;
+};
+
+export type DomainContractInput = DomainContractSlice | LegacyFlatDomainRoot;
+
+function domainNamespacesOf(contract: DomainContractInput): DomainPlane['namespaces'] | undefined {
+  if (!('domain' in contract) || contract.domain?.namespaces === undefined) {
+    return undefined;
   }
-  return merged;
+  return contract.domain.namespaces;
+}
+
+export function contractModels(contract: DomainContractInput): Record<string, ContractModelBase> {
+  const namespaces = domainNamespacesOf(contract);
+  if (namespaces !== undefined) {
+    const merged: Record<string, ContractModelBase> = {};
+    for (const ns of Object.values(namespaces)) {
+      Object.assign(merged, ns.models);
+    }
+    return merged;
+  }
+  return contract.models ?? {};
 }
 
 export function contractValueObjects(
-  contract: DomainContractSlice,
+  contract: DomainContractInput,
 ): Record<string, ContractValueObject> | undefined {
-  const merged: Record<string, ContractValueObject> = {};
-  let any = false;
-  for (const ns of Object.values(contract.domain.namespaces)) {
-    if (ns.valueObjects === undefined) continue;
-    any = true;
-    Object.assign(merged, ns.valueObjects);
+  const namespaces = domainNamespacesOf(contract);
+  if (namespaces !== undefined) {
+    const merged: Record<string, ContractValueObject> = {};
+    let any = false;
+    for (const ns of Object.values(namespaces)) {
+      if (ns.valueObjects === undefined) continue;
+      any = true;
+      Object.assign(merged, ns.valueObjects);
+    }
+    return any ? merged : undefined;
   }
-  return any ? merged : undefined;
+  return contract.valueObjects;
 }
 
 export function buildDomainPlaneFromFlat(params: {

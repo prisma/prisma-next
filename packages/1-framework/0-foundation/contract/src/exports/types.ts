@@ -6,7 +6,13 @@ export type {
 } from '../contract-types';
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
-export type { DomainNamespace, DomainPlane } from '../domain-envelope';
+export type {
+  DomainContractInput,
+  DomainContractSlice,
+  DomainNamespace,
+  DomainPlane,
+  LegacyFlatDomainRoot,
+} from '../domain-envelope';
 export {
   buildDomainPlaneFromFlat,
   contractModels,
