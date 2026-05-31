@@ -1,4 +1,6 @@
+import { canonicalizeContractToObject } from '@prisma-next/contract/hashing';
 import type {
+  Contract,
   ContractField,
   ContractReferenceRelation,
   StorageHashBase,
@@ -15,6 +17,7 @@ import {
   MongoValidator,
 } from '@prisma-next/mongo-contract';
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToMongoContractInput,
@@ -549,6 +552,111 @@ describe('interpretPslDocumentToMongoContract', () => {
     });
   });
 
+  describe('_id objectId requirement', () => {
+    it('accepts an ObjectId @id mapped to _id', () => {
+      const ir = interpretOk(`
+        model Item {
+          id ObjectId @id @map("_id")
+          name String
+        }
+      `);
+
+      expect(ir.models['Item']).toBeDefined();
+    });
+
+    it('accepts a field literally named _id of type ObjectId', () => {
+      const ir = interpretOk(`
+        model Item {
+          _id ObjectId @id
+          name String
+        }
+      `);
+
+      expect(ir.models['Item']).toBeDefined();
+    });
+
+    it('rejects an @id ObjectId that is not mapped to _id', () => {
+      const result = interpret(`
+        model Item {
+          id ObjectId @id
+          name String
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_MONGO_ID_REQUIRED',
+            message: expect.stringContaining('Item'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects an _id whose type is not ObjectId', () => {
+      const result = interpret(`
+        model Item {
+          id String @id @map("_id")
+          name String
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'PSL_MONGO_ID_REQUIRED' })]),
+      );
+    });
+
+    it('does not flag variant models (they inherit the base id)', () => {
+      const ir = interpretOk(`
+        model Post {
+          id   ObjectId @id @map("_id")
+          kind String
+
+          @@discriminator(kind)
+          @@map("posts")
+        }
+
+        model Article {
+          summary String
+
+          @@base(Post, "article")
+        }
+      `);
+
+      expect(ir.models['Article']).toBeDefined();
+    });
+
+    it('keeps the emitted _id objectId property through canonicalization', () => {
+      const ir = interpretOk(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+
+          @@map("users")
+        }
+      `);
+
+      // The original injection bug slipped through emission: a permissive `_id`
+      // was stripped by the canonicalizer. A real ObjectId `_id` must survive
+      // the canonicalize → on-disk contract path.
+      const canonical = canonicalizeContractToObject(ir as unknown as Contract, {
+        serializeContract: (c) => JSON.parse(JSON.stringify(c)) as JsonObject,
+      });
+      const namespaces = canonical['storage'] as Record<string, Record<string, unknown>>;
+      const collections = namespaces[UNBOUND_NAMESPACE_ID]!['collections'] as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const validator = collections['users']!['validator'] as Record<string, unknown>;
+      const jsonSchema = validator['jsonSchema'] as Record<string, Record<string, unknown>>;
+      expect(jsonSchema['properties']!['_id']).toEqual({ bsonType: 'objectId' });
+    });
+  });
+
   describe('contract structure', () => {
     it('generates roots mapping collection names to model names', () => {
       const ir = interpretOk(`
@@ -823,6 +931,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                           email: { bsonType: 'string' },
                           bio: { bsonType: ['null', 'string'] },
                         },
+                        additionalProperties: false,
                       },
                       validationLevel: 'strict',
                       validationAction: 'error',
@@ -840,6 +949,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                           authorId: { bsonType: 'objectId' },
                           createdAt: { bsonType: 'date' },
                         },
+                        additionalProperties: false,
                       },
                       validationLevel: 'strict',
                       validationAction: 'error',
@@ -1640,6 +1750,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           street: { bsonType: 'string' },
           city: { bsonType: 'string' },
         },
+        additionalProperties: false,
       });
     });
 
@@ -1668,6 +1779,7 @@ describe('interpretPslDocumentToMongoContract', () => {
               street: { bsonType: 'string' },
               city: { bsonType: 'string' },
             },
+            additionalProperties: false,
           },
         ],
       });
@@ -1793,7 +1905,7 @@ describe('interpretPslDocumentToMongoContract', () => {
     it('accepts top-level model declarations (no namespace block)', () => {
       const document = parsePslDocument({
         schema: `model User {
-  id String @id
+  id ObjectId @id @map("_id")
   name String
 }
 `,

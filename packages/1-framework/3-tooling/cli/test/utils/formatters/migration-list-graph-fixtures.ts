@@ -1,6 +1,6 @@
-import { classifyMigrationListGraphTopology } from '@prisma-next/migration-tools/migration-list-graph-topology';
-import type { MigrationListEntry } from '@prisma-next/migration-tools/migration-list-types';
 import { computeMigrationListGraphLayout } from '../../../src/utils/formatters/migration-list-graph-layout';
+import { classifyMigrationListGraphTopology } from '../../../src/utils/formatters/migration-list-graph-topology';
+import type { MigrationListEntry } from '../../../src/utils/formatters/migration-list-types';
 
 let hashSeq = 0;
 

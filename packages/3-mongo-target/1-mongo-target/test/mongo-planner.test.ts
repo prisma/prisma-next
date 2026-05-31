@@ -708,6 +708,84 @@ describe('MongoMigrationPlanner', () => {
       expect(collModOps[0]!.operationClass).toBe('widening');
     });
 
+    it('classifies the open->closed transition (adding additionalProperties:false) as destructive', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: { email: { bsonType: 'string' } },
+              additionalProperties: false,
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          validator: new MongoSchemaValidator({
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: { email: { bsonType: 'string' } },
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('destructive');
+    });
+
+    it('classifies adding a non-required property to an already-closed schema as widening', () => {
+      const contract = makeContract({
+        users: {
+          validator: {
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: {
+                email: { bsonType: 'string' },
+                avatarUrl: { bsonType: ['null', 'string'] },
+              },
+              additionalProperties: false,
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          },
+        },
+      });
+      const origin = new MongoSchemaIR([
+        new MongoSchemaCollection({
+          name: 'users',
+          validator: new MongoSchemaValidator({
+            jsonSchema: {
+              bsonType: 'object',
+              required: ['email'],
+              properties: { email: { bsonType: 'string' } },
+              additionalProperties: false,
+            },
+            validationLevel: 'strict',
+            validationAction: 'error',
+          }),
+        }),
+      ]);
+      const plan = planSuccess(planner, contract, origin);
+      const collModOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'collMod',
+      );
+      expect(collModOps).toHaveLength(1);
+      expect(collModOps[0]!.operationClass).toBe('widening');
+    });
+
     it('classifies narrowing an existing property type as destructive', () => {
       const contract = makeContract({
         users: {

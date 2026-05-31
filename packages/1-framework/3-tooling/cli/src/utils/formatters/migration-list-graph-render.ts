@@ -1,8 +1,3 @@
-import type { MigrationListGraphTopology } from '@prisma-next/migration-tools/migration-list-graph-topology';
-import type {
-  MigrationListEntry,
-  MigrationListResult,
-} from '@prisma-next/migration-tools/migration-list-types';
 import type { GlyphMode } from '../glyph-mode';
 import {
   abbreviateContractHash,
@@ -22,7 +17,9 @@ import type {
   NodeLineLayoutRow,
 } from './migration-list-graph-layout';
 import { computeMigrationListGraphLayout } from './migration-list-graph-layout';
+import type { MigrationListGraphTopology } from './migration-list-graph-topology';
 import type { MigrationListStyler } from './migration-list-render';
+import type { MigrationListEntry, MigrationListResult } from './migration-list-types';
 
 export type { GlyphMode } from '../glyph-mode';
 

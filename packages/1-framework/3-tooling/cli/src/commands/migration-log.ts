@@ -16,7 +16,6 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadMigrationPackages,
   maskConnectionUrl,
   resolveMigrationPaths,
   setCommandDescriptions,
@@ -24,6 +23,7 @@ import {
   setCommandSeeAlso,
   targetSupportsMigrations,
 } from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
@@ -51,13 +51,13 @@ export interface MigrationLogResult {
   readonly summary: string;
 }
 
-async function executeMigrationLogCommand(
+export async function executeMigrationLogCommand(
   options: MigrationLogOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
 ): Promise<Result<MigrationLogResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(
+  const { configPath, appMigrationsRelative, migrationsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -94,18 +94,12 @@ async function executeMigrationLogCommand(
     ui.stderr(header);
   }
 
-  let bundles: Awaited<ReturnType<typeof loadMigrationPackages>>['bundles'];
-  let graph: Awaited<ReturnType<typeof loadMigrationPackages>>['graph'];
-  try {
-    ({ bundles, graph } = await loadMigrationPackages(appMigrationsDir));
-  } catch (error) {
-    if (MigrationToolsError.is(error)) return notOk(mapMigrationToolsError(error));
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read migrations: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
+  const loaded = await buildReadAggregate(config, { migrationsDir });
+  if (!loaded.ok) {
+    return loaded;
   }
+  const graph = loaded.value.aggregate.app.graph();
+  const bundles = loaded.value.aggregate.app.packages;
 
   const client = createControlClient({
     family: config.family,

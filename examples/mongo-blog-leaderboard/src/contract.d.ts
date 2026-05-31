@@ -17,7 +17,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:fc34f27d1ebaa3b0d068907c7c075313703197dd48846d33f9d24631868d0ea1'>;
+  StorageHashBase<'sha256:d9419a557f554b9ab4c91b7df99c66881d77e199ecd0066f003262bda1c397a8'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -125,18 +125,30 @@ type ContractBase = Omit<
                 readonly oneOf: readonly [
                   {
                     readonly properties: {
+                      readonly _id: { readonly bsonType: 'objectId' };
+                      readonly title: { readonly bsonType: 'string' };
+                      readonly content: { readonly bsonType: 'string' };
                       readonly kind: { readonly enum: readonly ['article'] };
+                      readonly authorId: { readonly bsonType: 'objectId' };
+                      readonly createdAt: { readonly bsonType: 'date' };
                       readonly summary: { readonly bsonType: 'string' };
                     };
                     readonly required: readonly ['kind', 'summary'];
+                    readonly additionalProperties: false;
                   },
                   {
                     readonly properties: {
+                      readonly _id: { readonly bsonType: 'objectId' };
+                      readonly title: { readonly bsonType: 'string' };
+                      readonly content: { readonly bsonType: 'string' };
                       readonly kind: { readonly enum: readonly ['tutorial'] };
+                      readonly authorId: { readonly bsonType: 'objectId' };
+                      readonly createdAt: { readonly bsonType: 'date' };
                       readonly difficulty: { readonly bsonType: 'string' };
                       readonly duration: { readonly bsonType: 'int' };
                     };
                     readonly required: readonly ['difficulty', 'duration', 'kind'];
+                    readonly additionalProperties: false;
                   },
                 ];
               };
@@ -166,11 +178,13 @@ type ContractBase = Omit<
                           readonly zip: { readonly bsonType: readonly ['null', 'string'] };
                           readonly country: { readonly bsonType: 'string' };
                         };
+                        readonly additionalProperties: false;
                         readonly required: readonly ['city', 'country', 'street'];
                       },
                     ];
                   };
                 };
+                readonly additionalProperties: false;
                 readonly required: readonly ['_id', 'email', 'name'];
               };
               readonly validationLevel: 'strict';

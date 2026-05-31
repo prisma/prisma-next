@@ -242,6 +242,63 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-05-30, project `migration-list-graph`. TML-2733's first per-space classification test used a cycle internal to one space, so per-space and global classification were byte-identical — it would not fail under a revert to global scoping. Caught at PR #636's principal-engineer review (F03); rewritten as a cross-space spurious cycle (`app: X→Y`, `ext: Y→X`).
 
+### F14. Dispatch reports validation green but CI is red (dispatch gates didn't mirror CI)
+
+**Symptom.** An implementer (and the orchestrator-side post-dispatch walk) report end-of-dispatch validation green, but the PR's CI comes back red. The gaps are systematic, not one-offs:
+
+- **(a) biome `lint` / formatter never run locally.** The dispatch ran `pnpm typecheck` + `vitest`, but never the package's biome `lint` — which is a *separate CI job*. An unused import (biome `noUnusedImports`) or a formatter diff ships invisibly.
+- **(b) typecheck didn't cover the package's `test` project.** A package whose `typecheck` script compiles `src` only (or a single sub-project) misses a `TS6133`-class error in a `test/**` file. CI compiles tests, so it catches what the local gate didn't.
+- **(c) branch was behind base.** A sibling change already on `main` (e.g. a status row gaining a field, an output shape changing) red-fails a test that the local HEAD passes; merging `main` makes it green. The dispatch validated against a stale base.
+
+**Detection signal.**
+
+- Dispatch report asserts "lint passed" / "all green" but the transcript shows only `pnpm typecheck` + `vitest run` — no `biome` / `pnpm lint` invocation.
+- CI "Type Check" fails on a `test/**` file while the dispatch's typecheck was `src`-only or a single sub-project.
+- CI "Test" failures vanish after `git merge origin/main`; the failing assertions reference a shape changed on `main`, not by the branch.
+
+**Mitigation.**
+
+- **biome lint is a non-negotiable end-of-dispatch gate.** Run `pnpm --filter <pkg> lint` (i.e. `biome check --error-on-warnings`) for every touched package — it's the CI "Lint" job and catches unused imports + formatter diffs that typecheck/vitest do not. Now an always-run item in [`dod.md § Dispatch-DoD validation gates`](./dod.md#dispatch-dod-validation-gates).
+- **Typecheck must cover the `test` project.** For packages whose `typecheck` script is `src`-only, also compile the test tsconfig (`tsc -p tsconfig.test.json --noEmit`); CI compiles tests.
+- **Sync `main` before the final end-of-slice validation + push.** Merge/rebase `origin/main` so "behind base" drift surfaces locally, not in CI. (This is a *slice-close* discipline, not a per-dispatch one — see [`dod.md § Slice-close ritual`](./dod.md#slice-close-ritual-added-2026-05-21-retro).)
+- **Orchestrator DoD:** treat "implementer reports green" as a hypothesis. The gates in `dod.md` (now including biome lint + test-tsconfig + sync-main) are the evidence; the post-dispatch walk re-runs them, it doesn't trust the report.
+
+**Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715). The final dispatch reported all-green; PR #626 CI failed **Type Check** (unused `mkdir` import in `loader.catastrophic-io.test.ts`) + **Lint** (formatter diff in `loader.test.ts`) + **Test** (2 `migration-status-aggregate-spaces` failures that were pure behind-`main` drift, resolved by merging `main`). All three classes were caught by the babysit loop after the PR was open, not by the dispatch gates — exactly the work the gates exist to front-load.
+### F15. Consolidation onto a shared facet re-infers result-kind from the input instead of carrying provenance
+
+**Symptom.** Hand-rolled resolution logic (which branched on *where* it found a value) is consolidated onto a shared abstraction. The call site keeps its old "which kind is this?" branch — but now infers the kind from the *input* it passed (e.g. "I supplied a ref name, therefore this is a snapshot") rather than from *how the shared facet actually resolved*. The shared facet can reach the value by a different path than the input implies (a ref whose snapshot is missing falls back to the bundle's bookend contract), so the inferred kind is wrong on the fallback branch — and any state keyed off that kind (a `sourceDir`, a classification label) is silently dropped or mislabelled.
+
+**Detection signal.**
+
+- A behaviour-preserving rewire whose existing tests stay green — because the tests were written against the *old* branching and never exercised the path where input-implied-kind and actual-resolution-path diverge.
+- A call site that classifies a shared facet's result by re-examining the *arguments it passed in* (`if (refName !== undefined) → snapshot`) rather than a discriminator the facet *returns*.
+- A non-null assertion (`result.sourceDir!`) on a field that's only populated on one of the facet's resolution paths — the smell that the caller knows more than the type does.
+
+**Mitigation.**
+
+- A shared resolution facet must **return the provenance of its result** (a discriminator: `'snapshot' | 'graph-node'`), and callers must classify off the returned discriminator, never off the input they supplied. Model it as a discriminated union so path-specific fields (`sourceDir`) are statically guaranteed present on the path that owns them — this also retires the non-null assertion.
+- A consolidation/rewire dispatch that replaces branching logic needs a reviewer/intent pass *even when tests are green*: green proves nothing here, because the existing tests pass by construction (they predate the divergent branch). The review question is "does the new path preserve every distinction the old branches drew?" — which no pre-existing test asserts.
+- **Canonical candidate** (generalises to any system): land in canonical via `drive-update-skills` if a second occurrence confirms the pattern.
+
+**Reference incident.** 2026-05-30, project `migrate-to-rollback-plannable` (TML-2690). The round-2 consolidation rewired `plan-resolution.ts` onto the contract-space aggregate's new `contractAt(hash)` facet. The rewire classified the result as a "snapshot" whenever a ref name was supplied — but `contractAt` falls back to the graph node's `end-contract.*` bundle when a ref's snapshot is absent, so a snapshot-missing ref was mislabelled and its `sourceDir` lost. Tests stayed green (none straddled the snapshot-miss → bundle-fallback boundary). Caught by CodeRabbit on PR #635, not by the rewire dispatches' own verification; fixed by adding a `provenance` discriminator + `sourceDir` to `ContractAtResult` (discriminated union) and classifying off it.
+
+### F15. Behavioural "reports-all / tolerates / refuses" AC verified by code-reading instead of a populated fixture
+
+**Symptom.** An AC asserts a behaviour *over a populated input* — "`check` reports all violations at once", "`list` tolerates a hash-mismatched package", "apply refuses on a self-edge". The reviewer (or implementer) marks it satisfied by **reading** the code for the enabling property (e.g. "no first-failure bail across the command's own codes") rather than **running** the command against a fixture that actually carries every case the AC enumerates. A wiring gap the code-read can't see ships green.
+
+**Detection signal.**
+
+- An AC verdict cites a code-read ("confirmed no early return", "the loop covers all entries") for an AC whose subject is *runtime behaviour over data*.
+- No fixture in the dispatch exercises the command against an input that *populates* all the cases the AC enumerates ("all" / "every" / "each").
+- The behaviour depends on a wiring step (which integrity surface the command calls) that the code-read assumed but didn't trace end-to-end.
+
+**Mitigation.**
+
+- An AC of the form "X reports / tolerates / refuses all / every `<case>`" is satisfied **only** by running X against a fixture that carries every `<case>` at once and observing the full result — never by a structural code read. Add the populated-fixture run to the dispatch DoD for any behavioural-over-input AC.
+- Sibling of **F13** (a regression test must fail under ¬P): F13 is about the *test fixture* discriminating; F15 is about the AC's *verification method* being empirical, not a read.
+
+**Reference incident.** 2026-05-30, slice `tolerant-queryable-aggregate` (TML-2715), D3→D4. The D3 reviewer passed the AC "`migration check` reports all violations at once" by reading `check`'s own `PN-MIG-CHECK-*` path for no-first-failure-bail — but `check` was never wired to `checkIntegrity()`, so the *relocated* self-edge (`sameSourceAndTarget`) and orphan-space-dir checks were never re-acquired there. Invisible to code-reading; surfaced only when D4 ran a real all-three-problems fixture through `check` and got 1-of-3.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

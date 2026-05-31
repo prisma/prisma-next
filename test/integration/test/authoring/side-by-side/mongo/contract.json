@@ -126,6 +126,7 @@
           "kind": "mongo-collection",
           "validator": {
             "jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -159,6 +160,7 @@
           "kind": "mongo-collection",
           "validator": {
             "jsonSchema": {
+              "additionalProperties": false,
               "bsonType": "object",
               "properties": {
                 "_id": {
@@ -192,7 +194,7 @@
       "id": "__unbound__",
       "kind": "mongo-database"
     },
-    "storageHash": "sha256:c01f9b67df3a1057686184f42e85b2d62e239a28c19458ce6e8d4bb404cfbf9c"
+    "storageHash": "sha256:bc9b75610f1b8a7b01ed510feb08f2e896dc2ad876874f9a0883c812355fcf72"
   },
   "capabilities": {},
   "extensionPacks": {},
