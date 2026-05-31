@@ -28,7 +28,9 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
   if (ast.kind === 'select') {
     return ast.projection;
   }
-  if (ast.kind === 'raw-sql') {
+  if (ast.kind === 'raw-sql' || ast.kind === 'create-schema' || ast.kind === 'create-table') {
+    // Raw-SQL and DDL (create-schema / create-table) have no projection list
+    // to decode against.
     return undefined;
   }
   return ast.returning;

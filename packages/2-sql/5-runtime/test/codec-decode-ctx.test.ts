@@ -8,6 +8,7 @@ import {
   type SqlCodecCallContext,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { col, createSchema, createTable } from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { buildDecodeContext, decodeRow } from '../src/codecs/decoding';
@@ -357,5 +358,22 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     // SqlColumnRef shape `{ table, name }` projected from the ColumnRef shape `{ table, column }` the resolver returns — same source, one resolution per cell.
     expect(observedColumns).toEqual([{ table: 'users', name: 'email' }]);
+  });
+
+  it('builds a decode context for DDL ASTs without throwing', () => {
+    const createTableContext = buildDecodeContext(
+      createTable('prisma_contract.marker', [col('space', 'text', { notNull: true })], {
+        ifNotExists: true,
+      }),
+      undefined,
+    );
+    const createSchemaContext = buildDecodeContext(
+      createSchema('prisma_contract', { ifNotExists: true }),
+      undefined,
+    );
+
+    // DDL has no projection list, so there are no aliases to decode against.
+    expect(createTableContext.aliases).toBeUndefined();
+    expect(createSchemaContext.aliases).toBeUndefined();
   });
 });

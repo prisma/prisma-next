@@ -100,6 +100,12 @@ function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
       // shape-based heuristics don't apply.
       break;
 
+    case 'create-schema':
+    case 'create-table':
+      // DDL ASTs have no structural shape (WHERE / LIMIT / projection) for the
+      // lints to inspect, so they opt out just like raw-SQL.
+      break;
+
     // v8 ignore next 2
     default:
       throw new Error(`Unsupported AST kind: ${(ast satisfies never as { kind: string }).kind}`);

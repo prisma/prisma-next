@@ -12,6 +12,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { col, createSchema, createTable } from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
@@ -295,6 +296,28 @@ describe('lints middleware', () => {
       const ctx = createMiddlewareContext();
 
       await mw.beforeExecute?.(plan, ctx);
+      expect(ctx.log.warn).not.toHaveBeenCalled();
+    },
+    timeouts.default,
+  );
+
+  it(
+    'passes DDL (create-table / create-schema) plans through without throwing or linting',
+    async () => {
+      const ctx = createMiddlewareContext();
+      const mw = lints();
+
+      const createTablePlan = createPlan({
+        ast: createTable('prisma_contract.marker', [col('space', 'text', { notNull: true })], {
+          ifNotExists: true,
+        }),
+      });
+      const createSchemaPlan = createPlan({
+        ast: createSchema('prisma_contract', { ifNotExists: true }),
+      });
+
+      await expect(mw.beforeExecute?.(createTablePlan, ctx)).resolves.toBeUndefined();
+      await expect(mw.beforeExecute?.(createSchemaPlan, ctx)).resolves.toBeUndefined();
       expect(ctx.log.warn).not.toHaveBeenCalled();
     },
     timeouts.default,
