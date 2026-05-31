@@ -3,14 +3,16 @@ name: drive-judge-harness
 description: >
   Spawns one Drive orchestrator run on a golden-case brief with a pinned model,
   accumulates per-run token usage, and writes a run manifest — the corpus
-  generator the Drive LLM judge calibrates against. Use when you want to run a
-  golden Drive brief end-to-end, produce a natively-instrumented run, accumulate
-  token usage from the Cursor SDK, or validate the post-hoc trace parser against
-  a transcript corpus. Live execution is gated behind --live + CURSOR_API_KEY;
-  the default is a dry-run that makes no live call.
+  generator the Drive LLM judge calibrates against. Supports a pinned skill-bundle
+  input (prepare-run → spawn → collect-run) so runs are reproducible against a
+  known base ref + skill version. Use when you want to run a golden Drive brief
+  end-to-end, produce a natively-instrumented run, accumulate token usage from the
+  Cursor SDK, or validate the post-hoc trace parser against a transcript corpus.
+  Live execution is gated behind --live + CURSOR_API_KEY; the default is a dry-run
+  that makes no live call.
 ---
 
-# Drive: Judge harness (run-one-brief)
+# Drive: Judge harness (run-one-brief / run-arm)
 
 A **minimal live harness** that runs ONE canonical Drive brief through an
 orchestrator and records the run. It is the read/produce-side counterpart to the
@@ -27,11 +29,28 @@ builds the k=N A/B loop on top of.
   token counters (`inputTokens` / `outputTokens` / `cacheReadTokens` /
   `cacheWriteTokens`) into a per-run `TokenTotals`.
 - `manifest.ts` — `RunManifest` + `writeManifest`: the per-run record (status,
-  model, run/agent ids, accumulated `tokens`, trace path).
+  model, run/agent ids, accumulated `tokens`, trace path, and the pinned-input
+  fields added by `run-arm`).
+- `prepare-run.ts` — `prepareRun(config, deps)`: isolate a git checkout at a
+  pinned base ref, overlay the skill bundle's canonical home dirs (`skills-contrib`,
+  `.agents/rules`, `AGENTS.md`, `CLAUDE.md`), materialize via the repo's `prepare`
+  hook, and finalize a baseline commit so the agent's diff is cleanly separable
+  from the injected skills.
+- `collect-run.ts` — `collectRun(prepared, opts)`: glob `*.jsonl` in the run
+  dir, keep those whose first line validates against the trace schema, match by
+  `orchestrator_agent_id` (falling back to newest), and compute `diff`/`diffStat`
+  against the baseline commit.
+- `run-arm.ts` — thin CLI + `runArm(config, deps)` that composes the full
+  pipeline: `prepareRun → runOneBrief({ runDir }) → collectRun → write enriched
+  manifest`. The enriched manifest carries `base_ref`, `base_sha`,
+  `skill_bundle_ref`, `skill_bundle_sha`, `run_dir`, `collected_trace_paths`,
+  `diff_stat`, and `materialized`.
 - `run-one-brief.ts` — `runOneBrief(config, deps)` + a CLI. Owns the
-  live-execution gate and orchestration.
+  live-execution gate and orchestration. Accepts `runDir` so the orchestrator
+  spawns inside the prepared checkout.
 - `sdk-adapter.ts` — the **only** module that touches `@cursor/sdk`, via a
-  dynamic import reached solely on the live path.
+  dynamic import reached solely on the live path. Uses the `cwd` passed from
+  `run-one-brief` rather than the harness's `process.cwd()`.
 - `validate-parser.ts` — validates `drive-diagnose-run/posthoc.ts` over a
   transcript corpus, tallying reconstruction confidence (clears TML-2728).
 - `judge/` — the bespoke-minimal LLM judge (TML-2736). Grades one Drive run
@@ -47,6 +66,52 @@ never makes a network call, and writes a manifest with `status: "dry-run"`,
 dynamic import on the live path, **typecheck / test / lint / CI all stay green
 with no `CURSOR_API_KEY` set and `@cursor/sdk` not installed.** Tests inject a
 mock `createAgent` and never make a live call.
+
+## The pinned skill-bundle pipeline (run-arm)
+
+`run-arm` makes a run **reproducible**: the skill bundle under test (a git ref of
+`skills-contrib/` + `.agents/rules/` + `AGENTS.md`/`CLAUDE.md`) becomes a
+first-class recorded input alongside the base ref and model. An A/B arm is
+expressible as `(brief + base_sha, model, skill_bundle_ref)` with one axis varied.
+
+Steps:
+
+1. **Isolate**: `git worktree add --detach <runDir> <baseRef>` — a detached
+   worktree that shares the object store; `--detach` removes the branch-conflict
+   limitation so parallel arms on the same base work.
+2. **Overlay**: `git archive <bundleRef> -- skills-contrib .agents/rules AGENTS.md CLAUDE.md | tar -x -C <runDir>` — the skill bundle's canonical dirs are extracted over the base checkout.
+3. **Materialize**: the repo's own `prepare` hook (`pnpm install`) regenerates
+   the gitignored `.cursor/`/`.claude/`/`.agents/skills/` trees. If it fails
+   against an old toolchain, `materialized: false` is recorded (the case is not
+   replayable) rather than silently mis-instrumented.
+4. **Baseline commit**: `git add -A && git commit -m 'prepare-run baseline'` —
+   the cut point. Everything injected lives in this commit, so `collect-run`'s
+   diff is exactly the agent's work.
+5. **Spawn**: `runOneBrief({ runDir })` executes the orchestrator inside the
+   prepared checkout.
+6. **Collect**: `collectRun` globs `*.jsonl` in `runDir`, validates the first
+   line of each against the trace schema, and computes the agent diff against
+   the baseline commit.
+
+Usage (dry-run — proves the pipeline without a live call):
+
+```bash
+pnpm drive:run-arm -- \
+  --repo . --base-ref main --bundle-ref HEAD \
+  --run-dir /tmp/my-run \
+  --case projects/drive-judge-harness/assets/golden/slice-dedupe-generated-imports \
+  --model claude-4.6-sonnet-high-thinking
+```
+
+Live run (operator-gated):
+
+```bash
+CURSOR_API_KEY=cursor_... pnpm drive:run-arm -- \
+  --repo . --base-ref <historical-sha> --bundle-ref HEAD \
+  --run-dir /tmp/my-run \
+  --case projects/drive-judge-harness/assets/golden/slice-dedupe-generated-imports \
+  --model claude-4.6-sonnet-high-thinking --live
+```
 
 ## Usage
 

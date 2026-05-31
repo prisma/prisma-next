@@ -2262,6 +2262,9 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:0.11.0
         version: link:../4-query/query-ast
+      '@prisma-next/mongo-value':
+        specifier: workspace:0.11.0
+        version: link:../1-foundation/mongo-value
       '@prisma-next/mongo-wire':
         specifier: workspace:0.11.0
         version: link:../6-transport/mongo-wire
@@ -2284,9 +2287,6 @@ importers:
       '@prisma-next/mongo-query-builder':
         specifier: workspace:0.11.0
         version: link:../5-query-builders/query-builder
-      '@prisma-next/mongo-value':
-        specifier: workspace:0.11.0
-        version: link:../1-foundation/mongo-value
       '@prisma-next/target-mongo':
         specifier: workspace:0.11.0
         version: link:../../3-mongo-target/1-mongo-target

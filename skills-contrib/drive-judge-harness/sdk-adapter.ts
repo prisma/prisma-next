@@ -87,7 +87,7 @@ function adaptRun(sdkRun: {
 }
 
 /** Live `CreateAgent` backed by `@cursor/sdk`. Reached only on the live path. */
-export const createCursorAgent: CreateAgent = async ({ model, prompt }) => {
+export const createCursorAgent: CreateAgent = async ({ model, prompt, cwd }) => {
   const apiKey = process.env.CURSOR_API_KEY;
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new Error('CURSOR_API_KEY is required for a live run');
@@ -95,7 +95,7 @@ export const createCursorAgent: CreateAgent = async ({ model, prompt }) => {
   const agent = await Agent.create({
     apiKey,
     model: { id: model },
-    local: { cwd: process.cwd() },
+    local: { cwd },
   });
   const sdkRun = await agent.send(prompt);
   return adaptRun(sdkRun);

@@ -1,7 +1,8 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
-import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { AggregateWireCommand, type AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   MongoExecutionContext,
@@ -19,6 +20,17 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     lower: adapter.lower.bind(adapter),
+    structuralLower: vi.fn(
+      (plan: MongoQueryPlan): MongoLoweredDraft => ({
+        kind: 'rawAggregate',
+        collection: plan.collection,
+        pipeline: [],
+      }),
+    ),
+    resolveParams: vi.fn(
+      async (draft: MongoLoweredDraft): Promise<AnyMongoWireCommand> =>
+        new AggregateWireCommand(draft.collection, []),
+    ),
   };
   const target: MongoRuntimeTargetDescriptor<'mongo'> = {
     kind: 'target',
@@ -325,11 +337,11 @@ describe('MongoRuntime middleware lifecycle', () => {
     expect(logWorks).toBe(true);
   });
 
-  it('exposes a working contentHash on the middleware context', async () => {
+  it('exposes a working contentHash on the middleware context over the resolved plan', async () => {
     const observedKeys: string[] = [];
     const middleware: MongoMiddleware = {
       name: 'content-hash-tester',
-      async beforeExecute(plan, ctx) {
+      async afterExecute(plan, _result, ctx) {
         observedKeys.push(await ctx.contentHash(plan));
       },
     };

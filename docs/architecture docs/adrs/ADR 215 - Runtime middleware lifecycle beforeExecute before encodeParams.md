@@ -160,9 +160,27 @@ When `beforeExecute` returns, the draft plan's `params` slot contains the same e
 
 The same shape applies to any future param-mutating middleware: any middleware that wants to populate or rewrite parameter values in their user-domain form before encode runs the same lifecycle position.
 
+## Mongo family: lifecycle parity and intentional placement asymmetries
+
+Mongo execute ([`packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`](../../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts)) now follows the same pre-resolve middleware lifecycle invariant as SQL: `beforeCompile` → structural draft (user-domain `MongoParamRef` leaves) → `beforeExecute` with a param mutator → resolve/encode params → `intercept` / driver → row hooks → `afterExecute`. Content hashing ([`content-hash.ts`](../../../packages/2-mongo-family/7-runtime/src/content-hash.ts)) runs only on the post-resolution wire command, so interceptors and cache keys observe the driver-bound payload after middleware mutations — the same load-bearing property ADR 215 establishes for SQL.
+
+The SQL and Mongo stacks differ in *where* the two lowering phases and the param mutator live. Those differences are intentional family shape, not drift.
+
+| Concern | SQL | Mongo |
+|---|---|---|
+| Two-phase lowering API | `lowerToDraft` / `encodeDraftParams` are **private** methods on `SqlRuntimeImpl` ([`packages/2-sql/5-runtime/src/sql-runtime.ts`](../../../packages/2-sql/5-runtime/src/sql-runtime.ts)); lowering walks the SQL adapter inside the runtime package. | `structuralLower` / `resolveParams` are **public** methods on the `MongoAdapter` SPI ([`packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts`](../../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts)); the target-owned implementation lives in [`@prisma-next/adapter-mongo`](../../../packages/3-mongo-target/2-mongo-adapter/). |
+| Param mutator home | `SqlParamRefMutator` in [`packages/2-sql/4-lanes/relational-core`](../../../packages/2-sql/4-lanes/relational-core) (middleware module), composed by the SQL runtime. | `MongoParamRefMutator` in [`packages/2-mongo-family/7-runtime`](../../../packages/2-mongo-family/7-runtime/src/param-ref-mutator.ts) alongside `MongoMiddleware`, because Mongo has no `relational-core`-equivalent lanes layer — the runtime is the first layer that composes middleware and execute. |
+| Pre-resolve draft type | Reuses `SqlExecutionPlan` for both the pre-encode draft and the post-encode exec (params slot mutates; same interface type). | Introduces a distinct `MongoLoweredDraft` union (not a wire command) for phase 1; `MongoExecutionPlan.command` is typed as `AnyMongoWireCommand` but holds the draft only during `beforeExecute` ([`mongo-execution-plan.ts`](../../../packages/2-mongo-family/7-runtime/src/mongo-execution-plan.ts)). Mongo's typology is the stricter, preferable shape: phase 1 cannot be mistaken for a driver-ready command at the type level. |
+
+**Why the phase API is public on Mongo but private on SQL.** SQL structural lowering and param encoding are orchestrated entirely inside `@prisma-next/sql-runtime` against the generic SQL `Adapter` surface. Mongo lowering is target-owned: the runtime invokes `MongoAdapter` on the execution stack, and the two-phase contract must be auditable at the adapter SPI so implementors (`adapter-mongo`) and reviewers can see exactly where `MongoParamRef` resolution is deferred relative to middleware. Exposing `structuralLower` / `resolveParams` on the SPI documents that contract; hiding them inside the runtime would obscure the target boundary.
+
+**Convenience `lower`.** `MongoAdapter.lower` remains the one-shot `resolveParams(structuralLower(plan))` for callers that do not need the split; production execute uses the split explicitly.
+
 ## Related
 
 - [ADR 204 — Single-tier runtime](./ADR%20204%20-%20Single-tier%20runtime.md) — the runtime composition this ADR refines.
 - [ADR 207 — Codec call context per-query AbortSignal and column metadata](./ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) — the per-query `AbortSignal` and `SqlCodecCallContext` shape threaded through `runBeforeExecuteChain`.
 - [ADR 214 — Extension operator surface: namespaced replacement operators and the predicate/helper split](./ADR%20214%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md) — the cipherstash operator surface that depends on this lifecycle ordering at execute time.
 - [ADR 213 — Codec lifecycle hooks](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md) — the plan-time analogue of this ADR's runtime hook.
+- [`@prisma-next/mongo-lowering`](../../../packages/2-mongo-family/6-transport/mongo-lowering/) — `MongoAdapter` two-phase SPI (`structuralLower` / `resolveParams`).
+- [`@prisma-next/mongo-runtime`](../../../packages/2-mongo-family/7-runtime/) — Mongo execute wiring and `MongoParamRefMutator` ([TML-2376](https://linear.app/prisma-company/issue/TML-2376)).
