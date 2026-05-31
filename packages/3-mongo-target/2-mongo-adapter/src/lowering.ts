@@ -11,6 +11,7 @@ import type {
 } from '@prisma-next/mongo-query-ast/execution';
 import { isExprArray, isRecordArgs } from '@prisma-next/mongo-query-ast/execution';
 import type { Document } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 import { resolveValue } from './resolve-value';
 
 // Biome flags `{ then: ... }` as a thenable object (noThenProperty). Build via Object.fromEntries to avoid.
@@ -161,7 +162,9 @@ export function structuralLowerFilter(filter: MongoFilterExpr): Record<string, u
       return { $expr: lowerAggExpr(filter.aggExpr) };
     default: {
       const _exhaustive: never = filter;
-      throw new Error(`Unhandled filter kind: ${(_exhaustive as MongoFilterExpr).kind}`);
+      throw new Error(
+        `Unhandled filter kind: ${blindCast<MongoFilterExpr, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
     }
   }
 }
@@ -186,7 +189,9 @@ export async function lowerFilter(
       return { $expr: lowerAggExpr(filter.aggExpr) };
     default: {
       const _exhaustive: never = filter;
-      throw new Error(`Unhandled filter kind: ${(_exhaustive as MongoFilterExpr).kind}`);
+      throw new Error(
+        `Unhandled filter kind: ${blindCast<MongoFilterExpr, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
     }
   }
 }
@@ -207,9 +212,9 @@ function lowerExprRecord(
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
     if (Array.isArray(val)) {
-      result[key] = val.map((v: MongoAggExpr) => lowerAggExpr(v));
+      result[key] = val.map((v) => lowerAggExpr(v));
     } else {
-      result[key] = lowerAggExpr(val as MongoAggExpr);
+      result[key] = lowerAggExpr(val);
     }
   }
   return result;
@@ -445,7 +450,9 @@ export async function lowerStage(
     }
     default: {
       const _exhaustive: never = stage;
-      throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoPipelineStage).kind}`);
+      throw new Error(
+        `Unhandled stage kind: ${blindCast<MongoPipelineStage, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
     }
   }
 }
@@ -660,7 +667,9 @@ export function structuralLowerStage(stage: MongoPipelineStage): Record<string, 
     }
     default: {
       const _exhaustive: never = stage;
-      throw new Error(`Unhandled stage kind: ${(_exhaustive as MongoPipelineStage).kind}`);
+      throw new Error(
+        `Unhandled stage kind: ${blindCast<MongoPipelineStage, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+      );
     }
   }
 }

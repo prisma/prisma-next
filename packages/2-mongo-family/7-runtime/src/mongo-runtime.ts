@@ -95,7 +95,12 @@ class MongoRuntimeImpl
       log: { info: noop, warn: noop, error: noop },
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
       // the framework parameter type is the cross-family base.
-      contentHash: (exec) => computeMongoContentHash(exec as MongoExecutionPlan),
+      contentHash: (exec) =>
+        computeMongoContentHash(
+          blindCast<MongoExecutionPlan, 'runWithMiddleware passes execs this runtime lowered'>(
+            exec,
+          ),
+        ),
       // When MongoRuntimeImpl grows connection()/transaction() surfaces,
       // derive a scope-narrowed ctx per call (mirror
       // SqlRuntimeImpl#executeAgainstQueryable in `sql-runtime.ts`).
@@ -205,7 +210,9 @@ class MongoRuntimeImpl
       );
       for await (const rawRow of stream) {
         if (exec.resultShape === undefined) {
-          yield rawRow as Row;
+          yield blindCast<Row, 'driver row matches plan _row phantom when resultShape is absent'>(
+            rawRow,
+          );
         } else {
           // Source the collection from the lowered exec rather than the
           // pre-lowering plan: a runBeforeCompile middleware is allowed to
@@ -218,7 +225,7 @@ class MongoRuntimeImpl
             exec.command.collection,
             codecCtx,
           );
-          yield decoded as Row;
+          yield blindCast<Row, 'decodeMongoRow output matches plan _row phantom'>(decoded);
         }
       }
     };

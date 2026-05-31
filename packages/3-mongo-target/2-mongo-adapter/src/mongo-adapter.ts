@@ -18,6 +18,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
+import { blindCast } from '@prisma-next/utils/casts';
 import { buildStandardCodecRegistry } from './core/codecs';
 import { structuralLowerFilter, structuralLowerPipeline } from './lowering';
 import { resolveDraftDoc } from './resolve-value';
@@ -34,13 +35,9 @@ async function resolveUpdate(
   ctx: CodecCallContext,
 ): Promise<Record<string, unknown> | ReadonlyArray<Record<string, unknown>>> {
   if (Array.isArray(update)) {
-    return Promise.all(
-      (update as ReadonlyArray<Record<string, unknown>>).map((stage) =>
-        resolveDraftDoc(stage, codecs, ctx),
-      ),
-    );
+    return Promise.all(update.map((stage) => resolveDraftDoc(stage, codecs, ctx)));
   }
-  return resolveDraftDoc(update as Record<string, unknown>, codecs, ctx);
+  return resolveDraftDoc(update, codecs, ctx);
 }
 
 class MongoAdapterImpl implements MongoAdapter {
@@ -170,7 +167,9 @@ class MongoAdapterImpl implements MongoAdapter {
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;
-        throw new Error(`Unknown command kind: ${(_exhaustive as { kind: string }).kind}`);
+        throw new Error(
+          `Unknown command kind: ${blindCast<{ kind: string }, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+        );
       }
     }
   }
@@ -269,7 +268,9 @@ class MongoAdapterImpl implements MongoAdapter {
       // v8 ignore next 4
       default: {
         const _exhaustive: never = draft;
-        throw new Error(`Unknown draft kind: ${(_exhaustive as { kind: string }).kind}`);
+        throw new Error(
+          `Unknown draft kind: ${blindCast<{ kind: string }, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
+        );
       }
     }
   }

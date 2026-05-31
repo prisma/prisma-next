@@ -1,6 +1,7 @@
 import type { ParamRefMutator } from '@prisma-next/framework-components/runtime';
 import type { MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 
 /**
  * Phantom brand on {@link MongoParamRefHandle} so handles produced by
@@ -93,6 +94,10 @@ export interface MongoParamRefMutatorInternal<
 
 type AnyMongoHandle = MongoParamRefHandle<string | undefined>;
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 // ─── Internal tree-walk helpers ────────────────────────────────────────────
 
 function* flattenDraftSlot(value: unknown): Generator<MongoParamRef> {
@@ -106,8 +111,8 @@ function* flattenDraftSlot(value: unknown): Generator<MongoParamRef> {
     }
     return;
   }
-  if (value !== null && typeof value === 'object') {
-    for (const v of Object.values(value as Record<string, unknown>)) {
+  if (isPlainRecord(value)) {
+    for (const v of Object.values(value)) {
       yield* flattenDraftSlot(v);
     }
   }
@@ -177,9 +182,9 @@ function substituteSlot(value: unknown, overrides: ReadonlyMap<MongoParamRef, un
   if (Array.isArray(value)) {
     return value.map((item) => substituteSlot(item, overrides));
   }
-  if (value !== null && typeof value === 'object') {
+  if (isPlainRecord(value)) {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    for (const [k, v] of Object.entries(value)) {
       out[k] = substituteSlot(v, overrides);
     }
     return out;
@@ -191,19 +196,26 @@ function substituteDoc(
   doc: Record<string, unknown>,
   overrides: ReadonlyMap<MongoParamRef, unknown>,
 ): Record<string, unknown> {
-  return substituteSlot(doc, overrides) as Record<string, unknown>;
+  return blindCast<
+    Record<string, unknown>,
+    'substituteSlot preserves plain-object shape for document inputs'
+  >(substituteSlot(doc, overrides));
+}
+
+function isUpdatePipeline(
+  update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
+): update is ReadonlyArray<Record<string, unknown>> {
+  return Array.isArray(update);
 }
 
 function substituteUpdate(
   update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
   overrides: ReadonlyMap<MongoParamRef, unknown>,
 ): Record<string, unknown> | Array<Record<string, unknown>> {
-  if (!Array.isArray(update)) {
-    return substituteDoc(update as Record<string, unknown>, overrides);
+  if (isUpdatePipeline(update)) {
+    return update.map((stage) => substituteDoc(stage, overrides));
   }
-  return (update as ReadonlyArray<Record<string, unknown>>).map((stage) =>
-    substituteDoc(stage, overrides),
-  );
+  return substituteDoc(update, overrides);
 }
 
 function buildMutatedDraft(
@@ -363,16 +375,25 @@ export function createMongoParamRefMutator<
 
   function* entries(): IterableIterator<MongoParamRefEntryUnion<TCodecMap>> {
     for (const ref of flattenMongoParamRefs(originalDraft)) {
-      const handle = ref as unknown as MongoParamRefHandle<string | undefined>;
+      const handle = blindCast<
+        MongoParamRefHandle<string | undefined>,
+        'MongoParamRef instance is the runtime handle token'
+      >(ref);
       const value = overrides?.has(ref) ? overrides.get(ref) : ref.value;
       const codecId: string | undefined = ref.codecId;
       const entry: MongoParamRefEntry<string | undefined> = { ref: handle, value, codecId };
-      yield entry as MongoParamRefEntryUnion<TCodecMap>;
+      yield blindCast<
+        MongoParamRefEntryUnion<TCodecMap>,
+        'entry codecId widened to TCodecMap union'
+      >(entry);
     }
   }
 
   function replaceValue(handle: AnyMongoHandle, newValue: unknown): void {
-    ensureOverrides().set(handle as unknown as MongoParamRef, newValue);
+    ensureOverrides().set(
+      blindCast<MongoParamRef, 'MongoParamRefHandle brand is the underlying ref instance'>(handle),
+      newValue,
+    );
   }
 
   function replaceValues(
@@ -380,13 +401,19 @@ export function createMongoParamRefMutator<
   ): void {
     const map = ensureOverrides();
     for (const { ref, newValue } of updates) {
-      map.set(ref as unknown as MongoParamRef, newValue);
+      map.set(
+        blindCast<MongoParamRef, 'MongoParamRefHandle brand is the underlying ref instance'>(ref),
+        newValue,
+      );
     }
   }
 
   return {
     entries,
-    replaceValue: replaceValue as MongoParamRefMutator<TCodecMap>['replaceValue'],
+    replaceValue: blindCast<
+      MongoParamRefMutator<TCodecMap>['replaceValue'],
+      'replaceValue overloads are enforced at the interface; implementation accepts AnyMongoHandle'
+    >(replaceValue),
     replaceValues,
     currentDraft(): MongoLoweredDraft {
       if (!overrides || overrides.size === 0) {

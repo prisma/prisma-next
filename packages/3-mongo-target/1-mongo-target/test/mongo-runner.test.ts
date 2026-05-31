@@ -1,10 +1,11 @@
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type {
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationRunnerExecutionChecks,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type {
   AnyMongoDdlCommand,
   AnyMongoInspectionCommand,
@@ -85,14 +86,29 @@ class StubMongoDriver implements MongoDriver {
 class StubMongoAdapter implements MongoAdapter {
   readonly loweredPlans: MongoQueryPlan[] = [];
 
-  async lower(plan: MongoQueryPlan): Promise<WireCommand> {
+  structuralLower(plan: MongoQueryPlan): MongoLoweredDraft {
     this.loweredPlans.push(plan);
     const kind = plan.command.kind;
-    const wireKind = kind === 'aggregate' || kind === 'rawAggregate' ? 'aggregate' : 'updateMany';
-    // The stub driver only reads `kind` and `collection`, so a minimal shape
-    // is sufficient. The double-cast documents that this is a test-only
-    // mock standing in for the full wire-command class hierarchy.
-    return { kind: wireKind, collection: plan.collection } as unknown as WireCommand;
+    if (kind === 'aggregate' || kind === 'rawAggregate') {
+      return { kind: 'aggregate', collection: plan.collection, pipeline: [] };
+    }
+    return {
+      kind: 'updateMany',
+      collection: plan.collection,
+      filter: {},
+      update: {},
+      upsert: undefined,
+    };
+  }
+
+  async resolveParams(draft: MongoLoweredDraft, _ctx: CodecCallContext): Promise<WireCommand> {
+    const wireKind =
+      draft.kind === 'aggregate' || draft.kind === 'rawAggregate' ? 'aggregate' : 'updateMany';
+    return { kind: wireKind, collection: draft.collection } as unknown as WireCommand;
+  }
+
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<WireCommand> {
+    return this.resolveParams(this.structuralLower(plan), ctx);
   }
 }
 

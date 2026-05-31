@@ -152,12 +152,12 @@ function paramRefLabel(ref: MongoParamRef, codecId: string): string {
   return ref.name ?? codecId;
 }
 
+function isErrorWithCode(error: unknown): error is Error & { code: unknown } {
+  return error instanceof Error && 'code' in error;
+}
+
 function isAlreadyEncodeFailure(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error as Error & { code?: unknown }).code === 'RUNTIME.ENCODE_FAILED'
-  );
+  return isErrorWithCode(error) && error.code === 'RUNTIME.ENCODE_FAILED';
 }
 
 function wrapEncodeFailure(error: unknown, ref: MongoParamRef, codecId: string): never {
