@@ -22,12 +22,10 @@ describe('Mongo pack composition', () => {
         users: { namespace: '__unbound__', model: 'User' },
       },
       storage: {
-        namespaces: {
-          __unbound__: {
-            id: '__unbound__',
-            collections: {
-              users: {},
-            },
+        __unbound__: {
+          id: '__unbound__',
+          collections: {
+            users: {},
           },
         },
       },

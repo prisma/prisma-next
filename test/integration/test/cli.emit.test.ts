@@ -69,11 +69,9 @@ describe('emit command functionality', () => {
         targetFamily: 'sql',
         target: 'postgres',
         storage: {
-          namespaces: {
-            __unbound__: {
-              tables: {
-                user: expect.anything(),
-              },
+          __unbound__: {
+            tables: {
+              user: expect.anything(),
             },
           },
         },

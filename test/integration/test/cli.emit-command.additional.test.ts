@@ -367,14 +367,12 @@ model Post {
         targetFamily: 'mongo',
         target: 'mongo',
         storage: {
-          namespaces: {
-            __unbound__: {
-              collections: {
-                users: {
-                  indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
-                  options: {
-                    collation: { locale: 'en', strength: 2 },
-                  },
+          __unbound__: {
+            collections: {
+              users: {
+                indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
+                options: {
+                  collation: { locale: 'en', strength: 2 },
                 },
               },
             },

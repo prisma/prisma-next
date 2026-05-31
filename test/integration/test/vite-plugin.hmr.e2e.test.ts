@@ -174,13 +174,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(initialContract.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      email: expect.anything(),
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    email: expect.anything(),
                   },
                 },
               },
@@ -209,13 +207,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(updatedContract.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      name: { nullable: true },
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    name: { nullable: true },
                   },
                 },
               },
@@ -259,13 +255,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(initialContract.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      email: expect.anything(),
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    email: expect.anything(),
                   },
                 },
               },
@@ -285,13 +279,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(updatedContract.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      name: { nullable: true },
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    name: { nullable: true },
                   },
                 },
               },
@@ -355,13 +347,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(contractAfterConfigChange.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      name: { nullable: true },
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    name: { nullable: true },
                   },
                 },
               },
@@ -384,13 +374,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(contractAfterAltEdit.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      nickname: { nullable: true },
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    nickname: { nullable: true },
                   },
                 },
               },
@@ -485,13 +473,11 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
             await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
           );
           expect(recoveredContract.storage).toMatchObject({
-            namespaces: {
-              [UNBOUND_NAMESPACE]: {
-                tables: {
-                  user: {
-                    columns: {
-                      name: { nullable: true },
-                    },
+            [UNBOUND_NAMESPACE]: {
+              tables: {
+                user: {
+                  columns: {
+                    name: { nullable: true },
                   },
                 },
               },

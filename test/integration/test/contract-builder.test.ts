@@ -41,11 +41,9 @@ describe('builder integration', () => {
       targetFamily: 'sql',
       storage: expect.objectContaining({
         storageHash: 'sha256:test-core',
-        namespaces: expect.objectContaining({
-          __unbound__: expect.objectContaining({
-            tables: expect.objectContaining({
-              user: expect.anything(),
-            }),
+        __unbound__: expect.objectContaining({
+          tables: expect.objectContaining({
+            user: expect.anything(),
           }),
         }),
       }),

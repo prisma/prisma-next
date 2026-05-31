@@ -111,36 +111,34 @@ describe('contract.d.ts imports resolution', () => {
           },
         },
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                    createdAt: {
-                      codecId: 'pg/timestamptz@1',
-                      nativeType: 'timestamptz',
-                      nullable: false,
-                    },
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                  createdAt: {
+                    codecId: 'pg/timestamptz@1',
+                    nativeType: 'timestamptz',
+                    nullable: false,
                   },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
                 },
-                post: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                    userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
+              post: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                  userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
             },
           },
@@ -265,20 +263,18 @@ type UserIdColumn = UserColumns['id'];
           },
         },
         storage: {
-          namespaces: {
-            [UNBOUND_NAMESPACE_ID]: {
-              id: UNBOUND_NAMESPACE_ID,
-              tables: {
-                user: {
-                  columns: {
-                    id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                    email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-                  },
-                  primaryKey: { columns: ['id'] },
-                  uniques: [],
-                  indexes: [],
-                  foreignKeys: [],
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            tables: {
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
             },
           },

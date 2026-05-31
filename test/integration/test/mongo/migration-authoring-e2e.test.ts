@@ -89,17 +89,15 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
         // Synthetic-contract opt-out (paired with `strictVerification: false`):
         // these tests exercise the runner against hand-rolled migration ops,
         // not a real authored contract. Supply the minimum well-formed shape
-        // `contractToMongoSchemaIR` reads (`storage.namespaces`) so the
+        // `contractToMongoSchemaIR` reads (flat `storage.<namespaceId>`) so the
         // verifier degrades to an empty-expected diff rather than crashing.
         destinationContract: {
           storage: {
             storageHash: destinationHash,
-            namespaces: {
-              [UNBOUND_NAMESPACE_ID]: {
-                id: UNBOUND_NAMESPACE_ID,
-                kind: 'mongo-namespace' as const,
-                collections: {},
-              },
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              kind: 'mongo-namespace' as const,
+              collections: {},
             },
           },
         } as unknown as MongoContract,
@@ -350,12 +348,10 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           destinationContract: {
             storage: {
               storageHash: destinationHashV2,
-              namespaces: {
-                [UNBOUND_NAMESPACE_ID]: {
-                  id: UNBOUND_NAMESPACE_ID,
-                  kind: 'mongo-namespace' as const,
-                  collections: {},
-                },
+              [UNBOUND_NAMESPACE_ID]: {
+                id: UNBOUND_NAMESPACE_ID,
+                kind: 'mongo-namespace' as const,
+                collections: {},
               },
             },
           } as unknown as MongoContract,
@@ -401,12 +397,10 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           destinationContract: {
             storage: {
               storageHash: destinationHashV3,
-              namespaces: {
-                [UNBOUND_NAMESPACE_ID]: {
-                  id: UNBOUND_NAMESPACE_ID,
-                  kind: 'mongo-namespace' as const,
-                  collections: {},
-                },
+              [UNBOUND_NAMESPACE_ID]: {
+                id: UNBOUND_NAMESPACE_ID,
+                kind: 'mongo-namespace' as const,
+                collections: {},
               },
             },
           } as unknown as MongoContract,

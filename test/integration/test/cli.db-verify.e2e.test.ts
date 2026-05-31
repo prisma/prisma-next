@@ -43,22 +43,20 @@ function createTestContract(
     targetFamily: 'sql',
     storage: {
       storageHash: 'sha256:test',
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: {
-          id: UNBOUND_NAMESPACE_ID,
-          tables: Object.fromEntries(
-            Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
-              name,
-              {
-                columns,
-                primaryKey: { columns: ['id'] },
-                uniques,
-                indexes: [],
-                foreignKeys: [],
-              },
-            ]),
-          ),
-        },
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables: Object.fromEntries(
+          Object.entries(tables).map(([name, { columns, uniques = [] }]) => [
+            name,
+            {
+              columns,
+              primaryKey: { columns: ['id'] },
+              uniques,
+              indexes: [],
+              foreignKeys: [],
+            },
+          ]),
+        ),
       },
     },
     roots: {},
