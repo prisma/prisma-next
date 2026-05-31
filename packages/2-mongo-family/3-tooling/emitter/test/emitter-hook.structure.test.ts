@@ -42,7 +42,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: { storageHash: 'sha256:test' },
     } as Contract;
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'must have storage namespace entries',
+      'must have at least one storage namespace entry',
     );
   });
 

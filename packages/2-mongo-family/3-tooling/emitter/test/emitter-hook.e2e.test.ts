@@ -74,7 +74,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   it('generates storage section with namespaces', () => {
     const types = generateContractDts(blogContract, mongoEmission, [], testHashes);
 
-    expect(types).toContain('readonly namespaces:');
+    expect(types).toContain('readonly __unbound__:');
     expect(types).toContain('readonly collections:');
     expect(types).toContain('readonly users: MongoCollection');
     expect(types).toContain('readonly posts: MongoCollection');
