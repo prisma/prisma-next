@@ -14,6 +14,9 @@ import {
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { migrationGraphToRenderInput } from '../utils/formatters/graph-migration-mapper';
 import { graphRenderer } from '../utils/formatters/graph-render';
+import { buildMigrationGraphLayout } from '../utils/formatters/migration-graph-layout';
+import { buildMigrationGraphRows } from '../utils/formatters/migration-graph-rows';
+import { renderMigrationGraphTree } from '../utils/formatters/migration-graph-tree-render';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
@@ -24,6 +27,7 @@ import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
 interface MigrationGraphOptions extends CommonCommandOptions {
   readonly config?: string;
   readonly dot?: boolean;
+  readonly tree?: boolean;
 }
 
 export interface MigrationGraphResult {
@@ -93,6 +97,7 @@ export function createMigrationGraphCommand(): Command {
     'prisma-next migration graph',
     'prisma-next migration graph --json',
     'prisma-next migration graph --dot',
+    'prisma-next migration graph --tree',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
@@ -103,6 +108,7 @@ export function createMigrationGraphCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--dot', 'Output in Graphviz DOT format')
+    .option('--tree', 'Experimental condensed annotated tree renderer')
     .action(async (options: MigrationGraphOptions) => {
       const flags = parseGlobalFlagsOrExit(options);
       const ui = createTerminalUI(flags);
@@ -134,21 +140,41 @@ export function createMigrationGraphCommand(): Command {
             JSON.stringify({ ok: true, nodes, edges, summary: graphResult.summary }, null, 2),
           );
         } else if (!flags.quiet) {
-          const renderInput = migrationGraphToRenderInput({
-            graph: graphResult.graph,
-            mode: 'offline',
-            markerHash: undefined,
-            contractHash: graphResult.contractHash ?? EMPTY_CONTRACT_HASH,
-            refs: graphResult.refs,
-            activeRefHash: undefined,
-            activeRefName: undefined,
-            edgeStatuses: [],
-          });
-          const graphOutput = graphRenderer.render(renderInput.graph, {
-            ...renderInput.options,
-            colorize: flags.color !== false,
-          });
-          ui.log(graphOutput);
+          if (options.tree) {
+            const refsByHash = new Map<string, string[]>();
+            for (const ref of graphResult.refs) {
+              const existing = refsByHash.get(ref.hash);
+              refsByHash.set(ref.hash, existing ? [...existing, ref.name] : [ref.name]);
+            }
+            const rowModel = buildMigrationGraphRows(graphResult.graph);
+            const layout = buildMigrationGraphLayout(rowModel);
+            const activeRef = graphResult.refs.find((ref) => ref.active);
+            const treeOutput = renderMigrationGraphTree(layout, {
+              refsByHash,
+              ...(graphResult.contractHash !== null
+                ? { contractHash: graphResult.contractHash }
+                : {}),
+              ...(activeRef !== undefined ? { activeRefName: activeRef.name } : {}),
+              colorize: flags.color !== false,
+            });
+            ui.log(treeOutput);
+          } else {
+            const renderInput = migrationGraphToRenderInput({
+              graph: graphResult.graph,
+              mode: 'offline',
+              markerHash: undefined,
+              contractHash: graphResult.contractHash ?? EMPTY_CONTRACT_HASH,
+              refs: graphResult.refs,
+              activeRefHash: undefined,
+              activeRefName: undefined,
+              edgeStatuses: [],
+            });
+            const graphOutput = graphRenderer.render(renderInput.graph, {
+              ...renderInput.options,
+              colorize: flags.color !== false,
+            });
+            ui.log(graphOutput);
+          }
           ui.log(`\n${graphResult.summary}`);
         }
       });
