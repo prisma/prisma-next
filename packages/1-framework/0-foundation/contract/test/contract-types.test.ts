@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applicationDomainOf } from '../../../../../test/utils/src/application-domain-of';
 import { asNamespaceId } from '../src/namespace-id';
+import { applicationDomainOf } from './support/application-domain-of';
 
 function crossRef(model: string, namespace = 'default') {
   return { namespace: asNamespaceId(namespace), model };

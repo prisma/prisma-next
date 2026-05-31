@@ -8,7 +8,6 @@ function crossRef(model: string, namespace = 'default') {
 
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { applicationDomainOf } from '../../../../../test/utils/src/application-domain-of';
 import {
   type CanonicalizeContractOptions,
   canonicalizeContract as canonicalizeContractRaw,
@@ -20,6 +19,7 @@ import { createStorageSort, type NamedArraySortTarget } from '../src/canonicaliz
 import type { Contract } from '../src/contract-types';
 import type { ContractModelBase, ContractValueObject } from '../src/domain-types';
 import { coreHash, profileHash } from '../src/types';
+import { applicationDomainOf } from './support/application-domain-of';
 
 // Tests author JSON-clean contracts directly, so the canonicalisation
 // hook trivially passes through.

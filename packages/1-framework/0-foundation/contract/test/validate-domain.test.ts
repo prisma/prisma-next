@@ -8,11 +8,11 @@ function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID
 
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { applicationDomainOf } from '../../../../../test/utils/src/application-domain-of';
 import { ContractValidationError } from '../src/contract-validation-error';
 import type { ContractValueObject } from '../src/domain-types';
 import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
+import { applicationDomainOf } from './support/application-domain-of';
 
 function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
