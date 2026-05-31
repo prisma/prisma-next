@@ -9,7 +9,7 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
-import { contractModels, crossRef } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
@@ -1674,10 +1674,18 @@ export function interpretPslDocumentToSqlContract(
     })),
   });
 
-  let patchedModels = patchModelDomainFields(
-    contractModels(contract) as Record<string, ContractModel>,
-    modelResolvedFields,
-  );
+  const modelsForPatch: Record<string, ContractModel> = {};
+  for (const namespaceSlice of Object.values(contract.domain.namespaces)) {
+    for (const [modelName, model] of Object.entries(namespaceSlice.models)) {
+      if (Object.hasOwn(modelsForPatch, modelName)) {
+        throw new Error(
+          `duplicate model name "${modelName}" across domain namespaces during PSL interpretation`,
+        );
+      }
+      modelsForPatch[modelName] = model as ContractModel;
+    }
+  }
+  let patchedModels = patchModelDomainFields(modelsForPatch, modelResolvedFields);
 
   const polyDiagnostics: ContractSourceDiagnostic[] = [];
   patchedModels = resolvePolymorphism(

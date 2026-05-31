@@ -1,4 +1,4 @@
-import { type Contract, type ContractModel, contractModels } from '@prisma-next/contract/types';
+import type { Contract, ContractModel } from '@prisma-next/contract/types';
 import {
   serializeNamespaceId,
   serializeObjectKey,
@@ -112,7 +112,6 @@ export const sqlEmission = {
 
     assertUniqueSqlTableNames(storage);
 
-    const models = contractModels(contract) as Record<string, ContractModel<SqlModelStorage>>;
     const tableNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
       for (const t of Object.keys(ns.tables)) {
@@ -120,40 +119,44 @@ export const sqlEmission = {
       }
     }
 
-    if (models) {
+    for (const [namespaceId, domainNs] of Object.entries(contract.domain.namespaces)) {
+      const models = domainNs.models as Record<string, ContractModel<SqlModelStorage>>;
       for (const [modelName, model] of Object.entries(models)) {
+        const qualifiedName = `${namespaceId}:${modelName}`;
         if (!model.storage?.table) {
-          throw new Error(`Model "${modelName}" is missing storage.table`);
+          throw new Error(`Model "${qualifiedName}" is missing storage.table`);
         }
 
         const tableName = model.storage.table;
         const located = findSqlTable(storage, tableName);
         if (!located) {
-          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
+          throw new Error(`Model "${qualifiedName}" references non-existent table "${tableName}"`);
         }
 
         const { table } = located;
         const columnNames = new Set(Object.keys(table.columns));
         const storageFields = model.storage.fields;
         if (!storageFields || Object.keys(storageFields).length === 0) {
-          throw new Error(`Model "${modelName}" is missing storage.fields`);
+          throw new Error(`Model "${qualifiedName}" is missing storage.fields`);
         }
 
         for (const [fieldName, field] of Object.entries(storageFields)) {
           if (!field.column) {
-            throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
+            throw new Error(
+              `Model "${qualifiedName}" field "${fieldName}" is missing column property`,
+            );
           }
 
           if (!columnNames.has(field.column)) {
             throw new Error(
-              `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
+              `Model "${qualifiedName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
             );
           }
         }
 
         if (!model.relations || typeof model.relations !== 'object') {
           throw new Error(
-            `Model "${modelName}" is missing required field "relations" (must be an object)`,
+            `Model "${qualifiedName}" is missing required field "relations" (must be an object)`,
           );
         }
       }

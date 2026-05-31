@@ -666,10 +666,13 @@ export function buildSqlContractFromDefinition(
         )
       : undefined;
 
-  const domainNamespaceIds = new Set([
-    ...namespaceCoordinateIds,
-    ...Object.keys(modelsByNamespace),
-  ]);
+  const domainNamespaceIds = new Set(Object.keys(modelsByNamespace));
+  if (domainNamespaceIds.size === 0) {
+    domainNamespaceIds.add(UNBOUND_NAMESPACE_ID);
+  }
+  if (valueObjects !== undefined) {
+    domainNamespaceIds.add(UNBOUND_NAMESPACE_ID);
+  }
   const domainNamespaces = Object.fromEntries(
     [...domainNamespaceIds].sort().map((namespaceId) => {
       const modelsInNs = modelsByNamespace[namespaceId] ?? {};
