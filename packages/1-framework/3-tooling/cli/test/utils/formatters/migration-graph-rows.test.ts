@@ -579,7 +579,7 @@ describe('buildMigrationGraphRows', () => {
           '├───╯   │',
           '○◂──────╯     1111111',
           '│↑            init                ∅ → 1111111',
-          '○             ∅',
+          '∅',
           '',
           '○             c222222',
           '│↑            experiment          c111111 → c222222',

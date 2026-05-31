@@ -400,9 +400,18 @@ export function renderMigrationGraphTree(
     if (row.kind === 'node') {
       const contractHash = row.contractHash ?? EMPTY_CONTRACT_HASH;
       if (contractHash === EMPTY_CONTRACT_HASH) {
-        const emptyGlyph = palette.emptySource.padEnd(2, ' ');
-        gutter = emptyGlyph + gutter.slice(2);
-        lines.push(gutter.replace(/\s+$/, ''));
+        const trailingLanes = row.cells
+          .slice(1)
+          .map((cell) => renderCellPair(cell, style, palette))
+          .join('');
+        const emptyGutter = palette.emptySource.padEnd(2, ' ') + trailingLanes;
+        const overlayNames = overlayNamesForContract(contractHash, opts);
+        if (overlayNames.length === 0) {
+          lines.push(emptyGutter.replace(/\s+$/, ''));
+          continue;
+        }
+        const overlay = style.refs(overlayNames);
+        lines.push(`${padVisible(emptyGutter, dataColumn)}${overlay}`.replace(/\s+$/, ''));
         continue;
       }
       const hashText = style.sourceHash(
