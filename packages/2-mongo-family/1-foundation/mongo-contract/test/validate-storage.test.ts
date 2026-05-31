@@ -1,4 +1,9 @@
-import { asNamespaceId, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  asNamespaceId,
+  buildDomainPlaneFromFlat,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 
@@ -6,7 +11,7 @@ function crossRef(model: string, namespace = 'default') {
   return { namespace: asNamespaceId(namespace), model };
 }
 
-import type { MongoContract } from '../src/contract-types';
+import type { MongoContract, MongoModelDefinition } from '../src/contract-types';
 import { buildMongoNamespace } from '../src/ir/build-mongo-namespace';
 import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoStorage } from '../src/ir/mongo-storage';
@@ -28,24 +33,30 @@ function storageWithItemsCollections(
   });
 }
 
-function makeMinimalContract(overrides: Partial<MongoContract> = {}): MongoContract {
+type MongoContractTestOverrides = Partial<MongoContract> & {
+  models?: Record<string, MongoModelDefinition>;
+};
+
+function makeMinimalContract(overrides: MongoContractTestOverrides = {}): MongoContract {
+  const { models, domain, ...rest } = overrides;
+  const defaultModels: Record<string, MongoModelDefinition> = {
+    Item: {
+      fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
+      storage: { collection: 'items' },
+      relations: {},
+    },
+  };
   return {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { items: crossRef('Item') },
     storage: storageWithItemsCollections({ items: new MongoCollection() }),
-    models: {
-      Item: {
-        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-        storage: { collection: 'items' },
-        relations: {},
-      },
-    },
+    domain: domain ?? buildDomainPlaneFromFlat({ models: models ?? defaultModels }),
     capabilities: {},
     extensionPacks: {},
     profileHash: profileHash('sha256:test'),
     meta: {},
-    ...overrides,
+    ...rest,
   };
 }
 

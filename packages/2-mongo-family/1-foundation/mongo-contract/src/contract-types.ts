@@ -2,7 +2,9 @@ import type {
   Contract,
   ContractField,
   ContractModel,
+  ContractModelsMap,
   ContractValueObject,
+  ContractValueObjectsMap,
   StorageBase,
 } from '@prisma-next/contract/types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -125,11 +127,7 @@ export type ExtractMongoFieldInputTypes<T> =
       : Record<string, never>
     : Record<string, never>;
 
-type ExtractValueObjects<TContract> = TContract extends {
-  valueObjects: infer VO extends Record<string, ContractValueObject>;
-}
-  ? VO
-  : Record<never, never>;
+type ExtractValueObjects<TContract extends Contract> = ContractValueObjectsMap<TContract>;
 
 type NormalizeContractFields<TFields> = {
   [K in keyof TFields]: TFields[K] extends ContractField ? TFields[K] : never;
@@ -181,8 +179,8 @@ type InferFieldType<
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-  TFields extends Record<string, ContractField> = TContract['models'][ModelName]['fields'],
+  ModelName extends string & keyof ContractModelsMap<TContract>,
+  TFields extends Record<string, ContractField> = ContractModelsMap<TContract>[ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
   TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
 > = {

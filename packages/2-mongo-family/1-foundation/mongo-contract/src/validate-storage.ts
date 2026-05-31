@@ -1,4 +1,6 @@
-import type { MongoContract } from './contract-types';
+import { contractModels } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import type { MongoContract, MongoModelDefinition } from './contract-types';
 
 function formatCrossRef(crossRef: { readonly namespace: string; readonly model: string }): string {
   return `${crossRef.namespace}.${crossRef.model}`;
@@ -18,8 +20,12 @@ function storageDeclaresCollection(
 
 export function validateMongoStorage(contract: MongoContract): void {
   const errors: string[] = [];
+  const models = blindCast<
+    Record<string, MongoModelDefinition>,
+    'domain.namespaces flatten to Mongo model definitions'
+  >(contractModels(contract));
 
-  for (const [modelName, model] of Object.entries(contract.models)) {
+  for (const [modelName, model] of Object.entries(models)) {
     if (
       model.storage.collection &&
       !storageDeclaresCollection(contract.storage, model.storage.collection)
@@ -30,7 +36,7 @@ export function validateMongoStorage(contract: MongoContract): void {
     }
 
     if (model.base) {
-      const baseModel = contract.models[model.base.model];
+      const baseModel = models[model.base.model];
       if (baseModel) {
         const variantCollection = model.storage.collection;
         const baseCollection = baseModel.storage.collection;
@@ -43,7 +49,7 @@ export function validateMongoStorage(contract: MongoContract): void {
     }
 
     for (const [relName, relation] of Object.entries(model.relations ?? {})) {
-      const targetModel = contract.models[relation.to.model];
+      const targetModel = models[relation.to.model];
       const targetLabel = formatCrossRef(relation.to);
 
       if (targetModel?.owner) {

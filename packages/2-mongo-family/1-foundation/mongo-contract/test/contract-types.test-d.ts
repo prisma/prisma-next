@@ -36,45 +36,51 @@ type ContractWithVO = MongoContractWithTypeMaps<
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
-    readonly models: {
-      readonly User: {
-        readonly fields: {
-          readonly _id: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+    readonly domain: {
+      readonly namespaces: {
+        readonly __unbound__: {
+          readonly models: {
+            readonly User: {
+              readonly fields: {
+                readonly _id: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+                };
+                readonly homeAddress: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+                };
+                readonly workAddress: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+                };
+                readonly previousAddresses: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
+                  readonly many: true;
+                };
+              };
+              readonly relations: Record<string, never>;
+              readonly storage: { readonly collection: 'users' };
+            };
           };
-          readonly homeAddress: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          };
-          readonly workAddress: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-          };
-          readonly previousAddresses: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' };
-            readonly many: true;
-          };
-        };
-        readonly relations: Record<string, never>;
-        readonly storage: { readonly collection: 'users' };
-      };
-    };
-    readonly valueObjects: {
-      readonly Address: {
-        readonly fields: {
-          readonly street: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly city: {
-            readonly nullable: false;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
-          };
-          readonly zip: {
-            readonly nullable: true;
-            readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly valueObjects: {
+            readonly Address: {
+              readonly fields: {
+                readonly street: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly city: {
+                  readonly nullable: false;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+                readonly zip: {
+                  readonly nullable: true;
+                  readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+                };
+              };
+            };
           };
         };
       };
@@ -140,8 +146,9 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
       readonly extensionPacks: Record<string, never>;
       readonly meta: Record<string, never>;
       readonly roots: Record<string, never>;
-      readonly models: Record<string, never>;
-      readonly valueObjects: Record<string, never>;
+      readonly domain: {
+        readonly namespaces: Record<string, { readonly models: Record<string, never> }>;
+      };
       readonly storage: {
         readonly namespaces: Record<
           string,
@@ -176,8 +183,9 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
       readonly extensionPacks: Record<string, never>;
       readonly meta: Record<string, never>;
       readonly roots: Record<string, never>;
-      readonly models: Record<string, never>;
-      readonly valueObjects: Record<string, never>;
+      readonly domain: {
+        readonly namespaces: Record<string, { readonly models: Record<string, never> }>;
+      };
       readonly storage: {
         readonly namespaces: Record<
           string,
