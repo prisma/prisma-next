@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { join } from 'pathe';
+import { collectRun } from '../collect-run.ts';
 import { type PrepareRunConfig, prepareRun } from '../prepare-run.ts';
 
 let tmpDir: string;
@@ -149,5 +150,40 @@ describe('prepareRun', () => {
     const prepared = prepareRun(config, { materialize: mockMaterialize });
     assert.equal(prepared.runDir, runDir);
     assert.equal(prepared.baseRef, baseRef);
+  });
+
+  it('does not throw and yields a 40-char prepareCommit when the overlay stages nothing', () => {
+    const config: PrepareRunConfig = {
+      repoUnderTestDir: repoDir,
+      baseRef: bundleRef,
+      skillBundle: { repoDir, ref: bundleRef },
+      runDir,
+    };
+    const prepared = prepareRun(config, { materialize: mockMaterialize });
+    assert.equal(prepared.prepareCommit.length, 40);
+  });
+});
+
+describe('prepareRun + collectRun — empty-overlay cut point', () => {
+  it('collectRun reports no changes before agent work and picks up a post-baseline change', () => {
+    const config: PrepareRunConfig = {
+      repoUnderTestDir: repoDir,
+      baseRef: bundleRef,
+      skillBundle: { repoDir, ref: bundleRef },
+      runDir,
+    };
+    const prepared = prepareRun(config, { materialize: mockMaterialize });
+
+    const before = collectRun(prepared);
+    assert.equal(before.diffStat.filesChanged, 0);
+    assert.equal(before.diff.trim(), '');
+
+    writeFileSync(join(runDir, 'src', 'bar.ts'), 'export const y = 2;\n');
+    gitIn(runDir, 'add', '-A');
+    gitIn(runDir, 'commit', '-m', 'agent: add bar.ts');
+
+    const after = collectRun(prepared);
+    assert.equal(after.diffStat.filesChanged, 1);
+    assert.ok(after.diff.includes('bar.ts'));
   });
 });

@@ -94,7 +94,7 @@ export function prepareRun(config: PrepareRunConfig, deps?: PrepareRunDeps): Pre
   const matResult = materialize(config.runDir);
 
   git(['add', '-A'], config.runDir);
-  git(['commit', '-m', 'prepare-run baseline'], config.runDir);
+  git(['commit', '--allow-empty', '-m', 'prepare-run baseline'], config.runDir);
   const prepareCommit = git(['rev-parse', 'HEAD'], config.runDir).stdout;
 
   return {
