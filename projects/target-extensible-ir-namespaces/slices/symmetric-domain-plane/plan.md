@@ -73,6 +73,21 @@ A second review round confirmed the structure + validator are correct, but flagg
 - You are tempted to relocate or delete the shared runtime mappers (`contractModels` / `contractValueObjects` / `resolveSingleDomainNamespaceId`) or the type-level `ContractModelsMap` / `ContractValueObjectsMap` — **stop**; they stay this slice (deferred to `runtime-qualification`).
 - The rename forces touching generated `contract.d.ts` content beyond import names — report (it shouldn't; `DomainPlane` isn't emitted).
 
+## Rework round 3 — finish evicting non-foundation code from contract src (review-driven)
+
+Live review of the round-2 result surfaced two more misplaced things in `contract/src` (same principle as `domainPlaneOf`): a `testing-factories.ts` test-support module (exported via the public `@prisma-next/contract/testing` subpath, ~23 test consumers, zero production consumers) and an inline `DomainNamespaceResolutionError` class while `ContractValidationError` already has a home in `contract-validation-error.ts`.
+
+### Dispatch 4 — surface cleanup
+
+1. **Relocate `DomainNamespaceResolutionError`** to live with `ContractValidationError` (the package's centralized contract-error module). Update imports. Tiny.
+2. **Evict `testing-factories.ts` to `@prisma-next/test-utils`** — it is test-only (no production consumers). Repoint the ~23 test consumers (currently importing `@prisma-next/contract/testing`). Contract's own tests use a local helper to avoid the contract↔test-utils cycle (same pattern as `applicationDomainOf`).
+
+**HALT condition:** `createContract`/`createSqlContract` depend on contract's **non-exported** hashing internals (`computeStorageHash`, etc.). If relocating forces widening contract's *main public API* to expose those, **stop and report** — trading "test code in prod" for "leaked internals" is not a win. A test-only subpath export is acceptable; polluting the primary surface is not.
+
+### Deferred (NOT relocated this slice — decision recorded)
+
+`contractModels` / `contractValueObjects` / `resolveSingleDomainNamespaceId` (and type-level `ContractModelsMap` / `ContractValueObjectsMap`) stay in foundation this slice. They are shared single-namespace projections across three consumer families (Mongo DSL, `sql-orm-client`, emitter) with no common home below foundation; the `runtime-qualification` slice eliminates them as it makes those consumers namespace-aware. Relocating now is throwaway churn that slice immediately deletes. Review threads on these get a reply documenting the decision and are resolved.
+
 ## Review
 
 Opus 4.8-high reviewer after **each** dispatch. CI owns the validation gates. Reviewer confirms: no back-compat residue, validation is coordinate-based (not a flat `Set`), no silent cross-namespace merge, emitter loud about single-namespace, storage untouched, framework domain has no `types`. For round 2: `ApplicationDomain` naming applied throughout, identity key is structural (no `${ns}:${model}`), the authoring helper is gone from production code, and the transitional projection helpers are untouched. Work continues on PR #653 (same branch).
