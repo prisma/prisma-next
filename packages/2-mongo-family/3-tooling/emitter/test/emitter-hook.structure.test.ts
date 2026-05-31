@@ -1,10 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
-import {
-  getStorageNamespace,
-  storageNamespaceEntries,
-  storageNamespaceValues,
-} from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import {
