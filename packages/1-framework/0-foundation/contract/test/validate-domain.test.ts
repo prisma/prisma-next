@@ -5,9 +5,11 @@ function crossRef(model: string, namespace = 'default') {
   return { namespace: asNamespaceId(namespace), model };
 }
 
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ContractValidationError } from '../src/contract-validation-error';
 import { buildDomainPlaneFromFlat } from '../src/domain-envelope';
+import type { ContractValueObject } from '../src/domain-types';
 import type { DomainContractShape } from '../src/validate-domain';
 import { validateContractDomain } from '../src/validate-domain';
 
@@ -15,6 +17,7 @@ function makeMinimalModel(overrides: Record<string, unknown> = {}) {
   return {
     fields: {},
     relations: {},
+    storage: {},
     ...overrides,
   };
 }
@@ -47,7 +50,12 @@ function makeValidContract(overrides: Record<string, unknown> = {}): DomainContr
             models,
             ...ifDefined(
               'valueObjects',
-              valueObjects as Record<string, { fields: Record<string, unknown> }> | undefined,
+              valueObjects !== undefined
+                ? blindCast<
+                    Record<string, ContractValueObject>,
+                    'validate-domain fixtures use structural value-object shapes'
+                  >(valueObjects)
+                : undefined,
             ),
           }),
     ...rest,

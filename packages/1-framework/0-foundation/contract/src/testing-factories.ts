@@ -1,8 +1,13 @@
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PreserveEmptyPredicate, StorageSort } from './canonicalization';
 import type { Contract } from './contract-types';
 import type { CrossReference } from './cross-reference';
-import { buildDomainPlaneFromFlat, UNBOUND_DOMAIN_NAMESPACE_ID } from './domain-envelope';
+import {
+  buildDomainPlaneFromFlat,
+  type DomainPlane,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
+} from './domain-envelope';
 import type {
   ContractModel,
   ContractModelBase,
@@ -77,11 +82,16 @@ export function createContract<
     target,
     targetFamily,
     roots: overrides.roots ?? {},
-    domain: buildDomainPlaneFromFlat({
-      models: (overrides.models ?? {}) as TModels,
-      ...ifDefined('valueObjects', overrides.valueObjects),
-      namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
-    }),
+    domain: blindCast<
+      DomainPlane<TModels>,
+      'buildDomainPlaneFromFlat merges override models into __unbound__ namespace'
+    >(
+      buildDomainPlaneFromFlat({
+        models: (overrides.models ?? {}) as TModels,
+        ...ifDefined('valueObjects', overrides.valueObjects),
+        namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+      }),
+    ),
     storage,
     capabilities,
     extensionPacks: overrides.extensionPacks ?? {},
