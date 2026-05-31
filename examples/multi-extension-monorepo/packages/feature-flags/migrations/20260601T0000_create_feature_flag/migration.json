@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "sha256:1a11ef0c4ef2dc0d6ae0663e65bf61113f980fee7f55e3dd828f65fe439a88cb",
+  "to": "sha256:c0992219c5649447a60c6672771d1cea94d9a8fed488c14b7f773118a900a488",
   "providedInvariants": ["feature-flags:create-feature_flag-v1"],
   "createdAt": "2026-05-09T04:27:33.360Z",
-  "migrationHash": "sha256:59796a538c6acea2e89459b8a0ab4a2717bf87597e7506bc5faebdd2a36467b9"
+  "migrationHash": "sha256:65d563a00b4b80756e1194a090475a0acd02ddc96335390fc1eeb8f0b94f9717"
 }

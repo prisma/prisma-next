@@ -290,27 +290,33 @@ model Post {
       expect(contractJson).toMatchObject({
         targetFamily: 'mongo',
         target: 'mongo',
-        models: {
-          User: expect.objectContaining({
-            fields: expect.objectContaining({
-              _id: {
-                type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
-                nullable: false,
+        domain: {
+          namespaces: {
+            __unbound__: {
+              models: {
+                User: expect.objectContaining({
+                  fields: expect.objectContaining({
+                    _id: {
+                      type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+                      nullable: false,
+                    },
+                    name: {
+                      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+                      nullable: false,
+                    },
+                  }),
+                }),
+                Post: expect.objectContaining({
+                  relations: expect.objectContaining({
+                    author: expect.objectContaining({
+                      to: { namespace: '__unbound__', model: 'User' },
+                      cardinality: 'N:1',
+                    }),
+                  }),
+                }),
               },
-              name: {
-                type: { kind: 'scalar', codecId: 'mongo/string@1' },
-                nullable: false,
-              },
-            }),
-          }),
-          Post: expect.objectContaining({
-            relations: expect.objectContaining({
-              author: expect.objectContaining({
-                to: { namespace: '__unbound__', model: 'User' },
-                cardinality: 'N:1',
-              }),
-            }),
-          }),
+            },
+          },
         },
       });
 
@@ -380,25 +386,31 @@ model Post {
             },
           },
         },
-        models: {
-          Task: expect.objectContaining({
-            storage: expect.objectContaining({
-              collection: 'tasks',
-              relations: {
-                comments: { field: 'comments' },
+        domain: {
+          namespaces: {
+            __unbound__: {
+              models: {
+                Task: expect.objectContaining({
+                  storage: expect.objectContaining({
+                    collection: 'tasks',
+                    relations: {
+                      comments: { field: 'comments' },
+                    },
+                  }),
+                  discriminator: { field: 'type' },
+                  variants: {
+                    Bug: { value: 'bug' },
+                  },
+                }),
+                Bug: expect.objectContaining({
+                  base: { namespace: '__unbound__', model: 'Task' },
+                }),
+                Comment: expect.objectContaining({
+                  owner: 'Task',
+                }),
               },
-            }),
-            discriminator: { field: 'type' },
-            variants: {
-              Bug: { value: 'bug' },
             },
-          }),
-          Bug: expect.objectContaining({
-            base: { namespace: '__unbound__', model: 'Task' },
-          }),
-          Comment: expect.objectContaining({
-            owner: 'Task',
-          }),
+          },
         },
       });
 

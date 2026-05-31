@@ -18,7 +18,9 @@ const ContractIrSchema = type({
   storage: type({
     storageHash: 'string',
   }),
-  models: 'object',
+  domain: type({
+    namespaces: 'object',
+  }),
 });
 
 function hasErrnoCode(error: unknown, code: string): boolean {
