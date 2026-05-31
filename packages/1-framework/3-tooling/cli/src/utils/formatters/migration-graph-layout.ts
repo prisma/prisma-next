@@ -700,13 +700,20 @@ function applySkipRollbackRouting(
           cells[lane] = { kind: 'arc-branch-tee' };
           continue;
         }
-        const crossed = routes.some(
-          (other) =>
-            other.edge.migrationHash !== edge.migrationHash &&
-            other.backLane === lane &&
-            routeCrossesRow(other, sourceRowIndex, result),
-        );
-        cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'empty' };
+        const existing = cells[lane];
+        const occupied =
+          existing !== undefined &&
+          existing.kind !== 'empty' &&
+          existing.kind !== 'horizontal-pass';
+        const crossed =
+          occupied ||
+          routes.some(
+            (other) =>
+              other.edge.migrationHash !== edge.migrationHash &&
+              other.backLane === lane &&
+              routeCrossesRow(other, sourceRowIndex, result),
+          );
+        cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'horizontal-pass' };
       }
       cells[backLane] =
         backLane < maxCoSourcedLane ? { kind: 'arc-branch-tee' } : { kind: 'arc-branch-corner' };
@@ -758,14 +765,23 @@ function applySkipRollbackRouting(
       const contractHash = targetRow.contractHash ?? EMPTY_CONTRACT_HASH;
       cells[targetCol] = { kind: 'node', contractHash, arcLand: true };
       for (let lane = targetCol + 1; lane < backLane; lane += 1) {
-        // A bridged lane that carries another arc still active at this row must
-        // cross over it (`┼`) rather than overwrite it with a bare bridge (`──`).
-        const crossed = routes.some(
-          (other) =>
-            other.edge.migrationHash !== edge.migrationHash &&
-            other.backLane === lane &&
-            routeCrossesRow(other, targetRowIndex, result),
-        );
+        // A bridged lane that carries another arc OR a forward vertical still
+        // active at this row must cross over it (`┼`) rather than overwrite it
+        // with a bare bridge (`──`).
+        const existing = cells[lane];
+        const occupied =
+          existing !== undefined &&
+          existing.kind !== 'empty' &&
+          existing.kind !== 'horizontal-pass' &&
+          existing.kind !== 'arc-land-bridge';
+        const crossed =
+          occupied ||
+          routes.some(
+            (other) =>
+              other.edge.migrationHash !== edge.migrationHash &&
+              other.backLane === lane &&
+              routeCrossesRow(other, targetRowIndex, result),
+          );
         cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'arc-land-bridge' };
       }
       cells[backLane] = { kind: 'arc-land-corner' };
