@@ -23,6 +23,10 @@ export type RunArmConfig = {
   manifestFile: string;
   live: boolean;
   apiKeyPresent: boolean;
+  /** The adapter runtime to use. Defaults to `'claude'` in the CLI. */
+  runtime: 'claude' | 'cursor';
+  /** Optional hard per-run USD budget cap (Claude adapter only). */
+  maxBudgetUsd?: number;
 };
 
 export type RunArmDeps = {
@@ -57,6 +61,8 @@ export async function runArm(config: RunArmConfig, deps?: RunArmDeps): Promise<R
       runDir: prepared.runDir,
       live: config.live,
       apiKeyPresent: config.apiKeyPresent,
+      runtime: config.runtime,
+      maxBudgetUsd: config.maxBudgetUsd,
     },
     { createAgent: deps?.createAgent, now: deps?.now },
   );
@@ -88,8 +94,9 @@ const USAGE =
   'Usage: node skills-contrib/drive-judge-harness/run-arm.ts ' +
   '--repo <repo-dir> --base-ref <ref> --bundle-ref <ref> --run-dir <dir> ' +
   '--case <golden-case-dir> --model <model-id> ' +
-  '[--bundle-repo <dir>] [--manifest-file <path>] [--live]\n' +
-  'Live execution requires both --live and CURSOR_API_KEY.';
+  '[--bundle-repo <dir>] [--manifest-file <path>] [--live] ' +
+  '[--runtime <claude|cursor>] [--max-budget-usd <n>]\n' +
+  'Live execution requires both --live and the runtime API key. Default runtime is claude.';
 
 function parseArgs(argv: string[]): {
   repo?: string;
@@ -101,6 +108,8 @@ function parseArgs(argv: string[]): {
   model?: string;
   manifestFile?: string;
   live: boolean;
+  runtime: 'claude' | 'cursor';
+  maxBudgetUsd?: number;
 } {
   let repo: string | undefined;
   let baseRef: string | undefined;
@@ -111,6 +120,8 @@ function parseArgs(argv: string[]): {
   let model: string | undefined;
   let manifestFile: string | undefined;
   let live = false;
+  let runtime: 'claude' | 'cursor' = 'claude';
+  let maxBudgetUsd: number | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -153,12 +164,42 @@ function parseArgs(argv: string[]): {
       case '--live':
         live = true;
         break;
+      case '--runtime': {
+        const val = takeValue();
+        if (val !== 'claude' && val !== 'cursor') {
+          process.stderr.write(`--runtime must be "claude" or "cursor"\n${USAGE}\n`);
+          process.exit(1);
+        }
+        runtime = val;
+        break;
+      }
+      case '--max-budget-usd': {
+        const val = Number(takeValue());
+        if (!Number.isFinite(val) || val <= 0) {
+          process.stderr.write(`--max-budget-usd must be a positive number\n${USAGE}\n`);
+          process.exit(1);
+        }
+        maxBudgetUsd = val;
+        break;
+      }
       default:
         process.stderr.write(`Unknown argument: ${arg}\n${USAGE}\n`);
         process.exit(1);
     }
   }
-  return { repo, baseRef, bundleRef, bundleRepo, runDir, caseDir, model, manifestFile, live };
+  return {
+    repo,
+    baseRef,
+    bundleRef,
+    bundleRepo,
+    runDir,
+    caseDir,
+    model,
+    manifestFile,
+    live,
+    runtime,
+    maxBudgetUsd,
+  };
 }
 
 async function main(): Promise<void> {
@@ -179,6 +220,9 @@ async function main(): Promise<void> {
   const bundleRepoDir = parsed.bundleRepo ?? repoUnderTestDir;
   const manifestFile = parsed.manifestFile ?? join(parsed.runDir, 'run-manifest.json');
   const traceFile = join(parsed.runDir, 'run-trace.jsonl');
+  const runtime = parsed.runtime;
+  const apiKeyEnvVar = runtime === 'cursor' ? 'CURSOR_API_KEY' : 'ANTHROPIC_API_KEY';
+  const apiKeyValue = process.env[apiKeyEnvVar];
 
   const result = await runArm({
     repoUnderTestDir,
@@ -190,8 +234,9 @@ async function main(): Promise<void> {
     traceFile,
     manifestFile,
     live: parsed.live,
-    apiKeyPresent:
-      typeof process.env.CURSOR_API_KEY === 'string' && process.env.CURSOR_API_KEY.length > 0,
+    apiKeyPresent: typeof apiKeyValue === 'string' && apiKeyValue.length > 0,
+    runtime,
+    maxBudgetUsd: parsed.maxBudgetUsd,
   });
 
   process.stdout.write(`${result.manifestContent}\n`);

@@ -66,7 +66,15 @@ function mockRun(): OrchestratorRun {
   return {
     async *stream() {},
     async wait() {
-      return { status: 'finished', runId: 'run-1', agentId: 'agent-1', durationMs: null };
+      return {
+        status: 'finished' as const,
+        runId: 'run-1',
+        agentId: 'agent-1',
+        durationMs: null,
+        tokens: null,
+        costUsd: null,
+        numTurns: null,
+      };
     },
   };
 }
@@ -85,6 +93,7 @@ function baseConfig(): RunArmConfig {
     manifestFile: join(tmpDir, 'run.json'),
     live: true,
     apiKeyPresent: true,
+    runtime: 'claude',
   };
 }
 

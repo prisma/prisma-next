@@ -26,7 +26,15 @@ function mockRun(): OrchestratorRun {
   return {
     async *stream() {},
     async wait() {
-      return { status: 'finished', runId: null, agentId: null, durationMs: null };
+      return {
+        status: 'finished' as const,
+        runId: null,
+        agentId: null,
+        durationMs: null,
+        tokens: null,
+        costUsd: null,
+        numTurns: null,
+      };
     },
   };
 }
@@ -48,6 +56,7 @@ describe('runOneBrief — cwd thread-through', () => {
         runDir,
         live: true,
         apiKeyPresent: true,
+        runtime: 'claude',
       },
       { createAgent },
     );
@@ -71,6 +80,7 @@ describe('runOneBrief — cwd thread-through', () => {
         runDir,
         live: false,
         apiKeyPresent: true,
+        runtime: 'claude',
       },
       { createAgent },
     );

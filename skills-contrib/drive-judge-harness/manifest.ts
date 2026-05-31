@@ -23,6 +23,8 @@ export type RunManifest = {
   schema_version: '1';
   case_slug: string;
   model: string;
+  /** The adapter runtime used for this run. */
+  runtime: 'claude' | 'cursor';
   status: RunStatus;
   run_id: string | null;
   agent_id: string | null;
@@ -33,6 +35,10 @@ export type RunManifest = {
   /** Wall-clock duration reported by the SDK (`wait()` outcome `durationMs`),
    *  or `null` for dry-run, startup-failed, and error paths. */
   wall_clock_ms: number | null;
+  /** Total USD cost reported by the runtime, or `null` when unavailable. */
+  cost_usd: number | null;
+  /** Number of turns reported by the runtime, or `null` when unavailable. */
+  num_turns: number | null;
   started_at: string;
   finished_at: string | null;
   notes: string[];

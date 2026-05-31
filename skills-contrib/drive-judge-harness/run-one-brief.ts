@@ -29,6 +29,9 @@ export type RunOutcome = {
   runId: string | null;
   agentId: string | null;
   durationMs: number | null;
+  tokens: TokenTotals | null;
+  costUsd: number | null;
+  numTurns: number | null;
 };
 
 /** A started orchestrator run the harness observes. */
@@ -38,11 +41,12 @@ export type OrchestratorRun = {
 };
 
 /** Spawns an orchestrator run for a pinned model + prompt. Injected in tests;
- *  the live default is loaded lazily from `sdk-adapter.ts`. */
+ *  the live default is loaded lazily from the matching adapter module. */
 export type CreateAgent = (opts: {
   model: string;
   prompt: string;
   cwd: string;
+  maxBudgetUsd?: number;
 }) => Promise<OrchestratorRun>;
 
 export type RunOneBriefConfig = {
@@ -55,8 +59,12 @@ export type RunOneBriefConfig = {
   runDir: string;
   /** Caller asked for a live run. */
   live: boolean;
-  /** Whether a Cursor API key is present in the environment. */
+  /** Whether the runtime's API key is present in the environment. */
   apiKeyPresent: boolean;
+  /** The adapter runtime to use. Defaults to `'claude'` in the CLI. */
+  runtime: 'claude' | 'cursor';
+  /** Optional hard per-run USD budget cap (Claude adapter only). */
+  maxBudgetUsd?: number;
 };
 
 export type RunOneBriefDeps = {
@@ -86,11 +94,15 @@ function gateSatisfied(config: RunOneBriefConfig): boolean {
   return config.live && config.apiKeyPresent;
 }
 
-async function defaultCreateAgent(): Promise<CreateAgent> {
-  // Lazy import so `@cursor/sdk` is only required when a live run is actually
+async function defaultCreateAgent(runtime: 'claude' | 'cursor'): Promise<CreateAgent> {
+  // Lazy import so the SDK is only required when a live run is actually
   // requested without an injected agent. Never reached under test.
-  const adapter = await import('./sdk-adapter.ts');
-  return adapter.createCursorAgent;
+  if (runtime === 'cursor') {
+    const adapter = await import('./sdk-adapter.ts');
+    return adapter.createCursorAgent;
+  }
+  const adapter = await import('./claude-adapter.ts');
+  return adapter.createClaudeAgent;
 }
 
 /** Run one brief end-to-end (or dry-run) and write the manifest. */
@@ -108,12 +120,14 @@ export async function runOneBrief(
     model: config.model,
     trace_file: config.traceFile,
     started_at: startedAt,
+    runtime: config.runtime,
   } as const;
 
   if (!gateSatisfied(config)) {
+    const keyName = config.runtime === 'cursor' ? 'CURSOR_API_KEY' : 'ANTHROPIC_API_KEY';
     const reason = !config.live
-      ? 'dry-run: live execution not requested (pass --live and set CURSOR_API_KEY to run live)'
-      : 'dry-run: live requested but CURSOR_API_KEY is absent';
+      ? `dry-run: live execution not requested (pass --live and set ${keyName} to run live)`
+      : `dry-run: live requested but ${keyName} is absent`;
     const manifest: RunManifest = {
       ...baseManifest,
       status: 'dry-run',
@@ -121,6 +135,8 @@ export async function runOneBrief(
       agent_id: null,
       tokens: null,
       wall_clock_ms: null,
+      cost_usd: null,
+      num_turns: null,
       finished_at: now(),
       notes: [reason, 'no SDK call was made; no orchestrator run was spawned'],
     };
@@ -128,12 +144,17 @@ export async function runOneBrief(
     return { status: 'dry-run', manifest, manifestContent, createAgentCalled: false };
   }
 
-  const createAgent = deps.createAgent ?? (await defaultCreateAgent());
+  const createAgent = deps.createAgent ?? (await defaultCreateAgent(config.runtime));
   const prompt = assemblePrompt(golden);
 
   let run: OrchestratorRun;
   try {
-    run = await createAgent({ model: config.model, prompt, cwd: config.runDir });
+    run = await createAgent({
+      model: config.model,
+      prompt,
+      cwd: config.runDir,
+      maxBudgetUsd: config.maxBudgetUsd,
+    });
   } catch (err) {
     const manifest: RunManifest = {
       ...baseManifest,
@@ -142,6 +163,8 @@ export async function runOneBrief(
       agent_id: null,
       tokens: null,
       wall_clock_ms: null,
+      cost_usd: null,
+      num_turns: null,
       finished_at: now(),
       notes: [`startup-failed: ${err instanceof Error ? err.message : String(err)}`],
     };
@@ -157,8 +180,9 @@ export async function runOneBrief(
       }
     }
     const outcome = await run.wait();
-    const tokens: TokenTotals | null =
+    const accumulatedTokens: TokenTotals | null =
       usageUpdates.length > 0 ? accumulateUsage(usageUpdates) : null;
+    const tokens: TokenTotals | null = outcome.tokens ?? accumulatedTokens;
 
     const notes: string[] = [];
     if (outcome.status === 'finished' && tokens === null) {
@@ -174,6 +198,8 @@ export async function runOneBrief(
       agent_id: outcome.agentId,
       tokens,
       wall_clock_ms: outcome.durationMs,
+      cost_usd: outcome.costUsd,
+      num_turns: outcome.numTurns,
       finished_at: now(),
       notes,
     };
@@ -192,6 +218,8 @@ export async function runOneBrief(
       agent_id: null,
       tokens,
       wall_clock_ms: null,
+      cost_usd: null,
+      num_turns: null,
       finished_at: now(),
       notes: [`error: ${err instanceof Error ? err.message : String(err)}`],
     };
@@ -207,8 +235,8 @@ export async function runOneBrief(
 const USAGE =
   'Usage: node skills-contrib/drive-judge-harness/run-one-brief.ts ' +
   '--case <golden-case-dir> --model <model-id> [--trace-file <path>] ' +
-  '[--manifest-file <path>] [--live]\n' +
-  'Live execution requires both --live and CURSOR_API_KEY. Default is dry-run.';
+  '[--manifest-file <path>] [--live] [--runtime <claude|cursor>] [--max-budget-usd <n>]\n' +
+  'Live execution requires both --live and the runtime API key. Default runtime is claude.';
 
 function parseArgs(argv: string[]): {
   caseDir?: string;
@@ -216,12 +244,16 @@ function parseArgs(argv: string[]): {
   traceFile?: string;
   manifestFile?: string;
   live: boolean;
+  runtime: 'claude' | 'cursor';
+  maxBudgetUsd?: number;
 } {
   let caseDir: string | undefined;
   let model: string | undefined;
   let traceFile: string | undefined;
   let manifestFile: string | undefined;
   let live = false;
+  let runtime: 'claude' | 'cursor' = 'claude';
+  let maxBudgetUsd: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const takeValue = (): string => {
@@ -252,12 +284,30 @@ function parseArgs(argv: string[]): {
       case '--live':
         live = true;
         break;
+      case '--runtime': {
+        const val = takeValue();
+        if (val !== 'claude' && val !== 'cursor') {
+          process.stderr.write(`--runtime must be "claude" or "cursor"\n${USAGE}\n`);
+          process.exit(1);
+        }
+        runtime = val;
+        break;
+      }
+      case '--max-budget-usd': {
+        const val = Number(takeValue());
+        if (!Number.isFinite(val) || val <= 0) {
+          process.stderr.write(`--max-budget-usd must be a positive number\n${USAGE}\n`);
+          process.exit(1);
+        }
+        maxBudgetUsd = val;
+        break;
+      }
       default:
         process.stderr.write(`Unknown argument: ${arg}\n${USAGE}\n`);
         process.exit(1);
     }
   }
-  return { caseDir, model, traceFile, manifestFile, live };
+  return { caseDir, model, traceFile, manifestFile, live, runtime, maxBudgetUsd };
 }
 
 async function main(): Promise<void> {
@@ -268,6 +318,9 @@ async function main(): Promise<void> {
   }
   const traceFile = parsed.traceFile ?? join(parsed.caseDir, 'run-trace.jsonl');
   const manifestFile = parsed.manifestFile ?? join(parsed.caseDir, 'run-manifest.json');
+  const runtime = parsed.runtime;
+  const apiKeyEnvVar = runtime === 'cursor' ? 'CURSOR_API_KEY' : 'ANTHROPIC_API_KEY';
+  const apiKeyValue = process.env[apiKeyEnvVar];
 
   const result = await runOneBrief({
     caseDir: parsed.caseDir,
@@ -276,8 +329,9 @@ async function main(): Promise<void> {
     manifestFile,
     runDir: process.cwd(),
     live: parsed.live,
-    apiKeyPresent:
-      typeof process.env.CURSOR_API_KEY === 'string' && process.env.CURSOR_API_KEY.length > 0,
+    apiKeyPresent: typeof apiKeyValue === 'string' && apiKeyValue.length > 0,
+    runtime,
+    maxBudgetUsd: parsed.maxBudgetUsd,
   });
 
   process.stdout.write(`${result.manifestContent}\n`);

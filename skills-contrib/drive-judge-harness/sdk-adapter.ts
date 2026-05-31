@@ -39,7 +39,15 @@ function adaptRun(sdkRun: {
     async wait(): Promise<RunOutcome> {
       const raw = await sdkRun.wait();
       const { status, runId, durationMs } = outcomeFromResult(raw);
-      return { status, runId, agentId: capturedAgentId, durationMs };
+      return {
+        status,
+        runId,
+        agentId: capturedAgentId,
+        durationMs,
+        tokens: null,
+        costUsd: null,
+        numTurns: null,
+      };
     },
   };
 }

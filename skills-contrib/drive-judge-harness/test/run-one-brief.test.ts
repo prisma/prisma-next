@@ -9,9 +9,11 @@ import {
   assemblePrompt,
   type CreateAgent,
   type OrchestratorRun,
+  type RunOutcome,
   type RunStreamEvent,
   runOneBrief,
 } from '../run-one-brief.ts';
+import type { TokenTotals } from '../usage.ts';
 
 const GOLDEN_DIR = fileURLToPath(
   new URL('../../../projects/drive-judge-harness/assets/golden/', import.meta.url),
@@ -28,11 +30,18 @@ afterEach(() => {
 
 const FIXED_NOW = () => '2026-05-30T12:00:00.000Z';
 
+const NULL_OUTCOME: RunOutcome = {
+  status: 'finished',
+  runId: null,
+  agentId: null,
+  durationMs: null,
+  tokens: null,
+  costUsd: null,
+  numTurns: null,
+};
+
 /** A mock orchestrator run that yields synthetic stream events — no network. */
-function mockRun(
-  events: RunStreamEvent[],
-  outcome: Awaited<ReturnType<OrchestratorRun['wait']>>,
-): OrchestratorRun {
+function mockRun(events: RunStreamEvent[], outcome: RunOutcome): OrchestratorRun {
   return {
     async *stream() {
       for (const e of events) yield e;
@@ -48,7 +57,7 @@ describe('runOneBrief — dry-run gate', () => {
     let called = false;
     const createAgent: CreateAgent = async () => {
       called = true;
-      return mockRun([], { status: 'finished', runId: null, agentId: null, durationMs: null });
+      return mockRun([], NULL_OUTCOME);
     };
     const result = await runOneBrief(
       {
@@ -59,6 +68,7 @@ describe('runOneBrief — dry-run gate', () => {
         runDir: dir,
         live: false,
         apiKeyPresent: true,
+        runtime: 'claude',
       },
       { createAgent, now: FIXED_NOW },
     );
@@ -66,13 +76,14 @@ describe('runOneBrief — dry-run gate', () => {
     assert.equal(result.createAgentCalled, false);
     assert.equal(result.status, 'dry-run');
     assert.equal(result.manifest.tokens, null);
+    assert.equal(result.manifest.runtime, 'claude');
   });
 
-  it('does not call createAgent when live is true but no API key', async () => {
+  it('does not call createAgent when live is true but no API key (cursor runtime)', async () => {
     let called = false;
     const createAgent: CreateAgent = async () => {
       called = true;
-      return mockRun([], { status: 'finished', runId: null, agentId: null, durationMs: null });
+      return mockRun([], NULL_OUTCOME);
     };
     const result = await runOneBrief(
       {
@@ -83,12 +94,37 @@ describe('runOneBrief — dry-run gate', () => {
         runDir: dir,
         live: true,
         apiKeyPresent: false,
+        runtime: 'cursor',
       },
       { createAgent, now: FIXED_NOW },
     );
     assert.equal(called, false);
     assert.equal(result.status, 'dry-run');
     assert.match(result.manifest.notes.join(' '), /CURSOR_API_KEY is absent/);
+  });
+
+  it('does not call createAgent when live is true but no API key (claude runtime)', async () => {
+    let called = false;
+    const createAgent: CreateAgent = async () => {
+      called = true;
+      return mockRun([], NULL_OUTCOME);
+    };
+    const result = await runOneBrief(
+      {
+        caseDir: CASE_DIR,
+        traceFile: join(dir, 'trace.jsonl'),
+        manifestFile: join(dir, 'run.json'),
+        model: 'pinned-model',
+        runDir: dir,
+        live: true,
+        apiKeyPresent: false,
+        runtime: 'claude',
+      },
+      { createAgent, now: FIXED_NOW },
+    );
+    assert.equal(called, false);
+    assert.equal(result.status, 'dry-run');
+    assert.match(result.manifest.notes.join(' '), /ANTHROPIC_API_KEY is absent/);
   });
 
   it('writes a dry-run manifest to disk', async () => {
@@ -102,6 +138,7 @@ describe('runOneBrief — dry-run gate', () => {
         runDir: dir,
         live: false,
         apiKeyPresent: false,
+        runtime: 'claude',
       },
       { now: FIXED_NOW },
     );
@@ -110,6 +147,9 @@ describe('runOneBrief — dry-run gate', () => {
     assert.equal(parsed.case_slug, 'slice-dedupe-generated-imports');
     assert.equal(parsed.model, 'pinned-model');
     assert.equal(parsed.tokens, null);
+    assert.equal(parsed.runtime, 'claude');
+    assert.equal(parsed.cost_usd, null);
+    assert.equal(parsed.num_turns, null);
   });
 });
 
@@ -130,6 +170,9 @@ describe('runOneBrief — live path with mock SDK', () => {
         runId: 'run-42',
         agentId: 'agent-42',
         durationMs: null,
+        tokens: null,
+        costUsd: null,
+        numTurns: null,
       });
 
     const manifestFile = join(dir, 'run.json');
@@ -142,6 +185,7 @@ describe('runOneBrief — live path with mock SDK', () => {
         runDir: dir,
         live: true,
         apiKeyPresent: true,
+        runtime: 'cursor',
       },
       { createAgent, now: FIXED_NOW },
     );
@@ -153,6 +197,7 @@ describe('runOneBrief — live path with mock SDK', () => {
     assert.equal(result.manifest.tokens?.outputTokens, 60);
     assert.equal(result.manifest.tokens?.totalTokens, 225);
     assert.equal(result.manifest.run_id, 'run-42');
+    assert.equal(result.manifest.runtime, 'cursor');
 
     const parsed = JSON.parse(readFileSync(manifestFile, 'utf8'));
     assert.equal(parsed.tokens.totalTokens, 225);
@@ -171,6 +216,7 @@ describe('runOneBrief — live path with mock SDK', () => {
         runDir: dir,
         live: true,
         apiKeyPresent: true,
+        runtime: 'claude',
       },
       { createAgent, now: FIXED_NOW },
     );
@@ -184,7 +230,15 @@ describe('runOneBrief — live path with mock SDK', () => {
       { kind: 'turn-ended', usage: { inputTokens: 10, outputTokens: 2 } },
     ];
     const createAgent: CreateAgent = async () =>
-      mockRun(events, { status: 'error', runId: 'run-err', agentId: null, durationMs: null });
+      mockRun(events, {
+        status: 'error',
+        runId: 'run-err',
+        agentId: null,
+        durationMs: null,
+        tokens: null,
+        costUsd: null,
+        numTurns: null,
+      });
     const result = await runOneBrief(
       {
         caseDir: CASE_DIR,
@@ -194,6 +248,7 @@ describe('runOneBrief — live path with mock SDK', () => {
         runDir: dir,
         live: true,
         apiKeyPresent: true,
+        runtime: 'claude',
       },
       { createAgent, now: FIXED_NOW },
     );
@@ -208,7 +263,15 @@ describe('runOneBrief — live path with mock SDK', () => {
         throw new Error('stream died');
       },
       async wait() {
-        return { status: 'finished', runId: 'unreached', agentId: null, durationMs: null };
+        return {
+          status: 'finished' as const,
+          runId: 'unreached',
+          agentId: null,
+          durationMs: null,
+          tokens: null,
+          costUsd: null,
+          numTurns: null,
+        };
       },
     });
     const manifestFile = join(dir, 'run.json');
@@ -221,6 +284,7 @@ describe('runOneBrief — live path with mock SDK', () => {
         runDir: dir,
         live: true,
         apiKeyPresent: true,
+        runtime: 'claude',
       },
       { createAgent, now: FIXED_NOW },
     );
@@ -239,6 +303,9 @@ describe('runOneBrief — live path with mock SDK', () => {
         runId: 'run-live-1',
         agentId: 'agent-live-1',
         durationMs: 87654,
+        tokens: null,
+        costUsd: null,
+        numTurns: null,
       });
 
     const result = await runOneBrief(
@@ -250,6 +317,7 @@ describe('runOneBrief — live path with mock SDK', () => {
         runDir: dir,
         live: true,
         apiKeyPresent: true,
+        runtime: 'cursor',
       },
       { createAgent, now: FIXED_NOW },
     );
@@ -263,6 +331,81 @@ describe('runOneBrief — live path with mock SDK', () => {
         n.includes('tokens unavailable: @cursor/sdk local runtime emits no usage events'),
       ),
     );
+  });
+
+  it('prefers outcome.tokens over per-turn accumulation when the runtime provides them', async () => {
+    const runtimeTokens: TokenTotals = {
+      inputTokens: 33,
+      outputTokens: 904,
+      cacheReadTokens: 230827,
+      cacheWriteTokens: 53995,
+      totalTokens: 285759,
+    };
+    // Also emit a per-turn event with different values to confirm outcome wins.
+    const events: RunStreamEvent[] = [
+      { kind: 'turn-ended', usage: { inputTokens: 1, outputTokens: 1 } },
+    ];
+    const createAgent: CreateAgent = async () =>
+      mockRun(events, {
+        status: 'finished',
+        runId: 'sess-abc',
+        agentId: null,
+        durationMs: 16025,
+        tokens: runtimeTokens,
+        costUsd: 0.1839242,
+        numTurns: 9,
+      });
+
+    const manifestFile = join(dir, 'run.json');
+    const result = await runOneBrief(
+      {
+        caseDir: CASE_DIR,
+        traceFile: join(dir, 'trace.jsonl'),
+        manifestFile,
+        model: 'pinned-model',
+        runDir: dir,
+        live: true,
+        apiKeyPresent: true,
+        runtime: 'claude',
+      },
+      { createAgent, now: FIXED_NOW },
+    );
+
+    assert.equal(result.status, 'finished');
+    assert.equal(result.manifest.runtime, 'claude');
+    // outcome.tokens takes priority over accumulated per-turn totals
+    assert.equal(result.manifest.tokens?.inputTokens, 33);
+    assert.equal(result.manifest.tokens?.outputTokens, 904);
+    assert.equal(result.manifest.tokens?.totalTokens, 285759);
+    assert.equal(result.manifest.cost_usd, 0.1839242);
+    assert.equal(result.manifest.num_turns, 9);
+    assert.equal(result.manifest.wall_clock_ms, 16025);
+    assert.equal(result.manifest.notes.length, 0, 'no notes when tokens are present');
+
+    const parsed = JSON.parse(readFileSync(manifestFile, 'utf8'));
+    assert.equal(parsed.runtime, 'claude');
+    assert.equal(parsed.tokens.totalTokens, 285759);
+    assert.equal(parsed.cost_usd, 0.1839242);
+    assert.equal(parsed.num_turns, 9);
+    assert.equal(parsed.wall_clock_ms, 16025);
+  });
+
+  it('runtime:cursor produces runtime:cursor in the manifest', async () => {
+    const createAgent: CreateAgent = async () => mockRun([], NULL_OUTCOME);
+    const result = await runOneBrief(
+      {
+        caseDir: CASE_DIR,
+        traceFile: join(dir, 'trace.jsonl'),
+        manifestFile: join(dir, 'run.json'),
+        model: 'pinned-model',
+        runDir: dir,
+        live: true,
+        apiKeyPresent: true,
+        runtime: 'cursor',
+      },
+      { createAgent, now: FIXED_NOW },
+    );
+    assert.equal(result.manifest.runtime, 'cursor');
   });
 });
 
