@@ -24,38 +24,36 @@ const contract = new SqlContractSerializer().deserializeContract({
   meta: {},
   storage: {
     storageHash: 'sha256:test-core',
-    namespaces: {
-      __unbound__: {
-        id: '__unbound__',
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+    __unbound__: {
+      id: '__unbound__',
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
-          post: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+        post: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
-          comment: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              postId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+        comment: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            postId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },

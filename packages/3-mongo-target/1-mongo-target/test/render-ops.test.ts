@@ -63,12 +63,10 @@ function makeContract(collections: Record<string, MongoCollectionData>): MongoCo
     models: {},
     storage: {
       storageHash: 'sha256:test-storage',
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          kind: 'mongo-namespace',
-          collections: builtCollections,
-        },
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        collections: builtCollections,
       },
     },
   } as unknown as MongoContract;
