@@ -1,10 +1,10 @@
 import type {
   AfterExecuteResult,
-  ParamRefMutator,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
+import type { MongoParamRefMutator } from './param-ref-mutator';
 
 export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
 
@@ -24,7 +24,7 @@ export interface MongoMiddleware extends RuntimeMiddleware<MongoExecutionPlan> {
   beforeExecute?(
     plan: MongoExecutionPlan,
     ctx: MongoMiddlewareContext,
-    params?: ParamRefMutator,
+    params?: MongoParamRefMutator,
   ): void | Promise<void>;
   onRow?(
     row: Record<string, unknown>,

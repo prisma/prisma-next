@@ -57,6 +57,8 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     lower: adapter.lower.bind(adapter),
+    structuralLower: vi.fn(),
+    resolveParams: vi.fn(),
   };
   const target: MongoRuntimeTargetDescriptor<'mongo'> = {
     kind: 'target',
