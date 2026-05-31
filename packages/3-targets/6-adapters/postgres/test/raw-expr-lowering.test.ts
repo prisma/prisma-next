@@ -1,3 +1,4 @@
+import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
@@ -58,7 +59,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
 }) as PostgresContract;
 
 function selectWithWhere(whereExpr: import('@prisma-next/sql-relational-core/ast').AnyExpression) {

@@ -1,4 +1,9 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import {
   APP_SPACE_ID,
   type MigrationOperationPolicy,
@@ -186,7 +191,7 @@ function createContract(
       },
     }),
     roots: {},
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

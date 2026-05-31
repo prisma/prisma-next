@@ -1,3 +1,4 @@
+import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type AnyQueryAst,
@@ -50,7 +51,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
 }) as PostgresContract;
 
 const runtimeAdapter = createComposedPostgresAdapter({ extensionPacks: [] });

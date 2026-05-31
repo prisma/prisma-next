@@ -1,3 +1,4 @@
+import { buildDomainPlaneFromFlat } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
@@ -75,7 +76,7 @@ const baseContract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
 }) as PostgresContract;
 
 function selectWithParam(column: string, codecId: string | undefined, value: unknown) {

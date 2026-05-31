@@ -1,4 +1,9 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -28,7 +33,7 @@ const extensionContract: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},

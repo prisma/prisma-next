@@ -1,4 +1,10 @@
-import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  asNamespaceId,
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
@@ -41,7 +47,7 @@ function makeContract(
       },
     }),
     roots: {},
-    models: {},
+    domain: buildDomainPlaneFromFlat({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -1025,7 +1031,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         },
       }),
       roots: {},
-      models: {},
+      domain: buildDomainPlaneFromFlat({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},
@@ -1301,7 +1307,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         },
       }),
       roots: {},
-      models: {},
+      domain: buildDomainPlaneFromFlat({ models: {} }),
       capabilities: {},
       extensionPacks: {},
       meta: {},

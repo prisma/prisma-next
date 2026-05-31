@@ -1,4 +1,9 @@
-import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import {
+  buildDomainPlaneFromFlat,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, {
   createMigrationPlan,
@@ -39,7 +44,7 @@ export const contract: Contract<SqlStorage> = {
     },
   }),
   roots: {},
-  models: {},
+  domain: buildDomainPlaneFromFlat({ models: {} }),
   capabilities: {},
   extensionPacks: {},
   meta: {},
