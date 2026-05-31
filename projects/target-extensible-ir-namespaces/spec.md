@@ -102,7 +102,7 @@ The composition's two load-bearing properties:
 # Functional Requirements
 
 - **FR1.** Pack-contributed entity-kind mechanism exists at the framework level. Target packs register new entity kinds (storage-slot key, IR-class factory, serializer hydration, validator schema) through `AuthoringContributions.entityTypes`. Delivered by S1.
-- **FR2.** Contract IR follows the canonical shape `contract.{domain, storage}.<ns>.<entityKind>.<entityName>` everywhere. Cross-references use object pairs. Entity coordinate `(namespaceId, entityKind, entityName)` is the canonical addressing primitive. Delivered by S1.
+- **FR2.** Contract IR follows symmetric plane envelopes `contract.{domain, storage}.{namespaces}.<ns>.<entityKind>.<entityName>` (plus plane-level metadata: `storageHash`, SQL-only `storage.types`). Framework domain has no `types`. Delivered by S2. Cross-references use object pairs. Entity coordinate `(namespaceId, entityKind, entityName)` is the canonical addressing primitive. Delivered by S1.
 - **FR3.** Postgres enum migrates to a Postgres-pack-contributed entity slot; framework-shared `storage.<ns>.types` slot deleted as a load-bearing surface. Delivered by S1 (acts as the substrate's exemplar).
 - **FR4.** Runtime SQL emission qualifies every identifier by its namespace's family-specific DDL coordinate. Delivered by S2.
 - **FR5.** DSL/ORM exposes the existing flat-by-name surface (`db.sql.<table>`, `db.<Model>`), with every lookup resolving through a per-family default namespace (`'public'` for Postgres; `'__unbound__'` for Mongo/SQLite) hardcoded in the family façade function. Delivered by S2.
