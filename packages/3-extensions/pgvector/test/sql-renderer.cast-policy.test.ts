@@ -1,5 +1,5 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import { domainPlaneOf } from '@prisma-next/contract/types';
+import { applicationDomainOf } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -47,7 +47,7 @@ describe('pgvector cast policy', () => {
           },
         },
       },
-      domain: domainPlaneOf({ models: {} }),
+      domain: applicationDomainOf({ models: {} }),
     }) as PostgresContract;
 
     const ast = SelectAst.from(TableSource.named('user'))

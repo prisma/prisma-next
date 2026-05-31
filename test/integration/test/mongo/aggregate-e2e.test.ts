@@ -2,7 +2,7 @@ import mongoAdapterDescriptor, {
   createMongoControlDriver,
   readAllMarkers,
 } from '@prisma-next/adapter-mongo/control';
-import { coreHash, crossRef, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import { applicationDomainOf, coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
@@ -67,7 +67,7 @@ function buildAppContract(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { users: crossRef('User') },
-    domain: domainPlaneOf({
+    domain: applicationDomainOf({
       models: {
         User: {
           fields: {

@@ -6,7 +6,7 @@ function crossRef(model: string, namespace = 'default') {
 }
 
 import type { Contract } from '../src/contract-types';
-import { contractModels, domainPlaneOf } from '../src/domain-envelope';
+import { applicationDomainOf, contractModels } from '../src/domain-envelope';
 import type { ContractModel } from '../src/domain-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from '../src/types';
 
@@ -42,7 +42,7 @@ describe('unified contract types', () => {
         target: 'postgres',
         targetFamily: 'sql',
         roots: { users: crossRef('User') },
-        domain: domainPlaneOf({
+        domain: applicationDomainOf({
           models: {
             User: {
               fields: { id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
@@ -69,7 +69,7 @@ describe('unified contract types', () => {
         target: 'postgres',
         targetFamily: 'sql',
         roots: {},
-        domain: domainPlaneOf({ models: {} }),
+        domain: applicationDomainOf({ models: {} }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
         extensionPacks: {},
@@ -100,7 +100,7 @@ describe('unified contract types', () => {
         target: 'postgres',
         targetFamily: 'sql',
         roots: { users: crossRef('User') },
-        domain: domainPlaneOf({
+        domain: applicationDomainOf({
           models: {
             User: {
               fields: {

@@ -7,15 +7,15 @@ export type {
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export type {
+  ApplicationDomain,
+  ApplicationDomainNamespace,
   ContractWithDomain,
-  DomainNamespace,
-  DomainPlane,
 } from '../domain-envelope';
 export {
+  applicationDomainOf,
   contractModels,
   contractValueObjects,
   DomainNamespaceResolutionError,
-  domainPlaneOf,
   resolveSingleDomainNamespaceId,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '../domain-envelope';

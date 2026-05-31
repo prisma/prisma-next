@@ -1,8 +1,8 @@
 import {
+  applicationDomainOf,
   type Contract,
   type ContractModelBase,
   type ContractValueObject,
-  domainPlaneOf,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { normalizeRootSqlStorage } from './sql-storage-fixture';
@@ -20,7 +20,7 @@ export function createEmitterTestContract(
     roots: {},
     domain:
       domain ??
-      domainPlaneOf({
+      applicationDomainOf({
         models: models ?? {},
         ...(valueObjects !== undefined ? { valueObjects } : {}),
         namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,

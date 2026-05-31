@@ -1,5 +1,5 @@
 import { createMongoRunnerDeps, extractDb, readMarker } from '@prisma-next/adapter-mongo/control';
-import { coreHash, crossRef, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import { applicationDomainOf, coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
@@ -24,7 +24,7 @@ const emptyContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  domain: domainPlaneOf({
+  domain: applicationDomainOf({
     models: {
       User: {
         fields: {
@@ -58,7 +58,7 @@ const indexedContract: MongoContract = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { users: crossRef('User') },
-  domain: domainPlaneOf({
+  domain: applicationDomainOf({
     models: {
       User: {
         fields: {

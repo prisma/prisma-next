@@ -1,7 +1,7 @@
 import {
+  applicationDomainOf,
   type ContractModelBase,
   crossRef,
-  domainPlaneOf,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -23,7 +23,7 @@ export function mongoContractJson(params: {
     target: 'mongo',
     profileHash: 'sha256:test',
     roots: params.roots ?? { items: crossRef('Item') },
-    domain: domainPlaneOf({ models, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
+    domain: applicationDomainOf({ models, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
     storage: {
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections },

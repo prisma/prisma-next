@@ -1,6 +1,6 @@
 import {
+  applicationDomainOf,
   type ContractModelBase,
-  domainPlaneOf,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -42,7 +42,7 @@ export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
     roots: {},
     domain:
       domain ??
-      domainPlaneOf({
+      applicationDomainOf({
         models: normalizeModels((models ?? {}) as Record<string, ContractModelBase>),
         namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
       }),

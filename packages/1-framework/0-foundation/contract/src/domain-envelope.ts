@@ -4,10 +4,10 @@ import type { ContractModelBase, ContractValueObject } from './domain-types';
 export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
 
 /**
- * One namespace's domain entities on the framework domain plane — models and
- * optional value objects keyed by entity name within that namespace coordinate.
+ * One namespace's application-domain entities — models and optional value
+ * objects keyed by entity name within that namespace coordinate.
  */
-export interface DomainNamespace<
+export interface ApplicationDomainNamespace<
   TModels extends Record<string, ContractModelBase> = Record<string, ContractModelBase>,
 > {
   readonly models: TModels;
@@ -15,17 +15,17 @@ export interface DomainNamespace<
 }
 
 /**
- * Framework domain plane envelope: entity content keyed by namespace id.
+ * Application-domain envelope: entity content keyed by namespace id.
  * Mirrors the storage plane's `namespaces` segment (ADR 221).
  */
-export interface DomainPlane<
+export interface ApplicationDomain<
   TModels extends Record<string, ContractModelBase> = Record<string, ContractModelBase>,
 > {
-  readonly namespaces: Readonly<Record<string, DomainNamespace<TModels>>>;
+  readonly namespaces: Readonly<Record<string, ApplicationDomainNamespace<TModels>>>;
 }
 
 export type ContractWithDomain = {
-  readonly domain: DomainPlane;
+  readonly domain: ApplicationDomain;
 };
 
 export class DomainNamespaceResolutionError extends Error {
@@ -35,7 +35,10 @@ export class DomainNamespaceResolutionError extends Error {
   }
 }
 
-export function resolveSingleDomainNamespaceId(domain: DomainPlane, namespaceId?: string): string {
+export function resolveSingleDomainNamespaceId(
+  domain: ApplicationDomain,
+  namespaceId?: string,
+): string {
   if (namespaceId !== undefined) {
     if (!Object.hasOwn(domain.namespaces, namespaceId)) {
       throw new DomainNamespaceResolutionError(
@@ -61,8 +64,9 @@ export function resolveSingleDomainNamespaceId(domain: DomainPlane, namespaceId?
   return soleNamespaceId;
 }
 
+// Transitional single-namespace projection; pending runtime-qualification slice.
 export function contractModels<TModels extends Record<string, ContractModelBase>>(
-  contract: { readonly domain: DomainPlane<TModels> },
+  contract: { readonly domain: ApplicationDomain<TModels> },
   namespaceId?: string,
 ): TModels {
   const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
@@ -76,7 +80,7 @@ export function contractModels<TModels extends Record<string, ContractModelBase>
 }
 
 export function contractValueObjects<TModels extends Record<string, ContractModelBase>>(
-  contract: { readonly domain: DomainPlane<TModels> },
+  contract: { readonly domain: ApplicationDomain<TModels> },
   namespaceId?: string,
 ): Record<string, ContractValueObject> | undefined {
   const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
@@ -89,14 +93,15 @@ export function contractValueObjects<TModels extends Record<string, ContractMode
   return domainNamespace.valueObjects;
 }
 
-export function domainPlaneOf<TModels extends Record<string, ContractModelBase>>(params: {
+export function applicationDomainOf<TModels extends Record<string, ContractModelBase>>(params: {
   readonly models?: TModels;
   readonly valueObjects?: Record<string, ContractValueObject>;
   readonly namespaceId?: string;
-}): DomainPlane<TModels> {
+}): ApplicationDomain<TModels> {
   const namespaceId = params.namespaceId ?? UNBOUND_DOMAIN_NAMESPACE_ID;
   const models =
-    params.models ?? blindCast<TModels, 'default empty models when domainPlaneOf omits models'>({});
+    params.models ??
+    blindCast<TModels, 'default empty models when applicationDomainOf omits models'>({});
   return {
     namespaces: {
       [namespaceId]: {

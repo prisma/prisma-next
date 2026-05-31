@@ -1,5 +1,5 @@
 import type { CrossReference } from './cross-reference';
-import type { DomainPlane } from './domain-envelope';
+import type { ApplicationDomain } from './domain-envelope';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
 import type {
   ExecutionHashBase,
@@ -50,7 +50,7 @@ export interface Contract<
    * Application plane (ADR 221): `domain.namespaces.<nsId>.{ models, valueObjects }`.
    * `TModels` types the union of model entries across namespaces for family DSL inference.
    */
-  readonly domain: DomainPlane<TModels>;
+  readonly domain: ApplicationDomain<TModels>;
   readonly storage: TStorage;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;

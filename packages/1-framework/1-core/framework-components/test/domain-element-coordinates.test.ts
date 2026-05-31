@@ -1,10 +1,10 @@
-import type { DomainPlane } from '@prisma-next/contract/types';
+import type { ApplicationDomain } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { domainElementCoordinates } from '../src/ir/domain';
 
 describe('domainElementCoordinates', () => {
   it('yields domain-plane coordinates for models and value objects', () => {
-    const domain: Pick<DomainPlane, 'namespaces'> = {
+    const domain: Pick<ApplicationDomain, 'namespaces'> = {
       namespaces: {
         auth: {
           models: { User: { fields: {}, relations: {}, storage: {} } },

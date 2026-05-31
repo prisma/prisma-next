@@ -1,4 +1,4 @@
-import { domainPlaneOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { applicationDomainOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
@@ -23,7 +23,7 @@ function deserializedContract() {
         },
       },
     },
-    domain: domainPlaneOf({
+    domain: applicationDomainOf({
       models: {
         Item: {
           fields: {
@@ -57,7 +57,7 @@ describe('MongoTargetSchemaVerifier', () => {
           },
         },
       },
-      domain: domainPlaneOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
+      domain: applicationDomainOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
     };
     const contract = new MongoTargetContractSerializer().deserializeContract(json);
     const schema = new MongoSchemaIR([]);

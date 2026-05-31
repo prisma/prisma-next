@@ -1,8 +1,8 @@
 import {
+  applicationDomainOf,
   asNamespaceId,
   type Contract,
   coreHash,
-  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
@@ -73,7 +73,7 @@ function createRefActionContract(
       },
     }),
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

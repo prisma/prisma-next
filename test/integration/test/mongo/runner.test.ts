@@ -1,5 +1,5 @@
 import { readAllMarkers, readMarker } from '@prisma-next/adapter-mongo/control';
-import { coreHash, crossRef, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import { applicationDomainOf, coreHash, crossRef, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
@@ -48,7 +48,7 @@ function buildAppContract(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { users: crossRef('User'), posts: crossRef('Post') },
-    domain: domainPlaneOf({
+    domain: applicationDomainOf({
       models: {
         User: {
           fields: {
@@ -119,7 +119,7 @@ function buildAppContractMissingPosts(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: { users: crossRef('User') },
-    domain: domainPlaneOf({
+    domain: applicationDomainOf({
       models: {
         User: {
           fields: {
@@ -164,7 +164,7 @@ function buildExtContract(): MongoContract {
     target: 'mongo',
     targetFamily: 'mongo',
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     storage: {
       namespaces: {
         __unbound__: {

@@ -1,8 +1,8 @@
 import {
+  applicationDomainOf,
   type Contract,
   type ContractModelBase,
   type ContractValueObject,
-  domainPlaneOf,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -31,7 +31,7 @@ export function createMongoContract(
     target: 'mongo',
     domain:
       domain ??
-      domainPlaneOf({
+      applicationDomainOf({
         models: models ?? {},
         ...(valueObjects !== undefined ? { valueObjects } : {}),
         namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,

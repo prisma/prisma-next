@@ -1,4 +1,9 @@
-import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import {
+  applicationDomainOf,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import {
   INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperationStep,
@@ -63,7 +68,7 @@ function buildUnboundContract(): Contract<SqlStorage> {
       },
     }),
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

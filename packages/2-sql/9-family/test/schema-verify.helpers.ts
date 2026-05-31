@@ -3,10 +3,10 @@
  */
 
 import {
+  applicationDomainOf,
   asNamespaceId,
   type ColumnDefault,
   type Contract,
-  domainPlaneOf,
   profileHash,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -53,7 +53,7 @@ export function createTestContract(
       },
       ...ifDefined('types', storageTypes),
     }),
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     meta: {},
     extensionPacks,

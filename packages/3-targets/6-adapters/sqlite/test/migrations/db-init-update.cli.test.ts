@@ -1,6 +1,11 @@
 import { mkdir } from 'node:fs/promises';
 import { executeDbInit, executeDbUpdate } from '@prisma-next/cli/control-api';
-import { type Contract, coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import {
+  applicationDomainOf,
+  type Contract,
+  coreHash,
+  profileHash,
+} from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   SqlControlExtensionDescriptor,
@@ -82,7 +87,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       },
     }),
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

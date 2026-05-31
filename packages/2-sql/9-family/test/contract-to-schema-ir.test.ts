@@ -1,5 +1,5 @@
 import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
-import { asNamespaceId, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import { applicationDomainOf, asNamespaceId, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   buildSqlNamespace,
@@ -33,7 +33,7 @@ function wrap(storage: SqlStorage): Contract<SqlStorage> {
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage,
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
     extensionPacks: {},

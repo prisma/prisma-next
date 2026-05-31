@@ -1,8 +1,8 @@
 import {
+  applicationDomainOf,
   asNamespaceId,
   type Contract,
   coreHash,
-  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
@@ -32,7 +32,7 @@ function makeContract(
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

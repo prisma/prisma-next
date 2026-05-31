@@ -1,7 +1,7 @@
 import {
+  applicationDomainOf,
   asNamespaceId,
   type ContractModelBase,
-  domainPlaneOf,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import {
@@ -44,7 +44,7 @@ function makeValidContract(overrides: Record<string, unknown> = {}): DomainContr
     domain:
       domainOverride !== undefined
         ? (domainOverride as DomainContractShape['domain'])
-        : domainPlaneOf({ models }),
+        : applicationDomainOf({ models }),
     ...rest,
   } as DomainContractShape;
 }

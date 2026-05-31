@@ -1,9 +1,9 @@
 import {
+  applicationDomainOf,
   asNamespaceId,
   type ColumnDefaultLiteralInputValue,
   type Contract,
   coreHash,
-  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
@@ -601,7 +601,7 @@ function createTestContract(
       storageHash: storageHashValue,
     }),
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

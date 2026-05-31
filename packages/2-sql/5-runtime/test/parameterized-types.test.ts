@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { coreHash, domainPlaneOf, profileHash } from '@prisma-next/contract/types';
+import { applicationDomainOf, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
@@ -54,7 +54,7 @@ function createParamTypesTestContract(
     targetFamily: 'sql',
     target: 'postgres',
     profileHash: profileHash('sha256:test'),
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     roots: {},
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),

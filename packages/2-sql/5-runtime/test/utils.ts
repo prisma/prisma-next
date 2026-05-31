@@ -1,8 +1,8 @@
 import {
+  applicationDomainOf,
   type Contract,
   type ContractModelBase,
   coreHash,
-  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import type {
@@ -411,7 +411,7 @@ export function unboundNamespaceWithTables(tables: Record<string, StorageTableIn
 }
 
 export function emptySqlTestDomain() {
-  return domainPlaneOf({ models: {} });
+  return applicationDomainOf({ models: {} });
 }
 
 export function createTestContract(
@@ -439,7 +439,7 @@ export function createTestContract(
           storageHash: storageHashValue,
           namespaces: { __unbound__: SqlUnboundNamespace.instance },
         }),
-    domain: rest['domain'] ?? domainPlaneOf({ models: rest['models'] ?? {} }),
+    domain: rest['domain'] ?? applicationDomainOf({ models: rest['models'] ?? {} }),
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},
     extensionPacks: rest['extensionPacks'] ?? {},

@@ -1,4 +1,4 @@
-import { domainPlaneOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { applicationDomainOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
@@ -28,7 +28,7 @@ function makeSingletonUnboundContractJson() {
         },
       },
     },
-    domain: domainPlaneOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
+    domain: applicationDomainOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
   };
 }
 
@@ -50,7 +50,7 @@ function makeValidContractJson() {
         },
       },
     },
-    domain: domainPlaneOf({
+    domain: applicationDomainOf({
       models: {
         Item: {
           fields: {
@@ -149,7 +149,7 @@ describe('MongoTargetContractSerializer', () => {
             },
           },
         },
-        domain: domainPlaneOf({
+        domain: applicationDomainOf({
           models: {
             Item: {
               fields: {

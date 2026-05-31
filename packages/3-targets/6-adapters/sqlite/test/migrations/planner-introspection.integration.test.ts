@@ -9,10 +9,10 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import {
+  applicationDomainOf,
   asNamespaceId,
   type Contract,
   coreHash,
-  domainPlaneOf,
   profileHash,
 } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -76,7 +76,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
       },
     }),
     roots: {},
-    domain: domainPlaneOf({ models: {} }),
+    domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     extensionPacks: {},
     meta: {},

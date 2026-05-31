@@ -2,7 +2,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { PreserveEmptyPredicate, StorageSort } from './canonicalization';
 import type { Contract } from './contract-types';
 import type { CrossReference } from './cross-reference';
-import { domainPlaneOf, UNBOUND_DOMAIN_NAMESPACE_ID } from './domain-envelope';
+import { applicationDomainOf, UNBOUND_DOMAIN_NAMESPACE_ID } from './domain-envelope';
 import type {
   ContractModel,
   ContractModelBase,
@@ -77,7 +77,7 @@ export function createContract<
     target,
     targetFamily,
     roots: overrides.roots ?? {},
-    domain: domainPlaneOf<TModels>({
+    domain: applicationDomainOf<TModels>({
       ...ifDefined('models', overrides.models),
       ...ifDefined('valueObjects', overrides.valueObjects),
       namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
