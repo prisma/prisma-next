@@ -42,7 +42,7 @@ export type Contract = ContractWithTypeMaps<BaseContract<
         readonly typeParams: { readonly length: 768 };
       };
     };
-    readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
+    readonly __unbound__: { readonly id: '__unbound__' };
   },
   {
     readonly User: {

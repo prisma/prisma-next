@@ -45,20 +45,18 @@ interface MongoShapedExtensionContract {
   readonly roots: Record<string, never>;
   readonly models: Record<string, never>;
   readonly storage: {
-    readonly namespaces: {
-      readonly __unbound__: {
-        readonly id: '__unbound__';
-        readonly kind: 'mongo-namespace';
-        readonly tables: Record<
-          string,
-          {
-            readonly indexes: ReadonlyArray<{
-              readonly keys: ReadonlyArray<{ readonly field: string; readonly direction: 1 | -1 }>;
-              readonly unique?: boolean;
-            }>;
-          }
-        >;
-      };
+    readonly __unbound__: {
+      readonly id: '__unbound__';
+      readonly kind: 'mongo-namespace';
+      readonly tables: Record<
+        string,
+        {
+          readonly indexes: ReadonlyArray<{
+            readonly keys: ReadonlyArray<{ readonly field: string; readonly direction: 1 | -1 }>;
+            readonly unique?: boolean;
+          }>;
+        }
+      >;
     };
     readonly storageHash: string;
   };
@@ -75,14 +73,12 @@ function buildMongoExtensionContract(): MongoShapedExtensionContract {
     roots: {},
     models: {},
     storage: {
-      namespaces: {
-        __unbound__: {
-          id: '__unbound__',
-          kind: 'mongo-namespace',
-          tables: {
-            cipherstash_state: {
-              indexes: [{ keys: [{ field: 'tenantId', direction: 1 }], unique: true }],
-            },
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        tables: {
+          cipherstash_state: {
+            indexes: [{ keys: [{ field: 'tenantId', direction: 1 }], unique: true }],
           },
         },
       },
