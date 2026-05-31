@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
@@ -26,7 +26,7 @@ function buildContract(overrides?: Partial<Contract>): Contract {
     targetFamily: 'sql',
     domain: {
       namespaces: {
-        [UNBOUND_DOMAIN_NAMESPACE_ID]: {
+        [UNBOUND_NAMESPACE_ID]: {
           models: {
             user: userModel,
           },
@@ -84,7 +84,7 @@ describe('ContractView', () => {
     const contract = buildContract({
       domain: {
         namespaces: {
-          [UNBOUND_DOMAIN_NAMESPACE_ID]: {
+          [UNBOUND_NAMESPACE_ID]: {
             models: {
               [untrusted]: {
                 storage: {
