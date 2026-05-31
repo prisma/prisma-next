@@ -35,15 +35,15 @@ export type {
   ContractSpaceMember,
 } from '../aggregate/types';
 export {
-  type AggregateVerifierError,
-  type AggregateVerifierInput,
-  type AggregateVerifierOutput,
-  type AggregateVerifierSuccess,
   type MarkerCheckResult,
   type MarkerCheckSection,
   type OrphanElement,
   type SchemaCheckSection,
-  verifyAggregate,
+  type VerifierError,
+  type VerifierInput,
+  type VerifierOutput,
+  type VerifierSuccess,
+  verifyMigration,
 } from '../aggregate/verifier';
 export type {
   DeclaredExtensionEntry,

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types';
 import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
-import { verifyAggregate } from '../../src/aggregate/verifier';
+import { verifyMigration } from '../../src/aggregate/verifier';
 import { makeContractSpaceMember } from '../fixtures';
 
 interface StubSchemaResult {
@@ -58,13 +58,13 @@ const STUB_VERIFY = (
   return { tablesSeen: Object.keys(schema.tables).sort() };
 };
 
-describe('verifyAggregate', () => {
+describe('verifyMigration', () => {
   describe('markerCheck', () => {
     it('reports `absent` when the member has no marker row', () => {
       const aggregate = makeAggregate({
         app: makeMember({ spaceId: 'app', headHash: 'sha256:app-head' }),
       });
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
@@ -86,7 +86,7 @@ describe('verifyAggregate', () => {
       const markers = new Map<string, ContractMarkerRecordLike>([
         ['app', { storageHash: 'sha256:app-head', invariants: ['inv-1'] }],
       ]);
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
@@ -103,7 +103,7 @@ describe('verifyAggregate', () => {
       const markers = new Map<string, ContractMarkerRecordLike>([
         ['app', { storageHash: 'sha256:actual', invariants: [] }],
       ]);
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
@@ -131,7 +131,7 @@ describe('verifyAggregate', () => {
       const markers = new Map<string, ContractMarkerRecordLike>([
         ['cipher', { storageHash: 'sha256:cipher', invariants: ['cipher:create-v1'] }],
       ]);
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
@@ -153,7 +153,7 @@ describe('verifyAggregate', () => {
         ['cipher', { storageHash: 'sha256:cipher', invariants: [] }],
         ['vector', { storageHash: 'sha256:vector', invariants: [] }],
       ]);
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
@@ -192,7 +192,7 @@ describe('verifyAggregate', () => {
         },
       };
 
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: liveSchema,
@@ -230,7 +230,7 @@ describe('verifyAggregate', () => {
         },
       };
 
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: liveSchema,
@@ -258,7 +258,7 @@ describe('verifyAggregate', () => {
         ],
       });
 
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: {
@@ -279,7 +279,7 @@ describe('verifyAggregate', () => {
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
       });
 
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: { user: { columns: {} } } },
@@ -307,7 +307,7 @@ describe('verifyAggregate', () => {
         },
       };
 
-      const result = verifyAggregate({
+      const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: exploding,
@@ -325,7 +325,7 @@ describe('verifyAggregate', () => {
         app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
       });
 
-      verifyAggregate({
+      verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },

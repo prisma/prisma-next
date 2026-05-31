@@ -236,7 +236,7 @@ export function collectOrdered(
   return applyOrder.map((spaceId) => {
     const entry = perSpace.get(spaceId);
     if (!entry) {
-      throw new Error(`Aggregate planner output missing per-space plan for "${spaceId}"`);
+      throw new Error(`planner output missing per-space plan for "${spaceId}"`);
     }
     return { spaceId, entry };
   });

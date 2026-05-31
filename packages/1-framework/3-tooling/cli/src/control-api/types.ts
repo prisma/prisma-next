@@ -245,7 +245,7 @@ export interface DbUpdateOptions {
  * Options for the dbVerify operation.
  *
  * Drives the loader → aggregate-verifier pipeline. `strict` maps to
- * `verifyAggregate({ mode: 'strict' | 'lenient' })`; `skipSchema`
+ * `verifyMigration({ mode: 'strict' | 'lenient' })`; `skipSchema`
  * mirrors the `--marker-only` CLI flag and short-circuits the schema
  * portion of the verifier.
  */
