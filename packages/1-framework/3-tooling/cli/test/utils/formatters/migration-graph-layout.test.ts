@@ -275,7 +275,7 @@ describe('buildMigrationGraphLayout', () => {
   // Skipped until the traversal renders the longer branch contiguously before dipping
   // into the shorter sibling (today it braids them). Every value below is derived by hand
   // from `mockups.md` § kitchen-sink, NOT from code output.
-  it.skip('lays out kitchen-sink with unequal branch lengths per mockup', () => {
+  it('lays out kitchen-sink with unequal branch lengths per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'root', 'init');
     const addPhone = edge('root', 'n1', 'add_phone');
     const emailDefault = edge('n1', 'n2', 'email_default');

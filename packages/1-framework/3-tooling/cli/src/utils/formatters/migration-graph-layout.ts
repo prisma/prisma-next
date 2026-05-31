@@ -616,11 +616,35 @@ function layoutComponent(
     return edges.filter((e) => e.from === from && e.kind === 'forward' && e.from !== e.to);
   }
 
+  function branchSpineLengthFromChild(start: string): number {
+    let length = 1;
+    let current = start;
+    for (;;) {
+      const outs = forwardChildrenFrom(current);
+      if (outs.length !== 1) return length;
+      const next = outs[0];
+      if (next === undefined) return length;
+      if ((forwardInDegree.get(next.to) ?? 0) >= 2) return length + 1;
+      length += 1;
+      current = next.to;
+    }
+  }
+
   function passThroughForBranchEdge(from: string, laneIndex: number): number[] {
-    const siblingSpan = forwardChildrenFrom(from).length - 1;
+    const children = forwardChildrenFrom(from);
+    if (children.length < 2) return [];
+
+    const spineLengths = children.map((child) => branchSpineLengthFromChild(child.to));
+    const unequalSpines = new Set(spineLengths).size > 1;
+
     const passThrough: number[] = [];
-    for (let index = 0; index <= siblingSpan; index++) {
-      if (index !== laneIndex) passThrough.push(index);
+    for (let index = 0; index < children.length; index++) {
+      if (index === laneIndex) continue;
+      if (unequalSpines) {
+        if (laneIndex > index) passThrough.push(index);
+      } else {
+        passThrough.push(index);
+      }
     }
     return passThrough;
   }
@@ -796,6 +820,9 @@ function layoutComponent(
       (e) => e.kind === 'forward',
     );
     const sorted = [...producers].sort((a, b) => {
+      const spineA = branchSpineLengthFromTip(a.from);
+      const spineB = branchSpineLengthFromTip(b.from);
+      if (spineA !== spineB) return spineB - spineA;
       const laneA = producerLaneByHash.get(a.migrationHash) ?? 0;
       const laneB = producerLaneByHash.get(b.migrationHash) ?? 0;
       return laneA - laneB;
@@ -808,6 +835,25 @@ function layoutComponent(
   }
 
   const emittedNodes = new Set<string>();
+
+  function branchSpineLengthFromTip(tip: string): number {
+    let length = 0;
+    let current = tip;
+    for (;;) {
+      const producers = (forwardProducersByTo.get(current) ?? []).filter(
+        (e) => e.kind === 'forward' && e.from !== e.to,
+      );
+      if (producers.length !== 1) return length;
+      const producer = producers[0];
+      if (producer === undefined) return length;
+      const parent = producer.from;
+      if ((forwardOutDegree.get(parent) ?? 0) >= 2) {
+        return length + 1;
+      }
+      length += 1;
+      current = parent;
+    }
+  }
 
   function visitNode(contract: string): void {
     if (emittedNodes.has(contract)) return;
@@ -827,11 +873,26 @@ function layoutComponent(
     emitForwardProducersTo(contract);
     emitDepartingEdgesFrom(contract);
     visitBranchRoots(contract);
+    visitSingleProducerParent(contract);
+  }
+
+  function visitSingleProducerParent(contract: string): void {
+    const producers = (forwardProducersByTo.get(contract) ?? []).filter(
+      (e) => e.kind === 'forward' && e.from !== e.to,
+    );
+    if (producers.length !== 1) return;
+    const parent = producers[0]?.from;
+    if (parent === undefined || emittedNodes.has(parent)) return;
+    if ((forwardOutDegree.get(parent) ?? 0) >= 2) return;
+    visitNode(parent);
   }
 
   const tipStarts = componentNodes
     .filter((node) => (forwardOutDegree.get(node) ?? 0) === 0)
     .sort((a, b) => {
+      const spineA = branchSpineLengthFromTip(a);
+      const spineB = branchSpineLengthFromTip(b);
+      if (spineA !== spineB) return spineB - spineA;
       const inA = forwardInDegree.get(a) ?? 0;
       const inB = forwardInDegree.get(b) ?? 0;
       if (inA !== inB) return inA - inB;
