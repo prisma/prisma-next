@@ -47,6 +47,32 @@ Sized against `drive/calibration/sizing.md`. A single dispatch tripped two mis-s
 
 **Note.** The typecheck sweep already migrated fixtures to call `buildDomainPlaneFromFlat`; this dispatch renames those call sites. Pure mechanical fan-out — no new judgment.
 
+## Rework round 2 — foundation surface honesty (single dispatch)
+
+A second review round confirmed the structure + validator are correct, but flagged three foundation-surface defects (see spec "Rework round 2"). All three have fully-decided designs and small/mechanical blast radii — `DomainPlane` is 5 files (not in generated d.ts), `DomainNamespace` 2 files, the bulk is a mechanical 83-test-file import swap for the relocated helper. Sized against `drive/calibration/sizing.md`: one coherent unit ("clean the foundation domain surface"), low freedom (exact names + destination + key strategy are specified), fan-out is mechanical. Kept as **one** dispatch with an ordered checklist; the prior over-complex failures were underspecified-outcome/too-much-freedom, neither of which applies here.
+
+### Dispatch 3 — foundation surface honesty
+
+**Surface:** `packages/1-framework/0-foundation/contract/**`, `test/utils/**` (test-utils new home), and the 83 test files importing the relocated helper.
+
+**Outcome.** The foundation `contract` production surface carries only namespaced structural truth + the (transitional, untouched) projection helpers; the application-domain segment type is named for ubiquitous language; identity keys are structural; the test-only authoring helper is gone from production code.
+
+**Do it in this order, committing between steps:**
+1. **Structural identity key.** Replace `modelCoordinateKey` `${ns}:${model}` string with a collision-safe structural key in `validate-domain.ts` (nested namespace→model map or canonical non-ambiguous encoding; prefer the existing `EntityCoordinate` shape). The same-name-in-two-namespaces pin must keep passing. Commit.
+2. **Rename for ubiquitous language.** `DomainPlane` → `ApplicationDomain`, `DomainNamespace` → `ApplicationDomainNamespace`, and rename the authoring constructor away from "plane" (e.g. `applicationDomainOf`). Field stays `domain`. Update all references; `pnpm typecheck` green. Commit.
+3. **Evict the test helper.** Move the renamed authoring constructor to `@prisma-next/test-utils` (`test/utils`); remove it from `contract/src` + `contract/src/exports`; point all 83 test sites at test-utils. Commit.
+
+**Completed when (all binary):**
+- [ ] `rg '\bDomainPlane\b|\bDomainNamespace\b'` over `packages/` + `test/` + `examples/` returns empty.
+- [ ] `rg "modelCoordinateKey|\\$\\{.*\\}:\\$\\{" ` shows no `${ns}:${model}` identity key; validator keys structurally; same-name-two-namespaces pin green.
+- [ ] The relocated helper is exported from `@prisma-next/test-utils`; `rg 'domainPlaneOf|applicationDomainOf' packages/1-framework/0-foundation/contract/src` returns empty.
+- [ ] `pnpm typecheck` · `pnpm lint:deps` · `pnpm test:packages -- @prisma-next/contract` green.
+
+**Halt conditions (stop and report — do NOT work around):**
+- Relocating the helper to test-utils creates a package-graph cycle `lint:deps` rejects (e.g. `contract` tests → test-utils → `contract`). Report; do not suppress the lint.
+- You are tempted to relocate or delete the shared runtime mappers (`contractModels` / `contractValueObjects` / `resolveSingleDomainNamespaceId`) or the type-level `ContractModelsMap` / `ContractValueObjectsMap` — **stop**; they stay this slice (deferred to `runtime-qualification`).
+- The rename forces touching generated `contract.d.ts` content beyond import names — report (it shouldn't; `DomainPlane` isn't emitted).
+
 ## Review
 
-Opus 4.8-high reviewer after **each** dispatch. CI owns the validation gates. Reviewer confirms: no back-compat residue, validation is coordinate-based (not a flat `Set`), no silent cross-namespace merge, emitter loud about single-namespace, storage untouched, framework domain has no `types`. Work continues on PR #653 (same branch).
+Opus 4.8-high reviewer after **each** dispatch. CI owns the validation gates. Reviewer confirms: no back-compat residue, validation is coordinate-based (not a flat `Set`), no silent cross-namespace merge, emitter loud about single-namespace, storage untouched, framework domain has no `types`. For round 2: `ApplicationDomain` naming applied throughout, identity key is structural (no `${ns}:${model}`), the authoring helper is gone from production code, and the transitional projection helpers are untouched. Work continues on PR #653 (same branch).

@@ -149,3 +149,33 @@ Corollary: a single-namespace *projection* (the only case that exists today) is 
 
 - Implementer reaches for a cross-namespace flat merge to "make types line up" — **stop and report**; the single-namespace projection must name its namespace.
 - Implementer expands into multi-namespace DSL typing or per-namespace d.ts emission — **stop and report** (that is `runtime-qualification`).
+
+---
+
+# Rework round 2: foundation surface honesty (review-driven)
+
+A second review round on the rework found the namespaced structure and the validator are now correct (the validator walks every namespace and resolves cross-refs structurally), but three foundation-surface defects remain. Two are plain defects; the third is a placement decision.
+
+## Decisions
+
+1. **Naming: the application-domain segment type is `ApplicationDomain` (was `DomainPlane`); its per-namespace entry is `ApplicationDomainNamespace` (was `DomainNamespace`).** The contract field stays `domain`. Rationale: the storage segment type is just `Storage` — there is no `StoragePlane` — so a `DomainPlane` type was asymmetric and mislabelled (a "plane" is the abstract concept, reserved by `EntityCoordinate.plane`). Bare `Domain` is too overloaded; the team's spoken term for this concept is "application domain" (vs storage domain). Ubiquitous-language wins over type-name symmetry here.
+
+2. **Model identity key is structural, not a `:`-joined string.** `modelCoordinateKey(ns, model) => `${ns}:${model}`` reintroduces exactly the stringly, separator-ambiguous coordinate that the cross-reference work (TML-2624) and ADR 221 moved away from, and a blessed structural `EntityCoordinate` already exists in `framework-components`. The validator's in-memory identity index must key on a collision-safe structural coordinate (nested map by namespace→model, or a canonical non-ambiguous encoding) — never `${ns}:${model}`.
+
+3. **`domainPlaneOf` is a test helper and leaves production code.** It has 83 test call sites and **zero** production consumers (only its own definition + re-export). It moves to the shared test-utils package (`@prisma-next/test-utils`, at `test/utils`); the foundation `contract` package's production surface no longer exports an authoring convenience that only tests use. (It is also renamed away from "plane" to match decision 1, e.g. `applicationDomainOf`.)
+
+## Transitional surface that deliberately stays (no relocation this slice)
+
+The single-namespace projection helpers — runtime `contractModels` / `contractValueObjects` / `resolveSingleDomainNamespaceId`, and type-level `ContractModelsMap` / `ContractValueObjectsMap` — **stay where they are for this slice.** They are *shared* across three consumer families (Mongo DSL, `sql-orm-client`, the emitter) whose only common ancestor is the foundation `contract` package, so "move them to their consumers" now means duplication or a throwaway shim package. The `runtime-qualification` slice eliminates them as it makes those consumers namespace-aware (per-family default-namespace resolution); relocating them now would be churn that slice immediately deletes. No separate ticket — `runtime-qualification` owns the elimination.
+
+## Round-2 done conditions
+
+- [ ] `DomainPlane` → `ApplicationDomain`, `DomainNamespace` → `ApplicationDomainNamespace`; all references updated; field stays `domain`; `pnpm typecheck` green.
+- [ ] Validator identity index keys on a structural coordinate; no `${ns}:${model}` string key anywhere. A same-name-in-two-namespaces fixture still validates as two distinct models (existing pin must keep passing).
+- [ ] `domainPlaneOf` (renamed) lives in `@prisma-next/test-utils`; foundation `contract/src` and its `exports/` no longer reference it; all 83 test sites import from test-utils; no production import of it.
+- [ ] The transitional projection helpers are untouched (still in foundation), with a one-line note marking them transitional pending `runtime-qualification`.
+
+## Round-2 refusal triggers
+
+- Moving `domainPlaneOf` to test-utils introduces a package-graph cycle that `lint:deps` rejects (e.g. the `contract` package's own tests importing test-utils which depends on `contract`) — **stop and report**; do not suppress `lint:deps`.
+- Relocating the shared runtime mappers (`contractModels` et al.) to consumers — **stop**; that is deliberately deferred to `runtime-qualification`.
