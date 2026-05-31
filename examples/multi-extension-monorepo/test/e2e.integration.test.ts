@@ -18,7 +18,7 @@
  *      contract.d.ts, refs/head.json}` and the same triple under
  *      `migrations/feature-flags/`.
  *
- *   2. **Multi-space planning across three spaces.** Calling
+ *   2. **Planning across three spaces.** Calling
  *      `executeDbInit` with `mode: 'plan'` produces a plan whose ops
  *      are ordered alphabetically by space id (extensions first, app
  *      last) per `concatenateSpaceApplyInputs`. The audit
@@ -27,7 +27,7 @@
  *      sort by space id), and both precede the app-space User-table
  *      op.
  *
- *   3. **Multi-space apply across three spaces.** Same wiring as test
+ *   3. **Apply across three spaces.** Same wiring as test
  *      (2) with `mode: 'apply'`. Asserts:
  *
  *        - all three tables (`audit_event`, `feature_flag`, the app
