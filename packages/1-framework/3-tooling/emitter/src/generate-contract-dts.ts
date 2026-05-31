@@ -98,6 +98,7 @@ ${importLines.join('\n')}
 ${familyImportLines.join('\n')}
 import type {
   Contract as ContractType,
+  ContractModelsMap,
   ExecutionHashBase,
   NamespaceId,
   ProfileHashBase,

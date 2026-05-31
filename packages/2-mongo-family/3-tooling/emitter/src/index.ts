@@ -1,4 +1,4 @@
-import type { Contract, ContractModel } from '@prisma-next/contract/types';
+import { type Contract, type ContractModel, contractModels } from '@prisma-next/contract/types';
 import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type { ValidationContext } from '@prisma-next/framework-components/emission';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -77,7 +77,7 @@ export const mongoEmission = {
   validateTypes(contract: Contract, _ctx: ValidationContext): void {
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    for (const [modelName, model] of Object.entries(contract.models)) {
+    for (const [modelName, model] of Object.entries(contractModels(contract))) {
       for (const [fieldName, field] of Object.entries(model.fields)) {
         const fieldType = (
           field as {
@@ -132,7 +132,7 @@ export const mongoEmission = {
       }
     }
 
-    const models = contract.models;
+    const models = contractModels(contract);
     if (!models || Object.keys(models).length === 0) return;
 
     for (const [modelName, model] of Object.entries(models)) {

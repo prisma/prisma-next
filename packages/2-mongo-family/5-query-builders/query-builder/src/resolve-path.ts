@@ -1,4 +1,4 @@
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { MongoContract, MongoModelsMap } from '@prisma-next/mongo-contract';
 import type { DocField } from './types';
 
 /**
@@ -174,7 +174,7 @@ type VONestedShape<
  *
  * The mapped iteration is inlined (not hidden behind a helper type that
  * takes `Fields` as a generic) so TypeScript recognises the mapped type
- * as homomorphic over `TContract['models'][ModelName]['fields']`. That
+ * as homomorphic over `MongoModelsMap<TContract>[ModelName]['fields']`. That
  * preserves the literal field-name keys at instantiation — without this,
  * the intersection of `Record<string, ContractField>` and the specific
  * literal field record collapses `keyof` to `string` and the result hover
@@ -182,11 +182,11 @@ type VONestedShape<
  */
 export type ModelNestedShape<
   TContract extends MongoContract,
-  ModelName extends string & keyof TContract['models'],
+  ModelName extends string & keyof MongoModelsMap<TContract>,
 > = {
-  readonly [K in keyof TContract['models'][ModelName]['fields'] & string]: TranslateField<
+  readonly [K in keyof MongoModelsMap<TContract>[ModelName]['fields'] & string]: TranslateField<
     TContract & ContractHasValueObjects,
-    TContract['models'][ModelName]['fields'][K]
+    MongoModelsMap<TContract>[ModelName]['fields'][K]
   >;
 };
 

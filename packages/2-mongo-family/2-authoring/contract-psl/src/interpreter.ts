@@ -1183,8 +1183,14 @@ export function interpretPslDocumentToMongoContract(
     targetFamily,
     target,
     roots: polyResult.roots,
-    models: polyResult.models,
-    ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
+    domain: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          models: polyResult.models,
+          ...(Object.keys(valueObjects).length > 0 ? { valueObjects } : {}),
+        },
+      },
+    },
     storage,
     extensionPacks: {},
     capabilities,

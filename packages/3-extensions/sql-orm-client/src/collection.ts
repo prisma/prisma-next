@@ -25,6 +25,7 @@ import {
   getColumnToFieldMap,
   getFieldToColumnMap,
   isToOneCardinality,
+  modelOf,
   type PolymorphismInfo,
   resolveFieldToColumn,
   resolveIncludeRelation,
@@ -301,7 +302,7 @@ export class Collection<
     WithVariantState<WithWhereState<State>, V>
   > {
     type ReturnState = WithVariantState<WithWhereState<State>, V>;
-    const model = this.contract.models[this.modelName] as Record<string, unknown> | undefined;
+    const model = modelOf(this.contract, this.modelName) as Record<string, unknown> | undefined;
     const discriminator = model?.['discriminator'] as { field: string } | undefined;
     const variants = model?.['variants'] as Record<string, { value: string }> | undefined;
 

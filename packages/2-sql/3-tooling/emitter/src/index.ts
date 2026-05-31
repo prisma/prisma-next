@@ -354,7 +354,7 @@ export const sqlEmission = {
       `export type Contract = ContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>;`,
       '',
       "export type Namespaces = Contract['storage']['namespaces'];",
-      "export type Models = Contract['models'];",
+      'export type Models = ContractModelsMap<Contract>;',
     ].join('\n');
   },
 } as const;

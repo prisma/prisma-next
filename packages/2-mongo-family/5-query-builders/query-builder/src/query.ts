@@ -1,4 +1,4 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
+import { normalizeLegacyDomainRoot, type PlanMeta } from '@prisma-next/contract/types';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
@@ -31,7 +31,9 @@ export interface QueryRoot<
 export function mongoQuery<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
 >(options: { contractJson: unknown }): QueryRoot<TContract> {
-  const contract = options.contractJson as TContract;
+  const contract = normalizeLegacyDomainRoot(
+    options.contractJson as Record<string, unknown>,
+  ) as TContract;
   return {
     from<K extends keyof TContract['roots'] & string>(rootName: K) {
       return createCollectionHandle(contract, rootName);

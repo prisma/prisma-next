@@ -1,4 +1,9 @@
-import type { Contract, ContractFieldType, CrossReference } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  type ContractFieldType,
+  type CrossReference,
+  contractModels,
+} from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
@@ -37,7 +42,7 @@ function unboundTable(contract: Contract<SqlStorage>, tableName: string): Storag
 }
 
 function modelsOf(contract: Contract<SqlStorage>): ModelsMap {
-  return contract.models as ModelsMap;
+  return contractModels(contract) as ModelsMap;
 }
 
 export function modelOf(contract: Contract<SqlStorage>, name: string): ModelEntry | undefined {

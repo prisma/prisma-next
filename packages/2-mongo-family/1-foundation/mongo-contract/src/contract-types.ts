@@ -73,6 +73,9 @@ export type MongoContract<
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = Contract<S, M>;
 
+/** Model map inferred from a {@link MongoContract} (domain.namespaces union). */
+export type MongoModelsMap<TContract extends MongoContract> = ContractModelsMap<TContract>;
+
 export type RootModelName<
   TContract extends MongoContract,
   RootName extends keyof TContract['roots'] & string,
