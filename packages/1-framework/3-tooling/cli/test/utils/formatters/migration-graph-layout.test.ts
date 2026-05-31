@@ -387,17 +387,30 @@ describe('buildMigrationGraphLayout', () => {
     expect(model.nodeColumn.get('avatar')).toBe(2);
   });
 
-  // Skipped until the lane allocator reconciles a node that is both a divergence child
-  // and a convergence producer (D feeds E yet also diverges from A), and connector rows
-  // emit column-absolute cells with pass-throughs for active lanes outside their span.
   // Every value below is derived by hand from `mockups.md` § cross-link, NOT from code output.
-  it.skip('lays out cross-link with three lanes per mockup', () => {
+  it('lays out cross-link with three lanes per mockup', () => {
     const aToB = edge('A', 'B', 'A_to_B');
     const bToC = edge('B', 'C', 'B_to_C');
     const aToD = edge('A', 'D', 'A_to_D');
     const dToE = edge('D', 'E', 'D_to_E');
     const bToE = edge('B', 'E', 'B_to_E');
     const model = layout([aToB, bToC, aToD, dToE, bToE]);
+
+    expect(renderLayout(model)).toMatchInlineSnapshot(`
+      "○         C
+      │↑        B_to_C
+      │ ○       E
+      │ ├─╮
+      │ │↑│     B_to_E
+      │ │ │↑    D_to_E
+      ├─╯ │
+      ○   │     B
+      │↑  │     A_to_B
+      │   ○     D
+      │   │↑    A_to_D
+      ├───╯
+      ○         A"
+    `);
 
     // `│ ├─╮` — E fans down to lanes 1 (B→E) and 2 (D→E); lane 0 (the C-spine) passes through.
     const branchAtE = model.rows.find(
