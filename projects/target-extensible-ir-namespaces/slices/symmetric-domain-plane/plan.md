@@ -6,25 +6,47 @@
 
 The first pass (D1 substrate + D2 consumers/fixtures) landed the `domain.namespaces` envelope and is on PR #653 — but review found it wrapped the shape over a flat identity model bridged by back-compat. The rework below replaces that layer; it supersedes the original D1/D2 framing for the parts it touches.
 
-## Rework dispatch — commit fully to the namespaced model
+## Rework dispatches — two units along the substrate→consumer seam
 
-**One dispatch.** The changes are tightly coupled in the foundation `contract` package (domain-envelope types, validation, exports) and its immediate consumers; splitting them creates churn and half-migrated intermediate states. The implementer commits in coherent steps internally.
+Sized against `drive/calibration/sizing.md`. A single dispatch tripped two mis-sizing anti-patterns (substrate + consumer in one; design judgment + rename fan-out in one) and its `Completed when` read as a paragraph, not a 1–3 item checklist. The prior failure on this slice was *underspecified outcome + missing halt conditions* (the 81-file defensive-helper expansion), so each brief below names a sharp outcome, a binary checklist, and explicit halt conditions that fence the executor's freedom.
 
-**Outcome.** The framework treats domain entities by coordinate `(namespaceId, entityName)` end to end. No legacy-flat read path, no namespace-collapsing merge, namespace-aware validation, canonicalizer on the shared path-pattern helper, honest single-namespace projection for the emitter/DSL inference, and clean naming.
+### Dispatch 1 — coordinate identity in the `contract` package (the judgment)
 
-**Internal commit order (suggested):**
+**Surface (do not leave this package):** `packages/1-framework/0-foundation/contract/**` only. (One emitter call site moves in Dispatch 2, not here.)
 
-1. **Kill back-compat.** Remove `LegacyFlatDomainRoot` / `DomainContractInput` / `isLegacyFlatDomainRoot` / `normalizeLegacyDomainRoot` and exports; make read helpers single-branch on `domain.namespaces`; fix the deserializer to accept only the envelope.
-2. **Namespace-aware validation.** Rewrite `validate-domain.ts` to resolve `(namespace, model)`; remove `flattenDomainContract`; add a test pinning two same-named models in different namespaces.
-3. **De-merge helpers + single-namespace projection.** Replace cross-namespace merge in `contractModels` / `contractValueObjects` and `ContractModelsMap` / `ContractValueObjectsMap` with an explicit single-namespace projection (takes/asserts a namespace); route the emitter through it; emitter throws on multi-namespace.
-4. **Canonicalizer + naming.** `matchesPathPattern` for domain path checks; rename `DomainContractSlice` → `ContractWithDomain`; rename `buildDomainPlaneFromFlat` → `domainPlaneOf` and update all call sites (incl. the fixtures the typecheck sweep migrated).
+**Outcome.** The foundation contract's domain identity is coordinate-`(namespace, model)`-based: no legacy-flat read path, no cross-namespace merge, validation resolves by coordinate.
 
-**Focus.** Foundation `contract` package first (types/validation), then ripple to emitter + family consumers. Selective gates per touched package; full `pnpm typecheck` + `pnpm fixtures:check` + `pnpm test:packages` before handoff. PGlite/MMS integration flakes are acceptable (note them); type errors are not.
+**Completed when (all binary):**
+- [ ] `rg 'LegacyFlatDomainRoot|DomainContractInput|isLegacyFlatDomainRoot|normalizeLegacyDomainRoot'` over `packages/` returns empty.
+- [ ] A new test in the `contract` package proves two models with the same name in two different namespaces validate as **distinct** (no false "duplicate" / no collapse).
+- [ ] `rg "Object.assign|UnionToIntersection"` in `domain-envelope.ts` / `contract-types.ts` returns empty for the model/VO merge paths; the single-namespace projection takes or asserts a `namespaceId`.
+- [ ] `pnpm test:packages -- @prisma-next/contract` green; `pnpm typecheck` green for the package.
 
-**Refusal triggers.** Storage flatten; framework `domain.types`; cross-namespace flat merge to "line up types"; expansion into multi-namespace DSL typing or per-namespace d.ts emission (that is `runtime-qualification`).
+**Halt conditions (stop and report — do NOT invent a workaround):**
+- You need to add any normalization / compatibility / defensive helper that accepts more than the `domain.namespaces` shape.
+- You need a cross-namespace flat merge to make types line up.
+- The change forces edits outside `packages/1-framework/0-foundation/contract/**` to get the package green (that ripple is Dispatch 2 — report the surface it wants).
+- Storage flatten or framework `domain.types` (slice-wide refusal).
 
-**Validation gate.** `pnpm typecheck` · `pnpm fixtures:check` · `pnpm test:packages` (type errors none) · `pnpm lint:deps`. Push to `bot`; the work continues on PR #653 (same branch).
+**Includes the surgical canonicalizer swap** (`matchesPathPattern` for the domain path checks) — it lives in this package and is part of the identity-correctness outcome.
+
+### Dispatch 2 — consumer migration + renames (the fan-out)
+
+**Builds on:** Dispatch 1's new `contract` API (committed on-branch).
+
+**Outcome.** Every consumer uses the new projection + names; the emitter is loud (throws) on a multi-namespace domain; all gates green.
+
+**Completed when (all binary):**
+- [ ] `rg 'buildDomainPlaneFromFlat|DomainContractSlice'` over `packages/` + `examples/` + `test/` returns empty (renamed to `domainPlaneOf` / `ContractWithDomain`).
+- [ ] The emitter **throws** (test-pinned) when handed a domain with >1 namespace; single-namespace emission unchanged.
+- [ ] `pnpm typecheck` · `pnpm fixtures:check` · `pnpm test:packages` (type errors none; PGlite/MMS flakes noted, not type regressions) · `pnpm lint:deps` all green.
+
+**Halt conditions:**
+- Any consumer "needs" a cross-namespace merge — stop; the single-namespace projection names its namespace.
+- The migration pulls you into multi-namespace DSL typing or per-namespace `contract.d.ts` emission — stop; that is `runtime-qualification`.
+
+**Note.** The typecheck sweep already migrated fixtures to call `buildDomainPlaneFromFlat`; this dispatch renames those call sites. Pure mechanical fan-out — no new judgment.
 
 ## Review
 
-Opus 4.8-high reviewer after the dispatch. CI owns the validation gates. Reviewer confirms: no back-compat residue, validation is coordinate-based (not a flat Set), no silent cross-namespace merge, emitter is loud about single-namespace, storage untouched, framework domain has no `types`.
+Opus 4.8-high reviewer after **each** dispatch. CI owns the validation gates. Reviewer confirms: no back-compat residue, validation is coordinate-based (not a flat `Set`), no silent cross-namespace merge, emitter loud about single-namespace, storage untouched, framework domain has no `types`. Work continues on PR #653 (same branch).
