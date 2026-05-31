@@ -31,6 +31,10 @@
       "types": "./dist/exports/index.d.mts",
       "import": "./dist/exports/index.mjs"
     },
+    "./contract-factories": {
+      "types": "./dist/exports/contract-factories.d.mts",
+      "import": "./dist/exports/contract-factories.mjs"
+    },
     "./column-descriptors": {
       "types": "./dist/exports/column-descriptors.d.mts",
       "import": "./dist/exports/column-descriptors.mjs"

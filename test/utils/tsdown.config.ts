@@ -3,6 +3,7 @@ import { defineConfig } from '@prisma-next/tsdown';
 export default defineConfig({
   entry: {
     index: 'src/exports/index.ts',
+    'contract-factories': 'src/contract-factories.ts',
     'column-descriptors': 'src/column-descriptors.ts',
     'lowered-params': 'src/lowered-params.ts',
     'operation-descriptors': 'src/operation-descriptors.ts',
