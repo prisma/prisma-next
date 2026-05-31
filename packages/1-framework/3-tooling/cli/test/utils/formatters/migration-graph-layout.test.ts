@@ -98,6 +98,25 @@ function expectEdgeGeometry(
   expect(row.passThroughLanes).toEqual([...passThroughLanes]);
 }
 
+// Spacing-free lane assertion: pins which lane an edge owns and which lanes it passes
+// through, without asserting forward adjacency (forward edges always render `↑`, so their
+// adjacency does not affect the diagram). Use this to lock divergence topologies where the
+// only design freedom that matters is the lane staircase + connector placement.
+function expectEdgeLane(
+  rows: readonly MigrationGraphGridRow[],
+  dirName: string,
+  laneIndex: number,
+  passThroughLanes: readonly number[],
+): void {
+  const row = edgeRowByDirName(rows, dirName);
+  expect(row.laneIndex).toBe(laneIndex);
+  expect(row.passThroughLanes).toEqual([...passThroughLanes]);
+}
+
+function maxLaneCount(rows: readonly MigrationGraphGridRow[]): number {
+  return rows.reduce((max, row) => Math.max(max, row.cells.length), 0);
+}
+
 // Debug renderer: turns the structural cell roles back into the box-drawing glyphs
 // from `mockups.md` so each fixture's inline snapshot shows the actual diagram next to
 // the geometry assertions. This is a test-only aid — the production text renderer is a
@@ -387,6 +406,159 @@ describe('buildMigrationGraphLayout', () => {
     expect(model.nodeColumn.get('avatar')).toBe(2);
   });
 
+  // ---------------------------------------------------------------------------------------
+  // Divergence family (`it.fails`): these lock the correct layouts from `mockups.md` for the
+  // divergence-heavy topologies the current allocator gets wrong (it fans, spills phantom
+  // lanes, or mis-orders). Each asserts node columns, connector placement, and per-edge lane
+  // staircase derived by hand from the mockups — NOT from code output. They fail today; when
+  // the allocator generalises to the lane-join rule, flip each `it.fails` to `it`. Forward
+  // adjacency is intentionally not asserted (forward edges always render `↑`).
+  // ---------------------------------------------------------------------------------------
+
+  // `mockups.md` § wide-fan: pure 5-way divergence, no reconvergence. Five tips each open a
+  // lane; all five merge down into the shared parent (one merge connector, no branch).
+  it.fails('lays out a wide fan as five lanes merging into the parent (pending allocator)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const addCategory = edge('ef9de27', 'becd3f1', 'add_category');
+    const addSettings = edge('ef9de27', 'b01f4d9', 'add_settings');
+    const model = layout([init, addPhone, addPosts, addAvatar, addCategory, addSettings]);
+
+    // No phantom lanes: exactly five (one per tip).
+    expect(maxLaneCount(model.rows)).toBe(5);
+    expect(model.rows.filter(isBranchConnector)).toHaveLength(0);
+    const merge = model.rows.find(isMergeConnector);
+    expect(merge).toMatchObject({ startLane: 0, endLane: 4, branchCount: 5 });
+
+    expect(model.nodeColumn.get('b01f4d9')).toBe(0);
+    expect(model.nodeColumn.get('becd3f1')).toBe(1);
+    expect(model.nodeColumn.get('6656a6e')).toBe(2);
+    expect(model.nodeColumn.get('a94b7b4')).toBe(3);
+    expect(model.nodeColumn.get('73e3abe')).toBe(4);
+    expect(model.nodeColumn.get('ef9de27')).toBe(0);
+
+    expectEdgeLane(model.rows, 'add_settings', 0, []);
+    expectEdgeLane(model.rows, 'add_category', 1, [0]);
+    expectEdgeLane(model.rows, 'add_avatar', 2, [0, 1]);
+    expectEdgeLane(model.rows, 'add_posts', 3, [0, 1, 2]);
+    expectEdgeLane(model.rows, 'add_phone', 4, [0, 1, 2, 3]);
+    expectEdgeLane(model.rows, 'init', 0, []);
+  });
+
+  // `mockups.md` § sub-branches: nested divergence. Both fans reuse the same two lanes — the
+  // child-lanes merge into their own parent, never into each other.
+  it.fails('lays out nested divergence reusing two lanes (pending allocator)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addPosts = edge('73e3abe', 'a94b7b4', 'add_posts');
+    const addBio = edge('73e3abe', '3ee5d20', 'add_bio');
+    const addAvatar = edge('ef9de27', '6656a6e', 'add_avatar');
+    const model = layout([init, addPhone, addPosts, addBio, addAvatar]);
+
+    // Two lanes only — nested fans reuse them, no widening.
+    expect(maxLaneCount(model.rows)).toBe(2);
+    expect(model.rows.filter(isBranchConnector)).toHaveLength(0);
+    const merges = model.rows.filter(isMergeConnector);
+    expect(merges).toHaveLength(2);
+    expect(merges.every((m) => m.startLane === 0 && m.endLane === 1 && m.branchCount === 2)).toBe(
+      true,
+    );
+
+    expect(model.nodeColumn.get('a94b7b4')).toBe(0);
+    expect(model.nodeColumn.get('3ee5d20')).toBe(1);
+    expect(model.nodeColumn.get('73e3abe')).toBe(0);
+    expect(model.nodeColumn.get('6656a6e')).toBe(1);
+    expect(model.nodeColumn.get('ef9de27')).toBe(0);
+
+    expectEdgeLane(model.rows, 'add_posts', 0, []);
+    expectEdgeLane(model.rows, 'add_bio', 1, [0]);
+    expectEdgeLane(model.rows, 'add_phone', 0, []);
+    expectEdgeLane(model.rows, 'add_avatar', 1, [0]);
+    expectEdgeLane(model.rows, 'init', 0, []);
+  });
+
+  // `mockups.md` § diamond-sub-branch: a diamond (lanes 0/1) where one arm (`6656a6e`) also
+  // diverges into a leaf spur (lane 2). `6656a6e` is both a diamond arm and a divergence.
+  it.fails('lays out a diamond with a leaf spur off one arm (pending allocator)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const mergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const mergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+    const experiment = edge('6656a6e', 'becd3f1', 'bob_experiment');
+    const experiment2 = edge('becd3f1', 'b01f4d9', 'bob_experiment_2');
+    const model = layout([init, alice, bob, mergeAlice, mergeBob, experiment, experiment2]);
+
+    expect(maxLaneCount(model.rows)).toBe(3);
+    // Branch at the diamond convergence; merges at the spur divergence and at the root.
+    const branch = model.rows.find(isBranchConnector);
+    expect(branch).toMatchObject({ contractHash: '3b2d98d', startLane: 0, endLane: 1 });
+    const mergeAt6656 = model.rows.find(
+      (r) => r.kind === 'merge-connector' && r.contractHash === '6656a6e',
+    );
+    expect(mergeAt6656).toMatchObject({ startLane: 1, endLane: 2, branchCount: 2 });
+    const mergeAtRoot = model.rows.find(
+      (r) => r.kind === 'merge-connector' && r.contractHash === 'ef9de27',
+    );
+    expect(mergeAtRoot).toMatchObject({ startLane: 0, endLane: 1, branchCount: 2 });
+
+    expect(model.nodeColumn.get('3b2d98d')).toBe(0);
+    expect(model.nodeColumn.get('73e3abe')).toBe(0);
+    expect(model.nodeColumn.get('b01f4d9')).toBe(2);
+    expect(model.nodeColumn.get('becd3f1')).toBe(2);
+    expect(model.nodeColumn.get('6656a6e')).toBe(1);
+    expect(model.nodeColumn.get('ef9de27')).toBe(0);
+
+    expectEdgeLane(model.rows, 'merge_alice', 0, [1]);
+    expectEdgeLane(model.rows, 'merge_bob', 1, [0]);
+    expectEdgeLane(model.rows, 'alice_add_phone', 0, [1]);
+    expectEdgeLane(model.rows, 'bob_experiment_2', 2, [0, 1]);
+    expectEdgeLane(model.rows, 'bob_experiment', 2, [0, 1]);
+    expectEdgeLane(model.rows, 'bob_add_avatar', 1, [0]);
+    expectEdgeLane(model.rows, 'init', 0, []);
+  });
+
+  // `mockups.md` § complex: three-way divergence (diamond arms + a leaf tip) above a spine.
+  // The leaf tip sits low (lane 2, short), like `kitchen-sink`'s short branch.
+  it.fails('lays out divergence + diamond + spine + leaf tip (pending allocator)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
+    const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
+    const staging = edge('ef9de27', 'a94b7b4', 'staging_posts');
+    const mergeAlice = edge('73e3abe', '3b2d98d', 'merge_alice');
+    const mergeBob = edge('6656a6e', '3b2d98d', 'merge_bob');
+    const addComments = edge('3b2d98d', '0276f92', 'add_comments');
+    const addTags = edge('0276f92', 'cd5c15b', 'add_tags');
+    const model = layout([init, alice, bob, staging, mergeAlice, mergeBob, addComments, addTags]);
+
+    expect(maxLaneCount(model.rows)).toBe(3);
+    const branch = model.rows.find(isBranchConnector);
+    expect(branch).toMatchObject({ contractHash: '3b2d98d', startLane: 0, endLane: 1 });
+    const mergeAtRoot = model.rows.find(
+      (r) => r.kind === 'merge-connector' && r.contractHash === 'ef9de27',
+    );
+    expect(mergeAtRoot).toMatchObject({ startLane: 0, endLane: 2, branchCount: 3 });
+
+    expect(model.nodeColumn.get('cd5c15b')).toBe(0);
+    expect(model.nodeColumn.get('0276f92')).toBe(0);
+    expect(model.nodeColumn.get('3b2d98d')).toBe(0);
+    expect(model.nodeColumn.get('73e3abe')).toBe(0);
+    expect(model.nodeColumn.get('6656a6e')).toBe(1);
+    expect(model.nodeColumn.get('a94b7b4')).toBe(2);
+    expect(model.nodeColumn.get('ef9de27')).toBe(0);
+
+    expectEdgeLane(model.rows, 'add_tags', 0, []);
+    expectEdgeLane(model.rows, 'add_comments', 0, []);
+    expectEdgeLane(model.rows, 'merge_alice', 0, [1]);
+    expectEdgeLane(model.rows, 'merge_bob', 1, [0]);
+    expectEdgeLane(model.rows, 'alice_add_phone', 0, [1]);
+    expectEdgeLane(model.rows, 'bob_add_avatar', 1, [0]);
+    expectEdgeLane(model.rows, 'staging_posts', 2, [0, 1]);
+    expectEdgeLane(model.rows, 'init', 0, []);
+  });
+
   // Every value below is derived by hand from `mockups.md` § cross-link, NOT from code output.
   it('lays out cross-link with three lanes per mockup', () => {
     const aToB = edge('A', 'B', 'A_to_B');
@@ -560,6 +732,41 @@ describe('buildMigrationGraphLayout', () => {
     expect(noopIndex).toBe(aaaNodeIndex - 1);
     expect(nextIndex).toBeLessThan(noopIndex);
     expectEdgeGeometry(model.rows, 'noop', 0, [], 'adjacent');
+  });
+
+  // Multi-edge: N migrations sharing the same `from` AND `to` are a multigraph edge, not a
+  // convergence. They stack in the ONE lane — each a plain `│↑` — never a fan (the edges don't
+  // branch: one source; and don't merge: one target). Asserts the correct single-lane output
+  // from `mockups.md § multi-edge`. Marked `it.fails` because the allocator currently keys
+  // convergence off forward in-degree (edge count) rather than distinct sources, so it fans the
+  // parallel edges into multiple lanes. When the allocator distinguishes multi-edges from a true
+  // convergence, flip this to `it(...)`. The diff against current output is the spec for the fix.
+  it.fails('stacks parallel multi-edges in one lane (pending allocator generalization)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
+    const variantA = edge('aaa', 'bbb', 'variant_a');
+    const variantB = edge('aaa', 'bbb', 'variant_b');
+    const variantC = edge('aaa', 'bbb', 'variant_c');
+    const model = layout([init, variantA, variantB, variantC]);
+
+    expect(renderLayout(model)).toBe(
+      [
+        '○     bbb',
+        '│↑    variant_c',
+        '│↑    variant_b',
+        '│↑    variant_a',
+        '○     aaa',
+        '│↑    init',
+        '○     ∅',
+      ].join('\n'),
+    );
+
+    expect(model.rows.filter(isBranchConnector)).toHaveLength(0);
+    expect(model.rows.filter(isMergeConnector)).toHaveLength(0);
+    expectEdgeGeometry(model.rows, 'variant_a', 0, [], 'adjacent');
+    expectEdgeGeometry(model.rows, 'variant_b', 0, [], 'adjacent');
+    expectEdgeGeometry(model.rows, 'variant_c', 0, [], 'adjacent');
+    expect(model.nodeColumn.get('bbb')).toBe(0);
+    expect(model.nodeColumn.get('aaa')).toBe(0);
   });
 
   it('separates disjoint components with a blank separator row', () => {
