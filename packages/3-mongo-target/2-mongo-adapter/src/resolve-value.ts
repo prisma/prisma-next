@@ -5,8 +5,9 @@ import {
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
-import type { MongoValue } from '@prisma-next/mongo-value';
+import type { Document, MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 
 /**
  * Resolves a `MongoValue` (which may contain `MongoParamRef` leaves) into the
@@ -80,6 +81,63 @@ export async function resolveValue(
   const entries = Object.entries(value);
   const all = Promise.all(entries.map(([, val]) => resolveValue(val, codecs, ctx)));
   const resolved = await raceAgainstAbort(all, signal, 'encode');
+  const result: Record<string, unknown> = {};
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry) {
+      result[entry[0]] = resolved[i];
+    }
+  }
+  return result;
+}
+
+/**
+ * Resolves a draft slot value — which may be `MongoParamRef`, a primitive, a
+ * nested plain-object, or an array — into the corresponding wire value.
+ * Mirrors `resolveValue`'s traversal strategy but accepts `unknown` so it can
+ * handle pipeline stage documents whose field types cannot be narrowed to
+ * `MongoValue` statically (e.g. `$geoNear.near: unknown`).
+ */
+async function resolveDraftSlot(
+  value: unknown,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
+): Promise<unknown> {
+  if (value instanceof MongoParamRef) {
+    return resolveValue(value, codecs, ctx);
+  }
+  if (value === null || typeof value !== 'object') return value;
+  if (value instanceof Date) return value;
+  if (Array.isArray(value)) {
+    const tasks = Promise.all(value.map((v: unknown) => resolveDraftSlot(v, codecs, ctx)));
+    return raceAgainstAbort(tasks, ctx.signal, 'encode');
+  }
+  return resolveDraftDoc(
+    blindCast<
+      Record<string, unknown>,
+      'narrowed by instanceof/typeof guards: non-null, non-Date, non-array object'
+    >(value),
+    codecs,
+    ctx,
+  );
+}
+
+/**
+ * Resolves a pipeline stage draft document by walking every entry and
+ * forwarding to {@link resolveDraftSlot}. Used by `MongoAdapterImpl.resolveParams`
+ * for aggregate pipeline stages, which carry `unknown`-typed fields (e.g.
+ * `$geoNear.near`) alongside filter sub-documents that may contain
+ * `MongoParamRef` leaves.
+ */
+export async function resolveDraftDoc(
+  doc: Record<string, unknown>,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
+): Promise<Document> {
+  checkAborted(ctx, 'encode');
+  const entries = Object.entries(doc);
+  const all = Promise.all(entries.map(([, val]) => resolveDraftSlot(val, codecs, ctx)));
+  const resolved = await raceAgainstAbort(all, ctx.signal, 'encode');
   const result: Record<string, unknown> = {};
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];

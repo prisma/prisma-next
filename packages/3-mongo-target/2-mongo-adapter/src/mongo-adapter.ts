@@ -1,12 +1,11 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
-import type { MongoAdapter } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoLoweredDraft } from '@prisma-next/mongo-lowering';
 import type {
   MongoQueryPlan,
   MongoUpdatePipelineStage,
   MongoUpdateSpec,
 } from '@prisma-next/mongo-query-ast/execution';
-import type { Document, MongoExpr } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import {
   AggregateWireCommand,
@@ -20,13 +19,28 @@ import {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
 import { buildStandardCodecRegistry } from './core/codecs';
-import { lowerFilter, lowerPipeline, lowerStage } from './lowering';
-import { resolveValue } from './resolve-value';
+import { structuralLowerFilter, structuralLowerPipeline } from './lowering';
+import { resolveDraftDoc } from './resolve-value';
 
 function isUpdatePipeline(
   update: MongoUpdateSpec,
 ): update is ReadonlyArray<MongoUpdatePipelineStage> {
   return Array.isArray(update);
+}
+
+async function resolveUpdate(
+  update: Record<string, unknown> | ReadonlyArray<Record<string, unknown>>,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
+): Promise<Record<string, unknown> | ReadonlyArray<Record<string, unknown>>> {
+  if (Array.isArray(update)) {
+    return Promise.all(
+      (update as ReadonlyArray<Record<string, unknown>>).map((stage) =>
+        resolveDraftDoc(stage, codecs, ctx),
+      ),
+    );
+  }
+  return resolveDraftDoc(update as Record<string, unknown>, codecs, ctx);
 }
 
 class MongoAdapterImpl implements MongoAdapter {
@@ -36,124 +50,232 @@ class MongoAdapterImpl implements MongoAdapter {
     this.#codecs = codecs;
   }
 
-  async #resolveDocument(expr: MongoExpr, ctx: CodecCallContext): Promise<Document> {
-    const entries = Object.entries(expr);
-    const resolved = await Promise.all(
-      entries.map(([, val]) => resolveValue(val, this.#codecs, ctx)),
-    );
-    const result: Record<string, unknown> = {};
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      if (entry) {
-        result[entry[0]] = resolved[i];
-      }
-    }
-    return result;
-  }
-
-  async #lowerUpdate(
-    update: MongoUpdateSpec,
-    ctx: CodecCallContext,
-  ): Promise<Document | ReadonlyArray<Document>> {
-    if (isUpdatePipeline(update)) {
-      return Promise.all(update.map((stage) => lowerStage(stage, this.#codecs, ctx)));
-    }
-    return this.#resolveDocument(update, ctx);
-  }
-
-  async lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand> {
+  structuralLower(plan: MongoQueryPlan): MongoLoweredDraft {
     const { command } = plan;
     switch (command.kind) {
       case 'insertOne':
-        return new InsertOneWireCommand(
-          command.collection,
-          await this.#resolveDocument(command.document, ctx),
-        );
-      case 'updateOne': {
-        const [filter, update] = await Promise.all([
-          lowerFilter(command.filter, this.#codecs, ctx),
-          this.#lowerUpdate(command.update, ctx),
-        ]);
-        return new UpdateOneWireCommand(command.collection, filter, update, command.upsert);
-      }
+        return { kind: 'insertOne', collection: command.collection, document: command.document };
       case 'insertMany':
-        return new InsertManyWireCommand(
-          command.collection,
-          await Promise.all(command.documents.map((doc) => this.#resolveDocument(doc, ctx))),
-        );
-      case 'updateMany': {
-        const [filter, update] = await Promise.all([
-          lowerFilter(command.filter, this.#codecs, ctx),
-          this.#lowerUpdate(command.update, ctx),
-        ]);
-        return new UpdateManyWireCommand(command.collection, filter, update, command.upsert);
-      }
+        return {
+          kind: 'insertMany',
+          collection: command.collection,
+          documents: command.documents,
+        };
+      case 'updateOne':
+        return {
+          kind: 'updateOne',
+          collection: command.collection,
+          filter: structuralLowerFilter(command.filter),
+          update: isUpdatePipeline(command.update)
+            ? structuralLowerPipeline(command.update)
+            : command.update,
+          upsert: command.upsert,
+        };
+      case 'updateMany':
+        return {
+          kind: 'updateMany',
+          collection: command.collection,
+          filter: structuralLowerFilter(command.filter),
+          update: isUpdatePipeline(command.update)
+            ? structuralLowerPipeline(command.update)
+            : command.update,
+          upsert: command.upsert,
+        };
       case 'deleteOne':
-        return new DeleteOneWireCommand(
-          command.collection,
-          await lowerFilter(command.filter, this.#codecs, ctx),
-        );
+        return {
+          kind: 'deleteOne',
+          collection: command.collection,
+          filter: structuralLowerFilter(command.filter),
+        };
       case 'deleteMany':
-        return new DeleteManyWireCommand(
-          command.collection,
-          await lowerFilter(command.filter, this.#codecs, ctx),
-        );
-      case 'findOneAndUpdate': {
-        const [filter, update] = await Promise.all([
-          lowerFilter(command.filter, this.#codecs, ctx),
-          this.#lowerUpdate(command.update, ctx),
-        ]);
-        return new FindOneAndUpdateWireCommand(
-          command.collection,
-          filter,
-          update,
-          command.upsert,
-          command.sort,
-          command.returnDocument,
-        );
-      }
+        return {
+          kind: 'deleteMany',
+          collection: command.collection,
+          filter: structuralLowerFilter(command.filter),
+        };
+      case 'findOneAndUpdate':
+        return {
+          kind: 'findOneAndUpdate',
+          collection: command.collection,
+          filter: structuralLowerFilter(command.filter),
+          update: isUpdatePipeline(command.update)
+            ? structuralLowerPipeline(command.update)
+            : command.update,
+          upsert: command.upsert,
+          sort: command.sort,
+          returnDocument: command.returnDocument,
+        };
       case 'findOneAndDelete':
-        return new FindOneAndDeleteWireCommand(
-          command.collection,
-          await lowerFilter(command.filter, this.#codecs, ctx),
-          command.sort,
-        );
+        return {
+          kind: 'findOneAndDelete',
+          collection: command.collection,
+          filter: structuralLowerFilter(command.filter),
+          sort: command.sort,
+        };
       case 'aggregate':
-        return new AggregateWireCommand(
-          command.collection,
-          await lowerPipeline(command.pipeline, this.#codecs, ctx),
-        );
+        return {
+          kind: 'aggregate',
+          collection: command.collection,
+          pipeline: structuralLowerPipeline(command.pipeline),
+        };
       case 'rawAggregate':
-        return new AggregateWireCommand(command.collection, command.pipeline);
+        return { kind: 'rawAggregate', collection: command.collection, pipeline: command.pipeline };
       case 'rawInsertOne':
-        return new InsertOneWireCommand(command.collection, command.document);
+        return {
+          kind: 'rawInsertOne',
+          collection: command.collection,
+          document: command.document,
+        };
       case 'rawInsertMany':
-        return new InsertManyWireCommand(command.collection, command.documents);
+        return {
+          kind: 'rawInsertMany',
+          collection: command.collection,
+          documents: command.documents,
+        };
       case 'rawUpdateOne':
-        return new UpdateOneWireCommand(command.collection, command.filter, command.update);
+        return {
+          kind: 'rawUpdateOne',
+          collection: command.collection,
+          filter: command.filter,
+          update: command.update,
+        };
       case 'rawUpdateMany':
-        return new UpdateManyWireCommand(command.collection, command.filter, command.update);
+        return {
+          kind: 'rawUpdateMany',
+          collection: command.collection,
+          filter: command.filter,
+          update: command.update,
+        };
       case 'rawDeleteOne':
-        return new DeleteOneWireCommand(command.collection, command.filter);
+        return { kind: 'rawDeleteOne', collection: command.collection, filter: command.filter };
       case 'rawDeleteMany':
-        return new DeleteManyWireCommand(command.collection, command.filter);
+        return { kind: 'rawDeleteMany', collection: command.collection, filter: command.filter };
       case 'rawFindOneAndUpdate':
-        return new FindOneAndUpdateWireCommand(
-          command.collection,
-          command.filter,
-          command.update,
-          command.upsert,
-          command.sort,
-          command.returnDocument,
-        );
+        return {
+          kind: 'rawFindOneAndUpdate',
+          collection: command.collection,
+          filter: command.filter,
+          update: command.update,
+          upsert: command.upsert,
+          sort: command.sort,
+          returnDocument: command.returnDocument,
+        };
       case 'rawFindOneAndDelete':
-        return new FindOneAndDeleteWireCommand(command.collection, command.filter, command.sort);
+        return {
+          kind: 'rawFindOneAndDelete',
+          collection: command.collection,
+          filter: command.filter,
+          sort: command.sort,
+        };
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;
         throw new Error(`Unknown command kind: ${(_exhaustive as { kind: string }).kind}`);
       }
     }
+  }
+
+  async resolveParams(
+    draft: MongoLoweredDraft,
+    ctx: CodecCallContext,
+  ): Promise<AnyMongoWireCommand> {
+    switch (draft.kind) {
+      case 'insertOne':
+        return new InsertOneWireCommand(
+          draft.collection,
+          await resolveDraftDoc(draft.document, this.#codecs, ctx),
+        );
+      case 'insertMany':
+        return new InsertManyWireCommand(
+          draft.collection,
+          await Promise.all(draft.documents.map((doc) => resolveDraftDoc(doc, this.#codecs, ctx))),
+        );
+      case 'updateOne': {
+        const [filter, update] = await Promise.all([
+          resolveDraftDoc(draft.filter, this.#codecs, ctx),
+          resolveUpdate(draft.update, this.#codecs, ctx),
+        ]);
+        return new UpdateOneWireCommand(draft.collection, filter, update, draft.upsert);
+      }
+      case 'updateMany': {
+        const [filter, update] = await Promise.all([
+          resolveDraftDoc(draft.filter, this.#codecs, ctx),
+          resolveUpdate(draft.update, this.#codecs, ctx),
+        ]);
+        return new UpdateManyWireCommand(draft.collection, filter, update, draft.upsert);
+      }
+      case 'deleteOne':
+        return new DeleteOneWireCommand(
+          draft.collection,
+          await resolveDraftDoc(draft.filter, this.#codecs, ctx),
+        );
+      case 'deleteMany':
+        return new DeleteManyWireCommand(
+          draft.collection,
+          await resolveDraftDoc(draft.filter, this.#codecs, ctx),
+        );
+      case 'findOneAndUpdate': {
+        const [filter, update] = await Promise.all([
+          resolveDraftDoc(draft.filter, this.#codecs, ctx),
+          resolveUpdate(draft.update, this.#codecs, ctx),
+        ]);
+        return new FindOneAndUpdateWireCommand(
+          draft.collection,
+          filter,
+          update,
+          draft.upsert,
+          draft.sort,
+          draft.returnDocument,
+        );
+      }
+      case 'findOneAndDelete':
+        return new FindOneAndDeleteWireCommand(
+          draft.collection,
+          await resolveDraftDoc(draft.filter, this.#codecs, ctx),
+          draft.sort,
+        );
+      case 'aggregate':
+        return new AggregateWireCommand(
+          draft.collection,
+          await Promise.all(
+            draft.pipeline.map((stage) => resolveDraftDoc(stage, this.#codecs, ctx)),
+          ),
+        );
+      case 'rawAggregate':
+        return new AggregateWireCommand(draft.collection, draft.pipeline);
+      case 'rawInsertOne':
+        return new InsertOneWireCommand(draft.collection, draft.document);
+      case 'rawInsertMany':
+        return new InsertManyWireCommand(draft.collection, draft.documents);
+      case 'rawUpdateOne':
+        return new UpdateOneWireCommand(draft.collection, draft.filter, draft.update);
+      case 'rawUpdateMany':
+        return new UpdateManyWireCommand(draft.collection, draft.filter, draft.update);
+      case 'rawDeleteOne':
+        return new DeleteOneWireCommand(draft.collection, draft.filter);
+      case 'rawDeleteMany':
+        return new DeleteManyWireCommand(draft.collection, draft.filter);
+      case 'rawFindOneAndUpdate':
+        return new FindOneAndUpdateWireCommand(
+          draft.collection,
+          draft.filter,
+          draft.update,
+          draft.upsert,
+          draft.sort,
+          draft.returnDocument,
+        );
+      case 'rawFindOneAndDelete':
+        return new FindOneAndDeleteWireCommand(draft.collection, draft.filter, draft.sort);
+      // v8 ignore next 4
+      default: {
+        const _exhaustive: never = draft;
+        throw new Error(`Unknown draft kind: ${(_exhaustive as { kind: string }).kind}`);
+      }
+    }
+  }
+
+  lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand> {
+    return this.resolveParams(this.structuralLower(plan), ctx);
   }
 }
 

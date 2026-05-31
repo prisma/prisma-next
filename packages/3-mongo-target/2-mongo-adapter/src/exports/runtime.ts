@@ -41,6 +41,8 @@ const mongoRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
       familyId: 'mongo' as const,
       targetId: 'mongo' as const,
       lower: adapter.lower.bind(adapter),
+      structuralLower: adapter.structuralLower.bind(adapter),
+      resolveParams: adapter.resolveParams.bind(adapter),
     };
   },
 };
