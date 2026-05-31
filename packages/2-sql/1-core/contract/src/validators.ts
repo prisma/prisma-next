@@ -4,8 +4,6 @@ import {
   type ContractField,
   type ContractModel,
   CrossReferenceSchema,
-  contractModels,
-  normalizeLegacyDomainRoot,
 } from '@prisma-next/contract/types';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -689,43 +687,46 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
  * columns. Throws `ContractValidationError` on the first mismatch.
  */
 export function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
-  const models = contractModels(contract) as Record<string, ContractModel<SqlModelStorage>>;
-  for (const [modelName, model] of Object.entries(models)) {
-    const storageTable = model.storage.table;
+  for (const [namespaceId, namespace] of Object.entries(contract.domain.namespaces)) {
+    const models = namespace.models as Record<string, ContractModel<SqlModelStorage>>;
+    for (const [modelName, model] of Object.entries(models)) {
+      const qualifiedName = `${namespaceId}:${modelName}`;
+      const storageTable = model.storage.table;
 
-    const rawTable = findStorageTableByTableName(contract.storage, storageTable);
-    if (rawTable === undefined) {
-      throw new ContractValidationError(
-        `Model "${modelName}" references non-existent table "${storageTable}"`,
-        'storage',
-      );
-    }
-
-    const table = rawTable as StorageTable;
-
-    const columnNames = new Set(Object.keys(table.columns));
-    for (const [fieldName, field] of Object.entries(model.storage.fields)) {
-      if (!columnNames.has(field.column)) {
+      const rawTable = findStorageTableByTableName(contract.storage, storageTable);
+      if (rawTable === undefined) {
         throw new ContractValidationError(
-          `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
+          `Model "${qualifiedName}" references non-existent table "${storageTable}"`,
           'storage',
         );
       }
-    }
 
-    const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
-    for (const [fieldName, domainField] of Object.entries(model.fields ?? {})) {
-      const f = domainField as ContractField;
-      if (f.type?.kind !== 'valueObject') continue;
-      const storageField = model.storage.fields[fieldName];
-      if (!storageField) continue;
-      const column = table.columns[storageField.column];
-      if (!column) continue;
-      if (!JSON_NATIVE_TYPES.has(column.nativeType)) {
-        throw new ContractValidationError(
-          `Model "${modelName}" field "${fieldName}" is a value object but storage column "${storageField.column}" has nativeType "${column.nativeType}" (expected json or jsonb)`,
-          'storage',
-        );
+      const table = rawTable as StorageTable;
+
+      const columnNames = new Set(Object.keys(table.columns));
+      for (const [fieldName, field] of Object.entries(model.storage.fields)) {
+        if (!columnNames.has(field.column)) {
+          throw new ContractValidationError(
+            `Model "${qualifiedName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
+            'storage',
+          );
+        }
+      }
+
+      const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
+      for (const [fieldName, domainField] of Object.entries(model.fields ?? {})) {
+        const f = domainField as ContractField;
+        if (f.type?.kind !== 'valueObject') continue;
+        const storageField = model.storage.fields[fieldName];
+        if (!storageField) continue;
+        const column = table.columns[storageField.column];
+        if (!column) continue;
+        if (!JSON_NATIVE_TYPES.has(column.nativeType)) {
+          throw new ContractValidationError(
+            `Model "${qualifiedName}" field "${fieldName}" is a value object but storage column "${storageField.column}" has nativeType "${column.nativeType}" (expected json or jsonb)`,
+            'storage',
+          );
+        }
       }
     }
   }
@@ -858,7 +859,7 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(
     typeof value === 'object' && value !== null
       ? (() => {
           const { schemaVersion: _, _generated: _g, ...rest } = value as Record<string, unknown>;
-          return normalizeLegacyDomainRoot(rest);
+          return rest;
         })()
       : value;
   const schema = options?.contractSchema ?? SqlContractSchema;
