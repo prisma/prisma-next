@@ -590,19 +590,6 @@ describe('buildMigrationGraphLayout', () => {
     const rollbackAdjacent = edge('bbb', 'aaa', 'rollback_adjacent');
     const model = layout([init, addPosts, rollbackAdjacent]);
 
-    // FIXME(rollback-lane-lifecycle): the `init`/`∅` rows below carry a phantom lane 1
-    // (`│ │↑` / `○ │`). An adjacent rollback leaves lane 0 reserved for its source, so the
-    // forward `init` edge spills into a second lane. Per `mockups.md` § pure-cycle the whole
-    // chain is single-lane: `│↑ init` then `○ ∅`. Snapshot pins current (wrong) output.
-    expect(renderLayout(model)).toMatchInlineSnapshot(`
-      "○       bbb
-      │↑      add_posts
-      │↓      rollback_adjacent
-      ○       aaa
-      │ │↑    init
-      ○ │     ∅"
-    `);
-
     expectEdgeGeometry(model.rows, 'rollback_adjacent', 0, [], 'adjacent');
 
     const init2 = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
@@ -611,21 +598,55 @@ describe('buildMigrationGraphLayout', () => {
     const rollbackSkip = edge('ccc', 'aaa', 'rollback_skip');
     const modelSkip = layout([init2, addPhone, addBio, rollbackSkip]);
 
-    // FIXME(rollback-lane-lifecycle): same phantom lane 1 as the adjacent case (`│ │↑` /
-    // `○ │` from `add_phone` downward). The node-skipping rollback also still lacks its
-    // routed arc (`mockups.md` § routed arcs) — deferred. Snapshot pins current output.
-    expect(renderLayout(modelSkip)).toMatchInlineSnapshot(`
-      "○       ccc
-      │↑      add_bio
-      │↓      rollback_skip
-      ○       bbb
-      │ │↑    add_phone
-      ○ │     aaa
-      │ │↑    init
-      ○ │     ∅"
-    `);
-
     expectEdgeGeometry(modelSkip.rows, 'rollback_skip', 0, [], 'node-skipping-rollback');
+  });
+
+  // Expected-failure (`it.fails`): these assert the CORRECT single-lane rendering. They fail
+  // today because an adjacent rollback leaves lane 0 reserved for its source, spilling the
+  // forward edge below into a phantom lane 1 (the rollback-lane-lifecycle bug). When that bug
+  // is fixed, `it.fails` will start failing — flip these to `it(...)`. The diff against
+  // current output is the clearest spec for the fix.
+  it.fails('renders an adjacent rollback as a single lane (pending lane-lifecycle fix)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
+    const addPosts = edge('aaa', 'bbb', 'add_posts');
+    const rollbackAdjacent = edge('bbb', 'aaa', 'rollback_adjacent');
+    const model = layout([init, addPosts, rollbackAdjacent]);
+
+    // Per `mockups.md` § pure cycle: forward `↑` and rollback `↓` share the one lane.
+    expect(renderLayout(model)).toBe(
+      [
+        '○     bbb',
+        '│↑    add_posts',
+        '│↓    rollback_adjacent',
+        '○     aaa',
+        '│↑    init',
+        '○     ∅',
+      ].join('\n'),
+    );
+  });
+
+  it.fails('renders a node-skipping rollback as a single lane (pending lane-lifecycle fix)', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
+    const addPhone = edge('aaa', 'bbb', 'add_phone');
+    const addBio = edge('bbb', 'ccc', 'add_bio');
+    const rollbackSkip = edge('ccc', 'aaa', 'rollback_skip');
+    const modelSkip = layout([init, addPhone, addBio, rollbackSkip]);
+
+    // Interim correct output: single lane, no phantom. (The routed back-arc for a
+    // node-skipping rollback — `mockups.md` § routed arcs — is a separate deferred feature
+    // that will further change this fixture; the lane-lifecycle fix lands single-lane first.)
+    expect(renderLayout(modelSkip)).toBe(
+      [
+        '○     ccc',
+        '│↑    add_bio',
+        '│↓    rollback_skip',
+        '○     bbb',
+        '│↑    add_phone',
+        '○     aaa',
+        '│↑    init',
+        '○     ∅',
+      ].join('\n'),
+    );
   });
 
   it('uses structural cell roles without literal box-drawing characters', () => {
