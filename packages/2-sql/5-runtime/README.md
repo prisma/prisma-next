@@ -128,7 +128,6 @@ const runtime = createRuntime({
 ### SQL Marker
 
 - `readContractMarker`, `writeContractMarker` - SQL marker statements
-- `ensureSchemaStatement`, `ensureTableStatement` - DDL statements for marker table setup
 - `SqlStatement` - SQL statement type
 
 ### Plan Lowering
