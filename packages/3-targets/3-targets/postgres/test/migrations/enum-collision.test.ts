@@ -340,7 +340,9 @@ describe('enum namespace collision planning', () => {
 
       expect(alterCalls).toHaveLength(1);
       expect(alterCalls[0]?.tableName).toBe('user');
-      expect(alterCalls[0]?.schemaName).toBe('public');
+      // The column's table is in the unbound namespace — ALTER TABLE is unqualified
+      // so search_path resolves the schema at runtime.
+      expect(alterCalls[0]?.schemaName).toBe(UNBOUND_NAMESPACE_ID);
       // Rebuild recipe creates the temp type and drops the old one — both in
       // the enum's `public` schema, not the column's unbound coordinate.
       expect(createCalls).toHaveLength(1);
