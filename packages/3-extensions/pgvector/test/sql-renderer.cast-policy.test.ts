@@ -29,19 +29,17 @@ describe('pgvector cast policy', () => {
       meta: {},
       storage: {
         storageHash: 'sha256:vector-cast-policy',
-        namespaces: {
-          [UNBOUND_NAMESPACE_ID]: {
-            id: UNBOUND_NAMESPACE_ID,
-            tables: {
-              user: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                  vec: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-                },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+        [UNBOUND_NAMESPACE_ID]: {
+          id: UNBOUND_NAMESPACE_ID,
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                vec: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
               },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
           },
         },

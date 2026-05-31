@@ -24,30 +24,28 @@ function makeStubContext(): ExecutionContext<Contract<SqlStorage>> {
       target: 'postgres',
       storage: {
         storageHash: 'sha256:raw-sql-composition-core',
-        namespaces: {
-          __unbound__: {
-            id: '__unbound__',
-            tables: {
-              users: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nullable: false },
-                  name: { codecId: 'pg/text@1', nullable: false },
-                  score: { codecId: 'pg/int4@1', nullable: true },
-                },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+        __unbound__: {
+          id: '__unbound__',
+          tables: {
+            users: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nullable: false },
+                name: { codecId: 'pg/text@1', nullable: false },
+                score: { codecId: 'pg/int4@1', nullable: true },
               },
-              events: {
-                columns: {
-                  id: { codecId: 'pg/int4@1', nullable: false },
-                  createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
-                  score: { codecId: 'pg/int4@1', nullable: true },
-                },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            events: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nullable: false },
+                createdAt: { codecId: 'pg/timestamptz@1', nullable: false },
+                score: { codecId: 'pg/int4@1', nullable: true },
               },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
           },
         },

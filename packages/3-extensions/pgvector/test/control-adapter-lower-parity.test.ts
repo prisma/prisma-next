@@ -28,19 +28,17 @@ const contract = new SqlContractSerializer().deserializeContract({
   meta: {},
   storage: {
     storageHash: 'sha256:test-core',
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },

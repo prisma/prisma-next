@@ -37,35 +37,33 @@ const contract = new SqlContractSerializer().deserializeContract({
   meta: {},
   storage: {
     storageHash: 'sha256:test-core',
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              createdAt: {
-                codecId: 'pg/timestamptz@1',
-                nativeType: 'timestamptz',
-                nullable: false,
-              },
-              vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+    [UNBOUND_NAMESPACE_ID]: {
+      id: UNBOUND_NAMESPACE_ID,
+      tables: {
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            createdAt: {
+              codecId: 'pg/timestamptz@1',
+              nativeType: 'timestamptz',
+              nullable: false,
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
           },
-          post: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+        post: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            user_id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
           },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
       },
     },
