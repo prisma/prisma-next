@@ -1,6 +1,6 @@
 import { ContractValidationError } from './contract-validation-error';
 import type { CrossReference } from './cross-reference';
-import { type ContractWithDomain, modelCoordinateKey } from './domain-envelope';
+import type { ContractWithDomain } from './domain-envelope';
 import { asNamespaceId, type NamespaceId } from './namespace-id';
 
 export interface DomainModelShape {
@@ -22,23 +22,34 @@ interface IndexedModel {
   readonly model: DomainModelShape;
 }
 
-function indexDomainModels(contract: DomainContractShape): Map<string, IndexedModel> {
-  const index = new Map<string, IndexedModel>();
+type ModelIndex = Map<NamespaceId, Map<string, IndexedModel>>;
+
+function indexDomainModels(contract: DomainContractShape): ModelIndex {
+  const index: ModelIndex = new Map();
   for (const [namespaceKey, namespace] of Object.entries(contract.domain.namespaces)) {
     const namespaceId = asNamespaceId(namespaceKey);
+    let modelsInNamespace = index.get(namespaceId);
+    if (modelsInNamespace === undefined) {
+      modelsInNamespace = new Map();
+      index.set(namespaceId, modelsInNamespace);
+    }
     for (const [name, model] of Object.entries(namespace.models)) {
-      const key = modelCoordinateKey(namespaceId, name);
-      index.set(key, { namespaceId, name, model });
+      modelsInNamespace.set(name, { namespaceId, name, model });
     }
   }
   return index;
 }
 
-function lookupModel(
-  index: Map<string, IndexedModel>,
-  ref: CrossReference,
-): IndexedModel | undefined {
-  return index.get(modelCoordinateKey(ref.namespace, ref.model));
+function lookupModel(index: ModelIndex, ref: CrossReference): IndexedModel | undefined {
+  return index.get(ref.namespace)?.get(ref.model);
+}
+
+function* iterateIndexedModels(index: ModelIndex): IterableIterator<IndexedModel> {
+  for (const modelsInNamespace of index.values()) {
+    for (const entry of modelsInNamespace.values()) {
+      yield entry;
+    }
+  }
 }
 
 export function validateContractDomain(contract: DomainContractShape): void {
@@ -63,18 +74,22 @@ export function validateContractDomain(contract: DomainContractShape): void {
 
 function validateRoots(
   contract: DomainContractShape,
-  modelIndex: Map<string, IndexedModel>,
+  modelIndex: ModelIndex,
   errors: string[],
 ): void {
-  const seenValues = new Set<string>();
+  const seenRootTargets = new Map<NamespaceId, Set<string>>();
   for (const [rootKey, crossRef] of Object.entries(contract.roots)) {
-    const dedupeKey = modelCoordinateKey(crossRef.namespace, crossRef.model);
-    if (seenValues.has(dedupeKey)) {
+    let modelsInNamespace = seenRootTargets.get(crossRef.namespace);
+    if (modelsInNamespace === undefined) {
+      modelsInNamespace = new Set();
+      seenRootTargets.set(crossRef.namespace, modelsInNamespace);
+    }
+    if (modelsInNamespace.has(crossRef.model)) {
       errors.push(
         `Duplicate root value: "${crossRef.namespace}:${crossRef.model}" is mapped by multiple root keys`,
       );
     }
-    seenValues.add(dedupeKey);
+    modelsInNamespace.add(crossRef.model);
 
     if (!lookupModel(modelIndex, crossRef)) {
       errors.push(
@@ -84,8 +99,8 @@ function validateRoots(
   }
 }
 
-function validateVariantsAndBases(modelIndex: Map<string, IndexedModel>, errors: string[]): void {
-  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
+function validateVariantsAndBases(modelIndex: ModelIndex, errors: string[]): void {
+  for (const { namespaceId, name: modelName, model } of iterateIndexedModels(modelIndex)) {
     if (model.variants) {
       for (const variantName of Object.keys(model.variants)) {
         const variantRef: CrossReference = { namespace: namespaceId, model: variantName };
@@ -122,8 +137,8 @@ function validateVariantsAndBases(modelIndex: Map<string, IndexedModel>, errors:
   }
 }
 
-function validateRelationTargets(modelIndex: Map<string, IndexedModel>, errors: string[]): void {
-  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
+function validateRelationTargets(modelIndex: ModelIndex, errors: string[]): void {
+  for (const { namespaceId, name: modelName, model } of iterateIndexedModels(modelIndex)) {
     for (const [relName, relation] of Object.entries(model.relations ?? {})) {
       if (!lookupModel(modelIndex, relation.to)) {
         errors.push(
@@ -134,8 +149,8 @@ function validateRelationTargets(modelIndex: Map<string, IndexedModel>, errors: 
   }
 }
 
-function validateDiscriminators(modelIndex: Map<string, IndexedModel>, errors: string[]): void {
-  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
+function validateDiscriminators(modelIndex: ModelIndex, errors: string[]): void {
+  for (const { namespaceId, name: modelName, model } of iterateIndexedModels(modelIndex)) {
     if (model.discriminator) {
       if (!model.variants || Object.keys(model.variants).length === 0) {
         errors.push(`Model "${namespaceId}:${modelName}" has discriminator but no variants`);
@@ -164,10 +179,10 @@ function validateDiscriminators(modelIndex: Map<string, IndexedModel>, errors: s
 
 function validateOwnership(
   contract: DomainContractShape,
-  modelIndex: Map<string, IndexedModel>,
+  modelIndex: ModelIndex,
   errors: string[],
 ): void {
-  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
+  for (const { namespaceId, name: modelName, model } of iterateIndexedModels(modelIndex)) {
     if (!model.owner) continue;
 
     if (model.owner === modelName) {
@@ -250,11 +265,11 @@ function validateValueObjectReferences(contract: DomainContractShape, errors: st
 }
 
 function validateFieldModifiers(
-  modelIndex: Map<string, IndexedModel>,
+  modelIndex: ModelIndex,
   contract: DomainContractShape,
   errors: string[],
 ): void {
-  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
+  for (const { namespaceId, name: modelName, model } of iterateIndexedModels(modelIndex)) {
     for (const [fieldName, field] of Object.entries(model.fields)) {
       const f = field as FieldLike | undefined;
       if (f?.many && f?.dict) {

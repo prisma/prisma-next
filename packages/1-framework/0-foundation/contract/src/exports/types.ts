@@ -16,7 +16,6 @@ export {
   contractValueObjects,
   DomainNamespaceResolutionError,
   domainPlaneOf,
-  modelCoordinateKey,
   resolveSingleDomainNamespaceId,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '../domain-envelope';

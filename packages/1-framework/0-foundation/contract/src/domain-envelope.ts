@@ -1,6 +1,5 @@
 import { blindCast } from '@prisma-next/utils/casts';
 import type { ContractModelBase, ContractValueObject } from './domain-types';
-import type { NamespaceId } from './namespace-id';
 
 export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
 
@@ -106,8 +105,4 @@ export function domainPlaneOf<TModels extends Record<string, ContractModelBase>>
       },
     },
   };
-}
-
-export function modelCoordinateKey(namespace: NamespaceId, model: string): string {
-  return `${namespace}:${model}`;
 }
