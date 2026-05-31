@@ -448,6 +448,13 @@ describe('buildMigrationGraphRows', () => {
 
       expect(withEmpty).toEqual(baseline);
     });
+
+    it('renders a lone floating node when the graph is empty and the contract is detached', () => {
+      const model = buildMigrationGraphRows(graph([]), { contractHash: 'c0ffee0' });
+
+      expect(model.nodes).toEqual(['c0ffee0']);
+      expect(model.edges).toEqual([]);
+    });
   });
 
   // -------------------------------------------------------------------------

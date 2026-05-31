@@ -281,6 +281,23 @@ function postOrderNodes(
  *
  * No columns, no lane allocation, no glyphs, no rendering.
  */
+/**
+ * Resolve the detached current contract, if any: a real contract (not the
+ * empty baseline) that no migration on disk produces, so it is absent from
+ * the graph. Such a contract renders as a floating node rather than
+ * decorating an existing one. Returns the hash when detached, else undefined.
+ */
+function detachedContractHash(
+  graph: MigrationGraph,
+  contractHash: string | undefined,
+): string | undefined {
+  return contractHash !== undefined &&
+    contractHash !== EMPTY_CONTRACT_HASH &&
+    !graph.nodes.has(contractHash)
+    ? contractHash
+    : undefined;
+}
+
 export function buildMigrationGraphRows(
   graph: MigrationGraph,
   options: BuildMigrationGraphRowsOptions = {},
@@ -293,15 +310,8 @@ export function buildMigrationGraphRows(
   };
 
   if (graph.nodes.size === 0) {
-    const contractHash = options.contractHash;
-    if (
-      contractHash !== undefined &&
-      contractHash !== EMPTY_CONTRACT_HASH &&
-      !graph.nodes.has(contractHash)
-    ) {
-      return { ...emptyModel, nodes: [contractHash] };
-    }
-    return emptyModel;
+    const detached = detachedContractHash(graph, options.contractHash);
+    return detached !== undefined ? { ...emptyModel, nodes: [detached] } : emptyModel;
   }
 
   // 1. Classify all edges (shared DFS, same algorithm as Tier-2)
@@ -349,16 +359,12 @@ export function buildMigrationGraphRows(
     }
   }
 
-  const contractHash = options.contractHash;
-  if (
-    contractHash !== undefined &&
-    contractHash !== EMPTY_CONTRACT_HASH &&
-    !graph.nodes.has(contractHash)
-  ) {
+  const detached = detachedContractHash(graph, options.contractHash);
+  if (detached !== undefined) {
     if (nodes.length > 0) {
       nodes.unshift(null);
     }
-    nodes.unshift(contractHash);
+    nodes.unshift(detached);
   }
 
   return { nodes, edges, edgesByFrom, edgesByTo };
