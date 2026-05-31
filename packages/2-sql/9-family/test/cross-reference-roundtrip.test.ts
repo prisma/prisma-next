@@ -1,5 +1,10 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
-import { CrossReferenceSchema, crossRef } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  CrossReferenceSchema,
+  contractModels,
+  crossRef,
+} from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
@@ -65,7 +70,8 @@ describe('cross-reference shape round-trip', () => {
     const serialized = JSON.parse(JSON.stringify(serializer.serializeContract(hydrated)));
 
     expect(serialized.roots.users).toEqual(rootsCrossRef);
-    expect(serialized.models.User.relations.posts.to).toEqual(relationCrossRef);
-    expect(serialized.models.Post.base).toEqual(baseCrossRef);
+    const serializedModels = contractModels(serializer.deserializeContract(serialized) as Contract);
+    expect(serializedModels.User?.relations?.posts?.to).toEqual(relationCrossRef);
+    expect(serializedModels.Post?.base).toEqual(baseCrossRef);
   });
 });

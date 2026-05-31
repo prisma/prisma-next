@@ -11,6 +11,7 @@ import {
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
 import { emit as emitImpl } from '../src/exports';
@@ -69,6 +70,24 @@ type TestContractOverrides = {
   schemaVersion?: string;
   sources?: Record<string, unknown>;
 };
+
+/** Models map from canonical contract JSON (`domain.namespaces` or legacy flat `models`). */
+export function modelsFromCanonicalContract(
+  json: Record<string, unknown>,
+): Record<string, unknown> {
+  const domain = json['domain'] as Record<string, unknown> | undefined;
+  const namespaces = domain?.['namespaces'] as Record<string, unknown> | undefined;
+  const unbound = namespaces?.[UNBOUND_NAMESPACE_ID] as Record<string, unknown> | undefined;
+  const fromDomain = unbound?.['models'];
+  if (fromDomain !== undefined && typeof fromDomain === 'object' && fromDomain !== null) {
+    return fromDomain as Record<string, unknown>;
+  }
+  const legacy = json['models'];
+  if (legacy !== undefined && typeof legacy === 'object' && legacy !== null) {
+    return legacy as Record<string, unknown>;
+  }
+  return {};
+}
 
 export function createTestContract(overrides: TestContractOverrides = {}): Contract {
   const { storageHash: _sh, schemaVersion: _sv, sources: _src, storage, ...rest } = overrides;

@@ -220,7 +220,7 @@ describe('mongo contract builder', () => {
       models: { Metric },
     });
 
-    expect(contractModels(contract).Metric.fields.value).toEqual({
+    expect(contractModels(contract).Metric?.fields['value']).toEqual({
       type: { kind: 'scalar', codecId: 'mongo/double@1' },
       nullable: false,
     });

@@ -3,6 +3,7 @@ import type {
   InferModelRow,
   MongoCollectionOptionsAuthoringInput,
   MongoIndexOptionsInput,
+  MongoModelsMap,
 } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, field, index, model, valueObject } from '../src/contract-builder';
@@ -89,10 +90,14 @@ test('contract roots stay specific', () => {
 });
 
 test('polymorphic variants keep literal model keys', () => {
-  type VariantKeys = keyof NonNullable<typeof polymorphicContract.models.Task.variants>;
+  type VariantKeys = keyof NonNullable<
+    MongoModelsMap<typeof polymorphicContract>['Task']['variants']
+  >;
 
   expectTypeOf<VariantKeys>().toEqualTypeOf<'Bug' | 'Feature'>();
-  expectTypeOf(polymorphicContract.models.Task.variants.Bug.value).toEqualTypeOf<'bug'>();
+  expectTypeOf(
+    MongoModelsMap < typeof polymorphicContract > ['Task']['variants']['Bug']['value'],
+  ).toEqualTypeOf<'bug'>();
 });
 
 test('value object rows flow through InferModelRow', () => {

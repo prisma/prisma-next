@@ -45,9 +45,9 @@ describe('Mongo runtime decode integration', () => {
       const row = rows[0]!;
       expect(typeof row._id).toBe('string');
       expect(row._id).toBe(insert.insertedId.toHexString());
-      expect(row.createdAt).toBeInstanceOf(Date);
-      expect(row.createdAt.getTime()).toBe(createdAt.getTime());
-      expect(row.embeddings).toEqual(vec);
+      expect(row['createdAt']).toBeInstanceOf(Date);
+      expect(row['createdAt'].getTime()).toBe(createdAt.getTime());
+      expect(row['embeddings']).toEqual(vec);
     });
   });
 
