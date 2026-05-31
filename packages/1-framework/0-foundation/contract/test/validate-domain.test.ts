@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from '../src/domain-envelope';
 import { asNamespaceId } from '../src/namespace-id';
 
-function crossRef(model: string, namespace = 'default') {
+function crossRef(model: string, namespace: string = UNBOUND_DOMAIN_NAMESPACE_ID) {
   return { namespace: asNamespaceId(namespace), model };
 }
 
@@ -63,6 +64,46 @@ function makeValidContract(overrides: Record<string, unknown> = {}): DomainContr
 }
 
 describe('validateContractDomain()', () => {
+  describe('namespace coordinate identity', () => {
+    it('treats the same model name in different namespaces as distinct models', () => {
+      const contract = makeValidContract({
+        roots: {
+          authUsers: crossRef('User', 'auth'),
+          publicUsers: crossRef('User', 'public'),
+        },
+        domain: {
+          namespaces: {
+            auth: {
+              models: {
+                User: makeMinimalModel({
+                  fields: {
+                    id: {
+                      nullable: false,
+                      type: { kind: 'scalar', codecId: 'pg/int4@1' },
+                    },
+                  },
+                }),
+              },
+            },
+            public: {
+              models: {
+                User: makeMinimalModel({
+                  fields: {
+                    id: {
+                      nullable: false,
+                      type: { kind: 'scalar', codecId: 'pg/text@1' },
+                    },
+                  },
+                }),
+              },
+            },
+          },
+        },
+      });
+      expect(() => validateContractDomain(contract)).not.toThrow();
+    });
+  });
+
   describe('root validation', () => {
     it('accepts valid roots', () => {
       expect(() => validateContractDomain(makeValidContract())).not.toThrow();

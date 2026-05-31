@@ -7,17 +7,16 @@ export type {
 export type { CrossReference } from '../cross-reference';
 export { CrossReferenceSchema, crossRef } from '../cross-reference';
 export type {
-  DomainContractInput,
-  DomainContractSlice,
+  ContractWithDomain,
   DomainNamespace,
   DomainPlane,
-  LegacyFlatDomainRoot,
 } from '../domain-envelope';
 export {
   buildDomainPlaneFromFlat,
   contractModels,
   contractValueObjects,
-  normalizeLegacyDomainRoot,
+  modelCoordinateKey,
+  resolveSingleDomainNamespaceId,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '../domain-envelope';
 export type {

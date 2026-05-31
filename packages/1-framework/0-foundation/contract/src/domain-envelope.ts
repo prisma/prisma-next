@@ -1,4 +1,5 @@
 import type { ContractModelBase, ContractValueObject } from './domain-types';
+import type { NamespaceId } from './namespace-id';
 
 export const UNBOUND_DOMAIN_NAMESPACE_ID = '__unbound__' as const;
 
@@ -23,62 +24,53 @@ export interface DomainPlane<
   readonly namespaces: Readonly<Record<string, DomainNamespace<TModels>>>;
 }
 
-export type DomainContractSlice = {
+export type ContractWithDomain = {
   readonly domain: DomainPlane;
 };
 
-/** Pre-domain-envelope contract root still carrying flat `models` / `valueObjects`. */
-export type LegacyFlatDomainRoot = {
-  readonly models?: Record<string, ContractModelBase>;
-  readonly valueObjects?: Record<string, ContractValueObject>;
-};
-
-export type DomainContractInput = DomainContractSlice | LegacyFlatDomainRoot;
-
-function domainNamespacesOf(contract: DomainContractInput): DomainPlane['namespaces'] | undefined {
-  if (!('domain' in contract) || contract.domain?.namespaces === undefined) {
-    return undefined;
+export class DomainNamespaceResolutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DomainNamespaceResolutionError';
   }
-  return contract.domain.namespaces;
 }
 
-function isLegacyFlatDomainRoot(contract: DomainContractInput): contract is LegacyFlatDomainRoot {
-  return domainNamespacesOf(contract) === undefined;
-}
-
-export function contractModels(contract: DomainContractInput): Record<string, ContractModelBase> {
-  const namespaces = domainNamespacesOf(contract);
-  if (namespaces !== undefined) {
-    const merged: Record<string, ContractModelBase> = {};
-    for (const ns of Object.values(namespaces)) {
-      Object.assign(merged, ns.models);
+export function resolveSingleDomainNamespaceId(domain: DomainPlane, namespaceId?: string): string {
+  if (namespaceId !== undefined) {
+    if (!Object.hasOwn(domain.namespaces, namespaceId)) {
+      throw new DomainNamespaceResolutionError(
+        `domain namespace "${namespaceId}" is not present on the contract`,
+      );
     }
-    return merged;
+    return namespaceId;
   }
-  if (isLegacyFlatDomainRoot(contract)) {
-    return contract.models ?? {};
+
+  const namespaceIds = Object.keys(domain.namespaces);
+  if (namespaceIds.length === 0) {
+    throw new DomainNamespaceResolutionError('domain has no namespaces');
   }
-  return {};
+  if (namespaceIds.length > 1) {
+    throw new DomainNamespaceResolutionError(
+      `expected exactly one domain namespace, found ${namespaceIds.length} (${namespaceIds.join(', ')})`,
+    );
+  }
+  return namespaceIds[0]!;
+}
+
+export function contractModels(
+  contract: ContractWithDomain,
+  namespaceId?: string,
+): Record<string, ContractModelBase> {
+  const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
+  return contract.domain.namespaces[resolved]!.models;
 }
 
 export function contractValueObjects(
-  contract: DomainContractInput,
+  contract: ContractWithDomain,
+  namespaceId?: string,
 ): Record<string, ContractValueObject> | undefined {
-  const namespaces = domainNamespacesOf(contract);
-  if (namespaces !== undefined) {
-    const merged: Record<string, ContractValueObject> = {};
-    let any = false;
-    for (const ns of Object.values(namespaces)) {
-      if (ns.valueObjects === undefined) continue;
-      any = true;
-      Object.assign(merged, ns.valueObjects);
-    }
-    return any ? merged : undefined;
-  }
-  if (isLegacyFlatDomainRoot(contract)) {
-    return contract.valueObjects;
-  }
-  return undefined;
+  const resolved = resolveSingleDomainNamespaceId(contract.domain, namespaceId);
+  return contract.domain.namespaces[resolved]!.valueObjects;
 }
 
 export function buildDomainPlaneFromFlat(params: {
@@ -97,35 +89,6 @@ export function buildDomainPlaneFromFlat(params: {
   };
 }
 
-/**
- * Lifts a legacy flat `models` / `valueObjects` contract root into
- * `domain.namespaces.__unbound__` when the domain envelope is absent.
- */
-export function normalizeLegacyDomainRoot(value: Record<string, unknown>): Record<string, unknown> {
-  if (value['domain'] !== undefined && value['domain'] !== null) {
-    return value;
-  }
-  const models = value['models'];
-  if (models === undefined || typeof models !== 'object' || models === null) {
-    return value;
-  }
-  const valueObjects = value['valueObjects'];
-  const namespace: Record<string, unknown> = { models };
-  if (
-    valueObjects !== undefined &&
-    typeof valueObjects === 'object' &&
-    valueObjects !== null &&
-    !Array.isArray(valueObjects)
-  ) {
-    namespace['valueObjects'] = valueObjects;
-  }
-  const { models: _m, valueObjects: _vo, ...rest } = value;
-  return {
-    ...rest,
-    domain: {
-      namespaces: {
-        [UNBOUND_DOMAIN_NAMESPACE_ID]: namespace,
-      },
-    },
-  };
+export function modelCoordinateKey(namespace: NamespaceId, model: string): string {
+  return `${namespace}:${model}`;
 }

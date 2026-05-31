@@ -62,10 +62,10 @@ export interface Contract<
 export type ContractModelsMap<TContract extends Contract> =
   TContract extends Contract<StorageBase, infer TModels> ? TModels : never;
 
-type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
-  value: infer I,
-) => void
-  ? I
+type ExactlyOneKey<T extends Record<string, unknown>> = keyof T extends infer Only extends keyof T
+  ? [keyof T] extends [Only]
+    ? Only
+    : never
   : never;
 
 type NamespaceValueObjectsOf<TNamespace> = TNamespace extends {
@@ -76,16 +76,12 @@ type NamespaceValueObjectsOf<TNamespace> = TNamespace extends {
     : Record<never, never>
   : Record<never, never>;
 
-/** Merged value-object map across all domain namespaces (for type-level inference). */
+/** Value-object map for the contract's sole domain namespace (type-level single-namespace projection). */
 export type ContractValueObjectsMap<TContract extends Contract> =
-  UnionToIntersection<
-    {
-      [K in keyof TContract['domain']['namespaces']]: NamespaceValueObjectsOf<
-        TContract['domain']['namespaces'][K]
-      >;
-    }[keyof TContract['domain']['namespaces']]
-  > extends infer Merged
-    ? Merged extends Record<string, ContractValueObject>
-      ? Merged
+  NamespaceValueObjectsOf<
+    TContract['domain']['namespaces'][ExactlyOneKey<TContract['domain']['namespaces']>]
+  > extends infer Projected
+    ? Projected extends Record<string, ContractValueObject>
+      ? Projected
       : Record<never, never>
     : Record<never, never>;

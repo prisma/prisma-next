@@ -1,7 +1,7 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
-
+import { matchesPathPattern, type PathPattern } from './canonicalization-path-match';
 import type { Contract } from './contract-types';
 
 /**
@@ -32,6 +32,30 @@ export type PreserveEmptyPredicate = (path: readonly string[]) => boolean;
  * family-agnostic `sortObjectKeys` pass cannot handle.
  */
 export type StorageSort = (storage: unknown) => unknown;
+
+const DOMAIN_NAMESPACE_SLOT_PATTERN = ['domain', 'namespaces', '*'] as const satisfies PathPattern;
+const DOMAIN_MODELS_CONTAINER_PATTERN = [
+  'domain',
+  'namespaces',
+  '*',
+  'models',
+] as const satisfies PathPattern;
+const DOMAIN_MODEL_RELATIONS_PATTERN = [
+  'domain',
+  'namespaces',
+  '*',
+  'models',
+  '*',
+  'relations',
+] as const satisfies PathPattern;
+const DOMAIN_MODEL_STORAGE_PATTERN = [
+  'domain',
+  'namespaces',
+  '*',
+  'models',
+  '*',
+  'storage',
+] as const satisfies PathPattern;
 
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
@@ -91,15 +115,11 @@ function omitDefaults(
 
     if (isDefaultValue(value)) {
       const isRequiredDomainNamespaces = isArrayEqual(currentPath, ['domain', 'namespaces']);
-      const isDomainNamespaceSlot =
-        currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[1]], ['domain', 'namespaces']);
-      const isRequiredDomainModels =
-        currentPath.length === 4 &&
-        isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
-          ['domain', 'namespaces', 'models'],
-        );
+      const isDomainNamespaceSlot = matchesPathPattern(currentPath, DOMAIN_NAMESPACE_SLOT_PATTERN);
+      const isRequiredDomainModels = matchesPathPattern(
+        currentPath,
+        DOMAIN_MODELS_CONTAINER_PATTERN,
+      );
       const isRequiredStorageNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
       const isStorageNamespaceSlot =
         currentPath.length === 3 &&
@@ -114,18 +134,8 @@ function omitDefaults(
         'defaults',
       ]);
       const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
-      const isModelRelations =
-        currentPath.length === 6 &&
-        currentPath[0] === 'domain' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'models' &&
-        currentPath[5] === 'relations';
-      const isModelStorage =
-        currentPath.length === 6 &&
-        currentPath[0] === 'domain' &&
-        currentPath[1] === 'namespaces' &&
-        currentPath[3] === 'models' &&
-        currentPath[5] === 'storage';
+      const isModelRelations = matchesPathPattern(currentPath, DOMAIN_MODEL_RELATIONS_PATTERN);
+      const isModelStorage = matchesPathPattern(currentPath, DOMAIN_MODEL_STORAGE_PATTERN);
 
       const isNullableField = key === 'nullable';
 

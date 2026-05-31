@@ -1,7 +1,7 @@
-import { ifDefined } from '@prisma-next/utils/defined';
 import { ContractValidationError } from './contract-validation-error';
 import type { CrossReference } from './cross-reference';
-import { contractModels, contractValueObjects, type DomainContractSlice } from './domain-envelope';
+import { type ContractWithDomain, modelCoordinateKey } from './domain-envelope';
+import { asNamespaceId, type NamespaceId } from './namespace-id';
 
 export interface DomainModelShape {
   readonly fields: Record<string, unknown>;
@@ -12,36 +12,46 @@ export interface DomainModelShape {
   readonly owner?: string;
 }
 
-export interface DomainContractShape extends DomainContractSlice {
+export interface DomainContractShape extends ContractWithDomain {
   readonly roots: Record<string, CrossReference>;
 }
 
-type FlatDomainContractShape = {
-  readonly roots: Record<string, CrossReference>;
-  readonly models: Record<string, DomainModelShape>;
-  readonly valueObjects?: Record<string, { readonly fields: Record<string, unknown> }>;
-};
+interface IndexedModel {
+  readonly namespaceId: NamespaceId;
+  readonly name: string;
+  readonly model: DomainModelShape;
+}
 
-function flattenDomainContract(contract: DomainContractShape): FlatDomainContractShape {
-  return {
-    roots: contract.roots,
-    models: contractModels(contract),
-    ...ifDefined('valueObjects', contractValueObjects(contract)),
-  };
+function indexDomainModels(contract: DomainContractShape): Map<string, IndexedModel> {
+  const index = new Map<string, IndexedModel>();
+  for (const [namespaceKey, namespace] of Object.entries(contract.domain.namespaces)) {
+    const namespaceId = asNamespaceId(namespaceKey);
+    for (const [name, model] of Object.entries(namespace.models)) {
+      const key = modelCoordinateKey(namespaceId, name);
+      index.set(key, { namespaceId, name, model });
+    }
+  }
+  return index;
+}
+
+function lookupModel(
+  index: Map<string, IndexedModel>,
+  ref: CrossReference,
+): IndexedModel | undefined {
+  return index.get(modelCoordinateKey(ref.namespace, ref.model));
 }
 
 export function validateContractDomain(contract: DomainContractShape): void {
-  const flat = flattenDomainContract(contract);
   const errors: string[] = [];
-  const modelNames = new Set(Object.keys(flat.models));
+  const modelIndex = indexDomainModels(contract);
 
-  validateRoots(flat, modelNames, errors);
-  validateVariantsAndBases(flat, modelNames, errors);
-  validateRelationTargets(flat, modelNames, errors);
-  validateDiscriminators(flat, errors);
-  validateOwnership(flat, modelNames, errors);
-  validateValueObjectReferences(flat, errors);
-  validateFieldModifiers(flat, errors);
+  validateRoots(contract, modelIndex, errors);
+  validateVariantsAndBases(modelIndex, errors);
+  validateRelationTargets(modelIndex, errors);
+  validateDiscriminators(modelIndex, errors);
+  validateOwnership(contract, modelIndex, errors);
+  validateValueObjectReferences(contract, errors);
+  validateFieldModifiers(modelIndex, contract, errors);
 
   if (errors.length > 0) {
     throw new ContractValidationError(
@@ -52,137 +62,129 @@ export function validateContractDomain(contract: DomainContractShape): void {
 }
 
 function validateRoots(
-  contract: FlatDomainContractShape,
-  modelNames: Set<string>,
+  contract: DomainContractShape,
+  modelIndex: Map<string, IndexedModel>,
   errors: string[],
 ): void {
   const seenValues = new Set<string>();
   for (const [rootKey, crossRef] of Object.entries(contract.roots)) {
-    const modelName = crossRef.model;
-    const dedupeKey = `${crossRef.namespace}:${modelName}`;
+    const dedupeKey = modelCoordinateKey(crossRef.namespace, crossRef.model);
     if (seenValues.has(dedupeKey)) {
-      errors.push(`Duplicate root value: "${modelName}" is mapped by multiple root keys`);
+      errors.push(
+        `Duplicate root value: "${crossRef.namespace}:${crossRef.model}" is mapped by multiple root keys`,
+      );
     }
     seenValues.add(dedupeKey);
 
-    if (!modelNames.has(modelName)) {
+    if (!lookupModel(modelIndex, crossRef)) {
       errors.push(
-        `Root "${rootKey}" references model "${modelName}" which does not exist in models`,
+        `Root "${rootKey}" references model "${crossRef.namespace}:${crossRef.model}" which does not exist in domain.namespaces`,
       );
     }
   }
 }
 
-function validateVariantsAndBases(
-  contract: FlatDomainContractShape,
-  modelNames: Set<string>,
-  errors: string[],
-): void {
-  const models = new Map(Object.entries(contract.models));
-
-  for (const [modelName, model] of models) {
+function validateVariantsAndBases(modelIndex: Map<string, IndexedModel>, errors: string[]): void {
+  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
     if (model.variants) {
       for (const variantName of Object.keys(model.variants)) {
-        if (!modelNames.has(variantName)) {
+        const variantRef: CrossReference = { namespace: namespaceId, model: variantName };
+        const variantEntry = lookupModel(modelIndex, variantRef);
+        if (!variantEntry) {
           errors.push(
-            `Model "${modelName}" lists variant "${variantName}" which does not exist in models`,
+            `Model "${namespaceId}:${modelName}" lists variant "${variantName}" which does not exist at that namespace coordinate`,
           );
           continue;
         }
-        const variantModel = models.get(variantName);
-        if (!variantModel) continue;
-        if (variantModel.base?.model !== modelName) {
+        const variantBase = variantEntry.model.base;
+        if (variantBase?.namespace !== namespaceId || variantBase?.model !== modelName) {
           errors.push(
-            `Variant "${variantName}" has base "${variantModel.base?.model ?? '(none)'}" but expected "${modelName}"`,
+            `Variant "${namespaceId}:${variantName}" has base "${variantBase?.namespace ?? '?'}:${variantBase?.model ?? '(none)'}" but expected "${namespaceId}:${modelName}"`,
           );
         }
       }
     }
 
     if (model.base) {
-      const baseModelName = model.base.model;
-      if (!modelNames.has(baseModelName)) {
+      const baseEntry = lookupModel(modelIndex, model.base);
+      if (!baseEntry) {
         errors.push(
-          `Model "${modelName}" has base "${baseModelName}" which does not exist in models`,
+          `Model "${namespaceId}:${modelName}" has base "${model.base.namespace}:${model.base.model}" which does not exist in domain.namespaces`,
         );
         continue;
       }
-      const baseModel = models.get(baseModelName);
-      if (!baseModel) continue;
-      if (!baseModel.variants || !Object.hasOwn(baseModel.variants, modelName)) {
+      if (!baseEntry.model.variants || !Object.hasOwn(baseEntry.model.variants, modelName)) {
         errors.push(
-          `Model "${modelName}" has base "${baseModelName}" which does not list it as a variant`,
+          `Model "${namespaceId}:${modelName}" has base "${model.base.namespace}:${model.base.model}" which does not list it as a variant`,
         );
       }
     }
   }
 }
 
-function validateRelationTargets(
-  contract: FlatDomainContractShape,
-  modelNames: Set<string>,
-  errors: string[],
-): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
+function validateRelationTargets(modelIndex: Map<string, IndexedModel>, errors: string[]): void {
+  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
     for (const [relName, relation] of Object.entries(model.relations ?? {})) {
-      const targetModelName = relation.to.model;
-      if (!modelNames.has(targetModelName)) {
+      if (!lookupModel(modelIndex, relation.to)) {
         errors.push(
-          `Relation "${relName}" on model "${modelName}" targets "${targetModelName}" which does not exist in models`,
+          `Relation "${relName}" on model "${namespaceId}:${modelName}" targets "${relation.to.namespace}:${relation.to.model}" which does not exist in domain.namespaces`,
         );
       }
     }
   }
 }
 
-function validateDiscriminators(contract: FlatDomainContractShape, errors: string[]): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
+function validateDiscriminators(modelIndex: Map<string, IndexedModel>, errors: string[]): void {
+  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
     if (model.discriminator) {
       if (!model.variants || Object.keys(model.variants).length === 0) {
-        errors.push(`Model "${modelName}" has discriminator but no variants`);
+        errors.push(`Model "${namespaceId}:${modelName}" has discriminator but no variants`);
       }
       if (!Object.hasOwn(model.fields, model.discriminator.field)) {
         errors.push(
-          `Discriminator field "${model.discriminator.field}" is not a field on model "${modelName}"`,
+          `Discriminator field "${model.discriminator.field}" is not a field on model "${namespaceId}:${modelName}"`,
         );
       }
     }
 
     if (model.variants && Object.keys(model.variants).length > 0 && !model.discriminator) {
-      errors.push(`Model "${modelName}" has variants but no discriminator`);
+      errors.push(`Model "${namespaceId}:${modelName}" has variants but no discriminator`);
     }
 
     if (model.base) {
       if (model.discriminator) {
-        errors.push(`Model "${modelName}" has base and must not have discriminator`);
+        errors.push(`Model "${namespaceId}:${modelName}" has base and must not have discriminator`);
       }
       if (model.variants && Object.keys(model.variants).length > 0) {
-        errors.push(`Model "${modelName}" has base and must not have variants`);
+        errors.push(`Model "${namespaceId}:${modelName}" has base and must not have variants`);
       }
     }
   }
 }
 
 function validateOwnership(
-  contract: FlatDomainContractShape,
-  modelNames: Set<string>,
+  contract: DomainContractShape,
+  modelIndex: Map<string, IndexedModel>,
   errors: string[],
 ): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
+  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
     if (!model.owner) continue;
 
     if (model.owner === modelName) {
-      errors.push(`Model "${modelName}" cannot own itself`);
+      errors.push(`Model "${namespaceId}:${modelName}" cannot own itself`);
     }
 
-    if (!modelNames.has(model.owner)) {
-      errors.push(`Model "${modelName}" has owner "${model.owner}" which does not exist in models`);
+    const ownerRef: CrossReference = { namespace: namespaceId, model: model.owner };
+    if (!lookupModel(modelIndex, ownerRef)) {
+      errors.push(
+        `Model "${namespaceId}:${modelName}" has owner "${namespaceId}:${model.owner}" which does not exist in domain.namespaces`,
+      );
     }
 
     for (const [rootKey, rootRef] of Object.entries(contract.roots)) {
-      if (rootRef.model === modelName) {
+      if (rootRef.namespace === namespaceId && rootRef.model === modelName) {
         errors.push(
-          `Owned model "${modelName}" must not appear in roots (found as root "${rootKey}")`,
+          `Owned model "${namespaceId}:${modelName}" must not appear in roots (found as root "${rootKey}")`,
         );
       }
     }
@@ -201,49 +203,78 @@ interface FieldLike {
   readonly dict?: boolean;
 }
 
-function forEachContractField(
-  contract: FlatDomainContractShape,
-  callback: (field: unknown, location: string) => void,
-): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
-    for (const [fieldName, field] of Object.entries(model.fields)) {
-      callback(field, `Model "${modelName}" field "${fieldName}"`);
-    }
+function validateValueObjectReferences(contract: DomainContractShape, errors: string[]): void {
+  const voNamesByNamespace = new Map<NamespaceId, Set<string>>();
+  for (const [namespaceKey, namespace] of Object.entries(contract.domain.namespaces)) {
+    const namespaceId = asNamespaceId(namespaceKey);
+    voNamesByNamespace.set(namespaceId, new Set(Object.keys(namespace.valueObjects ?? {})));
   }
-  for (const [voName, vo] of Object.entries(contract.valueObjects ?? {})) {
-    for (const [fieldName, field] of Object.entries(vo.fields)) {
-      callback(field, `Value object "${voName}" field "${fieldName}"`);
-    }
-  }
-}
 
-function validateValueObjectReferences(contract: FlatDomainContractShape, errors: string[]): void {
-  const voNames = new Set(Object.keys(contract.valueObjects ?? {}));
-
-  function checkType(type: FieldTypeLike | undefined, location: string): void {
+  function checkType(
+    type: FieldTypeLike | undefined,
+    location: string,
+    namespaceId: NamespaceId,
+  ): void {
     if (!type) return;
+    const voNames = voNamesByNamespace.get(namespaceId) ?? new Set<string>();
     if (type.kind === 'valueObject' && type.name && !voNames.has(type.name)) {
       errors.push(
-        `${location} references value object "${type.name}" which does not exist in valueObjects`,
+        `${location} references value object "${namespaceId}:${type.name}" which does not exist in that namespace's valueObjects`,
       );
       return;
     }
     if (type.kind === 'union') {
-      for (const member of type.members ?? []) checkType(member, location);
+      for (const member of type.members ?? []) checkType(member, location, namespaceId);
     }
   }
 
-  forEachContractField(contract, (field, location) => {
-    const f = field as FieldLike | undefined;
-    checkType(f?.type, location);
-  });
+  for (const [namespaceKey, namespace] of Object.entries(contract.domain.namespaces)) {
+    const namespaceId = asNamespaceId(namespaceKey);
+    for (const [modelName, model] of Object.entries(namespace.models)) {
+      for (const [fieldName, field] of Object.entries(model.fields)) {
+        const f = field as FieldLike | undefined;
+        checkType(f?.type, `Model "${namespaceId}:${modelName}" field "${fieldName}"`, namespaceId);
+      }
+    }
+    for (const [voName, vo] of Object.entries(namespace.valueObjects ?? {})) {
+      for (const [fieldName, field] of Object.entries(vo.fields)) {
+        const f = field as FieldLike | undefined;
+        checkType(
+          f?.type,
+          `Value object "${namespaceId}:${voName}" field "${fieldName}"`,
+          namespaceId,
+        );
+      }
+    }
+  }
 }
 
-function validateFieldModifiers(contract: FlatDomainContractShape, errors: string[]): void {
-  forEachContractField(contract, (field, location) => {
-    const f = field as FieldLike | undefined;
-    if (f?.many && f?.dict) {
-      errors.push(`${location} cannot have both "many" and "dict" modifiers`);
+function validateFieldModifiers(
+  modelIndex: Map<string, IndexedModel>,
+  contract: DomainContractShape,
+  errors: string[],
+): void {
+  for (const { namespaceId, name: modelName, model } of modelIndex.values()) {
+    for (const [fieldName, field] of Object.entries(model.fields)) {
+      const f = field as FieldLike | undefined;
+      if (f?.many && f?.dict) {
+        errors.push(
+          `Model "${namespaceId}:${modelName}" field "${fieldName}" cannot have both "many" and "dict" modifiers`,
+        );
+      }
     }
-  });
+  }
+  for (const [namespaceKey, namespace] of Object.entries(contract.domain.namespaces)) {
+    const namespaceId = asNamespaceId(namespaceKey);
+    for (const [voName, vo] of Object.entries(namespace.valueObjects ?? {})) {
+      for (const [fieldName, field] of Object.entries(vo.fields)) {
+        const f = field as FieldLike | undefined;
+        if (f?.many && f?.dict) {
+          errors.push(
+            `Value object "${namespaceId}:${voName}" field "${fieldName}" cannot have both "many" and "dict" modifiers`,
+          );
+        }
+      }
+    }
+  }
 }
