@@ -3,15 +3,13 @@ import { computeProfileHash, computeStorageHash } from '@prisma-next/contract/ha
 import { describe, expect, it } from 'vitest';
 
 const emptyNamespacedStorage = () => ({
-  namespaces: {
-    __unbound__: { id: '__unbound__' as const, tables: {} },
-  },
+  __unbound__: { id: '__unbound__' as const, tables: {} },
 });
 
 const sqlPreserveEmpty: PreserveEmptyPredicate = (path) => {
   const len = path.length;
   if (len < 2 || path[0] !== 'storage') return false;
-  if (path[1] === 'namespaces' && len === 4 && path[3] === 'tables') return true;
+  if (len === 3 && path[2] === 'tables') return true;
   return false;
 };
 

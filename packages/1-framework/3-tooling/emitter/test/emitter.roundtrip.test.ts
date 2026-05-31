@@ -11,15 +11,12 @@ const mockSqlHook = createMockSpi();
 
 function unboundNamespaceTables(tables: Record<string, unknown>) {
   return {
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
-    },
+    [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, tables },
   };
 }
 
 function tablesFromCanonicalStorage(storage: Record<string, unknown>): Record<string, unknown> {
-  const namespaces = storage['namespaces'] as Record<string, unknown>;
-  const unbound = namespaces[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
+  const unbound = storage[UNBOUND_NAMESPACE_ID] as Record<string, unknown>;
   return unbound['tables'] as Record<string, unknown>;
 }
 
