@@ -407,17 +407,16 @@ describe('buildMigrationGraphLayout', () => {
   });
 
   // ---------------------------------------------------------------------------------------
-  // Divergence family (`it.fails`): these lock the correct layouts from `mockups.md` for the
-  // divergence-heavy topologies the current allocator gets wrong (it fans, spills phantom
-  // lanes, or mis-orders). Each asserts node columns, connector placement, and per-edge lane
-  // staircase derived by hand from the mockups — NOT from code output. They fail today; when
-  // the allocator generalises to the lane-join rule, flip each `it.fails` to `it`. Forward
-  // adjacency is intentionally not asserted (forward edges always render `↑`).
+  // Divergence family: these lock the correct layouts from `mockups.md` for the
+  // divergence-heavy topologies. Each asserts node columns, connector placement, and per-edge
+  // lane staircase. Tips open lanes in input (creation) order — soonest-created leftmost —
+  // which keeps lanes from crossing. Forward adjacency is intentionally not asserted (forward
+  // edges always render `↑`).
   // ---------------------------------------------------------------------------------------
 
   // `mockups.md` § wide-fan: pure 5-way divergence, no reconvergence. Five tips each open a
   // lane; all five merge down into the shared parent (one merge connector, no branch).
-  it.fails('lays out a wide fan as five lanes merging into the parent (pending allocator)', () => {
+  it('lays out a wide fan as five lanes merging into the parent', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
     const addPosts = edge('ef9de27', 'a94b7b4', 'add_posts');
@@ -432,24 +431,25 @@ describe('buildMigrationGraphLayout', () => {
     const merge = model.rows.find(isMergeConnector);
     expect(merge).toMatchObject({ startLane: 0, endLane: 4, branchCount: 5 });
 
-    expect(model.nodeColumn.get('b01f4d9')).toBe(0);
-    expect(model.nodeColumn.get('becd3f1')).toBe(1);
+    // Lanes open in creation order: the first-created tip (73e3abe) takes lane 0.
+    expect(model.nodeColumn.get('73e3abe')).toBe(0);
+    expect(model.nodeColumn.get('a94b7b4')).toBe(1);
     expect(model.nodeColumn.get('6656a6e')).toBe(2);
-    expect(model.nodeColumn.get('a94b7b4')).toBe(3);
-    expect(model.nodeColumn.get('73e3abe')).toBe(4);
+    expect(model.nodeColumn.get('becd3f1')).toBe(3);
+    expect(model.nodeColumn.get('b01f4d9')).toBe(4);
     expect(model.nodeColumn.get('ef9de27')).toBe(0);
 
-    expectEdgeLane(model.rows, 'add_settings', 0, []);
-    expectEdgeLane(model.rows, 'add_category', 1, [0]);
+    expectEdgeLane(model.rows, 'add_phone', 0, []);
+    expectEdgeLane(model.rows, 'add_posts', 1, [0]);
     expectEdgeLane(model.rows, 'add_avatar', 2, [0, 1]);
-    expectEdgeLane(model.rows, 'add_posts', 3, [0, 1, 2]);
-    expectEdgeLane(model.rows, 'add_phone', 4, [0, 1, 2, 3]);
+    expectEdgeLane(model.rows, 'add_category', 3, [0, 1, 2]);
+    expectEdgeLane(model.rows, 'add_settings', 4, [0, 1, 2, 3]);
     expectEdgeLane(model.rows, 'init', 0, []);
   });
 
   // `mockups.md` § sub-branches: nested divergence. Both fans reuse the same two lanes — the
   // child-lanes merge into their own parent, never into each other.
-  it.fails('lays out nested divergence reusing two lanes (pending allocator)', () => {
+  it('lays out nested divergence reusing two lanes', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
     const addPosts = edge('73e3abe', 'a94b7b4', 'add_posts');
@@ -481,7 +481,7 @@ describe('buildMigrationGraphLayout', () => {
 
   // `mockups.md` § diamond-sub-branch: a diamond (lanes 0/1) where one arm (`6656a6e`) also
   // diverges into a leaf spur (lane 2). `6656a6e` is both a diamond arm and a divergence.
-  it.fails('lays out a diamond with a leaf spur off one arm (pending allocator)', () => {
+  it('lays out a diamond with a leaf spur off one arm', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
     const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
@@ -522,7 +522,7 @@ describe('buildMigrationGraphLayout', () => {
 
   // `mockups.md` § complex: three-way divergence (diamond arms + a leaf tip) above a spine.
   // The leaf tip sits low (lane 2, short), like `kitchen-sink`'s short branch.
-  it.fails('lays out divergence + diamond + spine + leaf tip (pending allocator)', () => {
+  it('lays out divergence + diamond + spine + leaf tip', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const alice = edge('ef9de27', '73e3abe', 'alice_add_phone');
     const bob = edge('ef9de27', '6656a6e', 'bob_add_avatar');
@@ -736,12 +736,10 @@ describe('buildMigrationGraphLayout', () => {
 
   // Multi-edge: N migrations sharing the same `from` AND `to` are a multigraph edge, not a
   // convergence. They stack in the ONE lane — each a plain `│↑` — never a fan (the edges don't
-  // branch: one source; and don't merge: one target). Asserts the correct single-lane output
-  // from `mockups.md § multi-edge`. Marked `it.fails` because the allocator currently keys
-  // convergence off forward in-degree (edge count) rather than distinct sources, so it fans the
-  // parallel edges into multiple lanes. When the allocator distinguishes multi-edges from a true
-  // convergence, flip this to `it(...)`. The diff against current output is the spec for the fix.
-  it.fails('stacks parallel multi-edges in one lane (pending allocator generalization)', () => {
+  // branch: one source; and don't merge: one target). The allocator keys convergence off
+  // distinct sources, not edge count, so parallel edges between one pair share a lane. Forward
+  // adjacency is not asserted (forward edges always render `↑`).
+  it('stacks parallel multi-edges in one lane', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const variantA = edge('aaa', 'bbb', 'variant_a');
     const variantB = edge('aaa', 'bbb', 'variant_b');
@@ -762,9 +760,9 @@ describe('buildMigrationGraphLayout', () => {
 
     expect(model.rows.filter(isBranchConnector)).toHaveLength(0);
     expect(model.rows.filter(isMergeConnector)).toHaveLength(0);
-    expectEdgeGeometry(model.rows, 'variant_a', 0, [], 'adjacent');
-    expectEdgeGeometry(model.rows, 'variant_b', 0, [], 'adjacent');
-    expectEdgeGeometry(model.rows, 'variant_c', 0, [], 'adjacent');
+    expectEdgeLane(model.rows, 'variant_a', 0, []);
+    expectEdgeLane(model.rows, 'variant_b', 0, []);
+    expectEdgeLane(model.rows, 'variant_c', 0, []);
     expect(model.nodeColumn.get('bbb')).toBe(0);
     expect(model.nodeColumn.get('aaa')).toBe(0);
   });
@@ -808,12 +806,9 @@ describe('buildMigrationGraphLayout', () => {
     expectEdgeGeometry(modelSkip.rows, 'rollback_skip', 0, [], 'node-skipping-rollback');
   });
 
-  // Expected-failure (`it.fails`): these assert the CORRECT single-lane rendering. They fail
-  // today because an adjacent rollback leaves lane 0 reserved for its source, spilling the
-  // forward edge below into a phantom lane 1 (the rollback-lane-lifecycle bug). When that bug
-  // is fixed, `it.fails` will start failing — flip these to `it(...)`. The diff against
-  // current output is the clearest spec for the fix.
-  it.fails('renders an adjacent rollback as a single lane (pending lane-lifecycle fix)', () => {
+  // Rollbacks decorate their node's own column — they never reserve a downward lane, so the
+  // forward chain stays in a single lane with no phantom spill.
+  it('renders an adjacent rollback as a single lane', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPosts = edge('aaa', 'bbb', 'add_posts');
     const rollbackAdjacent = edge('bbb', 'aaa', 'rollback_adjacent');
@@ -832,16 +827,16 @@ describe('buildMigrationGraphLayout', () => {
     );
   });
 
-  it.fails('renders a node-skipping rollback as a single lane (pending lane-lifecycle fix)', () => {
+  it('renders a node-skipping rollback as a single lane', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPhone = edge('aaa', 'bbb', 'add_phone');
     const addBio = edge('bbb', 'ccc', 'add_bio');
     const rollbackSkip = edge('ccc', 'aaa', 'rollback_skip');
     const modelSkip = layout([init, addPhone, addBio, rollbackSkip]);
 
-    // Interim correct output: single lane, no phantom. (The routed back-arc for a
-    // node-skipping rollback — `mockups.md` § routed arcs — is a separate deferred feature
-    // that will further change this fixture; the lane-lifecycle fix lands single-lane first.)
+    // Single lane, no phantom. The routed back-arc for a node-skipping rollback
+    // (`mockups.md` § routed arcs) is a separate deferred feature that will further change
+    // this fixture; the lane stays single until then.
     expect(renderLayout(modelSkip)).toBe(
       [
         '○     ccc',

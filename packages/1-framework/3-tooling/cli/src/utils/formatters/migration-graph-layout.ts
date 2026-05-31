@@ -47,14 +47,9 @@ export interface MigrationGraphGridModel {
   readonly edgeColumn: ReadonlyMap<string, number>;
 }
 
-interface LaneState {
-  want: string;
-  active: boolean;
-}
-
-function canonicalFrom(from: string): string {
-  return from === EMPTY_CONTRACT_HASH ? EMPTY_CONTRACT_HASH : from;
-}
+// ---------------------------------------------------------------------------
+// Edge bucketing helpers
+// ---------------------------------------------------------------------------
 
 function forwardEdges(edges: readonly ClassifiedEdge[]): ClassifiedEdge[] {
   return edges.filter((e) => e.kind === 'forward');
@@ -91,6 +86,25 @@ function buildForwardInDegree(edges: readonly ClassifiedEdge[]): Map<string, num
   return indeg;
 }
 
+/**
+ * Distinct source contracts among a contract's forward producers. A contract is
+ * a *convergence* when this count is >= 2. Multiple migrations sharing one
+ * source (a multi-edge) count once — they stack in a single lane rather than
+ * fanning into a convergence.
+ */
+function buildDistinctSourceCountByTo(edges: readonly ClassifiedEdge[]): Map<string, number> {
+  const sources = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    if (edge.kind !== 'forward' || edge.from === edge.to) continue;
+    const set = sources.get(edge.to);
+    if (set) set.add(edge.from);
+    else sources.set(edge.to, new Set([edge.from]));
+  }
+  const counts = new Map<string, number>();
+  for (const [to, set] of sources) counts.set(to, set.size);
+  return counts;
+}
+
 function splitComponents(nodes: readonly (string | null)[]): readonly (readonly string[])[] {
   const components: string[][] = [];
   let current: string[] = [];
@@ -107,6 +121,10 @@ function splitComponents(nodes: readonly (string | null)[]): readonly (readonly 
   if (current.length > 0) components.push(current);
   return components;
 }
+
+// ---------------------------------------------------------------------------
+// Adjacency refinement (operates on the emitted rows)
+// ---------------------------------------------------------------------------
 
 function classifyForwardShortConvergenceAdjacency(
   rows: readonly MigrationGraphGridRow[],
@@ -192,7 +210,9 @@ function classifyForwardLayoutAdjacency(
         return sawObstruction ? 'node-skipping-forward' : 'adjacent';
       }
       const nodeCol = nodeColumn.get(row.contractHash) ?? 0;
-      if (!passThroughLaneSet.has(nodeCol)) {
+      // A divergence-branch lane runs unobstructed to its convergence point;
+      // sibling-branch nodes sit in parallel lanes and never block it.
+      if (!divergenceBranchEdge && !passThroughLaneSet.has(nodeCol)) {
         sawObstruction = true;
       }
     }
@@ -338,6 +358,10 @@ function classifyEdgeAdjacency(
   return toPos === fromPos + 1 ? 'adjacent' : 'node-skipping-rollback';
 }
 
+// ---------------------------------------------------------------------------
+// Cell builders
+// ---------------------------------------------------------------------------
+
 function emptyCells(width: number): StructuralCell[] {
   return Array.from({ length: width }, () => ({ kind: 'empty' as const }));
 }
@@ -429,170 +453,199 @@ function buildEdgeCells(
   return cells;
 }
 
+// ---------------------------------------------------------------------------
+// Vertical ordering: tips-first DFS post-order over forward edges
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the vertical node order for a component: tips at the top (index 0),
+ * roots at the bottom. This is a DFS post-order over forward edges starting
+ * from forward roots, visiting children in their input (insertion) order. A
+ * node is emitted only after all of its forward children, so convergence nodes
+ * sit below every branch that feeds them and the longest contiguous chain reads
+ * top-to-bottom without braiding.
+ */
+function computeVerticalOrder(
+  componentNodes: readonly string[],
+  forwardChildren: ReadonlyMap<string, readonly ClassifiedEdge[]>,
+  forwardInDegree: ReadonlyMap<string, number>,
+): string[] {
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>();
+  for (const node of componentNodes) color.set(node, WHITE);
+
+  const sortRoots = (roots: readonly string[]): string[] =>
+    [...roots].sort((a, b) => {
+      if (a === EMPTY_CONTRACT_HASH) return -1;
+      if (b === EMPTY_CONTRACT_HASH) return 1;
+      return a.localeCompare(b);
+    });
+
+  let roots = sortRoots(componentNodes.filter((n) => (forwardInDegree.get(n) ?? 0) === 0));
+  if (roots.length === 0) roots = sortRoots(componentNodes);
+
+  const result: string[] = [];
+
+  interface Frame {
+    node: string;
+    children: readonly ClassifiedEdge[];
+    index: number;
+  }
+
+  function runDfs(root: string): void {
+    if (color.get(root) !== WHITE) return;
+    const stack: Frame[] = [{ node: root, children: forwardChildren.get(root) ?? [], index: 0 }];
+    color.set(root, GRAY);
+
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      if (frame === undefined) break;
+      if (frame.index >= frame.children.length) {
+        color.set(frame.node, BLACK);
+        result.push(frame.node);
+        stack.pop();
+        continue;
+      }
+      const child = frame.children[frame.index];
+      frame.index += 1;
+      if (child === undefined) continue;
+      if (color.get(child.to) === WHITE) {
+        color.set(child.to, GRAY);
+        stack.push({ node: child.to, children: forwardChildren.get(child.to) ?? [], index: 0 });
+      }
+    }
+  }
+
+  for (const root of roots) runDfs(root);
+  // Nodes unreachable via forward edges (e.g. rollback-only sources) follow in
+  // component order.
+  for (const node of componentNodes) {
+    if (color.get(node) === WHITE) runDfs(node);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Lane allocation: one rule for all topologies
+// ---------------------------------------------------------------------------
+
+interface DownwardGroup {
+  readonly target: string;
+  readonly edges: ClassifiedEdge[];
+}
+
 function layoutComponent(
   componentNodes: readonly string[],
   allEdges: readonly ClassifiedEdge[],
-  edgesByFrom: ReadonlyMap<string, readonly ClassifiedEdge[]>,
 ): {
   rows: MigrationGraphGridRow[];
   nodeColumn: Map<string, number>;
   edgeColumn: Map<string, number>;
 } {
+  const componentSet = new Set(componentNodes);
+  const edges = allEdges.filter((e) => componentSet.has(e.from) && componentSet.has(e.to));
+
+  const forwardChildren = new Map<string, ClassifiedEdge[]>();
+  const producersByTo = new Map<string, ClassifiedEdge[]>();
+  const rollbacksByFrom = new Map<string, ClassifiedEdge[]>();
+  const selfByFrom = new Map<string, ClassifiedEdge[]>();
+  for (const edge of edges) {
+    if (edge.kind === 'self' || edge.from === edge.to) {
+      const bucket = selfByFrom.get(edge.from);
+      if (bucket) bucket.push(edge);
+      else selfByFrom.set(edge.from, [edge]);
+      continue;
+    }
+    if (edge.kind === 'forward') {
+      const children = forwardChildren.get(edge.from);
+      if (children) children.push(edge);
+      else forwardChildren.set(edge.from, [edge]);
+      const producers = producersByTo.get(edge.to);
+      if (producers) producers.push(edge);
+      else producersByTo.set(edge.to, [edge]);
+      continue;
+    }
+    // rollback
+    const bucket = rollbacksByFrom.get(edge.from);
+    if (bucket) bucket.push(edge);
+    else rollbacksByFrom.set(edge.from, [edge]);
+  }
+
+  const forwardInDegree = buildForwardInDegree(edges);
+  const forwardOutDegree = buildForwardOutDegree(edges);
+  const distinctSourceCountByTo = buildDistinctSourceCountByTo(edges);
+
+  const order = computeVerticalOrder(componentNodes, forwardChildren, forwardInDegree);
   const position = new Map<string, number>();
-  for (let index = 0; index < componentNodes.length; index++) {
-    const node = componentNodes[index];
+  for (let index = 0; index < order.length; index++) {
+    const node = order[index];
     if (node !== undefined) position.set(node, index);
   }
 
-  const componentEdgeSet = new Set(componentNodes);
-  const edges = allEdges.filter((e) => componentEdgeSet.has(e.from) && componentEdgeSet.has(e.to));
-
-  const forwardProducersByTo = buildForwardProducersByTo(edges);
-  const forwardInDegree = buildForwardInDegree(edges);
-  const forwardOutDegree = buildForwardOutDegree(edges);
-
-  const lanes: LaneState[] = [];
+  const lanes: (string | null)[] = [];
   const rows: MigrationGraphGridRow[] = [];
-  const nodeColumnByHash = new Map<string, number>();
-  const edgeColumnByHash = new Map<string, number>();
+  const nodeColumn = new Map<string, number>();
+  const edgeColumn = new Map<string, number>();
   const producerLaneByHash = new Map<string, number>();
-  const divergenceBranchLaneByHash = new Map<string, number>();
-  const spineLaneByNode = new Map<string, number>();
-  const divergenceRootByNode = new Map<string, string>();
-  const convergencesEmitted = new Set<string>();
   let gridWidth = 1;
-
-  function childCrossFeedsConvergence(childTo: string, convergence: string): boolean {
-    const outs = forwardChildrenFrom(childTo);
-    const toConvergence = outs.some((edge) => edge.to === convergence);
-    const elsewhere = outs.some((edge) => edge.to !== convergence);
-    return toConvergence && elsewhere;
-  }
-
-  function isCrossLinkDivergence(_from: string, children: readonly ClassifiedEdge[]): boolean {
-    if (children.length !== 2) return false;
-    const [left, right] = children;
-    if (left === undefined || right === undefined) return false;
-
-    for (const convergence of forwardProducersByTo.keys()) {
-      const producers = (forwardProducersByTo.get(convergence) ?? []).filter(
-        (edge) => edge.kind === 'forward',
-      );
-      if (producers.length < 2) continue;
-
-      const producerFroms = new Set(producers.map((producer) => producer.from));
-      if (!producerFroms.has(left.to) || !producerFroms.has(right.to)) continue;
-
-      if (
-        childCrossFeedsConvergence(left.to, convergence) ||
-        childCrossFeedsConvergence(right.to, convergence)
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  function spineBranchIndex(children: readonly ClassifiedEdge[]): number {
-    let bestIndex = 0;
-    let bestOut = -1;
-    for (const [index, child] of children.entries()) {
-      const outCount = forwardChildrenFrom(child.to).length;
-      if (outCount > bestOut) {
-        bestOut = outCount;
-        bestIndex = index;
-      }
-    }
-    return bestIndex;
-  }
-
-  function divergenceChildLane(
-    from: string,
-    branchIndex: number,
-    children: readonly ClassifiedEdge[],
-  ): number {
-    if (!isCrossLinkDivergence(from, children)) return branchIndex;
-    const spineIndex = spineBranchIndex(children);
-    if (branchIndex === spineIndex) return 0;
-    return 2;
-  }
-
-  function presetBranchLayout(): void {
-    for (const node of componentNodes) {
-      const children = forwardChildrenFrom(node);
-      if (children.length < 2) continue;
-
-      const crossLink = isCrossLinkDivergence(node, children);
-      if (crossLink) ensureGridWidth(3);
-
-      for (const [branchIndex, child] of children.entries()) {
-        const branchLane = divergenceChildLane(node, branchIndex, children);
-        presetColumnAlongSpine(child.to, branchLane, node);
-        divergenceBranchLaneByHash.set(child.migrationHash, branchLane);
-      }
-    }
-  }
-
-  function presetColumnAlongSpine(start: string, column: number, divergeFrom: string): void {
-    let current: string | undefined = start;
-    while (current !== undefined) {
-      if (!nodeColumnByHash.has(current)) {
-        nodeColumnByHash.set(current, column);
-      }
-      spineLaneByNode.set(current, column);
-      divergenceRootByNode.set(current, divergeFrom);
-
-      const outs = forwardChildrenFrom(current);
-      if (outs.length !== 1) break;
-      const next = outs[0];
-      if (next === undefined) break;
-      if ((forwardInDegree.get(next.to) ?? 0) >= 2) break;
-      current = next.to;
-    }
-  }
-
-  presetBranchLayout();
 
   function ensureGridWidth(minWidth: number): void {
     if (minWidth > gridWidth) gridWidth = minWidth;
   }
 
-  function ensureLane(index: number): void {
-    ensureGridWidth(index + 1);
-    while (lanes.length <= index) {
-      lanes.push({ want: '', active: false });
-    }
+  function setLane(index: number, want: string | null): void {
+    while (lanes.length <= index) lanes.push(null);
+    lanes[index] = want;
+    if (want !== null) ensureGridWidth(index + 1);
   }
 
   function activeLaneIndices(): number[] {
     const indices: number[] = [];
     for (let index = 0; index < lanes.length; index++) {
-      if (lanes[index]?.active) indices.push(index);
+      if (lanes[index] !== null) indices.push(index);
     }
     return indices;
+  }
+
+  function passThroughExcept(lane: number): number[] {
+    return activeLaneIndices().filter((index) => index !== lane);
+  }
+
+  function leftmostFreeLane(): number {
+    for (let index = 0; index < lanes.length; index++) {
+      if (lanes[index] === null) return index;
+    }
+    return lanes.length;
   }
 
   function lanesWanting(contract: string): number[] {
     const indices: number[] = [];
     for (let index = 0; index < lanes.length; index++) {
-      const lane = lanes[index];
-      if (lane?.active && lane.want === contract) indices.push(index);
+      if (lanes[index] === contract) indices.push(index);
     }
     return indices;
   }
 
-  function closeLane(index: number): void {
-    ensureLane(index);
-    const lane = lanes[index];
-    if (lane) lane.active = false;
-  }
-
-  function passThroughLaneCount(excludeContract?: string): number {
-    return activeLaneIndices().filter((index) => {
-      const lane = lanes[index];
-      return lane?.active && lane.want !== excludeContract;
-    }).length;
+  function emitMergeConnector(contractHash: string, laneIndices: readonly number[]): number {
+    const startLane = Math.min(...laneIndices);
+    const endLane = Math.max(...laneIndices);
+    ensureGridWidth(endLane + 1);
+    const activeLanes = new Set(activeLaneIndices());
+    rows.push({
+      kind: 'merge-connector',
+      contractHash,
+      startLane,
+      endLane,
+      branchCount: laneIndices.length,
+      cells: buildMergeConnectorCells(startLane, endLane, activeLanes, gridWidth),
+    });
+    for (const index of laneIndices) {
+      if (index !== startLane) setLane(index, null);
+    }
+    return startLane;
   }
 
   function emitBranchConnector(
@@ -613,66 +666,23 @@ function layoutComponent(
     });
   }
 
-  function emitMergeIfNeeded(contract: string): void {
-    const wanting = lanesWanting(contract);
-    if (wanting.length >= 2) {
-      emitMergeConnector(contract, wanting);
-      return;
-    }
-
-    const producers = (forwardProducersByTo.get(contract) ?? []).filter(
-      (edge) => edge.kind === 'forward',
-    );
-    if (producers.length >= 2) {
-      const producerLanes = [
-        ...new Set(
-          producers
-            .map((producer) => edgeColumnByHash.get(producer.migrationHash))
-            .filter((lane): lane is number => lane !== undefined),
-        ),
-      ];
-      if (producerLanes.length >= 2) {
-        emitMergeConnector(contract, producerLanes);
-        return;
-      }
-    }
-
-    const divergingChildren = forwardChildrenFrom(contract);
-    if (divergingChildren.length >= 2) {
-      const childLanes = [
-        ...new Set(
-          divergingChildren
-            .map((child) => edgeColumnByHash.get(child.migrationHash))
-            .filter((lane): lane is number => lane !== undefined),
-        ),
-      ];
-      if (childLanes.length >= 2) {
-        emitMergeConnector(contract, childLanes);
-      }
-    }
+  function emitEdgeRow(edge: ClassifiedEdge, lane: number, convergenceProducer: boolean): void {
+    const passThrough = passThroughExcept(lane);
+    const adjacency = classifyEdgeAdjacency(edge, position);
+    ensureGridWidth(Math.max(lane, ...passThrough, 0) + 1);
+    const row: MigrationGraphGridRow = {
+      kind: 'edge',
+      edge,
+      laneIndex: lane,
+      passThroughLanes: passThrough,
+      cells: buildEdgeCells(edge, lane, passThrough, adjacency, gridWidth),
+    };
+    rows.push(convergenceProducer ? { ...row, convergenceProducer: true } : row);
+    edgeColumn.set(edge.migrationHash, lane);
+    if (convergenceProducer) producerLaneByHash.set(edge.migrationHash, lane);
   }
 
-  function emitMergeConnector(contractHash: string, laneIndices: readonly number[]): void {
-    if (laneIndices.length < 2) return;
-    const startLane = Math.min(...laneIndices);
-    const endLane = Math.max(...laneIndices);
-    ensureGridWidth(endLane + 1);
-    const activeLanes = new Set(activeLaneIndices());
-    rows.push({
-      kind: 'merge-connector',
-      contractHash,
-      startLane,
-      endLane,
-      branchCount: laneIndices.length,
-      cells: buildMergeConnectorCells(startLane, endLane, activeLanes, gridWidth),
-    });
-    for (const index of laneIndices) {
-      if (index !== startLane) closeLane(index);
-    }
-  }
-
-  function emitNodeRow(contractHash: string): void {
-    const column = nodeColumnByHash.get(contractHash) ?? 0;
+  function emitNodeRow(contractHash: string, column: number): void {
     ensureGridWidth(column + 1);
     const passThrough = activeLaneIndices().filter((index) => index !== column);
     rows.push({
@@ -680,332 +690,99 @@ function layoutComponent(
       contractHash,
       cells: buildNodeCells(contractHash, column, passThrough, gridWidth),
     });
-    nodeColumnByHash.set(contractHash, column);
+    nodeColumn.set(contractHash, column);
   }
 
-  function forwardChildrenFrom(from: string): ClassifiedEdge[] {
-    return edges.filter((e) => e.from === from && e.kind === 'forward' && e.from !== e.to);
+  function producerGroups(node: string): DownwardGroup[] {
+    const byTarget = new Map<string, DownwardGroup>();
+    for (const producer of producersByTo.get(node) ?? []) {
+      const group = byTarget.get(producer.from);
+      if (group) group.edges.push(producer);
+      else byTarget.set(producer.from, { target: producer.from, edges: [producer] });
+    }
+    const groups = [...byTarget.values()];
+    // Lanes are ordered by where their target node lands vertically (soonest →
+    // leftmost), which keeps lanes from crossing.
+    groups.sort((a, b) => (position.get(a.target) ?? 0) - (position.get(b.target) ?? 0));
+    for (const group of groups) {
+      group.edges.sort((a, b) => b.dirName.localeCompare(a.dirName));
+    }
+    return groups;
   }
 
-  function branchSpineLengthFromChild(start: string): number {
-    let length = 1;
-    let current = start;
-    for (;;) {
-      const outs = forwardChildrenFrom(current);
-      if (outs.length !== 1) return length;
-      const next = outs[0];
-      if (next === undefined) return length;
-      if ((forwardInDegree.get(next.to) ?? 0) >= 2) return length + 1;
-      length += 1;
-      current = next.to;
-    }
-  }
-
-  function passThroughForBranchEdge(from: string, laneIndex: number): number[] {
-    const children = forwardChildrenFrom(from);
-    if (children.length < 2) return [];
-
-    if (isCrossLinkDivergence(from, children)) {
-      const spineIndex = spineBranchIndex(children);
-      const spineLane = divergenceChildLane(from, spineIndex, children);
-      if (laneIndex === spineLane) {
-        const otherIndex = spineIndex === 0 ? 1 : 0;
-        return [divergenceChildLane(from, otherIndex, children)];
-      }
-      return [spineLane];
-    }
-
-    const spineLengths = children.map((child) => branchSpineLengthFromChild(child.to));
-    const unequalSpines = new Set(spineLengths).size > 1;
-
-    const passThrough: number[] = [];
-    for (let index = 0; index < children.length; index++) {
-      if (index === laneIndex) continue;
-      if (unequalSpines) {
-        if (laneIndex > index) passThrough.push(index);
-      } else {
-        const siblingTarget = children[index]?.to;
-        const siblingTargetsConvergence =
-          siblingTarget !== undefined && (forwardInDegree.get(siblingTarget) ?? 0) >= 2;
-        if (laneIndex === 0 && siblingTargetsConvergence) continue;
-        passThrough.push(index);
-      }
-    }
-    return passThrough;
-  }
-
-  function emitEdgeRow(
-    edge: ClassifiedEdge,
-    laneIndex: number,
-    passThroughLanes: readonly number[],
-    options?: { readonly convergenceProducer?: boolean },
-  ): void {
-    let effectivePassThrough = passThroughLanes;
-    const branchLane = divergenceBranchLaneByHash.get(edge.migrationHash);
-    if (
-      !(options?.convergenceProducer ?? false) &&
-      branchLane !== undefined &&
-      branchLane === laneIndex
-    ) {
-      effectivePassThrough = passThroughForBranchEdge(edge.from, laneIndex);
-    }
-
-    const adjacency = classifyEdgeAdjacency(edge, position);
-    ensureGridWidth(Math.max(laneIndex, ...effectivePassThrough, 0) + 1);
-    const row: MigrationGraphGridRow = {
-      kind: 'edge',
-      edge,
-      laneIndex,
-      passThroughLanes: effectivePassThrough,
-      cells: buildEdgeCells(edge, laneIndex, effectivePassThrough, adjacency, gridWidth),
-    };
-    if (options?.convergenceProducer === true) {
-      rows.push({ ...row, convergenceProducer: true });
+  function processNode(node: string): void {
+    const wanting = lanesWanting(node);
+    let column: number;
+    if (wanting.length >= 2) {
+      column = emitMergeConnector(node, wanting);
+    } else if (wanting.length === 1) {
+      column = wanting[0] ?? 0;
     } else {
-      rows.push(row);
-    }
-    edgeColumnByHash.set(edge.migrationHash, laneIndex);
-    ensureLane(laneIndex);
-    lanes[laneIndex] = { want: canonicalFrom(edge.from), active: true };
-  }
-
-  function emitConvergenceAfterNode(contract: string): void {
-    if (convergencesEmitted.has(contract)) return;
-    if ((forwardInDegree.get(contract) ?? 0) < 2) return;
-
-    const producers = forwardProducersByTo.get(contract) ?? [];
-    if (producers.length >= 2) {
-      const startLane = passThroughLaneCount(contract);
-      const endLane = startLane + producers.length - 1;
-      emitBranchConnector(contract, startLane, endLane, producers.length);
-      for (const [producerIndex, producer] of producers.entries()) {
-        const lane = startLane + producerIndex;
-        ensureLane(lane);
-        lanes[lane] = { want: canonicalFrom(producer.from), active: true };
-        producerLaneByHash.set(producer.migrationHash, lane);
-        if (
-          (forwardOutDegree.get(producer.from) ?? 0) < 2 &&
-          !nodeColumnByHash.has(producer.from)
-        ) {
-          nodeColumnByHash.set(producer.from, lane);
-        }
-      }
+      column = leftmostFreeLane();
     }
 
-    convergencesEmitted.add(contract);
-  }
-
-  function branchLaneForProducerEdge(producer: ClassifiedEdge): number | undefined {
-    const children = forwardChildrenFrom(producer.from);
-    if (children.length < 2) return undefined;
-    const index = children.findIndex((child) => child.migrationHash === producer.migrationHash);
-    return index >= 0 ? index : undefined;
-  }
-
-  function emitForwardProducersTo(contract: string): void {
-    const producers = (forwardProducersByTo.get(contract) ?? []).filter(
-      (e) => e.kind === 'forward',
+    // Self-edges sit immediately above their node, in its column.
+    const selfEdges = [...(selfByFrom.get(node) ?? [])].sort((a, b) =>
+      b.dirName.localeCompare(a.dirName),
     );
-    const sorted = [...producers].sort((a, b) => {
-      const laneA = producerLaneByHash.get(a.migrationHash);
-      const laneB = producerLaneByHash.get(b.migrationHash);
-      if (laneA !== undefined && laneB !== undefined) return laneA - laneB;
-      if (laneA !== undefined) return -1;
-      if (laneB !== undefined) return 1;
-      return a.from.localeCompare(b.from);
-    });
+    for (const selfEdge of selfEdges) emitEdgeRow(selfEdge, column, false);
 
-    const convergenceProducers: ClassifiedEdge[] = [];
-    for (const producer of sorted) {
-      const convergenceLane = producerLaneByHash.get(producer.migrationHash);
-      if (convergenceLane !== undefined) {
-        convergenceProducers.push(producer);
-        continue;
-      }
+    emitNodeRow(node, column);
 
-      const branchLane =
-        divergenceBranchLaneByHash.get(producer.migrationHash) ??
-        branchLaneForProducerEdge(producer);
-      if (branchLane !== undefined) {
-        emitEdgeRow(producer, branchLane, passThroughForBranchEdge(producer.from, branchLane));
-        spineLaneByNode.set(producer.to, branchLane);
-        continue;
-      }
-
-      const spineLane = spineLaneByNode.get(producer.from);
-      if (spineLane !== undefined) {
-        const divergeFrom = divergenceRootByNode.get(producer.from);
-        const passThrough =
-          divergeFrom !== undefined
-            ? passThroughForBranchEdge(divergeFrom, spineLane)
-            : activeLaneIndices().filter((index) => index !== spineLane);
-        emitEdgeRow(producer, spineLane, passThrough);
-        continue;
-      }
-
-      const wanting = lanesWanting(contract);
-      if (wanting.length > 0) {
-        const laneIndex = wanting[0] ?? 0;
-        const passThrough = activeLaneIndices().filter((index) => index !== laneIndex);
-        emitEdgeRow(producer, laneIndex, passThrough);
-        continue;
-      }
-
-      const laneIndex = activeLaneIndices().length === 0 ? 0 : Math.max(...activeLaneIndices()) + 1;
-      emitEdgeRow(producer, laneIndex, activeLaneIndices());
+    const groups = producerGroups(node);
+    const isConvergence = (distinctSourceCountByTo.get(node) ?? 0) >= 2;
+    const laneForGroup: number[] = [];
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      const group = groups[groupIndex];
+      if (group === undefined) continue;
+      const lane = groupIndex === 0 ? column : leftmostFreeLane();
+      laneForGroup[groupIndex] = lane;
+      setLane(lane, group.target);
     }
 
-    for (const producer of convergenceProducers) {
-      const presetLane = producerLaneByHash.get(producer.migrationHash);
-      if (presetLane === undefined) continue;
-      const fanLanes = [
-        ...new Set(
-          convergenceProducers
-            .map((candidate) => producerLaneByHash.get(candidate.migrationHash))
-            .filter((lane): lane is number => lane !== undefined),
-        ),
-      ].sort((a, b) => a - b);
-      const fanStart = fanLanes[0] ?? presetLane;
-      const spinePassThrough: number[] = [];
-      for (let index = 0; index < fanStart; index++) {
-        spinePassThrough.push(index);
+    if (groups.length >= 2) {
+      const endLane = Math.max(...laneForGroup);
+      emitBranchConnector(node, column, endLane, groups.length);
+    }
+
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      const group = groups[groupIndex];
+      const lane = laneForGroup[groupIndex];
+      if (group === undefined || lane === undefined) continue;
+      for (const edge of group.edges) {
+        emitEdgeRow(edge, lane, isConvergence);
       }
-      const passThrough = [...spinePassThrough, ...fanLanes.filter((lane) => lane !== presetLane)];
-      emitEdgeRow(producer, presetLane, passThrough, { convergenceProducer: true });
     }
-  }
 
-  function emitSelfEdgesBeforeNode(contract: string): void {
-    const fromEdges = edgesByFrom.get(contract) ?? [];
-    const selfEdges = fromEdges.filter((e) => e.kind === 'self');
-    selfEdges.sort((a, b) => b.dirName.localeCompare(a.dirName));
-
-    const nodeColumn = nodeColumnByHash.get(contract) ?? 0;
-    for (const edge of selfEdges) {
-      const passThrough = activeLaneIndices().filter((index) => index !== nodeColumn);
-      emitEdgeRow(edge, nodeColumn, passThrough);
-    }
-  }
-
-  function emitDepartingEdgesFrom(contract: string): void {
-    const fromEdges = edgesByFrom.get(contract) ?? [];
-    const rollbacks = fromEdges.filter((e) => e.kind === 'rollback');
-    rollbacks.sort((a, b) => b.dirName.localeCompare(a.dirName));
-
-    for (const edge of rollbacks) {
-      const passThrough = activeLaneIndices().filter((index) => index !== 0);
-      emitEdgeRow(edge, 0, passThrough);
-    }
-  }
-
-  function visitBranchRoots(contract: string): void {
-    if ((forwardInDegree.get(contract) ?? 0) < 2) return;
-
-    const producers = (forwardProducersByTo.get(contract) ?? []).filter(
-      (e) => e.kind === 'forward',
+    // Rollbacks decorate the node's own column directly below its forward
+    // producers; they never reserve a downward lane. An adjacent rollback shares
+    // the lane heading to the next node; a node-skipping rollback stays in the
+    // column and is marked for routing (the routed back-arc is a later feature).
+    const rollbacks = [...(rollbacksByFrom.get(node) ?? [])].sort((a, b) =>
+      b.dirName.localeCompare(a.dirName),
     );
-    const sorted = [...producers].sort((a, b) => {
-      const spineA = branchSpineLengthFromTip(a.from);
-      const spineB = branchSpineLengthFromTip(b.from);
-      if (spineA !== spineB) return spineB - spineA;
-      const laneA = producerLaneByHash.get(a.migrationHash) ?? 0;
-      const laneB = producerLaneByHash.get(b.migrationHash) ?? 0;
-      return laneA - laneB;
-    });
-    for (const producer of sorted) {
-      if (!emittedNodes.has(producer.from)) {
-        visitNode(producer.from);
-      }
+    for (const rollback of rollbacks) emitEdgeRow(rollback, column, false);
+
+    if (groups.length === 0) {
+      // A root / leaf: its column lane terminates here.
+      setLane(column, null);
     }
   }
 
-  const emittedNodes = new Set<string>();
-
-  function branchSpineLengthFromTip(tip: string): number {
-    let length = 0;
-    let current = tip;
-    for (;;) {
-      const producers = (forwardProducersByTo.get(current) ?? []).filter(
-        (e) => e.kind === 'forward' && e.from !== e.to,
-      );
-      if (producers.length !== 1) return length;
-      const producer = producers[0];
-      if (producer === undefined) return length;
-      const parent = producer.from;
-      if ((forwardOutDegree.get(parent) ?? 0) >= 2) {
-        return length + 1;
-      }
-      length += 1;
-      current = parent;
-    }
-  }
-
-  function visitNode(contract: string): void {
-    if (emittedNodes.has(contract)) return;
-
-    emitMergeIfNeeded(contract);
-
-    const producerCount = (forwardProducersByTo.get(contract) ?? []).length;
-    if ((forwardInDegree.get(contract) ?? 0) >= 2 && producerCount >= 2) {
-      nodeColumnByHash.set(contract, passThroughLaneCount(contract));
-    }
-
-    emitSelfEdgesBeforeNode(contract);
-    emitNodeRow(contract);
-    emittedNodes.add(contract);
-
-    emitConvergenceAfterNode(contract);
-    emitForwardProducersTo(contract);
-    emitDepartingEdgesFrom(contract);
-    visitBranchRoots(contract);
-    visitSingleProducerParent(contract);
-  }
-
-  function visitSingleProducerParent(contract: string): void {
-    const producers = (forwardProducersByTo.get(contract) ?? []).filter(
-      (e) => e.kind === 'forward' && e.from !== e.to,
-    );
-    if (producers.length !== 1) return;
-    const parent = producers[0]?.from;
-    if (parent === undefined || emittedNodes.has(parent)) return;
-    if ((forwardOutDegree.get(parent) ?? 0) >= 2) return;
-    visitNode(parent);
-  }
-
-  const tipStarts = componentNodes
-    .filter((node) => (forwardOutDegree.get(node) ?? 0) === 0)
-    .sort((a, b) => {
-      const spineA = branchSpineLengthFromTip(a);
-      const spineB = branchSpineLengthFromTip(b);
-      if (spineA !== spineB) return spineB - spineA;
-      const inA = forwardInDegree.get(a) ?? 0;
-      const inB = forwardInDegree.get(b) ?? 0;
-      if (inA !== inB) return inA - inB;
-      return componentNodes.indexOf(a) - componentNodes.indexOf(b);
-    });
-
-  for (const tip of tipStarts) {
-    visitNode(tip);
-  }
-
-  for (const node of componentNodes) {
-    if (!emittedNodes.has(node)) {
-      visitNode(node);
-    }
-  }
+  for (const node of order) processNode(node);
 
   return {
     rows: refineAdjacency(
       rows,
-      nodeColumnByHash,
+      nodeColumn,
       position,
       forwardInDegree,
       forwardOutDegree,
       edges,
       producerLaneByHash,
     ),
-    nodeColumn: nodeColumnByHash,
-    edgeColumn: edgeColumnByHash,
+    nodeColumn,
+    edgeColumn,
   };
 }
 
@@ -1029,7 +806,7 @@ export function buildMigrationGraphLayout(
     const component = components[componentIndex];
     if (component === undefined || component.length === 0) continue;
 
-    const result = layoutComponent(component, rowModel.edges, rowModel.edgesByFrom);
+    const result = layoutComponent(component, rowModel.edges);
     allRows.push(...result.rows);
     for (const [hash, column] of result.nodeColumn) nodeColumn.set(hash, column);
     for (const [hash, column] of result.edgeColumn) edgeColumn.set(hash, column);
