@@ -1,9 +1,0 @@
-{
-  "extends": ["@prisma-next/tsconfig/base"],
-  "compilerOptions": {
-    "outDir": "dist",
-    "lib": ["ES2022"]
-  },
-  "include": ["src/**/*.ts", "prisma/**/*.ts", "prisma-next.config.ts", "test/**/*.ts"],
-  "exclude": ["dist", "migrations"]
-}

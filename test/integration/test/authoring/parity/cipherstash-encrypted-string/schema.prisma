@@ -1,6 +1,0 @@
-// use prisma-next
-
-model User {
-  id Int @id
-  email cipherstash.EncryptedString()
-}
