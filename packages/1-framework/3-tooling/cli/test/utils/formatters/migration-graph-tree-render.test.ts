@@ -173,6 +173,30 @@ describe('renderMigrationGraphTree', () => {
     );
   });
 
+  it('renders skip-rollback with routed back-arcs per mockup', () => {
+    const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
+    const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
+    const addBio = edge('73e3abe', '3ee5d20', 'add_bio');
+    const addPosts = edge('3ee5d20', 'a94b7b4', 'add_posts');
+    const rollbackToPhone = edge('a94b7b4', '73e3abe', 'rollback_to_phone');
+    const rollbackToInit = edge('3ee5d20', 'ef9de27', 'rollback_to_init');
+    expect(tree([init, addPhone, addBio, addPosts, rollbackToPhone, rollbackToInit])).toBe(
+      [
+        '○─╮       a94b7b4',
+        '│ │↓      rollback_to_phone   a94b7b4 → 73e3abe',
+        '│↑│       add_posts           3ee5d20 → a94b7b4',
+        '○─┼─╮     3ee5d20',
+        '│ │ │↓    rollback_to_init    3ee5d20 → ef9de27',
+        '│↑│ │     add_bio             73e3abe → 3ee5d20',
+        '○◂╯ │     73e3abe',
+        '│↑  │     add_phone           ef9de27 → 73e3abe',
+        '○◂──╯     ef9de27',
+        '│↑        init                ∅ → ef9de27',
+        '○         ∅',
+      ].join('\n'),
+    );
+  });
+
   it('renders an adjacent rollback as a plain down arrow per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPhone = edge('ef9de27', '73e3abe', 'add_phone');

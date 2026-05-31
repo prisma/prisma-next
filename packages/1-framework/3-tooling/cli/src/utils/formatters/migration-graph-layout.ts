@@ -6,13 +6,22 @@ export type EdgeAdjacency = 'adjacent' | 'node-skipping-forward' | 'node-skippin
 
 export type StructuralCell =
   | { readonly kind: 'empty' }
-  | { readonly kind: 'node'; readonly contractHash: string }
+  | {
+      readonly kind: 'node';
+      readonly contractHash: string;
+      readonly arcTee?: boolean;
+      readonly arcLand?: boolean;
+    }
   | { readonly kind: 'vertical-pass' }
   | { readonly kind: 'horizontal-pass' }
   | { readonly kind: 'branch-tee' }
   | { readonly kind: 'branch-corner' }
   | { readonly kind: 'merge-tee' }
   | { readonly kind: 'merge-corner' }
+  | { readonly kind: 'arc-branch-corner' }
+  | { readonly kind: 'arc-land-corner' }
+  | { readonly kind: 'arc-crossing' }
+  | { readonly kind: 'arc-land-bridge' }
   | {
       readonly kind: 'edge-lane';
       readonly migrationHash: string;
@@ -296,7 +305,7 @@ function refineAdjacency(
     return index >= 0 ? index : undefined;
   }
 
-  return rows.map((row, index) => {
+  return rows.map((row, rowIndex) => {
     if (row.kind !== 'edge' || row.edge === undefined || row.laneIndex === undefined) {
       return row;
     }
@@ -313,10 +322,10 @@ function refineAdjacency(
         forwardProducersByTo,
         producerLaneByHash,
       )
-        ? classifyForwardShortConvergenceAdjacency(rows, index, row.edge, row.laneIndex)
+        ? classifyForwardShortConvergenceAdjacency(rows, rowIndex, row.edge, row.laneIndex)
         : classifyLayoutAdjacency(
             rows,
-            index,
+            rowIndex,
             row.edge,
             row.laneIndex,
             row.passThroughLanes ?? [],
@@ -529,6 +538,230 @@ function computeVerticalOrder(
 }
 
 // ---------------------------------------------------------------------------
+// Routed back-arcs for node-skipping rollbacks
+// ---------------------------------------------------------------------------
+
+interface SkipRollbackRoute {
+  readonly edge: ClassifiedEdge;
+  readonly backLane: number;
+}
+
+function rollbackSpan(
+  edge: ClassifiedEdge,
+  position: ReadonlyMap<string, number>,
+): { readonly top: number; readonly bottom: number } {
+  const top = position.get(edge.from) ?? 0;
+  const bottom = position.get(edge.to) ?? top;
+  return { top, bottom };
+}
+
+function spansOverlap(
+  a: { readonly top: number; readonly bottom: number },
+  b: { readonly top: number; readonly bottom: number },
+): boolean {
+  return a.top <= b.bottom && b.top <= a.bottom;
+}
+
+function forwardMaxLane(
+  rows: readonly MigrationGraphGridRow[],
+  skipMigrationHashes: ReadonlySet<string>,
+): number {
+  let max = 0;
+  for (const row of rows) {
+    if (
+      row.kind === 'edge' &&
+      row.edge !== undefined &&
+      skipMigrationHashes.has(row.edge.migrationHash)
+    ) {
+      continue;
+    }
+    max = Math.max(max, row.laneIndex ?? 0);
+    for (const lane of row.passThroughLanes ?? []) {
+      max = Math.max(max, lane);
+    }
+    if (row.startLane !== undefined) {
+      max = Math.max(max, row.startLane, row.endLane ?? row.startLane);
+    }
+  }
+  return max;
+}
+
+function allocateSkipRollbackBackLanes(
+  skipRollbacks: readonly ClassifiedEdge[],
+  position: ReadonlyMap<string, number>,
+  forwardMax: number,
+): Map<string, number> {
+  const sorted = [...skipRollbacks].sort((a, b) => {
+    const aTop = position.get(a.from) ?? 0;
+    const bTop = position.get(b.from) ?? 0;
+    if (aTop !== bTop) return aTop - bTop;
+    return b.dirName.localeCompare(a.dirName);
+  });
+
+  const occupied: { readonly top: number; readonly bottom: number; readonly lane: number }[] = [];
+  const lanes = new Map<string, number>();
+  let nextLane = forwardMax + 1;
+
+  for (const edge of sorted) {
+    const span = rollbackSpan(edge, position);
+    let lane = nextLane;
+    while (occupied.some((entry) => entry.lane === lane && spansOverlap(entry, span))) {
+      lane += 1;
+    }
+    occupied.push({ ...span, lane });
+    lanes.set(edge.migrationHash, lane);
+    nextLane = Math.max(nextLane, lane + 1);
+  }
+
+  return lanes;
+}
+
+function findNodeRowIndex(rows: readonly MigrationGraphGridRow[], contractHash: string): number {
+  return rows.findIndex((row) => row.kind === 'node' && row.contractHash === contractHash);
+}
+
+function findEdgeRowIndex(rows: readonly MigrationGraphGridRow[], migrationHash: string): number {
+  return rows.findIndex((row) => row.kind === 'edge' && row.edge?.migrationHash === migrationHash);
+}
+
+function ensureCellWidth(cells: StructuralCell[], width: number): void {
+  while (cells.length < width) {
+    cells.push({ kind: 'empty' });
+  }
+}
+
+function cloneRow(row: MigrationGraphGridRow): MigrationGraphGridRow {
+  return { ...row, cells: [...row.cells] };
+}
+
+function routeCrossesRow(
+  route: SkipRollbackRoute,
+  rowIndex: number,
+  rows: readonly MigrationGraphGridRow[],
+): boolean {
+  const sourceRow = findNodeRowIndex(rows, route.edge.from);
+  const targetRow = findNodeRowIndex(rows, route.edge.to);
+  if (sourceRow < 0 || targetRow < 0) return false;
+  return rowIndex > sourceRow && rowIndex <= targetRow;
+}
+
+function applySkipRollbackRouting(
+  rows: readonly MigrationGraphGridRow[],
+  skipRollbacks: readonly ClassifiedEdge[],
+  position: ReadonlyMap<string, number>,
+  nodeColumn: ReadonlyMap<string, number>,
+  edgeColumn: Map<string, number>,
+): MigrationGraphGridRow[] {
+  if (skipRollbacks.length === 0) return [...rows];
+
+  const skipHashes = new Set(skipRollbacks.map((edge) => edge.migrationHash));
+  const forwardMax = forwardMaxLane(rows, skipHashes);
+  const backLaneByHash = allocateSkipRollbackBackLanes(skipRollbacks, position, forwardMax);
+  const routes: SkipRollbackRoute[] = skipRollbacks.map((edge) => ({
+    edge,
+    backLane: backLaneByHash.get(edge.migrationHash) ?? forwardMax + 1,
+  }));
+
+  const result = rows.map(cloneRow);
+
+  for (const route of routes) {
+    const { edge, backLane } = route;
+    const nodeCol = nodeColumn.get(edge.from) ?? 0;
+    const targetCol = nodeColumn.get(edge.to) ?? 0;
+    const sourceRowIndex = findNodeRowIndex(result, edge.from);
+    const targetRowIndex = findNodeRowIndex(result, edge.to);
+    const edgeRowIndex = findEdgeRowIndex(result, edge.migrationHash);
+    if (sourceRowIndex < 0 || targetRowIndex < 0 || edgeRowIndex < 0) continue;
+
+    edgeColumn.set(edge.migrationHash, backLane);
+
+    const sourceRow = result[sourceRowIndex];
+    if (sourceRow !== undefined) {
+      const cells = sourceRow.cells as StructuralCell[];
+      ensureCellWidth(cells, backLane + 1);
+      const contractHash = sourceRow.contractHash ?? EMPTY_CONTRACT_HASH;
+      cells[nodeCol] = { kind: 'node', contractHash, arcTee: true };
+      for (let lane = nodeCol + 1; lane < backLane; lane += 1) {
+        const crossed = routes.some(
+          (other) =>
+            other.edge.migrationHash !== edge.migrationHash &&
+            other.backLane === lane &&
+            routeCrossesRow(other, sourceRowIndex, result),
+        );
+        cells[lane] = crossed ? { kind: 'arc-crossing' } : { kind: 'empty' };
+      }
+      cells[backLane] = { kind: 'arc-branch-corner' };
+    }
+
+    const edgeRow = result[edgeRowIndex];
+    if (edgeRow !== undefined) {
+      const passThrough = [nodeCol];
+      const width = Math.max(edgeRow.cells.length, backLane + 1);
+      result[edgeRowIndex] = {
+        ...edgeRow,
+        laneIndex: backLane,
+        passThroughLanes: passThrough,
+        cells: buildEdgeCells(edge, backLane, passThrough, 'node-skipping-rollback', width),
+      };
+    }
+
+    for (let index = edgeRowIndex + 1; index < targetRowIndex; index += 1) {
+      const row = result[index];
+      if (row === undefined) continue;
+      const cells = row.cells as StructuralCell[];
+      ensureCellWidth(cells, backLane + 1);
+      const existing = cells[backLane];
+      if (
+        existing?.kind !== 'arc-land-corner' &&
+        existing?.kind !== 'arc-land-bridge' &&
+        existing?.kind !== 'arc-branch-corner' &&
+        existing?.kind !== 'arc-crossing'
+      ) {
+        cells[backLane] = { kind: 'vertical-pass' };
+      }
+    }
+
+    const targetRow = result[targetRowIndex];
+    if (targetRow !== undefined) {
+      const cells = targetRow.cells as StructuralCell[];
+      ensureCellWidth(cells, backLane + 1);
+      const contractHash = targetRow.contractHash ?? EMPTY_CONTRACT_HASH;
+      cells[targetCol] = { kind: 'node', contractHash, arcLand: true };
+      for (let lane = targetCol + 1; lane < backLane; lane += 1) {
+        cells[lane] = { kind: 'arc-land-bridge' };
+      }
+      cells[backLane] = { kind: 'arc-land-corner' };
+      for (const other of routes) {
+        if (other.backLane <= backLane) continue;
+        if (!routeCrossesRow(other, targetRowIndex, result)) continue;
+        ensureCellWidth(cells, other.backLane + 1);
+        const existing = cells[other.backLane];
+        if (
+          existing?.kind !== 'arc-land-corner' &&
+          existing?.kind !== 'arc-land-bridge' &&
+          existing?.kind !== 'node'
+        ) {
+          cells[other.backLane] = { kind: 'vertical-pass' };
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+function collectNodeSkippingRollbacks(
+  edges: readonly ClassifiedEdge[],
+  position: ReadonlyMap<string, number>,
+): ClassifiedEdge[] {
+  return edges.filter(
+    (edge) =>
+      edge.kind === 'rollback' &&
+      classifyEdgeAdjacency(edge, position) === 'node-skipping-rollback',
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Lane allocation: one rule for all topologies
 // ---------------------------------------------------------------------------
 
@@ -729,6 +962,22 @@ function layoutComponent(
 
     emitNodeRow(node, column);
 
+    const rollbacks = [...(rollbacksByFrom.get(node) ?? [])].sort((a, b) =>
+      b.dirName.localeCompare(a.dirName),
+    );
+    const skipRollbacks: ClassifiedEdge[] = [];
+    const adjacentRollbacks: ClassifiedEdge[] = [];
+    for (const rollback of rollbacks) {
+      if (classifyEdgeAdjacency(rollback, position) === 'node-skipping-rollback') {
+        skipRollbacks.push(rollback);
+      } else {
+        adjacentRollbacks.push(rollback);
+      }
+    }
+    for (const rollback of skipRollbacks) {
+      emitEdgeRow(rollback, column, false);
+    }
+
     const groups = producerGroups(node);
     const isConvergence = (distinctSourceCountByTo.get(node) ?? 0) >= 2;
     const laneForGroup: number[] = [];
@@ -754,14 +1003,9 @@ function layoutComponent(
       }
     }
 
-    // Rollbacks decorate the node's own column directly below its forward
-    // producers; they never reserve a downward lane. An adjacent rollback shares
-    // the lane heading to the next node; a node-skipping rollback stays in the
-    // column and is marked for routing (the routed back-arc is a later feature).
-    const rollbacks = [...(rollbacksByFrom.get(node) ?? [])].sort((a, b) =>
-      b.dirName.localeCompare(a.dirName),
-    );
-    for (const rollback of rollbacks) emitEdgeRow(rollback, column, false);
+    for (const rollback of adjacentRollbacks) {
+      emitEdgeRow(rollback, column, false);
+    }
 
     if (groups.length === 0) {
       // A root / leaf: its column lane terminates here.
@@ -771,16 +1015,20 @@ function layoutComponent(
 
   for (const node of order) processNode(node);
 
+  const refined = refineAdjacency(
+    rows,
+    nodeColumn,
+    position,
+    forwardInDegree,
+    forwardOutDegree,
+    edges,
+    producerLaneByHash,
+  );
+  const skipRollbacks = collectNodeSkippingRollbacks(edges, position);
+  const routed = applySkipRollbackRouting(refined, skipRollbacks, position, nodeColumn, edgeColumn);
+
   return {
-    rows: refineAdjacency(
-      rows,
-      nodeColumn,
-      position,
-      forwardInDegree,
-      forwardOutDegree,
-      edges,
-      producerLaneByHash,
-    ),
+    rows: routed,
     nodeColumn,
     edgeColumn,
   };
