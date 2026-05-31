@@ -38,13 +38,20 @@ export type OrchestratorRun = {
 
 /** Spawns an orchestrator run for a pinned model + prompt. Injected in tests;
  *  the live default is loaded lazily from `sdk-adapter.ts`. */
-export type CreateAgent = (opts: { model: string; prompt: string }) => Promise<OrchestratorRun>;
+export type CreateAgent = (opts: {
+  model: string;
+  prompt: string;
+  cwd: string;
+}) => Promise<OrchestratorRun>;
 
 export type RunOneBriefConfig = {
   caseDir: string;
   traceFile: string;
   manifestFile: string;
   model: string;
+  /** Working directory for the spawned orchestrator run. Defaults to
+   *  `process.cwd()` in the CLI so dry-run behaviour is unchanged. */
+  runDir: string;
   /** Caller asked for a live run. */
   live: boolean;
   /** Whether a Cursor API key is present in the environment. */
@@ -124,7 +131,7 @@ export async function runOneBrief(
 
   let run: OrchestratorRun;
   try {
-    run = await createAgent({ model: config.model, prompt });
+    run = await createAgent({ model: config.model, prompt, cwd: config.runDir });
   } catch (err) {
     const manifest: RunManifest = {
       ...baseManifest,
@@ -253,6 +260,7 @@ async function main(): Promise<void> {
     model: parsed.model,
     traceFile,
     manifestFile,
+    runDir: process.cwd(),
     live: parsed.live,
     apiKeyPresent:
       typeof process.env.CURSOR_API_KEY === 'string' && process.env.CURSOR_API_KEY.length > 0,
