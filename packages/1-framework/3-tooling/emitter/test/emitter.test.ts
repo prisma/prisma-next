@@ -1,9 +1,11 @@
+import { DomainNamespaceResolutionError } from '@prisma-next/contract/types';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
 import { getEmittedArtifactPaths } from '../src/exports';
+import { generateContractDts } from '../src/generate-contract-dts';
 import { createMockSpi } from './mock-spi';
 import { createTestContract, emit } from './utils';
 
@@ -450,6 +452,24 @@ describe('emitter', () => {
 
     const result = await emit(ir, options, baseSpi);
     expect(result.contractDts).toContain('export type FieldOutputTypes');
+  });
+
+  it('throws when domain has more than one namespace', () => {
+    const contract = {
+      ...createTestContract(),
+      domain: {
+        namespaces: {
+          auth: { models: {} },
+          public: { models: {} },
+        },
+      },
+    };
+    expect(() =>
+      generateContractDts(contract, mockSqlHook, [], {
+        storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
+        profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+      }),
+    ).toThrow(DomainNamespaceResolutionError);
   });
 
   it('emits execution clause when contract has execution section', async () => {

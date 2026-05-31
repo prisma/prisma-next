@@ -4,7 +4,7 @@ import {
   type ContractValueObject,
   contractModels,
   contractValueObjects,
-  UNBOUND_DOMAIN_NAMESPACE_ID,
+  resolveSingleDomainNamespaceId,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
@@ -57,14 +57,15 @@ export function generateContractDts(
 
   const storageType = emitter.generateStorageType(contract, 'StorageHash');
 
-  const modelsRecord = contractModels(contract) as Record<string, ContractModel>;
+  const domainNamespaceId = resolveSingleDomainNamespaceId(contract.domain);
+  const modelsRecord = contractModels(contract, domainNamespaceId) as Record<string, ContractModel>;
   const modelsType = generateModelsType(modelsRecord, (name, model) =>
     emitter.generateModelStorageType(name, model),
   );
 
   const rootsType = generateRootsType(contract.roots);
 
-  const valueObjects = contractValueObjects(contract) as
+  const valueObjects = contractValueObjects(contract, domainNamespaceId) as
     | Record<string, ContractValueObject>
     | undefined;
   const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
@@ -127,7 +128,7 @@ ${modelsType}
   readonly roots: ${rootsType};
   readonly domain: {
     readonly namespaces: {
-      readonly ${UNBOUND_DOMAIN_NAMESPACE_ID}: {
+      readonly ${domainNamespaceId}: {
         readonly models: ${modelsType};
         ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
       };

@@ -11,7 +11,6 @@ import {
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
 import { emit as emitImpl } from '../src/exports';
@@ -71,20 +70,25 @@ type TestContractOverrides = {
   sources?: Record<string, unknown>;
 };
 
-/** Models map from canonical contract JSON (`domain.namespaces` or legacy flat `models`). */
+/** Models map from canonical contract JSON (`domain.namespaces`, single namespace only). */
 export function modelsFromCanonicalContract(
   json: Record<string, unknown>,
 ): Record<string, unknown> {
   const domain = json['domain'] as Record<string, unknown> | undefined;
   const namespaces = domain?.['namespaces'] as Record<string, unknown> | undefined;
-  const unbound = namespaces?.[UNBOUND_NAMESPACE_ID] as Record<string, unknown> | undefined;
-  const fromDomain = unbound?.['models'];
-  if (fromDomain !== undefined && typeof fromDomain === 'object' && fromDomain !== null) {
-    return fromDomain as Record<string, unknown>;
+  if (namespaces === undefined) {
+    return {};
   }
-  const legacy = json['models'];
-  if (legacy !== undefined && typeof legacy === 'object' && legacy !== null) {
-    return legacy as Record<string, unknown>;
+  const namespaceIds = Object.keys(namespaces);
+  if (namespaceIds.length !== 1) {
+    throw new Error(
+      `expected exactly one domain namespace in canonical JSON, found ${namespaceIds.length}`,
+    );
+  }
+  const slice = namespaces[namespaceIds[0]!] as Record<string, unknown> | undefined;
+  const models = slice?.['models'];
+  if (models !== undefined && typeof models === 'object' && models !== null) {
+    return models as Record<string, unknown>;
   }
   return {};
 }
