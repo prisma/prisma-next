@@ -85,7 +85,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
 
-      expect(types).toContain('readonly namespaces:');
+      expect(types).toContain('readonly __unbound__:');
       expect(types).not.toContain('readonly Vector1536');
     });
 
@@ -108,7 +108,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
 
       const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
 
-      expect(types).toContain('readonly namespaces:');
+      expect(types).toContain('readonly __unbound__:');
       expect(types).not.toContain('readonly Vector1536');
     });
 

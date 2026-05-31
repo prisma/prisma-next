@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { getStorageNamespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
 import { normalizeRootSqlStorage } from './sql-storage-fixture';
@@ -22,50 +22,10 @@ function createContract(overrides: Partial<Contract>): Contract {
 }
 
 function installNamespacedTableDeletionRace(ir: Contract, tableName: string): void {
-  const originalStorage = ir.storage as {
-    namespaces: Record<string, { tables: Record<string, unknown> }>;
+  const namespace = getStorageNamespace(ir.storage, UNBOUND_NAMESPACE_ID) as {
+    tables: Record<string, unknown>;
   };
-  let tableDeleted = false;
-  const proxiedStorage = new Proxy(originalStorage, {
-    get(target, prop, receiver) {
-      if (prop === 'namespaces') {
-        return new Proxy(target.namespaces, {
-          get(nsTarget, nsKey) {
-            if (nsKey !== UNBOUND_NAMESPACE_ID) {
-              return Reflect.get(nsTarget, nsKey, nsTarget);
-            }
-            const inner = Reflect.get(nsTarget, nsKey) as { tables: Record<string, unknown> };
-            return new Proxy(inner, {
-              get(innerTarget, innerProp) {
-                if (innerProp !== 'tables') {
-                  return Reflect.get(innerTarget, innerProp, innerTarget);
-                }
-                return new Proxy(innerTarget.tables, {
-                  get(tableTarget, tableProp) {
-                    if (tableProp === tableName && tableDeleted) {
-                      return undefined;
-                    }
-                    return Reflect.get(tableTarget, tableProp, tableTarget);
-                  },
-                  has(tableTarget, tableProp) {
-                    return Reflect.has(tableTarget, tableProp);
-                  },
-                  ownKeys(tableTarget) {
-                    return Reflect.ownKeys(tableTarget);
-                  },
-                });
-              },
-            });
-          },
-        });
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  delete getStorageNamespace(originalStorage, UNBOUND_NAMESPACE_ID).tables[tableName];
-  tableDeleted = true;
-  (ir as { storage: unknown }).storage = proxiedStorage;
+  delete namespace.tables[tableName];
 }
 
 describe('sql-target-family-hook', () => {
@@ -178,7 +138,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('SQL contract must have storage namespace entries');
+    }).toThrow('SQL contract must have storage with storageHash');
   });
 
   it('validates structure with missing storage.tables', () => {
@@ -188,7 +148,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('SQL contract must have storage namespace entries');
+    }).toThrow('SQL contract must have storage with storageHash');
   });
 
   it('validates structure with model missing storage.table', () => {
