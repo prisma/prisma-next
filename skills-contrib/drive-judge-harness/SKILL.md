@@ -2,14 +2,15 @@
 name: drive-judge-harness
 description: >
   Spawns one Drive orchestrator run on a golden-case brief with a pinned model,
-  accumulates per-run token usage, and writes a run manifest — the corpus
-  generator the Drive LLM judge calibrates against. Supports a pinned skill-bundle
-  input (prepare-run → spawn → collect-run) so runs are reproducible against a
-  known base ref + skill version. Use when you want to run a golden Drive brief
-  end-to-end, produce a natively-instrumented run, accumulate token usage from the
-  Cursor SDK, or validate the post-hoc trace parser against a transcript corpus.
-  Live execution is gated behind --live + CURSOR_API_KEY; the default is a dry-run
-  that makes no live call.
+  records per-run token usage / USD cost / wall-clock, and writes a run manifest —
+  the corpus generator the Drive LLM judge calibrates against. Runs on the Claude
+  Agent SDK by default (Cursor SDK selectable via --runtime cursor). Supports a
+  pinned skill-bundle input (prepare-run → spawn → collect-run) so runs are
+  reproducible against a known base ref + skill version. Use when you want to run a
+  golden Drive brief end-to-end, produce a natively-instrumented run, capture
+  token/cost/wall-clock, or validate the post-hoc trace parser against a transcript
+  corpus. Live execution is gated behind --live + the runtime's API key; the default
+  is a dry-run that makes no live call.
 ---
 
 # Drive: Judge harness (run-one-brief / run-arm)
@@ -48,24 +49,56 @@ builds the k=N A/B loop on top of.
 - `run-one-brief.ts` — `runOneBrief(config, deps)` + a CLI. Owns the
   live-execution gate and orchestration. Accepts `runDir` so the orchestrator
   spawns inside the prepared checkout.
-- `sdk-adapter.ts` — the **only** module that touches `@cursor/sdk`, via a
-  dynamic import reached solely on the live path. Uses the `cwd` passed from
-  `run-one-brief` rather than the harness's `process.cwd()`.
+- `claude-adapter.ts` — the **default** live runtime: the only module that
+  imports `@anthropic-ai/claude-agent-sdk`, via a dynamic import reached solely on
+  the live claude path. Runs the orchestrator with the injected `.claude/skills/`
+  loaded (`settingSources: ['project']`, `skills: 'all'`) inside the prepared
+  checkout, unattended (`permissionMode: 'bypassPermissions'`), with an optional
+  `maxBudgetUsd` hard cap. Reports tokens + `total_cost_usd` + `duration_ms` +
+  `num_turns` natively.
+- `sdk-adapter.ts` — the **secondary** Cursor runtime: the only module that
+  touches `@cursor/sdk`, via a dynamic import reached solely on the live cursor
+  path. Selected with `--runtime cursor`.
+- `claude-events.ts` / `sdk-events.ts` — pure message-shape mappers for each
+  runtime (no SDK import), so the adapters' extraction logic is unit-testable with
+  neither SDK installed.
 - `validate-parser.ts` — validates `drive-diagnose-run/posthoc.ts` over a
   transcript corpus, tallying reconstruction confidence (clears TML-2728).
 - `judge/` — the bespoke-minimal LLM judge (TML-2736). Grades one Drive run
   from its diff + acceptance set + trace excerpts and emits the `intent`
   correctness component the scorecard already reads. See § The LLM judge below.
 
+## Runtimes (claude default, cursor secondary)
+
+The harness is decoupled from any one agent vendor by a small seam in
+`run-one-brief.ts` (`CreateAgent` / `OrchestratorRun` / `RunOutcome`); each runtime
+is one adapter behind it, selected with `--runtime <claude|cursor>` (default
+`claude`).
+
+- **`claude`** (default) — Anthropic's Claude Agent SDK. The native home of the
+  SKILL.md + subagent conventions the drive-* skills use, and it reports
+  per-run **tokens, USD cost (`cost_usd`), wall-clock (`wall_clock_ms`), and turn
+  count (`num_turns`)** on its terminal result message. Key: `ANTHROPIC_API_KEY`.
+  Supports `--max-budget-usd <n>` (a hard per-run dollar cap; the run aborts with
+  an error result if the estimate reaches it).
+- **`cursor`** (secondary) — `@cursor/sdk`. Kept for spot-checking the Cursor
+  substrate. Its **local runtime emits no token usage** (see KNOWN-ISSUES.md and
+  the spike), so cursor runs record `tokens: null` and rely on `wall_clock_ms`
+  alone. Key: `CURSOR_API_KEY`.
+
+The model is pinned with `--model` (e.g. `claude-haiku-4-5` for cheap calibration,
+`claude-sonnet-4-5` for realistic runs); the harness never hardcodes one.
+
 ## The live-execution gate (safety property)
 
-A live run requires **both** `--live` **and** a present `CURSOR_API_KEY`.
-Otherwise the harness takes the **dry-run** path: it never imports `@cursor/sdk`,
-never makes a network call, and writes a manifest with `status: "dry-run"`,
-`tokens: null`. Because the SDK is reached only through `sdk-adapter.ts`'s
-dynamic import on the live path, **typecheck / test / lint / CI all stay green
-with no `CURSOR_API_KEY` set and `@cursor/sdk` not installed.** Tests inject a
-mock `createAgent` and never make a live call.
+A live run requires **both** `--live` **and** the selected runtime's API key
+present (`ANTHROPIC_API_KEY` for claude, `CURSOR_API_KEY` for cursor). Otherwise
+the harness takes the **dry-run** path: it never imports an SDK, never makes a
+network call, and writes a manifest with `status: "dry-run"`, `tokens: null`.
+Because each SDK is reached only through its adapter's dynamic import on the live
+path, **typecheck / test / lint / CI all stay green with no API key set and
+neither SDK installed.** Tests inject a mock `createAgent` and never make a live
+call.
 
 ## The pinned skill-bundle pipeline (run-arm)
 
@@ -168,18 +201,18 @@ trace via the emitter. The spawned orchestrator self-instruments its Drive
 methodology events into `--trace-file` via `drive-record-traces`; the harness
 owns only the token manifest.
 
-**Tokens are unavailable for local runs.** The `@cursor/sdk` *local* runtime
-emits no per-turn usage events at all — no `turnEnded`, and nothing in the run
-outcome, the `getRun`/`V1Run` cloud query, or the `analytics` surface carries
-token counts (confirmed by the spike at
+**Token availability is per-runtime.** On the default **claude** runtime the
+terminal result message carries cumulative `usage` + `total_cost_usd`, so a run
+records real `tokens` **and** `cost_usd` (plus `num_turns` and `wall_clock_ms`).
+On the secondary **cursor** runtime the *local* `@cursor/sdk` runtime emits no
+usage signal at all — nothing in its stream, run outcome, `getRun`/`V1Run` cloud
+query, or `analytics` surface carries token counts (confirmed by the spike at
 `projects/drive-judge-harness/spikes/2026-05-31-sdk-token-usage-retrieval.md`,
-and see KNOWN-ISSUES.md). So `tokens` is honestly `null` for local runs, with a
-note recorded on the manifest. **Wall-clock (`wall_clock_ms`, from the run
-outcome's `durationMs`) is therefore the primary Tier-2 efficiency metric.** A
-future token source would have to come from outside the SDK (a Cursor
-admin/usage API, or CLI-internal telemetry); `accumulateUsage` stays wired so the
-signal flows automatically if the cloud runtime (which *does* stream usage) is
-used, or once a local source exists.
+and see KNOWN-ISSUES.md) — so cursor runs record `tokens: null` with a note, and
+fall back to **`wall_clock_ms`** as the efficiency metric. `run-one-brief` reads
+`tokens` from the run outcome when the runtime provides them (claude), else
+accumulates per-turn usage (the cursor path), so both runtimes feed the same
+`TokenTotals` shape.
 
 ## The LLM judge (`judge/`)
 
