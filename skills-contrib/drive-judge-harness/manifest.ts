@@ -28,8 +28,11 @@ export type RunManifest = {
   agent_id: string | null;
   trace_file: string;
   /** Accumulated per-run usage, or `null` when no live run produced a signal
-   *  (dry-run, or a startup failure before any turn completed). */
+   *  (dry-run, startup failure, or local runtime which emits no usage events). */
   tokens: TokenTotals | null;
+  /** Wall-clock duration reported by the SDK (`wait()` outcome `durationMs`),
+   *  or `null` for dry-run, startup-failed, and error paths. */
+  wall_clock_ms: number | null;
   started_at: string;
   finished_at: string | null;
   notes: string[];

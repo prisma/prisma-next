@@ -1,6 +1,6 @@
 import { Agent } from '@cursor/sdk';
 import type { CreateAgent, OrchestratorRun, RunOutcome } from './run-one-brief.ts';
-import { outcomeFromResult, streamEventFromMessage } from './sdk-events.ts';
+import { agentIdFromMessage, outcomeFromResult, streamEventFromMessage } from './sdk-events.ts';
 
 // The ONLY module that touches `@cursor/sdk`, loaded lazily by run-one-brief on
 // the live path, so typecheck / tests / lint / dry-run never require it.
@@ -26,16 +26,20 @@ function adaptRun(sdkRun: {
   stream(): AsyncIterable<unknown>;
   wait(): Promise<unknown>;
 }): OrchestratorRun {
+  let capturedAgentId: string | null = null;
   return {
     async *stream() {
       for await (const message of sdkRun.stream()) {
+        if (capturedAgentId === null) {
+          capturedAgentId = agentIdFromMessage(message);
+        }
         yield streamEventFromMessage(message);
       }
     },
     async wait(): Promise<RunOutcome> {
       const raw = await sdkRun.wait();
-      const { status, runId } = outcomeFromResult(raw);
-      return { status, runId, agentId: null };
+      const { status, runId, durationMs } = outcomeFromResult(raw);
+      return { status, runId, agentId: capturedAgentId, durationMs };
     },
   };
 }

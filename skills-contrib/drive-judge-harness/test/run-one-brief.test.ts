@@ -48,7 +48,7 @@ describe('runOneBrief — dry-run gate', () => {
     let called = false;
     const createAgent: CreateAgent = async () => {
       called = true;
-      return mockRun([], { status: 'finished', runId: null, agentId: null });
+      return mockRun([], { status: 'finished', runId: null, agentId: null, durationMs: null });
     };
     const result = await runOneBrief(
       {
@@ -72,7 +72,7 @@ describe('runOneBrief — dry-run gate', () => {
     let called = false;
     const createAgent: CreateAgent = async () => {
       called = true;
-      return mockRun([], { status: 'finished', runId: null, agentId: null });
+      return mockRun([], { status: 'finished', runId: null, agentId: null, durationMs: null });
     };
     const result = await runOneBrief(
       {
@@ -125,7 +125,12 @@ describe('runOneBrief — live path with mock SDK', () => {
       { kind: 'turn-ended', usage: { inputTokens: 50, outputTokens: 20 } },
     ];
     const createAgent: CreateAgent = async () =>
-      mockRun(events, { status: 'finished', runId: 'run-42', agentId: 'agent-42' });
+      mockRun(events, {
+        status: 'finished',
+        runId: 'run-42',
+        agentId: 'agent-42',
+        durationMs: null,
+      });
 
     const manifestFile = join(dir, 'run.json');
     const result = await runOneBrief(
@@ -179,7 +184,7 @@ describe('runOneBrief — live path with mock SDK', () => {
       { kind: 'turn-ended', usage: { inputTokens: 10, outputTokens: 2 } },
     ];
     const createAgent: CreateAgent = async () =>
-      mockRun(events, { status: 'error', runId: 'run-err', agentId: null });
+      mockRun(events, { status: 'error', runId: 'run-err', agentId: null, durationMs: null });
     const result = await runOneBrief(
       {
         caseDir: CASE_DIR,
@@ -203,7 +208,7 @@ describe('runOneBrief — live path with mock SDK', () => {
         throw new Error('stream died');
       },
       async wait() {
-        return { status: 'finished', runId: 'unreached', agentId: null };
+        return { status: 'finished', runId: 'unreached', agentId: null, durationMs: null };
       },
     });
     const manifestFile = join(dir, 'run.json');
@@ -225,6 +230,39 @@ describe('runOneBrief — live path with mock SDK', () => {
     // The manifest is still written to disk despite the throw.
     const parsed = JSON.parse(readFileSync(manifestFile, 'utf8'));
     assert.equal(parsed.status, 'error');
+  });
+
+  it('captures agent_id and wall_clock_ms from the outcome, and notes null tokens', async () => {
+    const createAgent: CreateAgent = async () =>
+      mockRun([], {
+        status: 'finished',
+        runId: 'run-live-1',
+        agentId: 'agent-live-1',
+        durationMs: 87654,
+      });
+
+    const result = await runOneBrief(
+      {
+        caseDir: CASE_DIR,
+        traceFile: join(dir, 'trace.jsonl'),
+        manifestFile: join(dir, 'run.json'),
+        model: 'pinned-model',
+        runDir: dir,
+        live: true,
+        apiKeyPresent: true,
+      },
+      { createAgent, now: FIXED_NOW },
+    );
+
+    assert.equal(result.status, 'finished');
+    assert.equal(result.manifest.agent_id, 'agent-live-1');
+    assert.equal(result.manifest.wall_clock_ms, 87654);
+    assert.equal(result.manifest.tokens, null);
+    assert.ok(
+      result.manifest.notes.some((n) =>
+        n.includes('tokens unavailable: @cursor/sdk local runtime emits no usage events'),
+      ),
+    );
   });
 });
 

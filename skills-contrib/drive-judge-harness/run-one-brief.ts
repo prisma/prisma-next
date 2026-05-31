@@ -28,6 +28,7 @@ export type RunOutcome = {
   status: 'finished' | 'error';
   runId: string | null;
   agentId: string | null;
+  durationMs: number | null;
 };
 
 /** A started orchestrator run the harness observes. */
@@ -119,6 +120,7 @@ export async function runOneBrief(
       run_id: null,
       agent_id: null,
       tokens: null,
+      wall_clock_ms: null,
       finished_at: now(),
       notes: [reason, 'no SDK call was made; no orchestrator run was spawned'],
     };
@@ -139,6 +141,7 @@ export async function runOneBrief(
       run_id: null,
       agent_id: null,
       tokens: null,
+      wall_clock_ms: null,
       finished_at: now(),
       notes: [`startup-failed: ${err instanceof Error ? err.message : String(err)}`],
     };
@@ -154,7 +157,15 @@ export async function runOneBrief(
       }
     }
     const outcome = await run.wait();
-    const tokens: TokenTotals = accumulateUsage(usageUpdates);
+    const tokens: TokenTotals | null =
+      usageUpdates.length > 0 ? accumulateUsage(usageUpdates) : null;
+
+    const notes: string[] = [];
+    if (outcome.status === 'finished' && tokens === null) {
+      notes.push(
+        'tokens unavailable: @cursor/sdk local runtime emits no usage events (see spike 2026-05-31)',
+      );
+    }
 
     const manifest: RunManifest = {
       ...baseManifest,
@@ -162,8 +173,9 @@ export async function runOneBrief(
       run_id: outcome.runId,
       agent_id: outcome.agentId,
       tokens,
+      wall_clock_ms: outcome.durationMs,
       finished_at: now(),
-      notes: [],
+      notes,
     };
     const manifestContent = writeManifest(config.manifestFile, manifest);
     return { status: outcome.status, manifest, manifestContent, createAgentCalled: true };
@@ -171,13 +183,15 @@ export async function runOneBrief(
     // A live stream/wait can throw mid-run; write an error manifest with the
     // usage gathered so far so the token signal and the failure survive rather
     // than escaping as an unhandled rejection out of `void main()`.
-    const tokens: TokenTotals = accumulateUsage(usageUpdates);
+    const tokens: TokenTotals | null =
+      usageUpdates.length > 0 ? accumulateUsage(usageUpdates) : null;
     const manifest: RunManifest = {
       ...baseManifest,
       status: 'error',
       run_id: null,
       agent_id: null,
       tokens,
+      wall_clock_ms: null,
       finished_at: now(),
       notes: [`error: ${err instanceof Error ? err.message : String(err)}`],
     };

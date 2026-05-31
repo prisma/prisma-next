@@ -26,7 +26,7 @@ function mockRun(): OrchestratorRun {
   return {
     async *stream() {},
     async wait() {
-      return { status: 'finished', runId: null, agentId: null };
+      return { status: 'finished', runId: null, agentId: null, durationMs: null };
     },
   };
 }

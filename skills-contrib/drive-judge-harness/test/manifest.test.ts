@@ -24,6 +24,7 @@ const dryRunManifest: RunManifest = {
   agent_id: null,
   trace_file: 'projects/x/trace.jsonl',
   tokens: null,
+  wall_clock_ms: null,
   started_at: '2026-05-30T00:00:00.000Z',
   finished_at: null,
   notes: ['dry-run: live execution gate not satisfied'],
@@ -59,6 +60,7 @@ describe('writeManifest', () => {
       status: 'finished',
       run_id: 'run-1',
       agent_id: 'agent-1',
+      wall_clock_ms: 5000,
       finished_at: '2026-05-30T00:10:00.000Z',
       tokens: {
         inputTokens: 100,

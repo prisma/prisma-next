@@ -66,7 +66,7 @@ function mockRun(): OrchestratorRun {
   return {
     async *stream() {},
     async wait() {
-      return { status: 'finished', runId: 'run-1', agentId: 'agent-1' };
+      return { status: 'finished', runId: 'run-1', agentId: 'agent-1', durationMs: null };
     },
   };
 }
