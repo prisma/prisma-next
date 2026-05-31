@@ -247,15 +247,21 @@ describe('buildMigrationGraphLayout', () => {
     expect(mergeAtB?.cells[1]?.kind).toBe('merge-corner');
     expect(mergeAtB?.cells[2]?.kind).toBe('vertical-pass');
 
-    // `├───┘` — lanes 0 (B) and 2 (D) merge into A.
+    // `├───┘` — lanes 0 (B) and 2 (D) merge into A; lane 1 carries no active lane here,
+    // so it is a dormant horizontal fill (the `─` bridging tee and corner) — neither a
+    // vertical pass-through nor a join.
     const mergeAtA = model.rows.find((r) => r.kind === 'merge-connector' && r.contractHash === 'A');
     expect(mergeAtA).toMatchObject({ startLane: 0, endLane: 2, branchCount: 2 });
     expect(mergeAtA?.cells[0]?.kind).toBe('merge-tee');
+    expect(mergeAtA?.cells[1]?.kind).toBe('horizontal-pass');
     expect(mergeAtA?.cells[2]?.kind).toBe('merge-corner');
 
+    // Convergence-producer adjacency mirrors the diamond's alice/bob reading: 'adjacent'
+    // is the producer whose source node is the nearest node row below the fan. B (B→E's
+    // source) renders immediately below the fan; D (D→E's source) is further down.
     expectEdgeGeometry(model.rows, 'B_to_C', 0, [], 'adjacent');
-    expectEdgeGeometry(model.rows, 'B_to_E', 1, [0, 2], 'node-skipping-forward');
-    expectEdgeGeometry(model.rows, 'D_to_E', 2, [0, 1], 'adjacent');
+    expectEdgeGeometry(model.rows, 'B_to_E', 1, [0, 2], 'adjacent');
+    expectEdgeGeometry(model.rows, 'D_to_E', 2, [0, 1], 'node-skipping-forward');
     expectEdgeGeometry(model.rows, 'A_to_B', 0, [2], 'adjacent');
     expectEdgeGeometry(model.rows, 'A_to_D', 2, [0], 'adjacent');
 
@@ -381,6 +387,7 @@ describe('buildMigrationGraphLayout', () => {
       'empty',
       'node',
       'vertical-pass',
+      'horizontal-pass',
       'branch-tee',
       'branch-corner',
       'merge-tee',
