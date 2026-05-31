@@ -168,6 +168,19 @@ trace via the emitter. The spawned orchestrator self-instruments its Drive
 methodology events into `--trace-file` via `drive-record-traces`; the harness
 owns only the token manifest.
 
+**Tokens are unavailable for local runs.** The `@cursor/sdk` *local* runtime
+emits no per-turn usage events at all — no `turnEnded`, and nothing in the run
+outcome, the `getRun`/`V1Run` cloud query, or the `analytics` surface carries
+token counts (confirmed by the spike at
+`projects/drive-judge-harness/spikes/2026-05-31-sdk-token-usage-retrieval.md`,
+and see KNOWN-ISSUES.md). So `tokens` is honestly `null` for local runs, with a
+note recorded on the manifest. **Wall-clock (`wall_clock_ms`, from the run
+outcome's `durationMs`) is therefore the primary Tier-2 efficiency metric.** A
+future token source would have to come from outside the SDK (a Cursor
+admin/usage API, or CLI-internal telemetry); `accumulateUsage` stays wired so the
+signal flows automatically if the cloud runtime (which *does* stream usage) is
+used, or once a local source exists.
+
 ## The LLM judge (`judge/`)
 
 A bespoke-minimal grader that turns the run's artifacts (diff + golden

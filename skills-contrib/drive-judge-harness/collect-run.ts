@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { type } from 'arktype';
-import { join } from 'pathe';
 import { Slice1TraceEvent } from '../drive-record-traces/schema.ts';
 import type { PreparedRun } from './prepare-run.ts';
 import { findJsonlFiles } from './trace-files.ts';

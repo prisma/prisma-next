@@ -52,3 +52,21 @@ The token-usage signal this harness needs comes from `TurnEndedUpdate.usage`, wh
 - read the per-turn `usage` field through a small, explicitly-bounded structural view in `sdk-adapter.ts` (guarded at runtime; no bare casts) rather than a fabricated full mirror of the SDK's types.
 
 When upstream ships resolvable types, replace that structural view with the real `TurnEndedUpdate` import and delete the workaround.
+
+## 2. The local runtime emits no token-usage signal at all
+
+Distinct from (and more fundamental than) the type-resolution gap above: even at **runtime**, the `@cursor/sdk` *local* runtime never emits a usage signal, so there is nothing to read regardless of types.
+
+Confirmed by a probe (spike `projects/drive-judge-harness/spikes/2026-05-31-sdk-token-usage-retrieval.md`) against `@cursor/sdk@1.0.15`:
+
+- The local `run.stream()` yields only `status` and `assistant` messages — **no `turnEnded`/`usage` event** (that update is streamed only by the *cloud* runtime).
+- The `run.wait()` outcome (`{ id, status, result, model, durationMs }`) carries wall-clock but **no tokens**.
+- The cloud `getRun → V1Run` (`{ id, agentId, status, createdAt, updatedAt, durationMs?, result?, git? }`), `RunResultMetadata`, and the `analytics` surface (emit-only `trackSdkRun*`; props carry `turn_count`/latency/`end_reason`) all carry **no token counts**.
+
+### Impact on this harness
+
+For local runs, `tokens` is `null` (with a manifest note), and **`wall_clock_ms` (the outcome's `durationMs`) is the primary efficiency metric.** `accumulateUsage` remains wired, so usage flows automatically if a cloud run (which does stream `turnEnded`) is used, or once a non-SDK local token source exists.
+
+### Suggested fix (upstream)
+
+Stream `turnEnded` (with `usage`) from the local runtime as the cloud runtime already does, or expose per-run token counts on the run outcome / a queryable usage API.
