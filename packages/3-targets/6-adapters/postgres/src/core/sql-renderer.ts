@@ -7,7 +7,12 @@ import {
   type AnyParamRef,
   type AnyQueryAst,
   type BinaryExpr,
+  type ColumnDefault,
   type ColumnRef,
+  type ColumnType,
+  type CreateSchemaAst,
+  type CreateTableAst,
+  type CreateTableColumn,
   collectOrderedParamRefs,
   type DeleteAst,
   type InsertAst,
@@ -150,6 +155,12 @@ export function renderLoweredSql(
       break;
     case 'raw-sql':
       sql = renderRawSql(node, contract, pim);
+      break;
+    case 'create-schema':
+      sql = renderCreateSchema(node);
+      break;
+    case 'create-table':
+      sql = renderCreateTable(node);
       break;
     // v8 ignore next 4
     default:
@@ -832,4 +843,51 @@ function renderRawExpr(node: RawExpr, contract: PostgresContract, pim: ParamInde
   return node.parts
     .map((part) => (typeof part === 'string' ? part : renderExpr(part, contract, pim)))
     .join('');
+}
+
+function renderCreateSchema(ast: CreateSchemaAst): string {
+  return `create schema${ast.ifNotExists ? ' if not exists' : ''} ${ast.name}`;
+}
+
+function renderCreateTable(ast: CreateTableAst): string {
+  const qualified =
+    ast.table.schema !== undefined ? `${ast.table.schema}.${ast.table.name}` : ast.table.name;
+  const columns = ast.columns.map((column) => `    ${renderColumnDef(column)}`).join(',\n');
+  return `create table${ast.ifNotExists ? ' if not exists' : ''} ${qualified} (\n${columns}\n  )`;
+}
+
+function renderColumnDef(column: CreateTableColumn): string {
+  const parts: string[] = [column.name, renderColumnType(column.type)];
+  if (column.notNull) parts.push('not null');
+  if (column.primaryKey) parts.push('primary key');
+  if (column.default !== undefined) parts.push(`default ${renderColumnDefault(column.default)}`);
+  return parts.join(' ');
+}
+
+function renderColumnType(type: ColumnType): string {
+  switch (type) {
+    case 'text':
+      return 'text';
+    case 'text-array':
+      return 'text[]';
+    case 'jsonb':
+      return 'jsonb';
+    case 'int':
+      return 'int';
+    case 'bigserial':
+      return 'bigserial';
+    case 'timestamptz':
+      return 'timestamptz';
+  }
+}
+
+function renderColumnDefault(def: ColumnDefault): string {
+  switch (def.kind) {
+    case 'literal':
+      return def.value;
+    case 'now':
+      return 'now()';
+    case 'empty-collection':
+      return "'{}'";
+  }
 }
