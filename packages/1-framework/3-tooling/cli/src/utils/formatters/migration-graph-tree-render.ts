@@ -33,12 +33,11 @@ function arrowForEdgeKind(kind: MigrationEdgeKind): string {
   return '↑';
 }
 
-// Node-skipping rollbacks are laid out in a single lane today; routed back-arcs
-// (mockups § routed arcs) are deferred and will replace the plain `↓` glyph later.
-
 function renderCellPair(cell: StructuralCell, style: MigrationListStyler): string {
   switch (cell.kind) {
     case 'node':
+      if (cell.arcLand === true) return style.lane('○◂');
+      if (cell.arcTee === true) return style.lane('○─');
       return '○ ';
     case 'vertical-pass':
       return style.lane('│ ');
@@ -52,6 +51,14 @@ function renderCellPair(cell: StructuralCell, style: MigrationListStyler): strin
       return style.lane('╮ ');
     case 'merge-corner':
       return style.lane('╯ ');
+    case 'arc-branch-corner':
+      return style.lane('╮ ');
+    case 'arc-land-corner':
+      return style.lane('╯ ');
+    case 'arc-crossing':
+      return style.lane('┼─');
+    case 'arc-land-bridge':
+      return style.lane('──');
     case 'horizontal-pass':
       return style.lane('──');
     case 'empty':
@@ -188,22 +195,43 @@ function maxDirNameLength(edges: readonly ClassifiedEdge[]): number {
   return Math.max(...edges.map((edge) => edge.dirName.length));
 }
 
-function rowDirNameWidth(labelColumn: number, maxDirNameLen: number): number {
+function rowDirNameWidth(labelColumn: number, maxDirNameLen: number, dirNameGap: number): number {
   // Reserve a gap past the longest dirName so the widest name keeps a column of
   // whitespace before its `hash → hash` data; without it, a dirName equal to
   // maxDirNameLen gets zero padding and collides with the source hash.
-  return Math.max(maxDirNameLen + LABEL_GAP, MIN_HASH_DATA_COLUMN - labelColumn);
+  return Math.max(maxDirNameLen + dirNameGap, MIN_HASH_DATA_COLUMN - labelColumn);
 }
 
-function edgeLabelColumn(row: MigrationGraphGridRow): number {
+function gridUsesSkipRollbackArcs(rows: readonly MigrationGraphGridRow[]): boolean {
+  return rows.some((row) =>
+    row.cells.some(
+      (cell) => cell.kind === 'edge-lane' && cell.adjacency === 'node-skipping-rollback',
+    ),
+  );
+}
+
+function edgeLabelColumn(
+  row: MigrationGraphGridRow,
+  gridWidth: number,
+  wideLabelColumn: number | undefined,
+): number {
+  if (wideLabelColumn !== undefined) {
+    return wideLabelColumn;
+  }
   const laneIndex = row.laneIndex ?? 0;
   if (row.edge?.from === EMPTY_CONTRACT_HASH && laneIndex === 0) {
     return (laneIndex + 1) * 2 + LABEL_GAP;
   }
   const usesFullRowGutter = row.cells.some(
-    (cell, index) => index > laneIndex && cell.kind === 'vertical-pass',
+    (cell, index) => index !== laneIndex && cell.kind === 'vertical-pass',
   );
   return usesFullRowGutter ? row.cells.length * 2 + LABEL_GAP : (laneIndex + 1) * 2 + LABEL_GAP;
+}
+
+function nodeHasArcDecoration(row: MigrationGraphGridRow): boolean {
+  return row.cells.some(
+    (cell) => cell.kind === 'node' && (cell.arcTee === true || cell.arcLand === true),
+  );
 }
 
 export function renderMigrationGraphTree(
@@ -213,6 +241,8 @@ export function renderMigrationGraphTree(
   const style = createTreeStyler(opts);
   const hashLength = opts.hashLength ?? MIGRATION_LIST_HASH_WIDTH;
   const gridWidth = gridWidthForModel(model.rows);
+  const wideLabelColumn = gridUsesSkipRollbackArcs(model.rows) ? gridWidth * 2 + 4 : undefined;
+  const dirNameGap = wideLabelColumn !== undefined ? 3 : LABEL_GAP;
   const allEdges = model.rows
     .filter(
       (row): row is MigrationGraphGridRow & { edge: ClassifiedEdge } =>
@@ -248,7 +278,13 @@ export function renderMigrationGraphTree(
         laneSpan = row.cells.length;
       }
     }
-    const labelColumn = row.kind === 'edge' ? edgeLabelColumn(row) : laneSpan * 2 + LABEL_GAP;
+    const labelColumn =
+      row.kind === 'edge'
+        ? edgeLabelColumn(row, gridWidth, wideLabelColumn)
+        : wideLabelColumn !== undefined &&
+            (nodeHasArcDecoration(row) || row.contractHash !== undefined)
+          ? wideLabelColumn
+          : laneSpan * 2 + LABEL_GAP;
     if (
       row.kind === 'edge' &&
       row.edge?.from === EMPTY_CONTRACT_HASH &&
@@ -258,7 +294,7 @@ export function renderMigrationGraphTree(
         .slice(0, 1)
         .map((cell) => renderCellPair(cell, style))
         .join('');
-    } else if (row.kind === 'node' && laneSpan < row.cells.length) {
+    } else if (row.kind === 'node' && laneSpan < row.cells.length && !nodeHasArcDecoration(row)) {
       gutter = row.cells
         .slice(0, laneSpan)
         .map((cell) => renderCellPair(cell, style))
@@ -266,7 +302,7 @@ export function renderMigrationGraphTree(
     } else if (gutter.length < laneSpan * 2) {
       gutter = gutter.padEnd(laneSpan * 2, ' ');
     }
-    const dirNameWidth = rowDirNameWidth(labelColumn, maxDirNameLen);
+    const dirNameWidth = rowDirNameWidth(labelColumn, maxDirNameLen, dirNameGap);
     const dataColumn = labelColumn + dirNameWidth;
     const gutterPad = padVisible(gutter, labelColumn);
 

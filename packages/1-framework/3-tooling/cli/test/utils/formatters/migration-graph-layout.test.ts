@@ -131,9 +131,19 @@ function arrowForEdgeKind(kind: string): string {
 function renderCellPair(cell: StructuralCell): string {
   switch (cell.kind) {
     case 'node':
+      if (cell.arcLand === true) return '○◂';
+      if (cell.arcTee === true) return '○─';
       return '○ ';
     case 'vertical-pass':
       return '│ ';
+    case 'arc-branch-corner':
+      return '╮ ';
+    case 'arc-land-corner':
+      return '╯ ';
+    case 'arc-crossing':
+      return '┼─';
+    case 'arc-land-bridge':
+      return '──';
     case 'edge-lane':
       return `│${arrowForEdgeKind(cell.edgeKind)}`;
     default:
@@ -789,7 +799,7 @@ describe('buildMigrationGraphLayout', () => {
     expect(model.rows.filter(isNodeRow)).toHaveLength(5);
   });
 
-  it('marks adjacent rollbacks without routing node-skipping rollbacks', () => {
+  it('routes node-skipping rollbacks in back-lanes while adjacent stay in column zero', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPosts = edge('aaa', 'bbb', 'add_posts');
     const rollbackAdjacent = edge('bbb', 'aaa', 'rollback_adjacent');
@@ -803,7 +813,7 @@ describe('buildMigrationGraphLayout', () => {
     const rollbackSkip = edge('ccc', 'aaa', 'rollback_skip');
     const modelSkip = layout([init2, addPhone, addBio, rollbackSkip]);
 
-    expectEdgeGeometry(modelSkip.rows, 'rollback_skip', 0, [], 'node-skipping-rollback');
+    expectEdgeGeometry(modelSkip.rows, 'rollback_skip', 1, [0], 'node-skipping-rollback');
   });
 
   // Rollbacks decorate their node's own column — they never reserve a downward lane, so the
@@ -832,7 +842,7 @@ describe('buildMigrationGraphLayout', () => {
   // past the intervening node, and lands in its target (`○◂╯`). The rollback row sits
   // immediately below its source so the tee connects. `it.fails` until routing lands;
   // the implementer flips this to `it` once the layout produces the arc.
-  it.fails('routes a node-skipping rollback as a back-arc per mockup', () => {
+  it('routes a node-skipping rollback as a back-arc per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'aaa', 'init');
     const addPhone = edge('aaa', 'bbb', 'add_phone');
     const addBio = edge('bbb', 'ccc', 'add_bio');
@@ -856,7 +866,7 @@ describe('buildMigrationGraphLayout', () => {
   // Two overlapping node-skipping rollbacks take adjacent back-lanes; the second arc's
   // tee crosses the first arc's lane (`┼`), and its landing crosses the (now-closed)
   // first lane horizontally (`○◂──╯`). Mirrors `mockups.md § skip-rollback` exactly.
-  it.fails('routes two overlapping node-skipping rollbacks per mockup', () => {
+  it('routes two overlapping node-skipping rollbacks per mockup', () => {
     const init = edge(EMPTY_CONTRACT_HASH, 'ef9de27', 'init');
     const addPhone = edge('ef9de27', '73e3abe', 'add_phone');
     const addBio = edge('73e3abe', '3ee5d20', 'add_bio');
@@ -899,6 +909,10 @@ describe('buildMigrationGraphLayout', () => {
       'branch-corner',
       'merge-tee',
       'merge-corner',
+      'arc-branch-corner',
+      'arc-land-corner',
+      'arc-crossing',
+      'arc-land-bridge',
       'edge-lane',
     ]);
 
