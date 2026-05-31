@@ -111,7 +111,7 @@ model Bug {
       if (!result.ok) return;
 
       expect(modelsOf(result.value)['Bug']).toMatchObject({
-        base: crossRef('Task'),
+        base: crossRef('Task', 'public'),
       });
     });
 
@@ -246,8 +246,8 @@ model Feature {
           Feature: { value: 'feature' },
         },
       });
-      expect(modelsOf(result.value)['Bug']).toMatchObject({ base: crossRef('Task') });
-      expect(modelsOf(result.value)['Feature']).toMatchObject({ base: crossRef('Task') });
+      expect(modelsOf(result.value)['Bug']).toMatchObject({ base: crossRef('Task', 'public') });
+      expect(modelsOf(result.value)['Feature']).toMatchObject({ base: crossRef('Task', 'public') });
     });
 
     it('variants are not included in roots', () => {
@@ -276,8 +276,8 @@ model Bug {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      expect(result.value.roots).toHaveProperty('task', crossRef('Task'));
-      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug'));
+      expect(result.value.roots).toHaveProperty('task', crossRef('Task', 'public'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug', 'public'));
     });
   });
 
@@ -558,13 +558,13 @@ model Feature {
           Feature: { value: 'feature' },
         },
       });
-      expect(modelsOf(result.value)['Bug']).toMatchObject({ base: crossRef('Task') });
-      expect(modelsOf(result.value)['Feature']).toMatchObject({ base: crossRef('Task') });
+      expect(modelsOf(result.value)['Bug']).toMatchObject({ base: crossRef('Task', 'public') });
+      expect(modelsOf(result.value)['Feature']).toMatchObject({ base: crossRef('Task', 'public') });
       expect(modelsOf(result.value)['Bug']?.storage).toMatchObject({ table: 'tasks' });
       expect(modelsOf(result.value)['Feature']?.storage).toMatchObject({ table: 'features' });
-      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug'));
-      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Feature'));
-      expect(result.value.roots).toHaveProperty('tasks', crossRef('Task'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Bug', 'public'));
+      expect(Object.values(result.value.roots)).not.toContainEqual(crossRef('Feature', 'public'));
+      expect(result.value.roots).toHaveProperty('tasks', crossRef('Task', 'public'));
     });
   });
 });

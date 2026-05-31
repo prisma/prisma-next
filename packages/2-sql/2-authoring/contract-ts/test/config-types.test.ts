@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import { type Contract, contractModels } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
@@ -140,11 +139,11 @@ describe('emptyContract', () => {
     expect(contract.target).toBe('postgres');
     expect(contract.extensionPacks).toEqual({});
     expect(contract.capabilities).toEqual({});
-    const unboundNamespace = contract.storage.namespaces[UNBOUND_NAMESPACE_ID] as unknown as Record<
+    const publicNamespace = contract.storage.namespaces['public'] as unknown as Record<
       string,
       unknown
     >;
-    expect(unboundNamespace['tables']).toEqual({});
+    expect(publicNamespace['tables']).toEqual({});
   });
 
   it('sets output when passed and omits it otherwise', () => {
