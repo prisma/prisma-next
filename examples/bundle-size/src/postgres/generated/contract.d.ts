@@ -100,12 +100,37 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
     readonly Note: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Note' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly Note: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'Note';
+              readonly fields: { readonly id: { readonly column: 'id' } };
+            };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {
     readonly postgres: {

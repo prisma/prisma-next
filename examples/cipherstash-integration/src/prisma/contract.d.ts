@@ -225,12 +225,93 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
     readonly users: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'User' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly User: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'cipherstash/string@1';
+                  readonly typeParams: {
+                    readonly equality: true;
+                    readonly freeTextSearch: true;
+                    readonly orderAndRange: true;
+                  };
+                };
+              };
+              readonly salary: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'cipherstash/double@1';
+                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+                };
+              };
+              readonly accountId: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'cipherstash/bigint@1';
+                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+                };
+              };
+              readonly birthday: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'cipherstash/date@1';
+                  readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
+                };
+              };
+              readonly emailVerified: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'cipherstash/boolean@1';
+                  readonly typeParams: { readonly equality: true };
+                };
+              };
+              readonly preferences: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'cipherstash/json@1';
+                  readonly typeParams: { readonly searchableJson: true };
+                };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'users';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly email: { readonly column: 'email' };
+                readonly salary: { readonly column: 'salary' };
+                readonly accountId: { readonly column: 'accountid' };
+                readonly birthday: { readonly column: 'birthday' };
+                readonly emailVerified: { readonly column: 'emailverified' };
+                readonly preferences: { readonly column: 'preferences' };
+              };
+            };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {
     readonly postgres: {

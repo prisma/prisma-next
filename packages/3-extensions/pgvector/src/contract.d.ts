@@ -74,11 +74,18 @@ type ContractBase = Omit<
     },
     Record<string, never>
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: Record<string, never>;
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: Record<string, never>;
+      };
+    };
+  };
   readonly capabilities: {
     readonly postgres: {
       readonly distinctOn: true;

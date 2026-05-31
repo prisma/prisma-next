@@ -58,12 +58,30 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'mongo';
   readonly targetFamily: 'mongo';
   readonly roots: {
     readonly notes: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Note' };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly Note: {
+            readonly fields: {
+              readonly _id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: { readonly collection: 'notes' };
+          };
+        };
+      };
+    };
   };
   readonly capabilities: {};
   readonly extensionPacks: {};

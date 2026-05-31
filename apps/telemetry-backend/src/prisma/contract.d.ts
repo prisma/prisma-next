@@ -279,7 +279,7 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
@@ -287,6 +287,101 @@ type ContractBase = Omit<
     readonly telemetry_event: {
       readonly namespace: '__unbound__' & NamespaceId;
       readonly model: 'TelemetryEvent';
+    };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly TelemetryEvent: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int8@1' };
+              };
+              readonly ingestedAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+              readonly installationId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly version: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly command: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly flags: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly many: true;
+              };
+              readonly runtimeName: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly runtimeVersion: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly os: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly arch: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly packageManager: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly databaseTarget: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly tsVersion: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly agent: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly extensions: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly many: true;
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'telemetry_event';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly ingestedAt: { readonly column: 'ingestedAt' };
+                readonly installationId: { readonly column: 'installationId' };
+                readonly version: { readonly column: 'version' };
+                readonly command: { readonly column: 'command' };
+                readonly flags: { readonly column: 'flags' };
+                readonly runtimeName: { readonly column: 'runtimeName' };
+                readonly runtimeVersion: { readonly column: 'runtimeVersion' };
+                readonly os: { readonly column: 'os' };
+                readonly arch: { readonly column: 'arch' };
+                readonly packageManager: { readonly column: 'packageManager' };
+                readonly databaseTarget: { readonly column: 'databaseTarget' };
+                readonly tsVersion: { readonly column: 'tsVersion' };
+                readonly agent: { readonly column: 'agent' };
+                readonly extensions: { readonly column: 'extensions' };
+              };
+            };
+          };
+        };
+      };
     };
   };
   readonly capabilities: {

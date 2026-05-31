@@ -128,7 +128,7 @@ type ContractBase = Omit<
       };
     }
   >,
-  'roots'
+  'roots' | 'domain'
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
@@ -136,6 +136,39 @@ type ContractBase = Omit<
     readonly eql_v2_configuration: {
       readonly namespace: '__unbound__' & NamespaceId;
       readonly model: 'EqlV2Configuration';
+    };
+  };
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly EqlV2Configuration: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly state: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly data: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'eql_v2_configuration';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly state: { readonly column: 'state' };
+                readonly data: { readonly column: 'data' };
+              };
+            };
+          };
+        };
+      };
     };
   };
   readonly capabilities: {
