@@ -223,7 +223,7 @@ function edgeLabelColumn(
     return (laneIndex + 1) * 2 + LABEL_GAP;
   }
   const usesFullRowGutter = row.cells.some(
-    (cell, index) => index !== laneIndex && cell.kind === 'vertical-pass',
+    (cell, index) => index > laneIndex && cell.kind === 'vertical-pass',
   );
   return usesFullRowGutter ? row.cells.length * 2 + LABEL_GAP : (laneIndex + 1) * 2 + LABEL_GAP;
 }
