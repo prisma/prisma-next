@@ -18,3 +18,14 @@ export {
 export type { MongoMiddleware, MongoMiddlewareContext } from '../mongo-middleware';
 export type { MongoRuntime, MongoRuntimeOptions } from '../mongo-runtime';
 export { createMongoRuntime } from '../mongo-runtime';
+export type {
+  MongoParamRefEntry,
+  MongoParamRefEntryUnion,
+  MongoParamRefHandle,
+  MongoParamRefMutator,
+  MongoParamRefMutatorInternal,
+} from '../param-ref-mutator';
+export {
+  createMongoParamRefMutator,
+  flattenMongoParamRefs,
+} from '../param-ref-mutator';
