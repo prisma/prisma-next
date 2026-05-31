@@ -3,6 +3,7 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   CodecTypes,
   Contract,
+  FieldOutputTypes,
 } from '../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 
 test('InferModelRow resolves Task fields', () => {
@@ -27,14 +28,7 @@ test('InferModelRow resolves User fields', () => {
     MongoModelsMap<Contract>['User']['fields'],
     CodecTypes
   >;
-  expectTypeOf({} as UserRow).toExtend<{
-    _id: string;
-    name: string;
-    email: string;
-    loginCount: number;
-    tags: string[];
-    homeAddress: { city: string; country: string } | null;
-  }>();
+  expectTypeOf<UserRow>().toEqualTypeOf<FieldOutputTypes['User']>();
 });
 
 test('InferModelRow resolves embedded model fields', () => {

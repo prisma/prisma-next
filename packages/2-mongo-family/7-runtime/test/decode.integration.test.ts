@@ -43,10 +43,11 @@ describe('Mongo runtime decode integration', () => {
       const rows = await ctx.runtime.execute(plan).toArray();
       expect(rows).toHaveLength(1);
       const row = rows[0]!;
-      expect(typeof row._id).toBe('string');
-      expect(row._id).toBe(insert.insertedId.toHexString());
-      expect(row['createdAt']).toBeInstanceOf(Date);
-      expect(row['createdAt'].getTime()).toBe(createdAt.getTime());
+      expect(typeof row['_id']).toBe('string');
+      expect(row['_id']).toBe(insert.insertedId.toHexString());
+      const decodedCreatedAt = row['createdAt'];
+      expect(decodedCreatedAt).toBeInstanceOf(Date);
+      expect((decodedCreatedAt as Date).getTime()).toBe(createdAt.getTime());
       expect(row['embeddings']).toEqual(vec);
     });
   });
