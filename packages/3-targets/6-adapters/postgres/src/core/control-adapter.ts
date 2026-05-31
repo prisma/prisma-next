@@ -7,7 +7,10 @@ import {
   APP_SPACE_ID,
   type ControlDriverInstance,
 } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  storageNamespaceEntries,
+  UNBOUND_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
@@ -806,17 +809,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
 /**
  * Extracts the namespace coordinate ids declared on a contract's storage,
- * or returns an empty array when no contract (or no storage / namespaces)
- * is present. Used by `PostgresControlAdapter.introspect` to decide
- * between the multi-namespace walk and the single-schema fallback.
+ * or returns an empty array when no contract (or no storage) is present.
+ * Reads ADR 221 flat storage (namespace ids are direct keys alongside the
+ * reserved `storageHash` / `types` siblings). Used by
+ * `PostgresControlAdapter.introspect` to decide between the multi-namespace
+ * walk and the single-schema fallback.
  */
 function extractContractNamespaceIds(contract: unknown): readonly string[] {
   if (contract === null || typeof contract !== 'object') return [];
   const storage = (contract as { storage?: unknown }).storage;
   if (storage === null || typeof storage !== 'object') return [];
-  const namespaces = (storage as { namespaces?: unknown }).namespaces;
-  if (namespaces === null || typeof namespaces !== 'object') return [];
-  return Object.keys(namespaces as Record<string, unknown>);
+  return [...storageNamespaceEntries(storage)].map(([id]) => id);
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
