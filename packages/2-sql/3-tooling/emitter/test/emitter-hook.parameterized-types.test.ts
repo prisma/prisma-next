@@ -2,24 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
-import { normalizeRootSqlStorage } from './sql-storage-fixture';
-
-function createContract(overrides: Partial<Contract>): Contract {
-  const merged = {
-    targetFamily: 'sql' as const,
-    target: 'test-db',
-    models: {},
-    roots: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    profileHash: 'sha256:test' as const,
-    ...overrides,
-  };
-  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
-  return merged as Contract;
-}
+import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
 

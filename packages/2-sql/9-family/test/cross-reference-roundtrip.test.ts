@@ -4,6 +4,7 @@ import {
   CrossReferenceSchema,
   contractModels,
   crossRef,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
@@ -12,9 +13,9 @@ import { SqlContractSerializer } from '../src/core/ir/sql-contract-serializer';
 
 describe('cross-reference shape round-trip', () => {
   it('parses and round-trips through SQL family serializer hydration', () => {
-    const rootsCrossRef = crossRef('User', 'public');
-    const relationCrossRef = crossRef('Post', 'public');
-    const baseCrossRef = crossRef('User', 'public');
+    const rootsCrossRef = crossRef('User', UNBOUND_DOMAIN_NAMESPACE_ID);
+    const relationCrossRef = crossRef('Post', UNBOUND_DOMAIN_NAMESPACE_ID);
+    const baseCrossRef = crossRef('User', UNBOUND_DOMAIN_NAMESPACE_ID);
     expect(CrossReferenceSchema(rootsCrossRef) instanceof type.errors).toBe(false);
 
     const envelope = createSqlContract({

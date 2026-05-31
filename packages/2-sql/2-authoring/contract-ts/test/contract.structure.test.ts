@@ -2,20 +2,12 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { validSqlContractJson } from './sql-contract-json-fixture';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 import { unboundTables } from './unbound-tables';
 
 describe('SqlContractSerializer structure validation', () => {
-  const validContractInput = {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    roots: {},
-    models: {},
+  const validContractInput = validSqlContractJson({
     storage: storageWithNamespacedTables({
       storageHash: 'sha256:test',
       tables: {
@@ -31,7 +23,7 @@ describe('SqlContractSerializer structure validation', () => {
         },
       },
     }),
-  };
+  });
 
   it('accepts valid contract structure', () => {
     const result = validateSqlContractFully<Contract<SqlStorage>>(validContractInput);
@@ -69,10 +61,10 @@ describe('SqlContractSerializer structure validation', () => {
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(invalid)).toThrow(/storage/);
   });
 
-  it('throws on missing models', () => {
+  it('throws on missing domain', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    const invalid = { ...validContractInput, models: undefined } as any;
-    expect(() => validateSqlContractFully<Contract<SqlStorage>>(invalid)).toThrow(/models/);
+    const invalid = { ...validContractInput, domain: undefined } as any;
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(invalid)).toThrow(/domain/);
   });
 
   it('throws on invalid column type', () => {

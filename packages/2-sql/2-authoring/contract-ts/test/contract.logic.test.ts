@@ -4,19 +4,12 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
 import { crossRef } from './cross-ref-helpers';
+import {
+  domainModelsRecord,
+  sqlStorageFixture,
+  validSqlContractJson,
+} from './sql-contract-json-fixture';
 import { unboundTables } from './unbound-tables';
-
-function sqlStorageFixture(tables: Record<string, unknown>) {
-  return {
-    storageHash: 'sha256:test',
-    namespaces: {
-      [UNBOUND_NAMESPACE_ID]: {
-        id: UNBOUND_NAMESPACE_ID,
-        tables,
-      },
-    },
-  };
-}
 
 function contractTablesRecord(contract: Record<string, unknown>): Record<string, unknown> {
   const storage = contract['storage'] as Record<string, unknown>;
@@ -26,16 +19,7 @@ function contractTablesRecord(contract: Record<string, unknown>): Record<string,
 }
 
 describe('SqlContractSerializer logic validation', () => {
-  const validContractInput = {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    roots: {},
-    models: {},
+  const validContractInput = validSqlContractJson({
     storage: sqlStorageFixture({
       User: {
         columns: {
@@ -67,7 +51,7 @@ describe('SqlContractSerializer logic validation', () => {
         ],
       },
     }),
-  };
+  });
 
   it('accepts valid contract logic', () => {
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(validContractInput)).not.toThrow();
@@ -252,15 +236,7 @@ describe('SqlContractSerializer logic validation', () => {
 
   describe('model validation', () => {
     const createModelContract = () =>
-      ({
-        schemaVersion: '1',
-        target: 'postgres',
-        targetFamily: 'sql',
-        profileHash: 'sha256:test',
-        capabilities: {},
-        extensionPacks: {},
-        meta: {},
-        roots: {},
+      validSqlContractJson({
         models: {
           User: {
             storage: { table: 'User', fields: { id: { column: 'id' } } },
@@ -284,7 +260,7 @@ describe('SqlContractSerializer logic validation', () => {
       }) as Record<string, unknown>;
 
     const addPostModel = (contract: Record<string, unknown>) => {
-      (contract['models'] as Record<string, Record<string, unknown>>)['Post'] = {
+      domainModelsRecord(contract)['Post'] = {
         storage: {
           table: 'Post',
           fields: { id: { column: 'id' }, userId: { column: 'userId' } },
@@ -310,9 +286,7 @@ describe('SqlContractSerializer logic validation', () => {
 
     it('rejects model referencing missing table', () => {
       const contract = createModelContract();
-      const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
-        'User'
-      ] as Record<string, unknown>;
+      const userModel = domainModelsRecord(contract)['User'] as Record<string, unknown>;
       userModel['storage'] = { table: 'MissingTable', fields: { id: { column: 'id' } } };
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow(
         /references non-existent table "MissingTable"/,
@@ -328,9 +302,10 @@ describe('SqlContractSerializer logic validation', () => {
 
     it('rejects model field referencing missing column', () => {
       const contract = createModelContract();
-      const userModel = (contract['models'] as Record<string, Record<string, unknown>>)[
-        'User'
-      ] as Record<string, Record<string, unknown>>;
+      const userModel = domainModelsRecord(contract)['User'] as Record<
+        string,
+        Record<string, unknown>
+      >;
       (userModel['storage'] as Record<string, unknown>)['fields'] = {
         id: { column: 'missing' },
       };
@@ -341,12 +316,7 @@ describe('SqlContractSerializer logic validation', () => {
 
     it('skips foreign key validation for 1:N relations', () => {
       const contract = addPostModel(createModelContract());
-      (
-        (contract['models'] as Record<string, Record<string, unknown>>)?.['User'] as Record<
-          string,
-          unknown
-        >
-      )['relations'] = {
+      (domainModelsRecord(contract)['User'] as Record<string, unknown>)['relations'] = {
         posts: {
           to: crossRef('Post'),
           on: { localFields: ['id'], targetFields: ['userId'] },
@@ -366,12 +336,7 @@ describe('SqlContractSerializer logic validation', () => {
 
     it('accepts N:1 relation without matching FK', () => {
       const contract = addPostModel(createModelContract());
-      (
-        (contract['models'] as Record<string, Record<string, unknown>>)?.['Post'] as Record<
-          string,
-          unknown
-        >
-      )['relations'] = {
+      (domainModelsRecord(contract)['Post'] as Record<string, unknown>)['relations'] = {
         user: {
           to: crossRef('User'),
           on: { localFields: ['userId'], targetFields: ['id'] },
@@ -383,12 +348,7 @@ describe('SqlContractSerializer logic validation', () => {
 
     it('accepts N:1 relations with matching foreign keys', () => {
       const contract = addPostModel(createModelContract());
-      (
-        (contract['models'] as Record<string, Record<string, unknown>>)?.['Post'] as Record<
-          string,
-          unknown
-        >
-      )['relations'] = {
+      (domainModelsRecord(contract)['Post'] as Record<string, unknown>)['relations'] = {
         user: {
           to: crossRef('User'),
           on: { localFields: ['userId'], targetFields: ['id'] },
@@ -408,16 +368,7 @@ describe('SqlContractSerializer logic validation', () => {
   });
 
   describe('column defaults', () => {
-    const baseContract = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const baseContract = validSqlContractJson({
       storage: sqlStorageFixture({
         Post: {
           columns: {
@@ -435,15 +386,14 @@ describe('SqlContractSerializer logic validation', () => {
           foreignKeys: [],
         },
       }),
-    };
+    });
 
     it('accepts function defaults without capability gating', () => {
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(baseContract)).not.toThrow();
     });
 
     it('accepts multiple function defaults without capability gating', () => {
-      const contract = {
-        ...baseContract,
+      const contract = validSqlContractJson({
         storage: sqlStorageFixture({
           Post: {
             columns: {
@@ -473,13 +423,12 @@ describe('SqlContractSerializer logic validation', () => {
             foreignKeys: [],
           },
         }),
-      };
+      });
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
     it('ignores non-function defaults (literal)', () => {
-      const contract = {
-        ...baseContract,
+      const contract = validSqlContractJson({
         storage: sqlStorageFixture({
           Post: {
             columns: {
@@ -497,14 +446,12 @@ describe('SqlContractSerializer logic validation', () => {
             foreignKeys: [],
           },
         }),
-        // No capabilities needed for non-function defaults
-      };
+      });
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).not.toThrow();
     });
 
     it('keeps ISO string defaults as strings for timestamp columns', () => {
-      const contract = {
-        ...baseContract,
+      const contract = validSqlContractJson({
         storage: sqlStorageFixture({
           Post: {
             columns: {
@@ -522,7 +469,7 @@ describe('SqlContractSerializer logic validation', () => {
             foreignKeys: [],
           },
         }),
-      };
+      });
 
       const validated = validateSqlContractFully<Contract<SqlStorage>>(contract);
       const defaultValue = unboundTables(validated.storage)['Post']!.columns['createdAt']!.default;
@@ -533,8 +480,7 @@ describe('SqlContractSerializer logic validation', () => {
     });
 
     it('throws for default with unsupported kind', () => {
-      const contract = {
-        ...baseContract,
+      const contract = validSqlContractJson({
         storage: sqlStorageFixture({
           Post: {
             columns: {
@@ -552,13 +498,12 @@ describe('SqlContractSerializer logic validation', () => {
             foreignKeys: [],
           },
         }),
-      };
+      });
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
 
     it('throws for default missing value', () => {
-      const contract = {
-        ...baseContract,
+      const contract = validSqlContractJson({
         storage: sqlStorageFixture({
           Post: {
             columns: {
@@ -576,13 +521,12 @@ describe('SqlContractSerializer logic validation', () => {
             foreignKeys: [],
           },
         }),
-      };
+      });
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
 
     it('throws for default expression with non-string type', () => {
-      const contract = {
-        ...baseContract,
+      const contract = validSqlContractJson({
         storage: sqlStorageFixture({
           Post: {
             columns: {
@@ -600,7 +544,7 @@ describe('SqlContractSerializer logic validation', () => {
             foreignKeys: [],
           },
         }),
-      };
+      });
       expect(() => validateSqlContractFully<Contract<SqlStorage>>(contract)).toThrow();
     });
   });

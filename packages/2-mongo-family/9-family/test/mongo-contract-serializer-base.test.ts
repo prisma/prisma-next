@@ -1,26 +1,11 @@
-import { crossRef } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import { MongoContractSerializerBase } from '../src/core/ir/mongo-contract-serializer-base';
+import { mongoContractJson } from './mongo-contract-json-fixture';
 
 function makeValidContractJson() {
-  return {
-    targetFamily: 'mongo',
-    roots: { items: crossRef('Item') },
-    storage: {
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, collections: { items: {} } },
-      },
-    },
-    models: {
-      Item: {
-        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-        storage: { collection: 'items' },
-      },
-    },
-  };
+  return mongoContractJson({});
 }
 
 interface Wrapped {
@@ -57,8 +42,7 @@ describe('MongoContractSerializerBase', () => {
 
     it('rejects when a model references a collection that does not exist in storage', () => {
       const serializer = new RecordingSerializer();
-      const json = {
-        ...makeValidContractJson(),
+      const json = mongoContractJson({
         models: {
           Item: {
             fields: {
@@ -67,15 +51,14 @@ describe('MongoContractSerializerBase', () => {
             storage: { collection: 'missing_collection' },
           },
         },
-      };
+      });
 
       expect(() => serializer.deserializeContract(json)).toThrow(/missing_collection/);
     });
 
     it('rejects when a field references a value object that does not exist', () => {
       const serializer = new RecordingSerializer();
-      const json = {
-        ...makeValidContractJson(),
+      const json = mongoContractJson({
         models: {
           Item: {
             fields: {
@@ -85,7 +68,7 @@ describe('MongoContractSerializerBase', () => {
             storage: { collection: 'items' },
           },
         },
-      };
+      });
 
       expect(() => serializer.deserializeContract(json)).toThrow();
     });

@@ -1,3 +1,4 @@
+import { domainPlaneOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   MongoCollationOptions,
@@ -27,7 +28,7 @@ function makeSingletonUnboundContractJson() {
         },
       },
     },
-    models: {},
+    domain: domainPlaneOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
   };
 }
 
@@ -49,12 +50,17 @@ function makeValidContractJson() {
         },
       },
     },
-    models: {
-      Item: {
-        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-        storage: { collection: 'items' },
+    domain: domainPlaneOf({
+      models: {
+        Item: {
+          fields: {
+            _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+          },
+          storage: { collection: 'items' },
+        },
       },
-    },
+      namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+    }),
   };
 }
 
@@ -142,14 +148,17 @@ describe('MongoTargetContractSerializer', () => {
             },
           },
         },
-        models: {
-          Item: {
-            fields: {
-              _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+        domain: domainPlaneOf({
+          models: {
+            Item: {
+              fields: {
+                _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+              },
+              storage: { collection: 'items' },
             },
-            storage: { collection: 'items' },
           },
-        },
+          namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+        }),
       };
     }
 

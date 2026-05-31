@@ -1,0 +1,76 @@
+import {
+  type ContractModelBase,
+  domainPlaneOf,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
+} from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
+
+const defaultTables = {
+  User: {
+    columns: {
+      id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  },
+};
+
+export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
+  const { models, domain, storage, ...rest } = overrides;
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: 'sha256:test',
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    roots: {},
+    domain:
+      domain ??
+      domainPlaneOf({
+        models: (models ?? {}) as Record<string, ContractModelBase>,
+        namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+      }),
+    storage:
+      storage ??
+      storageWithNamespacedTables({
+        storageHash: 'sha256:test',
+        tables: defaultTables,
+      }),
+    ...rest,
+  };
+}
+
+export function withContractModels(
+  base: Record<string, unknown>,
+  models: Record<string, ContractModelBase>,
+  patch: Record<string, unknown> = {},
+) {
+  const { domain: _domain, models: _models, ...rest } = { ...base, ...patch };
+  return validSqlContractJson({ ...rest, models });
+}
+
+export function domainModelsRecord(
+  contract: Record<string, unknown>,
+): Record<string, Record<string, unknown>> {
+  const domain = contract['domain'] as {
+    namespaces: Record<string, { models: Record<string, Record<string, unknown>> }>;
+  };
+  return domain.namespaces[UNBOUND_DOMAIN_NAMESPACE_ID]!.models;
+}
+
+export function sqlStorageFixture(tables: Record<string, unknown>) {
+  return {
+    storageHash: 'sha256:test',
+    namespaces: {
+      [UNBOUND_NAMESPACE_ID]: {
+        id: UNBOUND_NAMESPACE_ID,
+        tables,
+      },
+    },
+  };
+}

@@ -3,56 +3,31 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
 import { crossRef } from './cross-ref-helpers';
+import { validSqlContractJson } from './sql-contract-json-fixture';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 
 describe('SqlContractSerializer edge cases', () => {
   it('handles storage with null tables', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const contractInput = validSqlContractJson({
       storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: null,
       }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    }) as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('handles storage without tables property', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const contractInput = validSqlContractJson({
       storage: { storageHash: 'sha256:test' },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    }) as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('rejects models with null relations', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const contractInput = validSqlContractJson({
       models: {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
@@ -77,23 +52,14 @@ describe('SqlContractSerializer edge cases', () => {
         },
       }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    }) as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
       /relations/,
     );
   });
 
   it('handles table without columns in normalization', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
-      models: {},
+    const contractInput = validSqlContractJson({
       storage: storageWithNamespacedTables({
         storageHash: 'sha256:test',
         tables: {
@@ -106,21 +72,13 @@ describe('SqlContractSerializer edge cases', () => {
         },
       }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    }) as any;
     // This will fail validation, but normalization should handle it
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('rejects relation targeting non-existent model', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const contractInput = validSqlContractJson({
       models: {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
@@ -150,22 +108,14 @@ describe('SqlContractSerializer edge cases', () => {
         },
       }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    }) as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
-      /targets "Post" which does not exist/,
+      /targets "__unbound__:Post" which does not exist/,
     );
   });
 
   it('rejects relation without to property (domain validation)', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const contractInput = validSqlContractJson({
       models: {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
@@ -195,22 +145,14 @@ describe('SqlContractSerializer edge cases', () => {
         },
       }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    } as any;
+    }) as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
       /relations\.posts\.to must be an object/,
     );
   });
 
   it('accepts relation with localFields/targetFields on shape', () => {
-    const contractInput = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      profileHash: 'sha256:test',
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      roots: {},
+    const contractInput = validSqlContractJson({
       models: {
         User: {
           storage: { table: 'user', fields: { id: { column: 'id' } } },
@@ -260,7 +202,7 @@ describe('SqlContractSerializer edge cases', () => {
           },
         },
       }),
-    };
+    });
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 });

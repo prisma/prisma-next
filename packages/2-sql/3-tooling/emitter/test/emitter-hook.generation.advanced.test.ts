@@ -13,30 +13,12 @@ function crossRef(model: string) {
   return { namespace: '__unbound__', model };
 }
 
-import { normalizeRootSqlStorage } from './sql-storage-fixture';
+import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>
   | ControlAdapterDescriptor<'sql', string>
   | ControlExtensionDescriptor<'sql', string>;
-
-function createContract(overrides: Partial<Contract>): Contract {
-  const merged = {
-    schemaVersion: '1',
-    targetFamily: 'sql' as const,
-    target: 'test-db',
-    models: {},
-    relations: {},
-    storage: { tables: {} },
-    extensions: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
-  return merged as Contract;
-}
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
 

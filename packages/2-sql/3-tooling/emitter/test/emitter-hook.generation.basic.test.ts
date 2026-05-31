@@ -9,30 +9,12 @@ import { extractCodecTypeImports } from '@prisma-next/framework-components/contr
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
-import { normalizeRootSqlStorage } from './sql-storage-fixture';
+import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>
   | ControlAdapterDescriptor<'sql', string>
   | ControlExtensionDescriptor<'sql', string>;
-
-function createContract(overrides: Partial<Contract>): Contract {
-  const merged = {
-    schemaVersion: '1',
-    targetFamily: 'sql' as const,
-    target: 'test-db',
-    models: {},
-    relations: {},
-    storage: { tables: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-  merged.storage = normalizeRootSqlStorage(merged.storage) ?? merged.storage;
-  return merged as Contract;
-}
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
 

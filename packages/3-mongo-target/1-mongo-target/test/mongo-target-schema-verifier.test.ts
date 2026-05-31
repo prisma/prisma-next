@@ -1,3 +1,4 @@
+import { domainPlaneOf, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
@@ -22,12 +23,17 @@ function deserializedContract() {
         },
       },
     },
-    models: {
-      Item: {
-        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-        storage: { collection: 'items' },
+    domain: domainPlaneOf({
+      models: {
+        Item: {
+          fields: {
+            _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
+          },
+          storage: { collection: 'items' },
+        },
       },
-    },
+      namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+    }),
   };
   return new MongoTargetContractSerializer().deserializeContract(json);
 }
@@ -50,7 +56,7 @@ describe('MongoTargetSchemaVerifier', () => {
           },
         },
       },
-      models: {},
+      domain: domainPlaneOf({ models: {}, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
     };
     const contract = new MongoTargetContractSerializer().deserializeContract(json);
     const schema = new MongoSchemaIR([]);
