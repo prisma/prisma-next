@@ -118,10 +118,7 @@ function classifyForwardShortConvergenceAdjacency(
     const row = rows[index];
     if (row === undefined) break;
     if (row.kind === 'component-separator' || row.kind === 'branch-connector') continue;
-    if (row.kind === 'merge-connector') {
-      if (row.contractHash === edge.from) return 'node-skipping-forward';
-      continue;
-    }
+    if (row.kind === 'merge-connector') continue;
     if (row.kind === 'edge') {
       if (row.laneIndex === laneIndex) return 'node-skipping-forward';
       continue;
@@ -152,11 +149,9 @@ function convergenceProducerUsesShortAdjacency(
     ),
   ].sort((a, b) => a - b);
   const fanStart = fanLanes[0];
-  const fanEnd = fanLanes[fanLanes.length - 1];
-  if (fanStart === undefined || fanEnd === undefined) return false;
+  if (fanStart === undefined) return false;
 
-  if (fanStart === 0) return laneIndex === fanStart;
-  return laneIndex === fanEnd;
+  return laneIndex === fanStart;
 }
 
 function classifyForwardLayoutAdjacency(
@@ -343,41 +338,53 @@ function classifyEdgeAdjacency(
   return toPos === fromPos + 1 ? 'adjacent' : 'node-skipping-rollback';
 }
 
-function connectorWidth(startLane: number, endLane: number): number {
-  return endLane - startLane + 1;
-}
-
 function emptyCells(width: number): StructuralCell[] {
   return Array.from({ length: width }, () => ({ kind: 'empty' as const }));
 }
 
-function buildBranchConnectorCells(startLane: number, endLane: number): StructuralCell[] {
-  const width = connectorWidth(startLane, endLane);
-  const cells = emptyCells(width);
-  if (width === 1) {
-    cells[0] = { kind: 'branch-tee' };
-    return cells;
+function buildBranchConnectorCells(
+  startLane: number,
+  endLane: number,
+  activeLanes: ReadonlySet<number>,
+  gridWidth: number,
+): StructuralCell[] {
+  const cells = emptyCells(gridWidth);
+  for (let lane = 0; lane < gridWidth; lane++) {
+    if (activeLanes.has(lane) && (lane < startLane || lane > endLane)) {
+      cells[lane] = { kind: 'vertical-pass' };
+      continue;
+    }
+    if (lane === startLane) {
+      cells[lane] = { kind: 'branch-tee' };
+    } else if (lane === endLane) {
+      cells[lane] = { kind: 'branch-corner' };
+    } else if (lane > startLane && lane < endLane) {
+      cells[lane] = { kind: 'branch-tee' };
+    }
   }
-  cells[0] = { kind: 'branch-tee' };
-  for (let index = 1; index < width - 1; index++) {
-    cells[index] = { kind: 'branch-tee' };
-  }
-  cells[width - 1] = { kind: 'branch-corner' };
   return cells;
 }
 
-function buildMergeConnectorCells(startLane: number, endLane: number): StructuralCell[] {
-  const width = connectorWidth(startLane, endLane);
-  const cells = emptyCells(width);
-  if (width === 1) {
-    cells[0] = { kind: 'merge-tee' };
-    return cells;
+function buildMergeConnectorCells(
+  startLane: number,
+  endLane: number,
+  activeLanes: ReadonlySet<number>,
+  gridWidth: number,
+): StructuralCell[] {
+  const cells = emptyCells(gridWidth);
+  for (let lane = 0; lane < gridWidth; lane++) {
+    if (activeLanes.has(lane) && (lane < startLane || lane > endLane)) {
+      cells[lane] = { kind: 'vertical-pass' };
+      continue;
+    }
+    if (lane === startLane) {
+      cells[lane] = { kind: 'merge-tee' };
+    } else if (lane === endLane) {
+      cells[lane] = { kind: 'merge-corner' };
+    } else if (lane > startLane && lane < endLane) {
+      cells[lane] = activeLanes.has(lane) ? { kind: 'merge-tee' } : { kind: 'horizontal-pass' };
+    }
   }
-  cells[0] = { kind: 'merge-tee' };
-  for (let index = 1; index < width - 1; index++) {
-    cells[index] = { kind: 'merge-tee' };
-  }
-  cells[width - 1] = { kind: 'merge-corner' };
   return cells;
 }
 
@@ -455,12 +462,72 @@ function layoutComponent(
   const convergencesEmitted = new Set<string>();
   let gridWidth = 1;
 
+  function childCrossFeedsConvergence(childTo: string, convergence: string): boolean {
+    const outs = forwardChildrenFrom(childTo);
+    const toConvergence = outs.some((edge) => edge.to === convergence);
+    const elsewhere = outs.some((edge) => edge.to !== convergence);
+    return toConvergence && elsewhere;
+  }
+
+  function isCrossLinkDivergence(_from: string, children: readonly ClassifiedEdge[]): boolean {
+    if (children.length !== 2) return false;
+    const [left, right] = children;
+    if (left === undefined || right === undefined) return false;
+
+    for (const convergence of forwardProducersByTo.keys()) {
+      const producers = (forwardProducersByTo.get(convergence) ?? []).filter(
+        (edge) => edge.kind === 'forward',
+      );
+      if (producers.length < 2) continue;
+
+      const producerFroms = new Set(producers.map((producer) => producer.from));
+      if (!producerFroms.has(left.to) || !producerFroms.has(right.to)) continue;
+
+      if (
+        childCrossFeedsConvergence(left.to, convergence) ||
+        childCrossFeedsConvergence(right.to, convergence)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function spineBranchIndex(children: readonly ClassifiedEdge[]): number {
+    let bestIndex = 0;
+    let bestOut = -1;
+    for (const [index, child] of children.entries()) {
+      const outCount = forwardChildrenFrom(child.to).length;
+      if (outCount > bestOut) {
+        bestOut = outCount;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  }
+
+  function divergenceChildLane(
+    from: string,
+    branchIndex: number,
+    children: readonly ClassifiedEdge[],
+  ): number {
+    if (!isCrossLinkDivergence(from, children)) return branchIndex;
+    const spineIndex = spineBranchIndex(children);
+    if (branchIndex === spineIndex) return 0;
+    return 2;
+  }
+
   function presetBranchLayout(): void {
     for (const node of componentNodes) {
       const children = forwardChildrenFrom(node);
       if (children.length < 2) continue;
 
-      for (const [branchLane, child] of children.entries()) {
+      const crossLink = isCrossLinkDivergence(node, children);
+      if (crossLink) ensureGridWidth(3);
+
+      for (const [branchIndex, child] of children.entries()) {
+        const branchLane = divergenceChildLane(node, branchIndex, children);
         presetColumnAlongSpine(child.to, branchLane, node);
         divergenceBranchLaneByHash.set(child.migrationHash, branchLane);
       }
@@ -535,13 +602,14 @@ function layoutComponent(
     branchCount: number,
   ): void {
     ensureGridWidth(endLane + 1);
+    const activeLanes = new Set(activeLaneIndices());
     rows.push({
       kind: 'branch-connector',
       contractHash,
       startLane,
       endLane,
       branchCount,
-      cells: buildBranchConnectorCells(startLane, endLane),
+      cells: buildBranchConnectorCells(startLane, endLane, activeLanes, gridWidth),
     });
   }
 
@@ -589,13 +657,14 @@ function layoutComponent(
     const startLane = Math.min(...laneIndices);
     const endLane = Math.max(...laneIndices);
     ensureGridWidth(endLane + 1);
+    const activeLanes = new Set(activeLaneIndices());
     rows.push({
       kind: 'merge-connector',
       contractHash,
       startLane,
       endLane,
       branchCount: laneIndices.length,
-      cells: buildMergeConnectorCells(startLane, endLane),
+      cells: buildMergeConnectorCells(startLane, endLane, activeLanes, gridWidth),
     });
     for (const index of laneIndices) {
       if (index !== startLane) closeLane(index);
@@ -636,6 +705,16 @@ function layoutComponent(
     const children = forwardChildrenFrom(from);
     if (children.length < 2) return [];
 
+    if (isCrossLinkDivergence(from, children)) {
+      const spineIndex = spineBranchIndex(children);
+      const spineLane = divergenceChildLane(from, spineIndex, children);
+      if (laneIndex === spineLane) {
+        const otherIndex = spineIndex === 0 ? 1 : 0;
+        return [divergenceChildLane(from, otherIndex, children)];
+      }
+      return [spineLane];
+    }
+
     const spineLengths = children.map((child) => branchSpineLengthFromChild(child.to));
     const unequalSpines = new Set(spineLengths).size > 1;
 
@@ -645,6 +724,10 @@ function layoutComponent(
       if (unequalSpines) {
         if (laneIndex > index) passThrough.push(index);
       } else {
+        const siblingTarget = children[index]?.to;
+        const siblingTargetsConvergence =
+          siblingTarget !== undefined && (forwardInDegree.get(siblingTarget) ?? 0) >= 2;
+        if (laneIndex === 0 && siblingTargetsConvergence) continue;
         passThrough.push(index);
       }
     }
