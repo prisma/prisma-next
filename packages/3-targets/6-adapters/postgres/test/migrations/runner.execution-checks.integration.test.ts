@@ -102,7 +102,6 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
         perSpaceOptions: [
           {
             space: planWithFailingChecks.spaceId ?? APP_SPACE_ID,
-
             plan: planWithFailingChecks,
             driver: driver!,
             destinationContract: contract,
@@ -185,7 +184,6 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
         perSpaceOptions: [
           {
             space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
-
             plan: planWithPreSatisfiedPostcheck,
             driver: driver!,
             destinationContract: contract,

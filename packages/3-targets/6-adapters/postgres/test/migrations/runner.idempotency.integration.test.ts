@@ -100,7 +100,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         perSpaceOptions: [
           {
             space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
-
             plan: planWithPreSatisfiedPostcheck,
             driver: driver!,
             destinationContract: contract,
@@ -195,7 +194,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         perSpaceOptions: [
           {
             space: planWithPreSatisfiedPostcheck.spaceId ?? APP_SPACE_ID,
-
             plan: planWithPreSatisfiedPostcheck,
             driver: driver!,
             destinationContract: contract,
@@ -268,7 +266,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         perSpaceOptions: [
           {
             space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
-
             plan: initialPlan.plan,
             driver: driver!,
             destinationContract: contract,
@@ -302,7 +299,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         perSpaceOptions: [
           {
             space: noOpSelfEdgePlan.spaceId ?? APP_SPACE_ID,
-
             plan: noOpSelfEdgePlan,
             driver: driver!,
             destinationContract: contract,
@@ -356,7 +352,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         perSpaceOptions: [
           {
             space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
-
             plan: initialPlan.plan,
             driver: driver!,
             destinationContract: contract,
@@ -408,7 +403,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         perSpaceOptions: [
           {
             space: selfEdgePlan.spaceId ?? APP_SPACE_ID,
-
             plan: selfEdgePlan,
             driver: driver!,
             destinationContract: contract,

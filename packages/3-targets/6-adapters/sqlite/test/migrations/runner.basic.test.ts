@@ -45,7 +45,6 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: result.plan.spaceId ?? APP_SPACE_ID,
-
           plan: result.plan,
           driver,
           destinationContract: contract,
@@ -106,7 +105,6 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: initialPlan.plan.spaceId ?? APP_SPACE_ID,
-
           plan: initialPlan.plan,
           driver,
           destinationContract: contract,
@@ -132,7 +130,6 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       perSpaceOptions: [
         {
           space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
           plan: emptyPlan,
           driver,
           destinationContract: contract,

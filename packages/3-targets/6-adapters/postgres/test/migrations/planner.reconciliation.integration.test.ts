@@ -80,7 +80,6 @@ async function applyBaseline(
     perSpaceOptions: [
       {
         space: result.plan.spaceId ?? APP_SPACE_ID,
-
         plan: result.plan,
         driver,
         destinationContract: contract,
@@ -121,7 +120,6 @@ async function planAndExecute(
     perSpaceOptions: [
       {
         space: planResult.plan.spaceId ?? APP_SPACE_ID,
-
         plan: planResult.plan,
         driver,
         destinationContract: contract,

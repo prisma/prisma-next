@@ -71,7 +71,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
             plan: emptyPlan,
             driver: driver!,
             destinationContract: contract,
@@ -101,7 +100,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: failingPlan.spaceId ?? APP_SPACE_ID,
-
             plan: failingPlan,
             driver: driver!,
             destinationContract: contract,
@@ -156,7 +154,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
             plan: emptyPlan,
             driver: driver!,
             destinationContract: contract,
@@ -228,7 +225,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: emptyPlan.spaceId ?? APP_SPACE_ID,
-
             plan: emptyPlan,
             driver: driver!,
             destinationContract: contract,
@@ -307,7 +303,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: invalidPlan.spaceId ?? APP_SPACE_ID,
-
             plan: invalidPlan,
             driver: driver!,
             destinationContract: contract,
@@ -379,7 +374,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: planWithFailingPostcheck.spaceId ?? APP_SPACE_ID,
-
             plan: planWithFailingPostcheck,
             driver: driver!,
             destinationContract: contract,
@@ -450,7 +444,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: planWithInvalidSql.spaceId ?? APP_SPACE_ID,
-
             plan: planWithInvalidSql,
             driver: driver!,
             destinationContract: contract,
@@ -540,7 +533,6 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         perSpaceOptions: [
           {
             space: planWithConstraintViolation.spaceId ?? APP_SPACE_ID,
-
             plan: planWithConstraintViolation,
             driver: driver!,
             destinationContract: contract,

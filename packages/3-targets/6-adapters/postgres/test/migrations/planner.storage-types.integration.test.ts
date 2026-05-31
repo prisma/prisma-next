@@ -111,7 +111,6 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
         perSpaceOptions: [
           {
             space: planResult.plan.spaceId ?? APP_SPACE_ID,
-
             plan: planResult.plan,
             driver: driver!,
             destinationContract: contractWithEnum,
