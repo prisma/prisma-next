@@ -1,4 +1,4 @@
-import { crossRef, profileHash } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it } from 'vitest';

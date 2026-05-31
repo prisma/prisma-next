@@ -1,7 +1,6 @@
 import {
   type ContractModelBase,
   crossRef,
-  profileHash,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
