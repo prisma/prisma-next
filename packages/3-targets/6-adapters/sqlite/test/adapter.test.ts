@@ -27,6 +27,7 @@ import {
   UpdateAst,
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { describe, expect, it } from 'vitest';
 import { createSqliteAdapter } from '../src/core/adapter';
@@ -70,7 +71,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
 }) as SqliteContract;
 
 describe('SQLite adapter', () => {

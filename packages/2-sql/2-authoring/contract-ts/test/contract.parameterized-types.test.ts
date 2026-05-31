@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { validSqlContractJson } from './sql-contract-json-fixture';
 import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 import { unboundTables } from './unbound-tables';
 
@@ -13,16 +14,7 @@ import { unboundTables } from './unbound-tables';
 type TestContract = Contract<SqlStorage>;
 
 describe('SqlContractSerializer parameterized type fields', () => {
-  const baseContractInput = {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test',
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    roots: {},
-    models: {},
+  const baseContractInput = validSqlContractJson({
     storage: storageWithNamespacedTables({
       storageHash: 'sha256:test',
       tables: {
@@ -37,7 +29,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
         },
       },
     }),
-  };
+  });
 
   describe('column typeParams', () => {
     it('accepts column with typeParams object', () => {

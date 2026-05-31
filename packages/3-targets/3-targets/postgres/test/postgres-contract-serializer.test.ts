@@ -1,4 +1,3 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import {
   SqlContractSerializerBase,
@@ -14,6 +13,7 @@ import {
   type StorageTypeInstance,
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import postgresTargetDescriptor from '../src/exports/control';

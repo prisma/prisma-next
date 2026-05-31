@@ -4,7 +4,13 @@
   "target": "postgres",
   "profileHash": "sha256:fixture-codec-instance",
   "roots": {},
-  "models": {},
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {}
+      }
+    }
+  },
   "storage": {
     "storageHash": "sha256:fixture-codec-instance",
     "namespaces": {

@@ -2,54 +2,46 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "document": {
       "model": "Document",
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Document": {
-      "fields": {
-        "embedding": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/vector@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/int4@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "embedding": {
-            "column": "embedding"
-          },
-          "id": {
-            "column": "id"
-          }
-        },
-        "table": "document"
-      }
-    }
-  },
   "domain": {
-    "__unbound__": {
-      "types": {
-        "Embedding1536": {
-          "codecId": "pg/vector@1",
-          "kind": "codec-instance",
-          "nativeType": "vector",
-          "typeParams": {
-            "length": 1536
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Document": {
+            "fields": {
+              "embedding": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/vector@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "embedding": {
+                  "column": "embedding"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "table": "document"
+            }
           }
         }
       }
@@ -88,7 +80,7 @@
         }
       }
     },
-    "storageHash": "sha256:923650d8962586ae327c2224a8d4a589abf94ce9465182179bf7939228ef8cef",
+    "storageHash": "sha256:76e9d2fe6bb81df79b4dc773e3d49613723f5ce2dcd1db6fa4fc679789b9de3e",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

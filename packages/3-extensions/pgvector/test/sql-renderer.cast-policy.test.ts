@@ -9,6 +9,7 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
@@ -46,7 +47,7 @@ describe('pgvector cast policy', () => {
           },
         },
       },
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
     }) as PostgresContract;
 
     const ast = SelectAst.from(TableSource.named('user'))

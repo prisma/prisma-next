@@ -9,6 +9,7 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { ContractIR, Refs } from '@prisma-next/migration-tools/refs';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertFromIsGraphNode,
@@ -50,7 +51,7 @@ function sampleContractIR(storageHash: string): ContractIR {
       target: 'postgres',
       profileHash: `sha256:${'p'.repeat(64)}`,
       storage: { storageHash },
-      models: {},
+      domain: applicationDomainOf({ models: {} }),
       roots: {},
     },
     contractDts: 'export type Contract = unknown;\n',

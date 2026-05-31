@@ -1,16 +1,18 @@
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { PreserveEmptyPredicate, StorageSort } from './canonicalization';
-import type { Contract } from './contract-types';
-import type { CrossReference } from './cross-reference';
+import type { PreserveEmptyPredicate, StorageSort } from '../../src/canonicalization';
+import type { Contract } from '../../src/contract-types';
+import type { CrossReference } from '../../src/cross-reference';
+import { UNBOUND_DOMAIN_NAMESPACE_ID } from '../../src/domain-envelope';
 import type {
   ContractModel,
   ContractModelBase,
   ContractValueObject,
   ModelStorageBase,
-} from './domain-types';
-import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
-import type { ExecutionSection, ProfileHashBase, StorageBase } from './types';
-import { coreHash } from './types';
+} from '../../src/domain-types';
+import { computeExecutionHash, computeProfileHash, computeStorageHash } from '../../src/hashing';
+import type { ExecutionSection, ProfileHashBase, StorageBase } from '../../src/types';
+import { coreHash } from '../../src/types';
 
 type ContractOverrides<
   TStorage extends StorageBase = StorageBase,
@@ -46,6 +48,12 @@ const DEFAULT_SQL_STORAGE = {
   },
 } as const;
 
+/**
+ * Contract authoring convenience for this package's own tests. The shared copy
+ * lives in `@prisma-next/test-utils`, but the foundation `contract` package
+ * cannot depend on test-utils (test-utils depends on contract), so the helper
+ * is duplicated here to keep package boundaries one-way.
+ */
 export function createContract<
   TStorage extends StorageBase = StorageBase,
   TModels extends Record<string, ContractModelBase> = Record<string, ContractModel>,
@@ -76,8 +84,16 @@ export function createContract<
     target,
     targetFamily,
     roots: overrides.roots ?? {},
-    models: (overrides.models ?? {}) as TModels,
-    ...ifDefined('valueObjects', overrides.valueObjects),
+    domain: {
+      namespaces: {
+        [UNBOUND_DOMAIN_NAMESPACE_ID]: {
+          models:
+            overrides.models ??
+            blindCast<TModels, 'default empty models when createContract omits models'>({}),
+          ...ifDefined('valueObjects', overrides.valueObjects),
+        },
+      },
+    },
     storage,
     capabilities,
     extensionPacks: overrides.extensionPacks ?? {},

@@ -389,15 +389,20 @@ export function createMongoContractSchema(
     'meta?': 'Record<string, unknown>',
     'sources?': 'Record<string, unknown>',
     '_generated?': 'Record<string, unknown>',
-    'domain?': 'unknown',
+    domain: type({
+      namespaces: type({
+        '[string]': type({
+          models: type({ '[string]': ModelDefinitionSchema }),
+          'valueObjects?': type({
+            '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
+          }),
+        }),
+      }),
+    }),
     storage: type({
       '+': 'reject',
       namespaces: type({ '[string]': namespaceEnvelope }),
       'storageHash?': 'string',
-    }),
-    models: type({ '[string]': ModelDefinitionSchema }),
-    'valueObjects?': type({
-      '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
     }),
   }) as Type<unknown>;
 }

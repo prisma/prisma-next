@@ -311,6 +311,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Namespaces, Models } from './contract';
+import { contractModels } from '@prisma-next/contract/types';
 import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -320,7 +321,7 @@ const contract = new SqlContractSerializer().deserializeContract(contractJson) a
 // Verify we can access all exported types
 const _namespaces: Namespaces = contract.storage.namespaces;
 const _tables = _namespaces['__unbound__'].tables;
-const _models: Models = contract.models;
+const _models: Models = contractModels(contract);
 
 // Verify we can access nested types
 type UserTable = Namespaces['__unbound__']['tables']['user'];

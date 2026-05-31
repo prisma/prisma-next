@@ -2,7 +2,9 @@ import type {
   Contract,
   ContractField,
   ContractModel,
+  ContractModelsMap,
   ContractValueObject,
+  ContractValueObjectsMap,
   StorageBase,
 } from '@prisma-next/contract/types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
@@ -71,11 +73,14 @@ export type MongoContract<
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = Contract<S, M>;
 
+/** Model map inferred from a {@link MongoContract} (domain.namespaces union). */
+export type MongoModelsMap<TContract extends MongoContract> = ContractModelsMap<TContract>;
+
 export type RootModelName<
   TContract extends MongoContract,
   RootName extends keyof TContract['roots'] & string,
 > = TContract['roots'][RootName] extends { readonly model: infer M extends string }
-  ? M & keyof TContract['models']
+  ? M & keyof import('@prisma-next/contract/types').ContractModelsMap<TContract>
   : never;
 
 export type MongoTypeMaps<
@@ -125,11 +130,7 @@ export type ExtractMongoFieldInputTypes<T> =
       : Record<string, never>
     : Record<string, never>;
 
-type ExtractValueObjects<TContract> = TContract extends {
-  valueObjects: infer VO extends Record<string, ContractValueObject>;
-}
-  ? VO
-  : Record<never, never>;
+type ExtractValueObjects<TContract extends Contract> = ContractValueObjectsMap<TContract>;
 
 type NormalizeContractFields<TFields> = {
   [K in keyof TFields]: TFields[K] extends ContractField ? TFields[K] : never;
@@ -181,8 +182,8 @@ type InferFieldType<
 
 export type InferModelRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends string & keyof TContract['models'],
-  TFields extends Record<string, ContractField> = TContract['models'][ModelName]['fields'],
+  ModelName extends string & keyof ContractModelsMap<TContract>,
+  TFields extends Record<string, ContractField> = ContractModelsMap<TContract>[ModelName]['fields'],
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
   TValueObjects extends Record<string, ContractValueObject> = ExtractValueObjects<TContract>,
 > = {

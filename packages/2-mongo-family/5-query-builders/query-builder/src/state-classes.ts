@@ -1,8 +1,10 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
+import { contractModels, type PlanMeta } from '@prisma-next/contract/types';
 import type {
   ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoModelDefinition,
+  MongoModelsMap,
   MongoTypeMaps,
   RootModelName,
 } from '@prisma-next/mongo-contract';
@@ -93,7 +95,7 @@ function writeMeta(storageHash: string): PlanMeta {
  */
 export class CollectionHandle<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends keyof TContract['models'] & string,
+  ModelName extends keyof MongoModelsMap<TContract> & string,
 > extends PipelineChain<
   TContract,
   ModelToDocShape<TContract, ModelName>,
@@ -317,7 +319,7 @@ export class CollectionHandle<
  */
 export class FilteredCollection<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
-  ModelName extends keyof TContract['models'] & string,
+  ModelName extends keyof MongoModelsMap<TContract> & string,
 > extends PipelineChain<
   TContract,
   ModelToDocShape<TContract, ModelName>,
@@ -640,11 +642,11 @@ export function createCollectionHandle<
     const validRoots = Object.keys(c.roots).join(', ');
     throw new Error(`Unknown root: "${rootName}". Valid roots: ${validRoots}`);
   }
-  const model = c.models[modelName];
+  const model = contractModels(c)[modelName] as MongoModelDefinition | undefined;
   if (!model) {
     throw new Error(`Unknown model: "${modelName}" referenced by root "${rootName}".`);
   }
-  const collectionName = model.storage?.collection ?? rootName;
+  const collectionName = model.storage.collection ?? rootName;
   if (!c.storage?.storageHash) {
     throw new Error(
       'Contract is missing storage.storageHash. Pass a validated contract to mongoQuery().',

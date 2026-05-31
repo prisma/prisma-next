@@ -111,7 +111,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'Owned model "Address" must not have storage.collection',
+      /Owned model "__unbound__:Address" must not have storage\.collection/,
     );
   });
 
@@ -251,7 +251,7 @@ describe('mongoEmission.validateStructure', () => {
       storage: namespacedMongoStorageFromCollections({ tasks: {} }),
     });
     expect(() => mongoEmission.validateStructure(contract)).toThrow(
-      'declares base "NonExistent" which does not exist',
+      /declares base "__unbound__:NonExistent" which does not exist/,
     );
   });
 

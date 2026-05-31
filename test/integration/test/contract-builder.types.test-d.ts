@@ -6,6 +6,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import type { ContractModelsMap } from '@prisma-next/contract/types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
@@ -150,9 +151,10 @@ test('refined object contract preserves downstream model token inference', () =>
     Record<string, unknown>
   >();
   expectTypeOf<RefinedUserColumns>().toExtend<Record<string, { readonly codecId: string }>>();
-  expectTypeOf(validated.models.User.storage.table).toExtend<string>();
+  type ValidatedModels = ContractModelsMap<typeof validated>;
+  expectTypeOf<ValidatedModels['User']['storage']['table']>().toExtend<string>();
   expectTypeOf<
-    NonNullable<(typeof validated.models.Post.storage.fields)['userId']>['column']
+    NonNullable<ValidatedModels['Post']['storage']['fields']['userId']>['column']
   >().toExtend<string>();
   expectTypeOf(User.refs.id.fieldName).toEqualTypeOf<'id'>();
   expectTypeOf(User.refs.id.modelName).toEqualTypeOf<'User'>();
@@ -422,7 +424,7 @@ test('contract structure type matches Contract', () => {
 
   expectTypeOf(contract).toHaveProperty('target');
   expectTypeOf(contract).toHaveProperty('targetFamily');
-  expectTypeOf(contract).toHaveProperty('models');
+  expectTypeOf(contract).toHaveProperty('domain');
   expectTypeOf(contract).toHaveProperty('storage');
 });
 

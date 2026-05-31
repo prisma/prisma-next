@@ -2,6 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
+import { modelsMapForAssertions, modelsOf } from './contract-test-helpers';
 import { crossRef } from './cross-ref-helpers';
 
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -36,13 +37,6 @@ function defineTestContract<const Definition extends Omit<ContractInput, 'target
     target: postgresTargetPack,
     ...definition,
   });
-}
-
-function modelsOf(contract: { models: unknown }) {
-  return contract.models as Record<
-    string,
-    { storage: { fields: Record<string, unknown> }; fields: Record<string, unknown> }
-  >;
 }
 
 type OwnershipRelationCase = {
@@ -196,7 +190,7 @@ describe('contract DSL authoring surface', () => {
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
     ]);
-    const contractModels = contract.models as Record<
+    const contractModels = modelsOf(contract) as Record<
       string,
       {
         fields: Record<string, unknown>;
@@ -276,7 +270,7 @@ describe('contract DSL authoring surface', () => {
         columns: Record<string, unknown>;
       }
     >;
-    const models = modelsOf(contract);
+    const models = modelsMapForAssertions(contract);
     expect(tables['app_user']?.primaryKey).toEqual({
       columns: ['id'],
       name: 'app_user_pkey',
@@ -379,7 +373,7 @@ describe('contract DSL authoring surface', () => {
       },
     });
 
-    const contractModels = contract.models as Record<
+    const contractModels = modelsOf(contract) as Record<
       string,
       { relations: Record<string, unknown> }
     >;
@@ -536,7 +530,7 @@ describe('contract DSL authoring surface', () => {
       ...ownershipCase,
     });
 
-    const contractModels = contract.models as Record<
+    const contractModels = modelsOf(contract) as Record<
       string,
       { relations: Record<string, unknown> }
     >;
@@ -587,7 +581,7 @@ describe('contract DSL authoring surface', () => {
     expect(tables['blog_post']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
     expect(tables['blog_post']?.columns['author_identifier']).toBeDefined();
-    const models = modelsOf(contract);
+    const models = modelsMapForAssertions(contract);
     expect(models['BlogPost']?.storage.fields['createdAt']).toEqual({ column: 'created_at' });
     expect(models['BlogPost']?.storage.fields['authorId']).toEqual({
       column: 'author_identifier',
@@ -890,7 +884,7 @@ describe('self-referential and circular relations', () => {
     });
 
     const categoryModel = (
-      contract.models as Record<string, { relations: Record<string, unknown> }>
+      modelsOf(contract) as Record<string, { relations: Record<string, unknown> }>
     )['Category'];
     expect(categoryModel?.relations).toMatchObject({
       parent: {
@@ -940,7 +934,7 @@ describe('self-referential and circular relations', () => {
       models: { Employee, Department },
     });
 
-    const contractModels = contract.models as Record<
+    const contractModels = modelsOf(contract) as Record<
       string,
       { relations: Record<string, unknown> }
     >;

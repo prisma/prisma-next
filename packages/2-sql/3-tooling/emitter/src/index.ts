@@ -112,7 +112,6 @@ export const sqlEmission = {
 
     assertUniqueSqlTableNames(storage);
 
-    const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
     const tableNames = new Set<string>();
     for (const ns of Object.values(storage.namespaces)) {
       for (const t of Object.keys(ns.tables)) {
@@ -120,40 +119,44 @@ export const sqlEmission = {
       }
     }
 
-    if (models) {
+    for (const [namespaceId, domainNs] of Object.entries(contract.domain.namespaces)) {
+      const models = domainNs.models as Record<string, ContractModel<SqlModelStorage>>;
       for (const [modelName, model] of Object.entries(models)) {
+        const qualifiedName = `${namespaceId}:${modelName}`;
         if (!model.storage?.table) {
-          throw new Error(`Model "${modelName}" is missing storage.table`);
+          throw new Error(`Model "${qualifiedName}" is missing storage.table`);
         }
 
         const tableName = model.storage.table;
         const located = findSqlTable(storage, tableName);
         if (!located) {
-          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
+          throw new Error(`Model "${qualifiedName}" references non-existent table "${tableName}"`);
         }
 
         const { table } = located;
         const columnNames = new Set(Object.keys(table.columns));
         const storageFields = model.storage.fields;
         if (!storageFields || Object.keys(storageFields).length === 0) {
-          throw new Error(`Model "${modelName}" is missing storage.fields`);
+          throw new Error(`Model "${qualifiedName}" is missing storage.fields`);
         }
 
         for (const [fieldName, field] of Object.entries(storageFields)) {
           if (!field.column) {
-            throw new Error(`Model "${modelName}" field "${fieldName}" is missing column property`);
+            throw new Error(
+              `Model "${qualifiedName}" field "${fieldName}" is missing column property`,
+            );
           }
 
           if (!columnNames.has(field.column)) {
             throw new Error(
-              `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
+              `Model "${qualifiedName}" field "${fieldName}" references non-existent column "${field.column}" in table "${tableName}"`,
             );
           }
         }
 
         if (!model.relations || typeof model.relations !== 'object') {
           throw new Error(
-            `Model "${modelName}" is missing required field "relations" (must be an object)`,
+            `Model "${qualifiedName}" is missing required field "relations" (must be an object)`,
           );
         }
       }
@@ -250,10 +253,7 @@ export const sqlEmission = {
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as unknown as SqlStorage;
     const namespacesType = generateStorageNamespacesType(storage.namespaces);
-    const domainTypes = contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
-      | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
-      | undefined;
-    const docTypes = generateDocumentScopedStorageTypesType(domainTypes ?? storage.types);
+    const docTypes = generateDocumentScopedStorageTypesType(storage.types);
     const typesClause = docTypes === undefined ? '' : `; readonly types: ${docTypes}`;
     return `{ readonly namespaces: ${namespacesType}${typesClause}; readonly storageHash: ${storageHashTypeName} }`;
   },
@@ -308,13 +308,7 @@ export const sqlEmission = {
             ).enum
           : undefined;
       const fromNamespace = nsEnums?.[column.typeRef];
-      const fromDomain = (
-        contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] as
-          | Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>>
-          | undefined
-      )?.[column.typeRef];
-      const fromDocument = fromDomain ?? storage.types?.[column.typeRef];
-      const typeInstance = fromNamespace ?? fromDocument;
+      const typeInstance = fromNamespace ?? storage.types?.[column.typeRef];
       if (typeInstance === undefined) return undefined;
       if (isPostgresEnumStorageEntry(typeInstance)) {
         return { values: typeInstance.values };
@@ -363,7 +357,7 @@ export const sqlEmission = {
       `export type Contract = ContractWithTypeMaps<${contractBaseName}, ${typeMapsName}>;`,
       '',
       "export type Namespaces = Contract['storage']['namespaces'];",
-      "export type Models = Contract['models'];",
+      'export type Models = ContractModelsMap<Contract>;',
     ].join('\n');
   },
 } as const;

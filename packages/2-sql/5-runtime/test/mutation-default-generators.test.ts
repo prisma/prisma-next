@@ -1,5 +1,6 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
@@ -16,7 +17,7 @@ const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
   profileHash: profileHash('sha256:test'),
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),

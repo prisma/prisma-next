@@ -74,24 +74,20 @@ export interface ContractModel<TModelStorage extends ModelStorageBase = ModelSto
 
 // ── Relation key helpers ─────────────────────────────────────────────────────
 
-type HasModelsWithRelations = {
-  readonly models: Record<string, { readonly relations: Record<string, ContractRelation> }>;
-};
-
 export type ReferenceRelationKeys<
-  TContract extends HasModelsWithRelations,
-  ModelName extends string & keyof TContract['models'],
+  TModels extends Record<string, { readonly relations: Record<string, ContractRelation> }>,
+  ModelName extends string & keyof TModels,
 > = {
-  [K in keyof TContract['models'][ModelName]['relations']]: TContract['models'][ModelName]['relations'][K] extends ContractReferenceRelation
+  [K in keyof TModels[ModelName]['relations']]: TModels[ModelName]['relations'][K] extends ContractReferenceRelation
     ? K
     : never;
-}[keyof TContract['models'][ModelName]['relations']];
+}[keyof TModels[ModelName]['relations']];
 
 export type EmbedRelationKeys<
-  TContract extends HasModelsWithRelations,
-  ModelName extends string & keyof TContract['models'],
+  TModels extends Record<string, { readonly relations: Record<string, ContractRelation> }>,
+  ModelName extends string & keyof TModels,
 > = {
-  [K in keyof TContract['models'][ModelName]['relations']]: TContract['models'][ModelName]['relations'][K] extends ContractReferenceRelation
+  [K in keyof TModels[ModelName]['relations']]: TModels[ModelName]['relations'][K] extends ContractReferenceRelation
     ? never
     : K;
-}[keyof TContract['models'][ModelName]['relations']];
+}[keyof TModels[ModelName]['relations']];

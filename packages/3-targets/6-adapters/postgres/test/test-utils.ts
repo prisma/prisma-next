@@ -5,7 +5,6 @@
  * schemas, and other common test fixtures.
  */
 
-import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -15,6 +14,7 @@ import {
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { createContract } from '@prisma-next/test-utils';
 
 export function createTestContract(
   overrides: { tables?: Record<string, StorageTableInput>; storageHash?: string } = {},

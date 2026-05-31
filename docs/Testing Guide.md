@@ -484,11 +484,11 @@ const literalExpr: LiteralExpr = { kind: 'literal', value: 'test' };
 
 ### Contract Factory Functions
 
-When creating `Contract` values in tests, use `createContract` from `@prisma-next/contract/testing` (or a local helper such as `createTestContract` in package test `utils`) instead of manual object creation:
+When creating `Contract` values in tests, use `createContract` from `@prisma-next/test-utils` (or a local helper such as `createTestContract` in package test `utils`) instead of manual object creation:
 
 ```typescript
 // ✅ CORRECT: Use factory function
-import { createContract } from '@prisma-next/contract/testing';
+import { createContract } from '@prisma-next/test-utils';
 
 const contract = createContract({
   storage: {

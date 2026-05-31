@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
@@ -41,7 +42,10 @@ model Post {
 
     expect(result.value.roots).toEqual({ user: crossRef('User'), post: crossRef('Post') });
 
-    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
     expect(models['User']?.relations).toMatchObject({
       posts: {
         to: crossRef('Post'),
@@ -88,7 +92,10 @@ model Post {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
     expect(models['User']?.relations).toMatchObject({
       authored: {
         to: crossRef('Post'),
@@ -147,7 +154,10 @@ model Member {
       member: crossRef('Member'),
     });
 
-    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
     expect(models['User']?.relations).toMatchObject({
       posts: { to: crossRef('Post'), cardinality: '1:N' },
     });
@@ -176,7 +186,10 @@ model Member {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
     expect(models['Employee']?.relations).toMatchObject({
       manager: {
         to: crossRef('Employee'),

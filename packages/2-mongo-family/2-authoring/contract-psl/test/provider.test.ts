@@ -74,8 +74,14 @@ describe('mongoContract provider helper', () => {
     expect(result.value).toMatchObject({
       targetFamily: 'mongo',
       target: 'mongo',
-      models: {
-        User: expect.any(Object),
+      domain: {
+        namespaces: {
+          __unbound__: {
+            models: {
+              User: expect.any(Object),
+            },
+          },
+        },
       },
     });
   });

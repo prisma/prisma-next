@@ -1,4 +1,10 @@
-import type { MongoContract, RootModelName } from '@prisma-next/mongo-contract';
+import { contractModels } from '@prisma-next/contract/types';
+import type {
+  MongoContract,
+  MongoModelDefinition,
+  MongoModelsMap,
+  RootModelName,
+} from '@prisma-next/mongo-contract';
 import { createFieldAccessor, type FieldAccessor, type LeafExpression } from './field-accessor';
 import type { ModelNestedShape } from './resolve-path';
 import type { DocField, DocShape, ModelToDocShape } from './types';
@@ -92,7 +98,7 @@ export interface LookupBuilder<
   on(
     cb: (
       local: FieldAccessor<Shape, Nested>,
-      foreign: ModelName extends keyof TContract['models'] & string
+      foreign: ModelName extends keyof MongoModelsMap<TContract> & string
         ? FieldAccessor<
             ModelToDocShape<TContract, ModelName>,
             ModelNestedShape<TContract, ModelName>
@@ -142,7 +148,7 @@ export function createLookupFrom<
       const validRoots = Object.keys(contract.roots).join(', ');
       throw new Error(`lookup() unknown root: "${rootName}". Valid roots: ${validRoots}`);
     }
-    const model = contract.models[modelName];
+    const model = contractModels(contract)[modelName] as MongoModelDefinition | undefined;
     const foreignCollection = model?.storage?.collection ?? rootName;
     return createLookupBuilder({
       rootName,
@@ -260,7 +266,7 @@ export function extractLookupResult(
         'Returning a hand-rolled options object is not supported.',
     );
   }
-  const model = contract.models[result._model];
+  const model = contractModels(contract)[result._model] as MongoModelDefinition | undefined;
   const foreignCollection = model?.storage?.collection ?? result._root;
   return {
     foreignCollection,

@@ -1,15 +1,21 @@
-import { createSqlContract } from '@prisma-next/contract/testing';
-import { CrossReferenceSchema, crossRef } from '@prisma-next/contract/types';
+import {
+  type Contract,
+  CrossReferenceSchema,
+  contractModels,
+  crossRef,
+  UNBOUND_DOMAIN_NAMESPACE_ID,
+} from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { createSqlContract } from '@prisma-next/test-utils';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { SqlContractSerializer } from '../src/core/ir/sql-contract-serializer';
 
 describe('cross-reference shape round-trip', () => {
   it('parses and round-trips through SQL family serializer hydration', () => {
-    const rootsCrossRef = crossRef('User', 'public');
-    const relationCrossRef = crossRef('Post', 'public');
-    const baseCrossRef = crossRef('User', 'public');
+    const rootsCrossRef = crossRef('User', UNBOUND_DOMAIN_NAMESPACE_ID);
+    const relationCrossRef = crossRef('Post', UNBOUND_DOMAIN_NAMESPACE_ID);
+    const baseCrossRef = crossRef('User', UNBOUND_DOMAIN_NAMESPACE_ID);
     expect(CrossReferenceSchema(rootsCrossRef) instanceof type.errors).toBe(false);
 
     const envelope = createSqlContract({
@@ -65,7 +71,8 @@ describe('cross-reference shape round-trip', () => {
     const serialized = JSON.parse(JSON.stringify(serializer.serializeContract(hydrated)));
 
     expect(serialized.roots.users).toEqual(rootsCrossRef);
-    expect(serialized.models.User.relations.posts.to).toEqual(relationCrossRef);
-    expect(serialized.models.Post.base).toEqual(baseCrossRef);
+    const serializedModels = contractModels(serializer.deserializeContract(serialized) as Contract);
+    expect(serializedModels['User']?.relations?.['posts']?.to).toEqual(relationCrossRef);
+    expect(serializedModels['Post']?.base).toEqual(baseCrossRef);
   });
 });

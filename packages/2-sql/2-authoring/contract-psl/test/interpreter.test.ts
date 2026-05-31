@@ -11,6 +11,7 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
   testEnumEntityContributions,
@@ -256,7 +257,7 @@ model Comment {
         },
       },
     });
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       User: {
         storage: {
           table: 'user',
@@ -306,7 +307,7 @@ model Comment {
     // present — assert absence directly via a narrowed accessor instead.
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     expect(unboundTables(storage)['idlessThing']?.primaryKey).toBeUndefined();
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       IdlessThing: {
         storage: {
           table: 'idlessThing',
@@ -433,7 +434,10 @@ model Post {
     expect(documentScopedTypes(result.value)).toMatchObject({
       Email: { codecId: 'pg/text@1', nativeType: 'text' },
     });
-    const models = result.value.models as Record<string, { relations?: Record<string, unknown> }>;
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
     expect(models['Post']?.relations).toMatchObject({
       author: {
         to: crossRef('User'),
@@ -514,7 +518,7 @@ model Member {
         },
       },
     });
-    expect(result.value.models).toMatchObject({
+    expect(modelsOf(result.value)).toMatchObject({
       Team: {
         storage: {
           table: 'org_team',
@@ -559,7 +563,7 @@ model AuditLog {
       if (!result.ok) return;
       const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
       expect(unboundTables(storage)['audit_log']?.primaryKey).toBeUndefined();
-      expect(result.value.models).toMatchObject({
+      expect(modelsOf(result.value)).toMatchObject({
         AuditLog: { storage: { table: 'audit_log' } },
       });
     });

@@ -34,7 +34,7 @@ function hashContract(section: HashContractSection): string {
     targetFamily: sectionData['targetFamily'],
     target: sectionData['target'],
     roots: {},
-    models: {},
+    domain: { namespaces: {} },
     storage: sectionData['storage'] ?? {},
     execution: sectionData['execution'],
     extensionPacks: {},

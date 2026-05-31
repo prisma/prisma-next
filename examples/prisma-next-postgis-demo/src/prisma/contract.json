@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "cafe": {
       "model": "Cafe",
@@ -17,146 +17,138 @@
       "namespace": "__unbound__"
     }
   },
-  "models": {
-    "Cafe": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "location": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/geometry@1",
-            "kind": "scalar"
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "id"
-          },
-          "location": {
-            "column": "location"
-          },
-          "name": {
-            "column": "name"
-          }
-        },
-        "table": "cafe"
-      }
-    },
-    "Neighborhood": {
-      "fields": {
-        "boundary": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/geometry@1",
-            "kind": "scalar"
-          }
-        },
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "boundary": {
-            "column": "boundary"
-          },
-          "id": {
-            "column": "id"
-          },
-          "name": {
-            "column": "name"
-          }
-        },
-        "table": "neighborhood"
-      }
-    },
-    "Route": {
-      "fields": {
-        "id": {
-          "nullable": false,
-          "type": {
-            "codecId": "sql/char@1",
-            "kind": "scalar",
-            "typeParams": {
-              "length": 36
-            }
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/text@1",
-            "kind": "scalar"
-          }
-        },
-        "path": {
-          "nullable": false,
-          "type": {
-            "codecId": "pg/geometry@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "fields": {
-          "id": {
-            "column": "id"
-          },
-          "name": {
-            "column": "name"
-          },
-          "path": {
-            "column": "path"
-          }
-        },
-        "table": "route"
-      }
-    }
-  },
   "domain": {
-    "__unbound__": {
-      "types": {
-        "WgsGeometry": {
-          "codecId": "pg/geometry@1",
-          "kind": "codec-instance",
-          "nativeType": "geometry",
-          "typeParams": {
-            "srid": 4326
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Cafe": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "location": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/geometry@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "location": {
+                  "column": "location"
+                },
+                "name": {
+                  "column": "name"
+                }
+              },
+              "table": "cafe"
+            }
+          },
+          "Neighborhood": {
+            "fields": {
+              "boundary": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/geometry@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "boundary": {
+                  "column": "boundary"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                }
+              },
+              "table": "neighborhood"
+            }
+          },
+          "Route": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "path": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/geometry@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "path": {
+                  "column": "path"
+                }
+              },
+              "table": "route"
+            }
           }
         }
       }
@@ -264,7 +256,7 @@
         }
       }
     },
-    "storageHash": "sha256:05692bcae4c7e37855a66f6bbd809676cfa57fc42fa985e465846615cc3c715f",
+    "storageHash": "sha256:7a019a635e7114a712b928ce3a4d56e819863adbf5b17f8f5986d3d1a09e2fc3",
     "types": {
       "WgsGeometry": {
         "codecId": "pg/geometry@1",
@@ -277,7 +269,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:815d2a9f2f35488d3bb0aeba687849e2475b621c331c1d27ad79e37b6e56182f",
+    "executionHash": "sha256:c4e18220ce0fd45634a6b4bb622451893186000ee5c7dd1bdb3d0567c7047bd9",
     "mutations": {
       "defaults": [
         {

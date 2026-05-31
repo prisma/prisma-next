@@ -8,9 +8,9 @@ import {
   type NamedArraySortTarget,
   type PathPattern,
 } from '@prisma-next/contract/hashing-utils';
-import { createContract } from '@prisma-next/contract/testing';
 import type { Contract, CrossReference } from '@prisma-next/contract/types';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import { createContract } from '@prisma-next/test-utils/contract-factories';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
 import { emit as emitImpl } from '../src/exports';
@@ -69,6 +69,29 @@ type TestContractOverrides = {
   schemaVersion?: string;
   sources?: Record<string, unknown>;
 };
+
+/** Models map from canonical contract JSON (`domain.namespaces`, single namespace only). */
+export function modelsFromCanonicalContract(
+  json: Record<string, unknown>,
+): Record<string, unknown> {
+  const domain = json['domain'] as Record<string, unknown> | undefined;
+  const namespaces = domain?.['namespaces'] as Record<string, unknown> | undefined;
+  if (namespaces === undefined) {
+    return {};
+  }
+  const namespaceIds = Object.keys(namespaces);
+  if (namespaceIds.length !== 1) {
+    throw new Error(
+      `expected exactly one domain namespace in canonical JSON, found ${namespaceIds.length}`,
+    );
+  }
+  const slice = namespaces[namespaceIds[0]!] as Record<string, unknown> | undefined;
+  const models = slice?.['models'];
+  if (models !== undefined && typeof models === 'object' && models !== null) {
+    return models as Record<string, unknown>;
+  }
+  return {};
+}
 
 export function createTestContract(overrides: TestContractOverrides = {}): Contract {
   const { storageHash: _sh, schemaVersion: _sv, sources: _src, storage, ...rest } = overrides;

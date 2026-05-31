@@ -7,203 +7,6 @@
     "posts": "Post",
     "users": "User"
   },
-  "models": {
-    "Article": {
-      "base": "Post",
-      "fields": {
-        "summary": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "collection": "posts"
-      }
-    },
-    "Post": {
-      "discriminator": {
-        "field": "kind"
-      },
-      "fields": {
-        "_id": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/objectId@1",
-            "kind": "scalar"
-          }
-        },
-        "authorId": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/objectId@1",
-            "kind": "scalar"
-          }
-        },
-        "content": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "createdAt": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/date@1",
-            "kind": "scalar"
-          }
-        },
-        "kind": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "title": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "author": {
-          "cardinality": "N:1",
-          "on": {
-            "localFields": ["authorId"],
-            "targetFields": ["_id"]
-          },
-          "to": "User"
-        }
-      },
-      "storage": {
-        "collection": "posts"
-      },
-      "variants": {
-        "Article": {
-          "value": "article"
-        },
-        "Tutorial": {
-          "value": "tutorial"
-        }
-      }
-    },
-    "Tutorial": {
-      "base": "Post",
-      "fields": {
-        "difficulty": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "duration": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/int32@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {},
-      "storage": {
-        "collection": "posts"
-      }
-    },
-    "User": {
-      "fields": {
-        "_id": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/objectId@1",
-            "kind": "scalar"
-          }
-        },
-        "address": {
-          "nullable": true,
-          "type": {
-            "kind": "valueObject",
-            "name": "Address"
-          }
-        },
-        "bio": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "email": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "name": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      },
-      "relations": {
-        "posts": {
-          "cardinality": "1:N",
-          "on": {
-            "localFields": ["_id"],
-            "targetFields": ["authorId"]
-          },
-          "to": "Post"
-        }
-      },
-      "storage": {
-        "collection": "users"
-      }
-    }
-  },
-  "valueObjects": {
-    "Address": {
-      "fields": {
-        "city": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "country": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "street": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
-        "zip": {
-          "nullable": true,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        }
-      }
-    }
-  },
   "storage": {
     "collections": {
       "article": {
@@ -215,7 +18,9 @@
                 "bsonType": "string"
               }
             },
-            "required": ["summary"]
+            "required": [
+              "summary"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -245,7 +50,14 @@
                 "bsonType": "string"
               }
             },
-            "required": ["_id", "authorId", "content", "createdAt", "kind", "title"]
+            "required": [
+              "_id",
+              "authorId",
+              "content",
+              "createdAt",
+              "kind",
+              "title"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -263,7 +75,10 @@
                 "bsonType": "int"
               }
             },
-            "required": ["difficulty", "duration"]
+            "required": [
+              "difficulty",
+              "duration"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -295,15 +110,25 @@
                         "bsonType": "string"
                       },
                       "zip": {
-                        "bsonType": ["null", "string"]
+                        "bsonType": [
+                          "null",
+                          "string"
+                        ]
                       }
                     },
-                    "required": ["city", "country", "street"]
+                    "required": [
+                      "city",
+                      "country",
+                      "street"
+                    ]
                   }
                 ]
               },
               "bio": {
-                "bsonType": ["null", "string"]
+                "bsonType": [
+                  "null",
+                  "string"
+                ]
               },
               "email": {
                 "bsonType": "string"
@@ -312,7 +137,11 @@
                 "bsonType": "string"
               }
             },
-            "required": ["_id", "email", "name"]
+            "required": [
+              "_id",
+              "email",
+              "name"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -328,5 +157,216 @@
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
     "message": "This file is automatically generated by \"prisma-next contract emit\".",
     "regenerate": "To regenerate, run: prisma-next contract emit"
+  },
+  "domain": {
+    "namespaces": {
+      "__unbound__": {
+        "models": {
+          "Article": {
+            "base": "Post",
+            "fields": {
+              "summary": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "collection": "posts"
+            }
+          },
+          "Post": {
+            "discriminator": {
+              "field": "kind"
+            },
+            "fields": {
+              "_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/objectId@1",
+                  "kind": "scalar"
+                }
+              },
+              "authorId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/objectId@1",
+                  "kind": "scalar"
+                }
+              },
+              "content": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/date@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "authorId"
+                  ],
+                  "targetFields": [
+                    "_id"
+                  ]
+                },
+                "to": "User"
+              }
+            },
+            "storage": {
+              "collection": "posts"
+            },
+            "variants": {
+              "Article": {
+                "value": "article"
+              },
+              "Tutorial": {
+                "value": "tutorial"
+              }
+            }
+          },
+          "Tutorial": {
+            "base": "Post",
+            "fields": {
+              "difficulty": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "duration": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/int32@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "collection": "posts"
+            }
+          },
+          "User": {
+            "fields": {
+              "_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/objectId@1",
+                  "kind": "scalar"
+                }
+              },
+              "address": {
+                "nullable": true,
+                "type": {
+                  "kind": "valueObject",
+                  "name": "Address"
+                }
+              },
+              "bio": {
+                "nullable": true,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "_id"
+                  ],
+                  "targetFields": [
+                    "authorId"
+                  ]
+                },
+                "to": "Post"
+              }
+            },
+            "storage": {
+              "collection": "users"
+            }
+          }
+        },
+        "valueObjects": {
+          "Address": {
+            "fields": {
+              "city": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "country": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "street": {
+                "nullable": false,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              },
+              "zip": {
+                "nullable": true,
+                "type": {
+                  "codecId": "mongo/string@1",
+                  "kind": "scalar"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

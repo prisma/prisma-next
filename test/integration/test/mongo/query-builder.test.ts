@@ -32,28 +32,34 @@ type ScalarField<TCodecId extends string> = {
 };
 
 type PipelineContract = MongoContract & {
-  readonly models: {
-    readonly Product: {
-      readonly fields: {
-        readonly _id: ScalarField<'mongo/objectId@1'>;
-        readonly name: ScalarField<'mongo/string@1'>;
-        readonly category: ScalarField<'mongo/string@1'>;
-        readonly price: ScalarField<'mongo/double@1'>;
-        readonly tags: ScalarField<'mongo/array@1'>;
-        readonly createdAt: ScalarField<'mongo/date@1'>;
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: {
+        readonly models: {
+          readonly Product: {
+            readonly fields: {
+              readonly _id: ScalarField<'mongo/objectId@1'>;
+              readonly name: ScalarField<'mongo/string@1'>;
+              readonly category: ScalarField<'mongo/string@1'>;
+              readonly price: ScalarField<'mongo/double@1'>;
+              readonly tags: ScalarField<'mongo/array@1'>;
+              readonly createdAt: ScalarField<'mongo/date@1'>;
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: { readonly collection: 'products' };
+          };
+          readonly Order: {
+            readonly fields: {
+              readonly _id: ScalarField<'mongo/objectId@1'>;
+              readonly productName: ScalarField<'mongo/string@1'>;
+              readonly quantity: ScalarField<'mongo/double@1'>;
+              readonly status: ScalarField<'mongo/string@1'>;
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: { readonly collection: 'orders' };
+          };
+        };
       };
-      readonly relations: Record<string, never>;
-      readonly storage: { readonly collection: 'products' };
-    };
-    readonly Order: {
-      readonly fields: {
-        readonly _id: ScalarField<'mongo/objectId@1'>;
-        readonly productName: ScalarField<'mongo/string@1'>;
-        readonly quantity: ScalarField<'mongo/double@1'>;
-        readonly status: ScalarField<'mongo/string@1'>;
-      };
-      readonly relations: Record<string, never>;
-      readonly storage: { readonly collection: 'orders' };
     };
   };
   readonly roots: {
@@ -83,31 +89,49 @@ const contractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
   roots: { products: crossRef('Product'), orders: crossRef('Order') },
-  models: {
-    Product: {
-      fields: {
-        _id: scalarField('mongo/objectId@1'),
-        name: scalarField('mongo/string@1'),
-        category: scalarField('mongo/string@1'),
-        price: scalarField('mongo/double@1'),
-        tags: scalarField('mongo/array@1'),
-        createdAt: scalarField('mongo/date@1'),
+  domain: {
+    namespaces: {
+      __unbound__: {
+        models: {
+          Product: {
+            fields: {
+              _id: scalarField('mongo/objectId@1'),
+              name: scalarField('mongo/string@1'),
+              category: scalarField('mongo/string@1'),
+              price: scalarField('mongo/double@1'),
+              tags: scalarField('mongo/array@1'),
+              createdAt: scalarField('mongo/date@1'),
+            },
+            relations: {},
+            storage: { collection: 'products' },
+          },
+          Order: {
+            fields: {
+              _id: scalarField('mongo/objectId@1'),
+              productName: scalarField('mongo/string@1'),
+              quantity: scalarField('mongo/double@1'),
+              status: scalarField('mongo/string@1'),
+            },
+            relations: {},
+            storage: { collection: 'orders' },
+          },
+        },
       },
-      relations: {},
-      storage: { collection: 'products' },
-    },
-    Order: {
-      fields: {
-        _id: scalarField('mongo/objectId@1'),
-        productName: scalarField('mongo/string@1'),
-        quantity: scalarField('mongo/double@1'),
-        status: scalarField('mongo/string@1'),
-      },
-      relations: {},
-      storage: { collection: 'orders' },
     },
   },
-  storage: { storageHash: 'test-hash', collections: { products: {}, orders: {} } },
+  storage: {
+    storageHash: 'test-hash',
+    namespaces: {
+      __unbound__: {
+        id: '__unbound__',
+        kind: 'mongo-namespace',
+        collections: {
+          products: { kind: 'mongo-collection' },
+          orders: { kind: 'mongo-collection' },
+        },
+      },
+    },
+  },
   capabilities: {},
   extensionPacks: {},
   profileHash: 'test-profile',
@@ -686,7 +710,10 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
       const plan = products()
         .match((f) => f.name.eq('Laptop'))
         .addFields((f) => ({
-          dateStr: fn.dateToString({ date: f.createdAt, format: fn.literal('%Y-%m-%d') }),
+          dateStr: fn.dateToString({
+            date: f['createdAt'] as Parameters<typeof fn.dateToString>[0]['date'],
+            format: fn.literal('%Y-%m-%d'),
+          }),
         }))
         .build();
 

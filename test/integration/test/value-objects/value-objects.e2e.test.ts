@@ -23,28 +23,29 @@ import sqlContractJson from './fixtures/generated/sql-contract.json';
 describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) => {
   const contract = new MongoContractSerializer().deserializeContract(
     mongoContractJson,
-  ) as MongoVOContract;
+  ) as unknown as MongoVOContract;
 
   it('create and read value objects with correct types', async () => {
-    const ormClient = mongoOrm({ contract, executor: ctx.runtime });
+    const ormClient = mongoOrm<MongoVOContract>({ contract, executor: ctx.runtime });
 
-    const created = await ormClient.shop.create({
+    const shopCollection = ormClient['shop']!;
+    const created = await shopCollection.create({
       name: 'Corner Store',
       location: { street: '123 Main St', city: 'Springfield', zip: '62701' },
       notes: null,
     });
 
-    expectTypeOf(created.location).toEqualTypeOf<{
+    expectTypeOf(created['location']).toEqualTypeOf<{
       street: string;
       city: string;
       zip: string;
     }>();
-    expectTypeOf(created.notes).toEqualTypeOf<{
+    expectTypeOf(created['notes']).toEqualTypeOf<{
       street: string;
       city: string;
       zip: string;
     } | null>();
-    expectTypeOf(created.name).toEqualTypeOf<string>();
+    expectTypeOf(created['name']).toEqualTypeOf<string>();
 
     expect(created).toMatchObject({
       name: 'Corner Store',
@@ -52,40 +53,41 @@ describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) 
       notes: null,
     });
 
-    const allShops = await ormClient.shop.all();
+    const allShops = await shopCollection.all();
     expect(allShops).toHaveLength(1);
 
-    const shop = allShops[0]!;
-    expectTypeOf(shop.location).toEqualTypeOf<{
+    const shopRow = allShops[0]!;
+    expectTypeOf(shopRow['location']).toEqualTypeOf<{
       street: string;
       city: string;
       zip: string;
     }>();
-    expectTypeOf(shop.notes).toEqualTypeOf<{
+    expectTypeOf(shopRow['notes']).toEqualTypeOf<{
       street: string;
       city: string;
       zip: string;
     } | null>();
 
-    expect(shop.location).toEqual({
+    expect(shopRow['location']).toEqual({
       street: '123 Main St',
       city: 'Springfield',
       zip: '62701',
     });
-    expect(shop.notes).toBeNull();
+    expect(shopRow['notes']).toBeNull();
   });
 
   it('non-null value object field roundtrips through update', async () => {
-    const ormClient = mongoOrm({ contract, executor: ctx.runtime });
+    const ormClient = mongoOrm<MongoVOContract>({ contract, executor: ctx.runtime });
+    const shopCollection = ormClient['shop']!;
 
-    await ormClient.shop.create({
+    await shopCollection.create({
       name: 'Updated Store',
       location: { street: '1 First Ave', city: 'Oldtown', zip: '11111' },
       notes: { street: '2 Second Ave', city: 'Newtown', zip: '22222' },
     });
 
     const { MongoFieldFilter } = await import('@prisma-next/mongo-query-ast/execution');
-    const updated = await ormClient.shop
+    const updated = await shopCollection
       .where(MongoFieldFilter.eq('name', 'Updated Store'))
       .update({
         location: { street: '99 New Blvd', city: 'Metropolis', zip: '99999' },
@@ -93,12 +95,12 @@ describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) 
       });
 
     expect(updated).not.toBeNull();
-    expect(updated!.location).toEqual({
+    expect(updated!['location']).toEqual({
       street: '99 New Blvd',
       city: 'Metropolis',
       zip: '99999',
     });
-    expect(updated!.notes).toBeNull();
+    expect(updated!['notes']).toBeNull();
   });
 });
 

@@ -1,7 +1,7 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
-
+import { matchesPathPattern, type PathPattern } from './canonicalization-path-match';
 import type { Contract } from './contract-types';
 
 /**
@@ -33,6 +33,30 @@ export type PreserveEmptyPredicate = (path: readonly string[]) => boolean;
  */
 export type StorageSort = (storage: unknown) => unknown;
 
+const DOMAIN_NAMESPACE_SLOT_PATTERN = ['domain', 'namespaces', '*'] as const satisfies PathPattern;
+const DOMAIN_MODELS_CONTAINER_PATTERN = [
+  'domain',
+  'namespaces',
+  '*',
+  'models',
+] as const satisfies PathPattern;
+const DOMAIN_MODEL_RELATIONS_PATTERN = [
+  'domain',
+  'namespaces',
+  '*',
+  'models',
+  '*',
+  'relations',
+] as const satisfies PathPattern;
+const DOMAIN_MODEL_STORAGE_PATTERN = [
+  'domain',
+  'namespaces',
+  '*',
+  'models',
+  '*',
+  'storage',
+] as const satisfies PathPattern;
+
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
   'canonicalVersion',
@@ -40,8 +64,6 @@ const TOP_LEVEL_ORDER = [
   'target',
   'profileHash',
   'roots',
-  'models',
-  'valueObjects',
   'domain',
   'storage',
   'execution',
@@ -92,9 +114,14 @@ function omitDefaults(
     }
 
     if (isDefaultValue(value)) {
-      const isRequiredModels = isArrayEqual(currentPath, ['models']);
-      const isRequiredNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
-      const isNamespaceSlot =
+      const isRequiredDomainNamespaces = isArrayEqual(currentPath, ['domain', 'namespaces']);
+      const isDomainNamespaceSlot = matchesPathPattern(currentPath, DOMAIN_NAMESPACE_SLOT_PATTERN);
+      const isRequiredDomainModels = matchesPathPattern(
+        currentPath,
+        DOMAIN_MODELS_CONTAINER_PATTERN,
+      );
+      const isRequiredStorageNamespaces = isArrayEqual(currentPath, ['storage', 'namespaces']);
+      const isStorageNamespaceSlot =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[1]], ['storage', 'namespaces']);
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
@@ -107,27 +134,19 @@ function omitDefaults(
         'defaults',
       ]);
       const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
-      const isModelRelations =
-        currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[2]], ['models', 'relations']);
-      const isModelStorage =
-        currentPath.length === 3 &&
-        isArrayEqual([currentPath[0], currentPath[2]], ['models', 'storage']);
-
-      const isDomainUnboundTypeParams =
-        currentPath.length === 5 &&
-        currentPath[0] === 'domain' &&
-        currentPath[2] === 'types' &&
-        key === 'typeParams';
+      const isModelRelations = matchesPathPattern(currentPath, DOMAIN_MODEL_RELATIONS_PATTERN);
+      const isModelStorage = matchesPathPattern(currentPath, DOMAIN_MODEL_STORAGE_PATTERN);
 
       const isNullableField = key === 'nullable';
 
       const isFamilyPreserved = shouldPreserveEmpty?.(currentPath) ?? false;
 
       if (
-        !isRequiredModels &&
-        !isRequiredNamespaces &&
-        !isNamespaceSlot &&
+        !isRequiredDomainNamespaces &&
+        !isDomainNamespaceSlot &&
+        !isRequiredDomainModels &&
+        !isRequiredStorageNamespaces &&
+        !isStorageNamespaceSlot &&
         !isRequiredRoots &&
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
@@ -137,7 +156,6 @@ function omitDefaults(
         !isModelRelations &&
         !isModelStorage &&
         !isNullableField &&
-        !isDomainUnboundTypeParams &&
         !isFamilyPreserved
       ) {
         continue;
@@ -232,9 +250,7 @@ export function canonicalizeContractToObject(
     target: serialized['target'],
     profileHash: serialized['profileHash'],
     roots: serialized['roots'],
-    models: serialized['models'],
-    ...ifDefined('valueObjects', serialized['valueObjects']),
-    ...ifDefined('domain', serialized['domain']),
+    domain: serialized['domain'],
     storage: serialized['storage'],
     ...ifDefined('execution', serialized['execution']),
     extensionPacks: serialized['extensionPacks'],

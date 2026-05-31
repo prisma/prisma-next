@@ -12,6 +12,7 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorRuntime from '../src/exports/runtime';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
@@ -45,7 +46,7 @@ const contract = new SqlContractSerializer().deserializeContract({
       },
     },
   },
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
 }) as PostgresContract;
 
 describe('Operation lowering', () => {

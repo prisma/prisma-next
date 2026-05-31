@@ -1,27 +1,36 @@
 // @vitest-environment jsdom
+
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
 import { ContractView } from './ContractView';
 
 function buildContract(overrides?: Partial<Contract>): Contract {
+  const userModel = {
+    storage: {
+      table: 'users',
+      fields: {
+        id: { column: 'id' },
+        email: { column: 'email' },
+      },
+    },
+    fields: {
+      id: { codecId: 'pg/uuid@1', nullable: false },
+      email: { codecId: 'pg/text@1', nullable: false },
+    },
+    relations: {},
+  };
   const base = {
     target: 'postgres',
     targetFamily: 'sql',
-    models: {
-      user: {
-        storage: {
-          table: 'users',
-          fields: {
-            id: { column: 'id' },
-            email: { column: 'email' },
+    domain: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          models: {
+            user: userModel,
           },
         },
-        fields: {
-          id: { codecId: 'pg/uuid@1', nullable: false },
-          email: { codecId: 'pg/text@1', nullable: false },
-        },
-        relations: {},
       },
     },
     storage: {
@@ -73,18 +82,24 @@ describe('ContractView', () => {
   it('renders untrusted values as text content (no XSS)', () => {
     const untrusted = '<img src=x onerror=alert(1) />';
     const contract = buildContract({
-      models: {
-        [untrusted]: {
-          storage: {
-            table: 'users',
-            fields: {
-              [untrusted]: { column: untrusted },
+      domain: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            models: {
+              [untrusted]: {
+                storage: {
+                  table: 'users',
+                  fields: {
+                    [untrusted]: { column: untrusted },
+                  },
+                },
+                fields: {
+                  [untrusted]: { codecId: 'pg/text@1', nullable: false },
+                },
+                relations: {},
+              },
             },
           },
-          fields: {
-            [untrusted]: { codecId: 'pg/text@1', nullable: false },
-          },
-          relations: {},
         },
       },
     } as unknown as Partial<Contract>);

@@ -62,7 +62,35 @@ function createTestContract(
       },
     },
     roots: {},
-    models: {},
+    domain: {
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: {
+          models: Object.fromEntries(
+            Object.entries(tables).map(([name, { columns }]) => [
+              name,
+              {
+                storage: {
+                  table: name,
+                  fields: Object.fromEntries(
+                    Object.keys(columns).map((col) => [col, { column: col }]),
+                  ),
+                },
+                fields: Object.fromEntries(
+                  Object.entries(columns).map(([col, spec]) => [
+                    col,
+                    {
+                      nullable: spec.nullable,
+                      type: { kind: 'scalar' as const, codecId: spec.codecId },
+                    },
+                  ]),
+                ),
+                relations: {},
+              },
+            ]),
+          ),
+        },
+      },
+    },
     extensionPacks: {},
     capabilities: {},
     meta: {},

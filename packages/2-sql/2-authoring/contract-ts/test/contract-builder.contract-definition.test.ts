@@ -3,6 +3,7 @@ import type { TargetPackRef } from '@prisma-next/framework-components/components
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
+import { modelsOf } from './contract-test-helpers';
 import { crossRef, documentScopedTypes } from './cross-ref-helpers';
 import { unboundTables } from './unbound-tables';
 
@@ -129,7 +130,7 @@ describe('shared contract definition lowering', () => {
       ],
     });
 
-    const models = contract.models as Record<
+    const models = modelsOf(contract) as Record<
       string,
       | {
           readonly storage: { readonly fields: Record<string, unknown> };

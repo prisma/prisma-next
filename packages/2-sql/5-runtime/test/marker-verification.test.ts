@@ -16,6 +16,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   SqlRuntimeAdapterDescriptor,
@@ -42,7 +43,7 @@ const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
   profileHash: profileHash('sha256:test-profile'),
-  models: {},
+  domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
     storageHash: coreHash('sha256:test'),

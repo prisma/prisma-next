@@ -1,3 +1,4 @@
+export { domainElementCoordinates } from '../ir/domain';
 export type { IRNode } from '../ir/ir-node';
 export { freezeNode, IRNodeBase } from '../ir/ir-node';
 export type { Namespace } from '../ir/namespace';

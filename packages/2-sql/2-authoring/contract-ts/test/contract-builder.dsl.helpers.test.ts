@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, rel } from '../src/contract-builder';
+import { modelsOf } from './contract-test-helpers';
 import { documentScopedTypes } from './cross-ref-helpers';
 import { unboundTables } from './unbound-tables';
 
@@ -296,7 +297,7 @@ describe('contract DSL helper vocabulary', () => {
       },
     ]);
     expect(
-      (contract.models as Record<string, { storage: { fields: Record<string, unknown> } }>)[
+      (modelsOf(contract) as Record<string, { storage: { fields: Record<string, unknown> } }>)[
         'AuditEntry'
       ]!.storage.fields['actorId'],
     ).toEqual({ column: 'actor_id' });

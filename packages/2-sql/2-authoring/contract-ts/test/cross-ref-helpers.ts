@@ -3,12 +3,6 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 export { crossRef, UNBOUND_NAMESPACE_ID };
 
-export function documentScopedTypes(contract: {
-  readonly domain?: Record<string, { readonly types?: Record<string, unknown> } | undefined>;
-  readonly storage?: unknown;
-}) {
-  const storageTypes = (
-    contract.storage as { readonly types?: Record<string, unknown> } | undefined
-  )?.types;
-  return contract.domain?.[UNBOUND_NAMESPACE_ID]?.['types'] ?? storageTypes;
+export function documentScopedTypes(contract: { readonly storage?: unknown }) {
+  return (contract.storage as { readonly types?: Record<string, unknown> } | undefined)?.types;
 }

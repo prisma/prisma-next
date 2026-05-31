@@ -1,6 +1,6 @@
-import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { StorageBase } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { createContract, createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-space';
 import type { ContractSpaceMember } from '../../src/aggregate/types';
